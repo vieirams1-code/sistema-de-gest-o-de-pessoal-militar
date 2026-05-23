@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -52,9 +52,9 @@ import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
 import {
-  CONSULTA_MILITAR_COLUNAS_ALLOWLIST,
   CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
   CONSULTA_MILITAR_COLUNAS_STORAGE_KEY,
+  getAllowedConsultaMilitarColumns,
 } from '@/pages/consultaMilitar/consultaMilitarColumns';
 import {
   applyColumnFilters,
@@ -62,6 +62,7 @@ import {
   normalizeColumnFilters,
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
 import { exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -179,12 +180,12 @@ const MOVIMENTO_OPCOES = [
   { value: 'entrada', label: 'Somente entradas' },
   { value: 'saida', label: 'Somente saídas' },
 ];
-const fallbackColumnKey = CONSULTA_MILITAR_COLUNAS_ALLOWLIST[0]?.key || 'nome';
 const CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY = 'consulta_militar_column_filters_v1';
 
-function normalizeVisibleColumns(rawValue) {
-  const validKeys = new Set(CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((col) => col.key));
-  const defaultKeys = CONSULTA_MILITAR_COLUNAS_ALLOWLIST.filter((col) => col.defaultVisible).map((col) => col.key);
+function normalizeVisibleColumns(rawValue, allowedColumns) {
+  const validKeys = new Set((allowedColumns || []).map((col) => col.key));
+  const defaultKeys = (allowedColumns || []).filter((col) => col.defaultVisible).map((col) => col.key);
+  const fallbackColumnKey = allowedColumns?.[0]?.key || 'nome';
   const source = Array.isArray(rawValue) ? rawValue : defaultKeys;
   const normalized = source.filter((key, index) => validKeys.has(key) && source.indexOf(key) === index);
   if (normalized.length > 0) return normalized;
@@ -235,24 +236,32 @@ export default function Militares() {
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    try {
-      const saved = localStorage.getItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY);
-      return normalizeVisibleColumns(saved ? JSON.parse(saved) : null);
-    } catch {
-      return normalizeVisibleColumns(null);
-    }
-  });
-  const [pendingVisibleColumns, setPendingVisibleColumns] = useState(visibleColumns);
-  const [columnFilters, setColumnFilters] = useState(() => {
-    try {
-      const saved = localStorage.getItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY);
-      return normalizeColumnFilters(saved ? JSON.parse(saved) : {}, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
-    } catch {
-      return {};
-    }
-  });
+  const allowedColumns = useMemo(
+    () => getAllowedConsultaMilitarColumns({ userContext: { isAdmin, canAccessAction, modoAcesso } }),
+    [isAdmin, canAccessAction, modoAcesso],
+  );
+  const [visibleColumns, setVisibleColumns] = useState([]);
+  const [pendingVisibleColumns, setPendingVisibleColumns] = useState([]);
+  const [columnFilters, setColumnFilters] = useState({});
   const { toast } = useToast();
+
+  useEffect(() => {
+    try {
+      const savedColumnsRaw = localStorage.getItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY);
+      const savedColumns = savedColumnsRaw ? JSON.parse(savedColumnsRaw) : null;
+      setVisibleColumns(normalizeVisibleColumns(savedColumns, allowedColumns));
+    } catch {
+      setVisibleColumns(normalizeVisibleColumns(null, allowedColumns));
+    }
+
+    try {
+      const savedFiltersRaw = localStorage.getItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY);
+      const savedFilters = savedFiltersRaw ? JSON.parse(savedFiltersRaw) : {};
+      setColumnFilters(normalizeColumnFilters(savedFilters, allowedColumns));
+    } catch {
+      setColumnFilters({});
+    }
+  }, [allowedColumns]);
 
   useEffect(() => {
     setPendingVisibleColumns(visibleColumns);
@@ -266,12 +275,9 @@ export default function Militares() {
     localStorage.setItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY, JSON.stringify(columnFilters));
   }, [columnFilters]);
 
-  const columnMetaByKey = useMemo(
-    () => new Map(CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((col) => [col.key, col])),
-    [],
-  );
+  const columnMetaByKey = useMemo(() => new Map(allowedColumns.map((col) => [col.key, col])), [allowedColumns]);
   const groupedColumns = useMemo(() => {
-    const grouped = CONSULTA_MILITAR_COLUNAS_ALLOWLIST.reduce((acc, col) => {
+    const grouped = allowedColumns.reduce((acc, col) => {
       const group = col.group || 'Outros';
       acc[group] = acc[group] || [];
       acc[group].push(col);
@@ -280,8 +286,8 @@ export default function Militares() {
     return CONSULTA_MILITAR_COLUNAS_GROUP_ORDER
       .map((group) => ({ group, columns: grouped[group] || [] }))
       .filter((item) => item.columns.length > 0);
-  }, []);
-  const visibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumns), [visibleColumns]);
+  }, [allowedColumns]);
+  const visibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumns, allowedColumns), [visibleColumns, allowedColumns]);
   const visibleColumnSet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
 
   useEffect(() => {
@@ -562,12 +568,12 @@ export default function Militares() {
 
   const filteredMilitares = useMemo(
     () => {
-      const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, CONSULTA_MILITAR_COLUNAS_ALLOWLIST, columnFilters);
+      const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
       return ordenarComDestaqueInstitucional(filtradosPorColuna, decoracaoInstitucionalByMilitar);
     },
     [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar, columnFilters],
   );
-  const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, CONSULTA_MILITAR_COLUNAS_ALLOWLIST)), [columnFilters]);
+  const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(
     () => activeColumnFilterKeys.filter((key) => !visibleColumnSet.has(key)),
     [activeColumnFilterKeys, visibleColumnSet],
@@ -576,7 +582,7 @@ export default function Militares() {
   const hiddenColumnFilterLabels = useMemo(() => hiddenColumnFilterKeys
     .map((key) => columnMetaByKey.get(key)?.label || key), [hiddenColumnFilterKeys, columnMetaByKey]);
   const hasAnyColumnFilter = activeColumnFilterKeys.length > 0;
-  const multiselectColumns = useMemo(() => CONSULTA_MILITAR_COLUNAS_ALLOWLIST
+  const multiselectColumns = useMemo(() => allowedColumns
     .filter((column) => column.futureFilterType === 'multiselect'), []);
   const columnFilterOptionsByKey = useMemo(
     () => buildMultiselectOptionsByColumn(filteredMilitaresComFuncoesTags, multiselectColumns),
@@ -712,17 +718,31 @@ export default function Militares() {
   };
 
 
-  const handleExportExcel = () => {
-    if (filteredMilitares.length === 0) return;
+  const filteredSelectedMilitares = useMemo(
+    () => filteredMilitares.filter((militar) => selectedMilitarIds.has(String(militar.id))),
+    [filteredMilitares, selectedMilitarIds],
+  );
+
+  const handleExportExcel = ({ mode }) => {
+    const isSelectedMode = mode === 'selected';
+    const militaresParaExportar = isSelectedMode ? filteredSelectedMilitares : filteredMilitares;
+    if (militaresParaExportar.length === 0) return;
     try {
       const fileDate = new Date().toISOString().slice(0, 10);
       exportConsultaMilitarToXlsx({
-        militares: filteredMilitares,
+        militares: militaresParaExportar,
         visibleColumns: visibleColumnKeys,
-        columnsCatalog: CONSULTA_MILITAR_COLUNAS_ALLOWLIST,
-        fileName: `consulta-militar-${fileDate}.xlsx`,
+        columnsCatalog: allowedColumns,
+        fileName: isSelectedMode
+          ? `consulta-militar-selecionados-${fileDate}.xlsx`
+          : `consulta-militar-filtrados-${fileDate}.xlsx`,
       });
-      toast({ title: 'Exportação concluída', description: 'Arquivo Excel gerado com sucesso.' });
+      toast({
+        title: 'Exportação concluída',
+        description: isSelectedMode
+          ? 'Arquivo Excel dos militares selecionados gerado com sucesso.'
+          : 'Arquivo Excel dos militares filtrados gerado com sucesso.',
+      });
     } catch {
       toast({ title: 'Erro na exportação', description: 'Não foi possível gerar o arquivo Excel.', variant: 'destructive' });
     }
@@ -768,18 +788,34 @@ export default function Militares() {
               Limpar filtros de colunas
             </Button>
             <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
-              Colunas ({visibleColumnKeys.length}/{CONSULTA_MILITAR_COLUNAS_ALLOWLIST.length})
+              Colunas ({visibleColumnKeys.length}/{allowedColumns.length})
             </Button>
             <TooltipProvider delayDuration={120}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" onClick={handleExportExcel} disabled={filteredMilitares.length === 0}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Exportar Excel
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" disabled={filteredMilitares.length === 0}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Exportar Excel
+                        <ChevronDown className="w-4 h-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuItem
+                        disabled={filteredSelectedMilitares.length === 0}
+                        onClick={() => handleExportExcel({ mode: 'selected' })}
+                      >
+                        Exportar selecionados ({filteredSelectedMilitares.length})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportExcel({ mode: 'filtered' })}>
+                        Exportar filtrados ({filteredMilitares.length})
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[280px] text-xs">
-                  Exporta apenas militares carregados e filtros atuais
+                  Exporta apenas militares carregados, conforme colunas visíveis e permissões atuais.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -1041,7 +1077,7 @@ export default function Militares() {
                                   setColumnFilters((prev) => normalizeColumnFilters({
                                     ...prev,
                                     [key]: { type: 'text', text },
-                                  }, CONSULTA_MILITAR_COLUNAS_ALLOWLIST));
+                                  }, allowedColumns));
                                 }}
                                 placeholder="Filtrar..."
                                 className="h-8 text-xs"
@@ -1050,7 +1086,7 @@ export default function Militares() {
                                 setColumnFilters((prev) => {
                                   const next = { ...prev };
                                   delete next[key];
-                                  return normalizeColumnFilters(next, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+                                  return normalizeColumnFilters(next, allowedColumns);
                                 });
                               }}>Limpar</Button>
                             </>
@@ -1073,7 +1109,7 @@ export default function Militares() {
                                           setColumnFilters((prev) => normalizeColumnFilters({
                                             ...prev,
                                             [key]: { type: 'multiselect', selected: nextSelected },
-                                          }, CONSULTA_MILITAR_COLUNAS_ALLOWLIST));
+                                          }, allowedColumns));
                                         }}
                                       />
                                       <span className="truncate">{option}</span>
@@ -1085,7 +1121,7 @@ export default function Militares() {
                                 setColumnFilters((prev) => {
                                   const next = { ...prev };
                                   delete next[key];
-                                  return normalizeColumnFilters(next, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+                                  return normalizeColumnFilters(next, allowedColumns);
                                 });
                               }}>Limpar</Button>
                             </>
@@ -1114,7 +1150,7 @@ export default function Militares() {
                       hiddenColumnFilterKeys.forEach((key) => {
                         delete next[key];
                       });
-                      return normalizeColumnFilters(next, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+                      return normalizeColumnFilters(next, allowedColumns);
                     });
                   }}>Limpar filtros ocultos</Button>
                 </div>
@@ -1303,8 +1339,8 @@ export default function Militares() {
                           checked={isChecked}
                           disabled={disableUncheck}
                           onChange={(e) => {
-                            if (e.target.checked) setPendingVisibleColumns((prev) => normalizeVisibleColumns([...prev, coluna.key]));
-                            else setPendingVisibleColumns((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key)));
+                            if (e.target.checked) setPendingVisibleColumns((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
+                            else setPendingVisibleColumns((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
                           }}
                         />
                         <span>{coluna.label}</span>
@@ -1317,8 +1353,8 @@ export default function Militares() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setPendingVisibleColumns(visibleColumns)}>Cancelar</AlertDialogCancel>
-            <Button type="button" variant="outline" onClick={() => setPendingVisibleColumns(normalizeVisibleColumns(null))}>Restaurar padrão</Button>
-            <AlertDialogAction onClick={() => setVisibleColumns(normalizeVisibleColumns(pendingVisibleColumns))}>Aplicar</AlertDialogAction>
+            <Button type="button" variant="outline" onClick={() => setPendingVisibleColumns(normalizeVisibleColumns(null, allowedColumns))}>Restaurar padrão</Button>
+            <AlertDialogAction onClick={() => setVisibleColumns(normalizeVisibleColumns(pendingVisibleColumns, allowedColumns))}>Aplicar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

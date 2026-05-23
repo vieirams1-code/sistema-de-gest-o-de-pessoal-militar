@@ -23,7 +23,10 @@ const toExportText = (value) => {
 
 export function buildConsultaMilitarExportRows(militares, visibleColumns, columnsCatalog) {
   const catalogMap = new Map(columnsCatalog.map((col) => [col.key, col]));
-  const exportColumns = visibleColumns
+  const visibleAllowedKeys = (visibleColumns || []).filter((key, index) => (
+    catalogMap.has(key) && visibleColumns.indexOf(key) === index
+  ));
+  const exportColumns = visibleAllowedKeys
     .map((key) => catalogMap.get(key))
     .filter(Boolean);
 
@@ -41,7 +44,10 @@ export function buildConsultaMilitarExportRows(militares, visibleColumns, column
 
 export function exportConsultaMilitarToXlsx({ militares, visibleColumns, columnsCatalog, fileName }) {
   const catalogMap = new Map(columnsCatalog.map((col) => [col.key, col]));
-  const exportColumns = visibleColumns
+  const visibleAllowedKeys = (visibleColumns || []).filter((key, index) => (
+    catalogMap.has(key) && visibleColumns.indexOf(key) === index
+  ));
+  const exportColumns = visibleAllowedKeys
     .map((key) => catalogMap.get(key))
     .filter(Boolean)
     .map((column) => ({

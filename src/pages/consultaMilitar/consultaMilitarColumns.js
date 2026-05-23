@@ -120,3 +120,28 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
 
 export const CONSULTA_MILITAR_COLUNAS_GROUP_ORDER = ['Identificação', 'Carreira', 'Contato', 'Situação'];
 export const CONSULTA_MILITAR_COLUNAS_STORAGE_KEY = 'consulta_militar_visible_columns_v1';
+
+function canSeeSensitiveColumn({ column, userContext }) {
+  if (!column?.sensitive) return true;
+
+  if (userContext?.isAdmin) return true;
+
+  const canAccessSensitiveAction = typeof userContext?.canAccessAction === 'function'
+    ? userContext.canAccessAction('acesso_dados_sensiveis')
+    : false;
+  if (canAccessSensitiveAction) return true;
+
+  const visibleFor = Array.isArray(column?.visibleFor) ? column.visibleFor : [];
+  if (visibleFor.length === 0) return false;
+
+  const roles = Array.isArray(userContext?.roles) ? userContext.roles.map((role) => String(role || '').toLowerCase()) : [];
+  const modoAcesso = String(userContext?.modoAcesso || '').toLowerCase();
+  return visibleFor.some((role) => {
+    const normalized = String(role || '').toLowerCase();
+    return normalized === modoAcesso || roles.includes(normalized);
+  });
+}
+
+export function getAllowedConsultaMilitarColumns({ userContext } = {}) {
+  return CONSULTA_MILITAR_COLUNAS_ALLOWLIST.filter((column) => canSeeSensitiveColumn({ column, userContext }));
+}
