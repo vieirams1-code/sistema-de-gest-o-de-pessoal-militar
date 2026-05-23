@@ -57,6 +57,7 @@ export default function MilitarTagsBulkPanel({
 }) {
   const [busca, setBusca] = useState('');
   const [selecionadas, setSelecionadas] = useState([]);
+  const [tagsEditadas, setTagsEditadas] = useState([]);
   const [motivo, setMotivo] = useState('');
 
   const { data: tagsCatalogo = [] } = useQuery({
@@ -123,16 +124,27 @@ export default function MilitarTagsBulkPanel({
   }, [selecionadas, tagsFiltradas]);
 
   const statusEfetivoById = useMemo(() => {
+    const selecionadasSet = new Set(selecionadas.map(String));
+    const editadasSet = new Set(tagsEditadas.map(String));
     const mapa = {};
+
     tagsFiltradas.forEach((tag) => {
       const tagId = String(tag.id);
-      mapa[tagId] = tagsStatusById[tagId] || 'none';
+      if (selecionadasSet.has(tagId)) {
+        mapa[tagId] = 'all';
+        return;
+      }
+
+      if (!editadasSet.has(tagId)) {
+        mapa[tagId] = tagsStatusById[tagId] || 'none';
+        return;
+      }
+
+      mapa[tagId] = 'none';
     });
-    selecionadas.forEach((tagId) => {
-      mapa[String(tagId)] = 'all';
-    });
+
     return mapa;
-  }, [tagsFiltradas, tagsStatusById, selecionadas]);
+  }, [tagsFiltradas, tagsStatusById, selecionadas, tagsEditadas]);
 
   useEffect(() => {
     if (!open) return;
@@ -140,11 +152,15 @@ export default function MilitarTagsBulkPanel({
       .filter(([, status]) => status === 'all')
       .map(([tagId]) => String(tagId));
     setSelecionadas(iniciais);
+    setTagsEditadas([]);
   }, [open, tagsStatusById]);
 
   if (!open) return null;
 
-  const toggleTag = (tagId) => setSelecionadas((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
+  const toggleTag = (tagId) => {
+    setSelecionadas((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
+    setTagsEditadas((prev) => prev.includes(tagId) ? prev : [...prev, tagId]);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm" onClick={onClose}>
