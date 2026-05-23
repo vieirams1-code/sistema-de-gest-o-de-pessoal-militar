@@ -19,7 +19,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -193,15 +192,6 @@ function normalizeVisibleColumns(rawValue, allowedColumns) {
   return defaultKeys.length > 0 ? defaultKeys : [fallbackColumnKey];
 }
 
-function normalizeDraftVisibleColumns(rawValue, allowedColumns, { fallbackKey } = {}) {
-  const validKeys = new Set((allowedColumns || []).map((col) => col.key));
-  const source = Array.isArray(rawValue) ? rawValue : [];
-  const normalized = source.filter((key, index) => validKeys.has(key) && source.indexOf(key) === index);
-  if (normalized.length > 0) return normalized;
-  if (fallbackKey && validKeys.has(fallbackKey)) return [fallbackKey];
-  const firstAllowed = allowedColumns?.[0]?.key;
-  return firstAllowed ? [firstAllowed] : [];
-}
 
 function militarCorrespondeOrigemDestino(militar, termo) {
   const q = String(termo || '').trim().toLowerCase();
@@ -632,15 +622,22 @@ export default function Militares() {
   );
 
   const selectedMilitarIdsArray = useMemo(() => Array.from(selectedMilitarIds), [selectedMilitarIds]);
-  const primeiraColunaDraft = useMemo(() => draftVisibleColumnKeys[0] || allowedColumns?.[0]?.key || 'nome', [draftVisibleColumnKeys, allowedColumns]);
-
   const atualizarDraftColunas = (columnKey, shouldEnable) => {
+    const validKeys = new Set((allowedColumns || []).map((col) => col.key));
+    if (!validKeys.has(columnKey)) return;
     setDraftVisibleColumnKeys((prev) => {
-      const base = normalizeDraftVisibleColumns(prev, allowedColumns, { fallbackKey: primeiraColunaDraft });
+      const base = Array.isArray(prev)
+        ? prev.filter((key, index) => validKeys.has(key) && prev.indexOf(key) === index)
+        : [];
+
       if (shouldEnable) {
-        return normalizeDraftVisibleColumns([...base, columnKey], allowedColumns, { fallbackKey: primeiraColunaDraft });
+        if (base.includes(columnKey)) return base;
+        return [...base, columnKey];
       }
-      return normalizeDraftVisibleColumns(base.filter((key) => key !== columnKey), allowedColumns, { fallbackKey: columnKey });
+
+      if (!base.includes(columnKey)) return base;
+      if (base.length <= 1) return base;
+      return base.filter((key) => key !== columnKey);
     });
   };
   const allFilteredSelected = filteredMilitares.length > 0 && filteredMilitares.every((m) => selectedMilitarIds.has(String(m.id)));
@@ -1481,9 +1478,10 @@ export default function Militares() {
                     const isChecked = draftVisibleColumnKeys.includes(coluna.key);
                     return (
                       <label key={coluna.key} className="inline-flex items-center gap-2 text-sm">
-                        <Checkbox
+                        <input
+                          type="checkbox"
                           checked={isChecked}
-                          onCheckedChange={(checked) => atualizarDraftColunas(coluna.key, checked === true)}
+                          onChange={(e) => atualizarDraftColunas(coluna.key, e.target.checked)}
                         />
                         <span>{coluna.label}</span>
                       </label>
