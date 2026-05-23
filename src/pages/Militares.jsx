@@ -61,7 +61,7 @@ import {
   buildMultiselectOptionsByColumn,
   normalizeColumnFilters,
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
-import { exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
+import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
@@ -190,6 +190,12 @@ function normalizeVisibleColumns(rawValue, allowedColumns) {
   const normalized = source.filter((key, index) => validKeys.has(key) && source.indexOf(key) === index);
   if (normalized.length > 0) return normalized;
   return defaultKeys.length > 0 ? defaultKeys : [fallbackColumnKey];
+}
+
+function normalizeDraftVisibleColumns(rawValue, allowedColumns) {
+  const validKeys = new Set((allowedColumns || []).map((col) => col.key));
+  const source = Array.isArray(rawValue) ? rawValue : [];
+  return source.filter((key, index) => validKeys.has(key) && source.indexOf(key) === index);
 }
 
 function militarCorrespondeOrigemDestino(militar, termo) {
@@ -750,6 +756,32 @@ export default function Militares() {
     }
   };
 
+  const handleExportPdf = ({ mode }) => {
+    const isSelectedMode = mode === 'selected';
+    const militaresParaExportar = isSelectedMode ? filteredSelectedMilitares : filteredMilitares;
+    if (militaresParaExportar.length === 0) return;
+    try {
+      const fileDate = new Date().toISOString().slice(0, 10);
+      exportConsultaMilitarToPdf({
+        militares: militaresParaExportar,
+        visibleColumns: sanitizedVisibleColumnKeys,
+        columnsCatalog: allowedColumns,
+        modeLabel: isSelectedMode ? 'Selecionados' : 'Filtrados',
+        fileName: isSelectedMode
+          ? `consulta-militar-selecionados-${fileDate}.pdf`
+          : `consulta-militar-filtrados-${fileDate}.pdf`,
+      });
+      toast({
+        title: 'Exportação concluída',
+        description: isSelectedMode
+          ? 'Arquivo PDF dos militares selecionados gerado com sucesso.'
+          : 'Arquivo PDF dos militares filtrados gerado com sucesso.',
+      });
+    } catch {
+      toast({ title: 'Erro na exportação', description: 'Não foi possível gerar o arquivo PDF.', variant: 'destructive' });
+    }
+  };
+
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
   const shouldShowLotacoesDebugPanel = shouldShowLotacaoFilter && (isErrorLotacoes || lotacoesEmptyForScopedUser);
@@ -799,19 +831,28 @@ export default function Militares() {
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" disabled={filteredMilitares.length === 0}>
                         <FileSpreadsheet className="w-4 h-4 mr-2" />
-                        Exportar Excel
+                        Exportar
                         <ChevronDown className="w-4 h-4 ml-2" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64">
                       <DropdownMenuItem
                         disabled={filteredSelectedMilitares.length === 0}
+                        onClick={() => handleExportPdf({ mode: 'selected' })}
+                      >
+                        Exportar PDF selecionados ({filteredSelectedMilitares.length})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportPdf({ mode: 'filtered' })}>
+                        Exportar PDF filtrados ({filteredMilitares.length})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={filteredSelectedMilitares.length === 0}
                         onClick={() => handleExportExcel({ mode: 'selected' })}
                       >
-                        Exportar selecionados ({filteredSelectedMilitares.length})
+                        Exportar Excel selecionados ({filteredSelectedMilitares.length})
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleExportExcel({ mode: 'filtered' })}>
-                        Exportar filtrados ({filteredMilitares.length})
+                        Exportar Excel filtrados ({filteredMilitares.length})
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1341,8 +1382,8 @@ export default function Militares() {
                           checked={isChecked}
                           disabled={disableUncheck}
                           onChange={(e) => {
-                            if (e.target.checked) setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
-                            else setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
+                            if (e.target.checked) setDraftVisibleColumnKeys((prev) => normalizeDraftVisibleColumns([...prev, coluna.key], allowedColumns));
+                            else setDraftVisibleColumnKeys((prev) => normalizeDraftVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
                           }}
                         />
                         <span>{coluna.label}</span>
@@ -1355,7 +1396,7 @@ export default function Militares() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDraftVisibleColumnKeys([])}>Cancelar</AlertDialogCancel>
-            <Button type="button" variant="outline" onClick={() => setDraftVisibleColumnKeys(normalizeVisibleColumns(null, allowedColumns))}>Restaurar padrão</Button>
+            <Button type="button" variant="outline" onClick={() => setDraftVisibleColumnKeys(normalizeDraftVisibleColumns(allowedColumns.filter((col) => col.defaultVisible).map((col) => col.key), allowedColumns))}>Restaurar padrão</Button>
             <AlertDialogAction onClick={() => setVisibleColumnKeys(normalizeVisibleColumns(draftVisibleColumnKeys, allowedColumns))}>Aplicar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
