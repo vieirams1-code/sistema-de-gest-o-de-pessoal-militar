@@ -227,7 +227,9 @@ export default function AtestadosJisoListaView({
                         const diasAfastamento = atestado?.dias || atestado?.quantidade_dias || '—';
                         const dataInicio = formatDate(atestado?.data_inicio);
                         const dataFim = formatDate(atestado?.data_retorno || atestado?.data_termino);
-                        const texto = `Solicito a essa Diretoria de Saúde a marcação de Junta de Inspeção de Saúde para o militar ${posto} ${nome}, matrícula ${matricula}, em razão de atestado médico de ${diasAfastamento} dias, no período de ${dataInicio} a ${dataFim}.`;
+                        const lotacao = atestado?.militar_lotacao || atestado?.lotacao || atestado?.lotacao || 'lotação não informada';
+                        const cid = atestado?.cid || atestado?.codigo_cid || 'não informado';
+                        const texto = `Solicito a essa Diretoria de Saúde a marcação de Junta de Inspeção de Saúde para o militar ${posto} ${nome}, matrícula ${matricula}, lotado em ${lotacao}, em razão de atestado médico de ${diasAfastamento} dias, CID ${cid}, referente ao período de ${dataInicio} a ${dataFim}.`;
                         setGeneratedTextByAtestado((prev) => ({ ...prev, [atestadoId]: texto }));
                         console.warn('[JISO-TARS][visual-only] Preview local do texto TARS gerado sem persistência.', { atestadoId });
                       }}>Gerar preview TARS</Button>
@@ -236,13 +238,13 @@ export default function AtestadosJisoListaView({
                       )}
                       <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <FileText className="h-4 w-4 text-blue-600" />
-                        Resultado da JISO
+                        Próxima etapa
                       </p>
-                      Após realização da sessão, a resposta da JISO será lançada no fluxo atual.
+                      Após a realização da sessão, utilize o fluxo atual da JISO para lançar a decisão, aplicar reflexos no atestado, tratar ata e publicação.
                     </div>
                     {canRegistrarDecisaoJiso && (
                       <Button size="sm" className="w-full rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-700" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
-                        Registrar decisão JISO
+                        Abrir fluxo atual da JISO
                       </Button>
                     )}
                   </div>
