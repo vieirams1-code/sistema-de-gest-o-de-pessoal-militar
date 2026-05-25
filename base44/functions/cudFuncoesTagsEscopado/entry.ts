@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ENTIDADES = new Set(['MilitarFuncao', 'MilitarTag', 'FeriasTag', 'FuncaoMilitar', 'TagGrupo', 'Tag']);
-const OPERACOES = new Set(['create', 'update', 'encerrar', 'remover', 'desativar']);
+const OPERACOES = new Set(['create', 'update', 'encerrar', 'remover', 'desativar', 'delete']);
 
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 
@@ -112,8 +112,8 @@ Deno.serve(async (req) => {
     const svc = base44.asServiceRole.entities[entidade];
     const militarIdsEscopo = isAdmin ? null : await listarMilitarIdsDoEscopo(base44, perms.acessos);
     const isInScope = (mid: unknown) => militarIdsEscopo === null || militarIdsEscopo.includes(String(mid || ''));
-    const registroAtual = (operacao === 'update' || operacao === 'encerrar' || operacao === 'remover' || operacao === 'desativar') ? await svc.get(String(id || '')) : null;
-    if ((operacao === 'update' || operacao === 'encerrar' || operacao === 'remover' || operacao === 'desativar') && !registroAtual) return erro(404, 'Registro não encontrado.');
+    const registroAtual = (operacao === 'update' || operacao === 'encerrar' || operacao === 'remover' || operacao === 'desativar' || operacao === 'delete') ? await svc.get(String(id || '')) : null;
+    if ((operacao === 'update' || operacao === 'encerrar' || operacao === 'remover' || operacao === 'desativar' || operacao === 'delete') && !registroAtual) return erro(404, 'Registro não encontrado.');
 
     if (entidade === 'FuncaoMilitar') {
       if (!['create', 'update', 'desativar'].includes(operacao)) return erro(400, 'Operação inválida para FuncaoMilitar.');
@@ -171,10 +171,38 @@ Deno.serve(async (req) => {
     }
 
     if (entidade === 'Tag') {
-      if (!['create', 'update', 'desativar'].includes(operacao)) return erro(400, 'Operação inválida para Tag.');
+      if (!['create', 'update', 'desativar', 'delete'].includes(operacao)) return erro(400, 'Operação inválida para Tag.');
       if (operacao === 'desativar') {
         const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
         return Response.json({ data: await svc.update(String(id), { ativo }) });
+      }
+      if (operacao === 'delete') {
+        const tagId = String(id || '');
+        const militarTags = await base44.asServiceRole.entities.MilitarTag.filter({ tag_id: tagId }, undefined, 1, 0, ['id']);
+        const feriasTags = await base44.asServiceRole.entities.FeriasTag.filter({ tag_id: tagId }, undefined, 1, 0, ['id']);
+        let atestadoTags: any[] = [];
+        try {
+          if (base44.asServiceRole.entities.AtestadoTag?.filter) {
+            atestadoTags = await base44.asServiceRole.entities.AtestadoTag.filter({ tag_id: tagId }, undefined, 1, 0, ['id']);
+          }
+        } catch (_error) {
+          atestadoTags = [];
+        }
+        const militarCount = Array.isArray(militarTags) ? militarTags.length : 0;
+        const feriasCount = Array.isArray(feriasTags) ? feriasTags.length : 0;
+        const atestadoCount = Array.isArray(atestadoTags) ? atestadoTags.length : 0;
+        const totalVinculos = militarCount + feriasCount + atestadoCount;
+        if (totalVinculos > 0) {
+          return Response.json({
+            code: 'TAG_COM_VINCULOS',
+            militar_tags: militarCount,
+            ferias_tags: feriasCount,
+            atestado_tags: atestadoCount,
+            message: 'Esta tag possui vínculos e não pode ser excluída.',
+          }, { status: 409 });
+        }
+        await svc.delete(tagId);
+        return Response.json({ data: { id: tagId, deleted: true } });
       }
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
