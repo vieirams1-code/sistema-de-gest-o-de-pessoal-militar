@@ -199,49 +199,74 @@ function militarCorrespondeOrigemDestino(militar, termo) {
   return texto.includes(q);
 }
 
+function normalizarValorEstrutural(valor) {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor).trim().toLowerCase();
+  if (!texto) return null;
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function coletarContextosEstruturais(...fontes) {
+  const valores = new Set();
+  const chaves = [
+    'lotacao_id',
+    'estrutura_id',
+    'subsetor_id',
+    'setor_id',
+    'subgrupamento_id',
+    'subgrupamento',
+    'lotacao',
+    'lotacao_nome',
+    'estrutura_nome',
+    'lotacao_atual',
+    'nome',
+  ];
+
+  fontes.forEach((fonte) => {
+    if (!fonte || typeof fonte !== 'object') return;
+    chaves.forEach((chave) => {
+      const normalizado = normalizarValorEstrutural(fonte?.[chave]);
+      if (normalizado) valores.add(normalizado);
+    });
+  });
+
+  return valores;
+}
+
+function resolverContextoEstrutural(militar, vinculo, filtro) {
+  const contextoMilitar = coletarContextosEstruturais(militar);
+  const contextoVinculo = coletarContextosEstruturais(vinculo);
+  const contextoFiltro = coletarContextosEstruturais(filtro);
+
+  const pertenceLotacao = [...contextoVinculo].some((valor) => contextoMilitar.has(valor));
+  const dentroDoFiltro = contextoFiltro.size === 0
+    ? false
+    : [...contextoFiltro].some((valor) => contextoMilitar.has(valor) || contextoVinculo.has(valor));
+
+  return { pertenceLotacao, dentroDoFiltro };
+}
+
 function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitucionais = [], vinculosFuncoesAtivos = [], contextoEstrutural = null) {
   const PRIORIDADE_FUNCAO = { comandante: 0, subcomandante: 1 };
   const PRIORIDADE_SEM_FUNCAO = 999;
   const PRIORIDADE_ESTRUTURA_MATCH = 0;
   const PRIORIDADE_ESTRUTURA_FORA = 999;
-  const contextoEstruturalNormalizado = contextoEstrutural ? String(contextoEstrutural).trim().toLowerCase() : null;
+  const filtroContexto = contextoEstrutural !== null && contextoEstrutural !== undefined
+    ? { lotacao_id: contextoEstrutural }
+    : null;
   const funcoesById = new Map(funcoesInstitucionais.map((funcao) => [String(funcao?.id || ''), funcao]));
-  const estruturaKeyMilitar = (militar = {}) => {
-    const candidatos = [
-      militar?.estrutura_id,
-      militar?.lotacao_id,
-      militar?.subsetor_id,
-      militar?.setor_id,
-      militar?.subgrupamento_id,
-      militar?.subgrupamento,
-      militar?.estrutura_nome,
-      militar?.lotacao_atual,
-      militar?.lotacao,
-    ];
-    const valor = candidatos.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
-    return valor ? String(valor).trim().toLowerCase() : null;
-  };
-  const estruturaKeyVinculo = (vinculo = {}) => {
-    const candidatos = [
-      vinculo?.estrutura_id,
-      vinculo?.lotacao_id,
-      vinculo?.subsetor_id,
-      vinculo?.setor_id,
-      vinculo?.subgrupamento_id,
-      vinculo?.subgrupamento,
-      vinculo?.estrutura_nome,
-      vinculo?.lotacao,
-    ];
-    const valor = candidatos.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
-    return valor ? String(valor).trim().toLowerCase() : null;
-  };
 
   const scorePorMilitar = new Map();
-  const estruturaPorMilitar = new Map(militares.map((militar) => [String(militar?.id || ''), estruturaKeyMilitar(militar)]));
+  const militarPorId = new Map(militares.map((militar) => [String(militar?.id || ''), militar]));
 
   vinculosFuncoesAtivos.forEach((vinculo) => {
     const militarId = String(vinculo?.militar_id || '');
     if (!militarId) return;
+    const militar = militarPorId.get(militarId);
+    if (!militar) return;
 
     const funcao = funcoesById.get(String(vinculo?.funcao_id || ''));
     if (!funcao) return;
@@ -249,13 +274,10 @@ function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitu
     const prioridadeFuncao = PRIORIDADE_FUNCAO[chave];
     if (prioridadeFuncao === undefined) return;
 
-    const estruturaMilitar = estruturaPorMilitar.get(militarId) ?? null;
-    const estruturaVinculo = estruturaKeyVinculo(vinculo);
-    const vinculoPertenceLotacaoMilitar = Boolean(estruturaMilitar && estruturaVinculo && estruturaMilitar === estruturaVinculo);
-    if (!vinculoPertenceLotacaoMilitar) return;
+    const { pertenceLotacao, dentroDoFiltro } = resolverContextoEstrutural(militar, vinculo, filtroContexto);
+    if (!pertenceLotacao) return;
 
-    const militarDentroContextoExibido = Boolean(contextoEstruturalNormalizado && estruturaMilitar === contextoEstruturalNormalizado);
-    const prioridadeEstrutura = militarDentroContextoExibido
+    const prioridadeEstrutura = dentroDoFiltro
       ? PRIORIDADE_ESTRUTURA_MATCH
       : PRIORIDADE_ESTRUTURA_FORA;
     const score = prioridadeFuncao + prioridadeEstrutura;
