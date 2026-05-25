@@ -55,7 +55,7 @@ const DEFAULT_SORT_DIRECTION = 'asc';
 const FERIAS_TODAS_PRESENCAS_VALUE = '__ferias_todas_presencas__';
 const FERIAS_TODOS_STATUS_VALUE = '__ferias_todos_status__';
 const FERIAS_PERIODO_PADRAO = 'proximos_30';
-const TAG_APLICABILIDADE_PERMITIDA = new Set(['militar', 'ambos']);
+const TAG_APLICABILIDADE_PERMITIDA = new Set(['militar', 'todos', 'ambos']);
 
 const POSTO_GRADUACAO_OPTIONS = [
   'Coronel',
