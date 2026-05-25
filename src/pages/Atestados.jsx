@@ -16,9 +16,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
+import AtestadosJisoListaView from '@/components/atestado/AtestadosJisoListaView';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -367,46 +368,14 @@ export default function Atestados() {
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 border-b border-slate-100 text-slate-600">
-                        <tr>
-                          <th className="text-left px-4 py-3">Militar</th>
-                          <th className="text-left px-4 py-3">Matrícula</th>
-                          <th className="text-left px-4 py-3">Período</th>
-                          <th className="text-left px-4 py-3">Tipo</th>
-                          <th className="text-right px-4 py-3">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {vigentes.map((a) => (
-                          <tr key={a.id} className="border-b border-slate-100 last:border-0">
-                            <td className="px-4 py-3 text-slate-800">{a.militar_posto} {a.militar_nome}</td>
-                            <td className="px-4 py-3 text-slate-600">{a.militar_matricula_label || a.militar_matricula_atual || a.militar_matricula || '—'}</td>
-                            <td className="px-4 py-3 text-slate-600">{a.data_inicio || '—'} até {getDataFimAfastamento(a) || '—'}</td>
-                            <td className="px-4 py-3 text-slate-600">{a.tipo_afastamento || '—'}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => handleView(a)} title="Visualizar">
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                {canEditarAtestado && (
-                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(a)} title="Editar">
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                {canExcluirAtestado && (
-                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(a)} title="Excluir">
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <AtestadosJisoListaView
+                    atestados={vigentes}
+                    jisos={[]}
+                    loading={isLoading}
+                    onVisualizarJiso={handleView}
+                    onRegistrarDecisaoJiso={handleEdit}
+                    canRegistrarDecisaoJiso={canEditarAtestado}
+                  />
                 )
               )}
             </div>
