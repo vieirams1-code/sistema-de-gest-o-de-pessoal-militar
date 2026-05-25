@@ -86,7 +86,14 @@ export default function AtestadosJisoListaView({
   loading = false,
   onRegistrarDecisaoJiso,
   onVisualizarJiso,
+  onPublicarHomologacao,
+  onPublicarAtaJiso,
   canRegistrarDecisaoJiso = false,
+  canPublicarHomologacao = false,
+  canPublicarAtaJiso = false,
+  getStatusDocumentalAtaJiso,
+  hasHomologacaoGerada,
+  hasHomologacaoAtiva,
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -211,6 +218,22 @@ export default function AtestadosJisoListaView({
         const progresso = dias > 0 ? Math.max(0, Math.min(100, (diasDecorridos / dias) * 100)) : 0;
         const isExpanded = expandedId === atestadoId;
         const historico = buildHistorico(atestado, jiso);
+        const isFluxoJiso = atestado?.fluxo_homologacao === 'jiso' || dias > 15;
+        const isFluxoComandante = atestado?.fluxo_homologacao === 'comandante';
+        const homologacaoGerada = hasHomologacaoGerada?.(atestado) === true;
+        const homologacaoAtiva = hasHomologacaoAtiva?.(atestado) === true;
+        const statusAtaJiso = getStatusDocumentalAtaJiso?.(atestado, jiso);
+        const bloqueiaPublicacaoAta = statusAtaJiso?.bloqueiaNovaPublicacao === true;
+        const disableRegistrarJiso = canRegistrarDecisaoJiso === false || !onRegistrarDecisaoJiso;
+        const disablePublicarHomologacao = homologacaoAtiva || canPublicarHomologacao === false || !onPublicarHomologacao;
+        const disablePublicarAtaJiso = bloqueiaPublicacaoAta || canPublicarAtaJiso === false || !onPublicarAtaJiso;
+        const tituloBotaoRegistrarJiso = disableRegistrarJiso ? 'Sem permissão para esta ação' : undefined;
+        const tituloBotaoPublicarHomologacao = homologacaoAtiva
+          ? 'Homologação já existente'
+          : (canPublicarHomologacao === false ? 'Sem permissão para esta ação' : undefined);
+        const tituloBotaoPublicarAtaJiso = bloqueiaPublicacaoAta
+          ? 'Publicação bloqueada por documento ativo'
+          : (canPublicarAtaJiso === false ? 'Sem permissão para esta ação' : undefined);
         const dadosAdmin = parseDadosAdministrativosJiso(jiso?.observacoes);
         const draft = {
           numero_tars: dadosAdmin.numero_tars || '',
@@ -377,10 +400,45 @@ export default function AtestadosJisoListaView({
                       </p>
                       Após a realização da sessão, utilize o fluxo atual da JISO para lançar a decisão, aplicar reflexos no atestado, tratar ata e publicação.
                     </div>
-                    {canRegistrarDecisaoJiso && (
-                      <Button size="sm" className="w-full rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-700" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
-                        Abrir fluxo atual da JISO
-                      </Button>
+                    {(isFluxoJiso || (isFluxoComandante && !homologacaoGerada)) && (
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ações operacionais</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {isFluxoJiso && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={disableRegistrarJiso}
+                              title={tituloBotaoRegistrarJiso}
+                              onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}
+                            >
+                              Registrar decisão JISO
+                            </Button>
+                          )}
+                          {isFluxoJiso && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={disablePublicarAtaJiso}
+                              title={tituloBotaoPublicarAtaJiso}
+                              onClick={() => onPublicarAtaJiso?.(atestado, jiso)}
+                            >
+                              Publicar ata JISO
+                            </Button>
+                          )}
+                          {isFluxoComandante && !homologacaoGerada && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={disablePublicarHomologacao}
+                              title={tituloBotaoPublicarHomologacao}
+                              onClick={() => onPublicarHomologacao?.(atestado)}
+                            >
+                              Publicar Homologação
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
