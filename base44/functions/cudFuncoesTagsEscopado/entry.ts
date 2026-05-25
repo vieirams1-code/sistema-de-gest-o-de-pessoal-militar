@@ -113,7 +113,8 @@ Deno.serve(async (req) => {
       if (operacao === 'desativar') {
         const chaveAtual = normalizeTipo(registroAtual?.institucional_chave);
         if (INSTITUCIONAIS.has(chaveAtual)) return erro(400, 'Funções institucionais não podem ser desativadas.');
-        return Response.json({ data: await svc.update(String(id), { ativa: false }) });
+        const ativa = typeof data?.ativa === 'boolean' ? data.ativa : false;
+        return Response.json({ data: await svc.update(String(id), { ativa }) });
       }
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
@@ -143,11 +144,15 @@ Deno.serve(async (req) => {
 
     if (entidade === 'TagGrupo') {
       if (!['create', 'update', 'desativar'].includes(operacao)) return erro(400, 'Operação inválida para TagGrupo.');
-      if (operacao === 'desativar') return Response.json({ data: await svc.update(String(id), { ativo: false }) });
+      if (operacao === 'desativar') {
+        const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
+        return Response.json({ data: await svc.update(String(id), { ativo }) });
+      }
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
-      const tipoVisual = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
+      const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
+      const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       const gruposAtivos = await base44.asServiceRole.entities.TagGrupo.filter({ ativo: true }, undefined, 1000, 0);
@@ -160,12 +165,16 @@ Deno.serve(async (req) => {
 
     if (entidade === 'Tag') {
       if (!['create', 'update', 'desativar'].includes(operacao)) return erro(400, 'Operação inválida para Tag.');
-      if (operacao === 'desativar') return Response.json({ data: await svc.update(String(id), { ativo: false }) });
+      if (operacao === 'desativar') {
+        const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
+        return Response.json({ data: await svc.update(String(id), { ativo }) });
+      }
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
       const grupoId = String(data?.grupo_id ?? registroAtual?.grupo_id ?? '').trim() || null;
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
-      const tipoVisual = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
+      const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
+      const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
 
