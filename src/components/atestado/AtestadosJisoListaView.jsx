@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInCalendarDays, format } from 'date-fns';
 import { Check, ChevronDown, ChevronRight, Circle, Eye, FileText, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 
 
 export function parseDadosAdministrativosJiso(observacoes) {
@@ -85,6 +88,8 @@ export default function AtestadosJisoListaView({
   onVisualizarJiso,
   canRegistrarDecisaoJiso = false,
 }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [expandedId, setExpandedId] = useState(null);
   const [draftByAtestado, setDraftByAtestado] = useState({});
   const [generatedTextByAtestado, setGeneratedTextByAtestado] = useState({});
@@ -108,6 +113,70 @@ export default function AtestadosJisoListaView({
       },
     }));
   };
+
+  const salvarDadosAdministrativosMutation = useMutation({
+    mutationFn: async ({ atestado, jiso, draft, modo }) => {
+      const hasAdminData = Boolean(
+        (draft?.numero_tars || '').trim()
+        || (draft?.dataJiso || '').trim()
+        || (draft?.hora_jiso || '').trim()
+        || (draft?.local_jiso || '').trim()
+      );
+
+      if (!jiso?.id && !hasAdminData) return null;
+
+      const observacoes = buildObservacoesJiso({
+        observacoesBase: jiso?.observacoes || '',
+        numero_tars: draft?.numero_tars || '',
+        hora_jiso: draft?.hora_jiso || '',
+        local_jiso: draft?.local_jiso || '',
+      });
+
+      if (jiso?.id) {
+        const payload = { observacoes };
+        if (modo === 'agendamento' && (draft?.dataJiso || '').trim()) {
+          payload.data_jiso = draft.dataJiso;
+        }
+        if (modo === 'agendamento' && !jiso?.resultado_jiso && !jiso?.ata_jiso && !jiso?.data_ata) {
+          payload.status = 'Agendada';
+        }
+        return atualizarEscopado('JISO', jiso.id, payload);
+      }
+
+      if (!atestado?.id) return null;
+
+      return criarEscopado('JISO', {
+        atestado_id: atestado.id,
+        militar_id: atestado.militar_id,
+        militar_nome: atestado.militar_nome,
+        militar_posto: atestado.militar_posto,
+        militar_matricula: atestado.militar_matricula_atual || atestado.militar_matricula,
+        militar_matricula_atual: atestado.militar_matricula_atual || atestado.militar_matricula,
+        militar_matricula_vinculo: atestado.militar_matricula_vinculo || atestado.militar_matricula,
+        data_jiso: draft?.dataJiso || '',
+        observacoes,
+        status: 'Agendada',
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      await queryClient.invalidateQueries({ queryKey: ['cards'] });
+      await queryClient.invalidateQueries({ queryKey: ['atestados-jiso'] });
+      await queryClient.invalidateQueries({ queryKey: ['atestados-jiso-bundle'] });
+      await queryClient.invalidateQueries({ queryKey: ['jisos'] });
+      await queryClient.invalidateQueries({ queryKey: ['jiso'] });
+      await queryClient.invalidateQueries({ queryKey: ['agendamento-jiso'] });
+      await queryClient.invalidateQueries({ queryKey: ['agenda-saude'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Falha ao salvar dados administrativos',
+        description: error?.message || 'Não foi possível persistir os dados da JISO/TARS.',
+        variant: 'destructive',
+      });
+      console.error('[JISO-TARS] Falha ao persistir dados administrativos.', error);
+    },
+  });
 
   if (loading) {
     return <div className="py-10 text-center text-slate-500">Carregando lista...</div>;
@@ -240,7 +309,16 @@ export default function AtestadosJisoListaView({
                       <div className="space-y-2">
                         <Label>Nº TARS solicitação:</Label>
                         <Input value={draft.numero_tars || ''} onChange={(e) => updateDraft(atestadoId, 'numero_tars', e.target.value)} placeholder="231/2026" />
-                        <Button size="sm" variant="outline" onClick={() => console.warn('[JISO-TARS][visual-only] Nº TARS mantido somente em estado local.', { atestadoId, numero_tars: draft.numero_tars || '' })}>Registrar nº TARS</Button>
+                        {canRegistrarDecisaoJiso && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={salvarDadosAdministrativosMutation.isPending}
+                            onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft, modo: 'tars' })}
+                          >
+                            Registrar nº TARS
+                          </Button>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Data JISO:</Label>
@@ -249,7 +327,16 @@ export default function AtestadosJisoListaView({
                         <Input type="time" value={draft.hora_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'hora_jiso', e.target.value)} />
                         <Label>Local JISO:</Label>
                         <Input value={draft.local_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'local_jiso', e.target.value)} placeholder="Diretoria de Saúde" />
-                        <Button size="sm" variant="outline" onClick={() => console.warn('[JISO-TARS][visual-only] Agendamento JISO mantido somente em estado local.', { atestadoId, dataJiso: draft.dataJiso || '', hora_jiso: draft.hora_jiso || '', local_jiso: draft.local_jiso || '' })}>Registrar agendamento</Button>
+                        {canRegistrarDecisaoJiso && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={salvarDadosAdministrativosMutation.isPending}
+                            onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft, modo: 'agendamento' })}
+                          >
+                            Registrar agendamento
+                          </Button>
+                        )}
                       </div>
                       <Button size="sm" variant="outline" onClick={() => {
                         const posto = atestado?.militar_posto || '—';
