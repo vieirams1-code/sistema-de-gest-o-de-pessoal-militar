@@ -19,6 +19,7 @@ import {
   desativarFuncaoMilitarEscopado,
   desativarTagEscopado,
   desativarTagGrupoEscopado,
+  excluirTagGrupoEscopado,
   excluirTagEscopado,
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
@@ -142,12 +143,20 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
     },
     onError: (error) => toast({ title: 'Não foi possível alterar o status da tag.', description: error?.message, variant: 'destructive' }),
   });
-  const desativarGrupoMutation = useMutation({
-    mutationFn: (grupoId) => desativarTagGrupoEscopado(grupoId, { ativo: false }),
+  const excluirGrupoMutation = useMutation({
+    mutationFn: (grupoId) => excluirTagGrupoEscopado(grupoId),
     onSuccess: () => {
       invalidate('grupos');
-      toast({ title: 'Grupo arquivado com sucesso.' });
+      toast({ title: 'Grupo excluído com sucesso.' });
       setGrupoParaArquivar(null);
+    },
+    onError: (error) => {
+      if (error?.code === 'GRUPO_COM_TAGS_ATIVAS') {
+        setGrupoBloqueado({ grupo: grupoParaArquivar, tagsAtivas: error?.tags_ativas || [] });
+        setGrupoParaArquivar(null);
+        return;
+      }
+      toast({ title: 'Não foi possível excluir o grupo.', description: error?.message, variant: 'destructive' });
     },
   });
 
@@ -232,9 +241,12 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
   };
 
   const excluirGrupo = async (grupo) => {
-    const totalTags = quantidadeTagsPorGrupo.get(grupo.id) || 0;
-    if (totalTags > 0) {
-      setGrupoBloqueado({ grupo, totalTags });
+    const tagsAtivas = tags
+      .filter((tag) => getTagGrupoId(tag) === grupo.id && tag.ativo !== false)
+      .map((tag) => tag.nome)
+      .filter(Boolean);
+    if (tagsAtivas.length > 0) {
+      setGrupoBloqueado({ grupo, tagsAtivas });
       return;
     }
     setGrupoParaArquivar(grupo);
@@ -324,7 +336,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
 
     {activeTab === 'funcoes' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoFuncao}><Plus className="w-4 h-4 mr-2" />Nova Função Militar</Button></div><ListCard title={`Funções Cadastradas (${funcoesFiltradas.length})`} search={buscaFuncao} setSearch={setBuscaFuncao} searchPlaceholder="Buscar função...">{funcoesFiltradas.map((funcao) => <div key={funcao.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: funcao.cor || '#CBD5E1', backgroundColor: `${funcao.cor || '#E2E8F0'}18`, color: funcao.cor || '#1E293B' }}><IconeCatalogo value={funcao.emoji || '🏷️'} /> {funcao.nome}</span><span className="text-xs text-slate-500">Cor: {funcao.cor || '—'}</span><span className="text-xs text-slate-500">Escopo: Global</span><span className="text-xs text-slate-500">Prioridade: {funcao.prioridade_lista ?? '—'}</span></div><div className="flex items-center gap-3"><StatusBadge ativo={funcao.ativa !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarFuncao(funcao)} /><ActionButton label={funcao.ativa === false ? 'Reativar' : 'Desativar'} icon={funcao.ativa === false ? Check : X} onClick={() => toggleFuncao(funcao)} /></div></div>)}</ListCard></>}
 
-    {activeTab === 'grupos' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoGrupo}><Plus className="w-4 h-4 mr-2" />Novo Grupo de Tags</Button></div><ListCard title={`Grupos de Tags (${gruposFiltrados.length})`} search={buscaGrupo} setSearch={setBuscaGrupo} searchPlaceholder="Buscar grupo...">{gruposFiltrados.map((grupo) => <div key={grupo.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: grupo.cor || '#CBD5E1', backgroundColor: `${grupo.cor || '#E2E8F0'}18`, color: grupo.cor || '#1E293B' }}><IconeCatalogo value={grupo.emoji || '🏷️'} /> {grupo.nome}</span><span className="text-xs text-slate-500">Aplicabilidade: {labelAplicabilidade(grupo.aplicabilidade)}</span><span className="text-xs text-slate-500">{quantidadeTagsPorGrupo.get(grupo.id) || 0} tags</span><span className="text-xs text-slate-500">Escopo: Global</span></div><div className="flex items-center gap-3"><StatusBadge ativo={grupo.ativo !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarGrupo(grupo)} /><ActionButton label={grupo.ativo === false ? 'Reativar' : 'Desativar'} icon={grupo.ativo === false ? Check : X} onClick={() => toggleGrupo(grupo)} /><ActionButton label="Arquivar" icon={X} variant="danger" onClick={() => excluirGrupo(grupo)} /></div></div>)}</ListCard></>}
+    {activeTab === 'grupos' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoGrupo}><Plus className="w-4 h-4 mr-2" />Novo Grupo de Tags</Button></div><ListCard title={`Grupos de Tags (${gruposFiltrados.length})`} search={buscaGrupo} setSearch={setBuscaGrupo} searchPlaceholder="Buscar grupo...">{gruposFiltrados.map((grupo) => <div key={grupo.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: grupo.cor || '#CBD5E1', backgroundColor: `${grupo.cor || '#E2E8F0'}18`, color: grupo.cor || '#1E293B' }}><IconeCatalogo value={grupo.emoji || '🏷️'} /> {grupo.nome}</span><span className="text-xs text-slate-500">Aplicabilidade: {labelAplicabilidade(grupo.aplicabilidade)}</span><span className="text-xs text-slate-500">{quantidadeTagsPorGrupo.get(grupo.id) || 0} tags</span><span className="text-xs text-slate-500">Escopo: Global</span></div><div className="flex items-center gap-3"><StatusBadge ativo={grupo.ativo !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarGrupo(grupo)} /><ActionButton label={grupo.ativo === false ? 'Reativar' : 'Desativar'} icon={grupo.ativo === false ? Check : X} onClick={() => toggleGrupo(grupo)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => excluirGrupo(grupo)} /></div></div>)}</ListCard></>}
 
     {activeTab === 'tags' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoTag}><Plus className="w-4 h-4 mr-2" />Nova Tag Individual</Button></div><ListCard title={`Tags Individuais (${tagsFiltradas.length})`} search={buscaTag} setSearch={setBuscaTag} searchPlaceholder="Buscar tag...">{tagsFiltradas.map((tag) => { const grupo = gruposPorId.get(getTagGrupoId(tag)); const tipoUso = normalizarTipoUsoTag(tag?.tipo_uso); return <div key={tag.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl border" style={{ backgroundColor: `${tag.cor || '#F59E0B'}18`, borderColor: tag.cor || '#F59E0B' }}><IconeCatalogo value={tag.emoji || '🏷️'} /></div><div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{tag.nome}</p><TipoUsoBadge tipoUso={tipoUso} /><StatusBadge ativo={tag.ativo !== false} /></div><div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-1"><span>Grupo: {grupo?.nome || 'Sem grupo'}</span><span>•</span><span>Aplicabilidade: {labelAplicabilidade(tag.aplicabilidade)}</span><span>•</span><span>Tipo: {tag.tipo_visual || 'chip'}</span><span>•</span><span>Cor: {tag.cor || '—'}</span></div></div></div><div className="flex items-center gap-3"><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarTag(tag)} /><ActionButton label={tag.ativo === false ? 'Reativar' : 'Desativar'} icon={tag.ativo === false ? Check : X} onClick={() => toggleTag(tag)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => { setTagParaExcluir(tag); setTextoConfirmacaoExclusaoTag(''); setBloqueioExclusaoTag(null); }} /></div></div>; })}</ListCard></>}
 
@@ -344,10 +356,10 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
     </EntityModal>
 
     <Dialog open={Boolean(tagParaExcluir) && !bloqueioExclusaoTag} onOpenChange={(open) => !open && setTagParaExcluir(null)}><DialogContent><DialogHeader><DialogTitle>Excluir tag definitivamente</DialogTitle><DialogDescription>Deseja excluir definitivamente esta tag?</DialogDescription></DialogHeader><div className="space-y-2"><p className="text-sm text-slate-600">Digite <strong>EXCLUIR TAG</strong> para confirmar:</p><Input value={textoConfirmacaoExclusaoTag} onChange={(e) => setTextoConfirmacaoExclusaoTag(e.target.value)} placeholder="EXCLUIR TAG" /></div><DialogFooter><Button variant="outline" onClick={() => setTagParaExcluir(null)}>Cancelar</Button><Button disabled={excluirTagMutation.isPending || textoConfirmacaoExclusaoTag.trim() !== 'EXCLUIR TAG'} onClick={confirmarExclusaoTag}>Excluir tag</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(bloqueioExclusaoTag)} onOpenChange={(open) => !open && setBloqueioExclusaoTag(null)}><DialogContent><DialogHeader><DialogTitle>Exclusão bloqueada por vínculos</DialogTitle><DialogDescription>Esta tag possui vínculos com militares/férias/atestados. Para preservar histórico, ela não pode ser excluída. Você pode inativá-la.</DialogDescription></DialogHeader><div className="text-sm text-slate-700 space-y-1"><p>Militares: <strong>{bloqueioExclusaoTag?.militar_tags || 0}</strong></p><p>Férias: <strong>{bloqueioExclusaoTag?.ferias_tags || 0}</strong></p><p>Atestados: <strong>{bloqueioExclusaoTag?.atestado_tags || 0}</strong></p></div><DialogFooter><Button variant="outline" onClick={() => setBloqueioExclusaoTag(null)}>Cancelar</Button><Button disabled={desativarTagMutation.isPending} onClick={() => desativarTagMutation.mutate({ tagId: bloqueioExclusaoTag?.tag?.id, ativo: false })}>Inativar tag</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(bloqueioExclusaoTag)} onOpenChange={(open) => !open && setBloqueioExclusaoTag(null)}><DialogContent><DialogHeader><DialogTitle>Exclusão bloqueada por vínculos ativos</DialogTitle><DialogDescription>A exclusão foi bloqueada porque existem vínculos ativos para esta tag. Remova os vínculos ativos ou inative a tag.</DialogDescription></DialogHeader><div className="text-sm text-slate-700 space-y-1"><p>Militares ativos: <strong>{bloqueioExclusaoTag?.militar_tags || 0}</strong></p><p>Férias ativas: <strong>{bloqueioExclusaoTag?.ferias_tags || 0}</strong></p><p>Atestados ativos: <strong>{bloqueioExclusaoTag?.atestado_tags || 0}</strong></p></div><DialogFooter><Button variant="outline" onClick={() => setBloqueioExclusaoTag(null)}>Cancelar</Button><Button disabled={desativarTagMutation.isPending} onClick={() => desativarTagMutation.mutate({ tagId: bloqueioExclusaoTag?.tag?.id, ativo: false })}>Inativar tag</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={confirmarArquivamentoInstitucionaisOpen} onOpenChange={setConfirmarArquivamentoInstitucionaisOpen}><DialogContent><DialogHeader><DialogTitle>Arquivar tags institucionais selecionadas</DialogTitle><DialogDescription>Arquivar estas tags remove seu uso futuro, mas preserva histórico.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setConfirmarArquivamentoInstitucionaisOpen(false)}>Cancelar</Button><Button onClick={confirmarArquivamentoInstitucionais}>Confirmar arquivamento</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(grupoParaArquivar)} onOpenChange={(open) => !open && setGrupoParaArquivar(null)}><DialogContent><DialogHeader><DialogTitle>Arquivar grupo do catálogo</DialogTitle><DialogDescription>Este grupo está sem tags. Para evitar erros de remoção física, ele será desativado e poderá ser reativado depois.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setGrupoParaArquivar(null)}>Cancelar</Button><Button disabled={desativarGrupoMutation.isPending} onClick={() => desativarGrupoMutation.mutate(grupoParaArquivar.id)}>Desativar/Arquivar</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(grupoBloqueado)} onOpenChange={(open) => !open && setGrupoBloqueado(null)}><DialogContent><DialogHeader><DialogTitle>Grupo com tags vinculadas</DialogTitle><DialogDescription>Este grupo possui {grupoBloqueado?.totalTags || 0} tags. Para excluir o grupo, primeiro mova ou remova/desative as tags.</DialogDescription></DialogHeader><DialogFooter><Button onClick={() => setGrupoBloqueado(null)}>Entendi</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(grupoParaArquivar)} onOpenChange={(open) => !open && setGrupoParaArquivar(null)}><DialogContent><DialogHeader><DialogTitle>Excluir grupo definitivamente</DialogTitle><DialogDescription>Este grupo não possui tags ativas. Confirme para excluir definitivamente.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setGrupoParaArquivar(null)}>Cancelar</Button><Button disabled={excluirGrupoMutation.isPending} onClick={() => excluirGrupoMutation.mutate(grupoParaArquivar.id)}>Excluir grupo</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(grupoBloqueado)} onOpenChange={(open) => !open && setGrupoBloqueado(null)}><DialogContent><DialogHeader><DialogTitle>Grupo com tags ativas vinculadas</DialogTitle><DialogDescription>Este grupo possui {grupoBloqueado?.tagsAtivas?.length || 0} tag(s) ativa(s): {(grupoBloqueado?.tagsAtivas || []).join(', ')}. Para excluir o grupo, mova, inative ou exclua essas tags ativas.</DialogDescription></DialogHeader><DialogFooter><Button onClick={() => setGrupoBloqueado(null)}>Entendi</Button></DialogFooter></DialogContent></Dialog>
   </div>);
 }
 

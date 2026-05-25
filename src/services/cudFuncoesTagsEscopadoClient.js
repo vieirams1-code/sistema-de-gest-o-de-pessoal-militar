@@ -20,7 +20,7 @@ async function invocar(payload) {
     const body = error?.response?.data;
     const backendMessage = body?.message || body?.error || body?.details || error?.message;
 
-    if (body?.code === 'TAG_UNICA_CONFLITO' || body?.code === 'TAG_COM_VINCULOS') {
+    if (body?.code === 'TAG_UNICA_CONFLITO' || body?.code === 'TAG_COM_VINCULOS' || body?.code === 'GRUPO_COM_TAGS_ATIVAS') {
       throw criarErroSemantico(backendMessage, {
         code: body?.code,
         militar_id: body?.militar_id,
@@ -29,6 +29,7 @@ async function invocar(payload) {
         militar_tags: body?.militar_tags,
         ferias_tags: body?.ferias_tags,
         atestado_tags: body?.atestado_tags,
+        tags_ativas: body?.tags_ativas,
       });
     }
 
@@ -63,6 +64,7 @@ export const desativarFuncaoMilitarEscopado = (id, data) => invocar({ entidade: 
 export const criarTagGrupoEscopado = (data) => invocar({ entidade: 'TagGrupo', operacao: 'create', data });
 export const atualizarTagGrupoEscopado = (id, data) => invocar({ entidade: 'TagGrupo', operacao: 'update', id, data });
 export const desativarTagGrupoEscopado = (id, data) => invocar({ entidade: 'TagGrupo', operacao: 'desativar', id, data });
+export const excluirTagGrupoEscopado = (id) => invocar({ entidade: 'TagGrupo', operacao: 'delete', id });
 
 export const criarTagEscopado = (data) => invocar({ entidade: 'Tag', operacao: 'create', data });
 export const atualizarTagEscopado = (id, data) => invocar({ entidade: 'Tag', operacao: 'update', id, data });
