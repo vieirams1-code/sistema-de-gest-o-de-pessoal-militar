@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar, Search, Clock, ArrowRight, Edit } from 'lucide-react';
+import AtestadosJisoListaView from '@/components/atestado/AtestadosJisoListaView';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleC
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [modoVisualizacao, setModoVisualizacao] = useState('cards');
   const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
@@ -45,6 +47,58 @@ export default function AgendarJISO() {
     return jisos.find(j => j.atestado_id === atestadoId);
   };
 
+
+  const buildContextoTemplateJiso = useCallback(({ atestado, jiso }) => ({
+    militar: {
+      nome: atestado?.militar_nome || '',
+      posto_graduacao: atestado?.militar_posto || '',
+      matricula: atestado?.militar_matricula_label || atestado?.militar_matricula_atual || atestado?.militar_matricula || '',
+      lotacao: atestado?.militar_lotacao || atestado?.lotacao || '',
+    },
+    atestado: {
+      id: atestado?.id,
+      data_inicio: atestado?.data_inicio,
+      data_fim: atestado?.data_termino,
+      quantidade_dias: atestado?.dias,
+      cid: atestado?.cid_10 || atestado?.cid || '',
+      medico: atestado?.medico || atestado?.medico_nome || '',
+    },
+    jiso: {
+      id: jiso?.id,
+      data_agendamento: jiso?.data_agendamento || jiso?.data_jiso,
+      horario: jiso?.horario || '',
+      local: jiso?.local || '',
+      junta: jiso?.junta_nome || jiso?.junta || '',
+    },
+  }), []);
+
+  const handleGerarTarsAgendamento = useCallback(({ atestado, jiso }) => {
+    const contexto = buildContextoTemplateJiso({ atestado, jiso });
+    // TODO: integrar ao motor de templates quando o template TARS_JISO_AGENDAMENTO existir.
+    console.info('TODO template TARS_JISO_AGENDAMENTO', contexto);
+    alert('TODO: integração do template TARS_JISO_AGENDAMENTO ainda não disponível.');
+  }, [buildContextoTemplateJiso]);
+
+  const handleGerarOficioApresentacao = useCallback(({ atestado, jiso }) => {
+    const contexto = buildContextoTemplateJiso({ atestado, jiso });
+    // TODO: integrar ao motor de templates quando o template OFICIO_APRESENTACAO_JISO existir.
+    console.info('TODO template OFICIO_APRESENTACAO_JISO', contexto);
+    alert('TODO: integração do template OFICIO_APRESENTACAO_JISO ainda não disponível.');
+  }, [buildContextoTemplateJiso]);
+
+  const handleAbrirEdicaoJiso = useCallback((atestado) => {
+    const escopo = validarEscopoMilitar(atestado?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`);
+  }, [navigate, validarEscopoMilitar]);
+
+  const handleVisualizarAtestado = useCallback((atestado) => {
+    navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
+  }, [navigate]);
+
   const statusColors = {
     'Aguardando Realização': 'bg-yellow-100 text-yellow-700',
     'Realizada': 'bg-green-100 text-green-700',
@@ -72,6 +126,25 @@ export default function AgendarJISO() {
           </div>
         </div>
 
+        <div className="mb-4 flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm w-fit">
+          <Button
+            type="button"
+            variant={modoVisualizacao === 'cards' ? 'default' : 'ghost'}
+            onClick={() => setModoVisualizacao('cards')}
+            className="rounded-lg"
+          >
+            Cards atuais
+          </Button>
+          <Button
+            type="button"
+            variant={modoVisualizacao === 'lista' ? 'default' : 'ghost'}
+            onClick={() => setModoVisualizacao('lista')}
+            className="rounded-lg"
+          >
+            Nova lista
+          </Button>
+        </div>
+
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -84,7 +157,8 @@ export default function AgendarJISO() {
           </div>
         </div>
 
-        {isLoadingAtestados ? (
+        {modoVisualizacao === 'cards' ? (
+          isLoadingAtestados ? (
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
@@ -94,8 +168,8 @@ export default function AgendarJISO() {
             <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhum atestado encaminhado para JISO</h3>
             <p className="text-slate-500">Atestados marcados para JISO aparecerão aqui</p>
           </div>
-        ) : (
-          <div className="space-y-3">
+          ) : (
+            <div className="space-y-3">
             {filteredAtestados.map((atestado) => {
               const jiso = getJISOForAtestado(atestado.id);
               
@@ -173,14 +247,7 @@ export default function AgendarJISO() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            const escopo = validarEscopoMilitar(atestado?.militar_id);
-                            if (!escopo.permitido) {
-                              alert(escopo.motivo);
-                              return;
-                            }
-                            navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`);
-                          }}
+                          onClick={() => handleAbrirEdicaoJiso(atestado)}
                         >
                           <Edit className="w-4 h-4 mr-1" />
                           {jiso ? 'Editar JISO' : 'Registrar JISO'}
@@ -189,7 +256,7 @@ export default function AgendarJISO() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}
+                        onClick={() => handleVisualizarAtestado(atestado)}
                       >
                         <ArrowRight className="w-4 h-4" />
                       </Button>
@@ -198,7 +265,22 @@ export default function AgendarJISO() {
                 </div>
               );
             })}
-          </div>
+            </div>
+          )
+        ) : (
+          <AtestadosJisoListaView
+            atestados={filteredAtestados}
+            jisos={jisos}
+            loading={isLoadingAtestados}
+            onAgendarJiso={handleAbrirEdicaoJiso}
+            onRegistrarDecisaoJiso={handleAbrirEdicaoJiso}
+            onVisualizarJiso={handleVisualizarAtestado}
+            onAnexarAtaJiso={handleAbrirEdicaoJiso}
+            onGerarPublicacaoAta={handleAbrirEdicaoJiso}
+            onReverterJiso={handleAbrirEdicaoJiso}
+            onGerarTarsAgendamento={handleGerarTarsAgendamento}
+            onGerarOficioApresentacao={handleGerarOficioApresentacao}
+          />
         )}
       </div>
     </div>
