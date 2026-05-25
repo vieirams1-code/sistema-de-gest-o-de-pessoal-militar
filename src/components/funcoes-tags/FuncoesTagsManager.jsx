@@ -86,8 +86,16 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
       toast({ title: 'Não foi possível salvar a função.', description: error?.message, variant: 'destructive' });
     },
   });
-  const saveGrupo = useMutation({ mutationFn: (p) => editandoGrupo ? atualizarTagGrupoEscopado(editandoGrupo.id, p) : criarTagGrupoEscopado(p), onSuccess: () => { invalidate('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); } });
-  const saveTag = useMutation({ mutationFn: (p) => editandoTag ? atualizarTagEscopado(editandoTag.id, p) : criarTagEscopado(p), onSuccess: () => { invalidate('tags'); toast({ title: 'Tag salva com sucesso.' }); } });
+  const saveGrupo = useMutation({
+    mutationFn: (p) => editandoGrupo ? atualizarTagGrupoEscopado(editandoGrupo.id, p) : criarTagGrupoEscopado(p),
+    onSuccess: () => { invalidate('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); },
+    onError: (error) => toast({ title: 'Não foi possível salvar o grupo.', description: error?.message, variant: 'destructive' }),
+  });
+  const saveTag = useMutation({
+    mutationFn: (p) => editandoTag ? atualizarTagEscopado(editandoTag.id, p) : criarTagEscopado(p),
+    onSuccess: () => { invalidate('tags'); toast({ title: 'Tag salva com sucesso.' }); },
+    onError: (error) => toast({ title: 'Não foi possível salvar a tag.', description: error?.message, variant: 'destructive' }),
+  });
   const desativarTagMutation = useMutation({
     mutationFn: (tagId) => desativarTagEscopado(tagId, { ativo: false }),
     onSuccess: () => {
@@ -147,7 +155,8 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
   };
 
   const salvarTag = () => {
-    const payload = { ...formTag, tipo_visual: formTag.tipo_visual || 'chip', aplicabilidade: normalizarAplicabilidade(formTag.aplicabilidade), ativo: editandoTag?.ativo ?? true };
+    const tipoVisual = (formTag.tipo_visual || 'normal') === 'chip' ? 'normal' : (formTag.tipo_visual || 'normal');
+    const payload = { ...formTag, tipo_visual: tipoVisual, aplicabilidade: normalizarAplicabilidade(formTag.aplicabilidade), ativo: editandoTag?.ativo ?? true };
     const erro = validarTag(payload, tags, editandoTag);
     if (erro) return toast({ title: erro, variant: 'destructive' });
     saveTag.mutate(payload);
