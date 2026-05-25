@@ -58,8 +58,8 @@ export async function enriquecerAtestadosComContextoMilitar(atestados = [], { co
   if (!militarIds.length) return [];
 
   const { base44 } = await import('../api/base44Client.js');
-  const colecoes = await Promise.all(militarIds.map((id) => base44.entities.Militar.filter({ id })));
-  const militares = await carregarMilitaresComMatriculas(colecoes.flat());
+  const colecao = await base44.entities.Militar.filter({ id: { $in: militarIds } });
+  const militares = await carregarMilitaresComMatriculas(colecao || []);
   const byId = new Map(militares.map((m) => [String(m.id), m]));
   const operacionais = filtrarMesclados ? new Set(filtrarMilitaresOperacionais(militares, { incluirInativos: true }).map((m) => String(m.id))) : null;
 
