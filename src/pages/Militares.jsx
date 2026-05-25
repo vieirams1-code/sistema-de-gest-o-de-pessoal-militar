@@ -199,11 +199,12 @@ function militarCorrespondeOrigemDestino(militar, termo) {
   return texto.includes(q);
 }
 
-function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitucionais = [], vinculosFuncoesAtivos = []) {
+function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitucionais = [], vinculosFuncoesAtivos = [], contextoEstrutural = null) {
   const PRIORIDADE_FUNCAO = { comandante: 0, subcomandante: 1 };
   const PRIORIDADE_SEM_FUNCAO = 999;
   const PRIORIDADE_ESTRUTURA_MATCH = 0;
   const PRIORIDADE_ESTRUTURA_FORA = 999;
+  const contextoEstruturalNormalizado = contextoEstrutural ? String(contextoEstrutural).trim().toLowerCase() : null;
   const funcoesById = new Map(funcoesInstitucionais.map((funcao) => [String(funcao?.id || ''), funcao]));
   const estruturaKeyMilitar = (militar = {}) => {
     const candidatos = [
@@ -250,7 +251,11 @@ function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitu
 
     const estruturaMilitar = estruturaPorMilitar.get(militarId) ?? null;
     const estruturaVinculo = estruturaKeyVinculo(vinculo);
-    const prioridadeEstrutura = estruturaMilitar && estruturaVinculo && estruturaMilitar === estruturaVinculo
+    const vinculoPertenceLotacaoMilitar = Boolean(estruturaMilitar && estruturaVinculo && estruturaMilitar === estruturaVinculo);
+    if (!vinculoPertenceLotacaoMilitar) return;
+
+    const militarDentroContextoExibido = Boolean(contextoEstruturalNormalizado && estruturaMilitar === contextoEstruturalNormalizado);
+    const prioridadeEstrutura = militarDentroContextoExibido
       ? PRIORIDADE_ESTRUTURA_MATCH
       : PRIORIDADE_ESTRUTURA_FORA;
     const score = prioridadeFuncao + prioridadeEstrutura;
@@ -663,9 +668,10 @@ export default function Militares() {
         filtradosPorColuna,
         funcoesInstitucionais,
         vinculosFuncoesAtivosFiltros,
+        lotacaoFilter !== TODAS_LOTACOES_VALUE ? lotacaoFilter : null,
       );
     },
-    [filteredMilitaresComFuncoesTags, columnFilters, funcoesInstitucionais, vinculosFuncoesAtivosFiltros],
+    [filteredMilitaresComFuncoesTags, columnFilters, funcoesInstitucionais, vinculosFuncoesAtivosFiltros, lotacaoFilter],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(
