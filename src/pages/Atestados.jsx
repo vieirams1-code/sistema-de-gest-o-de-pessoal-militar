@@ -92,8 +92,8 @@ export default function Atestados() {
     enabled: isAccessResolved && hasAtestadosAccess
   });
 
-  const atestados = atestadosBundle?.atestados || [];
-  const jisos = atestadosBundle?.jisos || [];
+  const atestados = Array.isArray(atestadosBundle?.atestados) ? atestadosBundle.atestados : [];
+  const jisos = Array.isArray(atestadosBundle?.jisos) ? atestadosBundle.jisos : [];
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
