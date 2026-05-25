@@ -76,6 +76,7 @@ export default function Atestados() {
   const [vigentesCollapsed, setVigentesCollapsed] = useState(false);
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
   const [modoVisualizacaoVigentes, setModoVisualizacaoVigentes] = useState('cards');
+  const [verificandoEdicao, setVerificandoEdicao] = useState(false);
 
   const { data: atestadosBundle, isLoading } = useQuery({
     queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
@@ -149,6 +150,7 @@ export default function Atestados() {
   const finalizados = applyFilters(atestados.filter((atestado) => !isAtestadoVigente(atestado, hoje)));
 
   const handleEdit = async (atestado) => {
+    if (verificandoEdicao) return;
     if (!canEditarAtestado) {
       alert('Ação negada: você não tem permissão para editar atestados.');
       return;
@@ -158,15 +160,26 @@ export default function Atestados() {
       alert(escopo.motivo);
       return;
     }
-    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
-    const possuiPublicacaoVinculada = publicacoesMilitar.some(
-      (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
-    );
-    if (possuiPublicacaoVinculada) {
-      alert('Edição não permitida: este atestado possui publicação/nota vinculada.');
-      return;
+    setVerificandoEdicao(true);
+    try {
+      const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+      const possuiPublicacaoVinculada = publicacoesMilitar.some(
+        (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
+      );
+      if (possuiPublicacaoVinculada) {
+        alert('Edição não permitida: este atestado possui publicação/nota vinculada.');
+        return;
+      }
+      navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
+    } catch (error) {
+      if (error?.message?.includes('Rate limit')) {
+        alert('Muitas requisições em sequência. Aguarde alguns segundos e tente novamente.');
+      } else {
+        alert(error?.message || 'Não foi possível verificar a edição do atestado.');
+      }
+    } finally {
+      setVerificandoEdicao(false);
     }
-    navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
   };
   const handleDelete = (atestado) => {
     const escopo = validarEscopoMilitar(atestado?.militar_id);
@@ -188,16 +201,6 @@ export default function Atestados() {
     const escopoConfirm = validarEscopoMilitar(atestadoToDelete?.militar_id);
     if (!escopoConfirm.permitido) {
       alert(escopoConfirm.motivo);
-      setDeleteDialogOpen(false);
-      setAtestadoToDelete(null);
-      return;
-    }
-    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoToDelete.militar_id });
-    const possuiPublicacaoVinculada = publicacoesMilitar.some(
-      (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestadoToDelete.id)
-    );
-    if (possuiPublicacaoVinculada) {
-      alert('Exclusão não permitida: este atestado possui publicação/nota vinculada.');
       setDeleteDialogOpen(false);
       setAtestadoToDelete(null);
       return;
