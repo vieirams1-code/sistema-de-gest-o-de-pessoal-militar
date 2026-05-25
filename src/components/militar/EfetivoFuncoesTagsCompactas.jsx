@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 
 export default function EfetivoFuncoesTagsCompactas({ itens = [], textoExcesso = '' }) {
   if (!Array.isArray(itens) || itens.length === 0) return null;
@@ -11,7 +12,7 @@ export default function EfetivoFuncoesTagsCompactas({ itens = [], textoExcesso =
           <div className="text-xs text-slate-500 mt-0.5 inline-flex items-center gap-1 cursor-default max-w-full overflow-hidden">
             {itens.map((item, index) => (
               <span key={`${item.tipo}-${item.nome}-${index}`} aria-label={item.nome}>
-                {item.emoji}
+                <IconeCatalogo value={item.emoji} />
               </span>
             ))}
             {textoExcesso ? <span className="text-[11px] text-slate-400">{textoExcesso}</span> : null}
@@ -21,7 +22,7 @@ export default function EfetivoFuncoesTagsCompactas({ itens = [], textoExcesso =
           <div className="space-y-1">
             {itens.map((item, index) => (
               <div key={`tooltip-${item.tipo}-${item.nome}-${index}`}>
-                {item.emoji} {item.nome}
+                <span className="inline-flex items-center gap-1"><IconeCatalogo value={item.emoji} /> {item.nome}</span>
               </div>
             ))}
             {textoExcesso ? <div className="text-slate-500">{textoExcesso} adicionais</div> : null}

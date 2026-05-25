@@ -8,6 +8,18 @@ const TAGS_PRIORITARIAS_CHAVES = ['motorista', 'aph', 'altura', 'restricao', 'in
 
 const normalizarChave = (valor) => String(valor || '').trim().toLowerCase();
 const getMilitarFuncaoMilitarId = (vinculo = {}) => vinculo?.militar_id || vinculo?.militarId || vinculo?.militar?.id || null;
+const resolveIconeFuncao = (funcao = {}) => {
+  const chave = normalizarChave(funcao?.institucional_chave);
+  if (chave === 'comandante') return 'estrela_amarela_comandante';
+  if (chave === 'subcomandante') return 'estrela_azul_subcomandante';
+  return String(funcao?.emoji || EMOJI_PADRAO_FUNCAO);
+};
+const resolveIconeTag = (tag = {}) => {
+  const chave = normalizarChave(tag?.slug || tag?.chave || tag?.nome);
+  if (['manutencao', 'manutenção', 'condutor'].includes(chave)) return 'engrenagem';
+  if (['mob', 'moto', 'moto_socorro'].includes(chave)) return 'moto_socorro';
+  return String(tag?.emoji || EMOJI_PADRAO_TAG);
+};
 
 const isTipoVisualChip = (registro = {}) => {
   const tipoVisual = String(registro?.tipo_visual || '').trim().toLowerCase();
@@ -38,7 +50,7 @@ export function getFuncoesInstitucionaisCompactas({ militarId, funcoesInstitucio
     })
     .sort((a, b) => (Number(a?.prioridade_lista) || 999) - (Number(b?.prioridade_lista) || 999))
     .map((funcao) => ({
-      emoji: String(funcao?.emoji || EMOJI_PADRAO_FUNCAO),
+      emoji: resolveIconeFuncao(funcao),
       nome: String(funcao?.nome || '').trim(),
       tipo: 'funcao',
       prioridade: 1,
@@ -59,7 +71,7 @@ export function getTagsCompactasMilitar({ militarId, tagsAtivas = [], vinculosTa
       const chave = normalizarChave(tag?.slug || tag?.chave || tag?.nome);
       const indicePrioridade = TAGS_PRIORITARIAS_CHAVES.indexOf(chave);
       return {
-        emoji: String(tag?.emoji || EMOJI_PADRAO_TAG),
+        emoji: resolveIconeTag(tag),
         nome: String(tag?.nome || '').trim(),
         tipo: 'tag',
         prioridade: indicePrioridade >= 0 ? 4 : (isTipoVisualChip(tag) ? 5 : 6),

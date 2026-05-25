@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { calcularTentativasBulk } from '@/utils/funcoesTags/militarTagsBulk';
 import { getFuncaoMilitarId } from '@/utils/funcoesTags/contratoCampos';
+import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import { AlertCircle, Check, Loader2, Search, Shield, Tags as TagsIcon, Users, X } from 'lucide-react';
 
 function getTagNome(tag) {
@@ -12,7 +13,16 @@ function getTagNome(tag) {
 }
 
 function getTagEmoji(tag) {
+  const chave = normalizarBusca(tag?.slug || tag?.chave || tag?.nome);
+  if (['manutencao', 'manutenção', 'condutor'].includes(chave)) return 'engrenagem';
+  if (['mob', 'moto', 'moto_socorro'].includes(chave)) return 'moto_socorro';
   return tag?.emoji || tag?.icone || tag?.icon || '📋';
+}
+function getFuncaoIcone(funcao) {
+  const chave = normalizarBusca(funcao?.institucional_chave);
+  if (chave === 'comandante') return 'estrela_amarela_comandante';
+  if (chave === 'subcomandante') return 'estrela_azul_subcomandante';
+  return funcao?.emoji;
 }
 
 function getTagCor(tag) {
@@ -296,7 +306,7 @@ export default function MilitarTagsBulkPanel({
                   return (
                     <button key={id} type="button" onClick={() => toggleFuncao(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : isSelected ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'} ${isSelected ? 'shadow-md ring-1' : ''}`}>
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 border border-indigo-100 bg-indigo-50">
-                        {funcao?.emoji || <Shield className="w-4 h-4 text-indigo-600" />}
+                        {funcao?.emoji ? <IconeCatalogo value={getFuncaoIcone(funcao)} /> : <Shield className="w-4 h-4 text-indigo-600" />}
                       </div>
                       <div className="flex-1 min-w-0 pr-2">
                         <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{funcao?.nome || 'Função institucional'}</div>
@@ -322,7 +332,7 @@ export default function MilitarTagsBulkPanel({
                 {tagsSelecionadas.map((tag) => (
                   <button key={tag.id} type="button" onClick={() => toggleTag(String(tag.id))}
                   disabled={isLocked} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs ${getTagClassName(tag, true)}`}>
-                    <span>{getTagEmoji(tag)}</span>
+                    <IconeCatalogo value={getTagEmoji(tag)} />
                     <span>{getTagNome(tag)}</span>
                     <X className="w-3 h-3" />
                   </button>
@@ -351,7 +361,7 @@ export default function MilitarTagsBulkPanel({
                     const cor = getTagCor(tag);
                     return (
                       <button key={id} type="button" onClick={() => toggleTag(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : getTagClassName(tag, isSelected)} ${isSelected ? 'shadow-md ring-1' : ''}`}>
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 transition-transform group-hover:scale-105" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}>{emoji}</div>
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 transition-transform group-hover:scale-105" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}><IconeCatalogo value={emoji} /></div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{nome}</div>
                           {isPartial && <div className="text-[11px] text-amber-700 font-medium mt-0.5">Parcial</div>}
