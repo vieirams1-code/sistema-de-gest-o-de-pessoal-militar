@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
+import { base44 } from '@/api/base44Client';
 
 
 export function parseDadosAdministrativosJiso(observacoes) {
@@ -140,12 +140,12 @@ export default function AtestadosJisoListaView({
         if (modo === 'agendamento' && !jiso?.resultado_jiso && !jiso?.ata_jiso && !jiso?.data_ata) {
           payload.status = 'Agendada';
         }
-        return atualizarEscopado('JISO', jiso.id, payload);
+        return base44.entities.JISO.update(jiso.id, payload);
       }
 
       if (!atestado?.id) return null;
 
-      return criarEscopado('JISO', {
+      return base44.entities.JISO.create({
         atestado_id: atestado.id,
         militar_id: atestado.militar_id,
         militar_nome: atestado.militar_nome,
