@@ -389,24 +389,42 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const handleSaveJiso = async () => {
     if (!jisoDate) return;
+    if (savingJiso) return;
     if (!canAccessAction('registrar_decisao_jiso')) {
       alert('Ação negada: você não tem permissão para agendar/registrar JISO.');
       return;
     }
     setSavingJiso(true);
-    await atualizarEscopado('Atestado', atestado.id, {
-      data_jiso_agendada: jisoDate,
-      ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
-    });
-    await sincronizarAtestadoJisoNoQuadro({
-      ...atestado,
-      data_jiso_agendada: jisoDate,
-    });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['cards'] });
-    setSavingJiso(false);
-    setEditingJiso(false);
+    try {
+      await atualizarEscopado('Atestado', atestado.id, {
+        data_jiso_agendada: jisoDate,
+        ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
+      });
+      try {
+        await sincronizarAtestadoJisoNoQuadro({
+          ...atestado,
+          data_jiso_agendada: jisoDate,
+        });
+      } catch (syncError) {
+        if (syncError?.message?.includes('Rate limit')) {
+          console.warn('Rate limit em sincronizarAtestadoJisoNoQuadro — agendamento salvo, sincronização do quadro será refeita.', syncError);
+        } else {
+          throw syncError;
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      setEditingJiso(false);
+    } catch (error) {
+      if (error?.message?.includes('Rate limit')) {
+        alert('Muitas requisições em sequência. Aguarde alguns segundos e tente novamente.');
+      } else {
+        alert(error?.message || 'Não foi possível salvar o agendamento da JISO.');
+      }
+    } finally {
+      setSavingJiso(false);
+    }
   };
 
   const statusInfo = getStatusInfo();
