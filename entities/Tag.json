@@ -79,6 +79,15 @@
     "updated_by": {
       "type": "string",
       "default": ""
+    },
+    "tipo_uso": {
+      "type": "string",
+      "enum": [
+        "comum",
+        "unica"
+      ],
+      "default": "comum",
+      "description": "Define se a tag pode ser atribuída a múltiplos militares ou apenas a um militar ativo por vez."
     }
   },
   "required": [

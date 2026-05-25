@@ -2,7 +2,7 @@
   "name": "Tag",
   "type": "object",
   "title": "Tag",
-  "description": "Tag aplic\u00e1vel a militares e/ou f\u00e9rias, vinculada opcionalmente a um TagGrupo.",
+  "description": "Tag aplicável a militares e/ou férias, vinculada opcionalmente a um TagGrupo.",
   "properties": {
     "nome": {
       "type": "string",
@@ -35,7 +35,7 @@
     },
     "emoji": {
       "type": "string",
-      "default": "\ud83c\udff7\ufe0f"
+      "default": "🏷️"
     },
     "cor": {
       "type": "string",
@@ -56,6 +56,15 @@
     "observacoes": {
       "type": "string",
       "default": ""
+    },
+    "tipo_uso": {
+      "type": "string",
+      "enum": [
+        "comum",
+        "unica"
+      ],
+      "default": "comum",
+      "description": "Define se a tag pode ser atribuída a múltiplos militares ou apenas a um militar ativo por vez."
     }
   },
   "required": [
