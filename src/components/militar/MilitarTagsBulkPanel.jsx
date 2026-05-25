@@ -32,6 +32,9 @@ function getTagCor(tag) {
 function getTagGrupoId(tag) {
   return tag?.grupo_id || tag?.tag_grupo_id || tag?.grupoId || tag?.tagGrupoId || '';
 }
+function isTagUnica(tag) {
+  return String(tag?.tipo_uso || '').trim().toLowerCase() === 'unica';
+}
 
 function isTagAtiva(tag) {
   return tag?.ativo !== false && tag?.ativa !== false && tag?.status !== 'inativo';
@@ -93,6 +96,7 @@ export default function MilitarTagsBulkPanel({
   tagsStatusById = {},
   funcoesAtivas = [],
   funcoesStatusById = {},
+  vinculosTagsAtivos = [],
   onConfirm,
   loading,
   saving = false,
@@ -166,6 +170,19 @@ export default function MilitarTagsBulkPanel({
     const ids = new Set(selecionadas.map(String));
     return tagsFiltradas.filter((tag) => ids.has(String(tag.id)));
   }, [selecionadas, tagsFiltradas]);
+  const conflitoTagUnicaById = useMemo(() => {
+    if (selectedMilitares.length !== 1) return {};
+    const militarSelecionadoId = String(selectedMilitares?.[0]?.id || '');
+    if (!militarSelecionadoId) return {};
+    const mapa = {};
+    (vinculosTagsAtivos || []).forEach((vinculo) => {
+      const tagId = String(vinculo?.tag_id || '');
+      const militarId = String(vinculo?.militar_id || '');
+      if (!tagId || !militarId || militarId === militarSelecionadoId || mapa[tagId]) return;
+      mapa[tagId] = [vinculo?.posto_grad, vinculo?.nome_guerra || vinculo?.nome || vinculo?.militar_nome].filter(Boolean).join(' - ') || 'outro militar';
+    });
+    return mapa;
+  }, [selectedMilitares, vinculosTagsAtivos]);
 
 
   const funcoesFiltradas = useMemo(() => {
@@ -334,10 +351,16 @@ export default function MilitarTagsBulkPanel({
                   disabled={isLocked} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs ${getTagClassName(tag, true)}`}>
                     <IconeCatalogo value={getTagEmoji(tag)} />
                     <span>{getTagNome(tag)}</span>
+                    {isTagUnica(tag) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700 border border-violet-200">Única</span>}
                     <X className="w-3 h-3" />
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+          {tagsSelecionadas.some((tag) => isTagUnica(tag)) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+              Tags únicas exigem atribuição individual e não são transferidas automaticamente.
             </div>
           )}
 
@@ -359,12 +382,19 @@ export default function MilitarTagsBulkPanel({
                     const nome = getTagNome(tag);
                     const emoji = getTagEmoji(tag);
                     const cor = getTagCor(tag);
+                    const tagUnica = isTagUnica(tag);
+                    const bloqueadaPorSelecao = tagUnica && selectedCount > 1;
+                    const avisoConflito = tagUnica ? conflitoTagUnicaById[id] : '';
+                    const disabled = isLocked || bloqueadaPorSelecao;
                     return (
-                      <button key={id} type="button" onClick={() => toggleTag(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : getTagClassName(tag, isSelected)} ${isSelected ? 'shadow-md ring-1' : ''}`}>
+                      <button key={id} type="button" onClick={() => toggleTag(id)} title={bloqueadaPorSelecao ? 'Tag única só pode ser atribuída a um militar por vez.' : ''} disabled={disabled} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : getTagClassName(tag, isSelected)} ${isSelected ? 'shadow-md ring-1' : ''} ${bloqueadaPorSelecao ? 'opacity-60 cursor-not-allowed' : ''}`}>
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 transition-transform group-hover:scale-105" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}><IconeCatalogo value={emoji} /></div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{nome}</div>
+                          {tagUnica && <div className="mt-1"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700 border border-violet-200">Única</span></div>}
                           {isPartial && <div className="text-[11px] text-amber-700 font-medium mt-0.5">Parcial</div>}
+                          {bloqueadaPorSelecao && <div className="text-[11px] text-slate-500 mt-0.5">Tag única só pode ser atribuída a um militar por vez.</div>}
+                          {!bloqueadaPorSelecao && avisoConflito && <div className="text-[11px] text-amber-700 mt-0.5">Já ativa em {avisoConflito}. O backend fará a validação final.</div>}
                         </div>
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isPartial ? 'bg-amber-100 border-amber-400 text-amber-700' : 'border-slate-300 text-transparent group-hover:border-slate-400'}`}>
                           <Check className="w-3.5 h-3.5" />
