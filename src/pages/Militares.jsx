@@ -60,7 +60,7 @@ import {
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
 import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
+import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -567,9 +567,25 @@ export default function Militares() {
   const filteredMilitares = useMemo(
     () => {
       const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
-      return ordenarMilitaresPorAntiguidadeInstitucional(filtradosPorColuna);
+      const { hasOrdemOficialAntiguidade, posicaoOficialByMilitarId } = getPosicaoOficialAntiguidadeFromCache(queryClient);
+      if (!hasOrdemOficialAntiguidade) {
+        if (import.meta.env.DEV) {
+          console.info('[Efetivo] Ordem oficial de Antiguidade indisponível no cache. Mantendo ordem original estável.');
+        }
+        return filtradosPorColuna;
+      }
+
+      return filtradosPorColuna
+        .map((militar, index) => ({ militar, index }))
+        .sort((a, b) => {
+          const posA = posicaoOficialByMilitarId.get(String(a?.militar?.id || ''));
+          const posB = posicaoOficialByMilitarId.get(String(b?.militar?.id || ''));
+          if (Number.isFinite(posA) && Number.isFinite(posB)) return posA - posB;
+          return a.index - b.index;
+        })
+        .map((item) => item.militar);
     },
-    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters],
+    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters, queryClient],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(
