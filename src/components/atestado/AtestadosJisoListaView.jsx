@@ -4,7 +4,6 @@ import { Check, ChevronDown, ChevronRight, Circle, Eye, FileText, Pencil } from 
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 
 function parseDateOnly(value) {
   if (!value) return null;
@@ -47,14 +46,16 @@ function buildHistorico(atestado, jiso) {
 }
 
 export default function AtestadosJisoListaView({
-  atestados = [],
-  jisos = [],
+  atestados: atestadosProp = [],
+  jisos: jisosProp = [],
   loading = false,
   onRegistrarDecisaoJiso,
   onVisualizarJiso,
   canRegistrarDecisaoJiso = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
+  const atestados = Array.isArray(atestadosProp) ? atestadosProp : [];
+  const jisos = Array.isArray(jisosProp) ? jisosProp : [];
 
   const jisoPorAtestado = useMemo(() => {
     const mapa = new Map();
@@ -74,8 +75,9 @@ export default function AtestadosJisoListaView({
 
   return (
     <div className="space-y-3">
-      {atestados.map((atestado) => {
-        const jiso = jisoPorAtestado.get(atestado.id);
+      {atestados.map((atestado, index) => {
+        const atestadoId = atestado?.id ?? `sem-id-${index}`;
+        const jiso = jisoPorAtestado.get(atestado?.id);
         const statusJiso = getStatusJisoDerivado({ atestado, jiso });
         const dias = Number(atestado?.dias || atestado?.quantidade_dias || 0);
         const inicio = parseDateOnly(atestado?.data_inicio);
@@ -84,7 +86,7 @@ export default function AtestadosJisoListaView({
         const diasRestantes = fim ? differenceInCalendarDays(fim, hoje) : null;
         const diasDecorridos = inicio ? Math.max(0, differenceInCalendarDays(hoje, inicio)) : 0;
         const progresso = dias > 0 ? Math.max(0, Math.min(100, (diasDecorridos / dias) * 100)) : 0;
-        const isExpanded = expandedId === atestado.id;
+        const isExpanded = expandedId === atestadoId;
         const historico = buildHistorico(atestado, jiso);
         const timelineEtapas = [
           { label: 'Encaminhado', done: Boolean(jiso?.id) },
@@ -94,7 +96,7 @@ export default function AtestadosJisoListaView({
         ];
 
         return (
-          <div key={atestado.id} className="space-y-3">
+          <div key={atestadoId} className="space-y-3">
             <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${isExpanded ? 'border-blue-200 ring-1 ring-blue-100' : ''}`}>
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_auto] lg:items-start">
                 <div className="flex min-w-0 gap-3">
@@ -102,7 +104,7 @@ export default function AtestadosJisoListaView({
                     size="icon"
                     variant="ghost"
                     className="mt-1 h-9 w-9 rounded-full bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-                    onClick={() => setExpandedId((prev) => (prev === atestado.id ? null : atestado.id))}
+                    onClick={() => setExpandedId((prev) => (prev === atestadoId ? null : atestadoId))}
                     aria-label={isExpanded ? 'Recolher linha' : 'Expandir linha'}
                   >
                     {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -119,7 +121,12 @@ export default function AtestadosJisoListaView({
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Período</p>
                       <p className="text-sm text-slate-700">{formatDate(atestado.data_inicio)} → {formatDate(atestado.data_retorno || atestado.data_termino)}</p>
-                      <Progress value={progresso} className="mt-2 h-2 bg-slate-200 [&>div]:bg-emerald-500" />
+                                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full bg-emerald-500"
+                          style={{ width: `${progresso}%` }}
+                        />
+                      </div>
                       <p className="mt-1 text-xs text-slate-600">
                         {diasRestantes === null ? 'Dias restantes não calculáveis' : diasRestantes < 0 ? `${Math.abs(diasRestantes)} dia(s) em atraso` : `${diasRestantes} dia(s) restantes`}
                       </p>
