@@ -6,6 +6,33 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+
+export function parseDadosAdministrativosJiso(observacoes) {
+  if (!observacoes || typeof observacoes !== 'string') {
+    return { numero_tars: '', hora_jiso: '', local_jiso: '' };
+  }
+
+  const numero_tars = (observacoes.match(/(?:^|\n)TARS:\s*(.+)/i)?.[1] || '').trim();
+  const hora_jiso = (observacoes.match(/(?:^|\n)HORA_JISO:\s*(.+)/i)?.[1] || '').trim();
+  const local_jiso = (observacoes.match(/(?:^|\n)LOCAL_JISO:\s*(.+)/i)?.[1] || '').trim();
+
+  return { numero_tars, hora_jiso, local_jiso };
+}
+
+export function buildObservacoesJiso({ observacoesBase = '', numero_tars = '', hora_jiso = '', local_jiso = '' } = {}) {
+  const linhasBase = String(observacoesBase || '')
+    .split('\n')
+    .map((linha) => linha.trimEnd())
+    .filter((linha) => linha && !/^TARS:/i.test(linha) && !/^HORA_JISO:/i.test(linha) && !/^LOCAL_JISO:/i.test(linha));
+
+  const linhasAdmin = [];
+  if (numero_tars?.trim()) linhasAdmin.push(`TARS: ${numero_tars.trim()}`);
+  if (hora_jiso?.trim()) linhasAdmin.push(`HORA_JISO: ${hora_jiso.trim()}`);
+  if (local_jiso?.trim()) linhasAdmin.push(`LOCAL_JISO: ${local_jiso.trim()}`);
+
+  return [...linhasBase, ...linhasAdmin].join('\n');
+}
+
 function parseDateOnly(value) {
   if (!value) return null;
   const date = new Date(`${value}T00:00:00`);
@@ -102,10 +129,11 @@ export default function AtestadosJisoListaView({
         const progresso = dias > 0 ? Math.max(0, Math.min(100, (diasDecorridos / dias) * 100)) : 0;
         const isExpanded = expandedId === atestadoId;
         const historico = buildHistorico(atestado, jiso);
-        const draft = draftByAtestado[atestadoId] || {};
+        const draftPersistido = parseDadosAdministrativosJiso(jiso?.observacoes);
+        const draft = { ...draftPersistido, ...(draftByAtestado[atestadoId] || {}) };
         const timelineEtapas = [
           { label: 'Atestado', done: Boolean(atestado?.id) },
-          { label: 'TARS', done: Boolean((draft?.numeroTars || '').trim()) },
+          { label: 'TARS', done: Boolean((draft?.numero_tars || '').trim()) },
           { label: 'JISO', done: Boolean((draft?.dataJiso || '').trim()) },
           { label: 'Decisão', done: Boolean(jiso?.resultado_jiso || jiso?.data_ata || jiso?.ata_jiso) },
           { label: 'Publicação', done: atestado?.status_publicacao === 'Publicado' },
@@ -208,17 +236,17 @@ export default function AtestadosJisoListaView({
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Solicitação e Agendamento da JISO</p>
                       <div className="space-y-2">
                         <Label>Nº TARS solicitação:</Label>
-                        <Input value={draft.numeroTars || ''} onChange={(e) => updateDraft(atestadoId, 'numeroTars', e.target.value)} placeholder="231/2026" />
-                        <Button size="sm" variant="outline" onClick={() => console.warn('[JISO-TARS][visual-only] Nº TARS mantido somente em estado local.', { atestadoId, numeroTars: draft.numeroTars || '' })}>Registrar nº TARS</Button>
+                        <Input value={draft.numero_tars || ''} onChange={(e) => updateDraft(atestadoId, 'numero_tars', e.target.value)} placeholder="231/2026" />
+                        <Button size="sm" variant="outline" onClick={() => console.warn('[JISO-TARS][visual-only] Nº TARS mantido somente em estado local.', { atestadoId, numero_tars: draft.numero_tars || '' })}>Registrar nº TARS</Button>
                       </div>
                       <div className="space-y-2">
                         <Label>Data JISO:</Label>
                         <Input type="date" value={draft.dataJiso || ''} onChange={(e) => updateDraft(atestadoId, 'dataJiso', e.target.value)} />
                         <Label>Hora JISO:</Label>
-                        <Input type="time" value={draft.horaJiso || ''} onChange={(e) => updateDraft(atestadoId, 'horaJiso', e.target.value)} />
+                        <Input type="time" value={draft.hora_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'hora_jiso', e.target.value)} />
                         <Label>Local JISO:</Label>
-                        <Input value={draft.localJiso || ''} onChange={(e) => updateDraft(atestadoId, 'localJiso', e.target.value)} placeholder="Diretoria de Saúde" />
-                        <Button size="sm" variant="outline" onClick={() => console.warn('[JISO-TARS][visual-only] Agendamento JISO mantido somente em estado local.', { atestadoId, dataJiso: draft.dataJiso || '', horaJiso: draft.horaJiso || '', localJiso: draft.localJiso || '' })}>Registrar agendamento</Button>
+                        <Input value={draft.local_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'local_jiso', e.target.value)} placeholder="Diretoria de Saúde" />
+                        <Button size="sm" variant="outline" onClick={() => console.warn('[JISO-TARS][visual-only] Agendamento JISO mantido somente em estado local.', { atestadoId, dataJiso: draft.dataJiso || '', hora_jiso: draft.hora_jiso || '', local_jiso: draft.local_jiso || '' })}>Registrar agendamento</Button>
                       </div>
                       <Button size="sm" variant="outline" onClick={() => {
                         const posto = atestado?.militar_posto || '—';

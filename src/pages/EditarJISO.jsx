@@ -23,6 +23,7 @@ import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitar
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
+import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/AtestadosJisoListaView';
 
 export default function EditarJISO() {
   // GOVERNANÇA TEMPLATE:
@@ -51,7 +52,10 @@ export default function EditarJISO() {
     ata_jiso: '',
     parecer_jiso: '',
     status: 'Aguardando Realização',
-    observacoes: ''
+    observacoes: '',
+    numero_tars: '',
+    hora_jiso: '',
+    local_jiso: ''
   });
 
   const { data: atestado, isLoading: loadingAtestado } = useQuery({
@@ -74,6 +78,7 @@ export default function EditarJISO() {
 
   useEffect(() => {
     if (jiso) {
+      const dadosAdministrativos = parseDadosAdministrativosJiso(jiso.observacoes);
       setFormData({
         data_jiso: jiso.data_jiso || '',
         secao_jiso: jiso.secao_jiso || '',
@@ -84,7 +89,10 @@ export default function EditarJISO() {
         ata_jiso: jiso.ata_jiso || '',
         parecer_jiso: jiso.parecer_jiso || '',
         status: jiso.status || 'Aguardando Realização',
-        observacoes: jiso.observacoes || ''
+        observacoes: jiso.observacoes || '',
+        numero_tars: dadosAdministrativos.numero_tars || '',
+        hora_jiso: dadosAdministrativos.hora_jiso || '',
+        local_jiso: dadosAdministrativos.local_jiso || ''
       });
     }
   }, [jiso]);
@@ -167,6 +175,13 @@ export default function EditarJISO() {
       return;
     }
 
+    const observacoesComDadosAdministrativos = buildObservacoesJiso({
+      observacoesBase: formData.observacoes,
+      numero_tars: formData.numero_tars,
+      hora_jiso: formData.hora_jiso,
+      local_jiso: formData.local_jiso,
+    });
+
     const jisoData = {
       atestado_id: atestadoId,
       militar_id: atestado.militar_id,
@@ -176,6 +191,7 @@ export default function EditarJISO() {
       militar_matricula_atual: atestadoContexto.militar_matricula_atual || atestado.militar_matricula,
       militar_matricula_vinculo: atestadoContexto.militar_matricula_vinculo || atestado.militar_matricula,
       ...formData,
+      observacoes: observacoesComDadosAdministrativos,
       dias_original: atestado.dias,
       dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : null,
       texto_publicacao: gerarTextoPublicacao()
