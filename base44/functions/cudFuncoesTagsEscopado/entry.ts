@@ -21,6 +21,14 @@ const INSTITUCIONAIS = new Set(['comandante', 'subcomandante']);
 
 const normalizeTipo = (t: unknown) => String(t || '').trim().toLowerCase();
 const normalizeNome = (value: unknown) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
+const isDevRuntime = () => {
+  const env = String(Deno.env.get('ENV') || Deno.env.get('NODE_ENV') || '').toLowerCase();
+  return env === 'dev' || env === 'development' || env === 'local';
+};
+function logDev(label: string, payload: Record<string, unknown>) {
+  if (!isDevRuntime()) return;
+  console.log(label, payload);
+}
 
 function extrairMatrizPermissoes(descricao: unknown) {
   if (typeof descricao !== 'string' || !descricao) return {};
@@ -150,10 +158,25 @@ Deno.serve(async (req) => {
     }
 
     if (entidade === 'TagGrupo') {
-      if (!['create', 'update', 'desativar'].includes(operacao)) return erro(400, 'Operação inválida para TagGrupo.');
+      if (!['create', 'update', 'desativar', 'delete'].includes(operacao)) return erro(400, 'Operação inválida para TagGrupo.');
       if (operacao === 'desativar') {
         const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
         return Response.json({ data: await svc.update(String(id), { ativo }) });
+      }
+      if (operacao === 'delete') {
+        const grupoId = String(id || '');
+        const tagsAtivas = await base44.asServiceRole.entities.Tag.filter({ grupo_id: grupoId, ativo: true }, undefined, 2000, 0, ['id', 'nome']);
+        const nomesTagsAtivas = (tagsAtivas || []).map((tag: any) => String(tag?.nome || '').trim()).filter(Boolean);
+        logDev('[GRUPO_DELETE_CHECK]', { grupo_id: grupoId, tagsAtivas: nomesTagsAtivas.length });
+        if (nomesTagsAtivas.length > 0) {
+          return Response.json({
+            code: 'GRUPO_COM_TAGS_ATIVAS',
+            tags_ativas: nomesTagsAtivas,
+            message: 'Este grupo possui tags ativas e não pode ser excluído.',
+          }, { status: 409 });
+        }
+        await svc.delete(grupoId);
+        return Response.json({ data: { id: grupoId, deleted: true } });
       }
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
@@ -178,12 +201,12 @@ Deno.serve(async (req) => {
       }
       if (operacao === 'delete') {
         const tagId = String(id || '');
-        const militarTags = await base44.asServiceRole.entities.MilitarTag.filter({ tag_id: tagId }, undefined, 1, 0, ['id']);
-        const feriasTags = await base44.asServiceRole.entities.FeriasTag.filter({ tag_id: tagId }, undefined, 1, 0, ['id']);
+        const militarTags = await base44.asServiceRole.entities.MilitarTag.filter({ tag_id: tagId, status: 'ativa' }, undefined, 2000, 0, ['id']);
+        const feriasTags = await base44.asServiceRole.entities.FeriasTag.filter({ tag_id: tagId, status: 'ativa' }, undefined, 2000, 0, ['id']);
         let atestadoTags: any[] = [];
         try {
           if (base44.asServiceRole.entities.AtestadoTag?.filter) {
-            atestadoTags = await base44.asServiceRole.entities.AtestadoTag.filter({ tag_id: tagId }, undefined, 1, 0, ['id']);
+            atestadoTags = await base44.asServiceRole.entities.AtestadoTag.filter({ tag_id: tagId, status: 'ativa' }, undefined, 2000, 0, ['id']);
           }
         } catch (_error) {
           atestadoTags = [];
@@ -191,6 +214,12 @@ Deno.serve(async (req) => {
         const militarCount = Array.isArray(militarTags) ? militarTags.length : 0;
         const feriasCount = Array.isArray(feriasTags) ? feriasTags.length : 0;
         const atestadoCount = Array.isArray(atestadoTags) ? atestadoTags.length : 0;
+        logDev('[TAG_DELETE_CHECK]', {
+          tag_id: tagId,
+          militarAtivos: militarCount,
+          feriasAtivos: feriasCount,
+          atestadoAtivos: atestadoCount,
+        });
         const totalVinculos = militarCount + feriasCount + atestadoCount;
         if (totalVinculos > 0) {
           return Response.json({

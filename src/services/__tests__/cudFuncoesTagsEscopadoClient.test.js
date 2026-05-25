@@ -6,6 +6,7 @@ import {
   criarMilitarTagEscopado,
   atualizarTagEscopado,
   desativarTagEscopado,
+  excluirTagGrupoEscopado,
   excluirTagEscopado,
 } from '../cudFuncoesTagsEscopadoClient.js';
 
@@ -78,6 +79,42 @@ test('excluirTagEscopado envia entidade Tag e operacao delete', async () => {
   const result = await excluirTagEscopado('tag-1');
   assert.deepEqual(payload, { entidade: 'Tag', operacao: 'delete', id: 'tag-1' });
   assert.deepEqual(result, { id: 'tag-1', deleted: true });
+});
+
+test('excluirTagGrupoEscopado envia entidade TagGrupo e operacao delete', async () => {
+  let payload = null;
+  base44.functions.invoke = async (_name, body) => {
+    payload = body;
+    return { data: { data: { id: 'grupo-1', deleted: true } } };
+  };
+
+  const result = await excluirTagGrupoEscopado('grupo-1');
+  assert.deepEqual(payload, { entidade: 'TagGrupo', operacao: 'delete', id: 'grupo-1' });
+  assert.deepEqual(result, { id: 'grupo-1', deleted: true });
+});
+
+test('erro GRUPO_COM_TAGS_ATIVAS preserva lista de tags ativas', async () => {
+  base44.functions.invoke = async () => {
+    const error = new Error('Conflict');
+    error.response = {
+      status: 409,
+      data: {
+        code: 'GRUPO_COM_TAGS_ATIVAS',
+        tags_ativas: ['Urgente', 'Disponível'],
+        message: 'Este grupo possui tags ativas e não pode ser excluído.',
+      },
+    };
+    throw error;
+  };
+
+  await assert.rejects(
+    () => excluirTagGrupoEscopado('grupo-1'),
+    (err) => {
+      assert.equal(err.code, 'GRUPO_COM_TAGS_ATIVAS');
+      assert.deepEqual(err.tags_ativas, ['Urgente', 'Disponível']);
+      return true;
+    },
+  );
 });
 
 test('update Tag preserva tipo_uso', async () => {
