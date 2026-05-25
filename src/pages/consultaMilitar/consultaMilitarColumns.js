@@ -19,6 +19,24 @@ const getFirst = (obj, keys = []) => {
   return null;
 };
 
+const getNested = (obj, path) => {
+  if (!obj || !path) return null;
+  const value = String(path)
+    .split('.')
+    .reduce((acc, key) => (acc === null || acc === undefined ? null : acc[key]), obj);
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  return value;
+};
+
+const getFirstFromPaths = (obj, paths = []) => {
+  for (const path of paths) {
+    const value = getNested(obj, path);
+    if (value !== null) return value;
+  }
+  return null;
+};
+
 export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
   {
     key: 'posto_graduacao',
@@ -29,6 +47,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     sensitive: false,
     // TODO(governanca): aplicar visibleFor na renderização/exportação por perfil.
     visibleFor: ['admin', 'gestor'],
+    minWidth: 140,
+    align: 'left',
+    nowrap: true,
     accessor: (militar) => toText(militar?.posto_graduacao, 'Sem posto'),
   },
   {
@@ -39,6 +60,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 240,
+    align: 'left',
+    truncate: true,
     accessor: (militar) => toText(militar?.nome_guerra || militar?.nome_completo),
   },
   {
@@ -49,6 +73,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 240,
+    align: 'left',
+    truncate: true,
     accessor: (militar) => toText(militar?.nome_completo),
   },
   {
@@ -59,6 +86,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 240,
+    align: 'left',
+    truncate: true,
     accessor: (militar) => toText(militar?.nome_guerra),
   },
   {
@@ -69,6 +99,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 130,
+    align: 'center',
+    nowrap: true,
     accessor: (militar) => toText(militar?.matricula),
   },
   {
@@ -79,6 +112,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 120,
+    align: 'left',
+    nowrap: true,
     accessor: (militar) => toText(militar?.quadro),
   },
   {
@@ -89,6 +125,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 130,
+    align: 'center',
+    nowrap: true,
     accessor: (militar) => toText(getFirst(militar, ['ordem_antiguidade', 'antiguidade_ordem', 'antiguidade'])),
   },
   {
@@ -99,7 +138,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toDate(getFirst(militar, ['data_inclusao', 'inclusao_data'])),
+    minWidth: 130,
+    align: 'center',
+    nowrap: true,
+    accessor: (militar) => toDate(getFirst(militar, ['data_inclusao', 'inclusao_data', 'dataInclusao'])),
   },
   {
     key: 'data_promocao_atual',
@@ -109,7 +151,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toDate(getFirst(militar, ['data_promocao_atual', 'promocao_atual_data'])),
+    minWidth: 130,
+    align: 'center',
+    nowrap: true,
+    accessor: (militar) => toDate(getFirst(militar, ['data_promocao_atual', 'promocao_atual_data', 'dataPromocaoAtual'])),
   },
   {
     key: 'comportamento',
@@ -119,6 +164,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 120,
+    align: 'left',
+    nowrap: true,
     accessor: (militar) => toText(militar?.comportamento),
   },
   {
@@ -129,7 +177,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(militar?.lotacao_atual, 'Sem lotação'),
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['lotacao_atual', 'lotacao', 'lotacao_nome', 'lotacao.nome']), 'Sem lotação'),
   },
   {
     key: 'unidade',
@@ -139,7 +190,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(getFirst(militar, ['unidade', 'unidade_nome'])),
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['unidade', 'unidade_nome', 'lotacao_unidade', 'lotacao.unidade', 'lotacao.unidade_nome'])),
   },
   {
     key: 'subgrupamento',
@@ -149,7 +203,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(getFirst(militar, ['subgrupamento', 'subsetor_nome'])),
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['subgrupamento', 'subsetor_nome', 'lotacao_subgrupamento', 'lotacao.subgrupamento', 'lotacao.subsetor_nome'])),
   },
   {
     key: 'grupamento',
@@ -159,7 +216,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(getFirst(militar, ['grupamento', 'setor_nome'])),
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['grupamento', 'setor_nome', 'lotacao_grupamento', 'lotacao.grupamento', 'lotacao.setor_nome'])),
   },
   {
     key: 'municipio',
@@ -169,7 +229,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(getFirst(militar, ['municipio', 'cidade'])),
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['municipio', 'cidade', 'lotacao_municipio', 'lotacao.municipio', 'lotacao.cidade'])),
   },
   {
     key: 'setor_subsetor',
@@ -179,6 +242,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
     accessor: (militar) => toText(getFirst(militar, ['setor_subsetor', 'subsetor', 'setor'])),
   },
   {
@@ -189,6 +255,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 120,
+    align: 'center',
+    nowrap: true,
     accessor: (militar) => toText(militar?.situacao_militar),
   },
   {
@@ -199,6 +268,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 120,
+    align: 'center',
+    nowrap: true,
     accessor: (militar) => toText(militar?.situacao_condicao_militar),
   },
   {
@@ -209,6 +281,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
+    minWidth: 120,
+    align: 'center',
+    nowrap: true,
     accessor: (militar) => toText(militar?.condicao),
   },
   {
@@ -219,7 +294,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(getFirst(militar, ['condicao_origem_destino', 'destino', 'origem_destino'])),
+    minWidth: 180,
+    align: 'left',
+    truncate: true,
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['condicao_origem_destino', 'origem_destino', 'destino', 'origem', 'movimento_origem_destino'])),
   },
   {
     key: 'movimento_condicao',
@@ -259,7 +337,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.cpf),
+    minWidth: 150,
+    align: 'center',
+    nowrap: true,
+    accessor: (militar) => toText(getFirst(militar, ['cpf', 'cpf_numero'])),
   },
   {
     key: 'rg',
@@ -269,7 +350,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.rg),
+    minWidth: 150,
+    align: 'center',
+    nowrap: true,
+    accessor: (militar) => toText(getFirst(militar, ['rg', 'rg_numero'])),
   },
   {
     key: 'data_nascimento',
@@ -279,7 +363,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toDate(militar?.data_nascimento),
+    minWidth: 130,
+    align: 'center',
+    nowrap: true,
+    accessor: (militar) => toDate(getFirst(militar, ['data_nascimento', 'dataNascimento', 'nascimento', 'data_nasc'])),
   },
   {
     key: 'idade',
@@ -299,7 +386,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.sexo),
+    minWidth: 90,
+    align: 'center',
+    nowrap: true,
+    accessor: (militar) => toText(getFirst(militar, ['sexo', 'genero', 'sexo_biologico'])),
   },
   {
     key: 'telefone',
@@ -309,7 +399,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.telefone),
+    accessor: (militar) => toText(getFirst(militar, ['telefone', 'telefone_principal', 'telefone_celular', 'celular'])),
   },
   {
     key: 'email',
@@ -319,7 +409,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.email),
+    accessor: (militar) => toText(getFirst(militar, ['email', 'email_institucional', 'email_pessoal'])),
   },
   {
     key: 'endereco',
@@ -329,7 +419,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.endereco),
+    accessor: (militar) => toText(getFirstFromPaths(militar, ['endereco', 'endereco_completo', 'logradouro', 'residencia_endereco', 'contato.endereco'])),
   },
   {
     key: 'observacoes_administrativas',
