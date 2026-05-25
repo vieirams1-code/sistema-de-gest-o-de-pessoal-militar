@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp, Eye, Pencil, Trash2 } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
@@ -74,6 +74,7 @@ export default function Atestados() {
   const [atestadoToDelete, setAtestadoToDelete] = useState(null);
   const [vigentesCollapsed, setVigentesCollapsed] = useState(false);
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
+  const [modoVisualizacaoVigentes, setModoVisualizacaoVigentes] = useState('cards');
 
   const { data: atestados = [], isLoading } = useQuery({
     queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
@@ -315,18 +316,43 @@ export default function Atestados() {
           <div className="space-y-8">
             {/* Grupo: Vigentes */}
             <div>
-              <button
-                className="flex items-center gap-3 mb-4 w-full group"
-                onClick={() => setVigentesCollapsed(!vigentesCollapsed)}
-              >
-                <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                <h2 className="text-lg font-bold text-[#1e3a5f] group-hover:text-[#2d4a6f]">
-                  Atestados Vigentes
-                </h2>
-                <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">{vigentes.length}</span>
-                <div className="flex-1 h-px bg-slate-200" />
-                {vigentesCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
-              </button>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <button
+                  className="flex items-center gap-3 w-full group"
+                  onClick={() => setVigentesCollapsed(!vigentesCollapsed)}
+                >
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <h2 className="text-lg font-bold text-[#1e3a5f] group-hover:text-[#2d4a6f]">
+                    Atestados Vigentes
+                  </h2>
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">{vigentes.length}</span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                  {vigentesCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                </button>
+
+                <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm shrink-0">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={modoVisualizacaoVigentes === 'cards' ? 'default' : 'ghost'}
+                    onClick={() => setModoVisualizacaoVigentes('cards')}
+                    className="rounded-lg"
+                    aria-pressed={modoVisualizacaoVigentes === 'cards'}
+                  >
+                    ⊞ Cards
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={modoVisualizacaoVigentes === 'lista' ? 'default' : 'ghost'}
+                    onClick={() => setModoVisualizacaoVigentes('lista')}
+                    className="rounded-lg"
+                    aria-pressed={modoVisualizacaoVigentes === 'lista'}
+                  >
+                    ☰ Lista
+                  </Button>
+                </div>
+              </div>
 
               {!vigentesCollapsed && (
                 vigentes.length === 0 ? (
@@ -334,11 +360,52 @@ export default function Atestados() {
                     <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                     <p className="text-slate-500">{hasFilters ? 'Nenhum atestado vigente com esses filtros' : 'Nenhum atestado vigente no momento'}</p>
                   </div>
-                ) : (
+                ) : modoVisualizacaoVigentes === 'cards' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
                       <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-slate-100 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-slate-600">
+                        <tr>
+                          <th className="text-left px-4 py-3">Militar</th>
+                          <th className="text-left px-4 py-3">Matrícula</th>
+                          <th className="text-left px-4 py-3">Período</th>
+                          <th className="text-left px-4 py-3">Tipo</th>
+                          <th className="text-right px-4 py-3">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vigentes.map((a) => (
+                          <tr key={a.id} className="border-b border-slate-100 last:border-0">
+                            <td className="px-4 py-3 text-slate-800">{a.militar_posto} {a.militar_nome}</td>
+                            <td className="px-4 py-3 text-slate-600">{a.militar_matricula_label || a.militar_matricula_atual || a.militar_matricula || '—'}</td>
+                            <td className="px-4 py-3 text-slate-600">{a.data_inicio || '—'} até {getDataFimAfastamento(a) || '—'}</td>
+                            <td className="px-4 py-3 text-slate-600">{a.tipo_afastamento || '—'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleView(a)} title="Visualizar">
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                {canEditarAtestado && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(a)} title="Editar">
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {canExcluirAtestado && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(a)} title="Excluir">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )
               )}
