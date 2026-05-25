@@ -43,7 +43,7 @@ function isTagAtiva(tag) {
 function isTagAplicavelNoMilitar(tag) {
   const aplicabilidade = String(tag?.aplicabilidade || '').trim().toLowerCase();
   if (!aplicabilidade) return true;
-  return aplicabilidade === 'militar' || aplicabilidade === 'ambos';
+  return aplicabilidade === 'militar' || aplicabilidade === 'todos' || aplicabilidade === 'ambos' || aplicabilidade === '';
 }
 
 

@@ -14,7 +14,7 @@ const PERMISSIONS_MAP: Record<string, string[]> = {
   Tag: ['gerir_configuracoes'],
 };
 
-const APLICABILIDADES = new Set(['militar', 'ferias', 'ambos']);
+const APLICABILIDADES = new Set(['militar', 'ferias', 'atestado', 'todos']);
 const TIPOS_VISUAIS = new Set(['normal', 'destaque', 'alerta', 'favorito', 'critico']);
 const TIPOS_USO_TAG = new Set(['comum', 'unica']);
 const INSTITUCIONAIS = new Set(['comandante', 'subcomandante']);
@@ -81,7 +81,8 @@ function normalizarAplicabilidade(value: unknown) {
 
   if (normalized === 'militar') return 'militar';
   if (normalized === 'ferias') return 'ferias';
-  if (normalized === 'ambos') return 'ambos';
+  if (normalized === 'atestado') return 'atestado';
+  if (normalized === 'todos' || normalized === 'ambos' || !normalized) return 'todos';
   return null;
 }
 function validarAplicabilidade(value: unknown) { return APLICABILIDADES.has(String(value || '').trim()); }
@@ -159,7 +160,7 @@ Deno.serve(async (req) => {
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
-      if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
+      if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       const gruposAtivos = await base44.asServiceRole.entities.TagGrupo.filter({ ativo: true }, undefined, 1000, 0);
       const nomeNorm = normalizeNome(nome);
@@ -182,7 +183,7 @@ Deno.serve(async (req) => {
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
       const tipoUso = normalizarTipoUsoTag(data?.tipo_uso ?? registroAtual?.tipo_uso);
-      if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
+      if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       if (!TIPOS_USO_TAG.has(tipoUso)) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
 
@@ -192,8 +193,8 @@ Deno.serve(async (req) => {
         if (!grupo) return erro(404, 'Grupo não encontrado.');
         if (!grupo.ativo) return erro(400, 'Grupo inativo.');
         const grupoApl = String(grupo.aplicabilidade || '');
-        if (grupoApl === 'militar' && !['militar', 'ambos'].includes(aplicabilidade)) return erro(400, 'Grupo militar só aceita tag militar/ambos.');
-        if (grupoApl === 'ferias' && !['ferias', 'ambos'].includes(aplicabilidade)) return erro(400, 'Grupo ferias só aceita tag ferias/ambos.');
+        if (grupoApl === 'militar' && !['militar', 'todos'].includes(aplicabilidade)) return erro(400, 'Grupo militar só aceita tag militar/todos.');
+        if (grupoApl === 'ferias' && !['ferias', 'todos'].includes(aplicabilidade)) return erro(400, 'Grupo ferias só aceita tag ferias/todos.');
       }
 
       const ativas = await base44.asServiceRole.entities.Tag.filter({ ativo: true }, undefined, 2000, 0);
@@ -251,7 +252,7 @@ Deno.serve(async (req) => {
         const [tag] = await base44.asServiceRole.entities.Tag.filter({ id: tagId }, undefined, 1, 0);
         if (!tag) return erro(404, 'Tag não encontrada.');
         if (!tag.ativo) return erro(400, 'Tag inativa.');
-        if (!['militar', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para militar.');
+        if (!['militar', 'todos', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para militar.');
         const tipoUsoTag = normalizarTipoUsoTag(tag.tipo_uso);
         const duplicadas = await base44.asServiceRole.entities.MilitarTag.filter({ militar_id: militarId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
         if ((duplicadas || []).some((d: any) => String(d.id) !== String(id || ''))) return erro(400, 'Tag ativa já vinculada para este militar.');
@@ -290,7 +291,7 @@ Deno.serve(async (req) => {
       const [tag] = await base44.asServiceRole.entities.Tag.filter({ id: tagId }, undefined, 1, 0);
       if (!tag) return erro(404, 'Tag não encontrada.');
       if (!tag.ativo) return erro(400, 'Tag inativa.');
-      if (!['ferias', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para férias.');
+      if (!['ferias', 'todos', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para férias.');
       const duplicadas = await base44.asServiceRole.entities.FeriasTag.filter({ ferias_id: feriasId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
       if ((duplicadas || []).some((d: any) => String(d.id) !== String(id || ''))) return erro(400, 'Tag ativa já vinculada para esta férias.');
       if (operacao === 'create') return Response.json({ data: await svc.create({ ...data, ferias_id: feriasId, status: 'ativa' }) });

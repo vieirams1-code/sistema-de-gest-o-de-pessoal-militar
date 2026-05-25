@@ -1,4 +1,4 @@
-export const APLICABILIDADE_TAG_MILITAR = new Set(['militar', 'ambos']);
+export const APLICABILIDADE_TAG_MILITAR = new Set(['', 'militar', 'todos', 'ambos']);
 
 const normalizarTexto = (valor) => String(valor || '').trim().toLowerCase();
 

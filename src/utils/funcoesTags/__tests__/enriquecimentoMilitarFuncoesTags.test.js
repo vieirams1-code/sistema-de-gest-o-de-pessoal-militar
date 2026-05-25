@@ -20,7 +20,7 @@ describe('enriquecimentoMilitarFuncoesTags', () => {
     const gruposTagsAtivos = [{ id: 'g1', nome: 'Restrições' }, { id: 'g2', nome: 'Destaques' }];
     const tagsAtivas = [
       { id: 't1', nome: 'Restrição A', tag_grupo_id: 'g1', aplicabilidade: 'militar', ordem_lista: 2 },
-      { id: 't2', nome: 'Restrição B', grupo_id: 'g1', aplicabilidade: 'ambos', ordem_lista: 1 },
+      { id: 't2', nome: 'Restrição B', grupo_id: 'g1', aplicabilidade: 'todos', ordem_lista: 1 },
       { id: 't3', nome: 'Condecorado', grupo_id: 'g2', aplicabilidade: 'militar', ordem_lista: 1 },
       { id: 't4', nome: 'Somente férias', grupo_id: 'g2', aplicabilidade: 'ferias', ordem_lista: 1 },
     ];

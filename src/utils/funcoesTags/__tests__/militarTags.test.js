@@ -20,9 +20,10 @@ describe('validarAplicabilidadeTagMilitar', () => {
     expect(mensagem).toBe('Esta tag não pode ser aplicada em militares.');
   });
 
-  it('permite tag militar', () => {
-    const mensagem = validarAplicabilidadeTagMilitar({ aplicabilidade: 'militar' });
-    expect(mensagem).toBeNull();
+  it('permite tag militar/todos/ambos legado', () => {
+    expect(validarAplicabilidadeTagMilitar({ aplicabilidade: 'militar' })).toBeNull();
+    expect(validarAplicabilidadeTagMilitar({ aplicabilidade: 'todos' })).toBeNull();
+    expect(validarAplicabilidadeTagMilitar({ aplicabilidade: 'ambos' })).toBeNull();
   });
 });
 

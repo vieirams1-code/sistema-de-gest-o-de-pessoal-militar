@@ -2,7 +2,7 @@
   "name": "Tag",
   "type": "object",
   "title": "Tag",
-  "description": "Tag aplicável a militares e/ou férias, vinculada opcionalmente a um TagGrupo.",
+  "description": "Tag aplicável a militares, férias e/ou atestados, vinculada opcionalmente a um TagGrupo.",
   "properties": {
     "nome": {
       "type": "string",
@@ -18,9 +18,10 @@
       "enum": [
         "militar",
         "ferias",
-        "ambos"
+        "atestado",
+        "todos"
       ],
-      "default": "ambos"
+      "default": "todos"
     },
     "tipo_visual": {
       "type": "string",
