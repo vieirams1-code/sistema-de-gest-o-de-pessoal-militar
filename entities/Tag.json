@@ -2,7 +2,7 @@
   "name": "Tag",
   "type": "object",
   "title": "Tag",
-  "description": "Tag aplicável a militares e/ou férias com suporte a escopo.",
+  "description": "Tag aplicável a militares, férias e/ou atestados com suporte a escopo.",
   "properties": {
     "grupo_id": {
       "type": "string",
@@ -44,9 +44,10 @@
       "enum": [
         "militar",
         "ferias",
-        "ambos"
+        "atestado",
+        "todos"
       ],
-      "default": "ambos"
+      "default": "todos"
     },
     "ordem_exibicao": {
       "type": "number",

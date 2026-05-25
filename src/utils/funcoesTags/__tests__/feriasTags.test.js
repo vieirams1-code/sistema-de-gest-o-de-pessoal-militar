@@ -3,6 +3,7 @@ import {
   separarTagsFeriasPorStatus,
   validarAplicabilidadeTagFerias,
   validarDuplicidadeTagAtivaFerias,
+  isTagAplicavelNoAtestado,
 } from '../feriasTags';
 
 describe('feriasTags', () => {
@@ -18,8 +19,15 @@ describe('feriasTags', () => {
 
   it('valida aplicabilidade de férias', () => {
     expect(validarAplicabilidadeTagFerias({ aplicabilidade: 'ferias' })).toBeNull();
+    expect(validarAplicabilidadeTagFerias({ aplicabilidade: 'todos' })).toBeNull();
     expect(validarAplicabilidadeTagFerias({ aplicabilidade: 'ambos' })).toBeNull();
     expect(validarAplicabilidadeTagFerias({ aplicabilidade: 'militar' })).toBe('Esta tag não pode ser aplicada em férias.');
+  });
+
+  it('valida aplicabilidade de atestado (helper preparatório)', () => {
+    expect(isTagAplicavelNoAtestado({ ativo: true, aplicabilidade: 'atestado' })).toBe(true);
+    expect(isTagAplicavelNoAtestado({ ativo: true, aplicabilidade: 'todos' })).toBe(true);
+    expect(isTagAplicavelNoAtestado({ ativo: true, aplicabilidade: 'ferias' })).toBe(false);
   });
 
   it('bloqueia duplicidade de tag ativa na mesma férias', () => {

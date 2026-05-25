@@ -22,10 +22,10 @@ import {
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 
-const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'ambos', label: 'Ambos' }];
-const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'ambos', ativa: true };
-const FORM_GRUPO = { nome: '', aplicabilidade: 'ambos', emoji: '🚒', cor: '#0F766E', ativo: true };
-const FORM_TAG = { grupo_id: '', nome: '', aplicabilidade: 'ambos', emoji: '⚠️', tipo_visual: 'chip', tipo_uso: 'comum', cor: '#F59E0B', ativo: true };
+const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
+const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'todos', ativa: true };
+const FORM_GRUPO = { nome: '', aplicabilidade: 'todos', emoji: '🚒', cor: '#0F766E', ativo: true };
+const FORM_TAG = { grupo_id: '', nome: '', aplicabilidade: 'todos', emoji: '⚠️', tipo_visual: 'chip', tipo_uso: 'comum', cor: '#F59E0B', ativo: true };
 const isFuncaoInstitucionalProtegida = (funcao) => Boolean(funcao?.institucional_chave && INSTITUCIONAIS[funcao.institucional_chave]);
 
 const TERMOS_TAGS_INSTITUCIONAIS = ['comandante', 'subcomandante', 'comando', 'subcomando'];
@@ -317,7 +317,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
 }
 
 const filtrar = (itens, termo) => itens.filter((i) => String(i?.nome || '').toLowerCase().includes(String(termo || '').toLowerCase()));
-const labelAplicabilidade = (v) => v === 'militar' ? 'Militar' : v === 'ferias' ? 'Férias' : 'Ambos';
+const labelAplicabilidade = (v) => v === 'militar' ? 'Militar' : v === 'ferias' ? 'Férias' : v === 'atestado' ? 'Atestado' : 'Todos';
 const normalizarTipoUsoTag = (v) => v === 'unica' ? 'unica' : 'comum';
 function TabButton({ id, icon: Icon, label, activeTab, setActiveTab }) { const active = activeTab === id; return <button type="button" onClick={() => setActiveTab(id)} className={['inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition', active ? 'bg-white text-indigo-700 shadow border border-indigo-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'].join(' ')}><Icon className="w-4 h-4" />{label}</button>; }
 function PreviewBadge({ emoji, nome, cor, fallback = 'Prévia' }) { return <div className="flex items-center gap-2"><span className="text-xs text-slate-400">Preview visual:</span><span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold" style={{ borderColor: cor || '#CBD5E1', backgroundColor: `${cor || '#E2E8F0'}22`, color: cor || '#334155' }}><IconeCatalogo value={emoji || '🏷️'} /><span>{nome || fallback}</span></span></div>; }

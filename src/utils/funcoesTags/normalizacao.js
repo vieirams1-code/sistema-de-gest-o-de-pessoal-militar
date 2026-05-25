@@ -14,10 +14,12 @@ export function normalizarGrupoId(grupoId) {
 const APLICABILIDADE_MAP = {
   militar: 'militar',
   ferias: 'ferias',
-  ambos: 'ambos'
+  atestado: 'atestado',
+  todos: 'todos',
+  ambos: 'todos'
 };
 
 export function normalizarAplicabilidade(valor) {
   const chave = normalizarTexto(valor);
-  return APLICABILIDADE_MAP[chave] || null;
+  return APLICABILIDADE_MAP[chave] || 'todos';
 }
