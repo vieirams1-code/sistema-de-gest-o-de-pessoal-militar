@@ -48,48 +48,10 @@ export default function AgendarJISO() {
   };
 
 
-  const buildContextoTemplateJiso = useCallback(({ atestado, jiso }) => ({
-    militar: {
-      nome: atestado?.militar_nome || '',
-      posto_graduacao: atestado?.militar_posto || '',
-      matricula: atestado?.militar_matricula_label || atestado?.militar_matricula_atual || atestado?.militar_matricula || '',
-      lotacao: atestado?.militar_lotacao || atestado?.lotacao || '',
-    },
-    atestado: {
-      id: atestado?.id,
-      data_inicio: atestado?.data_inicio,
-      data_fim: atestado?.data_termino,
-      quantidade_dias: atestado?.dias,
-      cid: atestado?.cid_10 || atestado?.cid || '',
-      medico: atestado?.medico || atestado?.medico_nome || '',
-    },
-    jiso: {
-      id: jiso?.id,
-      data_agendamento: jiso?.data_agendamento || jiso?.data_jiso,
-      horario: jiso?.horario || '',
-      local: jiso?.local || '',
-      junta: jiso?.junta_nome || jiso?.junta || '',
-    },
-  }), []);
-
-  const handleGerarTarsAgendamento = useCallback(({ atestado, jiso }) => {
-    const contexto = buildContextoTemplateJiso({ atestado, jiso });
-    // TODO: integrar ao motor de templates quando o template TARS_JISO_AGENDAMENTO existir.
-    console.info('TODO template TARS_JISO_AGENDAMENTO', contexto);
-    alert('TODO: integração do template TARS_JISO_AGENDAMENTO ainda não disponível.');
-  }, [buildContextoTemplateJiso]);
-
-  const handleGerarOficioApresentacao = useCallback(({ atestado, jiso }) => {
-    const contexto = buildContextoTemplateJiso({ atestado, jiso });
-    // TODO: integrar ao motor de templates quando o template OFICIO_APRESENTACAO_JISO existir.
-    console.info('TODO template OFICIO_APRESENTACAO_JISO', contexto);
-    alert('TODO: integração do template OFICIO_APRESENTACAO_JISO ainda não disponível.');
-  }, [buildContextoTemplateJiso]);
-
   const handleAbrirEdicaoJiso = useCallback((atestado) => {
     const escopo = validarEscopoMilitar(atestado?.militar_id);
     if (!escopo.permitido) {
-      alert(escopo.motivo);
+      console.warn('Acesso negado para registrar decisão JISO', escopo?.motivo);
       return;
     }
     navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`);
@@ -272,14 +234,9 @@ export default function AgendarJISO() {
             atestados={filteredAtestados}
             jisos={jisos}
             loading={isLoadingAtestados}
-            onAgendarJiso={handleAbrirEdicaoJiso}
             onRegistrarDecisaoJiso={handleAbrirEdicaoJiso}
             onVisualizarJiso={handleVisualizarAtestado}
-            onAnexarAtaJiso={handleAbrirEdicaoJiso}
-            onGerarPublicacaoAta={handleAbrirEdicaoJiso}
-            onReverterJiso={handleAbrirEdicaoJiso}
-            onGerarTarsAgendamento={handleGerarTarsAgendamento}
-            onGerarOficioApresentacao={handleGerarOficioApresentacao}
+            canRegistrarDecisaoJiso={canAccessAction('registrar_decisao_jiso')}
           />
         )}
       </div>

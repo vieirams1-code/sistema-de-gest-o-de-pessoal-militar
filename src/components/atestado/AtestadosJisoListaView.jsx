@@ -13,8 +13,8 @@ function formatDate(value) {
 
 function getStatusJisoDerivado({ jiso }) {
   if (!jiso) return 'Sem JISO';
-  if (jiso.data_ata || jiso.ata_url || jiso.arquivo_ata_url || jiso.ata_jiso) return 'Ata registrada';
-  if (jiso.data_agendamento || jiso.data_jiso) return 'Agendada';
+  if (jiso.ata_jiso || jiso.data_ata) return 'Ata registrada';
+  if (jiso.data_jiso || jiso.data_agendamento) return 'Agendada';
   if (jiso.id) return 'Solicitada';
   return 'Sem JISO';
 }
@@ -23,14 +23,9 @@ export default function AtestadosJisoListaView({
   atestados = [],
   jisos = [],
   loading = false,
-  onAgendarJiso,
   onRegistrarDecisaoJiso,
   onVisualizarJiso,
-  onAnexarAtaJiso,
-  onGerarPublicacaoAta,
-  onReverterJiso,
-  onGerarTarsAgendamento,
-  onGerarOficioApresentacao,
+  canRegistrarDecisaoJiso = false,
 }) {
   const [expanded, setExpanded] = useState({});
 
@@ -86,9 +81,12 @@ export default function AtestadosJisoListaView({
               </div>
 
               <div className="flex flex-wrap items-start justify-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => onVisualizarJiso?.(atestado, jiso)}>Detalhes</Button>
-                <Button size="sm" variant="outline" onClick={() => onAgendarJiso?.(atestado, jiso)}>{jiso ? 'Visualizar JISO' : 'Agendar JISO'}</Button>
-                <Button size="sm" variant="outline" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>Registrar decisão</Button>
+                <Button size="sm" variant="outline" onClick={() => onVisualizarJiso?.(atestado, jiso)}>Visualizar atestado</Button>
+                {canRegistrarDecisaoJiso && (
+                  <Button size="sm" variant="outline" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
+                    {jiso ? 'Editar JISO' : 'Registrar JISO'}
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => setExpanded((p) => ({ ...p, [atestado.id]: !isExpanded }))}>
                   {isExpanded ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />} Expandir
                 </Button>
@@ -108,21 +106,22 @@ export default function AtestadosJisoListaView({
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <p className="mb-2 text-sm font-semibold text-slate-800">Documentos por template</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => onGerarTarsAgendamento?.({ atestado, jiso })}>Gerar TARS de agendamento</Button>
-                      <Button size="sm" variant="secondary" onClick={() => onGerarOficioApresentacao?.({ atestado, jiso })}>Gerar ofício de apresentação</Button>
-                    </div>
+                    <p className="text-sm text-slate-600">
+                      TARS de agendamento e ofício de apresentação serão integrados em lote próprio, usando templates institucionais.
+                    </p>
                   </div>
 
                   <div className="rounded-lg border border-slate-200 p-3">
                     <p className="mb-2 text-sm font-semibold text-slate-800">Rotinas atuais</p>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => onAgendarJiso?.(atestado, jiso)}>Agendar/visualizar JISO</Button>
-                      <Button size="sm" variant="outline" onClick={() => onAnexarAtaJiso?.(atestado, jiso)}>Subir ata</Button>
-                      <Button size="sm" variant="outline" onClick={() => onGerarPublicacaoAta?.(atestado, jiso)}>Gerar publicação</Button>
-                      <Button size="sm" variant="outline" onClick={() => onReverterJiso?.(atestado, jiso)}>Reverter/cancelar</Button>
+                      <Button size="sm" variant="outline" onClick={() => onVisualizarJiso?.(atestado, jiso)}>Visualizar atestado</Button>
+                      {canRegistrarDecisaoJiso && (
+                        <Button size="sm" variant="outline" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
+                          {jiso ? 'Editar JISO' : 'Registrar JISO'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
