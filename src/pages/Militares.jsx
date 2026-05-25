@@ -62,6 +62,7 @@ import {
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
 import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -197,86 +198,6 @@ function militarCorrespondeOrigemDestino(militar, termo) {
   if (!q) return true;
   const texto = String(militar?.condicao_origem_destino || militar?.destino || '').toLowerCase();
   return texto.includes(q);
-}
-
-const POSTO_GRADUACAO_ORDEM_ANTIGUIDADE = {
-  'coronel': 0,
-  'tenente coronel': 1,
-  'major': 2,
-  'capitao': 3,
-  'capitão': 3,
-  '1º tenente': 4,
-  '1o tenente': 4,
-  '2º tenente': 5,
-  '2o tenente': 5,
-  'aspirante': 6,
-  'subtenente': 7,
-  '1º sargento': 8,
-  '1o sargento': 8,
-  '2º sargento': 9,
-  '2o sargento': 9,
-  '3º sargento': 10,
-  '3o sargento': 10,
-  'cabo': 11,
-  'soldado': 12,
-};
-
-function normalizarTextoComparacao(valor) {
-  return String(valor || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
-}
-
-function resolverAntiguidadeNumerica(militar = {}) {
-  const candidatos = [
-    militar?.ordem_antiguidade,
-    militar?.antiguidade_ordem,
-    militar?.numero_antiguidade,
-    militar?.antiguidade_referencia_ordem,
-    militar?.antiguidade,
-  ];
-
-  for (const valor of candidatos) {
-    if (valor === null || valor === undefined || valor === '') continue;
-    const numero = Number(valor);
-    if (Number.isFinite(numero)) return numero;
-  }
-
-  return null;
-}
-
-function resolverOrdemPostoGraduacao(militar = {}) {
-  const posto = normalizarTextoComparacao(militar?.posto_grad || militar?.posto_graduacao || militar?.posto || '');
-  return POSTO_GRADUACAO_ORDEM_ANTIGUIDADE[posto] ?? Number.POSITIVE_INFINITY;
-}
-
-function ordenarEfetivoPorAntiguidade(militares = []) {
-  return militares
-    .slice()
-    .sort((a, b) => {
-      const antiguidadeA = resolverAntiguidadeNumerica(a);
-      const antiguidadeB = resolverAntiguidadeNumerica(b);
-      const aSemAntiguidade = antiguidadeA === null;
-      const bSemAntiguidade = antiguidadeB === null;
-
-      if (aSemAntiguidade !== bSemAntiguidade) return aSemAntiguidade ? 1 : -1;
-      if (!aSemAntiguidade && antiguidadeA !== antiguidadeB) return antiguidadeA - antiguidadeB;
-
-      const postoA = resolverOrdemPostoGraduacao(a);
-      const postoB = resolverOrdemPostoGraduacao(b);
-      if (postoA !== postoB) return postoA - postoB;
-
-      const nomeA = String(a?.nome_guerra || a?.nome || '').trim();
-      const nomeB = String(b?.nome_guerra || b?.nome || '').trim();
-      const nomeComparacao = nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
-      if (nomeComparacao !== 0) return nomeComparacao;
-
-      const matriculaA = String(a?.matricula || '').trim();
-      const matriculaB = String(b?.matricula || '').trim();
-      return matriculaA.localeCompare(matriculaB, 'pt-BR', { numeric: true, sensitivity: 'base' });
-    });
 }
 
 export default function Militares() {
@@ -648,7 +569,7 @@ export default function Militares() {
   const filteredMilitares = useMemo(
     () => {
       const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
-      return ordenarEfetivoPorAntiguidade(filtradosPorColuna);
+      return ordenarMilitaresPorAntiguidadeInstitucional(filtradosPorColuna);
     },
     [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters],
   );
