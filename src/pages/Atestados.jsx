@@ -84,8 +84,9 @@ export default function Atestados() {
       if (meta?.partialFailures > 0) {
         console.warn('getScopedAtestadosBundle retornou partialFailures', meta);
       }
+      const atestadosEnriquecidos = await enriquecerAtestadosComContextoMilitar(atestados, { contexto: 'operacional', filtrarMesclados: true });
       return {
-        atestados: enriquecerAtestadosComContextoMilitar(atestados, { contexto: 'operacional', filtrarMesclados: true }),
+        atestados: atestadosEnriquecidos,
         jisos,
       };
     },
