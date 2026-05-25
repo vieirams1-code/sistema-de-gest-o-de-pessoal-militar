@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ChevronDown, ChevronUp, RefreshCw, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import {
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ANTIGUIDADE_OFICIAL_ITENS_QUERY_KEY } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
 
 const TODOS = '__todos__';
 
@@ -210,6 +211,7 @@ function LoadingState() {
 }
 
 export default function AntiguidadePrevia() {
+  const queryClient = useQueryClient();
   const [filtros, setFiltros] = useState(filtroInicial);
   const [linhasExpandidas, setLinhasExpandidas] = useState({});
 
@@ -264,6 +266,10 @@ export default function AntiguidadePrevia() {
       },
     });
   }, [data, selecaoConfiguracao]);
+
+  useEffect(() => {
+    queryClient.setQueryData(ANTIGUIDADE_OFICIAL_ITENS_QUERY_KEY, resultado?.itens || []);
+  }, [queryClient, resultado]);
 
   const opcoesPosto = useMemo(() => opcoesUnicas(resultado?.itens, 'posto_graduacao'), [resultado]);
   const opcoesQuadro = useMemo(() => opcoesUnicas(resultado?.itens, 'quadro'), [resultado]);
