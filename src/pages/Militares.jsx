@@ -199,121 +199,83 @@ function militarCorrespondeOrigemDestino(militar, termo) {
   return texto.includes(q);
 }
 
-function normalizarValorEstrutural(valor) {
-  if (valor === null || valor === undefined) return null;
-  const texto = String(valor).trim().toLowerCase();
-  if (!texto) return null;
-  return texto
+const POSTO_GRADUACAO_ORDEM_ANTIGUIDADE = {
+  'coronel': 0,
+  'tenente coronel': 1,
+  'major': 2,
+  'capitao': 3,
+  'capitão': 3,
+  '1º tenente': 4,
+  '1o tenente': 4,
+  '2º tenente': 5,
+  '2o tenente': 5,
+  'aspirante': 6,
+  'subtenente': 7,
+  '1º sargento': 8,
+  '1o sargento': 8,
+  '2º sargento': 9,
+  '2o sargento': 9,
+  '3º sargento': 10,
+  '3o sargento': 10,
+  'cabo': 11,
+  'soldado': 12,
+};
+
+function normalizarTextoComparacao(valor) {
+  return String(valor || '')
+    .trim()
+    .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/[̀-ͯ]/g, '');
 }
 
-function coletarContextosEstruturais(...fontes) {
-  const valores = new Set();
-  const chaves = [
-    'lotacao_id',
-    'estrutura_id',
-    'subsetor_id',
-    'setor_id',
-    'subgrupamento_id',
-    'subgrupamento',
-    'lotacao',
-    'lotacao_nome',
-    'estrutura_nome',
-    'lotacao_atual',
-    'nome',
+function resolverAntiguidadeNumerica(militar = {}) {
+  const candidatos = [
+    militar?.ordem_antiguidade,
+    militar?.antiguidade_ordem,
+    militar?.numero_antiguidade,
+    militar?.antiguidade_referencia_ordem,
+    militar?.antiguidade,
   ];
 
-  fontes.forEach((fonte) => {
-    if (!fonte || typeof fonte !== 'object') return;
-    chaves.forEach((chave) => {
-      const normalizado = normalizarValorEstrutural(fonte?.[chave]);
-      if (normalizado) valores.add(normalizado);
-    });
-  });
-
-  return valores;
-}
-
-function resolverContextoEstrutural(militar, vinculo, filtro) {
-  const contextoMilitar = coletarContextosEstruturais(militar);
-  const contextoVinculo = coletarContextosEstruturais(vinculo);
-  const contextoFiltro = coletarContextosEstruturais(filtro);
-
-  const pertenceLotacao = [...contextoVinculo].some((valor) => contextoMilitar.has(valor));
-  const dentroDoFiltro = contextoFiltro.size === 0
-    ? false
-    : [...contextoFiltro].some((valor) => contextoMilitar.has(valor) || contextoVinculo.has(valor));
-
-  return { pertenceLotacao, dentroDoFiltro };
-}
-
-function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitucionais = [], vinculosFuncoesAtivos = [], contextoEstrutural = null) {
-  const PRIORIDADE_FUNCAO = { comandante: 0, subcomandante: 1 };
-  const PRIORIDADE_SEM_FUNCAO = 999;
-  const PRIORIDADE_ESTRUTURA_MATCH = 0;
-  const PRIORIDADE_ESTRUTURA_FORA = 999;
-  const filtroContexto = contextoEstrutural !== null && contextoEstrutural !== undefined
-    ? { lotacao_id: contextoEstrutural }
-    : null;
-  const funcoesById = new Map(funcoesInstitucionais.map((funcao) => [String(funcao?.id || ''), funcao]));
-
-  const scorePorMilitar = new Map();
-  const militarPorId = new Map(militares.map((militar) => [String(militar?.id || ''), militar]));
-
-  vinculosFuncoesAtivos.forEach((vinculo) => {
-    const militarId = String(vinculo?.militar_id || '');
-    if (!militarId) return;
-    const militar = militarPorId.get(militarId);
-    if (!militar) return;
-
-    const funcao = funcoesById.get(String(vinculo?.funcao_id || ''));
-    if (!funcao) return;
-    const chave = String(funcao?.institucional_chave || '').trim().toLowerCase();
-    const prioridadeFuncao = PRIORIDADE_FUNCAO[chave];
-    if (prioridadeFuncao === undefined) return;
-
-    const { pertenceLotacao, dentroDoFiltro } = resolverContextoEstrutural(militar, vinculo, filtroContexto);
-    if (!pertenceLotacao) return;
-
-    const prioridadeEstrutura = dentroDoFiltro
-      ? PRIORIDADE_ESTRUTURA_MATCH
-      : PRIORIDADE_ESTRUTURA_FORA;
-    const score = prioridadeFuncao + prioridadeEstrutura;
-
-    const atual = scorePorMilitar.get(militarId);
-    if (atual === undefined || score < atual) {
-      scorePorMilitar.set(militarId, score);
-    }
-  });
-
-  const normalizarAntiguidade = (militar) => {
-    const valor = militar?.ordem_antiguidade ?? militar?.antiguidade_referencia_ordem ?? militar?.antiguidade ?? null;
-    if (valor === null || valor === undefined || valor === '') return null;
+  for (const valor of candidatos) {
+    if (valor === null || valor === undefined || valor === '') continue;
     const numero = Number(valor);
     if (Number.isFinite(numero)) return numero;
-    return String(valor);
-  };
+  }
 
+  return null;
+}
+
+function resolverOrdemPostoGraduacao(militar = {}) {
+  const posto = normalizarTextoComparacao(militar?.posto_grad || militar?.posto_graduacao || militar?.posto || '');
+  return POSTO_GRADUACAO_ORDEM_ANTIGUIDADE[posto] ?? Number.POSITIVE_INFINITY;
+}
+
+function ordenarEfetivoPorAntiguidade(militares = []) {
   return militares
     .slice()
     .sort((a, b) => {
-      const prioridadeA = scorePorMilitar.get(String(a?.id || '')) ?? PRIORIDADE_SEM_FUNCAO;
-      const prioridadeB = scorePorMilitar.get(String(b?.id || '')) ?? PRIORIDADE_SEM_FUNCAO;
-      if (prioridadeA !== prioridadeB) return prioridadeA - prioridadeB;
+      const antiguidadeA = resolverAntiguidadeNumerica(a);
+      const antiguidadeB = resolverAntiguidadeNumerica(b);
+      const aSemAntiguidade = antiguidadeA === null;
+      const bSemAntiguidade = antiguidadeB === null;
 
-      const antiguidadeA = normalizarAntiguidade(a);
-      const antiguidadeB = normalizarAntiguidade(b);
-      const aNulo = antiguidadeA === null;
-      const bNulo = antiguidadeB === null;
-      if (aNulo !== bNulo) return aNulo ? 1 : -1;
-      if (!aNulo && antiguidadeA !== antiguidadeB) {
-        if (typeof antiguidadeA === 'number' && typeof antiguidadeB === 'number') return antiguidadeA - antiguidadeB;
-        return String(antiguidadeA).localeCompare(String(antiguidadeB), 'pt-BR', { numeric: true, sensitivity: 'base' });
-      }
+      if (aSemAntiguidade !== bSemAntiguidade) return aSemAntiguidade ? 1 : -1;
+      if (!aSemAntiguidade && antiguidadeA !== antiguidadeB) return antiguidadeA - antiguidadeB;
 
-      return String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' });
+      const postoA = resolverOrdemPostoGraduacao(a);
+      const postoB = resolverOrdemPostoGraduacao(b);
+      if (postoA !== postoB) return postoA - postoB;
+
+      const nomeA = String(a?.nome_guerra || a?.nome || '').trim();
+      const nomeB = String(b?.nome_guerra || b?.nome || '').trim();
+      const nomeComparacao = nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
+      if (nomeComparacao !== 0) return nomeComparacao;
+
+      const matriculaA = String(a?.matricula || '').trim();
+      const matriculaB = String(b?.matricula || '').trim();
+      return matriculaA.localeCompare(matriculaB, 'pt-BR', { numeric: true, sensitivity: 'base' });
     });
 }
 
@@ -686,14 +648,9 @@ export default function Militares() {
   const filteredMilitares = useMemo(
     () => {
       const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
-      return ordenarEfetivoComPrioridadeInstitucional(
-        filtradosPorColuna,
-        funcoesInstitucionais,
-        vinculosFuncoesAtivosFiltros,
-        lotacaoFilter !== TODAS_LOTACOES_VALUE ? lotacaoFilter : null,
-      );
+      return ordenarEfetivoPorAntiguidade(filtradosPorColuna);
     },
-    [filteredMilitaresComFuncoesTags, columnFilters, funcoesInstitucionais, vinculosFuncoesAtivosFiltros, lotacaoFilter],
+    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(
