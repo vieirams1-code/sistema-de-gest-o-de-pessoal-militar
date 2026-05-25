@@ -22,7 +22,7 @@ import {
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 
-const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
+export const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
 const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'todos', ativa: true };
 const FORM_GRUPO = { nome: '', aplicabilidade: 'todos', emoji: '🚒', cor: '#0F766E', ativo: true };
 const FORM_TAG = { grupo_id: '', nome: '', aplicabilidade: 'todos', emoji: '⚠️', tipo_visual: 'chip', tipo_uso: 'comum', cor: '#F59E0B', ativo: true };
