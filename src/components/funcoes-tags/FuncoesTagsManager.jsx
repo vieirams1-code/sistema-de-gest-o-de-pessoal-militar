@@ -67,7 +67,25 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
   const tagsFiltradas = useMemo(() => filtrar(tags, buscaTag), [tags, buscaTag]);
 
   const invalidate = (key) => { queryClient.invalidateQueries({ queryKey: ['funcoes-tags', key] }); queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }); };
-  const saveFuncao = useMutation({ mutationFn: (p) => editandoFuncao ? atualizarFuncaoMilitarEscopado(editandoFuncao.id, p) : criarFuncaoMilitarEscopado(p), onSuccess: () => { invalidate('funcoes'); toast({ title: 'Função salva com sucesso.' }); } });
+  const saveFuncao = useMutation({
+    mutationFn: (p) => {
+      const editandoId = editandoFuncao?.id;
+      console.debug('[FUNCAO_SAVE_MUTATION_FN]', { editandoId, modo: editandoId ? 'update' : 'create' });
+      return editandoId
+        ? atualizarFuncaoMilitarEscopado(editandoId, p)
+        : criarFuncaoMilitarEscopado(p);
+    },
+    onSuccess: () => {
+      console.debug('[FUNCAO_SAVE_SUCCESS]');
+      invalidate('funcoes');
+      toast({ title: 'Função salva com sucesso.' });
+      cancelarEdicaoFuncao();
+    },
+    onError: (error) => {
+      console.debug('[FUNCAO_SAVE_ERROR]', error);
+      toast({ title: 'Não foi possível salvar a função.', description: error?.message, variant: 'destructive' });
+    },
+  });
   const saveGrupo = useMutation({ mutationFn: (p) => editandoGrupo ? atualizarTagGrupoEscopado(editandoGrupo.id, p) : criarTagGrupoEscopado(p), onSuccess: () => { invalidate('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); } });
   const saveTag = useMutation({ mutationFn: (p) => editandoTag ? atualizarTagEscopado(editandoTag.id, p) : criarTagEscopado(p), onSuccess: () => { invalidate('tags'); toast({ title: 'Tag salva com sucesso.' }); } });
   const desativarTagMutation = useMutation({
@@ -103,21 +121,21 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
     const funcaoInstitucional = isFuncaoInstitucionalProtegida(editandoFuncao);
     const payload = {
       ...formFuncao,
-      ativa: editandoFuncao?.ativa ?? formFuncao.ativa ?? true,
+      ativa: formFuncao.ativa ?? editandoFuncao?.ativa ?? true,
       institucional_chave: funcaoInstitucional
         ? editandoFuncao.institucional_chave
-        : (editandoFuncao?.institucional_chave || formFuncao.institucional_chave || ''),
+        : (formFuncao.institucional_chave || editandoFuncao?.institucional_chave || ''),
       prioridade_lista: funcaoInstitucional
-        ? Number(editandoFuncao?.prioridade_lista ?? formFuncao.prioridade_lista)
-        : Number(formFuncao.prioridade_lista),
+        ? Number(editandoFuncao?.prioridade_lista)
+        : Number(formFuncao.prioridade_lista ?? editandoFuncao?.prioridade_lista),
       aplicabilidade: funcaoInstitucional
-        ? normalizarAplicabilidade(editandoFuncao?.aplicabilidade ?? formFuncao.aplicabilidade)
-        : normalizarAplicabilidade(formFuncao.aplicabilidade),
+        ? normalizarAplicabilidade(editandoFuncao?.aplicabilidade)
+        : normalizarAplicabilidade(formFuncao.aplicabilidade ?? editandoFuncao?.aplicabilidade),
     };
     const erro = validarFuncao(payload, funcoes, editandoFuncao);
     if (erro) return toast({ title: erro, variant: 'destructive' });
+    console.debug('[FUNCAO_SAVE]', { editandoId: editandoFuncao?.id, payload });
     saveFuncao.mutate(payload);
-    cancelarEdicaoFuncao();
   };
 
   const salvarGrupo = () => {
