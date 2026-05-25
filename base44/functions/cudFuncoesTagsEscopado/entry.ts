@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
         [grupo] = await base44.asServiceRole.entities.TagGrupo.filter({ id: grupoId }, undefined, 1, 0);
         if (!grupo) return erro(404, 'Grupo não encontrado.');
         if (!grupo.ativo) return erro(400, 'Grupo inativo.');
-        const grupoApl = String(grupo.aplicabilidade || '');
+        const grupoApl = normalizarAplicabilidade(grupo.aplicabilidade);
         if (grupoApl === 'militar' && !['militar', 'todos'].includes(aplicabilidade)) return erro(400, 'Grupo militar só aceita tag militar/todos.');
         if (grupoApl === 'ferias' && !['ferias', 'todos'].includes(aplicabilidade)) return erro(400, 'Grupo ferias só aceita tag ferias/todos.');
       }
