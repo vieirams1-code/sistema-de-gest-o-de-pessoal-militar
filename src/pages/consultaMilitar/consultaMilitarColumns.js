@@ -327,7 +327,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.tipo_sanguineo),
+    accessor: (militar) => toText(getFirst(militar, ['tipo_sanguineo', 'tipoSanguineo', 'grupo_sanguineo', 'tipo_sangue', 'sangue', 'fator_rh'])),
   },
   {
     key: 'cpf',
