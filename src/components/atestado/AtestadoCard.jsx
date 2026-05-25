@@ -33,11 +33,10 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
-import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
   aplicarTemplate,
   buildTemplateVarsContrato,
@@ -51,9 +50,6 @@ import {
 } from './atestadoPublicacaoHelpers';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
-import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
-import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
-import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -66,12 +62,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
   // edit_mode = hibrido
-  const TEMPLATE_GOVERNANCA = {
-    source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT,
-    edit_mode: TEMPLATE_EDIT_MODE.HIBRIDO,
-  };
-  const queryClient = useQueryClient();
-  const { canAccessAction, user } = useCurrentUser();
+  const { canAccessAction } = useCurrentUser();
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
@@ -103,11 +94,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
   };
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['templates-texto'],
-    queryFn: () => base44.entities.TemplateTexto.list(),
-    staleTime: 30000,
-  });
+  const templates = [];
   const { data: militarAtestado = null } = useQuery({
     queryKey: ['militar-atestado-template', atestado?.militar_id],
     queryFn: async () => {
@@ -167,7 +154,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const handleOpenHomologacao = () => {
     const texto = gerarTextoHomologacao({});
     if (texto === null) {
-      alert("Template obrigatório não encontrado para 'Homologação de Atestado'. Entre em contato com o administrador.");
+      console.warn("Template obrigatório não encontrado para 'Homologação de Atestado'. Entre em contato com o administrador.");
       return;
     }
     setHomologacaoForm(prev => ({ ...prev, texto_publicacao: texto }));
@@ -176,12 +163,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const handleOpenAtaJiso = () => {
     if (statusDocumentalAtaJiso.bloqueiaNovaPublicacao) {
-      alert('Ação bloqueada: já existe Ata JISO ativa/consolidada para este atestado.');
+      console.warn('Ação bloqueada: já existe Ata JISO ativa/consolidada para este atestado.');
       return;
     }
     const texto = gerarTextoAtaJiso(ataJisoForm);
     if (texto === null) {
-      alert("Template obrigatório não encontrado para 'Ata JISO'. Entre em contato com o administrador.");
+      console.warn("Template obrigatório não encontrado para 'Ata JISO'. Entre em contato com o administrador.");
       return;
     }
     setAtaJisoForm(prev => ({ ...prev, texto_publicacao: texto }));
@@ -189,155 +176,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   };
 
   const handleSaveHomologacao = async () => {
-    if (!canAccessAction('publicar_homologacao')) {
-      alert('Ação negada: você não tem permissão para publicar homologações.');
-      return;
-    }
     setSavingPublicacao(true);
-    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
-    const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
-      publicacoesMilitar,
-      atestado.id,
-      'Homologação de Atestado'
-    );
-
-    if (jaExisteHomologacao) {
-      alert('Já existe uma homologação ativa para este atestado.');
-      setSavingPublicacao(false);
-      return;
-    }
-
-    const status = calcStatusPublicacao({
-      nota_para_bg: homologacaoForm.nota_para_bg,
-      numero_bg: homologacaoForm.numero_bg,
-      data_bg: homologacaoForm.data_bg,
-    });
-    const templatesAtualizados = await queryClient.fetchQuery({
-      queryKey: ['templates-texto'],
-      queryFn: () => base44.entities.TemplateTexto.list(),
-    });
-    const templateHomologacao = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templatesAtualizados, {
-      grupamento_id: militarAtestado?.grupamento_id,
-      subgrupamento_id: militarAtestado?.subgrupamento_id,
-      subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
-    });
-    const renderMetadata = buildTemplateRenderMetadata({
-      template: templateHomologacao,
-      modulo: 'PublicacaoExOfficio',
-      user,
-      sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
-    });
-    const payloadPublicacao = {
-      tipo: 'Homologação de Atestado',
-      militar_id: atestado.militar_id,
-      militar_nome: atestado.militar_nome,
-      militar_posto: atestado.militar_posto,
-      militar_matricula: matriculaDocumental,
-      data_publicacao: homologacaoForm.data_publicacao,
-      atestado_homologado_id: atestado.id,
-      texto_publicacao: homologacaoForm.texto_publicacao,
-      nota_para_bg: homologacaoForm.nota_para_bg,
-      numero_bg: homologacaoForm.numero_bg,
-      data_bg: homologacaoForm.data_bg,
-      status
-    };
-    if (renderMetadata) {
-      payloadPublicacao.render_metadata = renderMetadata;
-      payloadPublicacao.template_id = renderMetadata.template_id;
-      payloadPublicacao.template_hash = renderMetadata.template_hash;
-      payloadPublicacao.rendered_at = renderMetadata.rendered_at;
-      payloadPublicacao.rendered_by = renderMetadata.rendered_by;
-      payloadPublicacao.source_of_truth = renderMetadata.source_of_truth;
-    }
-    await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
-    await atualizarEscopado('Atestado', atestado.id, {
-      homologado_comandante: true,
-      status_jiso: 'Homologado pelo Comandante',
-      status_publicacao: status
-    });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-    queryClient.invalidateQueries({ queryKey: ['cards'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-    queryClient.invalidateQueries({ queryKey: ['cards'] });
+    console.warn('[MODO VISUAL] Homologação não persistida. Mantendo apenas preview local.');
     setSavingPublicacao(false);
     setShowHomologacaoModal(false);
   };
 
   const handleSaveAtaJiso = async () => {
-    if (!canAccessAction('publicar_ata_jiso')) {
-      alert('Ação negada: você não tem permissão para publicar atas JISO.');
-      return;
-    }
     setSavingPublicacao(true);
-    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
-    const jaExisteAtaJiso = existePublicacaoAtivaParaAtestado(
-      publicacoesMilitar,
-      atestado.id,
-      'Ata JISO'
-    );
-
-    if (jaExisteAtaJiso) {
-      alert('Já existe uma nota/publicação ativa para esta Ata JISO.');
-      setSavingPublicacao(false);
-      return;
-    }
-
-    const status = calcStatusPublicacao({
-      nota_para_bg: ataJisoForm.nota_para_bg,
-      numero_bg: ataJisoForm.numero_bg,
-      data_bg: ataJisoForm.data_bg,
-    });
-    const templatesAtualizados = await queryClient.fetchQuery({
-      queryKey: ['templates-texto'],
-      queryFn: () => base44.entities.TemplateTexto.list(),
-    });
-    const templateAtaJiso = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templatesAtualizados, {
-      grupamento_id: militarAtestado?.grupamento_id,
-      subgrupamento_id: militarAtestado?.subgrupamento_id,
-      subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
-    });
-    const renderMetadata = buildTemplateRenderMetadata({
-      template: templateAtaJiso,
-      modulo: 'PublicacaoExOfficio',
-      user,
-      sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
-    });
-    const payloadPublicacao = {
-      tipo: 'Ata JISO',
-      militar_id: atestado.militar_id,
-      militar_nome: atestado.militar_nome,
-      militar_posto: atestado.militar_posto,
-      militar_matricula: matriculaDocumental,
-      data_publicacao: ataJisoForm.data_publicacao,
-      atestados_jiso_ids: [atestado.id],
-      finalidade_jiso: ataJisoForm.finalidade_jiso,
-      secao_jiso: ataJisoForm.secao_jiso,
-      data_ata: ataJisoForm.data_ata,
-      nup: ataJisoForm.nup,
-      parecer_jiso: ataJisoForm.parecer_jiso,
-      texto_publicacao: ataJisoForm.texto_publicacao,
-      nota_para_bg: ataJisoForm.nota_para_bg,
-      numero_bg: ataJisoForm.numero_bg,
-      data_bg: ataJisoForm.data_bg,
-      status
-    };
-    if (renderMetadata) {
-      payloadPublicacao.render_metadata = renderMetadata;
-      payloadPublicacao.template_id = renderMetadata.template_id;
-      payloadPublicacao.template_hash = renderMetadata.template_hash;
-      payloadPublicacao.rendered_at = renderMetadata.rendered_at;
-      payloadPublicacao.rendered_by = renderMetadata.rendered_by;
-      payloadPublicacao.source_of_truth = renderMetadata.source_of_truth;
-    }
-    await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
-    await atualizarEscopado('Atestado', atestado.id, {
-      status_jiso: 'Homologado pela JISO',
-      status_publicacao: status
-    });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    console.warn('[MODO VISUAL] Nº TARS/Ata JISO não persistidos. Mantendo apenas estado local.');
     setSavingPublicacao(false);
     setShowAtaJisoModal(false);
   };
@@ -389,22 +236,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const handleSaveJiso = async () => {
     if (!jisoDate) return;
-    if (!canAccessAction('registrar_decisao_jiso')) {
-      alert('Ação negada: você não tem permissão para agendar/registrar JISO.');
-      return;
-    }
     setSavingJiso(true);
-    await atualizarEscopado('Atestado', atestado.id, {
-      data_jiso_agendada: jisoDate,
-      ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
-    });
-    await sincronizarAtestadoJisoNoQuadro({
-      ...atestado,
-      data_jiso_agendada: jisoDate,
-    });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['cards'] });
+    console.warn('[MODO VISUAL] Agendamento JISO não persistido. Valor mantido apenas em estado local.', jisoDate);
     setSavingJiso(false);
     setEditingJiso(false);
   };
@@ -468,7 +301,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 <DropdownMenuItem
                   onClick={() => {
                     if (hasPublicacaoVinculada) {
-                      alert(mensagemBloqueioPublicacao);
+                      console.warn(mensagemBloqueioPublicacao);
                       return;
                     }
                     onEdit(atestado);
@@ -505,7 +338,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                   <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
                   {statusDocumentalAtaJiso.bloqueiaNovaPublicacao
                     ? 'Já existe uma nota/publicação ativa para esta Ata JISO.'
-                    : 'Publicar ata JISO'}
+                    : 'Gerar texto TARS'}
                 </DropdownMenuItem>
               )}
               {publicacoesVinculadas.length > 0 && (
@@ -544,7 +377,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
                     <History className="w-4 h-4 mr-2" />
-                    Registrar decisão JISO
+                    Registrar agendamento
                   </DropdownMenuItem>
                 </>
               )}
@@ -552,7 +385,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 <DropdownMenuItem
                   onClick={() => {
                     if (hasPublicacaoVinculada) {
-                      alert(mensagemBloqueioPublicacao);
+                      console.warn(mensagemBloqueioPublicacao);
                       return;
                     }
                     onDelete(atestado);
@@ -709,7 +542,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             onClick={() => setShowJisoModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm"
           >
-            Registrar Decisão
+            Registrar agendamento
             <ChevronRight size={16} />
           </button>
         )}
@@ -721,9 +554,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           <DialogHeader>
             <DialogTitle>Homologação pelo Comandante</DialogTitle>
             <p className="text-[11px] text-slate-500">
-              {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT
-                ? 'Texto derivado do template (permite ajuste manual).'
-                : 'Texto oficial persistido.'}
+              Pré-visualização local. Nenhum dado será persistido.
             </p>
           </DialogHeader>
           <div className="space-y-4">
@@ -738,7 +569,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
               <div className="flex items-center justify-between mb-1.5">
                 <Label className="text-sm font-medium">Texto para Publicação</Label>
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                  <RefreshCw className="w-3 h-3" /> Preview local
                 </span>
               </div>
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
@@ -755,7 +586,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowHomologacaoModal(false)}>Cancelar</Button>
               <Button onClick={handleSaveHomologacao} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
-                <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
+                <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar nº TARS'}
               </Button>
             </div>
           </div>
@@ -768,9 +599,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           <DialogHeader>
             <DialogTitle>Ata JISO</DialogTitle>
             <p className="text-[11px] text-slate-500">
-              {TEMPLATE_GOVERNANCA.edit_mode === TEMPLATE_EDIT_MODE.HIBRIDO
-                ? 'Texto derivado do template (permite ajuste manual).'
-                : 'Texto oficial persistido.'}
+              Pré-visualização local. Nenhum dado será persistido.
             </p>
           </DialogHeader>
           <div className="space-y-4">
@@ -813,7 +642,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
               <div className="flex items-center justify-between mb-1.5">
                 <Label className="text-sm font-medium">Texto para Publicação</Label>
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                  <RefreshCw className="w-3 h-3" /> Preview local
                 </span>
               </div>
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
@@ -830,7 +659,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowAtaJisoModal(false)}>Cancelar</Button>
               <Button onClick={handleSaveAtaJiso} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
-                <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
+                <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar nº TARS'}
               </Button>
             </div>
           </div>
