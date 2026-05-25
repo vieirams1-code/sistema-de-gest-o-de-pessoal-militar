@@ -287,6 +287,13 @@ export default function Militares() {
   }, [columnFilters]);
 
   const columnMetaByKey = useMemo(() => new Map(allowedColumns.map((col) => [col.key, col])), [allowedColumns]);
+  const getColumnClassName = useCallback((column, { isHeader = false } = {}) => {
+    const align = column?.align === 'center' ? 'text-center' : 'text-left';
+    const nowrap = column?.nowrap ? 'whitespace-nowrap' : '';
+    const truncate = column?.truncate ? 'truncate' : '';
+    const base = isHeader ? 'font-semibold text-slate-500' : '';
+    return [align, nowrap, truncate, base].filter(Boolean).join(' ');
+  }, []);
   const groupedColumns = useMemo(() => {
     const grouped = allowedColumns.reduce((acc, col) => {
       const group = col.group || 'Outros';
@@ -1189,8 +1196,10 @@ export default function Militares() {
                 </div>
               </div>
             )}
-            <div className="grid gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50" style={{ gridTemplateColumns: `repeat(${sanitizedVisibleColumnKeys.length}, minmax(0, 1fr)) auto` }}>
-              {sanitizedVisibleColumnKeys.map((key) => {
+            <div className="overflow-x-auto">
+              <div className="inline-flex min-w-full items-stretch border-b bg-slate-50 text-xs">
+                <div className="w-11 min-w-[44px] px-2 py-2" />
+                {sanitizedVisibleColumnKeys.map((key) => {
                 const column = columnMetaByKey.get(key);
                 const filterType = column?.futureFilterType;
                 const currentFilter = columnFilters[key];
@@ -1199,8 +1208,13 @@ export default function Militares() {
                   || (currentFilter?.type === 'multiselect' && Array.isArray(currentFilter?.selected) && currentFilter.selected.length > 0),
                 );
                 const multiselectOptions = columnFilterOptionsByKey.get(key) || [];
-                return (
-                  <div key={key} className="flex items-center gap-1 min-w-0">
+                  const cellStyle = {
+                    minWidth: column?.minWidth || 120,
+                    width: column?.width || undefined,
+                  };
+                  return (
+                    <div key={key} className={`px-2 py-2 ${getColumnClassName(column, { isHeader: true })}`} style={cellStyle}>
+                      <div className="flex items-center gap-1 min-w-0">
                     <span className="truncate">{column?.label || key}</span>
                     {filterType && (
                       <Popover>
@@ -1272,11 +1286,14 @@ export default function Militares() {
                         </PopoverContent>
                       </Popover>
                     )}
-                  </div>
-                );
-              })}
-              <div className="text-right">Ações</div>
-            </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="sticky right-0 z-10 w-[140px] min-w-[140px] bg-slate-50 px-2 py-2 text-right font-semibold text-slate-500">
+                  Ações
+                </div>
+              </div>
             {hiddenColumnFilterCount > 0 && (
               <div className="px-3 py-2 border-b bg-amber-50 text-xs text-amber-800 flex flex-wrap items-center gap-3 justify-between">
                 <div>
@@ -1299,31 +1316,37 @@ export default function Militares() {
                 </div>
               </div>
             )}
-            {filteredMilitares.map((militar) => {
+              {filteredMilitares.map((militar) => {
               const destacarQuadro = isQuadroComDestaque(militar?.quadro);
 
               return (
-                <div key={militar.id} className={`relative flex gap-2 pl-10 pr-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}>
-                <label className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
-                  <input
-                    type="checkbox"
-                    checked={selectedMilitarIds.has(String(militar.id))}
-                    onChange={(e) => {
-                      const id = String(militar.id);
-                      setSelectedMilitarIds((prev) => {
-                        const next = new Set(prev);
-                        if (e.target.checked) next.add(id);
-                        else next.delete(id);
-                        return next;
-                      });
-                    }}
-                  />
-                </label>
-                <div className="grid flex-1 min-w-0 gap-2" style={{ gridTemplateColumns: `repeat(${sanitizedVisibleColumnKeys.length}, minmax(0, 1fr))` }}>
+                <div key={militar.id} className={`inline-flex min-w-full items-stretch border-b text-sm ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}>
+                <div className="w-11 min-w-[44px] px-2 py-2 flex items-center justify-center">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedMilitarIds.has(String(militar.id))}
+                      onChange={(e) => {
+                        const id = String(militar.id);
+                        setSelectedMilitarIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(id);
+                          else next.delete(id);
+                          return next;
+                        });
+                      }}
+                    />
+                  </label>
+                </div>
                   {sanitizedVisibleColumnKeys.map((key) => {
+                    const column = columnMetaByKey.get(key) || {};
+                    const cellStyle = {
+                      minWidth: column.minWidth || 120,
+                      width: column.width || undefined,
+                    };
                     if (key === 'nome') {
                       return (
-                        <div key={key} className="min-w-0">
+                        <div key={key} className={`px-2 py-2 min-w-0 ${getColumnClassName(column)}`} style={cellStyle}>
                           <div className="font-medium truncate flex items-center gap-2">
                             <span className="truncate">{militar.nome_guerra || militar.nome_completo}</span>
                           </div>
@@ -1332,10 +1355,10 @@ export default function Militares() {
                         </div>
                       );
                     }
-                    if (key === 'situacao_condicao_militar') return <div key={key} className="min-w-0"><CondicaoBadge militar={militar} /></div>;
+                    if (key === 'situacao_condicao_militar') return <div key={key} className={`px-2 py-2 min-w-0 ${getColumnClassName(column)}`} style={cellStyle}><CondicaoBadge militar={militar} /></div>;
                     if (key === 'situacao_militar') {
                       return (
-                        <div key={key}>
+                        <div key={key} className={`px-2 py-2 ${getColumnClassName(column)}`} style={cellStyle}>
                           {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
                             <Badge variant="outline" className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}>
                               {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
@@ -1346,12 +1369,11 @@ export default function Militares() {
                         </div>
                       );
                     }
-                    if (key === 'status_cadastro') return <div key={key}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
+                    if (key === 'status_cadastro') return <div key={key} className={`px-2 py-2 ${getColumnClassName(column)}`} style={cellStyle}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
                     const value = columnMetaByKey.get(key)?.accessor?.(militar) || '—';
-                    return <div key={key} className="truncate">{value}</div>;
+                    return <div key={key} className={`px-2 py-2 ${getColumnClassName(column)}`.trim()} style={cellStyle}>{value}</div>;
                   })}
-                </div>
-                <div className="col-span-1 flex justify-end gap-1">
+                <div className="sticky right-0 z-10 w-[140px] min-w-[140px] bg-white px-2 py-2 flex justify-end gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
                     <Eye className="w-4 h-4" />
                   </Button>
@@ -1379,7 +1401,8 @@ export default function Militares() {
                 </div>
                 </div>
               );
-            })}
+              })}
+            </div>
             <div className="px-3 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-t bg-slate-50/60">
               <p className="text-xs text-slate-600">
                 Exibindo <span className="font-semibold text-slate-800">{filteredMilitares.length}</span>
