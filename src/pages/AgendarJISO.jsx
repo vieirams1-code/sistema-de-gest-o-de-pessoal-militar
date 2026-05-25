@@ -94,6 +94,7 @@ export default function AgendarJISO() {
             variant={modoVisualizacao === 'cards' ? 'default' : 'ghost'}
             onClick={() => setModoVisualizacao('cards')}
             className="rounded-lg"
+            aria-pressed={modoVisualizacao === 'cards'}
           >
             Cards atuais
           </Button>
@@ -102,6 +103,7 @@ export default function AgendarJISO() {
             variant={modoVisualizacao === 'lista' ? 'default' : 'ghost'}
             onClick={() => setModoVisualizacao('lista')}
             className="rounded-lg"
+            aria-pressed={modoVisualizacao === 'lista'}
           >
             Nova lista
           </Button>
