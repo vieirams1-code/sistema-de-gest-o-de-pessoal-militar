@@ -40,7 +40,6 @@ import SaneamentoQbmptQptbmDialog from '@/components/admin/SaneamentoQbmptQptbmD
 import SaneamentoPromocaoDivergenteDialog from '@/components/admin/SaneamentoPromocaoDivergenteDialog';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
-import { construirDecoracaoInstitucionalPorMilitar, ordenarComDestaqueInstitucional } from '@/utils/funcoesTags/destaqueInstitucionalEfetivo';
 import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
@@ -198,6 +197,97 @@ function militarCorrespondeOrigemDestino(militar, termo) {
   if (!q) return true;
   const texto = String(militar?.condicao_origem_destino || militar?.destino || '').toLowerCase();
   return texto.includes(q);
+}
+
+function ordenarEfetivoComPrioridadeInstitucional(militares = [], funcoesInstitucionais = [], vinculosFuncoesAtivos = []) {
+  const PRIORIDADE_FUNCAO = { comandante: 0, subcomandante: 1 };
+  const PRIORIDADE_SEM_FUNCAO = 999;
+  const PRIORIDADE_ESTRUTURA_MATCH = 0;
+  const PRIORIDADE_ESTRUTURA_FORA = 999;
+  const funcoesById = new Map(funcoesInstitucionais.map((funcao) => [String(funcao?.id || ''), funcao]));
+  const estruturaKeyMilitar = (militar = {}) => {
+    const candidatos = [
+      militar?.estrutura_id,
+      militar?.lotacao_id,
+      militar?.subsetor_id,
+      militar?.setor_id,
+      militar?.subgrupamento_id,
+      militar?.subgrupamento,
+      militar?.estrutura_nome,
+      militar?.lotacao_atual,
+      militar?.lotacao,
+    ];
+    const valor = candidatos.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
+    return valor ? String(valor).trim().toLowerCase() : null;
+  };
+  const estruturaKeyVinculo = (vinculo = {}) => {
+    const candidatos = [
+      vinculo?.estrutura_id,
+      vinculo?.lotacao_id,
+      vinculo?.subsetor_id,
+      vinculo?.setor_id,
+      vinculo?.subgrupamento_id,
+      vinculo?.subgrupamento,
+      vinculo?.estrutura_nome,
+      vinculo?.lotacao,
+    ];
+    const valor = candidatos.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
+    return valor ? String(valor).trim().toLowerCase() : null;
+  };
+
+  const scorePorMilitar = new Map();
+  const estruturaPorMilitar = new Map(militares.map((militar) => [String(militar?.id || ''), estruturaKeyMilitar(militar)]));
+
+  vinculosFuncoesAtivos.forEach((vinculo) => {
+    const militarId = String(vinculo?.militar_id || '');
+    if (!militarId) return;
+
+    const funcao = funcoesById.get(String(vinculo?.funcao_id || ''));
+    if (!funcao) return;
+    const chave = String(funcao?.institucional_chave || '').trim().toLowerCase();
+    const prioridadeFuncao = PRIORIDADE_FUNCAO[chave];
+    if (prioridadeFuncao === undefined) return;
+
+    const estruturaMilitar = estruturaPorMilitar.get(militarId) ?? null;
+    const estruturaVinculo = estruturaKeyVinculo(vinculo);
+    const prioridadeEstrutura = estruturaMilitar && estruturaVinculo && estruturaMilitar === estruturaVinculo
+      ? PRIORIDADE_ESTRUTURA_MATCH
+      : PRIORIDADE_ESTRUTURA_FORA;
+    const score = prioridadeFuncao + prioridadeEstrutura;
+
+    const atual = scorePorMilitar.get(militarId);
+    if (atual === undefined || score < atual) {
+      scorePorMilitar.set(militarId, score);
+    }
+  });
+
+  const normalizarAntiguidade = (militar) => {
+    const valor = militar?.ordem_antiguidade ?? militar?.antiguidade_referencia_ordem ?? militar?.antiguidade ?? null;
+    if (valor === null || valor === undefined || valor === '') return null;
+    const numero = Number(valor);
+    if (Number.isFinite(numero)) return numero;
+    return String(valor);
+  };
+
+  return militares
+    .slice()
+    .sort((a, b) => {
+      const prioridadeA = scorePorMilitar.get(String(a?.id || '')) ?? PRIORIDADE_SEM_FUNCAO;
+      const prioridadeB = scorePorMilitar.get(String(b?.id || '')) ?? PRIORIDADE_SEM_FUNCAO;
+      if (prioridadeA !== prioridadeB) return prioridadeA - prioridadeB;
+
+      const antiguidadeA = normalizarAntiguidade(a);
+      const antiguidadeB = normalizarAntiguidade(b);
+      const aNulo = antiguidadeA === null;
+      const bNulo = antiguidadeB === null;
+      if (aNulo !== bNulo) return aNulo ? 1 : -1;
+      if (!aNulo && antiguidadeA !== antiguidadeB) {
+        if (typeof antiguidadeA === 'number' && typeof antiguidadeB === 'number') return antiguidadeA - antiguidadeB;
+        return String(antiguidadeA).localeCompare(String(antiguidadeB), 'pt-BR', { numeric: true, sensitivity: 'base' });
+      }
+
+      return String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' });
+    });
 }
 
 export default function Militares() {
@@ -505,21 +595,6 @@ export default function Militares() {
     },
   });
 
-  const { data: vinculosInstitucionaisAtivos = [] } = useQuery({
-    queryKey: funcoesTagsKeys.militaresFuncoesInstitucionais(funcoesTagsScopeKey, idsHash),
-    staleTime: STALE_TIME_MS,
-    enabled: shouldQuery && idsMilitaresCarregados.length > 0 && funcoesInstitucionais.length > 0,
-    queryFn: async () => {
-      const funcaoIds = funcoesInstitucionais.map((f) => f.id).filter(Boolean);
-      if (funcaoIds.length === 0) return [];
-      return base44.entities.MilitarFuncao.filter({
-        status: 'ativa',
-        militar_id: { '$in': idsMilitaresCarregados },
-        funcao_id: { '$in': funcaoIds },
-      });
-    },
-  });
-
   const { data: vinculosFuncoesAtivosFiltros = [] } = useQuery({
     queryKey: funcoesTagsKeys.militaresFuncoesFiltros(funcoesTagsScopeKey, idsHash),
     staleTime: STALE_TIME_MS,
@@ -539,12 +614,6 @@ export default function Militares() {
       militar_id: { '$in': idsMilitaresCarregados },
     }),
   });
-
-  const decoracaoInstitucionalByMilitar = useMemo(() => construirDecoracaoInstitucionalPorMilitar({
-    militares: operacionais,
-    funcoesInstitucionais,
-    vinculosAtivos: vinculosInstitucionaisAtivos,
-  }), [operacionais, funcoesInstitucionais, vinculosInstitucionaisAtivos]);
 
   const quadrosDisponiveis = useMemo(
     () => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })),
@@ -590,9 +659,13 @@ export default function Militares() {
   const filteredMilitares = useMemo(
     () => {
       const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
-      return ordenarComDestaqueInstitucional(filtradosPorColuna, decoracaoInstitucionalByMilitar);
+      return ordenarEfetivoComPrioridadeInstitucional(
+        filtradosPorColuna,
+        funcoesInstitucionais,
+        vinculosFuncoesAtivosFiltros,
+      );
     },
-    [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar, columnFilters],
+    [filteredMilitaresComFuncoesTags, columnFilters, funcoesInstitucionais, vinculosFuncoesAtivosFiltros],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(
