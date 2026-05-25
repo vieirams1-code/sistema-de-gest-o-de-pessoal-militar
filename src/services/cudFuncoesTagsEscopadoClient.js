@@ -1,5 +1,11 @@
 import { base44 } from '@/api/base44Client';
 
+function criarErroSemantico(message, extras = {}) {
+  const err = new Error(message || 'Falha ao executar operação em funções e tags.');
+  Object.assign(err, extras);
+  return err;
+}
+
 async function invocar(payload) {
   try {
     console.debug('[CUD_FUNCOES_TAGS_REQUEST]', payload);
@@ -14,11 +20,25 @@ async function invocar(payload) {
     const body = error?.response?.data;
     const backendMessage = body?.message || body?.error || body?.details || error?.message;
 
-    if (status === 400) {
-      throw new Error(backendMessage || 'Requisição inválida ao atualizar catálogo de funções e tags.');
+    if (body?.code === 'TAG_UNICA_CONFLITO') {
+      throw criarErroSemantico(backendMessage, {
+        code: body?.code,
+        militar_id: body?.militar_id,
+        militar_nome: body?.militar_nome,
+        posto_grad: body?.posto_grad,
+      });
     }
 
-    throw new Error(backendMessage || 'Falha ao executar operação em funções e tags.');
+    if (status === 400) {
+      throw criarErroSemantico(backendMessage || 'Requisição inválida ao atualizar catálogo de funções e tags.');
+    }
+
+    throw criarErroSemantico(backendMessage || 'Falha ao executar operação em funções e tags.', {
+      code: body?.code,
+      militar_id: body?.militar_id,
+      militar_nome: body?.militar_nome,
+      posto_grad: body?.posto_grad,
+    });
   }
 }
 

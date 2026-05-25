@@ -16,6 +16,7 @@ const PERMISSIONS_MAP: Record<string, string[]> = {
 
 const APLICABILIDADES = new Set(['militar', 'ferias', 'ambos']);
 const TIPOS_VISUAIS = new Set(['normal', 'destaque', 'alerta', 'favorito', 'critico']);
+const TIPOS_USO_TAG = new Set(['comum', 'unica']);
 const INSTITUCIONAIS = new Set(['comandante', 'subcomandante']);
 
 const normalizeTipo = (t: unknown) => String(t || '').trim().toLowerCase();
@@ -85,6 +86,11 @@ function normalizarAplicabilidade(value: unknown) {
 }
 function validarAplicabilidade(value: unknown) { return APLICABILIDADES.has(String(value || '').trim()); }
 function validarTipoVisual(value: unknown) { return TIPOS_VISUAIS.has(String(value || '').trim()); }
+function normalizarTipoUsoTag(value: unknown) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'comum';
+  return normalized;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -175,8 +181,10 @@ Deno.serve(async (req) => {
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
+      const tipoUso = normalizarTipoUsoTag(data?.tipo_uso ?? registroAtual?.tipo_uso);
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
+      if (!TIPOS_USO_TAG.has(tipoUso)) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
 
       let grupo: any = null;
       if (grupoId) {
@@ -198,7 +206,7 @@ Deno.serve(async (req) => {
       });
       if (duplicada) return erro(400, 'Já existe tag ativa com este nome no mesmo grupo.');
 
-      const payload = { ...data, nome, grupo_id: grupoId, aplicabilidade, tipo_visual: tipoVisual, ativo: true };
+      const payload = { ...data, nome, grupo_id: grupoId, aplicabilidade, tipo_visual: tipoVisual, tipo_uso: tipoUso, ativo: true };
       if (operacao === 'create') return Response.json({ data: await svc.create(payload) });
       return Response.json({ data: await svc.update(String(id), payload) });
     }
@@ -244,8 +252,26 @@ Deno.serve(async (req) => {
         if (!tag) return erro(404, 'Tag não encontrada.');
         if (!tag.ativo) return erro(400, 'Tag inativa.');
         if (!['militar', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para militar.');
+        const tipoUsoTag = normalizarTipoUsoTag(tag.tipo_uso);
         const duplicadas = await base44.asServiceRole.entities.MilitarTag.filter({ militar_id: militarId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
         if ((duplicadas || []).some((d: any) => String(d.id) !== String(id || ''))) return erro(400, 'Tag ativa já vinculada para este militar.');
+        if (tipoUsoTag === 'unica') {
+          const vinculosAtivos = await base44.asServiceRole.entities.MilitarTag.filter({ tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
+          const conflito = (vinculosAtivos || []).find((v: any) => String(v.id) !== String(id || '') && String(v.militar_id || '') !== militarId);
+          if (conflito) {
+            const [militarConflito] = await base44.asServiceRole.entities.Militar.filter({ id: String(conflito.militar_id || '') }, undefined, 1, 0, ['id', 'nome', 'nome_guerra', 'posto_grad']);
+            const militarNome = String(militarConflito?.nome_guerra || militarConflito?.nome || 'militar');
+            const postoGrad = String(militarConflito?.posto_grad || '').trim();
+            const identificacao = postoGrad ? `${postoGrad} ${militarNome}` : militarNome;
+            return Response.json({
+              error: `Esta tag já está atribuída a ${identificacao}. Remova a tag desse militar antes de atribuir a outro.`,
+              code: 'TAG_UNICA_CONFLITO',
+              militar_id: String(conflito.militar_id || ''),
+              militar_nome: militarNome,
+              posto_grad: postoGrad,
+            }, { status: 409 });
+          }
+        }
         if (operacao === 'create') return Response.json({ data: await svc.create({ ...data, militar_id: militarId, status: 'ativa' }) });
         return Response.json({ data: await svc.update(String(id), { ...data, militar_id: militarId }) });
       }
