@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { differenceInCalendarDays, format } from 'date-fns';
-import { ChevronDown, ChevronRight, Eye, Pencil } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Circle, Eye, FileText, Pencil } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,13 @@ function getStatusJisoDerivado({ jiso }) {
   return 'Sem JISO';
 }
 
+function getJisoBadgeClass(statusJiso) {
+  if (statusJiso === 'Encaminhado') return 'border-purple-200 bg-purple-50 text-purple-700';
+  if (statusJiso === 'Sessão agendada') return 'border-blue-200 bg-blue-50 text-blue-700';
+  if (statusJiso === 'Decisão registrada') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  return 'border-slate-200 bg-slate-100 text-slate-700';
+}
+
 function buildHistorico(atestado, jiso) {
   const eventos = [
     atestado?.data_inicio && { label: 'Atestado iniciado', data: atestado.data_inicio },
@@ -47,7 +54,7 @@ export default function AtestadosJisoListaView({
   onVisualizarJiso,
   canRegistrarDecisaoJiso = false,
 }) {
-  const [expanded, setExpanded] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
 
   const jisoPorAtestado = useMemo(() => {
     const mapa = new Map();
@@ -77,19 +84,25 @@ export default function AtestadosJisoListaView({
         const diasRestantes = fim ? differenceInCalendarDays(fim, hoje) : null;
         const diasDecorridos = inicio ? Math.max(0, differenceInCalendarDays(hoje, inicio)) : 0;
         const progresso = dias > 0 ? Math.max(0, Math.min(100, (diasDecorridos / dias) * 100)) : 0;
-        const isExpanded = Boolean(expanded[atestado.id]);
+        const isExpanded = expandedId === atestado.id;
         const historico = buildHistorico(atestado, jiso);
+        const timelineEtapas = [
+          { label: 'Encaminhado', done: Boolean(jiso?.id) },
+          { label: 'Agendada', done: Boolean(jiso?.data_jiso || jiso?.data_agendamento) },
+          { label: 'Decisão', done: Boolean(jiso?.resultado_jiso || jiso?.data_ata || jiso?.ata_jiso) },
+          { label: 'Publicação', done: atestado?.status_publicacao === 'Publicado' },
+        ];
 
         return (
           <div key={atestado.id} className="space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex min-w-0 flex-1 gap-3">
+            <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${isExpanded ? 'border-blue-200 ring-1 ring-blue-100' : ''}`}>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_auto] lg:items-start">
+                <div className="flex min-w-0 gap-3">
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="mt-1 h-7 w-7"
-                    onClick={() => setExpanded((p) => ({ ...p, [atestado.id]: !isExpanded }))}
+                    className="mt-1 h-9 w-9 rounded-full bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+                    onClick={() => setExpandedId((prev) => (prev === atestado.id ? null : atestado.id))}
                     aria-label={isExpanded ? 'Recolher linha' : 'Expandir linha'}
                   >
                     {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -106,7 +119,7 @@ export default function AtestadosJisoListaView({
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Período</p>
                       <p className="text-sm text-slate-700">{formatDate(atestado.data_inicio)} → {formatDate(atestado.data_retorno || atestado.data_termino)}</p>
-                      <Progress value={progresso} className="mt-2 h-2" />
+                      <Progress value={progresso} className="mt-2 h-2 bg-slate-200 [&>div]:bg-emerald-500" />
                       <p className="mt-1 text-xs text-slate-600">
                         {diasRestantes === null ? 'Dias restantes não calculáveis' : diasRestantes < 0 ? `${Math.abs(diasRestantes)} dia(s) em atraso` : `${diasRestantes} dia(s) restantes`}
                       </p>
@@ -114,44 +127,51 @@ export default function AtestadosJisoListaView({
                   </div>
                 </div>
 
-                <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[280px]">
+                <div className="flex flex-col gap-3">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Status</p>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <Badge variant="outline">{atestado.status || '—'}</Badge>
                       <Badge variant="outline">{atestado.tipo_afastamento || '—'}</Badge>
-                      <Badge className="bg-slate-100 text-slate-700">{statusJiso}</Badge>
+                      <Badge className={getJisoBadgeClass(statusJiso)}>{statusJiso}</Badge>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => onVisualizarJiso?.(atestado, jiso)}>
-                      <Eye className="mr-1 h-4 w-4" />Visualizar
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Button size="sm" variant="outline" className="rounded-xl border-slate-200 bg-white hover:bg-slate-50" onClick={() => onVisualizarJiso?.(atestado, jiso)}>
+                    <Eye className="mr-1 h-4 w-4" />Visualizar
+                  </Button>
+                  {canRegistrarDecisaoJiso && (
+                    <Button size="sm" variant="outline" className="rounded-xl border-slate-200 bg-white hover:bg-slate-50" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
+                      <Pencil className="mr-1 h-4 w-4" />{jiso ? 'Editar JISO' : 'Registrar JISO'}
                     </Button>
-                    {canRegistrarDecisaoJiso && (
-                      <Button size="sm" variant="outline" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
-                        <Pencil className="mr-1 h-4 w-4" />{jiso ? 'Editar JISO' : 'Registrar JISO'}
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {isExpanded && (
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-5 shadow-sm">
                 <div className="grid gap-4 lg:grid-cols-3">
-                  <div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline derivada JISO</p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      <Badge variant="outline">Encaminhado</Badge>
-                      <Badge variant={jiso?.data_jiso || jiso?.data_agendamento ? 'default' : 'outline'}>Agendada</Badge>
-                      <Badge variant={jiso?.resultado_jiso || jiso?.data_ata || jiso?.ata_jiso ? 'default' : 'outline'}>Decisão</Badge>
-                      <Badge variant={atestado?.status_publicacao === 'Publicado' ? 'default' : 'outline'}>Publicação</Badge>
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      {timelineEtapas.map((etapa, idx) => (
+                        <div key={etapa.label} className="relative flex flex-col items-center text-center">
+                          {idx < timelineEtapas.length - 1 && (
+                            <span className={`absolute left-1/2 top-4 h-0.5 w-full ${etapa.done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+                          )}
+                          <span className={`z-10 flex h-8 w-8 items-center justify-center rounded-full border ${etapa.done ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                            {etapa.done ? <Check className="h-4 w-4" /> : <Circle className="h-3.5 w-3.5" />}
+                          </span>
+                          <span className="mt-2 text-[11px] font-medium text-slate-600">{etapa.label}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Histórico simples</p>
                     <ul className="mt-2 space-y-1 text-sm text-slate-700">
                       {historico.length ? historico.map((evento) => (
@@ -161,11 +181,15 @@ export default function AtestadosJisoListaView({
                   </div>
 
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                      <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        Documentos por template
+                      </p>
                       Documentos por template serão integrados futuramente.
                     </div>
                     {canRegistrarDecisaoJiso && (
-                      <Button size="sm" className="w-full" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
+                      <Button size="sm" className="w-full rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-700" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
                         Registrar decisão JISO
                       </Button>
                     )}
