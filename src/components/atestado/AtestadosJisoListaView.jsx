@@ -115,15 +115,22 @@ export default function AtestadosJisoListaView({
   };
 
   const salvarDadosAdministrativosMutation = useMutation({
-    mutationFn: async ({ atestado, jiso, draft, modo }) => {
+    mutationFn: async ({ atestado, jiso, draft }) => {
       const hasAdminData = Boolean(
         (draft?.numero_tars || '').trim()
-        || (draft?.dataJiso || '').trim()
+        || (draft?.data_jiso || '').trim()
         || (draft?.hora_jiso || '').trim()
         || (draft?.local_jiso || '').trim()
       );
 
-      if (!jiso?.id && !hasAdminData) return null;
+      if (!hasAdminData) {
+        toast({
+          title: 'Nada para salvar',
+          description: 'Preencha ao menos um campo administrativo da JISO antes de salvar.',
+        });
+        console.warn('[JISO-TARS] Salvamento ignorado: nenhum campo administrativo preenchido.');
+        return null;
+      }
 
       const observacoes = buildObservacoesJiso({
         observacoesBase: jiso?.observacoes || '',
@@ -133,11 +140,11 @@ export default function AtestadosJisoListaView({
       });
 
       if (jiso?.id) {
-        const payload = { observacoes };
-        if (modo === 'agendamento' && (draft?.dataJiso || '').trim()) {
-          payload.data_jiso = draft.dataJiso;
-        }
-        if (modo === 'agendamento' && !jiso?.resultado_jiso && !jiso?.ata_jiso && !jiso?.data_ata) {
+        const payload = {
+          observacoes,
+          data_jiso: draft?.data_jiso || '',
+        };
+        if ((draft?.data_jiso || '').trim() && !jiso?.resultado_jiso && !jiso?.ata_jiso && !jiso?.data_ata) {
           payload.status = 'Agendada';
         }
         return base44.entities.JISO.update(jiso.id, payload);
@@ -153,9 +160,13 @@ export default function AtestadosJisoListaView({
         militar_matricula: atestado.militar_matricula_atual || atestado.militar_matricula,
         militar_matricula_atual: atestado.militar_matricula_atual || atestado.militar_matricula,
         militar_matricula_vinculo: atestado.militar_matricula_vinculo || atestado.militar_matricula,
-        data_jiso: draft?.dataJiso || '',
+        data_jiso: draft?.data_jiso || '',
         observacoes,
-        status: 'Agendada',
+        status: (draft?.data_jiso || '').trim()
+          ? 'Agendada'
+          : (draft?.numero_tars || '').trim()
+            ? 'Encaminhado'
+            : 'Pendente',
       });
     },
     onSuccess: async () => {
@@ -165,7 +176,6 @@ export default function AtestadosJisoListaView({
       await queryClient.invalidateQueries({ queryKey: ['atestados-jiso-bundle'] });
       await queryClient.invalidateQueries({ queryKey: ['jisos'] });
       await queryClient.invalidateQueries({ queryKey: ['jiso'] });
-      await queryClient.invalidateQueries({ queryKey: ['agendamento-jiso'] });
       await queryClient.invalidateQueries({ queryKey: ['agenda-saude'] });
     },
     onError: (error) => {
@@ -201,12 +211,18 @@ export default function AtestadosJisoListaView({
         const progresso = dias > 0 ? Math.max(0, Math.min(100, (diasDecorridos / dias) * 100)) : 0;
         const isExpanded = expandedId === atestadoId;
         const historico = buildHistorico(atestado, jiso);
-        const draftPersistido = parseDadosAdministrativosJiso(jiso?.observacoes);
-        const draft = { ...draftPersistido, ...(draftByAtestado[atestadoId] || {}) };
+        const dadosAdmin = parseDadosAdministrativosJiso(jiso?.observacoes);
+        const draft = {
+          numero_tars: dadosAdmin.numero_tars || '',
+          hora_jiso: dadosAdmin.hora_jiso || '',
+          local_jiso: dadosAdmin.local_jiso || '',
+          data_jiso: jiso?.data_jiso || jiso?.data_agendamento || atestado?.data_jiso_agendada || '',
+          ...(draftByAtestado[atestadoId] || {}),
+        };
         const timelineEtapas = [
           { label: 'Atestado', done: Boolean(atestado?.id) },
           { label: 'TARS', done: Boolean((draft?.numero_tars || '').trim()) },
-          { label: 'JISO', done: Boolean((draft?.dataJiso || '').trim()) },
+          { label: 'JISO', done: Boolean((draft?.data_jiso || '').trim() || jiso?.data_jiso || jiso?.data_agendamento || atestado?.data_jiso_agendada) },
           { label: 'Decisão', done: Boolean(jiso?.resultado_jiso || jiso?.data_ata || jiso?.ata_jiso) },
           { label: 'Publicação', done: atestado?.status_publicacao === 'Publicado' },
         ];
@@ -305,40 +321,30 @@ export default function AtestadosJisoListaView({
 
                   <div className="space-y-3">
                     <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Solicitação e Agendamento da JISO</p>
-                      <div className="space-y-2">
-                        <Label>Nº TARS solicitação:</Label>
-                        <Input value={draft.numero_tars || ''} onChange={(e) => updateDraft(atestadoId, 'numero_tars', e.target.value)} placeholder="231/2026" />
-                        {canRegistrarDecisaoJiso && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={salvarDadosAdministrativosMutation.isPending}
-                            onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft, modo: 'tars' })}
-                          >
-                            Registrar nº TARS
-                          </Button>
-                        )}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dados administrativos da JISO</p>
+                        <p className="mt-1 text-xs text-slate-500">TARS de solicitação e agendamento informado pela Diretoria de Saúde.</p>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Data JISO:</Label>
-                        <Input type="date" value={draft.dataJiso || ''} onChange={(e) => updateDraft(atestadoId, 'dataJiso', e.target.value)} />
-                        <Label>Hora JISO:</Label>
-                        <Input type="time" value={draft.hora_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'hora_jiso', e.target.value)} />
-                        <Label>Local JISO:</Label>
-                        <Input value={draft.local_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'local_jiso', e.target.value)} placeholder="Diretoria de Saúde" />
-                        {canRegistrarDecisaoJiso && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={salvarDadosAdministrativosMutation.isPending}
-                            onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft, modo: 'agendamento' })}
-                          >
-                            Registrar agendamento
-                          </Button>
-                        )}
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label>Nº TARS</Label>
+                          <Input value={draft.numero_tars || ''} onChange={(e) => updateDraft(atestadoId, 'numero_tars', e.target.value)} placeholder="231/2026" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Data JISO</Label>
+                          <Input type="date" value={draft.data_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'data_jiso', e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Hora JISO</Label>
+                          <Input type="time" value={draft.hora_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'hora_jiso', e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Local JISO</Label>
+                          <Input value={draft.local_jiso || ''} onChange={(e) => updateDraft(atestadoId, 'local_jiso', e.target.value)} placeholder="Diretoria de Saúde" />
+                        </div>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => {
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => {
                         const posto = atestado?.militar_posto || '—';
                         const nome = atestado?.militar_nome || '—';
                         const matricula = atestado?.militar_matricula_label || atestado?.militar_matricula_atual || atestado?.militar_matricula || '—';
@@ -351,8 +357,19 @@ export default function AtestadosJisoListaView({
                         setGeneratedTextByAtestado((prev) => ({ ...prev, [atestadoId]: texto }));
                         console.warn('[JISO-TARS][visual-only] Preview local do texto TARS gerado sem persistência.', { atestadoId });
                       }}>Gerar preview TARS</Button>
+                        {canRegistrarDecisaoJiso && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={salvarDadosAdministrativosMutation.isPending}
+                            onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft })}
+                          >
+                            Salvar dados da JISO
+                          </Button>
+                        )}
+                      </div>
                       {generatedTextByAtestado[atestadoId] && (
-                        <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs">{generatedTextByAtestado[atestadoId]}</pre>
+                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs">{generatedTextByAtestado[atestadoId]}</pre>
                       )}
                       <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <FileText className="h-4 w-4 text-blue-600" />
