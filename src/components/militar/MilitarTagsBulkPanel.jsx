@@ -4,9 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { calcularTentativasBulk } from '@/utils/funcoesTags/militarTagsBulk';
-import { getFuncaoMilitarId } from '@/utils/funcoesTags/contratoCampos';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
-import { AlertCircle, Check, Loader2, Search, Shield, Tags as TagsIcon, Users, X } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
 
 function getTagNome(tag) {
   return tag?.nome || tag?.name || tag?.titulo || '';
@@ -18,13 +17,6 @@ function getTagEmoji(tag) {
   if (['mob', 'moto', 'moto_socorro'].includes(chave)) return 'moto_socorro';
   return tag?.emoji || tag?.icone || tag?.icon || '📋';
 }
-function getFuncaoIcone(funcao) {
-  const chave = normalizarBusca(funcao?.institucional_chave);
-  if (chave === 'comandante') return 'estrela_amarela_comandante';
-  if (chave === 'subcomandante') return 'estrela_azul_subcomandante';
-  return funcao?.emoji;
-}
-
 function getTagCor(tag) {
   return tag?.cor || tag?.color || '#6366F1';
 }
@@ -94,8 +86,6 @@ export default function MilitarTagsBulkPanel({
   tagsAtivas,
   gruposAtivos,
   tagsStatusById = {},
-  funcoesAtivas = [],
-  funcoesStatusById = {},
   vinculosTagsAtivos = [],
   onConfirm,
   loading,
@@ -105,8 +95,6 @@ export default function MilitarTagsBulkPanel({
   const [selecionadas, setSelecionadas] = useState([]);
   const [tagsEditadas, setTagsEditadas] = useState([]);
   const [motivo, setMotivo] = useState('');
-  const [funcoesSelecionadas, setFuncoesSelecionadas] = useState([]);
-  const [funcoesEditadas, setFuncoesEditadas] = useState([]);
 
   const { data: tagsCatalogo = [] } = useQuery({
     queryKey: ['funcoes-tags', 'tags'],
@@ -184,36 +172,6 @@ export default function MilitarTagsBulkPanel({
     return mapa;
   }, [selectedMilitares, vinculosTagsAtivos]);
 
-
-  const funcoesFiltradas = useMemo(() => {
-    const termo = normalizarBusca(busca.trim());
-    return (funcoesAtivas || []).filter((funcao) => {
-      if (!funcao || !isTagAtiva(funcao)) return false;
-      if (!termo) return true;
-      return normalizarBusca(`${funcao?.nome || ''} ${funcao?.emoji || ''}`).includes(termo);
-    });
-  }, [funcoesAtivas, busca]);
-
-  const funcoesSelecionadasCatalogo = useMemo(() => {
-    const ids = new Set(funcoesSelecionadas.map(String));
-    return funcoesFiltradas.filter((funcao) => ids.has(String(funcao.id)));
-  }, [funcoesSelecionadas, funcoesFiltradas]);
-
-  const funcoesStatusEfetivoById = useMemo(() => {
-    const selecionadasSet = new Set(funcoesSelecionadas.map(String));
-    const editadasSet = new Set(funcoesEditadas.map(String));
-    const mapa = {};
-
-    funcoesFiltradas.forEach((funcao) => {
-      const funcaoId = String(funcao.id);
-      if (selecionadasSet.has(funcaoId)) { mapa[funcaoId] = 'all'; return; }
-      if (!editadasSet.has(funcaoId)) { mapa[funcaoId] = funcoesStatusById[funcaoId] || 'none'; return; }
-      mapa[funcaoId] = 'none';
-    });
-
-    return mapa;
-  }, [funcoesFiltradas, funcoesStatusById, funcoesSelecionadas, funcoesEditadas]);
-
   const statusEfetivoById = useMemo(() => {
     const selecionadasSet = new Set(selecionadas.map(String));
     const editadasSet = new Set(tagsEditadas.map(String));
@@ -244,19 +202,11 @@ export default function MilitarTagsBulkPanel({
       .map(([tagId]) => String(tagId));
     setSelecionadas(iniciais);
     setTagsEditadas([]);
-    const funcoesIniciais = Object.entries(funcoesStatusById).filter(([, status]) => status === 'all').map(([id]) => String(id));
-    setFuncoesSelecionadas(funcoesIniciais);
-    setFuncoesEditadas([]);
-  }, [open, tagsStatusById, funcoesStatusById]);
+  }, [open, tagsStatusById]);
 
   if (!open) return null;
 
   const isLocked = loading || saving;
-
-  const toggleFuncao = (funcaoId) => {
-    setFuncoesSelecionadas((prev) => prev.includes(funcaoId) ? prev.filter((id) => id !== funcaoId) : [...prev, funcaoId]);
-    setFuncoesEditadas((prev) => prev.includes(funcaoId) ? prev : [...prev, funcaoId]);
-  };
 
   const toggleTag = (tagId) => {
     setSelecionadas((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
@@ -305,38 +255,6 @@ export default function MilitarTagsBulkPanel({
               onChange={(e) => setBusca(e.target.value)}
               disabled={isLocked}
             />
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">⭐ Funções institucionais</h3>
-            {funcoesFiltradas.length === 0 ? (
-              <div className="text-center py-4 text-slate-400">
-                <p>Nenhuma função institucional ativa.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {funcoesFiltradas.map((funcao) => {
-                  const id = String(getFuncaoMilitarId(funcao) || funcao.id);
-                  const status = funcoesStatusEfetivoById[id] || 'none';
-                  const isSelected = status === 'all';
-                  const isPartial = status === 'partial';
-                  return (
-                    <button key={id} type="button" onClick={() => toggleFuncao(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : isSelected ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'} ${isSelected ? 'shadow-md ring-1' : ''}`}>
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 border border-indigo-100 bg-indigo-50">
-                        {funcao?.emoji ? <IconeCatalogo value={getFuncaoIcone(funcao)} /> : <Shield className="w-4 h-4 text-indigo-600" />}
-                      </div>
-                      <div className="flex-1 min-w-0 pr-2">
-                        <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{funcao?.nome || 'Função institucional'}</div>
-                        {isPartial && <div className="text-[11px] text-amber-700 font-medium mt-0.5">Parcial</div>}
-                      </div>
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isPartial ? 'bg-amber-100 border-amber-400 text-amber-700' : 'border-slate-300 text-transparent group-hover:border-slate-400'}`}>
-                        <Check className="w-3.5 h-3.5" />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {selecionadas.length > 0 && (
@@ -412,7 +330,7 @@ export default function MilitarTagsBulkPanel({
           <p className="text-sm font-medium text-slate-700">Motivo da atribuição (opcional)</p>
           <Input placeholder="Descreva o motivo da ação" value={motivo} onChange={(e) => setMotivo(e.target.value)} disabled={isLocked} />
           <p className="text-xs text-slate-500">{selectedCount} militar(es) × {selecionadas.length} tags definidas = {calcularTentativasBulk(selectedCount, selecionadas.length)} alvo(s) de atualização</p>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading || saving} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, finalSelectedFuncaoIds: funcoesSelecionadas, motivo })}>
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading || saving} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, finalSelectedFuncaoIds: [], motivo })}>
             {saving ? (<>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Salvando...

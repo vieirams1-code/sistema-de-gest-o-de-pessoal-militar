@@ -45,7 +45,7 @@ function isTagInstitucionalLegada(tag) {
   return TERMOS_TAGS_INSTITUCIONAIS.some((termo) => nome.includes(termo));
 }
 
-export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funcoes' }) {
+export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupos', showFuncoesTab = true }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -71,7 +71,13 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
   const [tagsInstitucionaisSelecionadas, setTagsInstitucionaisSelecionadas] = useState([]);
   const [confirmarArquivamentoInstitucionaisOpen, setConfirmarArquivamentoInstitucionaisOpen] = useState(false);
 
-  useEffect(() => setActiveTab(initialTab), [initialTab]);
+  useEffect(() => {
+    if (showFuncoesTab) {
+      setActiveTab(initialTab);
+      return;
+    }
+    setActiveTab(initialTab === 'tags' ? 'tags' : 'grupos');
+  }, [initialTab, showFuncoesTab]);
 
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes-tags', 'funcoes'], queryFn: () => base44.entities.FuncaoMilitar.list('prioridade_lista') });
   const { data: grupos = [] } = useQuery({ queryKey: ['funcoes-tags', 'grupos'], queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao') });
@@ -124,7 +130,11 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
     },
   });
   const saveGrupo = useMutation({
-    mutationFn: (p) => editandoGrupo ? atualizarTagGrupoEscopado(editandoGrupo.id, p) : criarTagGrupoEscopado(p),
+    mutationFn: ({ payload, grupoId }) => (
+      grupoId
+        ? atualizarTagGrupoEscopado(grupoId, payload)
+        : criarTagGrupoEscopado(payload)
+    ),
     onSuccess: () => { invalidate('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); },
     onError: (error) => toast({ title: 'Não foi possível salvar o grupo.', description: error?.message, variant: 'destructive' }),
   });
@@ -197,7 +207,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
     const payload = { ...formGrupo, aplicabilidade: normalizarAplicabilidade(formGrupo.aplicabilidade), ativo: editandoGrupo?.ativo ?? true };
     const erro = validarTagGrupo(payload, grupos, editandoGrupo);
     if (erro) return toast({ title: erro, variant: 'destructive' });
-    saveGrupo.mutate(payload);
+    saveGrupo.mutate({ payload, grupoId: editandoGrupo?.id || null });
     cancelarEdicaoGrupo();
   };
 
@@ -294,7 +304,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
   };
 
   return (<div className="max-w-6xl mx-auto space-y-6">
-    <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">Configurações de Funções e Tags</h1></div><p className="text-sm text-slate-500 mt-1">Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.</p></div><Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button></header>
+    <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">{showFuncoesTab ? 'Configurações de Funções e Tags' : 'Configurações de Tags'}</h1></div><p className="text-sm text-slate-500 mt-1">{showFuncoesTab ? 'Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.' : 'Gerencie grupos de tags e marcadores operacionais do sistema.'}</p></div>{showFuncoesTab && <Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button>}</header>
     {activeTab === 'tags' && <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900"><p><strong>Tags no sistema:</strong> marcadores operacionais para filtros e organização. Não substituem funções institucionais.</p><p className="mt-1"><strong>Auditoria institucional:</strong> encontradas {tagsInstitucionaisEncontradas.length} tag(s) com nomes legados{tagsInstitucionaisArquivadas.length > 0 ? `; arquivadas nesta sessão: ${tagsInstitucionaisArquivadas.map((tag) => tag.nome).join(', ')}` : ''}.</p></div>}
     {activeTab === 'tags' && <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -332,9 +342,9 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funco
       )}
     </section>}
 
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex"><TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex">{showFuncoesTab && <TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} />}<TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
 
-    {activeTab === 'funcoes' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoFuncao}><Plus className="w-4 h-4 mr-2" />Nova Função Militar</Button></div><ListCard title={`Funções Cadastradas (${funcoesFiltradas.length})`} search={buscaFuncao} setSearch={setBuscaFuncao} searchPlaceholder="Buscar função...">{funcoesFiltradas.map((funcao) => <div key={funcao.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: funcao.cor || '#CBD5E1', backgroundColor: `${funcao.cor || '#E2E8F0'}18`, color: funcao.cor || '#1E293B' }}><IconeCatalogo value={funcao.emoji || '🏷️'} /> {funcao.nome}</span><span className="text-xs text-slate-500">Cor: {funcao.cor || '—'}</span><span className="text-xs text-slate-500">Escopo: Global</span><span className="text-xs text-slate-500">Prioridade: {funcao.prioridade_lista ?? '—'}</span></div><div className="flex items-center gap-3"><StatusBadge ativo={funcao.ativa !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarFuncao(funcao)} /><ActionButton label={funcao.ativa === false ? 'Reativar' : 'Desativar'} icon={funcao.ativa === false ? Check : X} onClick={() => toggleFuncao(funcao)} /></div></div>)}</ListCard></>}
+    {showFuncoesTab && activeTab === 'funcoes' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoFuncao}><Plus className="w-4 h-4 mr-2" />Nova Função Militar</Button></div><ListCard title={`Funções Cadastradas (${funcoesFiltradas.length})`} search={buscaFuncao} setSearch={setBuscaFuncao} searchPlaceholder="Buscar função...">{funcoesFiltradas.map((funcao) => <div key={funcao.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: funcao.cor || '#CBD5E1', backgroundColor: `${funcao.cor || '#E2E8F0'}18`, color: funcao.cor || '#1E293B' }}><IconeCatalogo value={funcao.emoji || '🏷️'} /> {funcao.nome}</span><span className="text-xs text-slate-500">Cor: {funcao.cor || '—'}</span><span className="text-xs text-slate-500">Escopo: Global</span><span className="text-xs text-slate-500">Prioridade: {funcao.prioridade_lista ?? '—'}</span></div><div className="flex items-center gap-3"><StatusBadge ativo={funcao.ativa !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarFuncao(funcao)} /><ActionButton label={funcao.ativa === false ? 'Reativar' : 'Desativar'} icon={funcao.ativa === false ? Check : X} onClick={() => toggleFuncao(funcao)} /></div></div>)}</ListCard></>}
 
     {activeTab === 'grupos' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoGrupo}><Plus className="w-4 h-4 mr-2" />Novo Grupo de Tags</Button></div><ListCard title={`Grupos de Tags (${gruposFiltrados.length})`} search={buscaGrupo} setSearch={setBuscaGrupo} searchPlaceholder="Buscar grupo...">{gruposFiltrados.map((grupo) => <div key={grupo.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: grupo.cor || '#CBD5E1', backgroundColor: `${grupo.cor || '#E2E8F0'}18`, color: grupo.cor || '#1E293B' }}><IconeCatalogo value={grupo.emoji || '🏷️'} /> {grupo.nome}</span><span className="text-xs text-slate-500">Aplicabilidade: {labelAplicabilidade(grupo.aplicabilidade)}</span><span className="text-xs text-slate-500">{quantidadeTagsPorGrupo.get(grupo.id) || 0} tags</span><span className="text-xs text-slate-500">Escopo: Global</span></div><div className="flex items-center gap-3"><StatusBadge ativo={grupo.ativo !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarGrupo(grupo)} /><ActionButton label={grupo.ativo === false ? 'Reativar' : 'Desativar'} icon={grupo.ativo === false ? Check : X} onClick={() => toggleGrupo(grupo)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => excluirGrupo(grupo)} /></div></div>)}</ListCard></>}
 
