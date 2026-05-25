@@ -77,17 +77,23 @@ export default function Atestados() {
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
   const [modoVisualizacaoVigentes, setModoVisualizacaoVigentes] = useState('cards');
 
-  const { data: atestados = [], isLoading } = useQuery({
+  const { data: atestadosBundle, isLoading } = useQuery({
     queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
     queryFn: async () => {
-      const { atestados, meta } = await fetchScopedAtestadosBundle();
+      const { atestados, jisos, meta } = await fetchScopedAtestadosBundle();
       if (meta?.partialFailures > 0) {
         console.warn('getScopedAtestadosBundle retornou partialFailures', meta);
       }
-      return enriquecerAtestadosComContextoMilitar(atestados, { contexto: 'operacional', filtrarMesclados: true });
+      return {
+        atestados: enriquecerAtestadosComContextoMilitar(atestados, { contexto: 'operacional', filtrarMesclados: true }),
+        jisos,
+      };
     },
     enabled: isAccessResolved && hasAtestadosAccess
   });
+
+  const atestados = atestadosBundle?.atestados || [];
+  const jisos = atestadosBundle?.jisos || [];
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
@@ -370,7 +376,7 @@ export default function Atestados() {
                 ) : (
                   <AtestadosJisoListaView
                     atestados={vigentes}
-                    jisos={[]}
+                    jisos={jisos}
                     loading={isLoading}
                     onVisualizarJiso={handleView}
                     onRegistrarDecisaoJiso={handleEdit}
