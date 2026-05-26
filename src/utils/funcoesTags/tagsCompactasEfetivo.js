@@ -1,4 +1,5 @@
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isRegistroAtivo } from './contratoCampos';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 const EMOJI_PADRAO_FUNCAO = '⭐';
 const EMOJI_PADRAO_TAG = '🏷️';
@@ -13,12 +14,6 @@ const resolveIconeFuncao = (funcao = {}) => {
   if (chave === 'comandante') return 'estrela_amarela_comandante';
   if (chave === 'subcomandante') return 'estrela_azul_subcomandante';
   return String(funcao?.emoji || EMOJI_PADRAO_FUNCAO);
-};
-const resolveIconeTag = (tag = {}) => {
-  const chave = normalizarChave(tag?.slug || tag?.chave || tag?.nome);
-  if (['manutencao', 'manutenção', 'condutor'].includes(chave)) return 'engrenagem';
-  if (['mob', 'moto', 'moto_socorro'].includes(chave)) return 'moto_socorro';
-  return String(tag?.emoji || EMOJI_PADRAO_TAG);
 };
 
 const isTipoVisualChip = (registro = {}) => {
@@ -65,14 +60,21 @@ export function getTagsCompactasMilitar({ militarId, tagsAtivas = [], vinculosTa
 
   return vinculosTagsAtivos
     .filter((vinculo) => isRegistroAtivo(vinculo) && String(getMilitarTagMilitarId(vinculo) || '') === militarKey)
-    .map((vinculo) => tagsById.get(String(getMilitarTagTagId(vinculo) || '')))
-    .filter(Boolean)
-    .map((tag) => {
-      const chave = normalizarChave(tag?.slug || tag?.chave || tag?.nome);
+    .map((vinculo) => {
+      const tagId = String(getMilitarTagTagId(vinculo) || '');
+      const tagCatalogo = tagsById.get(tagId);
+      const tagFallback = vinculo?.tag || vinculo?.Tag || vinculo?.tag_data || null;
+      const tag = tagCatalogo || tagFallback;
+      return { tag, tagCatalogo };
+    })
+    .filter(({ tag }) => Boolean(tag))
+    .map(({ tag, tagCatalogo }) => {
+      const origem = tagCatalogo || tag;
+      const chave = normalizarChave(origem?.slug || origem?.chave || origem?.nome);
       const indicePrioridade = TAGS_PRIORITARIAS_CHAVES.indexOf(chave);
       return {
-        emoji: resolveIconeTag(tag),
-        nome: String(tag?.nome || '').trim(),
+        emoji: resolveTagVisual(origem).emoji,
+        nome: resolveTagVisual(origem).nome,
         tipo: 'tag',
         prioridade: indicePrioridade >= 0 ? 4 : (isTipoVisualChip(tag) ? 5 : 6),
         ordemPrioritaria: indicePrioridade >= 0 ? indicePrioridade : 999,
