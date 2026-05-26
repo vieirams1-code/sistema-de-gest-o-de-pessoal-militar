@@ -21,6 +21,7 @@ import {
   desativarTagGrupoEscopado,
   excluirTagGrupoEscopado,
   excluirTagEscopado,
+  invocarCudFuncoesTagsEscopadoDebug,
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 
@@ -70,6 +71,10 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   const [tagsInstitucionaisArquivadas, setTagsInstitucionaisArquivadas] = useState([]);
   const [tagsInstitucionaisSelecionadas, setTagsInstitucionaisSelecionadas] = useState([]);
   const [confirmarArquivamentoInstitucionaisOpen, setConfirmarArquivamentoInstitucionaisOpen] = useState(false);
+  const [debugTagId, setDebugTagId] = useState('');
+  const [debugResultado, setDebugResultado] = useState(null);
+  const [debugErro, setDebugErro] = useState(null);
+  const [debugCarregando, setDebugCarregando] = useState(false);
 
   useEffect(() => {
     if (showFuncoesTab) {
@@ -324,6 +329,42 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     setConfirmarArquivamentoInstitucionaisOpen(false);
   };
 
+  const executarDebugTagRuntime = async () => {
+    const tagId = String(debugTagId || '').trim();
+    if (!tagId) {
+      toast({ title: 'Informe um ID de tag para debug.', variant: 'destructive' });
+      return;
+    }
+    setDebugCarregando(true);
+    setDebugErro(null);
+    setDebugResultado(null);
+    try {
+      const update = await invocarCudFuncoesTagsEscopadoDebug({
+        entidade: 'Tag',
+        operacao: 'update',
+        id: tagId,
+        data: { tipo_uso: 'unica' },
+      });
+      const refetch = await base44.entities.Tag.get(tagId);
+      setDebugResultado({
+        timestamp: new Date().toISOString(),
+        update_request: update?.request ?? null,
+        update_response: update?.response ?? null,
+        refetch,
+      });
+      await invalidate('tags');
+    } catch (error) {
+      setDebugErro({
+        timestamp: new Date().toISOString(),
+        request: error?.request ?? null,
+        response: error?.response ?? null,
+        message: error?.error?.message ?? error?.message ?? 'Erro desconhecido ao executar debug.',
+      });
+    } finally {
+      setDebugCarregando(false);
+    }
+  };
+
 
   return (<div className="max-w-6xl mx-auto space-y-6">
     <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">{showFuncoesTab ? 'Configurações de Funções e Tags' : 'Configurações de Tags'}</h1></div><p className="text-sm text-slate-500 mt-1">{showFuncoesTab ? 'Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.' : 'Gerencie grupos de tags e marcadores operacionais do sistema.'}</p></div>{showFuncoesTab && <Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button>}</header>
@@ -366,6 +407,23 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     
 
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex">{showFuncoesTab && <TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} />}<TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
+
+    {activeTab === 'tags' && <section className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 space-y-3">
+      <div>
+        <h2 className="font-semibold text-blue-900">Debug Tags Runtime</h2>
+        <p className="text-xs text-blue-800">Executa update em <code>Tag.tipo_uso = &quot;unica&quot;</code> e faz refetch imediato para validar persistência no runtime Base44.</p>
+      </div>
+      <div className="flex flex-col md:flex-row gap-2 md:items-end">
+        <Field label="Tag ID" className="w-full md:max-w-md">
+          <Input value={debugTagId} onChange={(e) => setDebugTagId(e.target.value)} placeholder="id da Tag para auditar" />
+        </Field>
+        <Button type="button" disabled={debugCarregando} onClick={executarDebugTagRuntime}>
+          {debugCarregando ? 'Executando debug...' : 'Rodar Debug Tags Runtime'}
+        </Button>
+      </div>
+      {debugResultado && <pre className="rounded-lg border border-blue-200 bg-white p-3 text-xs overflow-x-auto">{JSON.stringify(debugResultado, null, 2)}</pre>}
+      {debugErro && <pre className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs overflow-x-auto text-rose-900">{JSON.stringify(debugErro, null, 2)}</pre>}
+    </section>}
 
     {showFuncoesTab && activeTab === 'funcoes' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoFuncao}><Plus className="w-4 h-4 mr-2" />Nova Função Militar</Button></div><ListCard title={`Funções Cadastradas (${funcoesFiltradas.length})`} search={buscaFuncao} setSearch={setBuscaFuncao} searchPlaceholder="Buscar função...">{funcoesFiltradas.map((funcao) => <div key={funcao.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: funcao.cor || '#CBD5E1', backgroundColor: `${funcao.cor || '#E2E8F0'}18`, color: funcao.cor || '#1E293B' }}><IconeCatalogo value={funcao.emoji || '🏷️'} /> {funcao.nome}</span><span className="text-xs text-slate-500">Cor: {funcao.cor || '—'}</span><span className="text-xs text-slate-500">Escopo: Global</span><span className="text-xs text-slate-500">Prioridade: {funcao.prioridade_lista ?? '—'}</span></div><div className="flex items-center gap-3"><StatusBadge ativo={funcao.ativa !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarFuncao(funcao)} /><ActionButton label={funcao.ativa === false ? 'Reativar' : 'Desativar'} icon={funcao.ativa === false ? Check : X} onClick={() => toggleFuncao(funcao)} /></div></div>)}</ListCard></>}
 
