@@ -99,5 +99,12 @@
     "create": "admin",
     "update": "admin",
     "delete": "admin"
+  },
+  "fields": {
+    "icon_key": {
+      "type": "string",
+      "required": false,
+      "description": "Chave opcional de ícone SVG personalizado"
+    }
   }
 }
