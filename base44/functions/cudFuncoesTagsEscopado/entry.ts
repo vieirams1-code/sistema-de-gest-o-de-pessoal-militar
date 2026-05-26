@@ -96,7 +96,11 @@ function normalizarAplicabilidade(value: unknown) {
 function validarAplicabilidade(value: unknown) { return APLICABILIDADES.has(String(value || '').trim()); }
 function validarTipoVisual(value: unknown) { return TIPOS_VISUAIS.has(String(value || '').trim()); }
 function normalizarTipoUsoTag(value: unknown, { fallbackComum = true }: { fallbackComum?: boolean } = {}) {
-  const normalized = String(value ?? '').trim().toLowerCase();
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
   if (!normalized) return fallbackComum ? 'comum' : null;
   if (normalized === 'comum' || normalized === 'unica') return normalized;
   return null;
@@ -195,6 +199,7 @@ Deno.serve(async (req) => {
     }
 
     if (entidade === 'Tag') {
+      logDev('[TAG_BACKEND_INPUT]', { entidade, operacao, id, data });
       if (!['create', 'update', 'desativar', 'delete'].includes(operacao)) return erro(400, 'Operação inválida para Tag.');
       if (operacao === 'desativar') {
         const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
@@ -271,8 +276,15 @@ Deno.serve(async (req) => {
       if (duplicada) return erro(400, 'Já existe tag ativa com este nome no mesmo grupo.');
 
       const payload = { ...data, nome, grupo_id: grupoId, aplicabilidade, tipo_visual: tipoVisual, tipo_uso: tipoUso, ativo: true };
-      if (operacao === 'create') return Response.json({ data: await svc.create(payload) });
-      return Response.json({ data: await svc.update(String(id), payload) });
+      logDev('[TAG_BACKEND_PAYLOAD]', { entidade, operacao, id, payload });
+      if (operacao === 'create') {
+        const created = await svc.create(payload);
+        logDev('[TAG_BACKEND_RESULT]', { entidade, operacao, id, result: created });
+        return Response.json({ data: created });
+      }
+      const updated = await svc.update(String(id), payload);
+      logDev('[TAG_BACKEND_RESULT]', { entidade, operacao, id, result: updated });
+      return Response.json({ data: updated });
     }
 
     if (entidade === 'MilitarFuncao') {
