@@ -61,7 +61,16 @@ const isAtestadoVigente = (atestado, hoje) => {
 };
 
 
-function ListaAcoesAtestado({ atestado, handleView, handleEdit, handleDelete, canEditarAtestado, canExcluirAtestado }) {
+function ListaAcoesAtestado({
+  atestado,
+  handleView,
+  handleEdit,
+  handleDelete,
+  canEditarAtestado,
+  canExcluirAtestado,
+  openAtaJisoModal,
+  openHomologacaoModal,
+}) {
   const { data: publicacoesVinculadas = [] } = useQuery({
     queryKey: ['publicacoes-atestado', atestado.id],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id }),
@@ -86,8 +95,8 @@ function ListaAcoesAtestado({ atestado, handleView, handleEdit, handleDelete, ca
         onView: handleView,
         onEdit: handleEdit,
         onDelete: handleDelete,
-        onOpenHomologacao: handleView,
-        onOpenAtaJiso: handleView,
+        onOpenHomologacao: openHomologacaoModal,
+        onOpenAtaJiso: openAtaJisoModal,
         onOpenJisoModal: handleView,
       }}
       permissoes={{ canEdit: canEditarAtestado, canDelete: canExcluirAtestado }}
@@ -237,6 +246,8 @@ export default function Atestados() {
     setDeleteDialogOpen(true);
   };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
+  const openAtaJisoModal = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
+  const openHomologacaoModal = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
   const confirmDelete = async () => {
     if (!atestadoToDelete) return;
     if (!canExcluirAtestado) {
@@ -279,6 +290,8 @@ export default function Atestados() {
       handleDelete={handleDelete}
       canEditarAtestado={canEditarAtestado}
       canExcluirAtestado={canExcluirAtestado}
+      openAtaJisoModal={openAtaJisoModal}
+      openHomologacaoModal={openHomologacaoModal}
     />
   );
 
@@ -428,7 +441,7 @@ export default function Atestados() {
                 ) : visualizacao === 'cards' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onOpenAtaJiso={openAtaJisoModal} onOpenHomologacao={openHomologacaoModal} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 ) : (
@@ -463,7 +476,7 @@ export default function Atestados() {
                 ) : visualizacao === 'cards' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {finalizados.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onOpenAtaJiso={openAtaJisoModal} onOpenHomologacao={openHomologacaoModal} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 ) : (
