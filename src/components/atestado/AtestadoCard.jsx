@@ -3,53 +3,38 @@ import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   FileText, 
-  MoreVertical, 
-  Pencil, 
-  Trash2, 
-  Eye,
   Clock,
   AlertCircle,
   CheckCircle,
   Shield,
   ShieldCheck,
-  History,
-  BookOpen,
   Save,
   ChevronRight,
-  Download,
   RefreshCw
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
-import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
   aplicarTemplate,
   buildTemplateVarsContrato,
 } from '@/components/utils/templateUtils';
 import {
-  calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
   getAtestadoIdsVinculados,
   getStatusDocumentalAtaJiso,
   isPublicacaoAtestadoAtiva,
 } from './atestadoPublicacaoHelpers';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import AtestadoActionsMenu from './AtestadoActionsMenu';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
@@ -471,120 +456,28 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 text-gray-400 hover:text-gray-600 -mr-2">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => onView(atestado)}>
-                <Eye className="w-4 h-4 mr-2" />
-                Visualizar
-              </DropdownMenuItem>
-              {canEdit && (
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (hasPublicacaoVinculada) {
-                      alert(mensagemBloqueioPublicacao);
-                      return;
-                    }
-                    onEdit(atestado);
-                  }}
-                  disabled={hasPublicacaoVinculada}
-                  title={hasPublicacaoVinculada ? 'Edição bloqueada: há publicação/nota vinculada.' : ''}
-                >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  {hasPublicacaoVinculada ? 'Editar (bloqueado por publicação vinculada)' : 'Editar'}
-                </DropdownMenuItem>
-              )}
-              {atestado.arquivo_atestado && (
-                <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
-                  <Download className="w-4 h-4 mr-2 text-slate-600" />
-                  Baixar atestado anexado
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              {/* Fluxo exclusivo: mostrar apenas o botão do fluxo definido */}
-              {/* dias <= 15 e fluxo = comandante (ou não definido e dias <= 15): mostrar homologação */}
-              {podePublicarHomologacao && (
-                <DropdownMenuItem onClick={handleOpenHomologacao} disabled={hasHomologacaoAtiva}>
-                  <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
-                  {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Publicar Homologação'}
-                </DropdownMenuItem>
-              )}
-              {/* fluxo = jiso OU dias > 15: mostrar Ata JISO */}
-              {(atestado.fluxo_homologacao === 'jiso' || (atestado.dias > 15)) && (
-                <DropdownMenuItem
-                  onClick={handleOpenAtaJiso}
-                  disabled={statusDocumentalAtaJiso.bloqueiaNovaPublicacao}
-                  title={statusDocumentalAtaJiso.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
-                >
-                  <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
-                  {statusDocumentalAtaJiso.bloqueiaNovaPublicacao
-                    ? 'Já existe uma nota/publicação ativa para esta Ata JISO.'
-                    : 'Publicar ata JISO'}
-                </DropdownMenuItem>
-              )}
-              {publicacoesVinculadas.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  {publicacoesVinculadas.filter(isPublicacaoAtestadoAtiva).map(p => (
-                    p.tipo === 'Homologação de Atestado' ? (
-                      <DropdownMenuItem
-                        key={p.id}
-                        disabled
-                        title="A edição da homologação vinculada deve ser feita no módulo de publicações."
-                      >
-                        <FileText className="w-4 h-4 mr-2 text-slate-400" />
-                        <span className="truncate">Homologação vinculada — edição bloqueada neste card</span>
-                      </DropdownMenuItem>
-                    ) : p.tipo === 'Ata JISO' && calcStatusPublicacao(p) === 'Publicado' ? (
-                      <DropdownMenuItem
-                        key={p.id}
-                        disabled
-                        title="Ata JISO consolidada/publicada: edição bloqueada neste card."
-                      >
-                        <FileText className="w-4 h-4 mr-2 text-slate-400" />
-                        <span className="truncate">{statusDocumentalAtaJiso.texto} — edição bloqueada neste card</span>
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>
-                        <FileText className="w-4 h-4 mr-2 text-blue-500" />
-                        <span className="truncate">{p.tipo} — {p.status}</span>
-                      </DropdownMenuItem>
-                    )
-                  ))}
-                </>
-              )}
-              {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
-                    <History className="w-4 h-4 mr-2" />
-                    Registrar decisão JISO
-                  </DropdownMenuItem>
-                </>
-              )}
-              {canDelete && (
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (hasPublicacaoVinculada) {
-                      alert(mensagemBloqueioPublicacao);
-                      return;
-                    }
-                    onDelete(atestado);
-                  }}
-                  disabled={hasPublicacaoVinculada}
-                  title={hasPublicacaoVinculada ? 'Exclusão bloqueada: há publicação/nota vinculada.' : ''}
-                  className="text-red-600 focus:text-red-600"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  {hasPublicacaoVinculada ? 'Excluir (bloqueado por publicação vinculada)' : 'Excluir'}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <AtestadoActionsMenu
+            atestado={atestado}
+            handlers={{
+              onView,
+              onEdit,
+              onDelete,
+              onOpenHomologacao: handleOpenHomologacao,
+              onOpenAtaJiso: handleOpenAtaJiso,
+              onOpenJisoModal: () => setShowJisoModal(true),
+            }}
+            permissoes={{ canEdit, canDelete }}
+            estados={{
+              hasPublicacaoVinculada,
+              mensagemBloqueioPublicacao,
+              podePublicarHomologacao,
+              hasHomologacaoAtiva,
+              isFluxoJiso,
+              statusDocumentalAtaJiso,
+              bloquearEdicaoPublicacaoNoCard: true,
+            }}
+            publicacoesVinculadas={publicacoesVinculadas}
+          />
         </div>
 
         <div className="flex flex-wrap gap-1.5 mb-5">
