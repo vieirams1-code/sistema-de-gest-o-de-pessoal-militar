@@ -1,5 +1,6 @@
 import React from 'react';
 import { Bike, Settings, Star } from 'lucide-react';
+import TagIcon, { isTagIconKey } from '@/components/tags/TagIcon';
 
 const ICONES_ESPECIAIS = {
   estrela_amarela_comandante: { label: '★ Comandante' },
@@ -25,6 +26,7 @@ export function renderIconeCatalogoValue(value) {
   if (value === 'estrela_azul_subcomandante') return <EstrelaInstitucional color="#2563EB" />;
   if (value === 'engrenagem') return <Settings className="h-4 w-4 text-slate-700" />;
   if (value === 'moto_socorro') return <Bike className="h-4 w-4 text-emerald-700" />;
+  if (isTagIconKey(value)) return <TagIcon icon={value} size={18} />;
   return value;
 }
 
@@ -52,4 +54,14 @@ export const OPCOES_ICONE_CATALOGO = [
   { value: 'estrela_azul_subcomandante', label: ICONES_ESPECIAIS.estrela_azul_subcomandante.label },
   { value: 'engrenagem', label: ICONES_ESPECIAIS.engrenagem.label },
   { value: 'moto_socorro', label: ICONES_ESPECIAIS.moto_socorro.label },
+];
+
+
+export const OPCOES_ICONE_TAG = [
+  { value: '', label: 'Sem ícone' },
+  { value: 'comandante_maior', label: '⭐ Louros dourados (Comandante Maior)' },
+  { value: 'subcomandante_maior', label: '☆ Louros prata (Subcomandante Maior)' },
+  { value: 'comandante_menor', label: '🛡 Estrela dourada (Comandante Menor)' },
+  { value: 'subcomandante_menor', label: '🛡 Estrela prata (Subcomandante Menor)' },
+  { value: 'chefia', label: '☆ Vazada (Chefia)' },
 ];
