@@ -72,10 +72,6 @@ import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cud
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import { getFeriasTagFeriasId, getFeriasTagTagId } from '@/utils/funcoesTags/contratoCampos';
 
-// [DEBUG_FERIAS_TAGS] — Logs temporários para diagnóstico do carregamento de FeriasTag.
-// Para remover: apagar este flag e todos os blocos `if (DEBUG_FERIAS_TAGS) { ... }`.
-const DEBUG_FERIAS_TAGS = true;
-
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
   Autorizada: 'bg-blue-100 text-blue-700',
@@ -151,7 +147,7 @@ function isFeriasTagAtiva(vinculo = {}) {
   const semRemocao = !vinculo?.data_remocao;
   const campoAtivoValido = !isCampoFalseExplicito(vinculo?.ativo);
   const campoAtivaValido = !isCampoFalseExplicito(vinculo?.ativa);
-  return (statusAtivo || semRemocao) && campoAtivoValido && campoAtivaValido;
+  return statusAtivo && semRemocao && campoAtivoValido && campoAtivaValido;
 }
 
 function parseFeriasDateStart(value) {
@@ -511,61 +507,17 @@ export default function Ferias() {
   const { data: feriasTagsVinculos = [] } = useQuery({
     queryKey: ['ferias-tags-bulk', feriasIdsEscopoTags],
     queryFn: async () => {
-      if (DEBUG_FERIAS_TAGS) {
-        // [DEBUG_FERIAS_TAGS] (1) feriasIdsEscopoTags.length + (2) primeiros 5 ids
-        console.log('[DEBUG_FERIAS_TAGS] feriasIdsEscopoTags.length =', feriasIdsEscopoTags.length);
-        console.log('[DEBUG_FERIAS_TAGS] feriasIdsEscopoTags.slice(0,5) =', feriasIdsEscopoTags.slice(0, 5));
-      }
-      if (feriasIdsEscopoTags.length === 0) {
-        if (DEBUG_FERIAS_TAGS) console.warn('[DEBUG_FERIAS_TAGS] feriasIdsEscopoTags vazio — query retorna [] sem chamar FeriasTag.filter');
-        return [];
-      }
-      const resultados = await Promise.all(
-        feriasIdsEscopoTags.map(async (feriasId) => {
-          const lista = await base44.entities.FeriasTag.filter({ ferias_id: feriasId }, '-created_date');
-          if (DEBUG_FERIAS_TAGS) {
-            // [DEBUG_FERIAS_TAGS] (3) Quantidade retornada por cada FeriasTag.filter({ ferias_id })
-            console.log('[DEBUG_FERIAS_TAGS] FeriasTag.filter ferias_id=', feriasId, '→ count=', Array.isArray(lista) ? lista.length : 'N/A', 'raw=', lista);
-          }
-          return lista;
-        }),
-      );
-      const flat = resultados.flat();
-      const filtrado = flat.filter((item) => {
+      if (feriasIdsEscopoTags.length === 0) return [];
+      const feriasIdsSet = new Set(feriasIdsEscopoTags);
+      const vinculos = await base44.entities.FeriasTag.list('-created_date');
+      return (vinculos || []).filter((item) => {
         const feriasId = String(getFeriasTagFeriasId(item) || '');
-        return feriasIdsEscopoTags.includes(feriasId);
+        return feriasIdsSet.has(feriasId);
       });
-      if (DEBUG_FERIAS_TAGS) {
-        // [DEBUG_FERIAS_TAGS] (4) feriasTagsVinculos.length + (5) primeiro vínculo + (6) isFeriasTagAtiva(vinculo)
-        console.log('[DEBUG_FERIAS_TAGS] flat.length (antes do filtro de escopo) =', flat.length);
-        console.log('[DEBUG_FERIAS_TAGS] feriasTagsVinculos.length (após filtro) =', filtrado.length);
-        const primeiro = filtrado[0];
-        if (primeiro) {
-          console.log('[DEBUG_FERIAS_TAGS] primeiro vínculo =', {
-            id: primeiro.id,
-            ferias_id: primeiro.ferias_id,
-            tag_id: primeiro.tag_id,
-            status: primeiro.status,
-            data_remocao: primeiro.data_remocao,
-            ativo: primeiro.ativo,
-            ativa: primeiro.ativa,
-          });
-          console.log('[DEBUG_FERIAS_TAGS] isFeriasTagAtiva(primeiro) =', isFeriasTagAtiva(primeiro));
-          console.log('[DEBUG_FERIAS_TAGS] getFeriasTagFeriasId(primeiro) =', getFeriasTagFeriasId(primeiro));
-          console.log('[DEBUG_FERIAS_TAGS] getFeriasTagTagId(primeiro) =', getFeriasTagTagId(primeiro));
-        } else {
-          console.warn('[DEBUG_FERIAS_TAGS] nenhum vínculo retornado após o filtro de escopo.');
-        }
-      }
-      return filtrado;
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
-  if (DEBUG_FERIAS_TAGS) {
-    // [DEBUG_FERIAS_TAGS] Log em cada render do estado bruto dos vínculos
-    console.log('[DEBUG_FERIAS_TAGS][render] feriasTagsVinculos.length =', feriasTagsVinculos.length);
-  }
   const { data: tagsCatalogo = [] } = useQuery({
     queryKey: ['funcoes-tags', 'tags'],
     queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
@@ -635,59 +587,24 @@ export default function Ferias() {
 
   const feriasTagsAtivasMap = useMemo(() => {
     const mapa = new Map();
-    let descartadosInativos = 0;
-    let descartadosSemId = 0;
     feriasTagsVinculos.forEach((item) => {
       if (!isFeriasTagAtiva(item)) {
-        descartadosInativos += 1;
-        if (DEBUG_FERIAS_TAGS) {
-          console.warn('[DEBUG_FERIAS_TAGS] vínculo DESCARTADO por isFeriasTagAtiva=false:', {
-            id: item?.id,
-            ferias_id: item?.ferias_id,
-            tag_id: item?.tag_id,
-            status: item?.status,
-            data_remocao: item?.data_remocao,
-            ativo: item?.ativo,
-            ativa: item?.ativa,
-          });
-        }
         return;
       }
       const feriasId = String(getFeriasTagFeriasId(item) || '');
       const tagId = String(getFeriasTagTagId(item) || '');
       if (!feriasId || !tagId) {
-        descartadosSemId += 1;
-        if (DEBUG_FERIAS_TAGS) {
-          console.warn('[DEBUG_FERIAS_TAGS] vínculo DESCARTADO por falta de feriasId/tagId:', {
-            id: item?.id,
-            feriasId,
-            tagId,
-            raw: item,
-          });
-        }
         return;
       }
       if (!mapa.has(feriasId)) mapa.set(feriasId, new Map());
       mapa.get(feriasId).set(tagId, item);
     });
-    if (DEBUG_FERIAS_TAGS) {
-      // [DEBUG_FERIAS_TAGS] (7) feriasTagsAtivasMap.size
-      console.log('[DEBUG_FERIAS_TAGS] feriasTagsAtivasMap.size =', mapa.size);
-      console.log('[DEBUG_FERIAS_TAGS] descartadosInativos =', descartadosInativos, '| descartadosSemId =', descartadosSemId);
-      const chaves = Array.from(mapa.keys()).slice(0, 5);
-      console.log('[DEBUG_FERIAS_TAGS] feriasTagsAtivasMap chaves (até 5) =', chaves);
-      chaves.forEach((k) => {
-        const sub = mapa.get(k);
-        console.log('[DEBUG_FERIAS_TAGS]   feriasId=', k, '→ tags ativas count=', sub?.size, '| tagIds=', Array.from(sub?.keys() || []));
-      });
-    }
     return mapa;
   }, [feriasTagsVinculos]);
 
   const tagsStatusById = useMemo(() => {
     const status = {};
     if (selectedFerias.length === 0) {
-      if (DEBUG_FERIAS_TAGS) console.log('[DEBUG_FERIAS_TAGS] tagsStatusById: selectedFerias vazio → {}');
       return status;
     }
     const total = selectedFerias.length;
@@ -695,25 +612,12 @@ export default function Ferias() {
     selectedFerias.forEach((f) => {
       const feriasIdStr = String(f.id);
       const tagsDaFerias = feriasTagsAtivasMap.get(feriasIdStr);
-      if (DEBUG_FERIAS_TAGS) {
-        // [DEBUG_FERIAS_TAGS] (9) Para cada férias aberta/selecionada: feriasTagsAtivasMap.has(id)
-        console.log(
-          '[DEBUG_FERIAS_TAGS] férias selecionada id=', feriasIdStr,
-          '| militar_nome=', f?.militar_nome,
-          '| feriasTagsAtivasMap.has(id) =', feriasTagsAtivasMap.has(feriasIdStr),
-          '| tagsDaFerias.size =', tagsDaFerias?.size ?? 0,
-        );
-      }
       if (!tagsDaFerias) return;
       tagsDaFerias.forEach((_, tagId) => contagem.set(tagId, (contagem.get(tagId) || 0) + 1));
     });
     contagem.forEach((qtd, tagId) => {
       status[tagId] = qtd === total ? 'all' : 'some';
     });
-    if (DEBUG_FERIAS_TAGS) {
-      // [DEBUG_FERIAS_TAGS] (8) tagsStatusById
-      console.log('[DEBUG_FERIAS_TAGS] tagsStatusById final =', status, '| total selecionadas =', total);
-    }
     return status;
   }, [selectedFerias, feriasTagsAtivasMap]);
 
