@@ -15,6 +15,7 @@ import {
   validarDuplicidadeTagAtivaFerias,
 } from '@/utils/funcoesTags/feriasTags';
 import { getFeriasTagFeriasId, getFeriasTagTagId, isRegistroAtivo } from '@/utils/funcoesTags/contratoCampos';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 const formatDate = (date) => {
   if (!date) return '—';
@@ -35,7 +36,7 @@ function TagVinculoItem({ vinculo, removivel, onRemover, loading }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge style={{ backgroundColor: `${cor}22`, color: cor, borderColor: `${cor}55` }} className="border">
-            {(tag.emoji || '🏷️')} {tag.nome || 'Tag sem nome'}
+            {resolveTagVisual(tag).emoji} {resolveTagVisual(tag).nome || 'Tag sem nome'}
           </Badge>
           <Badge variant="outline">{vinculo.status || '—'}</Badge>
           {grupo && <Badge variant="outline">Grupo: {grupo.nome}</Badge>}
@@ -109,7 +110,7 @@ export default function FeriasTagsSection({ ferias }) {
     if (!termo) return tagsAtivasAplicaveis;
     return tagsAtivasAplicaveis.filter((tag) => {
       const grupo = gruposAtivos.find((item) => String(item.id) === String(tag.tag_grupo_id));
-      const texto = `${tag.nome || ''} ${tag.emoji || ''} ${grupo?.nome || 'Sem grupo'}`.toLowerCase();
+      const texto = `${resolveTagVisual(tag).nome} ${resolveTagVisual(tag).emoji} ${grupo?.nome || 'Sem grupo'}`.toLowerCase();
       return texto.includes(termo);
     });
   }, [buscaTag, tagsAtivasAplicaveis, gruposAtivos]);
@@ -174,7 +175,7 @@ export default function FeriasTagsSection({ ferias }) {
             <option value="">Selecione...</option>
             {tagsFiltradas.map((tag) => {
               const grupo = gruposAtivos.find((item) => String(item.id) === String(tag.tag_grupo_id));
-              return <option key={tag.id} value={tag.id}>{tag.emoji || '🏷️'} {tag.nome} · {grupo?.nome || 'Sem grupo'}</option>;
+              return <option key={tag.id} value={tag.id}>{resolveTagVisual(tag).emoji} {resolveTagVisual(tag).nome} · {grupo?.nome || 'Sem grupo'}</option>;
             })}
           </select>
         </div>

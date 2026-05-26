@@ -25,6 +25,7 @@ import {
   excluirTagEscopado,
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { CATEGORIAS_ICONE, OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 export const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
 const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'todos', ativa: true };
@@ -105,10 +106,14 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
   const invalidate = async (key) => {
     await Promise.all([
+      queryClient.invalidateQueries({
+        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'funcoes-tags',
+      }),
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags', key] }),
       queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }),
+      queryClient.invalidateQueries({ queryKey: ['ferias'] }),
       queryClient.invalidateQueries({ queryKey: ['ferias-tags'] }),
-      queryClient.invalidateQueries({ queryKey: ['ferias', 'tags'] }),
+      queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] }),
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'catalogo', key] }),
     ]);
   };
@@ -352,7 +357,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
                   checked={tagsInstitucionaisSelecionadas.includes(String(tag.id))}
                   onChange={() => alternarTagInstitucionalSelecionada(tag.id)}
                 />
-                <span className="font-medium text-slate-900">{tag.nome}</span>
+                <span className="font-medium text-slate-900">{resolveTagVisual(tag).nome}</span>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge ativo={tag.ativo} />
@@ -373,7 +378,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
     {activeTab === 'grupos' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoGrupo}><Plus className="w-4 h-4 mr-2" />Novo Grupo de Tags</Button></div><ListCard title={`Grupos de Tags (${gruposFiltrados.length})`} search={buscaGrupo} setSearch={setBuscaGrupo} searchPlaceholder="Buscar grupo...">{gruposFiltrados.map((grupo) => <div key={grupo.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: grupo.cor || '#CBD5E1', backgroundColor: `${grupo.cor || '#E2E8F0'}18`, color: grupo.cor || '#1E293B' }}><IconeCatalogo value={grupo.emoji || '🏷️'} /> {grupo.nome}</span><span className="text-xs text-slate-500">Aplicabilidade: {labelAplicabilidade(grupo.aplicabilidade)}</span><span className="text-xs text-slate-500">{quantidadeTagsPorGrupo.get(grupo.id) || 0} tags</span><span className="text-xs text-slate-500">Escopo: Global</span></div><div className="flex items-center gap-3"><StatusBadge ativo={grupo.ativo !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarGrupo(grupo)} /><ActionButton label={grupo.ativo === false ? 'Reativar' : 'Desativar'} icon={grupo.ativo === false ? Check : X} onClick={() => toggleGrupo(grupo)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => excluirGrupo(grupo)} /></div></div>)}</ListCard></>}
 
-    {activeTab === 'tags' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoTag}><Plus className="w-4 h-4 mr-2" />Nova Tag Individual</Button></div><ListCard title={`Tags Individuais (${tagsFiltradas.length})`} search={buscaTag} setSearch={setBuscaTag} searchPlaceholder="Buscar tag...">{tagsFiltradas.map((tag) => { const grupo = gruposPorId.get(getTagGrupoId(tag)); return <div key={tag.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl border" style={{ backgroundColor: `${tag.cor || '#F59E0B'}18`, borderColor: tag.cor || '#F59E0B' }}><IconeCatalogo value={tag.emoji || '🏷️'} /></div><div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{tag.nome}</p><StatusBadge ativo={tag.ativo !== false} /></div><div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-1"><span>Grupo: {grupo?.nome || 'Sem grupo'}</span><span>•</span><span>Aplicabilidade: {labelAplicabilidade(tag.aplicabilidade)}</span><span>•</span><span>Tipo: {tag.tipo_visual || 'chip'}</span><span>•</span><span>Cor: {tag.cor || '—'}</span></div></div></div><div className="flex items-center gap-3"><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarTag(tag)} /><ActionButton label={tag.ativo === false ? 'Reativar' : 'Desativar'} icon={tag.ativo === false ? Check : X} onClick={() => toggleTag(tag)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => { setTagParaExcluir(tag); setTextoConfirmacaoExclusaoTag(''); setBloqueioExclusaoTag(null); }} /></div></div>; })}</ListCard></>}
+    {activeTab === 'tags' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoTag}><Plus className="w-4 h-4 mr-2" />Nova Tag Individual</Button></div><ListCard title={`Tags Individuais (${tagsFiltradas.length})`} search={buscaTag} setSearch={setBuscaTag} searchPlaceholder="Buscar tag...">{tagsFiltradas.map((tag) => { const grupo = gruposPorId.get(getTagGrupoId(tag)); return <div key={tag.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl border" style={{ backgroundColor: `${resolveTagVisual(tag).cor}18`, borderColor: resolveTagVisual(tag).cor }}><IconeCatalogo value={resolveTagVisual(tag).emoji} /></div><div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{resolveTagVisual(tag).nome}</p><StatusBadge ativo={tag.ativo !== false} /></div><div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-1"><span>Grupo: {grupo?.nome || 'Sem grupo'}</span><span>•</span><span>Aplicabilidade: {labelAplicabilidade(tag.aplicabilidade)}</span><span>•</span><span>Tipo: {tag.tipo_visual || 'chip'}</span><span>•</span><span>Cor: {tag.cor || '—'}</span></div></div></div><div className="flex items-center gap-3"><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarTag(tag)} /><ActionButton label={tag.ativo === false ? 'Reativar' : 'Desativar'} icon={tag.ativo === false ? Check : X} onClick={() => toggleTag(tag)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => { setTagParaExcluir(tag); setTextoConfirmacaoExclusaoTag(''); setBloqueioExclusaoTag(null); }} /></div></div>; })}</ListCard></>}
 
     <EntityModal open={modalFuncaoOpen} onClose={cancelarEdicaoFuncao} title={editandoFuncao ? `Editar função militar: ${editandoFuncao.nome}` : 'Nova Função Militar'} description="Defina nome, ícone, cor e prioridade da função." loading={saveFuncao.isPending} onSave={salvarFuncao} preview={<PreviewBadge emoji={formFuncao.emoji} nome={formFuncao.nome || 'Nova função'} cor={formFuncao.cor} />}>
       <>
