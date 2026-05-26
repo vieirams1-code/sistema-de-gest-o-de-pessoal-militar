@@ -24,6 +24,19 @@ const numeroPorExtenso = (num) => {
 };
 
 
+
+const resolveTipoFeriasTexto = (fracionamento) => {
+  const valor = String(fracionamento || '')
+    .trim()
+    .toLowerCase();
+
+  if (valor.includes('1') || valor.includes('primeira')) return 'da primeira fração';
+  if (valor.includes('2') || valor.includes('segunda')) return 'da segunda fração';
+  if (valor.includes('3') || valor.includes('terceira')) return 'da terceira fração';
+
+  return 'integral';
+};
+
 export const formatDateBR = (ds) => {
   if (!ds) return '';
   try {
@@ -130,9 +143,7 @@ export function buildVarsLivro({ ferias, militar, registro, dataRegistro, period
     periodo_aquisitivo: formatPeriodoAquisitivo(ferias.periodo_aquisitivo_ref, periodo),
     periodo_aquisitivo_simplificado: ferias.periodo_aquisitivo_ref || '',
     fracionamento: ferias.fracionamento || '',
-    tipo_ferias_texto: ferias.fracionamento
-      ? `${ferias.fracionamento} de férias regulamentares`
-      : 'férias regulamentares',
+    tipo_ferias_texto: resolveTipoFeriasTexto(ferias.fracionamento),
   };
 }
 
@@ -209,7 +220,7 @@ export const VARS_PREVIEW = buildPreviewTemplateVars({
   periodo_aquisitivo: '01/01/2024 a 31/12/2025',
   periodo_aquisitivo_simplificado: '2024/2025',
   fracionamento: '1ª parcela',
-  tipo_ferias_texto: '1ª parcela de férias regulamentares',
+  tipo_ferias_texto: 'da primeira fração',
   conjuge_nome: 'Maria da Silva',
   falecido_nome: 'José da Silva',
   falecido_certidao: '123456',
