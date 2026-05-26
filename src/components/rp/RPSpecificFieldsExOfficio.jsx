@@ -305,6 +305,7 @@ export default function RPSpecificFieldsExOfficio({
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* COLUNA DA ESQUERDA (Títulos e Informações) */}
             <div className="lg:col-span-5 space-y-4">
               <div>
                 <h3 className="text-lg font-semibold text-[#1e3a5f]">Homologação de Atestado Médico</h3>
@@ -312,26 +313,26 @@ export default function RPSpecificFieldsExOfficio({
               </div>
             </div>
 
+            {/* COLUNA DA DIREITA (Área de Seleção) */}
             <div className="lg:col-span-7 flex flex-col h-full">
               <div className="flex justify-between items-end mb-2">
                 <label className="block text-sm font-semibold text-gray-900">Atestados Disponíveis</label>
               </div>
 
+              {/* Container da lista de atestados */}
               <div className="w-full flex-1 min-h-[160px] border border-gray-300 rounded-md p-4 bg-gray-50">
-                <div>
-                  {atestadosCurtos.length === 0 && <p className="text-sm text-slate-400">Nenhum atestado elegível para homologação.</p>}
-                  {atestadosCurtos.map(a => (
-                    <label key={a.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm mb-2">
-                      <input
-                        type="radio"
-                        name="atestado_homologado"
-                        checked={formData.atestado_homologado_id === a.id}
-                        onChange={() => handleChange('atestado_homologado_id', a.id)}
-                      />
-                      <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
-                    </label>
-                  ))}
-                </div>
+                {atestadosCurtos.length === 0 && <p className="text-sm text-slate-400">Nenhum atestado elegível para homologação.</p>}
+                {atestadosCurtos.map(a => (
+                  <label key={a.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm mb-2">
+                    <input
+                      type="radio"
+                      name="atestado_homologado"
+                      checked={formData.atestado_homologado_id === a.id}
+                      onChange={() => handleChange('atestado_homologado_id', a.id)}
+                    />
+                    <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
