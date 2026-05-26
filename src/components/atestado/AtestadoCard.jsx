@@ -699,64 +699,23 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                   </div>
                 </div>
 
-                <div className="space-y-2 rounded-lg border border-slate-200 p-4">
-                  <h4 className="text-xs font-semibold tracking-wide text-slate-500">ANEXO DA ATA JISO</h4>
-                  {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) ? (
-                    <div className="p-2 border border-slate-200 rounded-md bg-slate-50 space-y-2">
-                      <p className="text-xs text-slate-600">
-                        <span className="font-medium">Arquivo atual:</span>{' '}
-                        <span className="break-all">
-                          {arquivoAtaJisoNome || decodeURIComponent((ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso).split('/').pop()?.split('?')[0] || 'Arquivo anexado')}
-                        </span>
-                      </p>
-                      <button
-                        type="button"
-                        className="text-xs text-blue-600 hover:underline"
-                        onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}
-                      >
-                        Visualizar arquivo atual
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-500">Nenhum arquivo anexado.</p>
-                  )}
-
-                  <Input
-                    type="file"
-                    onChange={handleAtaJisoFileUpload}
-                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                    disabled={uploadingAtaJiso}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRemoveAtaJisoFile}
-                      >
-                        Remover
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {uploadingAtaJiso ? 'Enviando arquivo...' : 'Selecione um novo arquivo para substituir ou anexar.'}
-                  </p>
-                </div>
+                
               </div>
               <div className="lg:col-span-7">
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label className="text-sm font-medium">Texto para Publicação</Label>
-                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" /> Gerado automaticamente
-                  </span>
+                <div className="h-full rounded-lg border border-slate-200 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Label className="text-sm font-medium">Texto para Publicação</Label>
+                    <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                    </span>
+                  </div>
+                  <textarea
+                    value={homologacaoForm.texto_publicacao || ''}
+                    onChange={(e) => setHomologacaoForm(p => ({ ...p, texto_publicacao: e.target.value }))}
+                    className="w-full min-h-[300px] lg:min-h-[420px] rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20"
+                    placeholder="Nenhum texto gerado."
+                  />
                 </div>
-                <textarea
-                  value={homologacaoForm.texto_publicacao || ''}
-                  onChange={(e) => setHomologacaoForm(p => ({ ...p, texto_publicacao: e.target.value }))}
-                  className="w-full min-h-[300px] lg:min-h-[380px] rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20"
-                  placeholder="Nenhum texto gerado."
-                />
               </div>
             </div>
             </div>
