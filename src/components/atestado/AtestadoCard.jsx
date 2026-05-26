@@ -754,7 +754,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
       {/* Modal Ata JISO */}
       <Dialog open={showAtaJisoModal} onOpenChange={setShowAtaJisoModal}>
-        <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto px-6 pb-4">
           <DialogHeader>
             <DialogTitle>Ata JISO</DialogTitle>
             <p className="text-[11px] text-slate-500">
@@ -763,7 +763,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 : 'Texto oficial persistido.'}
             </p>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
               <strong>{atestado.militar_posto} {atestado.militar_nome}</strong> — {atestado.dias} dias — JISO: {atestado.status_jiso || 'Aguardando'}
             </div>
@@ -796,6 +796,14 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                     <Label className="text-sm">Parecer</Label>
                     <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="Apto" />
                   </div>
+                </div>
+
+                <hr className="border-slate-200" />
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div><Label className="text-sm">Nota para BG</Label><Input value={ataJisoForm.nota_para_bg} onChange={e => setAtaJisoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
+                  <div><Label className="text-sm">Número BG</Label><Input value={ataJisoForm.numero_bg} onChange={e => setAtaJisoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
+                  <div><Label className="text-sm">Data BG</Label><Input type="date" value={ataJisoForm.data_bg} onChange={e => setAtaJisoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
                 </div>
               </div>
 
@@ -842,12 +850,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><Label className="text-sm">Nota para BG</Label><Input value={ataJisoForm.nota_para_bg} onChange={e => setAtaJisoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
-              <div><Label className="text-sm">Número BG</Label><Input value={ataJisoForm.numero_bg} onChange={e => setAtaJisoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
-              <div><Label className="text-sm">Data BG</Label><Input type="date" value={ataJisoForm.data_bg} onChange={e => setAtaJisoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
               <Button variant="outline" onClick={() => setShowAtaJisoModal(false)}>Cancelar</Button>
               <Button onClick={handleSaveAtaJiso} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
                 <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
