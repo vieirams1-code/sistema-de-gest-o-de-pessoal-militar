@@ -245,16 +245,30 @@ Deno.serve(async (req) => {
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
-      const tipoUsoRaw = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso') ? data?.tipo_uso : null;
-      const tipoUsoEntrada = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso')
-        ? normalizarTipoUsoTag(tipoUsoRaw, { fallbackComum: false })
-        : null;
-      const tipoUsoAtual = normalizarTipoUsoTag(registroAtual?.tipo_uso);
-      const tipoUso = tipoUsoEntrada ?? tipoUsoAtual ?? 'comum';
-      if (Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso') && !tipoUsoEntrada) {
-        logDev('[TAG_TIPO_USO_FRONTEND_BUG]', { tipo_uso_recebido: tipoUsoRaw, tag_id: id || null, operacao });
-        return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
+
+      // CORREÇÃO tipo_uso: eliminar fallback destrutivo
+      const dataPossuiTipoUso = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso');
+      const tipoUsoRaw = dataPossuiTipoUso ? data?.tipo_uso : undefined;
+      console.log('[TIPO_USO_INPUT]', { operacao, tag_id: id || null, dataPossuiTipoUso, tipoUsoRaw, registroAtual_tipo_uso: registroAtual?.tipo_uso ?? null });
+
+      let tipoUso;
+      if (dataPossuiTipoUso) {
+        // Validação estrita: se veio tipo_uso, precisa ser canônico. Sem fallback silencioso.
+        const tipoUsoEntrada = normalizarTipoUsoTag(tipoUsoRaw, { fallbackComum: false });
+        if (!tipoUsoEntrada) {
+          console.log('[TIPO_USO_INVALIDO]', { tipo_uso_recebido: tipoUsoRaw, tag_id: id || null, operacao });
+          return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
+        }
+        tipoUso = tipoUsoEntrada;
+      } else if (operacao === 'update') {
+        // UPDATE sem tipo_uso no payload → preserva registroAtual
+        tipoUso = normalizarTipoUsoTag(registroAtual?.tipo_uso, { fallbackComum: false }) ?? 'comum';
+      } else {
+        // CREATE sem tipo_uso → default comum
+        tipoUso = 'comum';
       }
+      console.log('[TIPO_USO_FINAL]', { operacao, tag_id: id || null, tipoUso });
+
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       if (!TIPOS_USO_TAG.has(tipoUso)) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
@@ -280,13 +294,16 @@ Deno.serve(async (req) => {
       if (duplicada) return erro(400, 'Já existe tag ativa com este nome no mesmo grupo.');
 
       const payload = { ...data, nome, grupo_id: grupoId, aplicabilidade, tipo_visual: tipoVisual, tipo_uso: tipoUso, ativo: true };
+      console.log('[TIPO_USO_UPDATE_PAYLOAD]', { entidade, operacao, id, payload_tipo_uso: payload.tipo_uso, payload });
       logDev('[TAG_BACKEND_PAYLOAD]', { entidade, operacao, id, payload });
       if (operacao === 'create') {
         const created = await svc.create(payload);
+        console.log('[TIPO_USO_PERSISTIDO]', { operacao, id: created?.id, tipo_uso_persistido: created?.tipo_uso });
         logDev('[TAG_BACKEND_RESULT]', { entidade, operacao, id, result: created });
         return Response.json({ data: created });
       }
       const updated = await svc.update(String(id), payload);
+      console.log('[TIPO_USO_PERSISTIDO]', { operacao, id: updated?.id, tipo_uso_persistido: updated?.tipo_uso });
       logDev('[TAG_BACKEND_RESULT]', { entidade, operacao, id, result: updated });
       return Response.json({ data: updated });
     }
