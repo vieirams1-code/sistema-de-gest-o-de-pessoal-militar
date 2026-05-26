@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp, MoreVertical, Eye, Pencil, Download, BookOpen, History, Trash2 } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp, MoreVertical, Eye, Pencil, Download, BookOpen, History, Trash2, CheckCircle } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
 import AtestadosListaVisual from '@/components/atestado/AtestadosListaVisual';
@@ -31,7 +31,7 @@ import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHel
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
-import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { existePublicacaoAtivaParaAtestado, getAtestadoIdsVinculados, getStatusDocumentalAtaJiso, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 
@@ -63,6 +63,75 @@ const isAtestadoVigente = (atestado, hoje) => {
   if (!dataFim) return atestado.status === 'Ativo';
   return hoje <= dataFim;
 };
+
+function ListaAcoesAtestado({ atestado, handleView, handleEdit, handleDelete, canEditarAtestado, canExcluirAtestado }) {
+  const { data: publicacoesVinculadas = [] } = useQuery({
+    queryKey: ['publicacoes-atestado', atestado.id],
+    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id }),
+    select: (data) => data.filter(p =>
+      p.atestado_homologado_id === atestado.id ||
+      (p.atestados_jiso_ids && p.atestados_jiso_ids.includes(atestado.id))
+    )
+  });
+  const hasHomologacaoAtiva = existePublicacaoAtivaParaAtestado(publicacoesVinculadas, atestado.id, 'Homologação de Atestado');
+  const hasHomologacaoGerada = publicacoesVinculadas.some(
+    (publicacao) => publicacao.tipo === 'Homologação de Atestado' && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
+  );
+  const podePublicarHomologacao = atestado.fluxo_homologacao === 'comandante' && !hasHomologacaoGerada;
+  const hasPublicacaoVinculada = publicacoesVinculadas.some(isPublicacaoAtestadoAtiva);
+  const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas);
+  const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || Number(atestado.dias || 0) > 15;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={() => handleView(atestado)}><Eye className="w-4 h-4 mr-2" />Visualizar</DropdownMenuItem>
+        {canEditarAtestado && (
+          <DropdownMenuItem onClick={() => handleEdit(atestado)} disabled={hasPublicacaoVinculada}>
+            <Pencil className="w-4 h-4 mr-2" />
+            {hasPublicacaoVinculada ? 'Editar (bloqueado por publicação vinculada)' : 'Editar'}
+          </DropdownMenuItem>
+        )}
+        {atestado.arquivo_atestado && (
+          <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
+            <Download className="w-4 h-4 mr-2 text-slate-600" />Baixar atestado anexado
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        {podePublicarHomologacao && (
+          <DropdownMenuItem onClick={() => handleView(atestado)} disabled={hasHomologacaoAtiva}>
+            <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
+            {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Publicar Homologação'}
+          </DropdownMenuItem>
+        )}
+        {isFluxoJiso && (
+          <DropdownMenuItem onClick={() => handleView(atestado)} disabled={statusDocumentalAtaJiso.bloqueiaNovaPublicacao}>
+            <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
+            {statusDocumentalAtaJiso.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : 'Publicar ata JISO'}
+          </DropdownMenuItem>
+        )}
+        {publicacoesVinculadas.filter(isPublicacaoAtestadoAtiva).map(p => (
+          <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>
+            <FileText className="w-4 h-4 mr-2 text-blue-500" />
+            <span className="truncate">{p.tipo} — {p.status}</span>
+          </DropdownMenuItem>
+        ))}
+        {isFluxoJiso && <DropdownMenuItem onClick={() => handleView(atestado)}><History className="w-4 h-4 mr-2" />Registrar decisão JISO</DropdownMenuItem>}
+        {canExcluirAtestado && (
+          <DropdownMenuItem onClick={() => handleDelete(atestado)} disabled={hasPublicacaoVinculada} className="text-red-600 focus:text-red-600">
+            <Trash2 className="w-4 h-4 mr-2" />
+            {hasPublicacaoVinculada ? 'Excluir (bloqueado por publicação vinculada)' : 'Excluir'}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function Atestados() {
   const navigate = useNavigate();
@@ -230,59 +299,16 @@ export default function Atestados() {
 
 
 
-  const renderAtestadoActions = (atestado) => {
-    const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || Number(atestado.dias || 0) > 15;
-
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="w-4 h-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={() => handleView(atestado)}>
-            <Eye className="w-4 h-4 mr-2" />
-            Visualizar
-          </DropdownMenuItem>
-          {canEditarAtestado && (
-            <DropdownMenuItem onClick={() => handleEdit(atestado)}>
-              <Pencil className="w-4 h-4 mr-2" />
-              Editar
-            </DropdownMenuItem>
-          )}
-          {atestado.arquivo_atestado && (
-            <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
-              <Download className="w-4 h-4 mr-2" />
-              Baixar atestado anexado
-            </DropdownMenuItem>
-          )}
-          {isFluxoJiso && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}>
-                <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
-                Publicar ata JISO
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}>
-                <History className="w-4 h-4 mr-2" />
-                Registrar decisão JISO
-              </DropdownMenuItem>
-            </>
-          )}
-          {canExcluirAtestado && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleDelete(atestado)} className="text-red-600 focus:text-red-600">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Excluir
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  };
+  const renderAtestadoActions = (atestado) => (
+    <ListaAcoesAtestado
+      atestado={atestado}
+      handleView={handleView}
+      handleEdit={handleEdit}
+      handleDelete={handleDelete}
+      canEditarAtestado={canEditarAtestado}
+      canExcluirAtestado={canExcluirAtestado}
+    />
+  );
 
   const hasFilters = searchTerm || tipoAfastamentoFilter !== 'all' || jisoFilter !== 'all' || publicacaoFilter !== 'all';
 
