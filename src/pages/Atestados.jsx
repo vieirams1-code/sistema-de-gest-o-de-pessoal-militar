@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-} from "@/components/ui/dropdown-menu";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -21,13 +19,11 @@ import {
 import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
-import AtestadosListaVisual from '@/components/atestado/AtestadosListaVisual';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
-import { existePublicacaoAtivaParaAtestado, getAtestadoIdsVinculados, getStatusDocumentalAtaJiso, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
-import AtestadoActionsMenu from '@/components/atestado/AtestadoActionsMenu';
+import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 
@@ -61,59 +57,6 @@ const isAtestadoVigente = (atestado, hoje) => {
 };
 
 
-function ListaAcoesAtestado({
-  atestado,
-  handleView,
-  handleEdit,
-  handleDelete,
-  canEditarAtestado,
-  canExcluirAtestado,
-  openAtaJisoModal,
-  openHomologacaoModal,
-}) {
-  const { data: publicacoesVinculadas = [] } = useQuery({
-    queryKey: ['publicacoes-atestado', atestado.id],
-    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id }),
-    select: (data) => data.filter((p) =>
-      p.atestado_homologado_id === atestado.id ||
-      (p.atestados_jiso_ids && p.atestados_jiso_ids.includes(atestado.id))
-    )
-  });
-  const hasHomologacaoAtiva = existePublicacaoAtivaParaAtestado(publicacoesVinculadas, atestado.id, 'Homologação de Atestado');
-  const hasHomologacaoGerada = publicacoesVinculadas.some(
-    (publicacao) => publicacao.tipo === 'Homologação de Atestado' && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
-  );
-  const podePublicarHomologacao = atestado.fluxo_homologacao === 'comandante' && !hasHomologacaoGerada;
-  const hasPublicacaoVinculada = publicacoesVinculadas.some(isPublicacaoAtestadoAtiva);
-  const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas);
-  const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || Number(atestado.dias || 0) > 15;
-
-  return (
-    <AtestadoActionsMenu
-      atestado={atestado}
-      handlers={{
-        onView: handleView,
-        onEdit: handleEdit,
-        onDelete: handleDelete,
-        onOpenHomologacao: openHomologacaoModal,
-        onOpenAtaJiso: openAtaJisoModal,
-        onOpenJisoModal: handleView,
-      }}
-      permissoes={{ canEdit: canEditarAtestado, canDelete: canExcluirAtestado }}
-      estados={{
-        hasPublicacaoVinculada,
-        mensagemBloqueioPublicacao: 'Ação não permitida: este atestado possui publicação/nota vinculada.',
-        podePublicarHomologacao,
-        hasHomologacaoAtiva,
-        isFluxoJiso,
-        statusDocumentalAtaJiso,
-        bloquearEdicaoPublicacaoNoCard: false,
-      }}
-      publicacoesVinculadas={publicacoesVinculadas}
-    />
-  );
-}
-
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -133,7 +76,6 @@ export default function Atestados() {
   const [vigentesCollapsed, setVigentesCollapsed] = useState(false);
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
   const [verificandoEdicao, setVerificandoEdicao] = useState(false);
-  const [visualizacao, setVisualizacao] = useState('cards');
 
   const { data: atestadosBundle, isLoading } = useQuery({
     queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
@@ -281,20 +223,6 @@ export default function Atestados() {
   };
 
 
-
-  const renderAtestadoActions = (atestado) => (
-    <ListaAcoesAtestado
-      atestado={atestado}
-      handleView={handleView}
-      handleEdit={handleEdit}
-      handleDelete={handleDelete}
-      canEditarAtestado={canEditarAtestado}
-      canExcluirAtestado={canExcluirAtestado}
-      openAtaJisoModal={openAtaJisoModal}
-      openHomologacaoModal={openHomologacaoModal}
-    />
-  );
-
   const hasFilters = searchTerm || tipoAfastamentoFilter !== 'all' || jisoFilter !== 'all' || publicacaoFilter !== 'all';
 
   if (loadingUser || !isAccessResolved) return null;
@@ -388,24 +316,6 @@ export default function Atestados() {
                 Limpar filtros
               </Button>
             )}
-            <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-1">
-              <Button
-                size="sm"
-                variant={visualizacao === 'cards' ? 'default' : 'ghost'}
-                className={visualizacao === 'cards' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white' : 'text-slate-600'}
-                onClick={() => setVisualizacao('cards')}
-              >
-                Cards
-              </Button>
-              <Button
-                size="sm"
-                variant={visualizacao === 'lista' ? 'default' : 'ghost'}
-                className={visualizacao === 'lista' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white' : 'text-slate-600'}
-                onClick={() => setVisualizacao('lista')}
-              >
-                Lista
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -438,17 +348,12 @@ export default function Atestados() {
                     <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                     <p className="text-slate-500">{hasFilters ? 'Nenhum atestado vigente com esses filtros' : 'Nenhum atestado vigente no momento'}</p>
                   </div>
-                ) : visualizacao === 'cards' ? (
+                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
                       <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onOpenAtaJiso={openAtaJisoModal} onOpenHomologacao={openHomologacaoModal} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
-                ) : (
-                  <AtestadosListaVisual
-                    atestados={vigentes}
-                    renderActions={renderAtestadoActions}
-                  />
                 )
               )}
             </div>
@@ -473,17 +378,12 @@ export default function Atestados() {
                   <div className="bg-white rounded-xl p-8 text-center border border-slate-100">
                     <p className="text-slate-400">Nenhum atestado encerrado</p>
                   </div>
-                ) : visualizacao === 'cards' ? (
+                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {finalizados.map(a => (
                       <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onOpenAtaJiso={openAtaJisoModal} onOpenHomologacao={openHomologacaoModal} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
-                ) : (
-                  <AtestadosListaVisual
-                    atestados={finalizados}
-                    renderActions={renderAtestadoActions}
-                  />
                 )
               )}
             </div>
