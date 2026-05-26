@@ -663,8 +663,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
       {/* Modal Homologação pelo Comandante */}
       <Dialog open={showHomologacaoModal} onOpenChange={setShowHomologacaoModal}>
-        <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200">
             <DialogTitle>Homologação pelo Comandante</DialogTitle>
             <p className="text-[11px] text-slate-500">
               {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT
@@ -672,77 +672,95 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 : 'Texto oficial persistido.'}
             </p>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex max-h-[calc(92vh-64px)] flex-col">
+            <div className="overflow-y-auto px-6 pb-6">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
               <strong>{atestado.militar_posto} {atestado.militar_nome}</strong> — {atestado.dias} dias — {formatarDataExtenso(atestado.data_inicio)} a {formatarDataExtenso(atestado.data_termino)}
             </div>
-            <div>
-              <Label className="text-sm font-medium">Data da Publicação</Label>
-              <Input type="date" value={homologacaoForm.data_publicacao} onChange={e => setHomologacaoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <Label className="text-sm font-medium">Texto para Publicação</Label>
-                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
-                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {homologacaoForm.texto_publicacao || 'Nenhum texto gerado.'}
-                </p>
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm">Arquivo da Ata JISO</Label>
-              <div className="mt-1.5 space-y-2">
-                {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) ? (
-                  <div className="p-2 border border-slate-200 rounded-md bg-slate-50 space-y-1">
-                    <p className="text-xs text-slate-600">
-                      <span className="font-medium">Arquivo atual:</span>{' '}
-                      <span className="break-all">
-                        {arquivoAtaJisoNome || decodeURIComponent((ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso).split('/').pop()?.split('?')[0] || 'Arquivo anexado')}
-                      </span>
-                    </p>
-                    <button
-                      type="button"
-                      className="text-xs text-blue-600 hover:underline"
-                      onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}
-                    >
-                      Visualizar arquivo atual
-                    </button>
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+              <div className="space-y-4 lg:col-span-5">
+                <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+                  <h4 className="text-xs font-semibold tracking-wide text-slate-500">DADOS DA PUBLICAÇÃO</h4>
+                  <div>
+                    <Label className="text-sm font-medium">Data da Publicação</Label>
+                    <Input type="date" value={homologacaoForm.data_publicacao} onChange={e => setHomologacaoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500">Nenhum arquivo anexado.</p>
-                )}
+                </div>
 
-                <Input
-                  type="file"
-                  onChange={handleAtaJisoFileUpload}
-                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                  disabled={uploadingAtaJiso}
+                <div className="space-y-3 rounded-lg border border-slate-200 p-4">
+                  <h4 className="text-xs font-semibold tracking-wide text-slate-500">BOLETIM GERAL (BG)</h4>
+                  <div>
+                    <Label className="text-sm">Nota para BG</Label>
+                    <Input value={homologacaoForm.nota_para_bg} onChange={e => setHomologacaoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div><Label className="text-sm">Número BG</Label><Input value={homologacaoForm.numero_bg} onChange={e => setHomologacaoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
+                    <div><Label className="text-sm">Data BG</Label><Input type="date" value={homologacaoForm.data_bg} onChange={e => setHomologacaoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+                  <h4 className="text-xs font-semibold tracking-wide text-slate-500">ANEXO DA ATA JISO</h4>
+                  {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) ? (
+                    <div className="p-2 border border-slate-200 rounded-md bg-slate-50 space-y-2">
+                      <p className="text-xs text-slate-600">
+                        <span className="font-medium">Arquivo atual:</span>{' '}
+                        <span className="break-all">
+                          {arquivoAtaJisoNome || decodeURIComponent((ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso).split('/').pop()?.split('?')[0] || 'Arquivo anexado')}
+                        </span>
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600 hover:underline"
+                        onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}
+                      >
+                        Visualizar arquivo atual
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">Nenhum arquivo anexado.</p>
+                  )}
+
+                  <Input
+                    type="file"
+                    onChange={handleAtaJisoFileUpload}
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                    disabled={uploadingAtaJiso}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveAtaJisoFile}
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {uploadingAtaJiso ? 'Enviando arquivo...' : 'Selecione um novo arquivo para substituir ou anexar.'}
+                  </p>
+                </div>
+              </div>
+              <div className="lg:col-span-7">
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label className="text-sm font-medium">Texto para Publicação</Label>
+                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                  </span>
+                </div>
+                <textarea
+                  value={homologacaoForm.texto_publicacao || ''}
+                  onChange={(e) => setHomologacaoForm(p => ({ ...p, texto_publicacao: e.target.value }))}
+                  className="w-full min-h-[300px] lg:min-h-[380px] rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20"
+                  placeholder="Nenhum texto gerado."
                 />
-                <p className="text-xs text-slate-500">
-                  {uploadingAtaJiso ? 'Enviando arquivo...' : 'Selecione um novo arquivo para substituir ou anexar.'}
-                </p>
-                {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleRemoveAtaJisoFile}
-                  >
-                    Remover arquivo da ata
-                  </Button>
-                )}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><Label className="text-sm">Nota para BG</Label><Input value={homologacaoForm.nota_para_bg} onChange={e => setHomologacaoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
-              <div><Label className="text-sm">Número BG</Label><Input value={homologacaoForm.numero_bg} onChange={e => setHomologacaoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
-              <div><Label className="text-sm">Data BG</Label><Input type="date" value={homologacaoForm.data_bg} onChange={e => setHomologacaoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
               <Button variant="outline" onClick={() => setShowHomologacaoModal(false)}>Cancelar</Button>
               <Button onClick={handleSaveHomologacao} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
                 <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
