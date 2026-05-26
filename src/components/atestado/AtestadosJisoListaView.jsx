@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInCalendarDays, format } from 'date-fns';
-import { Check, ChevronDown, ChevronRight, Circle, Eye, FileText, Pencil } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Circle, Eye, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -123,19 +123,27 @@ export default function AtestadosJisoListaView({
 
   const salvarDadosAdministrativosMutation = useMutation({
     mutationFn: async ({ atestado, jiso, draft }) => {
-      const hasAdminData = Boolean(
-        (draft?.numero_tars || '').trim()
-        || (draft?.data_jiso || '').trim()
-        || (draft?.hora_jiso || '').trim()
-        || (draft?.local_jiso || '').trim()
-      );
+      const dadosAtuais = parseDadosAdministrativosJiso(jiso?.observacoes);
+      const atual = {
+        numero_tars: (dadosAtuais?.numero_tars || '').trim(),
+        hora_jiso: (dadosAtuais?.hora_jiso || '').trim(),
+        local_jiso: (dadosAtuais?.local_jiso || '').trim(),
+        data_jiso: (jiso?.data_jiso || jiso?.data_agendamento || '').trim(),
+      };
+      const proximo = {
+        numero_tars: (draft?.numero_tars || '').trim(),
+        hora_jiso: (draft?.hora_jiso || '').trim(),
+        local_jiso: (draft?.local_jiso || '').trim(),
+        data_jiso: (draft?.data_jiso || '').trim(),
+      };
+      const hasChanges = Object.keys(proximo).some((chave) => atual[chave] !== proximo[chave]);
 
-      if (!hasAdminData) {
+      if (!hasChanges) {
         toast({
           title: 'Nada para salvar',
-          description: 'Preencha ao menos um campo administrativo da JISO antes de salvar.',
+          description: 'Nenhuma alteração detectada nos campos administrativos da JISO.',
         });
-        console.warn('[JISO-TARS] Salvamento ignorado: nenhum campo administrativo preenchido.');
+        console.warn('[JISO-TARS] Salvamento ignorado: sem alterações nos dados administrativos.');
         return null;
       }
 
@@ -149,9 +157,9 @@ export default function AtestadosJisoListaView({
       if (jiso?.id) {
         const payload = {
           observacoes,
-          data_jiso: draft?.data_jiso || '',
+          data_jiso: proximo.data_jiso,
         };
-        if ((draft?.data_jiso || '').trim() && !jiso?.resultado_jiso && !jiso?.ata_jiso && !jiso?.data_ata) {
+        if (proximo.data_jiso && !jiso?.resultado_jiso && !jiso?.ata_jiso && !jiso?.data_ata) {
           payload.status = 'Agendada';
         }
         return base44.entities.JISO.update(jiso.id, payload);
@@ -167,11 +175,11 @@ export default function AtestadosJisoListaView({
         militar_matricula: atestado.militar_matricula_atual || atestado.militar_matricula,
         militar_matricula_atual: atestado.militar_matricula_atual || atestado.militar_matricula,
         militar_matricula_vinculo: atestado.militar_matricula_vinculo || atestado.militar_matricula,
-        data_jiso: draft?.data_jiso || '',
+        data_jiso: proximo.data_jiso,
         observacoes,
-        status: (draft?.data_jiso || '').trim()
+        status: proximo.data_jiso
           ? 'Agendada'
-          : (draft?.numero_tars || '').trim()
+          : proximo.numero_tars
             ? 'Encaminhado'
             : 'Pendente',
       });
@@ -218,7 +226,10 @@ export default function AtestadosJisoListaView({
         const progresso = dias > 0 ? Math.max(0, Math.min(100, (diasDecorridos / dias) * 100)) : 0;
         const isExpanded = expandedId === atestadoId;
         const historico = buildHistorico(atestado, jiso);
+        const hasJisoRegistro = Boolean(jiso?.id);
+        const hasJisoData = Boolean((jiso?.data_jiso || jiso?.data_agendamento || atestado?.data_jiso_agendada || '').trim?.() || (jiso?.data_jiso || jiso?.data_agendamento || atestado?.data_jiso_agendada));
         const isFluxoJiso = atestado?.fluxo_homologacao === 'jiso' || dias > 15;
+        const exibirBlocoJisoAdministrativo = isFluxoJiso || hasJisoRegistro || hasJisoData;
         const isFluxoComandante = atestado?.fluxo_homologacao === 'comandante';
         const homologacaoGerada = hasHomologacaoGerada?.(atestado) === true;
         const homologacaoAtiva = hasHomologacaoAtiva?.(atestado) === true;
@@ -304,11 +315,6 @@ export default function AtestadosJisoListaView({
                   <Button size="sm" variant="outline" className="rounded-xl border-slate-200 bg-white hover:bg-slate-50" onClick={() => onVisualizarJiso?.(atestado, jiso)}>
                     <Eye className="mr-1 h-4 w-4" />Visualizar
                   </Button>
-                  {canRegistrarDecisaoJiso && (
-                    <Button size="sm" variant="outline" className="rounded-xl border-slate-200 bg-white hover:bg-slate-50" onClick={() => onRegistrarDecisaoJiso?.(atestado, jiso)}>
-                      <Pencil className="mr-1 h-4 w-4" />{jiso ? 'Editar JISO' : 'Registrar JISO'}
-                    </Button>
-                  )}
                 </div>
               </div>
             </div>
@@ -318,17 +324,19 @@ export default function AtestadosJisoListaView({
                 <div className="grid gap-4 lg:grid-cols-3">
                   <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline derivada JISO</p>
-                    <div className="mt-3 grid grid-cols-4 gap-2">
+                    <div className="mt-3 flex flex-wrap items-start gap-2">
                       {timelineEtapas.map((etapa, idx) => (
-                        <div key={etapa.label} className="relative flex flex-col items-center text-center">
-                          {idx < timelineEtapas.length - 1 && (
-                            <span className={`absolute left-1/2 top-4 h-0.5 w-full ${etapa.done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-                          )}
+                        <React.Fragment key={etapa.label}>
+                        <div className="flex min-w-[70px] flex-col items-center text-center">
                           <span className={`z-10 flex h-8 w-8 items-center justify-center rounded-full border ${etapa.done ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
                             {etapa.done ? <Check className="h-4 w-4" /> : <Circle className="h-3.5 w-3.5" />}
                           </span>
                           <span className="mt-2 text-[11px] font-medium text-slate-600">{etapa.label}</span>
                         </div>
+                          {idx < timelineEtapas.length - 1 && (
+                            <span className={`mt-4 h-0.5 w-5 shrink-0 ${etapa.done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+                          )}
+                        </React.Fragment>
                       ))}
                     </div>
                   </div>
@@ -343,6 +351,7 @@ export default function AtestadosJisoListaView({
                   </div>
 
                   <div className="space-y-3">
+                    {exibirBlocoJisoAdministrativo && (
                     <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 space-y-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dados administrativos da JISO</p>
@@ -380,6 +389,9 @@ export default function AtestadosJisoListaView({
                         setGeneratedTextByAtestado((prev) => ({ ...prev, [atestadoId]: texto }));
                         console.warn('[JISO-TARS][visual-only] Preview local do texto TARS gerado sem persistência.', { atestadoId });
                       }}>Gerar preview TARS</Button>
+                        <Button size="sm" variant="outline" disabled title="Fluxo de ofício de apresentação na JISO não encontrado nos cards atuais.">
+                          Gerar ofício de apresentação
+                        </Button>
                         {canRegistrarDecisaoJiso && (
                           <Button
                             size="sm"
@@ -400,6 +412,7 @@ export default function AtestadosJisoListaView({
                       </p>
                       Após a realização da sessão, utilize o fluxo atual da JISO para lançar a decisão, aplicar reflexos no atestado, tratar ata e publicação.
                     </div>
+                    )}
                     {(isFluxoJiso || (isFluxoComandante && !homologacaoGerada)) && (
                       <div className="rounded-xl border border-slate-200 bg-white p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ações operacionais</p>
