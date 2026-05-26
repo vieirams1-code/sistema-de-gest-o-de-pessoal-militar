@@ -8,9 +8,6 @@ function criarErroSemantico(message, extras = {}) {
 
 async function invocar(payload) {
   try {
-    if (payload?.entidade === 'Tag') {
-      console.debug('[TAG_DELETE_CLIENT_PAYLOAD]', payload);
-    }
     console.debug('[CUD_FUNCOES_TAGS_REQUEST]', payload);
     const response = await base44.functions.invoke('cudFuncoesTagsEscopado', payload);
     console.debug('[CUD_FUNCOES_TAGS_RESPONSE]', response);
@@ -23,7 +20,7 @@ async function invocar(payload) {
     const body = error?.response?.data;
     const backendMessage = body?.message || body?.error || body?.details || error?.message;
 
-    if (body?.code === 'TAG_UNICA_CONFLITO' || body?.code === 'TAG_COM_VINCULOS' || body?.code === 'GRUPO_COM_TAGS_ATIVAS') {
+    if (body?.code === 'TAG_COM_VINCULOS' || body?.code === 'GRUPO_COM_TAGS_ATIVAS') {
       throw criarErroSemantico(backendMessage, {
         code: body?.code,
         militar_id: body?.militar_id,
@@ -74,12 +71,3 @@ export const atualizarTagEscopado = (id, data) => invocar({ entidade: 'Tag', ope
 export const desativarTagEscopado = (id, data) => invocar({ entidade: 'Tag', operacao: 'desativar', id, data });
 export const excluirTagEscopado = (id) => invocar({ entidade: 'Tag', operacao: 'delete', id });
 
-export async function invocarCudFuncoesTagsEscopadoDebug(payload) {
-  const request = JSON.parse(JSON.stringify(payload || {}));
-  try {
-    const response = await base44.functions.invoke('cudFuncoesTagsEscopado', request);
-    return { request, response: response?.data ?? response, ok: true };
-  } catch (error) {
-    throw { request, response: error?.response?.data ?? null, error };
-  }
-}

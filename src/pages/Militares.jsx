@@ -772,20 +772,12 @@ export default function Militares() {
       const criacoes = await Promise.allSettled(
         paraCriar.map((item) => criarMilitarTagEscopado({ ...item, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined })),
       );
-      let conflitoTagUnica = null;
       criacoes.forEach((resultado) => {
         if (resultado.status === 'fulfilled') {
           aplicadas += 1;
           return;
         }
         const erro = resultado.reason || {};
-        const conflito = erro?.code === 'TAG_UNICA_CONFLITO'
-          || erro?.data?.code === 'TAG_UNICA_CONFLITO'
-          || erro?.response?.data?.code === 'TAG_UNICA_CONFLITO';
-        if (conflito && !conflitoTagUnica) {
-          conflitoTagUnica = erro;
-          return;
-        }
         if (!isErroDuplicidade(erro)) erros += 1;
       });
 
@@ -812,22 +804,11 @@ export default function Militares() {
       queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] });
 
-      if (conflitoTagUnica) {
-        const posto = conflitoTagUnica?.posto_grad || conflitoTagUnica?.data?.posto_grad || conflitoTagUnica?.response?.data?.posto_grad;
-        const nome = conflitoTagUnica?.militar_nome || conflitoTagUnica?.data?.militar_nome || conflitoTagUnica?.response?.data?.militar_nome;
-        const destino = [posto, nome].filter(Boolean).join('/');
-        toast({
-          title: 'Conflito de tag única',
-          description: `Esta tag já está atribuída a ${destino || 'outro militar'}. Remova a tag desse militar antes de atribuir a outro.`,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Funções e tags atualizadas com sucesso.',
-          description: `${funcoesCriadas} função(ões) criada(s), ${funcoesEncerradas} função(ões) encerrada(s), ${aplicadas} tag(s) adicionada(s), ${removidas} tag(s) removida(s).`,
-          variant: erros > 0 ? 'destructive' : 'default',
-        });
-      }
+      toast({
+        title: 'Funções e tags atualizadas com sucesso.',
+        description: `${funcoesCriadas} função(ões) criada(s), ${funcoesEncerradas} função(ões) encerrada(s), ${aplicadas} tag(s) adicionada(s), ${removidas} tag(s) removida(s).`,
+        variant: erros > 0 ? 'destructive' : 'default',
+      });
     } finally {
       setBulkSaving(false);
     }
