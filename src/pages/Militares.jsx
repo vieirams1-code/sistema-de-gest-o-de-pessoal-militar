@@ -39,6 +39,7 @@ import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
@@ -1024,7 +1025,7 @@ export default function Militares() {
               placeholder="Todas"
               options={tagsAtivas.map((tag) => ({
                 value: String(tag.id),
-                label: `${tag.emoji || '🏷️'} ${tag.nome}`,
+                label: `${resolveTagVisual(tag).emoji} ${resolveTagVisual(tag).nome}`,
               }))}
               value={tagsSelecionadas}
               onChange={setTagsSelecionadas}
