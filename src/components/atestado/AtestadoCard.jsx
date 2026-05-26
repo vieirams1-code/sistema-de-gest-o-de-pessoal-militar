@@ -49,7 +49,7 @@ const statusColors = {
   'Prorrogado': 'bg-blue-100 text-blue-700 border-blue-200'
 };
 
-export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpenAtaJiso, canEdit = true, canDelete = true }) {
+export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpenAtaJiso, onOpenHomologacao, canEdit = true, canDelete = true }) {
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
   // edit_mode = hibrido
@@ -483,7 +483,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
               onView,
               onEdit,
               onDelete,
-              onOpenHomologacao: handleOpenHomologacao,
+              onOpenHomologacao: () => (onOpenHomologacao ? onOpenHomologacao(atestado) : handleOpenHomologacao()),
               onOpenAtaJiso: () => (onOpenAtaJiso ? onOpenAtaJiso(atestado) : handleOpenAtaJiso()),
               onOpenJisoModal: () => setShowJisoModal(true),
             }}
