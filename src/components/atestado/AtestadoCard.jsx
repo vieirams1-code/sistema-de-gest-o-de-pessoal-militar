@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -49,7 +49,7 @@ const statusColors = {
   'Prorrogado': 'bg-blue-100 text-blue-700 border-blue-200'
 };
 
-export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpenAtaJiso, canEdit = true, canDelete = true }) {
+export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpenAtaJiso, onOpenHomologacao, canEdit = true, canDelete = true }) {
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
   // edit_mode = hibrido
@@ -452,6 +452,24 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
 
   const progressPercent = getProgressPercent();
 
+
+  useEffect(() => {
+    const handleAtaJisoEvent = (event) => {
+      if (event?.detail?.atestadoId !== atestado?.id) return;
+      handleOpenAtaJiso();
+    };
+    const handleHomologacaoEvent = (event) => {
+      if (event?.detail?.atestadoId !== atestado?.id) return;
+      handleOpenHomologacao();
+    };
+    window.addEventListener('atestado:openAtaJiso', handleAtaJisoEvent);
+    window.addEventListener('atestado:openHomologacao', handleHomologacaoEvent);
+    return () => {
+      window.removeEventListener('atestado:openAtaJiso', handleAtaJisoEvent);
+      window.removeEventListener('atestado:openHomologacao', handleHomologacaoEvent);
+    };
+  }, [atestado?.id, ataJisoForm, statusDocumentalAtaJiso, templates, militarAtestado]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -483,7 +501,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
               onView,
               onEdit,
               onDelete,
-              onOpenHomologacao: handleOpenHomologacao,
+              onOpenHomologacao: () => (onOpenHomologacao ? onOpenHomologacao(atestado) : handleOpenHomologacao()),
               onOpenAtaJiso: () => (onOpenAtaJiso ? onOpenAtaJiso(atestado) : handleOpenAtaJiso()),
               onOpenJisoModal: () => setShowJisoModal(true),
             }}
