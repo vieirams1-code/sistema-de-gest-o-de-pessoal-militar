@@ -21,7 +21,6 @@ import {
   desativarTagGrupoEscopado,
   excluirTagGrupoEscopado,
   excluirTagEscopado,
-  invocarCudFuncoesTagsEscopadoDebug,
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 
@@ -71,11 +70,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   const [tagsInstitucionaisArquivadas, setTagsInstitucionaisArquivadas] = useState([]);
   const [tagsInstitucionaisSelecionadas, setTagsInstitucionaisSelecionadas] = useState([]);
   const [confirmarArquivamentoInstitucionaisOpen, setConfirmarArquivamentoInstitucionaisOpen] = useState(false);
-  const [debugTagId, setDebugTagId] = useState('');
-  const [debugResult, setDebugResult] = useState(null);
-  const [debugLoading, setDebugLoading] = useState(false);
-  const DEBUG_TAGS_BUILD = import.meta.env.VITE_COMMIT_SHA || import.meta.env.VITE_GIT_COMMIT || 'debug-tags-runtime';
-  const canShowDebugPanel = canEdit && isAdmin && import.meta.env.DEV;
 
   useEffect(() => {
     if (showFuncoesTab) {
@@ -330,35 +324,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     setConfirmarArquivamentoInstitucionaisOpen(false);
   };
 
-  const tagSelecionadaDebug = useMemo(
-    () => tags.find((item) => String(item.id) === String(debugTagId)) || null,
-    [tags, debugTagId],
-  );
-
-  const executarDebugTags = async (payload) => {
-    setDebugLoading(true);
-    setDebugResult({ status: 'running', request: payload, response: null, error: null, refetchTag: null });
-    try {
-      const result = await invocarCudFuncoesTagsEscopadoDebug(payload);
-      const refetchResult = await queryClient.fetchQuery({
-        queryKey: ['funcoes-tags', 'tags'],
-        queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
-      });
-      const tagAposRefetch = (refetchResult || []).find((item) => String(item.id) === String(payload?.id)) || null;
-      setDebugResult({ status: 'success', request: result.request, response: result.response, error: null, refetchTag: tagAposRefetch });
-    } catch (debugError) {
-      setDebugResult({
-        status: 'error',
-        request: debugError?.request ?? payload,
-        response: debugError?.response ?? null,
-        error: debugError?.error ?? debugError,
-        refetchTag: null,
-      });
-    } finally {
-      setDebugLoading(false);
-      await invalidate('tags');
-    }
-  };
 
   return (<div className="max-w-6xl mx-auto space-y-6">
     <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">{showFuncoesTab ? 'Configurações de Funções e Tags' : 'Configurações de Tags'}</h1></div><p className="text-sm text-slate-500 mt-1">{showFuncoesTab ? 'Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.' : 'Gerencie grupos de tags e marcadores operacionais do sistema.'}</p></div>{showFuncoesTab && <Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button>}</header>
@@ -398,45 +363,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
         </div>
       )}
     </section>}
-    {activeTab === 'tags' && canShowDebugPanel && <section className="rounded-2xl border-2 border-rose-300 bg-rose-50/70 p-4 space-y-3">
-      <h2 className="font-semibold text-rose-900">Debug Tags Runtime</h2>
-      <p className="text-xs text-rose-800 font-semibold">TEMPORÁRIO / REMOVER APÓS DIAGNÓSTICO</p>
-      <p className="text-xs text-rose-800">Build: <strong>{DEBUG_TAGS_BUILD}</strong></p>
-      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end">
-        <Field label="Selecionar Tag existente">
-          <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={debugTagId} onChange={(e) => setDebugTagId(e.target.value)}>
-            <option value="">Selecione...</option>
-            {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.nome} ({tag.id})</option>)}
-          </select>
-        </Field>
-        <Button disabled={!debugTagId || debugLoading} onClick={() => executarDebugTags({ entidade: 'Tag', operacao: 'update', id: debugTagId, data: { tipo_uso: 'unica' } })}>Enviar tipo_uso unica</Button>
-        <Button variant="destructive" disabled={!debugTagId || debugLoading} onClick={() => executarDebugTags({ entidade: 'Tag', operacao: 'delete', id: debugTagId })}>Testar delete</Button>
-      </div>
-      {tagSelecionadaDebug && <p className="text-xs text-slate-700">Tag selecionada agora: <strong>{tagSelecionadaDebug.nome}</strong> • tipo_uso: <strong>{tagSelecionadaDebug.tipo_uso || '—'}</strong> • ativo: <strong>{String(tagSelecionadaDebug.ativo !== false)}</strong></p>}
-      {debugResult && <div className="space-y-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-semibold text-slate-900 mb-1">Request JSON</p>
-          <pre className="text-xs overflow-auto">{JSON.stringify(debugResult.request, null, 2)}</pre>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-semibold text-slate-900 mb-1">Response JSON</p>
-          <pre className="text-xs overflow-auto">{JSON.stringify(debugResult.response, null, 2)}</pre>
-        </div>
-        {debugResult.error && <div className="rounded-lg border border-rose-300 bg-rose-100 p-3">
-          <p className="text-xs font-semibold text-rose-900 mb-1">Erro (sem máscara)</p>
-          <pre className="text-xs overflow-auto text-rose-900">{JSON.stringify({
-            message: debugResult.error?.message,
-            code: debugResult.error?.code,
-            status: debugResult.error?.response?.status,
-            data: debugResult.error?.response?.data,
-          }, null, 2)}</pre>
-        </div>}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-semibold text-slate-900 mb-1">Tag após refetch</p>
-          <pre className="text-xs overflow-auto">{JSON.stringify(debugResult.refetchTag, null, 2)}</pre>
-        </div>
-      </div>}
-    </section>}
+    
 
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex">{showFuncoesTab && <TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} />}<TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
 
