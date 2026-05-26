@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   Save,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Pencil
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
   buildTemplateVarsContrato,
 } from '@/components/utils/templateUtils';
 import {
+  calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
   getAtestadoIdsVinculados,
   getStatusDocumentalAtaJiso,
