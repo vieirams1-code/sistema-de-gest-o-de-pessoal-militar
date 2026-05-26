@@ -23,7 +23,7 @@ import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitar
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
-import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/AtestadosJisoListaView';
+import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/jisoObservacoesUtils';
 
 export default function EditarJISO() {
   // GOVERNANÇA TEMPLATE:
