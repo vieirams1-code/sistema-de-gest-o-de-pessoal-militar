@@ -130,6 +130,25 @@ function getTagCor(tag = {}) {
   return '#64748b';
 }
 
+function isCampoFalseExplicito(valor) {
+  if (valor === false) return true;
+  if (typeof valor === 'string') {
+    const normalizado = valor.trim().toLowerCase();
+    return ['false', '0', 'nao', 'não'].includes(normalizado);
+  }
+  if (typeof valor === 'number') return valor === 0;
+  return false;
+}
+
+function isFeriasTagAtiva(vinculo = {}) {
+  const status = String(vinculo?.status || '').trim().toLowerCase();
+  const statusAtivo = status === 'ativa' || status === 'ativo';
+  const semRemocao = !vinculo?.data_remocao;
+  const campoAtivoValido = !isCampoFalseExplicito(vinculo?.ativo);
+  const campoAtivaValido = !isCampoFalseExplicito(vinculo?.ativa);
+  return (statusAtivo || semRemocao) && campoAtivoValido && campoAtivaValido;
+}
+
 function parseFeriasDateStart(value) {
   if (!value) return null;
   if (value instanceof Date) {
@@ -568,7 +587,7 @@ export default function Ferias() {
   const feriasTagsAtivasMap = useMemo(() => {
     const mapa = new Map();
     feriasTagsVinculos.forEach((item) => {
-      if (String(item?.status || '').toLowerCase() !== 'ativa') return;
+      if (!isFeriasTagAtiva(item)) return;
       const feriasId = String(getFeriasTagFeriasId(item) || '');
       const tagId = String(getFeriasTagTagId(item) || '');
       if (!feriasId || !tagId) return;
