@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
     }
 
     if (entidade === 'Tag') {
-      logDev('[TAG_BACKEND_INPUT]', { entidade, operacao, id, data });
+      if (operacao === 'delete') logDev('[TAG_DELETE_BACKEND_INPUT]', { entidade, operacao, id, data });
       if (!['create', 'update', 'desativar', 'delete'].includes(operacao)) return erro(400, 'Operação inválida para Tag.');
       if (operacao === 'desativar') {
         const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
         const militarCount = Array.isArray(militarTags) ? militarTags.length : 0;
         const feriasCount = Array.isArray(feriasTags) ? feriasTags.length : 0;
         const atestadoCount = Array.isArray(atestadoTags) ? atestadoTags.length : 0;
-        logDev('[TAG_DELETE_CHECK]', {
+        logDev('[TAG_DELETE_BACKEND_RESULT]', {
           tag_id: tagId,
           militarAtivos: militarCount,
           feriasAtivos: feriasCount,
@@ -245,12 +245,16 @@ Deno.serve(async (req) => {
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
+      const tipoUsoRaw = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso') ? data?.tipo_uso : null;
       const tipoUsoEntrada = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso')
-        ? normalizarTipoUsoTag(data?.tipo_uso, { fallbackComum: false })
+        ? normalizarTipoUsoTag(tipoUsoRaw, { fallbackComum: false })
         : null;
       const tipoUsoAtual = normalizarTipoUsoTag(registroAtual?.tipo_uso);
       const tipoUso = tipoUsoEntrada ?? tipoUsoAtual ?? 'comum';
-      if (Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso') && !tipoUsoEntrada) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
+      if (Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso') && !tipoUsoEntrada) {
+        logDev('[TAG_TIPO_USO_FRONTEND_BUG]', { tipo_uso_recebido: tipoUsoRaw, tag_id: id || null, operacao });
+        return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
+      }
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       if (!TIPOS_USO_TAG.has(tipoUso)) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
