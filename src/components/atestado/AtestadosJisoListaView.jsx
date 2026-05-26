@@ -253,6 +253,19 @@ export default function AtestadosJisoListaView({
           data_jiso: jiso?.data_jiso || jiso?.data_agendamento || atestado?.data_jiso_agendada || '',
           ...(draftByAtestado[atestadoId] || {}),
         };
+        const dadosAtuais = {
+          numero_tars: (dadosAdmin?.numero_tars || '').trim(),
+          hora_jiso: (dadosAdmin?.hora_jiso || '').trim(),
+          local_jiso: (dadosAdmin?.local_jiso || '').trim(),
+          data_jiso: (jiso?.data_jiso || jiso?.data_agendamento || atestado?.data_jiso_agendada || '').trim(),
+        };
+        const dadosDraft = {
+          numero_tars: (draft?.numero_tars || '').trim(),
+          hora_jiso: (draft?.hora_jiso || '').trim(),
+          local_jiso: (draft?.local_jiso || '').trim(),
+          data_jiso: (draft?.data_jiso || '').trim(),
+        };
+        const hasPendingAdminChanges = Object.keys(dadosDraft).some((chave) => dadosAtuais[chave] !== dadosDraft[chave]);
         const timelineEtapas = [
           { label: 'Atestado', done: Boolean(atestado?.id) },
           { label: 'TARS', done: Boolean((draft?.numero_tars || '').trim()) },
@@ -324,19 +337,17 @@ export default function AtestadosJisoListaView({
                 <div className="grid gap-4 lg:grid-cols-3">
                   <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline derivada JISO</p>
-                    <div className="mt-3 flex flex-wrap items-start gap-2">
-                      {timelineEtapas.map((etapa, idx) => (
-                        <React.Fragment key={etapa.label}>
-                        <div className="flex min-w-[70px] flex-col items-center text-center">
-                          <span className={`z-10 flex h-8 w-8 items-center justify-center rounded-full border ${etapa.done ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
-                            {etapa.done ? <Check className="h-4 w-4" /> : <Circle className="h-3.5 w-3.5" />}
+                    <div className="mt-3 space-y-2">
+                      {timelineEtapas.map((etapa) => (
+                        <div key={etapa.label} className="flex items-center gap-2 rounded-md bg-slate-50 px-2 py-1.5">
+                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${etapa.done ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                            {etapa.done ? <Check className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                           </span>
-                          <span className="mt-2 text-[11px] font-medium text-slate-600">{etapa.label}</span>
+                          <span className="text-xs font-medium text-slate-700">{etapa.label}</span>
+                          <span className={`ml-auto text-[11px] font-semibold ${etapa.done ? 'text-emerald-700' : 'text-slate-500'}`}>
+                            {etapa.done ? 'Concluído' : 'Pendente'}
+                          </span>
                         </div>
-                          {idx < timelineEtapas.length - 1 && (
-                            <span className={`mt-4 h-0.5 w-5 shrink-0 ${etapa.done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-                          )}
-                        </React.Fragment>
                       ))}
                     </div>
                   </div>
@@ -392,16 +403,15 @@ export default function AtestadosJisoListaView({
                         <Button size="sm" variant="outline" disabled title="Fluxo de ofício de apresentação na JISO não encontrado nos cards atuais.">
                           Gerar ofício de apresentação
                         </Button>
-                        {canRegistrarDecisaoJiso && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={salvarDadosAdministrativosMutation.isPending}
-                            onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft })}
-                          >
-                            Salvar dados da JISO
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant={hasPendingAdminChanges ? 'default' : 'outline'}
+                          disabled={salvarDadosAdministrativosMutation.isPending || !canRegistrarDecisaoJiso}
+                          title={!canRegistrarDecisaoJiso ? 'Sem permissão para salvar dados administrativos da JISO' : undefined}
+                          onClick={() => salvarDadosAdministrativosMutation.mutate({ atestado, jiso, draft })}
+                        >
+                          Salvar dados da JISO
+                        </Button>
                       </div>
                       {generatedTextByAtestado[atestadoId] && (
                         <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs">{generatedTextByAtestado[atestadoId]}</pre>
