@@ -67,6 +67,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
   const [showAtaJisoModal, setShowAtaJisoModal] = useState(false);
   const [savingPublicacao, setSavingPublicacao] = useState(false);
   const [uploadingAtaJiso, setUploadingAtaJiso] = useState(false);
+  const [arquivoAtaJisoNome, setArquivoAtaJisoNome] = useState('');
 
   // Estado do formulário de homologação
   const [homologacaoForm, setHomologacaoForm] = useState({
@@ -328,6 +329,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
     });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
     setSavingPublicacao(false);
     setShowAtaJisoModal(false);
   };
@@ -339,6 +342,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setAtaJisoForm((prev) => ({ ...prev, arquivo_ata_jiso: file_url }));
+      setArquivoAtaJisoNome(file.name || 'Arquivo da Ata JISO');
     } catch (error) {
       console.error('Erro ao fazer upload da Ata JISO:', error);
       alert('Não foi possível enviar o arquivo da Ata JISO.');
@@ -761,12 +765,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, onOpe
             </div>
             <div>
               <Label className="text-sm">Arquivo da Ata JISO</Label>
-              <Input type="file" className="mt-1.5" onChange={handleAtaJisoFileUpload} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" />
+              <Input type="file" className="mt-1.5" onChange={handleAtaJisoFileUpload} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={uploadingAtaJiso} />
               <p className="text-xs text-slate-500 mt-1">{uploadingAtaJiso ? 'Enviando arquivo...' : 'Anexe PDF, imagem ou documento.'}</p>
               {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) && (
-                <button type="button" className="text-xs text-blue-600 hover:underline mt-1" onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}>
-                  Visualizar arquivo anexado
-                </button>
+                <div className="mt-1 flex flex-col gap-1"> 
+                  <span className="text-xs text-slate-600 truncate">{arquivoAtaJisoNome || decodeURIComponent((ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso).split('/').pop()?.split('?')[0] || 'Arquivo anexado')}</span>
+                  <button type="button" className="text-xs text-blue-600 hover:underline text-left" onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}>
+                    Visualizar arquivo anexado
+                  </button>
+                </div>
               )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
