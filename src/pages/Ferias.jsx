@@ -69,6 +69,7 @@ import { getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getS
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
+import { getFeriasTagFeriasId, getFeriasTagTagId } from '@/utils/funcoesTags/contratoCampos';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -478,9 +479,23 @@ export default function Ferias() {
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
+  const feriasIdsEscopoTags = useMemo(
+    () => ferias.map((item) => String(item.id)).filter(Boolean),
+    [ferias],
+  );
+
   const { data: feriasTagsVinculos = [] } = useQuery({
-    queryKey: ['ferias-tags-bulk'],
-    queryFn: () => base44.entities.FeriasTag.list('-created_date'),
+    queryKey: ['ferias-tags-bulk', feriasIdsEscopoTags],
+    queryFn: async () => {
+      if (feriasIdsEscopoTags.length === 0) return [];
+      const resultados = await Promise.all(
+        feriasIdsEscopoTags.map((feriasId) => base44.entities.FeriasTag.filter({ ferias_id: feriasId }, '-created_date')),
+      );
+      return resultados.flat().filter((item) => {
+        const feriasId = String(getFeriasTagFeriasId(item) || '');
+        return feriasIdsEscopoTags.includes(feriasId);
+      });
+    },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
   const { data: tagsCatalogo = [] } = useQuery({
@@ -554,8 +569,8 @@ export default function Ferias() {
     const mapa = new Map();
     feriasTagsVinculos.forEach((item) => {
       if (String(item?.status || '').toLowerCase() !== 'ativa') return;
-      const feriasId = String(item?.ferias_id || '');
-      const tagId = String(item?.tag_id || '');
+      const feriasId = String(getFeriasTagFeriasId(item) || '');
+      const tagId = String(getFeriasTagTagId(item) || '');
       if (!feriasId || !tagId) return;
       if (!mapa.has(feriasId)) mapa.set(feriasId, new Map());
       mapa.get(feriasId).set(tagId, item);
