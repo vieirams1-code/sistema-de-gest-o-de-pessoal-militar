@@ -80,7 +80,7 @@ export default function AtestadoActionsMenu({
         <DropdownMenuSeparator />
 
         {podePublicarHomologacao && (
-          <DropdownMenuItem onClick={() => onOpenHomologacao?.(atestado)} disabled={hasHomologacaoAtiva}>
+          <DropdownMenuItem onClick={() => onOpenHomologacao?.()} disabled={hasHomologacaoAtiva}>
             <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
             {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Publicar Homologação'}
           </DropdownMenuItem>
@@ -88,7 +88,7 @@ export default function AtestadoActionsMenu({
 
         {isFluxoJiso && (
           <DropdownMenuItem
-            onClick={() => onOpenAtaJiso?.(atestado)}
+            onClick={() => onOpenAtaJiso?.()}
             disabled={statusDocumentalAtaJiso?.bloqueiaNovaPublicacao}
             title={statusDocumentalAtaJiso?.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
           >

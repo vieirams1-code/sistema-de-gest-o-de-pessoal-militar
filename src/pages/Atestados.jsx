@@ -188,8 +188,6 @@ export default function Atestados() {
     setDeleteDialogOpen(true);
   };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
-  const openAtaJisoModal = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
-  const openHomologacaoModal = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
   const confirmDelete = async () => {
     if (!atestadoToDelete) return;
     if (!canExcluirAtestado) {
@@ -351,7 +349,7 @@ export default function Atestados() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onOpenAtaJiso={openAtaJisoModal} onOpenHomologacao={openHomologacaoModal} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 )
@@ -381,7 +379,7 @@ export default function Atestados() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {finalizados.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onOpenAtaJiso={openAtaJisoModal} onOpenHomologacao={openHomologacaoModal} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 )
