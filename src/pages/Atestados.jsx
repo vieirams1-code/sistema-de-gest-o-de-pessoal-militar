@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -16,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp, MoreVertical, Eye, Pencil, Download, BookOpen, History, Trash2 } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
 import AtestadosListaVisual from '@/components/atestado/AtestadosListaVisual';
@@ -221,6 +228,62 @@ export default function Atestados() {
     }).length
   };
 
+
+
+  const renderAtestadoActions = (atestado) => {
+    const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || Number(atestado.dias || 0) > 15;
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onClick={() => handleView(atestado)}>
+            <Eye className="w-4 h-4 mr-2" />
+            Visualizar
+          </DropdownMenuItem>
+          {canEditarAtestado && (
+            <DropdownMenuItem onClick={() => handleEdit(atestado)}>
+              <Pencil className="w-4 h-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+          )}
+          {atestado.arquivo_atestado && (
+            <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
+              <Download className="w-4 h-4 mr-2" />
+              Baixar atestado anexado
+            </DropdownMenuItem>
+          )}
+          {isFluxoJiso && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}>
+                <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
+                Publicar ata JISO
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}>
+                <History className="w-4 h-4 mr-2" />
+                Registrar decisão JISO
+              </DropdownMenuItem>
+            </>
+          )}
+          {canExcluirAtestado && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleDelete(atestado)} className="text-red-600 focus:text-red-600">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   const hasFilters = searchTerm || tipoAfastamentoFilter !== 'all' || jisoFilter !== 'all' || publicacaoFilter !== 'all';
 
   if (loadingUser || !isAccessResolved) return null;
@@ -373,11 +436,7 @@ export default function Atestados() {
                 ) : (
                   <AtestadosListaVisual
                     atestados={vigentes}
-                    renderActions={(atestado) => (
-                      <Button variant="outline" size="sm" onClick={() => handleView(atestado)}>
-                        Visualizar detalhes
-                      </Button>
-                    )}
+                    renderActions={renderAtestadoActions}
                   />
                 )
               )}
@@ -412,11 +471,7 @@ export default function Atestados() {
                 ) : (
                   <AtestadosListaVisual
                     atestados={finalizados}
-                    renderActions={(atestado) => (
-                      <Button variant="outline" size="sm" onClick={() => handleView(atestado)}>
-                        Visualizar detalhes
-                      </Button>
-                    )}
+                    renderActions={renderAtestadoActions}
                   />
                 )
               )}

@@ -23,13 +23,11 @@ const buildMilitarNome = (atestado) =>
 export default function AtestadosListaVisual({
   atestados = [],
   renderActions,
-  renderCardActions,
   renderExpandedContent,
   loading = false,
 }) {
   const [expandedRows, setExpandedRows] = useState({});
 
-  const renderActionSlot = renderActions || renderCardActions;
 
   const toggleExpanded = (id) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -94,7 +92,7 @@ export default function AtestadosListaVisual({
                     Detalhes
                   </Button>
                 )}
-                {renderActionSlot ? renderActionSlot(atestado) : <Button variant="ghost" size="sm" className="h-8 text-xs" disabled><Eye className="w-4 h-4 mr-1" />Visualizar detalhes</Button>}
+                {typeof renderActions === 'function' ? renderActions(atestado) : <Button variant="ghost" size="sm" className="h-8 text-xs" disabled><Eye className="w-4 h-4 mr-1" />Visualizar detalhes</Button>}
               </div>
             </div>
 
