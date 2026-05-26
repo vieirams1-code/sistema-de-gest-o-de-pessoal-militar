@@ -190,7 +190,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
       ...FORM_TAG,
       ...tag,
       emoji: tag?.emoji || FORM_TAG.emoji,
-      tipo_uso: tag?.tipo_uso || 'comum',
+      tipo_uso: normalizarTipoUsoTag(tag?.tipo_uso),
       grupo_id: getTagGrupoId(tag) || '',
     });
     setModalTagOpen(true);

@@ -95,10 +95,11 @@ function normalizarAplicabilidade(value: unknown) {
 }
 function validarAplicabilidade(value: unknown) { return APLICABILIDADES.has(String(value || '').trim()); }
 function validarTipoVisual(value: unknown) { return TIPOS_VISUAIS.has(String(value || '').trim()); }
-function normalizarTipoUsoTag(value: unknown) {
-  const normalized = String(value || '').trim().toLowerCase();
-  if (!normalized) return 'comum';
-  return normalized;
+function normalizarTipoUsoTag(value: unknown, { fallbackComum = true }: { fallbackComum?: boolean } = {}) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return fallbackComum ? 'comum' : null;
+  if (normalized === 'comum' || normalized === 'unica') return normalized;
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -239,7 +240,12 @@ Deno.serve(async (req) => {
       const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
-      const tipoUso = normalizarTipoUsoTag(data?.tipo_uso ?? registroAtual?.tipo_uso);
+      const tipoUsoEntrada = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso')
+        ? normalizarTipoUsoTag(data?.tipo_uso, { fallbackComum: false })
+        : null;
+      const tipoUsoAtual = normalizarTipoUsoTag(registroAtual?.tipo_uso);
+      const tipoUso = tipoUsoEntrada ?? tipoUsoAtual ?? 'comum';
+      if (Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso') && !tipoUsoEntrada) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       if (!TIPOS_USO_TAG.has(tipoUso)) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
@@ -310,7 +316,7 @@ Deno.serve(async (req) => {
         if (!tag) return erro(404, 'Tag não encontrada.');
         if (!tag.ativo) return erro(400, 'Tag inativa.');
         if (!['militar', 'todos', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para militar.');
-        const tipoUsoTag = normalizarTipoUsoTag(tag.tipo_uso);
+        const tipoUsoTag = normalizarTipoUsoTag(tag.tipo_uso) || 'comum';
         const duplicadas = await base44.asServiceRole.entities.MilitarTag.filter({ militar_id: militarId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
         if ((duplicadas || []).some((d: any) => String(d.id) !== String(id || ''))) return erro(400, 'Tag ativa já vinculada para este militar.');
         if (tipoUsoTag === 'unica') {
