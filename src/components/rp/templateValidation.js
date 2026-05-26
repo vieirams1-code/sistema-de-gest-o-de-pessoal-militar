@@ -325,6 +325,7 @@ const TEMPLATE_VAR_CONTRACT = {
       'dias',
       'dias_extenso',
       'periodo_aquisitivo',
+      'tipo_ferias_texto',
       'quadro',
       'quadro_nome',
       'militar_quadro',
@@ -351,6 +352,7 @@ const TEMPLATE_VAR_CONTRACT = {
       'dias_gozados',
       'dias_gozados_interrupcao',
       'saldo_remanescente',
+      'tipo_ferias_texto',
     ],
     aliases: {
       posto: 'posto_nome',
@@ -370,6 +372,7 @@ const TEMPLATE_VAR_CONTRACT = {
       'data_inicio',
       'data_retorno',
       'saldo_remanescente',
+      'tipo_ferias_texto',
     ],
     aliases: {
       posto: 'posto_nome',

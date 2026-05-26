@@ -228,6 +228,7 @@ const VARS_POR_TIPO = {
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo completo' },
       { v: '{{periodo_aquisitivo_simplificado}}', desc: 'Período aquisitivo simplificado (ex: 2024/2025)' },
       { v: '{{fracionamento}}', desc: 'Fração das férias (ex: 1ª parcela)' },
+      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias' },
     ]
   },
   'Interrupção de Férias': {
@@ -247,6 +248,7 @@ const VARS_POR_TIPO = {
       { v: '{{dias_gozados_interrupcao}}', desc: 'Dias efetivamente gozados até a interrupção' },
       { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente após a interrupção' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias' },
     ]
   },
   'Continuação de Férias': {
@@ -265,6 +267,7 @@ const VARS_POR_TIPO = {
       { v: '{{dias}}', desc: 'Dias retomados / saldo retomado' },
       { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente da interrupção anterior' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias' },
     ]
   },
   'Nova Saída / Retomada': {
@@ -283,6 +286,7 @@ const VARS_POR_TIPO = {
       { v: '{{dias}}', desc: 'Dias retomados / saldo retomado' },
       { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente da interrupção anterior' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias' },
     ]
   },
   'Retorno Férias': {
