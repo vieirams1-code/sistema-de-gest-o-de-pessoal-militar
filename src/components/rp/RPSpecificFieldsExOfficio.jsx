@@ -305,17 +305,23 @@ export default function RPSpecificFieldsExOfficio({
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-5">
-              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Homologação de Atestado Médico</h3>
-              <p className="text-sm text-slate-500">Somente atestados de até 15 dias não homologados.</p>
+            <div className="lg:col-span-5 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-[#1e3a5f]">Homologação de Atestado Médico</h3>
+                <p className="text-sm text-slate-500 mt-1">Somente atestados de até 15 dias não homologados.</p>
+              </div>
             </div>
 
-            <div className="lg:col-span-7">
-              <div className="bg-gray-50 border border-gray-300 rounded-md p-4 min-h-[250px]">
-                <div className="space-y-2">
+            <div className="lg:col-span-7 flex flex-col h-full">
+              <div className="flex justify-between items-end mb-2">
+                <label className="block text-sm font-semibold text-gray-900">Atestados Disponíveis</label>
+              </div>
+
+              <div className="w-full flex-1 min-h-[160px] border border-gray-300 rounded-md p-4 bg-gray-50">
+                <div>
                   {atestadosCurtos.length === 0 && <p className="text-sm text-slate-400">Nenhum atestado elegível para homologação.</p>}
                   {atestadosCurtos.map(a => (
-                    <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-100 bg-white">
+                    <label key={a.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm mb-2">
                       <input
                         type="radio"
                         name="atestado_homologado"
