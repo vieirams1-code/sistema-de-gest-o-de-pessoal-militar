@@ -54,14 +54,11 @@ export const OPCOES_ICONE_CATALOGO = [
   { value: 'estrela_azul_subcomandante', label: ICONES_ESPECIAIS.estrela_azul_subcomandante.label },
   { value: 'engrenagem', label: ICONES_ESPECIAIS.engrenagem.label },
   { value: 'moto_socorro', label: ICONES_ESPECIAIS.moto_socorro.label },
+
+  { value: 'comandante_maior', label: 'Comandante Maior (louros dourados)' },
+  { value: 'subcomandante_maior', label: 'Subcomandante Maior (louros prata)' },
+  { value: 'comandante_menor', label: 'Comandante Menor (escudo dourado)' },
+  { value: 'subcomandante_menor', label: 'Subcomandante Menor (escudo prata)' },
+  { value: 'chefia', label: 'Chefia (estrela vazada)' },
 ];
 
-
-export const OPCOES_ICONE_TAG = [
-  { value: '', label: 'Sem ícone' },
-  { value: 'comandante_maior', label: '⭐ Louros dourados (Comandante Maior)' },
-  { value: 'subcomandante_maior', label: '☆ Louros prata (Subcomandante Maior)' },
-  { value: 'comandante_menor', label: '🛡 Estrela dourada (Comandante Menor)' },
-  { value: 'subcomandante_menor', label: '🛡 Estrela prata (Subcomandante Menor)' },
-  { value: 'chefia', label: '☆ Vazada (Chefia)' },
-];
