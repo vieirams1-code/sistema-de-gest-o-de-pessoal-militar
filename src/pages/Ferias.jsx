@@ -67,6 +67,8 @@ import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFer
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import { getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
+import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -337,6 +339,8 @@ export default function Ferias() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
+  const [selectedFeriasIds, setSelectedFeriasIds] = useState([]);
+  const [feriasTagsBulkOpen, setFeriasTagsBulkOpen] = useState(false);
 
   const effectiveEmail = getEffectiveEmailMilitares();
   const {
@@ -460,6 +464,11 @@ export default function Ferias() {
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
+  const { data: feriasTagsVinculos = [] } = useQuery({
+    queryKey: ['ferias-tags-bulk'],
+    queryFn: () => base44.entities.FeriasTag.list('-created_date'),
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
@@ -520,6 +529,66 @@ export default function Ferias() {
     }
     return `Período: ${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
   }, [periodStart, periodEnd, periodFilterType, selectedMonth]);
+  const selectedFerias = useMemo(() => filteredFerias.filter((item) => selectedFeriasIds.includes(String(item.id))), [filteredFerias, selectedFeriasIds]);
+
+  const feriasTagsAtivasMap = useMemo(() => {
+    const mapa = new Map();
+    feriasTagsVinculos.forEach((item) => {
+      if (String(item?.status || '').toLowerCase() !== 'ativa') return;
+      const feriasId = String(item?.ferias_id || '');
+      const tagId = String(item?.tag_id || '');
+      if (!feriasId || !tagId) return;
+      if (!mapa.has(feriasId)) mapa.set(feriasId, new Map());
+      mapa.get(feriasId).set(tagId, item);
+    });
+    return mapa;
+  }, [feriasTagsVinculos]);
+
+  const tagsStatusById = useMemo(() => {
+    const status = {};
+    if (selectedFerias.length === 0) return status;
+    const total = selectedFerias.length;
+    const contagem = new Map();
+    selectedFerias.forEach((f) => {
+      const tagsDaFerias = feriasTagsAtivasMap.get(String(f.id));
+      if (!tagsDaFerias) return;
+      tagsDaFerias.forEach((_, tagId) => contagem.set(tagId, (contagem.get(tagId) || 0) + 1));
+    });
+    contagem.forEach((qtd, tagId) => {
+      status[tagId] = qtd === total ? 'all' : 'some';
+    });
+    return status;
+  }, [selectedFerias, feriasTagsAtivasMap]);
+
+  const salvarTagsBulk = async ({ finalSelectedTagIds }) => {
+    const targetIds = new Set((finalSelectedTagIds || []).map(String));
+    const now = new Date().toISOString().slice(0, 10);
+    const promises = [];
+    let aplicadas = 0;
+    let removidas = 0;
+
+    selectedFerias.forEach((f) => {
+      const ativos = feriasTagsAtivasMap.get(String(f.id)) || new Map();
+      targetIds.forEach((tagId) => {
+        if (ativos.has(tagId)) return;
+        aplicadas += 1;
+        promises.push(criarFeriasTagEscopado({ ferias_id: f.id, tag_id: tagId, status: 'ativa', data_aplicacao: now, motivo: 'Bulk férias' }));
+      });
+      ativos.forEach((vinculo, tagId) => {
+        if (targetIds.has(tagId)) return;
+        removidas += 1;
+        promises.push(removerFeriasTagEscopado(vinculo.id, { status: 'removida', data_remocao: now, motivo: 'Bulk férias' }));
+      });
+    });
+
+    const resultados = await Promise.allSettled(promises);
+    const falhas = resultados.filter((r) => r.status === 'rejected').length;
+    queryClient.invalidateQueries({ queryKey: ['ferias-tags-bulk'] });
+    queryClient.invalidateQueries({ queryKey: ['ferias-tags'] });
+    queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    alert(`${aplicadas} aplicadas, ${removidas} removidas, ${falhas} falhas`);
+    setFeriasTagsBulkOpen(false);
+  };
 
   const feriasAgrupadas = useMemo(() => {
     return filteredFerias.reduce((acc, f) => {
@@ -965,6 +1034,13 @@ export default function Ferias() {
         <div className="mb-4 text-sm text-slate-500">
           {hasFeriasLoadError ? 'Falha ao carregar dados.' : `${filteredFerias.length} férias encontrada(s)`}
         </div>
+        {selectedFeriasIds.length > 0 && (
+          <div className="mb-4">
+            <Button variant="outline" onClick={() => setFeriasTagsBulkOpen(true)}>
+              Gerenciar Tags ({selectedFeriasIds.length})
+            </Button>
+          </div>
+        )}
         {!isFeriasError && hasPartialDataWarning && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Alguns dados não puderam ser carregados. Tente novamente para atualizar.
@@ -1034,6 +1110,7 @@ export default function Ferias() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="text-left px-3 py-3 font-semibold text-slate-600 w-10" />
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Militar</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Período Aquisitivo</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Início</th>
@@ -1078,6 +1155,13 @@ export default function Ferias() {
                             className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
                           >
                             <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedFeriasIds.includes(String(f.id))}
+                                onChange={(e) => setSelectedFeriasIds((prev) => e.target.checked ? [...new Set([...prev, String(f.id)])] : prev.filter((id) => id !== String(f.id)))}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium text-slate-900">
                                   {f.militar_posto && (
@@ -1102,6 +1186,7 @@ export default function Ferias() {
                                 )}
                               </div>
                               <p className="text-xs text-slate-400">Mat: {f.militar_matricula_label || f.militar_matricula || '—'}</p>
+                              <p className="text-xs text-indigo-600">Tags ativas: {(feriasTagsAtivasMap.get(String(f.id))?.size || 0)}</p>
                               {f.militar_mesclado && (
                                 <p className="text-[11px] text-amber-700">Registro vinculado a militar mesclado (somente histórico documental).</p>
                               )}
@@ -1538,6 +1623,13 @@ export default function Ferias() {
           />
         </>
       )}
+      <FeriasTagsBulkPanel
+        open={feriasTagsBulkOpen}
+        onClose={() => setFeriasTagsBulkOpen(false)}
+        selectedFerias={selectedFerias}
+        tagsStatusById={tagsStatusById}
+        onConfirm={salvarTagsBulk}
+      />
     </div>
   );
 }
