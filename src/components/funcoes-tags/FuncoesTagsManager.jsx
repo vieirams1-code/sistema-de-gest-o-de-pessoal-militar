@@ -226,6 +226,13 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
   const salvarTag = () => {
     const tipoVisual = (formTag.tipo_visual || 'normal') === 'chip' ? 'normal' : (formTag.tipo_visual || 'normal');
+    const payload = {
+      ...formTag,
+      emoji: formTag.emoji,
+      tipo_visual: tipoVisual,
+      aplicabilidade: normalizarAplicabilidade(formTag.aplicabilidade),
+      ativo: editandoTag?.ativo ?? true,
+    };
     const erro = validarTag(payload, tags, editandoTag);
     if (erro) return toast({ title: erro, variant: 'destructive' });
     saveTag.mutate(payload);
