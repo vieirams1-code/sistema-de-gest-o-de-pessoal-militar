@@ -19,7 +19,6 @@ import {
 import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
-import AtestadosJisoListaView from '@/components/atestado/AtestadosJisoListaView';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -75,27 +74,24 @@ export default function Atestados() {
   const [atestadoToDelete, setAtestadoToDelete] = useState(null);
   const [vigentesCollapsed, setVigentesCollapsed] = useState(false);
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
-  const [modoVisualizacaoVigentes, setModoVisualizacaoVigentes] = useState('cards');
   const [verificandoEdicao, setVerificandoEdicao] = useState(false);
 
   const { data: atestadosBundle, isLoading } = useQuery({
     queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
     queryFn: async () => {
-      const { atestados, jisos, meta } = await fetchScopedAtestadosBundle();
+      const { atestados, meta } = await fetchScopedAtestadosBundle();
       if (meta?.partialFailures > 0) {
         console.warn('getScopedAtestadosBundle retornou partialFailures', meta);
       }
       const atestadosEnriquecidos = await enriquecerAtestadosComContextoMilitar(atestados, { contexto: 'operacional', filtrarMesclados: true });
       return {
         atestados: atestadosEnriquecidos,
-        jisos,
       };
     },
     enabled: isAccessResolved && hasAtestadosAccess
   });
 
   const atestados = Array.isArray(atestadosBundle?.atestados) ? atestadosBundle.atestados : [];
-  const jisos = Array.isArray(atestadosBundle?.jisos) ? atestadosBundle.jisos : [];
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
@@ -340,29 +336,6 @@ export default function Atestados() {
                   <div className="flex-1 h-px bg-slate-200" />
                   {vigentesCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
                 </button>
-
-                <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm shrink-0">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={modoVisualizacaoVigentes === 'cards' ? 'default' : 'ghost'}
-                    onClick={() => setModoVisualizacaoVigentes('cards')}
-                    className="rounded-lg"
-                    aria-pressed={modoVisualizacaoVigentes === 'cards'}
-                  >
-                    ⊞ Cards
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={modoVisualizacaoVigentes === 'lista' ? 'default' : 'ghost'}
-                    onClick={() => setModoVisualizacaoVigentes('lista')}
-                    className="rounded-lg"
-                    aria-pressed={modoVisualizacaoVigentes === 'lista'}
-                  >
-                    ☰ Lista
-                  </Button>
-                </div>
               </div>
 
               {!vigentesCollapsed && (
@@ -371,21 +344,12 @@ export default function Atestados() {
                     <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                     <p className="text-slate-500">{hasFilters ? 'Nenhum atestado vigente com esses filtros' : 'Nenhum atestado vigente no momento'}</p>
                   </div>
-                ) : modoVisualizacaoVigentes === 'cards' ? (
+                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
                       <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
-                ) : (
-                  <AtestadosJisoListaView
-                    atestados={vigentes}
-                    jisos={jisos}
-                    loading={isLoading}
-                    onVisualizarJiso={handleView}
-                    onRegistrarDecisaoJiso={handleEdit}
-                    canRegistrarDecisaoJiso={canEditarAtestado}
-                  />
                 )
               )}
             </div>

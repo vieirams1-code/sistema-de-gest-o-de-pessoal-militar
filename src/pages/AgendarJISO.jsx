@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar, Search, Clock, ArrowRight, Edit } from 'lucide-react';
-import AtestadosJisoListaView from '@/components/atestado/AtestadosJisoListaView';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,6 @@ import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleC
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [modoVisualizacao, setModoVisualizacao] = useState('cards');
   const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
@@ -105,34 +103,9 @@ export default function AgendarJISO() {
             <h2 className="text-xl font-bold">Atestados Vigentes</h2>
             <Badge>{filteredAtestados.length}</Badge>
           </div>
-
-          <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-            <Button
-              type="button"
-              size="sm"
-              variant={modoVisualizacao === 'cards' ? 'default' : 'ghost'}
-              onClick={() => setModoVisualizacao('cards')}
-              className="rounded-lg"
-              aria-pressed={modoVisualizacao === 'cards'}
-            >
-              ⊞ Cards
-            </Button>
-
-            <Button
-              type="button"
-              size="sm"
-              variant={modoVisualizacao === 'lista' ? 'default' : 'ghost'}
-              onClick={() => setModoVisualizacao('lista')}
-              className="rounded-lg"
-              aria-pressed={modoVisualizacao === 'lista'}
-            >
-              ☰ Lista
-            </Button>
-          </div>
         </div>
 
-        {modoVisualizacao === 'cards' ? (
-          isLoadingAtestados ? (
+        {isLoadingAtestados ? (
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
@@ -240,17 +213,7 @@ export default function AgendarJISO() {
               );
             })}
             </div>
-          )
-        ) : (
-          <AtestadosJisoListaView
-            atestados={filteredAtestados}
-            jisos={jisos}
-            loading={isLoadingAtestados}
-            onRegistrarDecisaoJiso={handleAbrirEdicaoJiso}
-            onVisualizarJiso={handleVisualizarAtestado}
-            canRegistrarDecisaoJiso={canAccessAction('registrar_decisao_jiso')}
-          />
-        )}
+          )}
       </div>
     </div>
   );
