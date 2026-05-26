@@ -71,6 +71,7 @@ import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient'
 import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import { getFeriasTagFeriasId, getFeriasTagTagId } from '@/utils/funcoesTags/contratoCampos';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -119,10 +120,7 @@ function getFeriasIntervalo(ferias) {
 }
 
 function getTagEmoji(tag = {}) {
-  if (typeof tag?.emoji === 'string' && tag.emoji.trim()) return tag.emoji.trim();
-  if (typeof tag?.icone === 'string' && tag.icone.trim()) return tag.icone.trim();
-  if (typeof tag?.icon === 'string' && tag.icon.trim()) return tag.icon.trim();
-  return '🏷️';
+  return resolveTagVisual(tag).emoji;
 }
 
 function getTagCor(tag = {}) {
@@ -1324,7 +1322,7 @@ export default function Ferias() {
                                             className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium cursor-help"
                                             style={{ backgroundColor: `${tag.cor}1A`, borderColor: `${tag.cor}4D`, color: tag.cor }}
                                           >
-                                            <span aria-hidden="true">{tag.emoji}</span>
+                                            <span aria-hidden="true">{resolveTagVisual(tag).emoji}</span>
                                             <span className="max-w-[90px] truncate">{tag.nome}</span>
                                           </span>
                                         </TooltipTrigger>

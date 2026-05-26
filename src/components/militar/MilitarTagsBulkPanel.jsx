@@ -6,28 +6,12 @@ import { Input } from '@/components/ui/input';
 import { calcularTentativasBulk } from '@/utils/funcoesTags/militarTagsBulk';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import { AlertCircle, Check, Loader2, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
-
-function getTagNome(tag) {
-  return tag?.nome || tag?.name || tag?.titulo || '';
-}
-
-function getTagEmoji(tag) {
-  const chave = normalizarBusca(tag?.slug || tag?.chave || tag?.nome);
-  if (['manutencao', 'manutenção', 'condutor'].includes(chave)) return 'engrenagem';
-  if (['mob', 'moto', 'moto_socorro'].includes(chave)) return 'moto_socorro';
-  return tag?.emoji || tag?.icone || tag?.icon || '📋';
-}
-function getTagCor(tag) {
-  return tag?.cor || tag?.color || '#6366F1';
-}
-
-function getTagGrupoId(tag) {
-  return tag?.grupo_id || tag?.tag_grupo_id || tag?.grupoId || tag?.tagGrupoId || '';
-}
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 function isTagAtiva(tag) {
-  return tag?.ativo !== false && tag?.ativa !== false && tag?.status !== 'inativo';
+  return resolveTagVisual(tag).ativo;
 }
+
 
 function isTagAplicavelNoMilitar(tag) {
   const aplicabilidade = String(tag?.aplicabilidade || '').trim().toLowerCase();
@@ -115,14 +99,14 @@ export default function MilitarTagsBulkPanel({
     return fonteTags.filter((tag) => {
       if (!tag || !isTagAtiva(tag) || !isTagAplicavelNoMilitar(tag)) return false;
 
-      const grupoId = getTagGrupoId(tag);
+      const grupoId = resolveTagVisual(tag).grupoId;
       const grupo = grupoId ? gruposPorId.get(String(grupoId)) : null;
       if (grupoId && grupo && !isGrupoAtivo(grupo)) return false;
 
       const grupoNome = grupo ? getGrupoNome(grupo) : 'Sem grupo';
       if (!termo) return true;
 
-      const textoBusca = normalizarBusca(`${getTagNome(tag)} ${getTagEmoji(tag)} ${grupoNome}`);
+      const textoBusca = normalizarBusca(`${resolveTagVisual(tag).nome} ${resolveTagVisual(tag).emoji} ${grupoNome}`);
       return textoBusca.includes(termo);
     });
   }, [fonteTags, busca, gruposPorId]);
@@ -131,7 +115,7 @@ export default function MilitarTagsBulkPanel({
     const mapa = new Map();
 
     tagsFiltradas.forEach((tag) => {
-      const grupoId = getTagGrupoId(tag);
+      const grupoId = resolveTagVisual(tag).grupoId;
       const grupo = grupoId ? gruposPorId.get(String(grupoId)) : null;
       const nomeGrupo = grupo ? getGrupoNome(grupo) : 'Sem grupo';
       if (!mapa.has(nomeGrupo)) mapa.set(nomeGrupo, []);
@@ -140,7 +124,7 @@ export default function MilitarTagsBulkPanel({
 
     const prioridade = ['operacional', 'cursos', 'administrativo', 'sem grupo'];
     return [...mapa.entries()]
-      .map(([nome, tags]) => ({ nome, tags: tags.sort((a, b) => getTipoVisualPeso(a) - getTipoVisualPeso(b) || getTagNome(a).localeCompare(getTagNome(b), 'pt-BR')) }))
+      .map(([nome, tags]) => ({ nome, tags: tags.sort((a, b) => getTipoVisualPeso(a) - getTipoVisualPeso(b) || resolveTagVisual(a).nome.localeCompare(resolveTagVisual(b).nome, 'pt-BR')) }))
       .sort((a, b) => {
         const ai = prioridade.indexOf(normalizarBusca(a.nome));
         const bi = prioridade.indexOf(normalizarBusca(b.nome));
@@ -251,8 +235,8 @@ export default function MilitarTagsBulkPanel({
                 {tagsSelecionadas.map((tag) => (
                   <button key={tag.id} type="button" onClick={() => toggleTag(String(tag.id))}
                   disabled={isLocked} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs ${getTagClassName(tag, true)}`}>
-                    <IconeCatalogo value={getTagEmoji(tag)} />
-                    <span>{getTagNome(tag)}</span>
+                    <IconeCatalogo value={resolveTagVisual(tag).emoji} />
+                    <span>{resolveTagVisual(tag).nome}</span>
                     <X className="w-3 h-3" />
                   </button>
                 ))}
@@ -275,9 +259,9 @@ export default function MilitarTagsBulkPanel({
                     const status = statusEfetivoById[id] || 'none';
                     const isSelected = status === 'all';
                     const isPartial = status === 'partial';
-                    const nome = getTagNome(tag);
-                    const emoji = getTagEmoji(tag);
-                    const cor = getTagCor(tag);
+                    const nome = resolveTagVisual(tag).nome;
+                    const emoji = resolveTagVisual(tag).emoji;
+                    const cor = resolveTagVisual(tag).cor;
                     const disabled = isLocked;
                     return (
                       <button key={id} type="button" onClick={() => toggleTag(id)} disabled={disabled} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : getTagClassName(tag, isSelected)} ${isSelected ? 'shadow-md ring-1' : ''}`}>

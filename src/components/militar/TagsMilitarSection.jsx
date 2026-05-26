@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { separarTagsPorStatus, validarAplicabilidadeTagMilitar, validarDuplicidadeTagAtiva } from '@/utils/funcoesTags/militarTags';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 const formatDate = (date) => {
   if (!date) return '—';
@@ -30,7 +31,7 @@ function TagItem({ vinculo, removivel, onRemover, loading }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge style={{ backgroundColor: `${cor}22`, color: cor, borderColor: `${cor}55` }} className="border">
-            {(tag.emoji || '🏷️')} {tag.nome || 'Tag sem nome'}
+            {resolveTagVisual(tag).emoji} {resolveTagVisual(tag).nome || 'Tag sem nome'}
           </Badge>
           <Badge variant="outline">{vinculo.status || '—'}</Badge>
           {grupo && <Badge variant="outline">Grupo: {grupo.nome}</Badge>}
@@ -156,7 +157,7 @@ export default function TagsMilitarSection({ militar }) {
               <option value="">Selecione...</option>
               {tagsAtivasAplicaveis.filter((tag) => String(tag.nome || '').toLowerCase().includes(tagBusca.toLowerCase())).map((tag) => {
                 const grupo = gruposCatalogo.find((item) => item.id === tag.tag_grupo_id);
-                return <option key={tag.id} value={tag.id}>{tag.emoji || '🏷️'} {tag.nome} {grupo ? `· ${grupo.nome}` : ''}</option>;
+                return <option key={tag.id} value={tag.id}>{resolveTagVisual(tag).emoji} {resolveTagVisual(tag).nome} {grupo ? `· ${grupo.nome}` : ''}</option>;
               })}
             </select>
           </div>

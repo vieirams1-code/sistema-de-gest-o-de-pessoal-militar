@@ -6,30 +6,16 @@ import { Input } from '@/components/ui/input';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import { AlertCircle, Check, Loader2, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
 import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
+import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 function isAtivo(item) {
-  return item?.ativo !== false && item?.ativa !== false && item?.status !== 'inativo';
+  return resolveTagVisual(item).ativo;
 }
 
 function normalizar(valor) {
   return String(valor || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function getTagNome(tag) {
-  return tag?.nome || tag?.name || tag?.titulo || '';
-}
-
-function getTagEmoji(tag) {
-  return tag?.emoji || tag?.icone || tag?.icon || '🏷️';
-}
-
-function getTagCor(tag) {
-  return tag?.cor || tag?.color || '#6366F1';
-}
-
-function getTagGrupoId(tag) {
-  return tag?.grupo_id || tag?.tag_grupo_id || tag?.grupoId || tag?.tagGrupoId || '';
-}
 
 function isAplicavelEmFerias(tag) {
   const valor = normalizarAplicabilidade(tag?.aplicabilidade);
@@ -69,11 +55,11 @@ export default function FeriasTagsBulkPanel({
     const termo = normalizar(busca.trim());
     return tags.filter((tag) => {
       if (!isAtivo(tag) || !isAplicavelEmFerias(tag)) return false;
-      const grupoId = getTagGrupoId(tag);
+      const grupoId = resolveTagVisual(tag).grupoId;
       const grupo = grupoId ? gruposPorId.get(String(grupoId)) : null;
       if (grupo && !isAtivo(grupo)) return false;
       if (!termo) return true;
-      const texto = normalizar(`${getTagNome(tag)} ${getTagEmoji(tag)} ${grupo?.nome || 'Sem grupo'}`);
+      const texto = normalizar(`${resolveTagVisual(tag).nome} ${resolveTagVisual(tag).emoji} ${grupo?.nome || 'Sem grupo'}`);
       return texto.includes(termo);
     });
   }, [tags, gruposPorId, busca]);
@@ -81,7 +67,7 @@ export default function FeriasTagsBulkPanel({
   const gruposExibicao = useMemo(() => {
     const mapa = new Map();
     tagsFiltradas.forEach((tag) => {
-      const grupoId = getTagGrupoId(tag);
+      const grupoId = resolveTagVisual(tag).grupoId;
       const nomeGrupo = grupoId ? (gruposPorId.get(String(grupoId))?.nome || 'Sem grupo') : 'Sem grupo';
       if (!mapa.has(nomeGrupo)) mapa.set(nomeGrupo, []);
       mapa.get(nomeGrupo).push(tag);
@@ -179,8 +165,8 @@ export default function FeriasTagsBulkPanel({
               <div className="flex flex-wrap gap-2">
                 {tagsSelecionadas.map((tag) => (
                   <button key={tag.id} type="button" onClick={() => toggleTag(String(tag.id))} disabled={isLocked} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs border-indigo-300 bg-indigo-50 text-indigo-800">
-                    <IconeCatalogo value={getTagEmoji(tag)} />
-                    <span>{getTagNome(tag)}</span>
+                    <IconeCatalogo value={resolveTagVisual(tag).emoji} />
+                    <span>{resolveTagVisual(tag).nome}</span>
                     <X className="w-3 h-3" />
                   </button>
                 ))}
@@ -198,11 +184,11 @@ export default function FeriasTagsBulkPanel({
                     const status = statusEfetivoById[id] || 'none';
                     const isSelected = status === 'all';
                     const isPartial = status === 'some';
-                    const cor = getTagCor(tag);
+                    const cor = resolveTagVisual(tag).cor;
                     return (
                       <button key={id} type="button" onClick={() => toggleTag(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : isSelected ? 'border-indigo-300 bg-indigo-50 text-indigo-800 shadow-md ring-1' : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50/40'}`}>
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}><IconeCatalogo value={getTagEmoji(tag)} /></div>
-                        <div className="flex-1 min-w-0 pr-2"><div className="text-sm font-medium truncate">{getTagNome(tag)}</div>{isPartial && <div className="text-[11px] text-amber-700 font-medium mt-0.5">Parcial</div>}</div>
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}><IconeCatalogo value={resolveTagVisual(tag).emoji} /></div>
+                        <div className="flex-1 min-w-0 pr-2"><div className="text-sm font-medium truncate">{resolveTagVisual(tag).nome}</div>{isPartial && <div className="text-[11px] text-amber-700 font-medium mt-0.5">Parcial</div>}</div>
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isPartial ? 'bg-amber-100 border-amber-400 text-amber-700' : 'border-slate-300 text-transparent group-hover:border-slate-400'}`}><Check className="w-3.5 h-3.5" /></div>
                       </button>
                     );
