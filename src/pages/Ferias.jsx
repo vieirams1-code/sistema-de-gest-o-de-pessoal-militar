@@ -116,6 +116,19 @@ function getFeriasIntervalo(ferias) {
   return { inicio, fim };
 }
 
+function getTagEmoji(tag = {}) {
+  if (typeof tag?.emoji === 'string' && tag.emoji.trim()) return tag.emoji.trim();
+  if (typeof tag?.icone === 'string' && tag.icone.trim()) return tag.icone.trim();
+  if (typeof tag?.icon === 'string' && tag.icon.trim()) return tag.icon.trim();
+  return '🏷️';
+}
+
+function getTagCor(tag = {}) {
+  if (typeof tag?.cor === 'string' && tag.cor.trim()) return tag.cor.trim();
+  if (typeof tag?.color === 'string' && tag.color.trim()) return tag.color.trim();
+  return '#64748b';
+}
+
 function parseFeriasDateStart(value) {
   if (!value) return null;
   if (value instanceof Date) {
@@ -565,6 +578,29 @@ export default function Ferias() {
     });
     return status;
   }, [selectedFerias, feriasTagsAtivasMap]);
+
+  const tagCatalogoById = useMemo(() => {
+    return new Map((tagsCatalogo || []).map((tag) => [String(tag.id), tag]));
+  }, [tagsCatalogo]);
+
+  const feriasTagsVisuaisMap = useMemo(() => {
+    const mapa = new Map();
+    feriasTagsAtivasMap.forEach((tagsDaFerias, feriasId) => {
+      const chips = [];
+      tagsDaFerias.forEach((vinculo, tagId) => {
+        const tag = tagCatalogoById.get(String(tagId));
+        chips.push({
+          id: String(tagId),
+          nome: tag?.nome || vinculo?.tag_nome || `Tag #${tagId}`,
+          emoji: getTagEmoji(tag || vinculo),
+          cor: getTagCor(tag || vinculo),
+        });
+      });
+      chips.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      mapa.set(feriasId, chips);
+    });
+    return mapa;
+  }, [feriasTagsAtivasMap, tagCatalogoById]);
 
   const salvarTagsBulk = async ({ finalSelectedTagIds }) => {
     const targetIds = new Set((finalSelectedTagIds || []).map(String));
@@ -1151,6 +1187,7 @@ export default function Ferias() {
                       <tr className="border-b border-slate-100 bg-slate-50">
                         <th className="text-left px-3 py-3 font-semibold text-slate-600 w-10" />
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Militar</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Tags</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Período Aquisitivo</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Início</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Retorno</th>
@@ -1187,6 +1224,9 @@ export default function Ferias() {
                         const inicioBlocked = Boolean(inicioBlockedReason);
                         const observacaoFerias = String(f.observacao || f.observacoes || '').trim();
                         const temObservacaoFerias = observacaoFerias.length > 0;
+                        const tagsVisuais = feriasTagsVisuaisMap.get(String(f.id)) || [];
+                        const tagsPreview = tagsVisuais.slice(0, 3);
+                        const tagsOverflow = Math.max(0, tagsVisuais.length - 3);
 
                         return (
                           <tr
@@ -1225,9 +1265,39 @@ export default function Ferias() {
                                 )}
                               </div>
                               <p className="text-xs text-slate-400">Mat: {f.militar_matricula_label || f.militar_matricula || '—'}</p>
-                              <p className="text-xs text-indigo-600">Tags ativas: {(feriasTagsAtivasMap.get(String(f.id))?.size || 0)}</p>
                               {f.militar_mesclado && (
                                 <p className="text-[11px] text-amber-700">Registro vinculado a militar mesclado (somente histórico documental).</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {tagsVisuais.length === 0 ? (
+                                <span className="text-slate-300">—</span>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {tagsPreview.map((tag) => (
+                                    <TooltipProvider key={tag.id} delayDuration={100}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span
+                                            className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium cursor-help"
+                                            style={{ backgroundColor: `${tag.cor}1A`, borderColor: `${tag.cor}4D`, color: tag.cor }}
+                                          >
+                                            <span aria-hidden="true">{tag.emoji}</span>
+                                            <span className="max-w-[90px] truncate">{tag.nome}</span>
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs">{tag.nome}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  ))}
+                                  {tagsOverflow > 0 && (
+                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                      +{tagsOverflow}
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </td>
 
