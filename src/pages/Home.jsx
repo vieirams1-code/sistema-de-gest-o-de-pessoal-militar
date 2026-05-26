@@ -58,7 +58,7 @@ function AlertItem({ nivel, titulo, subtitulo, diasRestantes }) {
     <div className={`flex items-center justify-between p-3 rounded-lg border ${cores[nivel]}`}>
       <div>
         <p className="text-sm font-medium">{titulo}</p>
-        <p className="text-xs opacity-75">{subtitulo}</p>
+        <div className="text-xs opacity-75">{subtitulo}</div>
       </div>
       {diasRestantes !== undefined && (
         <span className={`text-sm font-bold whitespace-nowrap ml-4 ${textDias[nivel]}`}>
@@ -310,8 +310,52 @@ export default function Home() {
     },
     enabled: dashboardEnabled,
   });
+  const { data: ferias = [] } = useQuery({
+    queryKey: ['dashboard-ferias', scopeKey],
+    queryFn: async () => {
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.Ferias.list('-data_inicio');
+      }
+
+      if (!scopedIds?.length) return [];
+
+      try {
+        const listaEscopo = await base44.entities.Ferias.filter({
+          militar_id: { in: scopedIds },
+        }, '-data_inicio');
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.Ferias.list('-data_inicio');
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
+    },
+    enabled: dashboardEnabled,
+  });
 
   // Alertas de férias por nível
+  const feriasPorPeriodoAquisitivo = React.useMemo(() => {
+    const mapa = new Map();
+    for (const feriasItem of ferias) {
+      const periodoId = String(feriasItem?.periodo_aquisitivo_id || '');
+      if (!periodoId || feriasItem?.status === 'Cancelada') continue;
+
+      if (!mapa.has(periodoId)) mapa.set(periodoId, []);
+      mapa.get(periodoId).push(feriasItem);
+    }
+
+    for (const listaFerias of mapa.values()) {
+      listaFerias.sort((a, b) => new Date(`${a.data_inicio}T00:00:00`) - new Date(`${b.data_inicio}T00:00:00`));
+    }
+    return mapa;
+  }, [ferias]);
+
+  const formatarDataCurta = (dataIso) => {
+    if (!dataIso) return '—';
+    const data = new Date(`${dataIso}T00:00:00`);
+    if (Number.isNaN(data.getTime())) return dataIso;
+    return format(data, 'dd/MM/yyyy');
+  };
+
   const periodosAlerta = periodos.filter(p => {
     if (!p.data_limite_gozo) return false;
     if (p.status === 'Gozado' || p.status === 'Inativo') return false;
@@ -320,7 +364,13 @@ export default function Home() {
     return dias >= 0 && dias <= 180;
   }).map(p => {
     const dias = differenceInDays(new Date(p.data_limite_gozo + 'T00:00:00'), hoje);
-    return { ...p, diasRestantes: dias, nivel: dias <= 30 ? 'critico' : dias <= 60 ? 'atencao' : 'aviso' };
+    const feriasPrevistas = feriasPorPeriodoAquisitivo.get(String(p.id)) || [];
+    return {
+      ...p,
+      diasRestantes: dias,
+      nivel: dias <= 30 ? 'critico' : dias <= 60 ? 'atencao' : 'aviso',
+      feriasPrevistas,
+    };
   }).sort((a, b) => a.diasRestantes - b.diasRestantes);
 
   const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
@@ -441,7 +491,20 @@ export default function Home() {
                       key={p.id}
                       nivel={p.nivel}
                       titulo={`${p.militar_posto ? p.militar_posto + ' ' : ''}${p.militar_nome}`}
-                      subtitulo={`Ano ref: ${p.ano_referencia} — Prazo: ${p.data_limite_gozo?.split('-').reverse().join('/')}`}
+                      subtitulo={(
+                        <>
+                          <p>Ano ref: {p.ano_referencia} — Prazo: {p.data_limite_gozo?.split('-').reverse().join('/')}</p>
+                          {p.feriasPrevistas?.length ? (
+                            <p>
+                              Férias previstas: Sim — Agendamento: {p.feriasPrevistas.map((feriasItem) => (
+                                `${formatarDataCurta(feriasItem.data_inicio)} a ${formatarDataCurta(feriasItem.data_fim)}`
+                              )).join('; ')}
+                            </p>
+                          ) : (
+                            <p>Férias previstas: Não</p>
+                          )}
+                        </>
+                      )}
                       diasRestantes={p.diasRestantes}
                     />
                   ))}
