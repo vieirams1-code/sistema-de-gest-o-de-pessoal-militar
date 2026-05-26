@@ -71,6 +71,11 @@ export default function AtestadoActionsMenu({
             <Download className="w-4 h-4 mr-2 text-slate-600" />Baixar atestado anexado
           </DropdownMenuItem>
         )}
+        {atestado?.arquivo_ata_jiso && (
+          <DropdownMenuItem onClick={() => window.open(atestado.arquivo_ata_jiso, '_blank')}>
+            <Download className="w-4 h-4 mr-2 text-purple-600" />Baixar ata JISO
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
 
