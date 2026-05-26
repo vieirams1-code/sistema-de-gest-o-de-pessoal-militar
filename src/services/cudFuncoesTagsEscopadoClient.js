@@ -8,6 +8,9 @@ function criarErroSemantico(message, extras = {}) {
 
 async function invocar(payload) {
   try {
+    if (payload?.entidade === 'Tag') {
+      console.debug('[TAG_CLIENT_PAYLOAD]', payload);
+    }
     console.debug('[CUD_FUNCOES_TAGS_REQUEST]', payload);
     const response = await base44.functions.invoke('cudFuncoesTagsEscopado', payload);
     console.debug('[CUD_FUNCOES_TAGS_RESPONSE]', response);

@@ -230,6 +230,11 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     const payload = { ...formTag, emoji: formTag.emoji, tipo_visual: tipoVisual, tipo_uso: normalizarTipoUsoTag(formTag.tipo_uso), aplicabilidade: normalizarAplicabilidade(formTag.aplicabilidade), ativo: editandoTag?.ativo ?? true };
     const erro = validarTag(payload, tags, editandoTag);
     if (erro) return toast({ title: erro, variant: 'destructive' });
+    console.debug('[TAG_FORM_SUBMIT]', {
+      formTag_tipo_uso: formTag.tipo_uso,
+      payload,
+      tagId: editandoTag?.id,
+    });
     saveTag.mutate(payload);
   };
 
@@ -389,7 +394,14 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
 const filtrar = (itens, termo) => itens.filter((i) => String(i?.nome || '').toLowerCase().includes(String(termo || '').toLowerCase()));
 const labelAplicabilidade = (v) => v === 'militar' ? 'Militar' : v === 'ferias' ? 'Férias' : v === 'atestado' ? 'Atestado' : 'Todos';
-const normalizarTipoUsoTag = (v) => v === 'unica' ? 'unica' : 'comum';
+const normalizarTipoUsoTag = (v) => {
+  const normalized = String(v ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return normalized === 'unica' ? 'unica' : 'comum';
+};
 function TabButton({ id, icon: Icon, label, activeTab, setActiveTab }) { const active = activeTab === id; return <button type="button" onClick={() => setActiveTab(id)} className={['inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition', active ? 'bg-white text-indigo-700 shadow border border-indigo-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'].join(' ')}><Icon className="w-4 h-4" />{label}</button>; }
 function PreviewBadge({ emoji, nome, cor, fallback = 'Prévia' }) { return <div className="flex items-center gap-2"><span className="text-xs text-slate-400">Preview visual:</span><span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold" style={{ borderColor: cor || '#CBD5E1', backgroundColor: `${cor || '#E2E8F0'}22`, color: cor || '#334155' }}><IconeCatalogo value={emoji || '🏷️'} /><span>{nome || fallback}</span></span></div>; }
 function Field({ label, children, className }) { return <label className={className}><span className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{label}</span>{children}</label>; }
@@ -405,4 +417,3 @@ function TipoUsoHelper({ tipoUso }) { const unica = normalizarTipoUsoTag(tipoUso
 function TipoUsoBadge({ tipoUso }) { const unica = normalizarTipoUsoTag(tipoUso) === 'unica'; const title = unica ? 'Uso exclusivo em um militar por vez.' : 'Pode ser atribuída a vários militares.'; return <span title={title} className={['inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border', unica ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-slate-100 text-slate-700 border-slate-200'].join(' ')}>{unica ? 'Única' : 'Comum'}</span>; }
 function ColorInput({ value, onChange }) { return <Input type="color" value={value || '#CBD5E1'} onChange={(e) => onChange(e.target.value)} className="h-10 p-1" />; }
 function EntityModal({ open, onClose, title, description, preview, children, onSave, loading }) { return <Dialog open={open} onOpenChange={(next) => !next && onClose()}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader><div className="mb-4">{preview}</div>{children}<DialogFooter className="mt-6"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={loading} onClick={onSave}>{loading ? 'Salvando...' : 'Salvar'}</Button></DialogFooter></DialogContent></Dialog>; }
-
