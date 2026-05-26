@@ -321,20 +321,18 @@ export default function RPSpecificFieldsExOfficio({
 
               {/* Container da lista de atestados */}
               <div className="w-full flex-1 min-h-[160px] border border-gray-300 rounded-md p-4 bg-gray-50">
-                <div>
-                  {atestadosCurtos.length === 0 && <p className="text-sm text-slate-400">Nenhum atestado elegível para homologação.</p>}
-                  {atestadosCurtos.map(a => (
-                    <label key={a.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm mb-2">
-                      <input
-                        type="radio"
-                        name="atestado_homologado"
-                        checked={formData.atestado_homologado_id === a.id}
-                        onChange={() => handleChange('atestado_homologado_id', a.id)}
-                      />
-                      <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
-                    </label>
-                  ))}
-                </div>
+                {atestadosCurtos.length === 0 && <p className="text-sm text-slate-400">Nenhum atestado elegível para homologação.</p>}
+                {atestadosCurtos.map(a => (
+                  <label key={a.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm mb-2">
+                    <input
+                      type="radio"
+                      name="atestado_homologado"
+                      checked={formData.atestado_homologado_id === a.id}
+                      onChange={() => handleChange('atestado_homologado_id', a.id)}
+                    />
+                    <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
