@@ -663,8 +663,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
       {/* Modal Homologação pelo Comandante */}
       <Dialog open={showHomologacaoModal} onOpenChange={setShowHomologacaoModal}>
-        <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto p-0">
+          <DialogHeader className="px-6 pt-6">
             <DialogTitle>Homologação pelo Comandante</DialogTitle>
             <p className="text-[11px] text-slate-500">
               {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT
@@ -672,7 +672,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 : 'Texto oficial persistido.'}
             </p>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 px-6 pb-4">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
               <strong>{atestado.militar_posto} {atestado.militar_nome}</strong> — {atestado.dias} dias — {formatarDataExtenso(atestado.data_inicio)} a {formatarDataExtenso(atestado.data_termino)}
             </div>
@@ -754,8 +754,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
       {/* Modal Ata JISO */}
       <Dialog open={showAtaJisoModal} onOpenChange={setShowAtaJisoModal}>
-        <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto p-0">
+          <DialogHeader className="px-6 pt-6">
             <DialogTitle>Ata JISO</DialogTitle>
             <p className="text-[11px] text-slate-500">
               {TEMPLATE_GOVERNANCA.edit_mode === TEMPLATE_EDIT_MODE.HIBRIDO
@@ -763,105 +763,103 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 : 'Texto oficial persistido.'}
             </p>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 px-6 pb-4">
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
               <strong>{atestado.militar_posto} {atestado.militar_nome}</strong> — {atestado.dias} dias — JISO: {atestado.status_jiso || 'Aguardando'}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Data da Publicação</Label>
-                <Input type="date" value={ataJisoForm.data_publicacao} onChange={e => setAtaJisoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
-              </div>
-              <div>
-                <Label className="text-sm">Finalidade</Label>
-                <select value={ataJisoForm.finalidade_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, finalidade_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5 w-full border rounded-md px-3 py-2 text-sm">
-                  {['V.A.F','LTS','Reserva Remunerada','Atestado de Origem'].map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Seção JISO</Label>
-                <Input value={ataJisoForm.secao_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, secao_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="62/JISO/2025" />
-              </div>
-              <div>
-                <Label className="text-sm">Data da Ata</Label>
-                <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">NUP</Label>
-                <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
-              </div>
-              <div>
-                <Label className="text-sm">Parecer</Label>
-                <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="Apto" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <Label className="text-sm font-medium">Texto para Publicação</Label>
-                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
-                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {ataJisoForm.texto_publicacao || 'Nenhum texto gerado.'}
-                </p>
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm">Arquivo da Ata JISO</Label>
-              <div className="mt-1.5 space-y-2">
-                {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) ? (
-                  <div className="p-2 border border-slate-200 rounded-md bg-slate-50 space-y-1">
-                    <p className="text-xs text-slate-600">
-                      <span className="font-medium">Arquivo atual:</span>{' '}
-                      <span className="break-all">
-                        {arquivoAtaJisoNome || decodeURIComponent((ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso).split('/').pop()?.split('?')[0] || 'Arquivo anexado')}
-                      </span>
-                    </p>
-                    <button
-                      type="button"
-                      className="text-xs text-blue-600 hover:underline"
-                      onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}
-                    >
-                      Visualizar arquivo atual
-                    </button>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-5 space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm">Data da Publicação</Label>
+                    <Input type="date" value={ataJisoForm.data_publicacao} onChange={e => setAtaJisoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500">Nenhum arquivo anexado.</p>
-                )}
+                  <div>
+                    <Label className="text-sm">Finalidade</Label>
+                    <select value={ataJisoForm.finalidade_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, finalidade_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5 w-full border rounded-md px-3 py-2 text-sm">
+                      {['V.A.F','LTS','Reserva Remunerada','Atestado de Origem'].map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Seção JISO</Label>
+                    <Input value={ataJisoForm.secao_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, secao_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="62/JISO/2025" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Data da Ata</Label>
+                    <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-sm">NUP</Label>
+                    <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-sm">Parecer</Label>
+                    <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="Apto" />
+                  </div>
+                </div>
 
-                <Input
-                  type="file"
-                  onChange={handleAtaJisoFileUpload}
-                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                  disabled={uploadingAtaJiso}
-                />
-                <p className="text-xs text-slate-500">
-                  {uploadingAtaJiso ? 'Enviando arquivo...' : 'Selecione um novo arquivo para substituir ou anexar.'}
-                </p>
-                {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleRemoveAtaJisoFile}
-                  >
-                    Remover arquivo da ata
-                  </Button>
-                )}
+                <hr className="border-gray-200" />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label className="text-sm">Nota para BG</Label>
+                    <Input value={ataJisoForm.nota_para_bg} onChange={e => setAtaJisoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Número BG</Label>
+                    <Input value={ataJisoForm.numero_bg} onChange={e => setAtaJisoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Data BG</Label>
+                    <Input type="date" value={ataJisoForm.data_bg} onChange={e => setAtaJisoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7 flex flex-col space-y-5">
+                <div className="flex-1 flex flex-col">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-sm font-medium">Texto para Publicação</Label>
+                    <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                    </span>
+                  </div>
+                  <div className="w-full flex-1 min-h-[200px] border border-gray-300 rounded-md px-4 py-4 text-sm text-gray-700 bg-gray-50 outline-none">
+                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {ataJisoForm.texto_publicacao || 'Nenhum texto gerado.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
+                  <Label className="text-sm">Arquivo da Ata JISO</Label>
+                  <div className="mt-1.5 space-y-2">
+                    {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) ? (
+                      <div className="p-2 border border-slate-200 rounded-md bg-slate-50 space-y-1">
+                        <p className="text-xs text-slate-600">
+                          <span className="font-medium">Arquivo atual:</span>{' '}
+                          <span className="break-all">
+                            {arquivoAtaJisoNome || decodeURIComponent((ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso).split('/').pop()?.split('?')[0] || 'Arquivo anexado')}
+                          </span>
+                        </p>
+                        <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => window.open(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso, '_blank')}>
+                          Visualizar arquivo atual
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">Nenhum arquivo anexado.</p>
+                    )}
+
+                    <Input type="file" onChange={handleAtaJisoFileUpload} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={uploadingAtaJiso} />
+                    <p className="text-xs text-slate-500">{uploadingAtaJiso ? 'Enviando arquivo...' : 'Selecione um novo arquivo para substituir ou anexar.'}</p>
+                    {(ataJisoForm.arquivo_ata_jiso || atestado.arquivo_ata_jiso) && (
+                      <Button type="button" variant="outline" className="w-full" onClick={handleRemoveAtaJisoFile}>Remover arquivo da ata</Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><Label className="text-sm">Nota para BG</Label><Input value={ataJisoForm.nota_para_bg} onChange={e => setAtaJisoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
-              <div><Label className="text-sm">Número BG</Label><Input value={ataJisoForm.numero_bg} onChange={e => setAtaJisoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
-              <div><Label className="text-sm">Data BG</Label><Input type="date" value={ataJisoForm.data_bg} onChange={e => setAtaJisoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
               <Button variant="outline" onClick={() => setShowAtaJisoModal(false)}>Cancelar</Button>
               <Button onClick={handleSaveAtaJiso} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
                 <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
