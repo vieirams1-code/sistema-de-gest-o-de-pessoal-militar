@@ -73,3 +73,13 @@ export const criarTagEscopado = (data) => invocar({ entidade: 'Tag', operacao: '
 export const atualizarTagEscopado = (id, data) => invocar({ entidade: 'Tag', operacao: 'update', id, data });
 export const desativarTagEscopado = (id, data) => invocar({ entidade: 'Tag', operacao: 'desativar', id, data });
 export const excluirTagEscopado = (id) => invocar({ entidade: 'Tag', operacao: 'delete', id });
+
+export async function invocarCudFuncoesTagsEscopadoDebug(payload) {
+  const request = JSON.parse(JSON.stringify(payload || {}));
+  try {
+    const response = await base44.functions.invoke('cudFuncoesTagsEscopado', request);
+    return { request, response: response?.data ?? response, ok: true };
+  } catch (error) {
+    throw { request, response: error?.response?.data ?? null, error };
+  }
+}
