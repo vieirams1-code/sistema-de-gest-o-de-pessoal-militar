@@ -341,6 +341,7 @@ export default function Ferias() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
   const [selectedFeriasIds, setSelectedFeriasIds] = useState([]);
   const [feriasTagsBulkOpen, setFeriasTagsBulkOpen] = useState(false);
+  const [feriasTagsBulkResultado, setFeriasTagsBulkResultado] = useState(null);
 
   const effectiveEmail = getEffectiveEmailMilitares();
   const {
@@ -469,6 +470,11 @@ export default function Ferias() {
     queryFn: () => base44.entities.FeriasTag.list('-created_date'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
+  const { data: tagsCatalogo = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'tags'],
+    queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
@@ -563,31 +569,64 @@ export default function Ferias() {
   const salvarTagsBulk = async ({ finalSelectedTagIds }) => {
     const targetIds = new Set((finalSelectedTagIds || []).map(String));
     const now = new Date().toISOString().slice(0, 10);
-    const promises = [];
+    const operacoes = [];
     let aplicadas = 0;
     let removidas = 0;
+    let semAlteracao = 0;
+
+    const tagNomePorId = new Map((tagsCatalogo || []).map((tag) => [String(tag.id), tag.nome || `Tag #${tag.id}`]));
 
     selectedFerias.forEach((f) => {
       const ativos = feriasTagsAtivasMap.get(String(f.id)) || new Map();
       targetIds.forEach((tagId) => {
-        if (ativos.has(tagId)) return;
+        if (ativos.has(tagId)) {
+          semAlteracao += 1;
+          return;
+        }
         aplicadas += 1;
-        promises.push(criarFeriasTagEscopado({ ferias_id: f.id, tag_id: tagId, status: 'ativa', data_aplicacao: now, motivo: 'Bulk férias' }));
+        operacoes.push({
+          acao: 'aplicar',
+          ferias_id: f.id,
+          tag_id: tagId,
+          tag_nome: tagNomePorId.get(String(tagId)),
+          ferias_nome: f?.militar_nome || f?.periodo_aquisitivo_ref || `Férias #${f.id}`,
+          promise: criarFeriasTagEscopado({ ferias_id: f.id, tag_id: tagId, status: 'ativa', data_aplicacao: now, motivo: 'Bulk férias' }),
+        });
       });
       ativos.forEach((vinculo, tagId) => {
-        if (targetIds.has(tagId)) return;
+        if (targetIds.has(tagId)) {
+          semAlteracao += 1;
+          return;
+        }
         removidas += 1;
-        promises.push(removerFeriasTagEscopado(vinculo.id, { status: 'removida', data_remocao: now, motivo: 'Bulk férias' }));
+        operacoes.push({
+          acao: 'remover',
+          ferias_id: f.id,
+          tag_id: tagId,
+          tag_nome: tagNomePorId.get(String(tagId)),
+          ferias_nome: f?.militar_nome || f?.periodo_aquisitivo_ref || `Férias #${f.id}`,
+          promise: removerFeriasTagEscopado(vinculo.id, { status: 'removida', data_remocao: now, motivo: 'Bulk férias' }),
+        });
       });
     });
 
-    const resultados = await Promise.allSettled(promises);
-    const falhas = resultados.filter((r) => r.status === 'rejected').length;
+    const resultados = await Promise.allSettled(operacoes.map((item) => item.promise));
+    const falhas = resultados.reduce((acc, resultado, index) => {
+      if (resultado.status !== 'rejected') return acc;
+      const operacao = operacoes[index];
+      const motivo = resultado.reason?.message || resultado.reason?.error || 'Falha não identificada';
+      acc.push({ ...operacao, motivo });
+      return acc;
+    }, []);
     queryClient.invalidateQueries({ queryKey: ['ferias-tags-bulk'] });
     queryClient.invalidateQueries({ queryKey: ['ferias-tags'] });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
-    alert(`${aplicadas} aplicadas, ${removidas} removidas, ${falhas} falhas`);
-    setFeriasTagsBulkOpen(false);
+    setFeriasTagsBulkResultado({
+      aplicadas: Math.max(0, aplicadas - falhas.filter((f) => f.acao === 'aplicar').length),
+      removidas: Math.max(0, removidas - falhas.filter((f) => f.acao === 'remover').length),
+      semAlteracao,
+      falhas,
+    });
   };
 
   const feriasAgrupadas = useMemo(() => {
@@ -1036,7 +1075,7 @@ export default function Ferias() {
         </div>
         {selectedFeriasIds.length > 0 && (
           <div className="mb-4">
-            <Button variant="outline" onClick={() => setFeriasTagsBulkOpen(true)}>
+            <Button variant="outline" onClick={() => { setFeriasTagsBulkResultado(null); setFeriasTagsBulkOpen(true); }}>
               Gerenciar Tags ({selectedFeriasIds.length})
             </Button>
           </div>
@@ -1629,6 +1668,7 @@ export default function Ferias() {
         selectedFerias={selectedFerias}
         tagsStatusById={tagsStatusById}
         onConfirm={salvarTagsBulk}
+        resultadoOperacao={feriasTagsBulkResultado}
       />
     </div>
   );

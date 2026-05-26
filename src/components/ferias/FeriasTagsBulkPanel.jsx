@@ -3,14 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Search, Tags as TagsIcon, X } from 'lucide-react';
+import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
 
 function isAtivo(item) {
   return item?.ativo !== false && item?.ativa !== false && item?.status !== 'inativo';
 }
 
 function isAplicavelEmFerias(tag) {
-  const valor = String(tag?.aplicabilidade || '').trim().toLowerCase();
-  return !valor || valor === 'ferias' || valor === 'férias' || valor === 'todos' || valor === 'ambos';
+  const valor = normalizarAplicabilidade(tag?.aplicabilidade);
+  return valor === 'ferias' || valor === 'todos' || valor === 'ambos';
 }
 
 function normalizar(valor) {
@@ -25,6 +26,7 @@ export default function FeriasTagsBulkPanel({
   onConfirm,
   loading = false,
   saving = false,
+  resultadoOperacao = null,
 }) {
   const [busca, setBusca] = useState('');
   const [selecionadas, setSelecionadas] = useState([]);
@@ -122,6 +124,22 @@ export default function FeriasTagsBulkPanel({
               </div>
             </div>
           ))}
+          {resultadoOperacao && (
+            <div className="bg-white border rounded-lg p-3 space-y-2">
+              <p className="text-sm font-semibold text-slate-700">
+                {resultadoOperacao.aplicadas} aplicada(s), {resultadoOperacao.removidas} removida(s), {resultadoOperacao.semAlteracao} sem alteração, {resultadoOperacao.falhas.length} falha(s).
+              </p>
+              {resultadoOperacao.falhas.length > 0 && (
+                <ul className="list-disc pl-5 space-y-1 text-xs text-red-700">
+                  {resultadoOperacao.falhas.map((falha, idx) => (
+                    <li key={`${falha.ferias_id}-${falha.tag_id}-${idx}`}>
+                      Tag {falha.tag_nome || `#${falha.tag_id}`} em {falha.ferias_nome || `Férias #${falha.ferias_id}`}: {falha.motivo}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
         <div className="p-4 border-t bg-white">
           <Button className="w-full" disabled={isLocked} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas })}>Salvar alterações</Button>
