@@ -16,7 +16,6 @@ const PERMISSIONS_MAP: Record<string, string[]> = {
 
 const APLICABILIDADES = new Set(['militar', 'ferias', 'atestado', 'todos']);
 const TIPOS_VISUAIS = new Set(['normal', 'destaque', 'alerta', 'favorito', 'critico']);
-const TIPOS_USO_TAG = new Set(['comum', 'unica']);
 const INSTITUCIONAIS = new Set(['comandante', 'subcomandante']);
 
 const normalizeTipo = (t: unknown) => String(t || '').trim().toLowerCase();
@@ -95,16 +94,6 @@ function normalizarAplicabilidade(value: unknown) {
 }
 function validarAplicabilidade(value: unknown) { return APLICABILIDADES.has(String(value || '').trim()); }
 function validarTipoVisual(value: unknown) { return TIPOS_VISUAIS.has(String(value || '').trim()); }
-function normalizarTipoUsoTag(value: unknown, { fallbackComum = true }: { fallbackComum?: boolean } = {}) {
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  if (!normalized) return fallbackComum ? 'comum' : null;
-  if (normalized === 'comum' || normalized === 'unica') return normalized;
-  return null;
-}
 
 Deno.serve(async (req) => {
   try {
@@ -199,7 +188,6 @@ Deno.serve(async (req) => {
     }
 
     if (entidade === 'Tag') {
-      if (operacao === 'delete') logDev('[TAG_DELETE_BACKEND_INPUT]', { entidade, operacao, id, data });
       if (!['create', 'update', 'desativar', 'delete'].includes(operacao)) return erro(400, 'Operação inválida para Tag.');
       if (operacao === 'desativar') {
         const ativo = typeof data?.ativo === 'boolean' ? data.ativo : false;
@@ -220,8 +208,7 @@ Deno.serve(async (req) => {
         const militarCount = Array.isArray(militarTags) ? militarTags.length : 0;
         const feriasCount = Array.isArray(feriasTags) ? feriasTags.length : 0;
         const atestadoCount = Array.isArray(atestadoTags) ? atestadoTags.length : 0;
-        logDev('[TAG_DELETE_BACKEND_RESULT]', {
-          tag_id: tagId,
+            tag_id: tagId,
           militarAtivos: militarCount,
           feriasAtivos: feriasCount,
           atestadoAtivos: atestadoCount,
@@ -246,32 +233,9 @@ Deno.serve(async (req) => {
       const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
       const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
 
-      // CORREÇÃO tipo_uso: eliminar fallback destrutivo
-      const dataPossuiTipoUso = Object.prototype.hasOwnProperty.call(data || {}, 'tipo_uso');
-      const tipoUsoRaw = dataPossuiTipoUso ? data?.tipo_uso : undefined;
-      console.log('[TIPO_USO_INPUT]', { operacao, tag_id: id || null, dataPossuiTipoUso, tipoUsoRaw, registroAtual_tipo_uso: registroAtual?.tipo_uso ?? null });
-
-      let tipoUso;
-      if (dataPossuiTipoUso) {
-        // Validação estrita: se veio tipo_uso, precisa ser canônico. Sem fallback silencioso.
-        const tipoUsoEntrada = normalizarTipoUsoTag(tipoUsoRaw, { fallbackComum: false });
-        if (!tipoUsoEntrada) {
-          console.log('[TIPO_USO_INVALIDO]', { tipo_uso_recebido: tipoUsoRaw, tag_id: id || null, operacao });
-          return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
-        }
-        tipoUso = tipoUsoEntrada;
-      } else if (operacao === 'update') {
-        // UPDATE sem tipo_uso no payload → preserva registroAtual
-        tipoUso = normalizarTipoUsoTag(registroAtual?.tipo_uso, { fallbackComum: false }) ?? 'comum';
-      } else {
-        // CREATE sem tipo_uso → default comum
-        tipoUso = 'comum';
-      }
-      console.log('[TIPO_USO_FINAL]', { operacao, tag_id: id || null, tipoUso });
 
       if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
-      if (!TIPOS_USO_TAG.has(tipoUso)) return erro(400, 'tipo_uso inválido. Valores aceitos: comum ou unica.');
 
       let grupo: any = null;
       if (grupoId) {
@@ -293,17 +257,13 @@ Deno.serve(async (req) => {
       });
       if (duplicada) return erro(400, 'Já existe tag ativa com este nome no mesmo grupo.');
 
-      const payload = { ...data, nome, grupo_id: grupoId, aplicabilidade, tipo_visual: tipoVisual, tipo_uso: tipoUso, ativo: true };
-      console.log('[TIPO_USO_UPDATE_PAYLOAD]', { entidade, operacao, id, payload_tipo_uso: payload.tipo_uso, payload });
       logDev('[TAG_BACKEND_PAYLOAD]', { entidade, operacao, id, payload });
       if (operacao === 'create') {
         const created = await svc.create(payload);
-        console.log('[TIPO_USO_PERSISTIDO]', { operacao, id: created?.id, tipo_uso_persistido: created?.tipo_uso });
         logDev('[TAG_BACKEND_RESULT]', { entidade, operacao, id, result: created });
         return Response.json({ data: created });
       }
       const updated = await svc.update(String(id), payload);
-      console.log('[TIPO_USO_PERSISTIDO]', { operacao, id: updated?.id, tipo_uso_persistido: updated?.tipo_uso });
       logDev('[TAG_BACKEND_RESULT]', { entidade, operacao, id, result: updated });
       return Response.json({ data: updated });
     }
@@ -349,26 +309,8 @@ Deno.serve(async (req) => {
         if (!tag) return erro(404, 'Tag não encontrada.');
         if (!tag.ativo) return erro(400, 'Tag inativa.');
         if (!['militar', 'todos', 'ambos'].includes(String(tag.aplicabilidade || ''))) return erro(400, 'Tag incompatível para militar.');
-        const tipoUsoTag = normalizarTipoUsoTag(tag.tipo_uso) || 'comum';
         const duplicadas = await base44.asServiceRole.entities.MilitarTag.filter({ militar_id: militarId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
         if ((duplicadas || []).some((d: any) => String(d.id) !== String(id || ''))) return erro(400, 'Tag ativa já vinculada para este militar.');
-        if (tipoUsoTag === 'unica') {
-          const vinculosAtivos = await base44.asServiceRole.entities.MilitarTag.filter({ tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
-          const conflito = (vinculosAtivos || []).find((v: any) => String(v.id) !== String(id || '') && String(v.militar_id || '') !== militarId);
-          if (conflito) {
-            const [militarConflito] = await base44.asServiceRole.entities.Militar.filter({ id: String(conflito.militar_id || '') }, undefined, 1, 0, ['id', 'nome', 'nome_guerra', 'posto_grad']);
-            const militarNome = String(militarConflito?.nome_guerra || militarConflito?.nome || 'militar');
-            const postoGrad = String(militarConflito?.posto_grad || '').trim();
-            const identificacao = postoGrad ? `${postoGrad} ${militarNome}` : militarNome;
-            return Response.json({
-              error: `Esta tag já está atribuída a ${identificacao}. Remova a tag desse militar antes de atribuir a outro.`,
-              code: 'TAG_UNICA_CONFLITO',
-              militar_id: String(conflito.militar_id || ''),
-              militar_nome: militarNome,
-              posto_grad: postoGrad,
-            }, { status: 409 });
-          }
-        }
         if (operacao === 'create') return Response.json({ data: await svc.create({ ...data, militar_id: militarId, status: 'ativa' }) });
         return Response.json({ data: await svc.update(String(id), { ...data, militar_id: militarId }) });
       }

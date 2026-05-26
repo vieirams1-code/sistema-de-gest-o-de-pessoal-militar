@@ -80,10 +80,6 @@
     "updated_by": {
       "type": "string",
       "default": ""
-    },
-    "tipo_uso": {
-      "type": "string",
-      "default": "comum"
     }
   },
   "required": [

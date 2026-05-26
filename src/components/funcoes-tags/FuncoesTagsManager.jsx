@@ -21,14 +21,13 @@ import {
   desativarTagGrupoEscopado,
   excluirTagGrupoEscopado,
   excluirTagEscopado,
-  invocarCudFuncoesTagsEscopadoDebug,
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 
 export const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
 const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'todos', ativa: true };
 const FORM_GRUPO = { nome: '', aplicabilidade: 'todos', emoji: '🚒', cor: '#0F766E', ativo: true };
-const FORM_TAG = { grupo_id: '', nome: '', aplicabilidade: 'todos', emoji: '⚠️', tipo_visual: 'chip', tipo_uso: 'comum', cor: '#F59E0B', ativo: true };
+const FORM_TAG = { grupo_id: '', nome: '', aplicabilidade: 'todos', emoji: '⚠️', tipo_visual: 'chip', cor: '#F59E0B', ativo: true };
 const isFuncaoInstitucionalProtegida = (funcao) => Boolean(funcao?.institucional_chave && INSTITUCIONAIS[funcao.institucional_chave]);
 
 const TERMOS_TAGS_INSTITUCIONAIS = ['comandante', 'subcomandante', 'comando', 'subcomando'];
@@ -71,10 +70,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   const [tagsInstitucionaisArquivadas, setTagsInstitucionaisArquivadas] = useState([]);
   const [tagsInstitucionaisSelecionadas, setTagsInstitucionaisSelecionadas] = useState([]);
   const [confirmarArquivamentoInstitucionaisOpen, setConfirmarArquivamentoInstitucionaisOpen] = useState(false);
-  const [debugTagId, setDebugTagId] = useState('');
-  const [debugResultado, setDebugResultado] = useState(null);
-  const [debugErro, setDebugErro] = useState(null);
-  const [debugCarregando, setDebugCarregando] = useState(false);
 
   useEffect(() => {
     if (showFuncoesTab) {
@@ -195,7 +190,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
       ...FORM_TAG,
       ...tag,
       emoji: tag?.emoji || FORM_TAG.emoji,
-      tipo_uso: normalizarTipoUsoTag(tag?.tipo_uso),
       grupo_id: getTagGrupoId(tag) || '',
     });
     setModalTagOpen(true);
@@ -232,16 +226,8 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
   const salvarTag = () => {
     const tipoVisual = (formTag.tipo_visual || 'normal') === 'chip' ? 'normal' : (formTag.tipo_visual || 'normal');
-    const tipoUsoCanonico = normalizarTipoUsoTag(formTag.tipo_uso, null);
-    if (!tipoUsoCanonico) return toast({ title: 'Tipo de uso inválido. Use Comum ou Única.', variant: 'destructive' });
-    const payload = { ...formTag, emoji: formTag.emoji, tipo_visual: tipoVisual, tipo_uso: tipoUsoCanonico, aplicabilidade: normalizarAplicabilidade(formTag.aplicabilidade), ativo: editandoTag?.ativo ?? true };
     const erro = validarTag(payload, tags, editandoTag);
     if (erro) return toast({ title: erro, variant: 'destructive' });
-    console.debug('[TAG_FORM_SUBMIT]', {
-      formTag_tipo_uso: formTag.tipo_uso,
-      payload,
-      tagId: editandoTag?.id,
-    });
     saveTag.mutate(payload);
   };
 
@@ -329,42 +315,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     setConfirmarArquivamentoInstitucionaisOpen(false);
   };
 
-  const executarDebugTagRuntime = async () => {
-    const tagId = String(debugTagId || '').trim();
-    if (!tagId) {
-      toast({ title: 'Informe um ID de tag para debug.', variant: 'destructive' });
-      return;
-    }
-    setDebugCarregando(true);
-    setDebugErro(null);
-    setDebugResultado(null);
-    try {
-      const update = await invocarCudFuncoesTagsEscopadoDebug({
-        entidade: 'Tag',
-        operacao: 'update',
-        id: tagId,
-        data: { tipo_uso: 'unica' },
-      });
-      const refetch = await base44.entities.Tag.get(tagId);
-      setDebugResultado({
-        timestamp: new Date().toISOString(),
-        update_request: update?.request ?? null,
-        update_response: update?.response ?? null,
-        refetch,
-      });
-      await invalidate('tags');
-    } catch (error) {
-      setDebugErro({
-        timestamp: new Date().toISOString(),
-        request: error?.request ?? null,
-        response: error?.response ?? null,
-        message: error?.error?.message ?? error?.message ?? 'Erro desconhecido ao executar debug.',
-      });
-    } finally {
-      setDebugCarregando(false);
-    }
-  };
-
 
   return (<div className="max-w-6xl mx-auto space-y-6">
     <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">{showFuncoesTab ? 'Configurações de Funções e Tags' : 'Configurações de Tags'}</h1></div><p className="text-sm text-slate-500 mt-1">{showFuncoesTab ? 'Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.' : 'Gerencie grupos de tags e marcadores operacionais do sistema.'}</p></div>{showFuncoesTab && <Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button>}</header>
@@ -408,28 +358,13 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex">{showFuncoesTab && <TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} />}<TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
 
-    {activeTab === 'tags' && <section className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 space-y-3">
-      <div>
-        <h2 className="font-semibold text-blue-900">Debug Tags Runtime</h2>
-        <p className="text-xs text-blue-800">Executa update em <code>Tag.tipo_uso = &quot;unica&quot;</code> e faz refetch imediato para validar persistência no runtime Base44.</p>
-      </div>
-      <div className="flex flex-col md:flex-row gap-2 md:items-end">
-        <Field label="Tag ID" className="w-full md:max-w-md">
-          <Input value={debugTagId} onChange={(e) => setDebugTagId(e.target.value)} placeholder="id da Tag para auditar" />
-        </Field>
-        <Button type="button" disabled={debugCarregando} onClick={executarDebugTagRuntime}>
-          {debugCarregando ? 'Executando debug...' : 'Rodar Debug Tags Runtime'}
-        </Button>
-      </div>
-      {debugResultado && <pre className="rounded-lg border border-blue-200 bg-white p-3 text-xs overflow-x-auto">{JSON.stringify(debugResultado, null, 2)}</pre>}
-      {debugErro && <pre className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs overflow-x-auto text-rose-900">{JSON.stringify(debugErro, null, 2)}</pre>}
-    </section>}
+
 
     {showFuncoesTab && activeTab === 'funcoes' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoFuncao}><Plus className="w-4 h-4 mr-2" />Nova Função Militar</Button></div><ListCard title={`Funções Cadastradas (${funcoesFiltradas.length})`} search={buscaFuncao} setSearch={setBuscaFuncao} searchPlaceholder="Buscar função...">{funcoesFiltradas.map((funcao) => <div key={funcao.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: funcao.cor || '#CBD5E1', backgroundColor: `${funcao.cor || '#E2E8F0'}18`, color: funcao.cor || '#1E293B' }}><IconeCatalogo value={funcao.emoji || '🏷️'} /> {funcao.nome}</span><span className="text-xs text-slate-500">Cor: {funcao.cor || '—'}</span><span className="text-xs text-slate-500">Escopo: Global</span><span className="text-xs text-slate-500">Prioridade: {funcao.prioridade_lista ?? '—'}</span></div><div className="flex items-center gap-3"><StatusBadge ativo={funcao.ativa !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarFuncao(funcao)} /><ActionButton label={funcao.ativa === false ? 'Reativar' : 'Desativar'} icon={funcao.ativa === false ? Check : X} onClick={() => toggleFuncao(funcao)} /></div></div>)}</ListCard></>}
 
     {activeTab === 'grupos' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoGrupo}><Plus className="w-4 h-4 mr-2" />Novo Grupo de Tags</Button></div><ListCard title={`Grupos de Tags (${gruposFiltrados.length})`} search={buscaGrupo} setSearch={setBuscaGrupo} searchPlaceholder="Buscar grupo...">{gruposFiltrados.map((grupo) => <div key={grupo.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: grupo.cor || '#CBD5E1', backgroundColor: `${grupo.cor || '#E2E8F0'}18`, color: grupo.cor || '#1E293B' }}><IconeCatalogo value={grupo.emoji || '🏷️'} /> {grupo.nome}</span><span className="text-xs text-slate-500">Aplicabilidade: {labelAplicabilidade(grupo.aplicabilidade)}</span><span className="text-xs text-slate-500">{quantidadeTagsPorGrupo.get(grupo.id) || 0} tags</span><span className="text-xs text-slate-500">Escopo: Global</span></div><div className="flex items-center gap-3"><StatusBadge ativo={grupo.ativo !== false} /><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarGrupo(grupo)} /><ActionButton label={grupo.ativo === false ? 'Reativar' : 'Desativar'} icon={grupo.ativo === false ? Check : X} onClick={() => toggleGrupo(grupo)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => excluirGrupo(grupo)} /></div></div>)}</ListCard></>}
 
-    {activeTab === 'tags' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoTag}><Plus className="w-4 h-4 mr-2" />Nova Tag Individual</Button></div><ListCard title={`Tags Individuais (${tagsFiltradas.length})`} search={buscaTag} setSearch={setBuscaTag} searchPlaceholder="Buscar tag...">{tagsFiltradas.map((tag) => { const grupo = gruposPorId.get(getTagGrupoId(tag)); const tipoUso = tag?.tipo_uso === 'unica' ? 'unica' : 'comum'; return <div key={tag.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl border" style={{ backgroundColor: `${tag.cor || '#F59E0B'}18`, borderColor: tag.cor || '#F59E0B' }}><IconeCatalogo value={tag.emoji || '🏷️'} /></div><div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{tag.nome}</p><TipoUsoBadge tipoUso={tipoUso} /><StatusBadge ativo={tag.ativo !== false} /></div><div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-1"><span>Grupo: {grupo?.nome || 'Sem grupo'}</span><span>•</span><span>Aplicabilidade: {labelAplicabilidade(tag.aplicabilidade)}</span><span>•</span><span>Tipo: {tag.tipo_visual || 'chip'}</span><span>•</span><span>Cor: {tag.cor || '—'}</span></div></div></div><div className="flex items-center gap-3"><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarTag(tag)} /><ActionButton label={tag.ativo === false ? 'Reativar' : 'Desativar'} icon={tag.ativo === false ? Check : X} onClick={() => toggleTag(tag)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => { setTagParaExcluir(tag); setTextoConfirmacaoExclusaoTag(''); setBloqueioExclusaoTag(null); }} /></div></div>; })}</ListCard></>}
+    {activeTab === 'tags' && <><div className="flex justify-end"><Button disabled={!canEdit} onClick={abrirNovoTag}><Plus className="w-4 h-4 mr-2" />Nova Tag Individual</Button></div><ListCard title={`Tags Individuais (${tagsFiltradas.length})`} search={buscaTag} setSearch={setBuscaTag} searchPlaceholder="Buscar tag...">{tagsFiltradas.map((tag) => { const grupo = gruposPorId.get(getTagGrupoId(tag)); return <div key={tag.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl border" style={{ backgroundColor: `${tag.cor || '#F59E0B'}18`, borderColor: tag.cor || '#F59E0B' }}><IconeCatalogo value={tag.emoji || '🏷️'} /></div><div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{tag.nome}</p><StatusBadge ativo={tag.ativo !== false} /></div><div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-1"><span>Grupo: {grupo?.nome || 'Sem grupo'}</span><span>•</span><span>Aplicabilidade: {labelAplicabilidade(tag.aplicabilidade)}</span><span>•</span><span>Tipo: {tag.tipo_visual || 'chip'}</span><span>•</span><span>Cor: {tag.cor || '—'}</span></div></div></div><div className="flex items-center gap-3"><ActionButton label="Editar" icon={Pencil} onClick={() => abrirEditarTag(tag)} /><ActionButton label={tag.ativo === false ? 'Reativar' : 'Desativar'} icon={tag.ativo === false ? Check : X} onClick={() => toggleTag(tag)} /><ActionButton label="Excluir" icon={X} variant="danger" onClick={() => { setTagParaExcluir(tag); setTextoConfirmacaoExclusaoTag(''); setBloqueioExclusaoTag(null); }} /></div></div>; })}</ListCard></>}
 
     <EntityModal open={modalFuncaoOpen} onClose={cancelarEdicaoFuncao} title={editandoFuncao ? `Editar função militar: ${editandoFuncao.nome}` : 'Nova Função Militar'} description="Defina nome, ícone, cor e prioridade da função." loading={saveFuncao.isPending} onSave={salvarFuncao} preview={<PreviewBadge emoji={formFuncao.emoji} nome={formFuncao.nome || 'Nova função'} cor={formFuncao.cor} />}>
       <>
@@ -443,7 +378,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     </EntityModal>
 
     <EntityModal open={modalTagOpen} onClose={cancelarEdicaoTag} title={editandoTag ? `Editar tag: ${editandoTag.nome}` : 'Nova Tag Individual'} description="Configure a tag e seu grupo." loading={saveTag.isPending} onSave={salvarTag} preview={<PreviewBadge emoji={formTag.emoji} nome={formTag.nome || 'Nova tag'} cor={formTag.cor} />}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Grupo da tag"><select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={formTag.grupo_id || ''} onChange={(e) => setFormTag({ ...formTag, grupo_id: e.target.value })}><option value="">Sem grupo</option>{gruposAtivos.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>)}</select></Field><Field label="Nome da tag"><Input value={formTag.nome} onChange={(e) => setFormTag({ ...formTag, nome: e.target.value })} /></Field><Field label="Aplicabilidade"><AplicabilidadeSelect value={formTag.aplicabilidade} onChange={(v) => setFormTag({ ...formTag, aplicabilidade: v })} /></Field><Field label="Ícone"><EmojiSelect value={formTag.emoji} onChange={(emoji) => setFormTag({ ...formTag, emoji })} /></Field><Field label="Tipo visual"><TipoVisualSelect value={formTag.tipo_visual} onChange={(v) => setFormTag({ ...formTag, tipo_visual: v })} /></Field><Field label="Tipo de uso" className="space-y-2"><TipoUsoSelect value={formTag.tipo_uso} onChange={(v) => setFormTag({ ...formTag, tipo_uso: v })} /><TipoUsoHelper tipoUso={formTag.tipo_uso} /></Field><Field label="Cor"><ColorInput value={formTag.cor} onChange={(cor) => setFormTag({ ...formTag, cor })} /></Field></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Grupo da tag"><select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={formTag.grupo_id || ''} onChange={(e) => setFormTag({ ...formTag, grupo_id: e.target.value })}><option value="">Sem grupo</option>{gruposAtivos.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>)}</select></Field><Field label="Nome da tag"><Input value={formTag.nome} onChange={(e) => setFormTag({ ...formTag, nome: e.target.value })} /></Field><Field label="Aplicabilidade"><AplicabilidadeSelect value={formTag.aplicabilidade} onChange={(v) => setFormTag({ ...formTag, aplicabilidade: v })} /></Field><Field label="Ícone"><EmojiSelect value={formTag.emoji} onChange={(emoji) => setFormTag({ ...formTag, emoji })} /></Field><Field label="Tipo visual"><TipoVisualSelect value={formTag.tipo_visual} onChange={(v) => setFormTag({ ...formTag, tipo_visual: v })} /></Field><Field label="Cor"><ColorInput value={formTag.cor} onChange={(cor) => setFormTag({ ...formTag, cor })} /></Field></div>
     </EntityModal>
 
     <Dialog open={Boolean(tagParaExcluir) && !bloqueioExclusaoTag} onOpenChange={(open) => !open && setTagParaExcluir(null)}><DialogContent><DialogHeader><DialogTitle>Excluir tag definitivamente</DialogTitle><DialogDescription>Deseja excluir definitivamente esta tag?</DialogDescription></DialogHeader><div className="space-y-2"><p className="text-sm text-slate-600">Digite <strong>EXCLUIR TAG</strong> para confirmar:</p><Input value={textoConfirmacaoExclusaoTag} onChange={(e) => setTextoConfirmacaoExclusaoTag(e.target.value)} placeholder="EXCLUIR TAG" /></div><DialogFooter><Button variant="outline" onClick={() => setTagParaExcluir(null)}>Cancelar</Button><Button disabled={excluirTagMutation.isPending || textoConfirmacaoExclusaoTag.trim() !== 'EXCLUIR TAG'} onClick={confirmarExclusaoTag}>Excluir tag</Button></DialogFooter></DialogContent></Dialog>
@@ -456,16 +391,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
 const filtrar = (itens, termo) => itens.filter((i) => String(i?.nome || '').toLowerCase().includes(String(termo || '').toLowerCase()));
 const labelAplicabilidade = (v) => v === 'militar' ? 'Militar' : v === 'ferias' ? 'Férias' : v === 'atestado' ? 'Atestado' : 'Todos';
-const TIPOS_USO_CANONICOS = new Set(['comum', 'unica']);
-const normalizarTipoUsoTag = (value, fallback = 'comum') => {
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  if (TIPOS_USO_CANONICOS.has(normalized)) return normalized;
-  return fallback;
-};
 function TabButton({ id, icon: Icon, label, activeTab, setActiveTab }) { const active = activeTab === id; return <button type="button" onClick={() => setActiveTab(id)} className={['inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition', active ? 'bg-white text-indigo-700 shadow border border-indigo-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'].join(' ')}><Icon className="w-4 h-4" />{label}</button>; }
 function PreviewBadge({ emoji, nome, cor, fallback = 'Prévia' }) { return <div className="flex items-center gap-2"><span className="text-xs text-slate-400">Preview visual:</span><span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold" style={{ borderColor: cor || '#CBD5E1', backgroundColor: `${cor || '#E2E8F0'}22`, color: cor || '#334155' }}><IconeCatalogo value={emoji || '🏷️'} /><span>{nome || fallback}</span></span></div>; }
 function Field({ label, children, className }) { return <label className={className}><span className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{label}</span>{children}</label>; }
@@ -476,8 +401,5 @@ function ListCard({ title, search, setSearch, searchPlaceholder, children }) { r
 function EmojiSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={value || '🏷️'} onChange={(e) => onChange(e.target.value)}>{OPCOES_ICONE_CATALOGO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>; }
 function AplicabilidadeSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={normalizarAplicabilidade(value)} onChange={(e) => onChange(e.target.value)}>{APLICABILIDADES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>; }
 function TipoVisualSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={value || 'chip'} onChange={(e) => onChange(e.target.value)}><option value="chip">Chip</option><option value="destaque">Destaque</option><option value="normal">Normal</option></select>; }
-function TipoUsoSelect({ value, onChange }) { const canonicalValue = value === 'unica' ? 'unica' : 'comum'; return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={canonicalValue} onChange={(e) => onChange(e.target.value)}><option value="comum">Comum</option><option value="unica">Única</option></select>; }
-function TipoUsoHelper({ tipoUso }) { const unica = normalizarTipoUsoTag(tipoUso) === 'unica'; return <div className="space-y-1 text-xs text-slate-600"><p><strong>Comum:</strong> Pode ser atribuída a vários militares.</p><p><strong>Única:</strong> Só pode estar ativa em um militar por vez.</p>{unica && <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">Tag única não é transferida automaticamente. Para atribuir a outro militar, remova primeiro do militar atual.</p>}</div>; }
-function TipoUsoBadge({ tipoUso }) { const unica = tipoUso === 'unica'; const title = unica ? 'Uso exclusivo em um militar por vez.' : 'Pode ser atribuída a vários militares.'; return <span title={title} className={['inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border', unica ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-slate-100 text-slate-700 border-slate-200'].join(' ')}>{unica ? 'Única' : 'Comum'}</span>; }
 function ColorInput({ value, onChange }) { return <Input type="color" value={value || '#CBD5E1'} onChange={(e) => onChange(e.target.value)} className="h-10 p-1" />; }
 function EntityModal({ open, onClose, title, description, preview, children, onSave, loading }) { return <Dialog open={open} onOpenChange={(next) => !next && onClose()}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader><div className="mb-4">{preview}</div>{children}<DialogFooter className="mt-6"><Button variant="outline" onClick={onClose}>Cancelar</Button><Button disabled={loading} onClick={onSave}>{loading ? 'Salvando...' : 'Salvar'}</Button></DialogFooter></DialogContent></Dialog>; }
