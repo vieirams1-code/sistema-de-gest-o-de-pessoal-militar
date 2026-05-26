@@ -226,39 +226,75 @@ export default function RPSpecificFieldsExOfficio({
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">JISO</h3>
-          <div className="space-y-4">
-            <FormField label="Finalidade" name="finalidade_jiso" value={formData.finalidade_jiso} onChange={handleChange} type="select" options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']} required />
-            <FormField label="Seção JISO" name="secao_jiso" value={formData.secao_jiso} onChange={handleChange} placeholder="62/JISO/2025" />
-            <FormField label="Data da Ata" name="data_ata" value={formData.data_ata} onChange={handleChange} type="date" required />
-            <FormField label="NUP" name="nup" value={formData.nup} onChange={handleChange} placeholder="31.001.005-12" />
-            <div>
-              <Label>Parecer</Label>
-              <Textarea value={formData.parecer_jiso} onChange={(e) => handleChange('parecer_jiso', e.target.value)} className="mt-1.5" rows={3} placeholder="Apto" />
-            </div>
-            {mostrarAtestados && (
-              <div>
-                <Label className="block mb-2">Atestados do militar homologados por esta JISO</Label>
-                {atestadosJISOPendentes.length === 0 ? (
-                  <p className="text-sm text-slate-400">Nenhum atestado aguardando JISO.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {atestadosJISOPendentes.map(a => (
-                      <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(a.id)}
-                          onChange={e => {
-                            const ids = e.target.checked ? [...selectedIds, a.id] : selectedIds.filter(id => id !== a.id);
-                            handleChange('atestados_jiso_ids', ids);
-                          }}
-                        />
-                        <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-5 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <FormField label="Finalidade" name="finalidade_jiso" value={formData.finalidade_jiso} onChange={handleChange} type="select" options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']} required />
+                </div>
+                <div>
+                  <FormField label="Seção JISO" name="secao_jiso" value={formData.secao_jiso} onChange={handleChange} placeholder="62/JISO/2025" />
+                </div>
+                <div>
+                  <FormField label="Data da Ata" name="data_ata" value={formData.data_ata} onChange={handleChange} type="date" required />
+                </div>
+                <div className="col-span-2">
+                  <FormField label="NUP" name="nup" value={formData.nup} onChange={handleChange} placeholder="31.001.005-12" />
+                </div>
+                <div className="col-span-2">
+                  <Label>Parecer</Label>
+                  <Textarea value={formData.parecer_jiso} onChange={(e) => handleChange('parecer_jiso', e.target.value)} className="mt-1.5" rows={3} placeholder="Apto" />
+                </div>
               </div>
-            )}
+
+              <hr className="border-gray-200" />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label className="block text-sm font-medium text-slate-700">Atestados vinculados à ata</Label>
+                  <p className="text-xs text-slate-500 mt-1">Selecione os atestados que serão homologados por esta JISO.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 flex flex-col space-y-5">
+              <div className="flex-1 flex flex-col">
+                <div className="flex justify-between items-end mb-2">
+                  <Label className="block text-sm font-semibold text-gray-900">Atestados do militar homologados por esta JISO</Label>
+                  <span className="text-xs text-emerald-600 flex items-center font-medium">Atualizado automaticamente</span>
+                </div>
+                <div className="w-full flex-1 min-h-[200px] border border-gray-300 rounded-md px-4 py-4 text-sm text-gray-700 bg-gray-50 outline-none">
+                  {mostrarAtestados ? (
+                    atestadosJISOPendentes.length === 0 ? (
+                      <p className="text-sm text-slate-400">Nenhum atestado aguardando JISO.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {atestadosJISOPendentes.map(a => (
+                          <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-100 bg-white">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(a.id)}
+                              onChange={e => {
+                                const ids = e.target.checked ? [...selectedIds, a.id] : selectedIds.filter(id => id !== a.id);
+                                handleChange('atestados_jiso_ids', ids);
+                              }}
+                            />
+                            <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-sm text-slate-400">A seleção de atestados é exibida para as finalidades V.A.F, LTS e Atestado de Origem.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
+                <Label className="block text-sm font-medium text-blue-900 mb-2">Resumo</Label>
+                <p className="text-xs text-blue-900/80">Revise a finalidade, parecer e atestados selecionados antes de salvar a publicação.</p>
+              </div>
+            </div>
           </div>
         </div>
       );
