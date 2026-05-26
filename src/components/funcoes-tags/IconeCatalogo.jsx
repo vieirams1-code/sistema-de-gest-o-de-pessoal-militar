@@ -42,14 +42,35 @@ function EstrelaInstitucional({ color }) {
   );
 }
 
+function normalizarValorIconeCatalogo(value) {
+  if (!value) return '';
+  const valorTexto = String(value).trim();
+  if (!valorTexto) return '';
+
+  const valorNormalizado = valorTexto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+
+  const prefixo = valorNormalizado.split('_')[0];
+
+  if (valorNormalizado.startsWith('estrela_amarela_comandante')) return 'estrela_amarela_comandante';
+  if (valorNormalizado.startsWith('estrela_azul_subcomandante')) return 'estrela_azul_subcomandante';
+  if (valorNormalizado.startsWith('engrenagem') || prefixo === 'engrenagem') return 'engrenagem';
+  if (valorNormalizado.startsWith('moto_socorro') || valorNormalizado.startsWith('moto_mob') || prefixo === 'moto') return 'moto_socorro';
+
+  return valorTexto;
+}
+
 export function renderIconeCatalogoValue(value) {
-  if (!value) return '🏷️';
-  if (value === 'sem_icone') return '🏷️';
-  if (value === 'estrela_amarela_comandante') return <EstrelaInstitucional color="#D4A017" />;
-  if (value === 'estrela_azul_subcomandante') return <EstrelaInstitucional color="#2563EB" />;
-  if (value === 'engrenagem') return <Settings className="h-4 w-4 text-slate-700" />;
-  if (value === 'moto_socorro') return <Bike className="h-4 w-4 text-emerald-700" />;
-  return value;
+  const valorNormalizado = normalizarValorIconeCatalogo(value);
+  if (!valorNormalizado || valorNormalizado === 'sem_icone') return '🏷️';
+  if (valorNormalizado === 'estrela_amarela_comandante') return <EstrelaInstitucional color="#D4A017" />;
+  if (valorNormalizado === 'estrela_azul_subcomandante') return <EstrelaInstitucional color="#2563EB" />;
+  if (valorNormalizado === 'engrenagem') return <Settings className="h-4 w-4 text-slate-700" />;
+  if (valorNormalizado === 'moto_socorro') return <Bike className="h-4 w-4 text-emerald-700" />;
+  return valorNormalizado;
 }
 
 export default function IconeCatalogo({ value }) {
