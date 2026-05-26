@@ -3,9 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Check, GitBranch, Network, Pencil, Plus, Search, Settings, Shield, Tags as TagsIcon, X } from 'lucide-react';
+import { Check, ChevronsUpDown, GitBranch, Network, Pencil, Plus, Search, Settings, Shield, Tags as TagsIcon, X } from 'lucide-react';
 import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
 import { getTagGrupoId } from '@/utils/funcoesTags/contratoCampos';
 import { INSTITUCIONAIS, validarFuncao, validarTag, validarTagGrupo } from '@/utils/funcoesTags/validacoes';
@@ -22,7 +24,7 @@ import {
   excluirTagGrupoEscopado,
   excluirTagEscopado,
 } from '@/services/cudFuncoesTagsEscopadoClient';
-import IconeCatalogo, { OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
+import IconeCatalogo, { CATEGORIAS_ICONE, OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 
 export const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
 const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'todos', ativa: true };
@@ -405,7 +407,68 @@ function StatusBadge({ ativo }) { return <span className={['inline-flex items-ce
 function ActionButton({ label, icon: Icon, onClick, variant = 'neutral' }) { const cls = variant === 'danger' ? 'border-rose-200 text-rose-700 hover:bg-rose-50' : 'border-slate-200 text-slate-700 hover:bg-slate-50'; return <button type="button" onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${cls}`}><Icon className="w-3.5 h-3.5" />{label}</button>; }
 function SearchInput({ value, onChange, placeholder }) { return <div className="relative w-64"><Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" /><Input value={value} onChange={(e) => onChange(e.target.value)} className="pl-9" placeholder={placeholder} /></div>; }
 function ListCard({ title, search, setSearch, searchPlaceholder, children }) { return <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"><div className="flex items-center justify-between px-6 py-4 border-b"><h2 className="font-semibold text-slate-900">{title}</h2><SearchInput value={search} onChange={setSearch} placeholder={searchPlaceholder} /></div><div className="divide-y divide-slate-100">{children}</div></section>; }
-function EmojiSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={value || '🏷️'} onChange={(e) => onChange(e.target.value)}>{OPCOES_ICONE_CATALOGO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>; }
+function normalizarBuscaIcone(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function EmojiSelect({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [categoriaAtiva, setCategoriaAtiva] = useState('Todas');
+
+  const termo = normalizarBuscaIcone(busca);
+  const opcoesFiltradas = useMemo(() => {
+    return OPCOES_ICONE_CATALOGO.filter((item) => {
+      const matchCategoria = categoriaAtiva === 'Todas'
+        || CATEGORIAS_ICONE.some((categoria) => categoria.nome === categoriaAtiva && categoria.itens.includes(item.value));
+      if (!matchCategoria && categoriaAtiva !== 'Especiais') return false;
+      if (categoriaAtiva === 'Especiais' && !['estrela_amarela_comandante', 'estrela_azul_subcomandante', 'engrenagem', 'moto_socorro'].includes(item.value)) return false;
+      if (!termo) return true;
+      const alvo = normalizarBuscaIcone(`${item.label} ${item.termos || ''} ${item.value}`);
+      return alvo.includes(termo);
+    });
+  }, [categoriaAtiva, termo]);
+
+  const iconeAtual = value || '🏷️';
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white flex items-center justify-between" >
+          <span className="flex items-center gap-2"><IconeCatalogo value={iconeAtual} /><span className="text-sm text-slate-700">{value ? 'Ícone selecionado' : 'Sem ícone'}</span></span>
+          <ChevronsUpDown className="h-4 w-4 text-slate-500" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[560px] p-3" align="start">
+        <div className="space-y-3">
+          <Input placeholder="Buscar ícone ou termo..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {['Todas', ...CATEGORIAS_ICONE.map((c) => c.nome), 'Especiais'].map((categoria) => (
+              <button key={categoria} type="button" onClick={() => setCategoriaAtiva(categoria)} className={`px-2.5 py-1 rounded-full text-xs whitespace-nowrap border ${categoriaAtiva === categoria ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>
+                {categoria}
+              </button>
+            ))}
+          </div>
+          <ScrollArea className="h-56 border rounded-md p-2">
+            <div className="grid grid-cols-8 gap-2">
+              {opcoesFiltradas.map((item) => (
+                <button key={item.value || 'sem-icone'} type="button" title={item.label} onClick={() => { onChange(item.value); setOpen(false); }} className={`h-9 rounded-md border text-lg flex items-center justify-center hover:bg-slate-100 ${value === item.value ? 'border-slate-900 bg-slate-100' : 'border-slate-200'}`}>
+                  {item.value ? <IconeCatalogo value={item.value} /> : <span className="text-[10px] text-slate-500">Ø</span>}
+                </button>
+              ))}
+            </div>
+            {opcoesFiltradas.length === 0 && <p className="text-xs text-slate-500 p-2">Nenhum ícone encontrado.</p>}
+          </ScrollArea>
+          <div className="text-xs text-slate-600">Preview: <span className="inline-flex items-center gap-1 ml-1"><IconeCatalogo value={iconeAtual} /> {value || 'Sem ícone'}</span></div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 function AplicabilidadeSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={normalizarAplicabilidade(value)} onChange={(e) => onChange(e.target.value)}>{APLICABILIDADES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>; }
 function TipoVisualSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={value || 'chip'} onChange={(e) => onChange(e.target.value)}><option value="chip">Chip</option><option value="destaque">Destaque</option><option value="normal">Normal</option></select>; }
 function ColorInput({ value, onChange }) { return <Input type="color" value={value || '#CBD5E1'} onChange={(e) => onChange(e.target.value)} className="h-10 p-1" />; }
