@@ -233,6 +233,7 @@ export default function EditarJISO() {
 
     queryClient.invalidateQueries({ queryKey: ['atestados-jiso'] });
     queryClient.invalidateQueries({ queryKey: ['jisos'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-jisos'] });
     queryClient.invalidateQueries({ queryKey: ['atestado'] });
     queryClient.invalidateQueries({ queryKey: ['jiso'] });
     
