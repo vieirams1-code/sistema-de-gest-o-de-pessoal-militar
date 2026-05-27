@@ -4,6 +4,8 @@ import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 export async function fetchScopedPainelContratosDesignacao(payload = {}) {
   const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : getEffectiveEmail();
   const finalPayload = { ...(payload || {}) };
+  if (payload.limit !== undefined) finalPayload.limit = payload.limit;
+  if (payload.offset !== undefined) finalPayload.offset = payload.offset;
 
   if (effectiveEmail) finalPayload.effectiveEmail = effectiveEmail;
   else delete finalPayload.effectiveEmail;
@@ -23,6 +25,6 @@ export async function fetchScopedPainelContratosDesignacao(payload = {}) {
     matriculasMilitar: Array.isArray(body?.matriculasMilitar) ? body.matriculasMilitar : [],
     legadoAtivaPorContrato: body?.legadoAtivaPorContrato && typeof body.legadoAtivaPorContrato === 'object' ? body.legadoAtivaPorContrato : {},
     counters: body?.counters && typeof body.counters === 'object' ? body.counters : {},
-    meta: body?.meta && typeof body.meta === 'object' ? body.meta : {},
+    meta: body?.meta && typeof body.meta === 'object' ? body.meta : { hasNext: false },
   };
 }

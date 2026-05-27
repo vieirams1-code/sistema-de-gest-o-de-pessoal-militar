@@ -43,6 +43,7 @@ const EMPTY_COUNTERS = {
   encerrados: 0,
   cancelados: 0,
 };
+const PAGE_SIZE = 200;
 
 const SITUACAO_UI = {
   [SITUACAO_CONTRATO_DESIGNACAO.ATIVO]: { label: 'Ativo', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -137,11 +138,12 @@ export default function ContratosDesignacao() {
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
   const [excluindoContratoId, setExcluindoContratoId] = useState(null);
+  const [offset, setOffset] = useState(0);
   const effectiveEmail = getEffectiveEmail();
 
   const query = useQuery({
-    queryKey: ['painel-contratos-designacao', Boolean(isAdmin || hasAbsoluteAccess), null, userEmail || null, null],
-    queryFn: () => fetchScopedPainelContratosDesignacao(),
+    queryKey: ['painel-contratos-designacao', Boolean(isAdmin || hasAbsoluteAccess), null, userEmail || null, null, offset, PAGE_SIZE, effectiveEmail || null],
+    queryFn: () => fetchScopedPainelContratosDesignacao({ offset, limit: PAGE_SIZE, effectiveEmail: effectiveEmail || undefined }),
     enabled: Boolean(isAccessResolved && canView),
   });
 
@@ -164,10 +166,13 @@ export default function ContratosDesignacao() {
   });
 
   const bundle = query.data || {};
+  const meta = bundle.meta || {};
   const counters = { ...EMPTY_COUNTERS, ...(bundle.counters || {}) };
   const contratos = bundle.contratos || [];
   const militares = bundle.militares || [];
   const matriculasMilitar = bundle.matriculasMilitar || [];
+  const hasNextPage = Boolean(meta?.hasNext);
+  const currentPage = Math.floor((Number(meta?.offset ?? offset) || 0) / PAGE_SIZE) + 1;
   const militaresDisponiveis = militaresDisponiveisQuery.data || [];
   const militaresOpcoesContrato = useMemo(() => {
     const porId = new Map();
@@ -470,6 +475,27 @@ export default function ContratosDesignacao() {
         </section>
 
         {query.error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{query.error.message || 'Erro ao carregar painel.'}</div>}
+        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-sm text-slate-600">Página {currentPage}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={offset <= 0 || query.isFetching}
+              onClick={() => setOffset((prev) => Math.max(prev - PAGE_SIZE, 0))}
+            >
+              Anterior
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!hasNextPage || query.isFetching}
+              onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
       </div>
 
       <ContratoDesignacaoModal

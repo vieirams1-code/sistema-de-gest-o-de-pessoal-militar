@@ -5,6 +5,8 @@ const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
 const CHUNK_SIZE = 200;
+const DEFAULT_PAGE_LIMIT = 200;
+const MAX_PAGE_LIMIT = 1000;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 const CAMPOS_MILITAR_RESUMO = ['id', 'nome_completo', 'nome_guerra', 'matricula', 'posto_graduacao', 'quadro', 'grupamento_id', 'subgrupamento_id', 'estrutura_id', 'grupamento_raiz_id'];
 const CAMPOS_MATRICULA = ['id', 'militar_id', 'matricula', 'matricula_normalizada', 'tipo_matricula', 'situacao', 'is_atual', 'data_inicio', 'data_fim'];
@@ -107,6 +109,14 @@ function getModoAcesso(criteriosAplicados) {
   return null;
 }
 
+function normalizarPaginacao(payload = {}) {
+  const limitRaw = Number.parseInt(String(payload?.limit ?? ''), 10);
+  const offsetRaw = Number.parseInt(String(payload?.offset ?? ''), 10);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, MAX_PAGE_LIMIT) : DEFAULT_PAGE_LIMIT;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
+  return { limit, offset };
+}
+
 async function listarPorIds(base44, entityName, ids, campos, orderBy) {
   const rows = []; let partialFailures = 0;
   for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
@@ -133,6 +143,10 @@ function diasParaVencimento(contrato, hoje) {
   const fim = new Date(String(raw).slice(0, 10) + 'T00:00:00Z');
   if (Number.isNaN(fim.getTime())) return null;
   return Math.ceil((fim.getTime() - hoje.getTime()) / 86400000);
+}
+
+function ordenarContratosPorInicioDesc(contratos = []) {
+  return [...contratos].sort((a, b) => String(b?.data_inicio_contrato || '').localeCompare(String(a?.data_inicio_contrato || '')));
 }
 
 function montarLegado(periodos, contratos) {
@@ -180,6 +194,7 @@ Deno.serve(async (req) => {
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
     let payload = {}; try { payload = await req.json(); } catch (_e) { payload = {}; }
+    const { limit, offset } = normalizarPaginacao(payload);
 
     const authUserEmail = normalizeEmail(authUser.email);
     const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
@@ -196,6 +211,7 @@ Deno.serve(async (req) => {
     const warnings = [];
     let partialFailures = 0;
     let totalMilitaresEscopo = null;
+    let hasNext = false;
 
     if (!targetIsAdmin && targetPerms.actions?.visualizar_contratos_designacao !== true && targetPerms.actions?.gerir_contratos_designacao !== true) {
       return Response.json({ error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: 'visualizar_contratos_designacao ou gerir_contratos_designacao' }, { status: 403 });
@@ -205,13 +221,22 @@ Deno.serve(async (req) => {
     let militarIdsEscopo = null;
     if (targetIsAdmin) {
       criteriosAplicados.add('admin');
-      contratos = await fetchWithRetry(() => base44.asServiceRole.entities.ContratoDesignacaoMilitar.list('-data_inicio_contrato', 1000, 0), 'ContratoDesignacaoMilitar.list');
+      const contratosPagina = await fetchWithRetry(
+        () => base44.asServiceRole.entities.ContratoDesignacaoMilitar.list('-data_inicio_contrato', limit + 1, offset),
+        'ContratoDesignacaoMilitar.list',
+      );
+      const pagina = contratosPagina || [];
+      hasNext = pagina.length > limit;
+      contratos = hasNext ? pagina.slice(0, limit) : pagina;
     } else {
       militarIdsEscopo = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos, criteriosAplicados, warnings);
       totalMilitaresEscopo = militarIdsEscopo?.length || 0;
       if (!militarIdsEscopo || militarIdsEscopo.length === 0) warnings.push('SEM_ESCOPO');
       const result = militarIdsEscopo?.length ? await listarPorMilitarIds(base44, 'ContratoDesignacaoMilitar', militarIdsEscopo, undefined, '-data_inicio_contrato') : { rows: [], partialFailures: 0 };
-      contratos = result.rows; partialFailures += result.partialFailures;
+      const ordenados = ordenarContratosPorInicioDesc(result.rows || []);
+      hasNext = (offset + limit) < ordenados.length;
+      contratos = ordenados.slice(offset, offset + limit);
+      partialFailures += result.partialFailures;
     }
 
     const militarIdsContratos = Array.from(new Set((contratos || []).map((c) => c?.militar_id).filter(Boolean).map(String)));
@@ -231,7 +256,7 @@ Deno.serve(async (req) => {
       matriculasMilitar: matriculasResult.rows || [],
       legadoAtivaPorContrato,
       counters,
-      meta: { isAdmin: targetIsAdmin, modoAcesso: getModoAcesso(criteriosAplicados), userEmail: authUserEmail || null, effectiveEmail: isImpersonating ? effectiveEmailNorm : null, totalMilitaresEscopo, partialFailures, warnings },
+      meta: { isAdmin: targetIsAdmin, modoAcesso: getModoAcesso(criteriosAplicados), userEmail: authUserEmail || null, effectiveEmail: isImpersonating ? effectiveEmailNorm : null, totalMilitaresEscopo, partialFailures, warnings, limit, offset, hasNext },
     });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
