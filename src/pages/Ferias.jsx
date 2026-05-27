@@ -73,6 +73,8 @@ import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
 import { getFeriasTagFeriasId, getFeriasTagTagId } from '@/utils/funcoesTags/contratoCampos';
+import { isFeriasTagVinculoAtivo } from '@/utils/funcoesTags/feriasTags';
+import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
 const statusColors = {
@@ -129,25 +131,6 @@ function getTagCor(tag = {}) {
   if (typeof tag?.cor === 'string' && tag.cor.trim()) return tag.cor.trim();
   if (typeof tag?.color === 'string' && tag.color.trim()) return tag.color.trim();
   return '#64748b';
-}
-
-function isCampoFalseExplicito(valor) {
-  if (valor === false) return true;
-  if (typeof valor === 'string') {
-    const normalizado = valor.trim().toLowerCase();
-    return ['false', '0', 'nao', 'não'].includes(normalizado);
-  }
-  if (typeof valor === 'number') return valor === 0;
-  return false;
-}
-
-function isFeriasTagAtiva(vinculo = {}) {
-  const status = String(vinculo?.status || '').trim().toLowerCase();
-  const statusAtivo = status === 'ativa' || status === 'ativo';
-  const semRemocao = !vinculo?.data_remocao;
-  const campoAtivoValido = !isCampoFalseExplicito(vinculo?.ativo);
-  const campoAtivaValido = !isCampoFalseExplicito(vinculo?.ativa);
-  return statusAtivo && semRemocao && campoAtivoValido && campoAtivaValido;
 }
 
 function parseFeriasDateStart(value) {
@@ -505,7 +488,7 @@ export default function Ferias() {
   );
 
   const { data: feriasTagsVinculos = [] } = useQuery({
-    queryKey: ['ferias-tags-bulk', feriasIdsEscopoTags],
+    queryKey: funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags),
     queryFn: async () => {
       if (feriasIdsEscopoTags.length === 0) return [];
       const feriasIdsSet = new Set(feriasIdsEscopoTags);
@@ -588,7 +571,7 @@ export default function Ferias() {
   const feriasTagsAtivasMap = useMemo(() => {
     const mapa = new Map();
     feriasTagsVinculos.forEach((item) => {
-      if (!isFeriasTagAtiva(item)) {
+      if (!isFeriasTagVinculoAtivo(item)) {
         return;
       }
       const feriasId = String(getFeriasTagFeriasId(item) || '');
@@ -696,8 +679,33 @@ export default function Ferias() {
       acc.push({ ...operacao, motivo });
       return acc;
     }, []);
-    queryClient.invalidateQueries({ queryKey: ['ferias-tags-bulk'] });
-    queryClient.invalidateQueries({ queryKey: ['ferias-tags'] });
+
+    const idsComFalha = new Set(
+      falhas.map((item) => `${String(item.ferias_id || '')}::${String(item.tag_id || '')}`),
+    );
+
+    queryClient.setQueryData(funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags), (atual = []) => {
+      const lista = Array.isArray(atual) ? [...atual] : [];
+      const byFeriasTag = new Map(lista.map((item) => [`${String(getFeriasTagFeriasId(item) || '')}::${String(getFeriasTagTagId(item) || '')}`, item]));
+      operacoes.forEach((op) => {
+        const chave = `${String(op.ferias_id || '')}::${String(op.tag_id || '')}`;
+        if (idsComFalha.has(chave)) return;
+        if (op.acao === 'aplicar' && !byFeriasTag.has(chave)) {
+          byFeriasTag.set(chave, { ferias_id: op.ferias_id, tag_id: op.tag_id, status: 'ativa', data_aplicacao: now });
+        }
+        if (op.acao === 'remover' && byFeriasTag.has(chave)) {
+          const atualItem = byFeriasTag.get(chave);
+          byFeriasTag.set(chave, { ...atualItem, status: 'removida', data_remocao: now });
+        }
+      });
+      return [...byFeriasTag.values()];
+    });
+    queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags) });
+    const feriasIdsAfetadas = [...new Set(selectedFerias.map((item) => String(item.id)).filter(Boolean))];
+    feriasIdsAfetadas.forEach((feriasId) => {
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTags('local', feriasId) });
+    });
+    queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTagsPrefix() });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     setFeriasTagsBulkResultado({
       aplicadas: Math.max(0, aplicadas - falhas.filter((f) => f.acao === 'aplicar').length),

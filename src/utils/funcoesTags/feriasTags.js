@@ -3,13 +3,31 @@ import { getFeriasTagTagId, isRegistroAtivo } from './contratoCampos';
 export const APLICABILIDADE_TAG_FERIAS = new Set(['', 'ferias', 'todos', 'ambos']);
 
 const normalizarTexto = (valor) => String(valor || '').trim().toLowerCase();
+const isCampoFalseExplicito = (valor) => {
+  if (valor === false) return true;
+  if (typeof valor === 'string') {
+    const normalizado = valor.trim().toLowerCase();
+    return ['false', '0', 'nao', 'não'].includes(normalizado);
+  }
+  if (typeof valor === 'number') return valor === 0;
+  return false;
+};
+
+export function isFeriasTagVinculoAtivo(vinculo = {}) {
+  const status = normalizarTexto(vinculo?.status);
+  const statusAtivo = status === 'ativa' || status === 'ativo';
+  const semRemocao = !vinculo?.data_remocao;
+  const campoAtivoValido = !isCampoFalseExplicito(vinculo?.ativo);
+  const campoAtivaValido = !isCampoFalseExplicito(vinculo?.ativa);
+  return statusAtivo && semRemocao && campoAtivoValido && campoAtivaValido;
+}
 
 export function separarTagsFeriasPorStatus(vinculos = []) {
   const ativas = [];
   const removidas = [];
 
   vinculos.forEach((vinculo) => {
-    if (normalizarTexto(vinculo.status) === 'ativa') {
+    if (isFeriasTagVinculoAtivo(vinculo)) {
       ativas.push(vinculo);
       return;
     }
@@ -33,7 +51,7 @@ export function isTagAplicavelEmFerias(tag) {
 
 export function validarDuplicidadeTagAtivaFerias({ vinculosAtivos = [], tagId }) {
   const alvo = String(tagId || '');
-  const existe = vinculosAtivos.some((vinculo) => normalizarTexto(vinculo.status) === 'ativa' && String(getFeriasTagTagId(vinculo) || '') === alvo);
+  const existe = vinculosAtivos.some((vinculo) => isFeriasTagVinculoAtivo(vinculo) && String(getFeriasTagTagId(vinculo) || '') === alvo);
   return existe ? 'Estas férias já possuem esta tag ativa.' : null;
 }
 
