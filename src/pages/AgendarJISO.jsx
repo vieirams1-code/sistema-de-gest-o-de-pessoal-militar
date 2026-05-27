@@ -12,6 +12,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { montarAgendaJiso } from '@/utils/jiso/montarAgendaJiso';
 
 export default function AgendarJISO() {
   const navigate = useNavigate();
@@ -32,19 +33,19 @@ export default function AgendarJISO() {
 
   const atestadosEnriquecidos = enriquecerAtestadosComContextoMilitar((bundle?.atestados || []).filter((a) => a.necessita_jiso), { contexto: 'operacional', filtrarMesclados: true });
   const atestados = Array.isArray(atestadosEnriquecidos) ? atestadosEnriquecidos : (atestadosEnriquecidos?.atestados || []);
-  const jisos = bundle?.jisos || [];
 
-  const filteredAtestados = atestados.filter(a =>
+  const agendaJiso = montarAgendaJiso({
+    atestados,
+    jisos: bundle?.jisos || [],
+    hoje: new Date(),
+  });
+
+  const filteredAtestados = agendaJiso.filter(a =>
     a.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.militar_matricula_label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.militar_matricula_atual?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const getJISOForAtestado = (atestadoId) => {
-    return jisos.find(j => j.atestado_id === atestadoId);
-  };
-
 
   const handleAbrirEdicaoJiso = useCallback((atestado) => {
     const escopo = validarEscopoMilitar(atestado?.militar_id);
@@ -118,8 +119,8 @@ export default function AgendarJISO() {
           ) : (
             <div className="space-y-3">
             {filteredAtestados.map((atestado) => {
-              const jiso = getJISOForAtestado(atestado.id);
-              
+              const jiso = atestado?.status === 'Aguardando Registro' ? null : atestado;
+
               return (
                 <div 
                   key={atestado.id} 
