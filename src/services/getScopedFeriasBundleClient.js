@@ -20,6 +20,8 @@ export async function fetchScopedFeriasBundle(payload = {}) {
   return {
     ferias: Array.isArray(body?.ferias) ? body.ferias : [],
     registrosLivro: Array.isArray(body?.registrosLivro) ? body.registrosLivro : [],
+    feriasTags: Array.isArray(body?.feriasTags) ? body.feriasTags : undefined,
+    tagsCatalogo: Array.isArray(body?.tagsCatalogo) ? body.tagsCatalogo : undefined,
     partialFailures: Number(body?.meta?.partialFailures || 0),
     meta: body?.meta || {},
   };

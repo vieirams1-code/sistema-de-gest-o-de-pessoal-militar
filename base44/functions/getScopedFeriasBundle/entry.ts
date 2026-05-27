@@ -5,6 +5,9 @@ const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
 const CHUNK_MILITAR_IDS = 200;
+const CHUNK_FERIAS_IDS = 100;
+const LIMIT_FERIAS_TAGS_PER_CHUNK = 5000;
+const FERIAS_TAGS_CONCURRENCY_FALLBACK = 8;
 
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
@@ -82,6 +85,94 @@ async function listarPorEscopoIds(base44, entityName, militarIds, orderBy) {
   return { rows: out, partialFailures };
 }
 
+async function listarFeriasTagsPorFeriasIds(base44, feriasIds) {
+  const out = [];
+  const seen = new Set();
+  let partialFailures = 0;
+  let usedFallback = false;
+
+  if (!Array.isArray(feriasIds) || feriasIds.length === 0) {
+    return { rows: [], partialFailures: 0, usedFallback: false };
+  }
+
+  const idsNormalizados = Array.from(new Set(feriasIds.map(String).filter(Boolean)));
+
+  for (let i = 0; i < idsNormalizados.length; i += CHUNK_FERIAS_IDS) {
+    const chunk = idsNormalizados.slice(i, i + CHUNK_FERIAS_IDS);
+    let chunkOk = false;
+    try {
+      const rows = await fetchWithRetry(
+        () => base44.asServiceRole.entities.FeriasTag.filter(
+          { ferias_id: { $in: chunk } },
+          '-created_date',
+          LIMIT_FERIAS_TAGS_PER_CHUNK,
+          0,
+        ),
+        'feriasTag.in.chunk',
+      );
+      for (const r of (rows || [])) {
+        if (!r?.id || seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push(r);
+      }
+      chunkOk = true;
+    } catch (errIn) {
+      console.warn('[getScopedFeriasBundle] feriasTag.$in chunk falhou — usando fallback por id', errIn?.message);
+    }
+
+    if (chunkOk) continue;
+
+    usedFallback = true;
+    for (let j = 0; j < chunk.length; j += FERIAS_TAGS_CONCURRENCY_FALLBACK) {
+      const slice = chunk.slice(j, j + FERIAS_TAGS_CONCURRENCY_FALLBACK);
+      const results = await Promise.allSettled(slice.map((feriasId) => fetchWithRetry(
+        () => base44.asServiceRole.entities.FeriasTag.filter({ ferias_id: feriasId }, '-created_date', 1000, 0),
+        `feriasTag.byId:${feriasId}`,
+      )));
+      for (const res of results) {
+        if (res.status !== 'fulfilled') {
+          partialFailures += 1;
+          continue;
+        }
+        for (const r of (res.value || [])) {
+          if (!r?.id || seen.has(r.id)) continue;
+          seen.add(r.id);
+          out.push(r);
+        }
+      }
+    }
+  }
+
+  return { rows: out, partialFailures, usedFallback };
+}
+
+async function listarCatalogoTagsParaFeriasTags(base44, feriasTags) {
+  if (!Array.isArray(feriasTags) || feriasTags.length === 0) return { rows: [], partialFailures: 0 };
+  const tagIds = Array.from(new Set(feriasTags.map((v) => String(v?.tag_id || '')).filter(Boolean)));
+  if (tagIds.length === 0) return { rows: [], partialFailures: 0 };
+
+  const out = [];
+  const seen = new Set();
+  let partialFailures = 0;
+  for (let i = 0; i < tagIds.length; i += CHUNK_FERIAS_IDS) {
+    const chunk = tagIds.slice(i, i + CHUNK_FERIAS_IDS);
+    try {
+      const rows = await fetchWithRetry(
+        () => base44.asServiceRole.entities.Tag.filter({ id: { $in: chunk } }, undefined, 1000, 0),
+        'tag.catalogo.chunk',
+      );
+      for (const r of (rows || [])) {
+        if (!r?.id || seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push(r);
+      }
+    } catch (_e) {
+      partialFailures += 1;
+    }
+  }
+  return { rows: out, partialFailures };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -111,12 +202,58 @@ Deno.serve(async (req) => {
         fetchWithRetry(() => base44.asServiceRole.entities.Ferias.list('-data_inicio'), 'ferias.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(), 'registroLivro.admin'),
       ]);
-      return Response.json({ ferias: ferias || [], registrosLivro: registrosLivro || [], meta: { totalMilitaresEscopo: null, totalFerias: (ferias || []).length, totalRegistrosLivro: (registrosLivro || []).length, hasMore: false, partialFailures: 0, warnings: [], targetIsAdmin: true } });
+
+      const feriasIdsAdmin = (ferias || []).map((f) => String(f?.id || '')).filter(Boolean);
+      const feriasTagsResultAdmin = await listarFeriasTagsPorFeriasIds(base44, feriasIdsAdmin);
+      const tagsCatalogoAdmin = await listarCatalogoTagsParaFeriasTags(base44, feriasTagsResultAdmin.rows);
+
+      const warningsAdmin = [];
+      if (feriasTagsResultAdmin.partialFailures > 0) warningsAdmin.push('FERIAS_TAGS_PARTIAL_FAILURES');
+      if (feriasTagsResultAdmin.usedFallback) warningsAdmin.push('FERIAS_TAGS_FALLBACK');
+      if (tagsCatalogoAdmin.partialFailures > 0) warningsAdmin.push('TAGS_CATALOGO_PARTIAL_FAILURES');
+
+      return Response.json({
+        ferias: ferias || [],
+        registrosLivro: registrosLivro || [],
+        feriasTags: feriasTagsResultAdmin.rows,
+        tagsCatalogo: tagsCatalogoAdmin.rows,
+        meta: {
+          totalMilitaresEscopo: null,
+          totalFerias: (ferias || []).length,
+          totalRegistrosLivro: (registrosLivro || []).length,
+          totalFeriasTags: feriasTagsResultAdmin.rows.length,
+          totalTagsCatalogo: tagsCatalogoAdmin.rows.length,
+          hasMore: false,
+          partialFailures: 0,
+          feriasTagsPartialFailures: feriasTagsResultAdmin.partialFailures,
+          feriasTagsUsedFallback: feriasTagsResultAdmin.usedFallback,
+          warnings: warningsAdmin,
+          targetIsAdmin: true,
+        },
+      });
     }
 
     const militarIds = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
     if (!militarIds || militarIds.length === 0) {
-      return Response.json({ ferias: [], registrosLivro: [], meta: { totalMilitaresEscopo: 0, totalFerias: 0, totalRegistrosLivro: 0, hasMore: false, partialFailures: 0, warnings: ['SEM_ESCOPO'], targetIsAdmin: false } });
+      return Response.json({
+        ferias: [],
+        registrosLivro: [],
+        feriasTags: [],
+        tagsCatalogo: [],
+        meta: {
+          totalMilitaresEscopo: 0,
+          totalFerias: 0,
+          totalRegistrosLivro: 0,
+          totalFeriasTags: 0,
+          totalTagsCatalogo: 0,
+          hasMore: false,
+          partialFailures: 0,
+          feriasTagsPartialFailures: 0,
+          feriasTagsUsedFallback: false,
+          warnings: ['SEM_ESCOPO'],
+          targetIsAdmin: false,
+        },
+      });
     }
 
     const [feriasResult, registrosResult] = await Promise.all([
@@ -124,17 +261,33 @@ Deno.serve(async (req) => {
       listarPorEscopoIds(base44, 'RegistroLivro', militarIds, undefined),
     ]);
 
+    const feriasIdsEscopo = feriasResult.rows.map((f) => String(f?.id || '')).filter(Boolean);
+    const feriasTagsResult = await listarFeriasTagsPorFeriasIds(base44, feriasIdsEscopo);
+    const tagsCatalogoResult = await listarCatalogoTagsParaFeriasTags(base44, feriasTagsResult.rows);
+
     const partialFailures = feriasResult.partialFailures + registrosResult.partialFailures;
+    const warnings = [];
+    if (partialFailures > 0) warnings.push('PARTIAL_FAILURES');
+    if (feriasTagsResult.partialFailures > 0) warnings.push('FERIAS_TAGS_PARTIAL_FAILURES');
+    if (feriasTagsResult.usedFallback) warnings.push('FERIAS_TAGS_FALLBACK');
+    if (tagsCatalogoResult.partialFailures > 0) warnings.push('TAGS_CATALOGO_PARTIAL_FAILURES');
+
     return Response.json({
       ferias: feriasResult.rows,
       registrosLivro: registrosResult.rows,
+      feriasTags: feriasTagsResult.rows,
+      tagsCatalogo: tagsCatalogoResult.rows,
       meta: {
         totalMilitaresEscopo: militarIds.length,
         totalFerias: feriasResult.rows.length,
         totalRegistrosLivro: registrosResult.rows.length,
+        totalFeriasTags: feriasTagsResult.rows.length,
+        totalTagsCatalogo: tagsCatalogoResult.rows.length,
         hasMore: false,
         partialFailures,
-        warnings: partialFailures > 0 ? ['PARTIAL_FAILURES'] : [],
+        feriasTagsPartialFailures: feriasTagsResult.partialFailures,
+        feriasTagsUsedFallback: feriasTagsResult.usedFallback,
+        warnings,
         targetIsAdmin: false,
       },
     });

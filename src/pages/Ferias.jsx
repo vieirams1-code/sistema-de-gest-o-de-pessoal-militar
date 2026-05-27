@@ -374,11 +374,19 @@ export default function Ferias() {
     queryFn: async () => {
       const bundle = await fetchScopedFeriasBundle();
       const ferias = await enriquecerFeriasComContextoMilitar(bundle.ferias || [], { contexto: 'operacional' });
-      return { ferias, partialFailures: Number(bundle.partialFailures || 0), meta: bundle.meta || {} };
+      return {
+        ferias,
+        feriasTags: Array.isArray(bundle.feriasTags) ? bundle.feriasTags : undefined,
+        tagsCatalogo: Array.isArray(bundle.tagsCatalogo) ? bundle.tagsCatalogo : undefined,
+        partialFailures: Number(bundle.partialFailures || 0),
+        meta: bundle.meta || {},
+      };
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
   const ferias = feriasData?.ferias || [];
+  const feriasTagsFromBundle = feriasData?.feriasTags;
+  const tagsCatalogoFromBundle = feriasData?.tagsCatalogo;
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
   const {
@@ -487,7 +495,10 @@ export default function Ferias() {
     [ferias],
   );
 
-  const { data: feriasTagsVinculos = [] } = useQuery({
+  // Fallback: só busca via FeriasTag.filter quando o bundle ainda não retorna feriasTags
+  // (compatibilidade com versões antigas do backend). Quando o bundle traz, este fallback fica desabilitado.
+  const bundleProvidesFeriasTags = Array.isArray(feriasTagsFromBundle);
+  const { data: feriasTagsFallback = [] } = useQuery({
     queryKey: funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags),
     queryFn: async () => {
       if (feriasIdsEscopoTags.length === 0) return [];
@@ -518,14 +529,21 @@ export default function Ferias() {
 
       return Array.from(dedupPorId.values());
     },
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && !bundleProvidesFeriasTags,
   });
 
-  const { data: tagsCatalogo = [] } = useQuery({
+  const feriasTagsVinculos = bundleProvidesFeriasTags ? feriasTagsFromBundle : feriasTagsFallback;
+
+  const bundleProvidesTagsCatalogo = Array.isArray(tagsCatalogoFromBundle) && tagsCatalogoFromBundle.length > 0;
+  const { data: tagsCatalogoFallback = [] } = useQuery({
     queryKey: ['funcoes-tags', 'tags'],
     queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && !bundleProvidesTagsCatalogo,
   });
+
+  // Quando o catálogo vindo do bundle cobre apenas as tags vinculadas, usamos como fonte primária para os chips;
+  // mas para o modal "Gerenciar tags" continua existindo a query do FeriasTagsBulkPanel (mostra todas as tags ativas).
+  const tagsCatalogo = bundleProvidesTagsCatalogo ? tagsCatalogoFromBundle : tagsCatalogoFallback;
 
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
@@ -704,9 +722,9 @@ export default function Ferias() {
       falhas.map((item) => `${String(item.ferias_id || '')}::${String(item.tag_id || '')}`),
     );
 
-    queryClient.setQueryData(funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags), (atual = []) => {
-      const lista = Array.isArray(atual) ? [...atual] : [];
-      const byFeriasTag = new Map(lista.map((item) => [`${String(getFeriasTagFeriasId(item) || '')}::${String(getFeriasTagTagId(item) || '')}`, item]));
+    const aplicarUpdatesEmLista = (lista = []) => {
+      const base = Array.isArray(lista) ? [...lista] : [];
+      const byFeriasTag = new Map(base.map((item) => [`${String(getFeriasTagFeriasId(item) || '')}::${String(getFeriasTagTagId(item) || '')}`, item]));
       operacoes.forEach((op) => {
         const chave = `${String(op.ferias_id || '')}::${String(op.tag_id || '')}`;
         if (idsComFalha.has(chave)) return;
@@ -719,7 +737,19 @@ export default function Ferias() {
         }
       });
       return [...byFeriasTag.values()];
+    };
+
+    // Atualiza o cache do bundle principal (fonte primária) para feedback imediato
+    queryClient.setQueryData(feriasQueryKey, (atual) => {
+      if (!atual) return atual;
+      if (!Array.isArray(atual.feriasTags)) return atual;
+      return { ...atual, feriasTags: aplicarUpdatesEmLista(atual.feriasTags) };
     });
+
+    // Atualiza também o cache do fallback antigo (caso esteja em uso)
+    queryClient.setQueryData(funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags), (atual = []) => aplicarUpdatesEmLista(atual));
+
+    // Invalidações determinísticas para garantir refetch consistente
     queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags) });
     const feriasIdsAfetadas = [...new Set(selectedFerias.map((item) => String(item.id)).filter(Boolean))];
     feriasIdsAfetadas.forEach((feriasId) => {
