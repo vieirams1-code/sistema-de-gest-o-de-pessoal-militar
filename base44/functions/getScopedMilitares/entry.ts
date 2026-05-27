@@ -37,6 +37,13 @@ const CAMPOS_BASE_MILITAR = [
     'ltip_data_fim',
     'sexo',
     'tipo_sanguineo',
+    'data_inclusao',
+    'data_nascimento',
+    'cpf',
+    'rg',
+    'cidade',
+    'email_funcional',
+    'email_particular',
 ];
 
 const CAMPOS_USUARIO_ACESSO = [
