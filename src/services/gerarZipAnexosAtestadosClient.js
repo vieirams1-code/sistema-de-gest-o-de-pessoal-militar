@@ -17,6 +17,7 @@ export async function gerarZipAnexosAtestadosClient(idsSelecionados = []) {
     const error = new Error(String(errorData?.error || 'Falha ao gerar ZIP de anexos.'));
     error.code = String(errorData?.code || '');
     error.meta = errorData?.meta || {};
+    error.detail = errorData?.detail || null;
     throw error;
   }
 

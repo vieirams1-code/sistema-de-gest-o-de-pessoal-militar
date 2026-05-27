@@ -250,8 +250,11 @@ export default function ExtratoAtestadosMedicos() {
       });
     } catch (e) {
       const apiMessage = String(e?.message || '');
-      const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage);
-      setErroAnexoById((prev) => ({ ...prev, [rowId]: isMissing ? 'Sem anexo disponível para este atestado.' : 'Não foi possível abrir o anexo agora.' }));
+      const code = String(e?.code || '');
+      const safeDetail = e?.detail ? JSON.stringify(e.detail) : '';
+      const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage) || code === 'NO_ATTACHMENT';
+      const fullError = `code=${code || '-'} | message=${apiMessage || '-'}${safeDetail ? ` | detail=${safeDetail}` : ''}`;
+      setErroAnexoById((prev) => ({ ...prev, [rowId]: isMissing ? `Sem anexo disponível. ${fullError}` : `Falha ao abrir anexo. ${fullError}` }));
     } finally {
       setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
     }
