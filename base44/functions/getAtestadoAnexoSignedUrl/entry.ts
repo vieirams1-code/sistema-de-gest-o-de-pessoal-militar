@@ -31,6 +31,31 @@ function parseStorageLocation(fileRef: string) {
   }
 }
 
+function extractArquivoFileUri(raw: unknown): string {
+  if (typeof raw === 'string') return raw.trim();
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const nested = extractArquivoFileUri(item);
+      if (nested) return nested;
+    }
+    return '';
+  }
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    const directCandidates = [obj.file_uri, obj.url, obj.path, obj.fileUrl, obj.signedUrl];
+    for (const candidate of directCandidates) {
+      const nested = extractArquivoFileUri(candidate);
+      if (nested) return nested;
+    }
+    const nestedCandidates = [obj.arquivo_atestado, obj.file, obj.anexo, obj.value, obj.data];
+    for (const candidate of nestedCandidates) {
+      const nested = extractArquivoFileUri(candidate);
+      if (nested) return nested;
+    }
+  }
+  return '';
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -49,11 +74,18 @@ Deno.serve(async (req) => {
     const atestado = atestados.find((item: Record<string, unknown>) => String(item?.id || '') === atestadoId);
     if (!atestado) return Response.json({ error: 'Atestado fora do escopo do usuário.' }, { status: 403 });
 
-    const arquivoAtestado = String(atestado?.arquivo_atestado || '').trim();
+    const arquivoAtestado = extractArquivoFileUri(atestado?.arquivo_atestado);
     if (!arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.' }, { status: 404 });
 
     const location = parseStorageLocation(arquivoAtestado);
-    if (!location) return Response.json({ error: 'Anexo em formato inválido.' }, { status: 422 });
+    if (!location) {
+      console.warn('[getAtestadoAnexoSignedUrl] anexo_invalido', {
+        atestado_id: atestadoId,
+        tipo_arquivo_atestado: Array.isArray(atestado?.arquivo_atestado) ? 'array' : typeof atestado?.arquivo_atestado,
+        arquivo_atestado_preview: typeof arquivoAtestado === 'string' ? arquivoAtestado.slice(0, 180) : '',
+      });
+      return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT' }, { status: 422 });
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('BASE44_SUPABASE_SERVICE_ROLE_KEY');
