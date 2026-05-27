@@ -39,6 +39,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'PublicacaoExOfficio',
   'CreditoExtraFerias',
   'ContratoDesignacaoMilitar',
+  'PerfilPermissao',
+  'UsuarioAcesso',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
@@ -88,6 +90,16 @@ const PERMISSIONS_MAP = {
     create: 'criar_contrato_designacao',
     update: 'editar_metadados_contrato_designacao',
     delete: 'excluir_contrato_designacao',
+  },
+  PerfilPermissao: {
+    create: 'gerir_permissoes',
+    update: 'gerir_permissoes',
+    delete: 'gerir_permissoes',
+  },
+  UsuarioAcesso: {
+    create: 'gerir_permissoes_usuarios',
+    update: 'gerir_permissoes_usuarios',
+    delete: 'excluir_usuarios_acesso',
   },
 };
 
