@@ -62,7 +62,7 @@ export default function Armamentos() {
     navigate(createPageUrl('CadastrarArmamento') + `?id=${arma.id}`);
   };
 
-  const armamentosQueryKey = ['armamentos', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null, searchTerm];
+  const armamentosQueryKey = ['armamentos', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null];
   const { data: armamentosBundle = { armamentos: [], meta: {} }, isLoading } = useQuery({
     queryKey: armamentosQueryKey,
     queryFn: () => fetchScopedArmamentosBundle(),
@@ -70,43 +70,11 @@ export default function Armamentos() {
   });
   const armamentos = armamentosBundle.armamentos || [];
 
-  const filteredArmamentos = useMemo(() => {
-    const normalizedTerm = normalizeText(searchTerm);
-
-    if (!normalizedTerm) return armamentos;
-
-    return armamentos.filter((arma) => {
-      const terms = [
-        arma.tipo,
-        arma.numero_serie,
-        arma.cad_bm,
-        arma.numero_sigma,
-        arma.militar_nome,
-        arma.militar_posto,
-        arma.calibre,
-        arma.marca,
-        arma.modelo,
-      ];
-
-      return terms.some((term) => normalizeText(term).includes(normalizedTerm));
-    });
-  }, [armamentos, searchTerm]);
-
-  if (loadingUser || !isAccessResolved) return null;
-  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const totalRegistrado = armamentos.length;
-  const crafVencidoOuIrregular = armamentos.filter((arma) => {
-    const status = normalizeText(arma.status);
-    if (status.includes('vencido') || status.includes('irregular') || status.includes('suspenso')) return true;
-
-    const validade = parseDate(arma.validade_craf);
-    return validade ? validade < today : false;
-  }).length;
-  const crafRegular = totalRegistrado - crafVencidoOuIrregular;
+  const today = useMemo(() => {
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    return currentDate;
+  }, []);
 
   const getStatusBadge = (arma) => {
     const status = normalizeText(arma.status);
@@ -135,6 +103,47 @@ export default function Armamentos() {
       className: 'bg-emerald-100 text-emerald-700',
     };
   };
+
+  const armamentosComStatus = useMemo(
+    () => armamentos.map((arma) => ({ ...arma, statusBadge: getStatusBadge(arma) })),
+    [armamentos],
+  );
+
+  const filteredArmamentos = useMemo(() => {
+    const normalizedTerm = normalizeText(searchTerm);
+
+    if (!normalizedTerm) return armamentosComStatus;
+
+    return armamentosComStatus.filter((arma) => {
+      const terms = [
+        arma.tipo,
+        arma.numero_serie,
+        arma.cad_bm,
+        arma.numero_sigma,
+        arma.militar_nome,
+        arma.militar_posto,
+        arma.calibre,
+        arma.marca,
+        arma.modelo,
+      ];
+
+      return terms.some((term) => normalizeText(term).includes(normalizedTerm));
+    });
+  }, [armamentosComStatus, searchTerm]);
+
+  const { totalRegistrado, crafVencidoOuIrregular, crafRegular } = useMemo(() => {
+    const total = armamentosComStatus.length;
+    const vencidoOuIrregular = armamentosComStatus.filter((arma) => arma.statusBadge.label !== 'Regular').length;
+
+    return {
+      totalRegistrado: total,
+      crafVencidoOuIrregular: vencidoOuIrregular,
+      crafRegular: total - vencidoOuIrregular,
+    };
+  }, [armamentosComStatus]);
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans p-6 md:p-8">
@@ -227,7 +236,7 @@ export default function Armamentos() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredArmamentos.map((arma) => {
-              const statusBadge = getStatusBadge(arma);
+              const statusBadge = arma.statusBadge;
               const StatusIcon = statusBadge.icon;
 
               return (
