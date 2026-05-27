@@ -41,10 +41,26 @@ const statusBadgeClass = (status) => {
   return 'bg-amber-100 text-amber-700 border-amber-200';
 };
 
+const formatDateBr = (value) => {
+  if (!value) return '-';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR').format(date);
+};
+
 export default function ExtratoAtestadosMedicos() {
   const { canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('atestados');
-  const [filtros, setFiltros] = useState({ periodoInicio: '', periodoFim: '', militar: '', lotacao: '', status: 'all', jiso: 'all' });
+  const [filtros, setFiltros] = useState({
+    periodoInicio: '',
+    periodoFim: '',
+    militar: '',
+    lotacao: '',
+    status: 'all',
+    jiso: 'all',
+    mes: 'all',
+    ano: 'all',
+  });
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
@@ -57,12 +73,32 @@ export default function ExtratoAtestadosMedicos() {
 
   const allRows = Array.isArray(data?.atestados) ? data.atestados : [];
 
+  const years = useMemo(() => {
+    const uniqueYears = new Set();
+    allRows.forEach((row) => {
+      const isoDate = String(row?.data_inicio || '');
+      if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) uniqueYears.add(isoDate.slice(0, 4));
+    });
+    return Array.from(uniqueYears).sort((a, b) => Number(b) - Number(a));
+  }, [allRows]);
+
   const filteredRows = useMemo(() => allRows.filter((a) => {
     if (filtros.periodoInicio && a.data_inicio && a.data_inicio < filtros.periodoInicio) return false;
     if (filtros.periodoFim && a.data_inicio && a.data_inicio > filtros.periodoFim) return false;
     if (filtros.militar && !String(a.militar_nome || '').toLowerCase().includes(filtros.militar.toLowerCase())) return false;
     if (filtros.lotacao && !String(a.lotacao_nome || a.estrutura_nome || '').toLowerCase().includes(filtros.lotacao.toLowerCase())) return false;
     if (filtros.status !== 'all' && String(a.status || '') !== filtros.status) return false;
+
+    if (filtros.mes !== 'all') {
+      const rowMonth = String(a.data_inicio || '').slice(5, 7);
+      if (rowMonth !== filtros.mes) return false;
+    }
+
+    if (filtros.ano !== 'all') {
+      const rowYear = String(a.data_inicio || '').slice(0, 4);
+      if (rowYear !== filtros.ano) return false;
+    }
+
     const isJiso = Boolean(a.necessita_jiso) || String(a.fluxo_homologacao || '').toLowerCase() === 'jiso';
     if (filtros.jiso === 'sim' && !isJiso) return false;
     if (filtros.jiso === 'nao' && isJiso) return false;
@@ -70,6 +106,16 @@ export default function ExtratoAtestadosMedicos() {
   }), [allRows, filtros]);
 
   const rows = filteredRows.slice(0, visibleCount);
+
+  const totalComJiso = useMemo(
+    () => filteredRows.filter((row) => Boolean(row.necessita_jiso) || String(row.fluxo_homologacao || '').toLowerCase() === 'jiso').length,
+    [filteredRows],
+  );
+
+  const somaDiasAfastamento = useMemo(
+    () => filteredRows.reduce((acc, row) => acc + (Number(row.dias) || 0), 0),
+    [filteredRows],
+  );
 
   const toggleSelection = (id) => {
     setSelectedIds((prev) => {
@@ -90,7 +136,7 @@ export default function ExtratoAtestadosMedicos() {
         <Badge variant="outline" className="text-slate-700 bg-white">Workspace de análise</Badge>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Total carregado</CardTitle>
@@ -109,6 +155,22 @@ export default function ExtratoAtestadosMedicos() {
         </Card>
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Total com JISO</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-indigo-700">{totalComJiso}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Soma dias afastamento</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-slate-900">{somaDiasAfastamento}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">Selecionados</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-2">
@@ -120,9 +182,20 @@ export default function ExtratoAtestadosMedicos() {
 
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
+          <CardTitle className="text-base">Ações (em breve)</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled aria-disabled>Exportar Excel</Button>
+          <Button variant="outline" disabled aria-disabled>Exportar PDF</Button>
+          <Button variant="outline" disabled aria-disabled>Abrir anexos</Button>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
           <CardTitle className="text-base">Filtros</CardTitle>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <CardContent className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="space-y-2">
             <Label htmlFor="periodo-inicio">Período inicial</Label>
             <Input id="periodo-inicio" type="date" value={filtros.periodoInicio} onChange={(e) => setFiltros((f) => ({ ...f, periodoInicio: e.target.value }))} />
@@ -130,6 +203,23 @@ export default function ExtratoAtestadosMedicos() {
           <div className="space-y-2">
             <Label htmlFor="periodo-fim">Período final</Label>
             <Input id="periodo-fim" type="date" value={filtros.periodoFim} onChange={(e) => setFiltros((f) => ({ ...f, periodoFim: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="filtro-mes">Mês</Label>
+            <select id="filtro-mes" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.mes} onChange={(e) => setFiltros((f) => ({ ...f, mes: e.target.value }))}>
+              <option value="all">Todos</option>
+              {Array.from({ length: 12 }).map((_, i) => {
+                const month = String(i + 1).padStart(2, '0');
+                return <option key={month} value={month}>{month}</option>;
+              })}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="filtro-ano">Ano</Label>
+            <select id="filtro-ano" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.ano} onChange={(e) => setFiltros((f) => ({ ...f, ano: e.target.value }))}>
+              <option value="all">Todos</option>
+              {years.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="militar">Nome do militar</Label>
@@ -190,18 +280,25 @@ export default function ExtratoAtestadosMedicos() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-t hover:bg-slate-50">
-                    {columns.selected && <td className="p-3"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
-                    {columns.data_inicio && <td className="p-3">{row.data_inicio || '-'}</td>}
-                    {columns.militar_nome && <td className="p-3 font-medium">{row.militar_nome || '-'}</td>}
-                    {columns.lotacao_nome && <td className="p-3">{row.lotacao_nome || row.estrutura_nome || '-'}</td>}
-                    {columns.status && <td className="p-3"><Badge variant="outline" className={statusBadgeClass(row.status)}>{row.status || '-'}</Badge></td>}
-                    {columns.necessita_jiso && <td className="p-3"><Badge variant="outline" className={row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
-                    {columns.medico && <td className="p-3">{row.medico || '-'}</td>}
-                    {columns.dias && <td className="p-3">{row.dias ?? '-'}</td>}
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const lotacao = row.lotacao_nome || row.estrutura_nome;
+                  return (
+                    <tr key={row.id} className="border-t hover:bg-slate-50">
+                      {columns.selected && <td className="p-3"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
+                      {columns.data_inicio && <td className="p-3">{formatDateBr(row.data_inicio)}</td>}
+                      {columns.militar_nome && <td className="p-3 font-medium">{row.militar_nome || '-'}</td>}
+                      {columns.lotacao_nome && (
+                        <td className="p-3">
+                          {lotacao ? lotacao : <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">Lotação ausente</Badge>}
+                        </td>
+                      )}
+                      {columns.status && <td className="p-3"><Badge variant="outline" className={statusBadgeClass(row.status)}>{row.status || '-'}</Badge></td>}
+                      {columns.necessita_jiso && <td className="p-3"><Badge variant="outline" className={row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
+                      {columns.medico && <td className="p-3">{row.medico || '-'}</td>}
+                      {columns.dias && <td className="p-3">{row.dias ?? '-'}</td>}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
