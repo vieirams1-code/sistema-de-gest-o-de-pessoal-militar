@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 import { getAtestadoAnexoSignedUrlClient } from '@/services/getAtestadoAnexoSignedUrlClient';
+import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 
 const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
@@ -81,6 +82,16 @@ export default function ExtratoAtestadosMedicos() {
     URL.revokeObjectURL(url);
   };
 
+
+
+  const registrarAuditoria = async (payload) => {
+    try {
+      await registrarAuditoriaExtratoAtestadosClient(payload);
+    } catch (error) {
+      console.warn('[ExtratoAtestadosMedicos] auditoria warning', error);
+    }
+  };
+
   const exportRowsToCsv = (rowsToExport) => {
     const headers = ['ID', 'Data início', 'Militar', 'Lotação', 'Status', 'JISO', 'Dias'];
     const csvRows = rowsToExport.map((row) => [
@@ -103,6 +114,16 @@ export default function ExtratoAtestadosMedicos() {
       const response = await gerarExtratoAtestados({ formato: 'xlsx', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
       const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
       exportRowsToCsv(rowsToExport);
+      await registrarAuditoria({
+        acao: 'export_csv',
+        quantidade_registros: rowsToExport.length,
+        atestado_ids: rowsToExport.map((row) => row?.id).filter(Boolean),
+        incluiu_sensiveis: Boolean(response?.meta?.sensiveis_incluidos),
+        sensiveis_bloqueados: Boolean(response?.meta?.sensiveis_bloqueados),
+        modo_acesso: 'exportacao',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: Boolean(response?.extrato_parcial),
+      });
     } finally {
       setIsExporting(false);
     }
@@ -178,6 +199,16 @@ export default function ExtratoAtestadosMedicos() {
       const data = await getAtestadoAnexoSignedUrlClient(rowId);
       if (!data?.url) throw new Error('Não foi possível gerar o link do anexo.');
       window.open(data.url, '_blank', 'noopener,noreferrer');
+      await registrarAuditoria({
+        acao: 'abrir_anexo',
+        quantidade_registros: 1,
+        atestado_ids: [rowId],
+        incluiu_sensiveis: false,
+        sensiveis_bloqueados: false,
+        modo_acesso: 'anexo_signed_url',
+        escopo: 'atestado_unico',
+        extrato_parcial: false,
+      });
     } catch (e) {
       const apiMessage = String(e?.message || '');
       const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage);
