@@ -24,6 +24,7 @@ import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewS
 import { buildAfastamentosVigentes } from '@/services/afastamentosVigentesService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { montarAgendaJiso } from '@/utils/jiso/montarAgendaJiso';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
@@ -375,39 +376,11 @@ export default function Home() {
 
   const registrosRecentes = registrosLivro.slice(0, 5);
   const jisosAgendadas = React.useMemo(() => {
-    const bundleJisos = Array.isArray(jisoBundle?.jisos) ? jisoBundle.jisos : [];
-    const bundleAtestados = Array.isArray(jisoBundle?.atestados) ? jisoBundle.atestados : [];
-
-    const formaisPorAtestado = new Map();
-    for (const jiso of bundleJisos) {
-      if (!jiso?.data_jiso) continue;
-      const dataJiso = new Date(`${jiso.data_jiso}T00:00:00`);
-      const status = (jiso.status || '').trim();
-      const statusFinalizada = status === 'Realizada' || status === 'Cancelada';
-      if (dataJiso < hoje || statusFinalizada) continue;
-      formaisPorAtestado.set(String(jiso.atestado_id || jiso.id), jiso);
-    }
-
-    const fallbackAtestados = [];
-    for (const atestado of bundleAtestados) {
-      if (!atestado?.necessita_jiso || !atestado?.data_jiso_agendada) continue;
-      const dataAgendada = new Date(`${atestado.data_jiso_agendada}T00:00:00`);
-      if (dataAgendada < hoje) continue;
-      const atestadoKey = String(atestado.id);
-      if (formaisPorAtestado.has(atestadoKey)) continue;
-      fallbackAtestados.push({
-        id: `fallback-${atestado.id}`,
-        atestado_id: atestado.id,
-        militar_id: atestado.militar_id,
-        militar_nome: atestado.militar_nome,
-        militar_posto: atestado.militar_posto,
-        data_jiso: atestado.data_jiso_agendada,
-        status: 'Aguardando Registro',
-      });
-    }
-
-    return [...formaisPorAtestado.values(), ...fallbackAtestados]
-      .sort((a, b) => new Date(`${a.data_jiso}T00:00:00`) - new Date(`${b.data_jiso}T00:00:00`));
+    return montarAgendaJiso({
+      atestados: jisoBundle?.atestados,
+      jisos: jisoBundle?.jisos,
+      hoje,
+    });
   }, [jisoBundle, hoje]);
 
   const formatarHoraJiso = (jiso) => {
