@@ -86,10 +86,19 @@ export default function FuncoesMilitarSection({ militar }) {
   const { ativas, encerradas } = React.useMemo(() => separarFuncoesPorStatus(vinculos), [vinculos]);
 
   const invalidate = () => {
+    const keyMilitaresFuncoesInstitucionais = funcoesTagsKeys.militaresFuncoesInstitucionais('local')[0];
+    const keyMilitaresFuncoesFiltros = funcoesTagsKeys.militaresFuncoesFiltros('local')[0];
+    const keyMilitarFuncaoInstitucional = funcoesTagsKeys.militarFuncaoInstitucional('local')[0];
     queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militarFuncoes('local', militar.id) });
-    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-institucionais'] });
-    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-filtros'] });
-    queryClient.invalidateQueries({ queryKey: ['militar-funcao-institucional'] });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === keyMilitaresFuncoesInstitucionais,
+    });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === keyMilitaresFuncoesFiltros,
+    });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === keyMilitarFuncaoInstitucional,
+    });
   };
 
   const createMutation = useMutation({

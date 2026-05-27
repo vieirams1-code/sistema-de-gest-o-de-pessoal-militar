@@ -26,6 +26,7 @@ import {
 } from '@/services/cudFuncoesTagsEscopadoClient';
 import IconeCatalogo, { CATEGORIAS_ICONE, OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
+import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 
 export const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'atestado', label: 'Atestado' }, { value: 'todos', label: 'Todos' }];
 const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'todos', ativa: true };
@@ -105,14 +106,20 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   }, [tags]);
 
   const invalidate = async (key) => {
+    const keyMilitaresTagsFiltros = funcoesTagsKeys.militaresTagsFiltros('local')[0];
+    const keyFeriasTags = funcoesTagsKeys.feriasTags('local')[0];
     await Promise.all([
       queryClient.invalidateQueries({
         predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'funcoes-tags',
       }),
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags', key] }),
-      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }),
+      queryClient.invalidateQueries({
+        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === keyMilitaresTagsFiltros,
+      }),
       queryClient.invalidateQueries({ queryKey: ['ferias'] }),
-      queryClient.invalidateQueries({ queryKey: ['ferias-tags'] }),
+      queryClient.invalidateQueries({
+        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === keyFeriasTags,
+      }),
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] }),
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'catalogo', key] }),
     ]);
