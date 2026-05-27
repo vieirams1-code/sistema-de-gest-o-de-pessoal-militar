@@ -1409,10 +1409,10 @@ export default function Militares() {
                         <div key={key} className={`px-2 py-2 min-w-0 ${getColumnClassName(column)}`} style={cellStyle}>
                           <div className="py-3 px-4">
                             <div className="flex flex-col">
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0 max-w-full overflow-hidden">
                                 <span className="font-bold text-gray-900 truncate min-w-0 flex-1">{militar.nome_guerra || militar.nome_completo}</span>
                                 {Array.isArray(tagsVisiveis) && tagsVisiveis.length > 0 && (
-                                  <div className="flex gap-1 items-center overflow-hidden">
+                                  <div className="flex gap-1 items-center overflow-hidden min-w-0 shrink">
                                     {tagsVisiveis.map((item, idx) => {
                                       const emoji = String(item?.emoji || '').trim();
                                       const tagVisual = resolveTagVisual({ nome: item?.nome, emoji });
@@ -1422,10 +1422,10 @@ export default function Militares() {
                                       return (
                                         <span
                                           key={`${emoji || label}-${idx}`}
-                                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${def?.bg || 'bg-slate-100'} ${def?.text || 'text-slate-700'} ${def?.border || 'border-slate-200'}`}
+                                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border max-w-[110px] shrink-0 ${def?.bg || 'bg-slate-100'} ${def?.text || 'text-slate-700'} ${def?.border || 'border-slate-200'}`}
                                         >
                                           {Icon ? <Icon size={10} strokeWidth={3} /> : <IconeCatalogo value={tagVisual?.emoji || emoji || '🏷️'} />}
-                                          {label}
+                                          <span className="truncate">{label}</span>
                                         </span>
                                       );
                                     })}
