@@ -57,10 +57,17 @@ function normalizarValorIconeCatalogo(value) {
 
   if (valorNormalizado.startsWith('estrela_amarela_comandante')) return 'estrela_amarela_comandante';
   if (valorNormalizado.startsWith('estrela_azul_subcomandante')) return 'estrela_azul_subcomandante';
+  if (valorNormalizado === 'cov') return 'engrenagem';
+  if (valorNormalizado === 'curso_terrestre') return '📘';
+  if (valorNormalizado === 'mob') return 'moto_socorro';
   if (valorNormalizado.startsWith('engrenagem') || prefixo === 'engrenagem') return 'engrenagem';
   if (valorNormalizado.startsWith('moto_socorro') || valorNormalizado.startsWith('moto_mob') || prefixo === 'moto') return 'moto_socorro';
 
   return valorTexto;
+}
+
+function isEmojiIcone(value) {
+  return /\p{Extended_Pictographic}/u.test(String(value || ''));
 }
 
 export function renderIconeCatalogoValue(value) {
@@ -70,7 +77,8 @@ export function renderIconeCatalogoValue(value) {
   if (valorNormalizado === 'estrela_azul_subcomandante') return <EstrelaInstitucional color="#2563EB" />;
   if (valorNormalizado === 'engrenagem') return <Settings className="h-4 w-4 text-slate-700" />;
   if (valorNormalizado === 'moto_socorro') return <Bike className="h-4 w-4 text-emerald-700" />;
-  return valorNormalizado;
+  if (isEmojiIcone(valorNormalizado)) return valorNormalizado;
+  return '🏷️';
 }
 
 export default function IconeCatalogo({ value }) {
