@@ -19,15 +19,6 @@ function emptyLivroMetricasRPContrato() {
   return mapLivroRegistrosMetricasRP({ registros: [] });
 }
 
-function deduplicateById(arrays) {
-  const map = new Map();
-  arrays.flat().forEach((item) => map.set(item.id, item));
-  return Array.from(map.values());
-}
-
-function sortByCreatedDateDesc(items = []) {
-  return [...items].sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-}
 
 async function listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters } = {}) {
   const scopeFilters = getMilitarScopeFilters?.();
@@ -73,11 +64,7 @@ export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilter
     return emptyLivroPresenterContrato();
   }
 
-  const registrosArrays = await Promise.all(
-    militarIds.map((id) => base44.entities.RegistroLivro.filter({ militar_id: id }, '-created_date'))
-  );
-
-  const registros = sortByCreatedDateDesc(deduplicateById(registrosArrays));
+  const registros = await base44.entities.RegistroLivro.filter({ militar_id: { $in: militarIds } }, '-created_date');
 
   return mapLivroRegistrosPresenter({
     registros,
@@ -141,10 +128,7 @@ export async function getLivroMetricasRPContrato({ isAdmin, getMilitarScopeFilte
     return emptyLivroMetricasRPContrato();
   }
 
-  const registrosArrays = await Promise.all(
-    militarIds.map((id) => base44.entities.RegistroLivro.filter({ militar_id: id }, '-created_date'))
-  );
-  const registros = sortByCreatedDateDesc(deduplicateById(registrosArrays));
+  const registros = await base44.entities.RegistroLivro.filter({ militar_id: { $in: militarIds } }, '-created_date');
 
   return mapLivroRegistrosMetricasRP({ registros });
 }
