@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, FileText, ChevronDown, Car, HeartPulse, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -46,7 +46,6 @@ import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfet
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
-import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTagsCompactas';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import { criarMilitarFuncaoEscopado, criarMilitarTagEscopado, encerrarMilitarFuncaoEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
@@ -148,6 +147,31 @@ const SITUACAO_MILITAR_BADGES = {
   'Reserva Remunerada': { label: 'Reserva Remunerada', className: 'bg-amber-50 text-amber-700 border-amber-200' },
   'Reformado': { label: 'Reformado', className: 'bg-slate-100 text-slate-600 border-slate-200' },
 };
+
+const TAG_DEFS = {
+  '🚑': {
+    label: 'Junta Médica',
+    icon: HeartPulse,
+    bg: 'bg-rose-100',
+    text: 'text-rose-700',
+    border: 'border-rose-200',
+  },
+  '🚗': {
+    label: 'Viatura',
+    icon: Car,
+    bg: 'bg-indigo-100',
+    text: 'text-indigo-700',
+    border: 'border-indigo-200',
+  },
+  '⚠️': {
+    label: 'Restrição',
+    icon: AlertTriangle,
+    bg: 'bg-amber-100',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+  },
+};
+const MAX_TAGS_INLINE = 3;
 
 const POSTOS_GRADUACOES_OPCOES = [
   { value: 'Coronel', label: 'Coronel' },
@@ -1376,13 +1400,46 @@ export default function Militares() {
                       width: column.width || undefined,
                     };
                     if (key === 'nome') {
+                      const tagsLinha = Array.isArray(emojisEfetivoByMilitar.get(String(militar.id))?.itens)
+                        ? emojisEfetivoByMilitar.get(String(militar.id)).itens.filter(Boolean)
+                        : [];
+                      const tagsVisiveis = tagsLinha.slice(0, MAX_TAGS_INLINE);
+                      const excessoTags = Math.max(0, tagsLinha.length - MAX_TAGS_INLINE);
                       return (
                         <div key={key} className={`px-2 py-2 min-w-0 ${getColumnClassName(column)}`} style={cellStyle}>
-                          <div className="font-medium truncate flex items-center gap-2">
-                            <span className="truncate">{militar.nome_guerra || militar.nome_completo}</span>
+                          <div className="py-3 px-4">
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-bold text-gray-900 truncate min-w-0 flex-1">{militar.nome_guerra || militar.nome_completo}</span>
+                                {Array.isArray(tagsVisiveis) && tagsVisiveis.length > 0 && (
+                                  <div className="flex gap-1 items-center overflow-hidden">
+                                    {tagsVisiveis.map((item, idx) => {
+                                      const emoji = String(item?.emoji || '').trim();
+                                      const tagVisual = resolveTagVisual({ nome: item?.nome, emoji });
+                                      const def = TAG_DEFS[emoji];
+                                      const label = def?.label || tagVisual?.nome || item?.nome || emoji || 'Tag';
+                                      const Icon = def?.icon;
+                                      return (
+                                        <span
+                                          key={`${emoji || label}-${idx}`}
+                                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${def?.bg || 'bg-slate-100'} ${def?.text || 'text-slate-700'} ${def?.border || 'border-slate-200'}`}
+                                        >
+                                          {Icon ? <Icon size={10} strokeWidth={3} /> : <IconeCatalogo value={tagVisual?.emoji || emoji || '🏷️'} />}
+                                          {label}
+                                        </span>
+                                      );
+                                    })}
+                                    {excessoTags > 0 && (
+                                      <span className="text-[10px] text-slate-500">
+                                        +{excessoTags}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-500 mt-0.5 truncate">{militar.nome_completo}</span>
+                            </div>
                           </div>
-                          <EfetivoFuncoesTagsCompactas itens={emojisEfetivoByMilitar.get(String(militar.id))?.itens || []} textoExcesso={emojisEfetivoByMilitar.get(String(militar.id))?.textoExcesso || ''} />
-                          <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
                         </div>
                       );
                     }
