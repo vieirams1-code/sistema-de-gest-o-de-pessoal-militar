@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 import { getAtestadoAnexoSignedUrlClient } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
+import { gerarZipAnexosAtestadosClient } from '@/services/gerarZipAnexosAtestadosClient';
 
 const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
@@ -70,6 +71,7 @@ export default function ExtratoAtestadosMedicos() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingZip, setIsExportingZip] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
 
@@ -126,6 +128,43 @@ export default function ExtratoAtestadosMedicos() {
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+
+  const handleBaixarAnexosZip = async () => {
+    if (selectedIds.size === 0) return;
+    setIsExportingZip(true);
+    try {
+      const response = await gerarZipAnexosAtestadosClient(Array.from(selectedIds));
+      downloadBlob(response.blob, response.fileName);
+      await registrarAuditoria({
+        acao: 'export_zip_anexos',
+        quantidade_registros: selectedIds.size,
+        atestado_ids: Array.from(selectedIds),
+        modo_acesso: 'zip_signed_urls_backend',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: Boolean(response?.meta?.extrato_parcial),
+        quantidade_anexos: Number(response?.meta?.quantidade_anexos || 0),
+        arquivos_ignorados_sem_anexo: Number(response?.meta?.arquivos_ignorados_sem_anexo || 0),
+      });
+    } catch (e) {
+      const msg = String(e?.message || 'Não foi possível gerar o ZIP agora.');
+      const isLimit = String(e?.code || '').toUpperCase() === 'LIMIT_EXCEEDED';
+      await registrarAuditoria({
+        acao: 'export_zip_anexos',
+        quantidade_registros: selectedIds.size,
+        atestado_ids: Array.from(selectedIds),
+        modo_acesso: 'zip_signed_urls_backend',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: false,
+        quantidade_anexos: Number(e?.meta?.quantidade_anexos || 0),
+        arquivos_ignorados_sem_anexo: Number(e?.meta?.arquivos_ignorados_sem_anexo || 0),
+        limite_excedido: isLimit,
+      });
+      window.alert(isLimit ? 'Limite excedido: selecione até 50 anexos e tamanho estimado até 100MB.' : msg.includes('Nenhum selecionado possui anexo') ? 'Nenhum selecionado possui anexo para download.' : 'Não foi possível gerar o ZIP agora.');
+    } finally {
+      setIsExportingZip(false);
     }
   };
 
@@ -278,8 +317,10 @@ export default function ExtratoAtestadosMedicos() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 items-center">
           <Button variant="outline" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>Exportar CSV</Button>
+          <Button variant="outline" disabled={selectedIds.size === 0 || isExportingZip} onClick={handleBaixarAnexosZip}>Baixar anexos ZIP</Button>
           <span className="text-xs text-slate-600">Exporta somente registros selecionados</span>
           {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
+          {isExportingZip && <span className="text-sm text-slate-700">Gerando ZIP...</span>}
         </CardContent>
       </Card>
 

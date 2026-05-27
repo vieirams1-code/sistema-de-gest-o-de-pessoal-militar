@@ -46,6 +46,9 @@ Deno.serve(async (req) => {
       modo_acesso: normalizeString(payload?.modo_acesso, 60),
       escopo: normalizeString(payload?.escopo, 120),
       extrato_parcial: normalizeBoolean(payload?.extrato_parcial),
+      quantidade_anexos: normalizeInteger(payload?.quantidade_anexos),
+      arquivos_ignorados_sem_anexo: normalizeInteger(payload?.arquivos_ignorados_sem_anexo),
+      limite_excedido: normalizeBoolean(payload?.limite_excedido),
       origem: 'ExtratoAtestadosMedicos',
     };
 
