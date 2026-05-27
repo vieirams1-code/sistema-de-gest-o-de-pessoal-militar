@@ -44,7 +44,41 @@ const CAMPOS_BASE_MILITAR = [
     'cidade',
     'email_funcional',
     'email_particular',
+    'telefone',
+    'endereco',
 ];
+
+
+const DEBUG_FIELDS_CHECKLIST = [
+    'cpf',
+    'rg',
+    'data_nascimento',
+    'data_inclusao',
+    'email_funcional',
+    'email_particular',
+    'telefone',
+    'condicao',
+    'status_cadastro',
+    'condicao_origem_destino',
+    'estrutura_nome',
+    'estrutura_tipo',
+    'cidade',
+];
+
+function buildDebugFields(rawPrimeiroMilitar, projetadoPrimeiroMilitar) {
+    const raw = rawPrimeiroMilitar && typeof rawPrimeiroMilitar === 'object' ? rawPrimeiroMilitar : {};
+    const projected = projetadoPrimeiroMilitar && typeof projetadoPrimeiroMilitar === 'object' ? projetadoPrimeiroMilitar : {};
+    const hasFields = {};
+    DEBUG_FIELDS_CHECKLIST.forEach((field) => {
+        hasFields[field] = Object.prototype.hasOwnProperty.call(projected, field);
+    });
+
+    return {
+        sampleKeysRaw: Object.keys(raw),
+        sampleKeysProjected: Object.keys(projected),
+        hasFields,
+    };
+}
 
 const CAMPOS_USUARIO_ACESSO = [
     'id',
@@ -325,6 +359,11 @@ Deno.serve(async (req) => {
             effectiveEmail,
             militarIds: militarIdsRaw,
         } = payload || {};
+
+        const requestUrl = new URL(req.url);
+        const debugFromQuery = String(requestUrl.searchParams.get('debugFields') || '').toLowerCase() === 'true';
+        const debugFromPayload = payload?.debugFields === true;
+        const debugFields = debugFromQuery || debugFromPayload;
 
         // Sanitização: aceita 'entrada' | 'saida'
         const condicaoMovimentoFiltro = (() => {
@@ -750,10 +789,8 @@ Deno.serve(async (req) => {
 
         const militaresProjetados = militares.map((m) => projetarMilitar(m, campos));
 
-        return Response.json({
-            militares: militaresProjetados,
-            meta: {
-                ...baseMeta,
+        const metaResponse = {
+            ...baseMeta,
                 returned: militaresProjetados.length,
                 militar_ids_retornados: aplicouFiltroMilitarIds ? militaresProjetados.length : 0,
                 limit: effLimit,
@@ -770,7 +807,15 @@ Deno.serve(async (req) => {
                 busca_aplicada: buscaAplicada,
                 busca_limitada_por_amostra: buscaLimitadaPorAmostra,
                 include_foto: effIncludeFoto,
-            },
+            };
+
+        if (debugFields) {
+            metaResponse.debugFields = buildDebugFields(militares[0], militaresProjetados[0]);
+        }
+
+        return Response.json({
+            militares: militaresProjetados,
+            meta: metaResponse,
         });
     } catch (error) {
         const status = error?.response?.status || error?.status || 500;

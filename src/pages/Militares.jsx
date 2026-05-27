@@ -67,6 +67,7 @@ import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPo
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
 const STALE_TIME_MS = 5 * 60 * 1000;
+const DEBUG_FIELDS_QS_PARAM = 'debugFields';
 
 const TIPO_ORDEM = { root: 0, setor: 1, subsetor: 2, unidade: 3 };
 
@@ -425,6 +426,14 @@ export default function Militares() {
       const { militares: lista, meta } = await fetchScopedMilitares(payload);
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       const comLotacao = enriquecidos.map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) }));
+
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get(DEBUG_FIELDS_QS_PARAM) === 'true' && Array.isArray(comLotacao) && comLotacao.length > 0) {
+          console.debug('[Militares] debugFields:firstRecordKeys', Object.keys(comLotacao[0] || {}));
+          console.debug('[Militares] debugFields:meta', meta?.debugFields || null);
+        }
+      }
 
       return {
         militares: comLotacao,
