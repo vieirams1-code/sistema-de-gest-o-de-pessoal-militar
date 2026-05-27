@@ -107,6 +107,7 @@ const menuGroups = [
         description: 'Atestados e controle de vínculos temporários',
         items: [
           { name: 'Atestados', page: 'Atestados', icon: HeartPulse, viewPermission: 'visualizar_atestados' },
+          { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, viewPermission: 'visualizar_atestados' },
           { name: 'Controle Temporários', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
         ],
       },
