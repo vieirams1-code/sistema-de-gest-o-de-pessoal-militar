@@ -11,6 +11,22 @@ const toDate = (value, fallback = '—') => {
   return date.toLocaleDateString('pt-BR');
 };
 
+const calculateAge = (value) => {
+  if (!value) return null;
+  const birthDate = new Date(value);
+  if (Number.isNaN(birthDate.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
+};
+
 const getFirst = (obj, keys = []) => {
   for (const key of keys) {
     const value = obj?.[key];
@@ -35,6 +51,19 @@ const getFirstFromPaths = (obj, paths = []) => {
     if (value !== null) return value;
   }
   return null;
+};
+
+const buildEndereco = (militar) => {
+  const logradouro = getFirst(militar, ['logradouro', 'endereco_logradouro']);
+  const numero = getFirst(militar, ['numero', 'endereco_numero']);
+  const bairro = getFirst(militar, ['bairro', 'endereco_bairro']);
+  const cidade = getFirst(militar, ['cidade', 'municipio', 'endereco_cidade']);
+
+  const partes = [logradouro, numero, bairro, cidade]
+    .map((parte) => (parte === null || parte === undefined ? '' : String(parte).trim()))
+    .filter(Boolean);
+
+  return partes.length ? partes.join(', ') : null;
 };
 
 export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
@@ -119,6 +148,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
   },
   {
     key: 'antiguidade_ordem',
+    future: true,
     label: 'Antiguidade/ordem',
     group: 'Carreira',
     defaultVisible: false,
@@ -145,6 +175,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
   },
   {
     key: 'data_promocao_atual',
+    future: true,
     label: 'Data da promoção atual',
     group: 'Carreira',
     defaultVisible: false,
@@ -184,6 +215,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
   },
   {
     key: 'unidade',
+    future: true,
     label: 'Unidade',
     group: 'Lotação',
     defaultVisible: false,
@@ -206,10 +238,16 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     minWidth: 180,
     align: 'left',
     truncate: true,
-    accessor: (militar) => toText(getFirstFromPaths(militar, ['subgrupamento', 'subsetor_nome', 'lotacao_subgrupamento', 'lotacao.subgrupamento', 'lotacao.subsetor_nome'])),
+    accessor: (militar) => {
+      const estruturaTipo = String(militar?.estrutura_tipo || '').toLowerCase();
+      const estruturaNome = militar?.estrutura_nome;
+      const subgrupamentoEstrutura = (estruturaTipo.includes('subgrupamento') || estruturaTipo.includes('unidade')) ? estruturaNome : null;
+      return toText(getFirstFromPaths(militar, ['subgrupamento', 'subsetor_nome', 'lotacao_subgrupamento', 'lotacao.subgrupamento', 'lotacao.subsetor_nome']) || subgrupamentoEstrutura);
+    },
   },
   {
     key: 'grupamento',
+    future: true,
     label: 'Grupamento',
     group: 'Lotação',
     defaultVisible: false,
@@ -236,6 +274,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
   },
   {
     key: 'setor_subsetor',
+    future: true,
     label: 'Setor/Subsetor',
     group: 'Lotação',
     defaultVisible: false,
@@ -271,7 +310,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     minWidth: 120,
     align: 'center',
     nowrap: true,
-    accessor: (militar) => toText(militar?.situacao_condicao_militar),
+    accessor: (militar) => toText(getFirst(militar, ['condicao', 'situacao_condicao_militar'])),
   },
   {
     key: 'condicao',
@@ -307,7 +346,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'multiselect',
     sensitive: false,
     visibleFor: ['admin', 'gestor'],
-    accessor: (militar) => toText(getFirst(militar, ['movimento_condicao', 'condicao_movimento'])),
+    accessor: (militar) => toText(getFirst(militar, ['condicao_movimento', 'movimento_condicao'])),
   },
   {
     key: 'status_cadastro',
@@ -376,7 +415,10 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(militar?.idade),
+    accessor: (militar) => {
+      const idade = calculateAge(getFirst(militar, ['data_nascimento', 'dataNascimento', 'nascimento', 'data_nasc']));
+      return idade === null ? '—' : String(idade);
+    },
   },
   {
     key: 'sexo',
@@ -409,7 +451,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(getFirst(militar, ['email', 'email_institucional', 'email_pessoal'])),
+    accessor: (militar) => toText(getFirst(militar, ['email_funcional', 'email_particular', 'email'])),
   },
   {
     key: 'endereco',
@@ -419,10 +461,11 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     futureFilterType: 'text',
     sensitive: true,
     visibleFor: ['admin'],
-    accessor: (militar) => toText(getFirstFromPaths(militar, ['endereco', 'endereco_completo', 'logradouro', 'residencia_endereco', 'contato.endereco'])),
+    accessor: (militar) => toText(buildEndereco(militar) || getFirstFromPaths(militar, ['endereco', 'endereco_completo', 'residencia_endereco', 'contato.endereco'])),
   },
   {
     key: 'observacoes_administrativas',
+    future: true,
     label: 'Observações administrativas',
     group: 'Saúde/Administrativo',
     defaultVisible: false,
