@@ -35,6 +35,8 @@ const CAMPOS_BASE_MILITAR = [
     'destino',
     'ltip_data_inicio',
     'ltip_data_fim',
+    'sexo',
+    'tipo_sanguineo',
 ];
 
 const CAMPOS_USUARIO_ACESSO = [
