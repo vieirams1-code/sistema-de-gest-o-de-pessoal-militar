@@ -5,9 +5,11 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
   const data = response?.data ?? response ?? {};
 
   if (response?.error || !data?.url) {
-    const error = new Error(String(data?.error || response?.error?.message || 'Falha ao obter URL do anexo.'));
+    const error = new Error(String(data?.error || data?.message || response?.error?.message || 'Falha ao obter URL do anexo.'));
     error.code = String(data?.code || response?.error?.code || 'SIGNED_URL_FAILED');
     error.detail = data?.detail || null;
+    error.status = Number(response?.status || response?.error?.status || data?.status || 0) || null;
+    error.raw = { response, data };
     throw error;
   }
 
@@ -15,5 +17,6 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
     url: String(data.url),
     expires_in: Number(data?.expires_in) || 0,
     atestado_id: data?.atestado_id ? String(data.atestado_id) : '',
+    source: String(data?.source || ''),
   };
 }

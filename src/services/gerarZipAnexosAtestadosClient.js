@@ -18,6 +18,8 @@ export async function gerarZipAnexosAtestadosClient(idsSelecionados = []) {
     error.code = String(errorData?.code || '');
     error.meta = errorData?.meta || {};
     error.detail = errorData?.detail || null;
+    error.status = response.status;
+    error.raw = { response: { status: response.status, statusText: response.statusText }, data: errorData };
     throw error;
   }
 

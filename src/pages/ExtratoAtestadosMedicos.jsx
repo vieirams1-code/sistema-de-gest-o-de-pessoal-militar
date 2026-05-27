@@ -252,9 +252,12 @@ export default function ExtratoAtestadosMedicos() {
       const apiMessage = String(e?.message || '');
       const code = String(e?.code || '');
       const safeDetail = e?.detail ? JSON.stringify(e.detail) : '';
+      const status = Number(e?.status || e?.raw?.response?.status || 0) || '-';
+      const rawPayload = e?.raw ? JSON.stringify(e.raw) : '';
       const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage) || code === 'NO_ATTACHMENT';
-      const fullError = `code=${code || '-'} | message=${apiMessage || '-'}${safeDetail ? ` | detail=${safeDetail}` : ''}`;
+      const fullError = `status=${status} | code=${code || '-'} | message=${apiMessage || '-'}${safeDetail ? ` | detail=${safeDetail}` : ''}${rawPayload ? ` | raw=${rawPayload.slice(0, 500)}` : ''}`;
       setErroAnexoById((prev) => ({ ...prev, [rowId]: isMissing ? `Sem anexo disponível. ${fullError}` : `Falha ao abrir anexo. ${fullError}` }));
+      console.error('[ExtratoAtestadosMedicos] erro abrir anexo', { rowId, status, code, message: apiMessage, detail: e?.detail || null, raw: e?.raw || null });
     } finally {
       setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
     }
