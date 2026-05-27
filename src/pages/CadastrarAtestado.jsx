@@ -122,23 +122,7 @@ export default function CadastrarAtestado() {
   React.useEffect(() => {
     const dias = parseInt(formData.dias) || 0;
     if (dias > 15) {
-      setFormData(prev => {
-        const jaNoEstadoAlvo =
-          prev.fluxo_homologacao === 'jiso' &&
-          prev.necessita_jiso === true &&
-          prev.homologado_comandante === false &&
-          prev.encaminhado_jiso === true;
 
-        if (jaNoEstadoAlvo) return prev;
-
-        return {
-          ...prev,
-          fluxo_homologacao: 'jiso',
-          necessita_jiso: true,
-          homologado_comandante: false,
-          encaminhado_jiso: true,
-        };
-      });
     }
   }, [formData.dias]);
 
