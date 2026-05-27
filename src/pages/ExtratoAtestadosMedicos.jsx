@@ -6,6 +6,9 @@ import { fetchScopedExtratoAtestados } from '@/services/getScopedExtratoAtestado
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
@@ -17,6 +20,25 @@ const DEFAULT_COLUMNS = {
   necessita_jiso: true,
   medico: true,
   dias: true,
+};
+
+const COLUMN_LABELS = {
+  selected: 'Seleção',
+  data_inicio: 'Data de início',
+  militar_nome: 'Militar',
+  lotacao_nome: 'Lotação',
+  status: 'Status',
+  necessita_jiso: 'JISO',
+  medico: 'Médico',
+  dias: 'Dias',
+};
+
+const statusBadgeClass = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'ativo') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (normalized === 'encerrado') return 'bg-slate-100 text-slate-700 border-slate-300';
+  if (normalized === 'cancelado') return 'bg-rose-100 text-rose-700 border-rose-200';
+  return 'bg-amber-100 text-amber-700 border-amber-200';
 };
 
 export default function ExtratoAtestadosMedicos() {
@@ -62,29 +84,89 @@ export default function ExtratoAtestadosMedicos() {
   if (!hasAccess) return <AccessDenied modulo="Atestados" />;
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold text-[#1e3a5f]">Extrato de Atestados Médicos</h1>
-
-      <div className="grid md:grid-cols-6 gap-2">
-        <Input type="date" value={filtros.periodoInicio} onChange={(e) => setFiltros((f) => ({ ...f, periodoInicio: e.target.value }))} />
-        <Input type="date" value={filtros.periodoFim} onChange={(e) => setFiltros((f) => ({ ...f, periodoFim: e.target.value }))} />
-        <Input placeholder="Militar" value={filtros.militar} onChange={(e) => setFiltros((f) => ({ ...f, militar: e.target.value }))} />
-        <Input placeholder="Lotação" value={filtros.lotacao} onChange={(e) => setFiltros((f) => ({ ...f, lotacao: e.target.value }))} />
-        <select className="border rounded px-2" value={filtros.status} onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value }))}>
-          <option value="all">Status (todos)</option><option value="Ativo">Ativo</option><option value="Encerrado">Encerrado</option><option value="Cancelado">Cancelado</option>
-        </select>
-        <select className="border rounded px-2" value={filtros.jiso} onChange={(e) => setFiltros((f) => ({ ...f, jiso: e.target.value }))}>
-          <option value="all">JISO (todos)</option><option value="sim">Com JISO</option><option value="nao">Sem JISO</option>
-        </select>
+    <div className="p-6 space-y-5 bg-slate-50 min-h-full">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-[#1e3a5f]">Extrato de Atestados Médicos</h1>
+        <Badge variant="outline" className="text-slate-700 bg-white">Workspace de análise</Badge>
       </div>
 
-      <div className="flex flex-wrap gap-4 text-sm">
-        {Object.keys(DEFAULT_COLUMNS).map((col) => (
-          <label key={col} className="flex items-center gap-1">
-            <Checkbox checked={columns[col]} onCheckedChange={(v) => setColumns((c) => ({ ...c, [col]: Boolean(v) }))} /> {col}
-          </label>
-        ))}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Total carregado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-slate-900">{allRows.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Total filtrado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold text-slate-900">{filteredRows.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Selecionados</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2">
+            <p className="text-2xl font-semibold text-slate-900">{selectedIds.size}</p>
+            <Badge className="bg-blue-100 text-blue-700 border-blue-200" variant="outline">Persistente entre páginas</Badge>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="periodo-inicio">Período inicial</Label>
+            <Input id="periodo-inicio" type="date" value={filtros.periodoInicio} onChange={(e) => setFiltros((f) => ({ ...f, periodoInicio: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="periodo-fim">Período final</Label>
+            <Input id="periodo-fim" type="date" value={filtros.periodoFim} onChange={(e) => setFiltros((f) => ({ ...f, periodoFim: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="militar">Nome do militar</Label>
+            <Input id="militar" placeholder="Digite o nome" value={filtros.militar} onChange={(e) => setFiltros((f) => ({ ...f, militar: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lotacao">Lotação/estrutura</Label>
+            <Input id="lotacao" placeholder="Digite a lotação" value={filtros.lotacao} onChange={(e) => setFiltros((f) => ({ ...f, lotacao: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="status">Status do atestado</Label>
+            <select id="status" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.status} onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value }))}>
+              <option value="all">Todos os status</option><option value="Ativo">Ativo</option><option value="Encerrado">Encerrado</option><option value="Cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="jiso">Filtro de JISO</Label>
+            <select id="jiso" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.jiso} onChange={(e) => setFiltros((f) => ({ ...f, jiso: e.target.value }))}>
+              <option value="all">Todos</option><option value="sim">Com JISO</option><option value="nao">Sem JISO</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Colunas visíveis</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {Object.keys(DEFAULT_COLUMNS).map((col) => (
+            <label key={col} className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+              <Checkbox checked={columns[col]} onCheckedChange={(v) => setColumns((c) => ({ ...c, [col]: Boolean(v) }))} />
+              <span>{COLUMN_LABELS[col]}</span>
+            </label>
+          ))}
+        </CardContent>
+      </Card>
 
       {isLoading && <div>Carregando extrato...</div>}
       {isError && <div className="text-red-600">Erro ao carregar: {error?.message || 'desconhecido'}</div>}
@@ -92,32 +174,32 @@ export default function ExtratoAtestadosMedicos() {
 
       {!isLoading && !isError && filteredRows.length > 0 && (
         <>
-          <div className="text-sm text-slate-500">Selecionados: {selectedIds.size}</div>
-          <div className="overflow-auto border rounded-lg bg-white">
+          <div className="text-sm text-slate-600">Itens selecionados no extrato: <span className="font-semibold">{selectedIds.size}</span></div>
+          <div className="overflow-auto border rounded-lg bg-white shadow-sm max-h-[65vh]">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-100">
+              <thead className="bg-slate-100 sticky top-0 z-10">
                 <tr>
-                  {columns.selected && <th className="p-2">Sel.</th>}
-                  {columns.data_inicio && <th className="p-2 text-left">Início</th>}
-                  {columns.militar_nome && <th className="p-2 text-left">Militar</th>}
-                  {columns.lotacao_nome && <th className="p-2 text-left">Lotação</th>}
-                  {columns.status && <th className="p-2 text-left">Status</th>}
-                  {columns.necessita_jiso && <th className="p-2 text-left">JISO</th>}
-                  {columns.medico && <th className="p-2 text-left">Médico</th>}
-                  {columns.dias && <th className="p-2 text-left">Dias</th>}
+                  {columns.selected && <th className="p-3">Sel.</th>}
+                  {columns.data_inicio && <th className="p-3 text-left">Início</th>}
+                  {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
+                  {columns.lotacao_nome && <th className="p-3 text-left">Lotação</th>}
+                  {columns.status && <th className="p-3 text-left">Status</th>}
+                  {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
+                  {columns.medico && <th className="p-3 text-left">Médico</th>}
+                  {columns.dias && <th className="p-3 text-left">Dias</th>}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="border-t">
-                    {columns.selected && <td className="p-2"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
-                    {columns.data_inicio && <td className="p-2">{row.data_inicio || '-'}</td>}
-                    {columns.militar_nome && <td className="p-2">{row.militar_nome || '-'}</td>}
-                    {columns.lotacao_nome && <td className="p-2">{row.lotacao_nome || row.estrutura_nome || '-'}</td>}
-                    {columns.status && <td className="p-2">{row.status || '-'}</td>}
-                    {columns.necessita_jiso && <td className="p-2">{row.necessita_jiso ? 'Sim' : 'Não'}</td>}
-                    {columns.medico && <td className="p-2">{row.medico || '-'}</td>}
-                    {columns.dias && <td className="p-2">{row.dias ?? '-'}</td>}
+                  <tr key={row.id} className="border-t hover:bg-slate-50">
+                    {columns.selected && <td className="p-3"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
+                    {columns.data_inicio && <td className="p-3">{row.data_inicio || '-'}</td>}
+                    {columns.militar_nome && <td className="p-3 font-medium">{row.militar_nome || '-'}</td>}
+                    {columns.lotacao_nome && <td className="p-3">{row.lotacao_nome || row.estrutura_nome || '-'}</td>}
+                    {columns.status && <td className="p-3"><Badge variant="outline" className={statusBadgeClass(row.status)}>{row.status || '-'}</Badge></td>}
+                    {columns.necessita_jiso && <td className="p-3"><Badge variant="outline" className={row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
+                    {columns.medico && <td className="p-3">{row.medico || '-'}</td>}
+                    {columns.dias && <td className="p-3">{row.dias ?? '-'}</td>}
                   </tr>
                 ))}
               </tbody>
