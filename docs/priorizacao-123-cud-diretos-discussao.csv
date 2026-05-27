@@ -1,0 +1,124 @@
+arquivo,entidade,acao,criticidade,usar cudEscopado?,usar Deno?,prioridade
+src/components/antiguidade/CarreiraAntiguidadePanel.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/CarreiraAntiguidadePanel.jsx,HistoricoPromocaoMilitarV2,delete,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/CarreiraAntiguidadePanel.jsx,HistoricoPromocaoMilitarV2,update,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/CarreiraAntiguidadePanel.jsx,HistoricoPromocaoMilitarV2,update,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/CarreiraAntiguidadePanel.jsx,Militar,update,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/PromocaoAtualModal.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/PromocaoAtualModal.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/PromocaoAtualModal.jsx,HistoricoPromocaoMilitarV2,update,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/PromocaoFuturaModal.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/PromocaoFuturaModal.jsx,HistoricoPromocaoMilitarV2,update,bloqueia publicação,SIM,SIM,1
+src/components/antiguidade/PromocaoHistoricaModal.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/components/militar/SolicitarAtualizacaoModal.jsx,SolicitacaoAtualizacao,create,bloqueia publicação,SIM,SIM,1
+src/pages/AntiguidadeImportarPromocoes.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/pages/AntiguidadeImportarPromocoes.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/pages/AntiguidadeImportarPromocoes.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/pages/AntiguidadeImportarPromocoes.jsx,HistoricoPromocaoMilitarV2,create,bloqueia publicação,SIM,SIM,1
+src/pages/AntiguidadeImportarPromocoes.jsx,HistoricoPromocaoMilitarV2,update,bloqueia publicação,SIM,SIM,1
+src/pages/AntiguidadeImportarPromocoes.jsx,HistoricoPromocaoMilitarV2,update,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,Promocao,delete,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,Promocao,update,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,PromocaoMilitar,create,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,PromocaoMilitar,delete,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,PromocaoMilitar,update,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,PromocaoMilitar,update,bloqueia publicação,SIM,SIM,1
+src/pages/DetalhePromocao.jsx,PromocaoMilitar,update,bloqueia publicação,SIM,SIM,1
+src/pages/EditarJISO.jsx,JISO,create,bloqueia publicação,SIM,SIM,1
+src/pages/EditarJISO.jsx,JISO,update,bloqueia publicação,SIM,SIM,1
+src/pages/PerfisPermissao.jsx,PerfilPermissao,create,bloqueia publicação,SIM,SIM,1
+src/pages/PerfisPermissao.jsx,PerfilPermissao,delete,bloqueia publicação,SIM,SIM,1
+src/pages/PerfisPermissao.jsx,PerfilPermissao,update,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,PerfilPermissao,create,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,PerfilPermissao,update,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,PerfilPermissao,update,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,UsuarioAcesso,create,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,UsuarioAcesso,delete,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,UsuarioAcesso,update,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,UsuarioAcesso,update,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,UsuarioAcesso,update,bloqueia publicação,SIM,SIM,1
+src/pages/PermissoesUsuarios.jsx,UsuarioAcesso,update,bloqueia publicação,SIM,SIM,1
+src/pages/Promocoes.jsx,Promocao,create,bloqueia publicação,SIM,SIM,1
+src/pages/Promocoes.jsx,Promocao,delete,bloqueia publicação,SIM,SIM,1
+src/pages/RastreamentoPromocoes.jsx,Promocao,create,bloqueia publicação,SIM,SIM,1
+src/pages/RastreamentoPromocoes.jsx,PromocaoMilitar,create,bloqueia publicação,SIM,SIM,1
+src/pages/SolicitacoesAtualizacao.jsx,Militar,update,bloqueia publicação,SIM,SIM,1
+src/pages/SolicitacoesAtualizacao.jsx,SolicitacaoAtualizacao,update,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,Historico,delete,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,Historico,update,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,Historico,update,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,MilitarEntity,update,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,Promocao,delete,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,Promocao,update,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,Promocao,update,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,PromocaoMilitar,delete,bloqueia publicação,SIM,SIM,1
+src/services/promocaoService.js,PromocaoMilitar,update,bloqueia publicação,SIM,SIM,1
+src/services/saneamentoPromocaoMilitarDivergenteService.js,Militar,update,bloqueia publicação,SIM,SIM,1
+src/services/saneamentoQuadroMilitarService.js,Militar,update,bloqueia publicação,SIM,SIM,1
+src/components/configuracoes/TiposPublicacaoManager.jsx,TipoPublicacaoCustom,create,alto risco,SIM,SIM,2
+src/components/configuracoes/TiposPublicacaoManager.jsx,TipoPublicacaoCustom,delete,alto risco,SIM,SIM,2
+src/components/configuracoes/TiposPublicacaoManager.jsx,TipoPublicacaoCustom,update,alto risco,SIM,SIM,2
+src/pages/AntiguidadeConfigQuadros.jsx,ConfiguracaoAntiguidade,create,alto risco,SIM,SIM,2
+src/pages/AntiguidadeConfigQuadros.jsx,ConfiguracaoAntiguidade,update,alto risco,SIM,SIM,2
+src/pages/ApuracaoMedalhasTempoServico.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/ApuracaoMedalhasTempoServico.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/CadastrarMedalha.jsx,Medalha,create,alto risco,SIM,SIM,2
+src/pages/CadastrarMedalha.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/IndicacoesDomPedroII.jsx,Medalha,create,alto risco,SIM,SIM,2
+src/pages/IndicacoesDomPedroII.jsx,Medalha,create,alto risco,SIM,SIM,2
+src/pages/IndicacoesDomPedroII.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/IndicacoesDomPedroII.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/IndicacoesDomPedroII.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/IndicacoesDomPedroII.jsx,Medalha,update,alto risco,SIM,SIM,2
+src/pages/Medalhas.jsx,Medalha,delete,alto risco,SIM,SIM,2
+src/pages/TemplatesTexto.jsx,TemplateTexto,create,alto risco,SIM,SIM,2
+src/pages/TemplatesTexto.jsx,TemplateTexto,delete,alto risco,SIM,SIM,2
+src/pages/TemplatesTexto.jsx,TemplateTexto,update,alto risco,SIM,SIM,2
+src/pages/TiposMedalha.jsx,TipoMedalha,create,alto risco,SIM,SIM,2
+src/pages/TiposMedalha.jsx,TipoMedalha,delete,alto risco,SIM,SIM,2
+src/pages/VerMilitar.jsx,ImpedimentoMedalha,create,alto risco,SIM,SIM,2
+src/pages/VerMilitar.jsx,ImpedimentoMedalha,update,alto risco,SIM,SIM,2
+src/services/comportamentoRPService.js,TemplateTexto,create,alto risco,SIM,SIM,2
+src/services/medalhasTempoServicoService.js,Medalha,create,alto risco,SIM,SIM,2
+src/services/medalhasTempoServicoService.js,Medalha,update,alto risco,SIM,SIM,2
+src/services/medalhasTempoServicoService.js,TipoMedalha,create,alto risco,SIM,SIM,2
+src/services/medalhasTempoServicoService.js,TipoMedalha,update,alto risco,SIM,SIM,2
+src/components/militar/FuncaoSelector.jsx,Funcao,create,backlog,NÃO,NÃO,3
+src/components/militar/LotacaoSelector.jsx,Lotacao,create,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardChecklistItem,create,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardChecklistItem,delete,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardChecklistItem,update,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardComentario,create,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/CardDetalheModal.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardChecklistItem,create,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardComentario,create,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardComentario,create,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardOperacional,create,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardVinculo,create,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardVinculo,delete,backlog,NÃO,NÃO,3
+src/components/quadro/quadroHelpers.jsx,CardVinculo,update,backlog,NÃO,NÃO,3
+src/pages/CadastrarArmamento.jsx,Armamento,create,backlog,NÃO,NÃO,3
+src/pages/CadastrarArmamento.jsx,Armamento,update,backlog,NÃO,NÃO,3
+src/pages/Configuracoes.jsx,Funcao,create,backlog,NÃO,NÃO,3
+src/pages/Configuracoes.jsx,Funcao,delete,backlog,NÃO,NÃO,3
+src/pages/Configuracoes.jsx,Lotacao,create,backlog,NÃO,NÃO,3
+src/pages/Configuracoes.jsx,Lotacao,delete,backlog,NÃO,NÃO,3
+src/pages/EstruturaOrganizacional.jsx,Subgrupamento,create,backlog,NÃO,NÃO,3
+src/pages/EstruturaOrganizacional.jsx,Subgrupamento,delete,backlog,NÃO,NÃO,3
+src/pages/EstruturaOrganizacional.jsx,Subgrupamento,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,CardComentario,create,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,CardOperacional,create,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,CardOperacional,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,ColunaOperacional,create,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,ColunaOperacional,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,ColunaOperacional,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,ColunaOperacional,update,backlog,NÃO,NÃO,3
+src/pages/QuadroOperacional.jsx,QuadroOperacional,create,backlog,NÃO,NÃO,3
