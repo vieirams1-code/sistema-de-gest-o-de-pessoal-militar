@@ -172,7 +172,33 @@ const TAG_DEFS = {
   },
 };
 const MAX_TAGS_INLINE = 3;
-const MILITARES_GRID_TEMPLATE = '44px 140px minmax(220px, 1.4fr) 130px 120px minmax(160px, 1fr) 120px 120px 140px';
+const CONSULTA_MILITAR_GRID_WIDTHS = {
+  nome: 'minmax(280px, 1.6fr)',
+  nome_completo: 'minmax(300px, 1.8fr)',
+  nome_guerra: 'minmax(220px, 1.2fr)',
+  posto_graduacao: '140px',
+  matricula: '130px',
+  quadro: '120px',
+  lotacao: 'minmax(180px, 1fr)',
+  municipio: 'minmax(160px, 1fr)',
+  cidade: 'minmax(160px, 1fr)',
+  municipio_cidade: 'minmax(160px, 1fr)',
+  email: 'minmax(220px, 1.2fr)',
+  email_pessoal: 'minmax(220px, 1.2fr)',
+  endereco: 'minmax(300px, 1.8fr)',
+  logradouro: 'minmax(300px, 1.8fr)',
+  situacao_militar: '130px',
+  situacao_condicao_militar: '150px',
+  status_cadastro: '130px',
+  origem_destino: 'minmax(180px, 1fr)',
+  obs: 'minmax(220px, 1fr)',
+  observacoes_administrativas: 'minmax(220px, 1fr)',
+  observacao: 'minmax(220px, 1fr)',
+};
+const WRAP_COLUMN_KEYS = new Set(['endereco', 'logradouro', 'observacao', 'obs', 'observacoes_administrativas']);
+const DEFAULT_GRID_COLUMN_WIDTH = 'minmax(140px, 1fr)';
+const SELECTION_COLUMN_WIDTH = '44px';
+const ACTIONS_COLUMN_WIDTH = '140px';
 
 const POSTOS_GRADUACOES_OPCOES = [
   { value: 'Coronel', label: 'Coronel' },
@@ -335,6 +361,17 @@ export default function Militares() {
   }, [allowedColumnKeysSignature]);
   const sanitizedVisibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumnKeys, allowedColumns), [visibleColumnKeys, allowedColumns]);
   const visibleColumnSet = useMemo(() => new Set(sanitizedVisibleColumnKeys), [sanitizedVisibleColumnKeys]);
+  const militaresGridTemplate = useMemo(() => {
+    const visibleWidths = sanitizedVisibleColumnKeys.map((key) => (
+      CONSULTA_MILITAR_GRID_WIDTHS[key] || DEFAULT_GRID_COLUMN_WIDTH
+    ));
+
+    return [
+      SELECTION_COLUMN_WIDTH,
+      ...visibleWidths,
+      ACTIONS_COLUMN_WIDTH,
+    ].join(' ');
+  }, [sanitizedVisibleColumnKeys]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
@@ -1255,7 +1292,7 @@ export default function Militares() {
             <div className="overflow-x-auto">
               <div
                 className="grid min-w-full items-center border-b bg-slate-50 text-xs font-medium text-slate-600"
-                style={{ gridTemplateColumns: MILITARES_GRID_TEMPLATE }}
+                style={{ gridTemplateColumns: militaresGridTemplate }}
               >
                 <div className="min-w-0 px-2 py-2" />
                 {sanitizedVisibleColumnKeys.map((key) => {
@@ -1378,7 +1415,7 @@ export default function Militares() {
                 <div
                   key={militar.id}
                   className={`grid min-w-full items-center border-b text-sm ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
-                  style={{ gridTemplateColumns: MILITARES_GRID_TEMPLATE }}
+                  style={{ gridTemplateColumns: militaresGridTemplate }}
                 >
                 <div className="min-w-0 px-2 py-2 flex items-center justify-center">
                   <label>
@@ -1436,15 +1473,17 @@ export default function Militares() {
                                   </div>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-500 mt-0.5 truncate">{militar.nome_completo}</span>
+                              <span className="text-xs text-gray-500 mt-0.5 whitespace-normal break-words leading-snug">
+                                {militar.nome_completo}
+                              </span>
                             </div>
                         </div>
                       );
                     }
-                    if (key === 'situacao_condicao_militar') return <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`}><CondicaoBadge militar={militar} /></div>;
+                    if (key === 'situacao_condicao_militar') return <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}><CondicaoBadge militar={militar} /></div>;
                     if (key === 'situacao_militar') {
                       return (
-                        <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`}>
+                        <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}>
                           {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
                             <Badge variant="outline" className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}>
                               {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
@@ -1455,9 +1494,18 @@ export default function Militares() {
                         </div>
                       );
                     }
-                    if (key === 'status_cadastro') return <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
+                    if (key === 'status_cadastro') return <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
                     const value = columnMetaByKey.get(key)?.accessor?.(militar) || '—';
-                    return <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`.trim()}>{value}</div>;
+                    return (
+                      <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`.trim()}>
+                        <span className={WRAP_COLUMN_KEYS.has(key)
+                          ? 'block whitespace-normal break-words leading-snug'
+                          : 'block truncate'}
+                        >
+                          {value}
+                        </span>
+                      </div>
+                    );
                   })}
                 <div className="min-w-0 px-2 py-2 flex justify-end gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
