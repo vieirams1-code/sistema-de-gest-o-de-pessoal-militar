@@ -47,6 +47,21 @@ const normalizeAccessMode = (value) => {
 
 const CUSTOM_PROFILE_DESCRIPTION = 'Perfil personalizado para usuário.';
 
+const createEscopadoEntity = (entityName, data) => {
+  assertCudEntityAllowed(entityName);
+  return criarEscopado(entityName, data);
+};
+
+const updateEscopadoEntity = (entityName, id, data) => {
+  assertCudEntityAllowed(entityName);
+  return atualizarEscopado(entityName, id, data);
+};
+
+const deleteEscopadoEntity = (entityName, id) => {
+  assertCudEntityAllowed(entityName);
+  return excluirEscopado(entityName, id);
+};
+
 const resolveBaseProfileIdFromSource = (profileSource) => {
   if (!profileSource) return '';
   if (isBasePermissionProfile(profileSource)) return profileSource.id || '';
@@ -61,8 +76,7 @@ const markProfileAsLegacy = async (profile) => {
     ? descricaoAtual
     : `${prefixoLegado} ${new Date().toISOString()} ${descricaoAtual}`.trim();
 
-  assertCudEntityAllowed('PerfilPermissao');
-  await atualizarEscopado('PerfilPermissao', profile.id, {
+  await updateEscopadoEntity('PerfilPermissao', profile.id, {
     ativo: false,
     descricao: descricaoLegado,
   });
@@ -433,10 +447,9 @@ export default function PermissoesUsuarios() {
         permissoes_override: null,
       };
 
-      assertCudEntityAllowed('UsuarioAcesso');
       const savedAccess = isNewAcesso
-        ? await criarEscopado('UsuarioAcesso', dataToSave)
-        : await atualizarEscopado('UsuarioAcesso', existingUserId, dataToSave);
+        ? await createEscopadoEntity('UsuarioAcesso', dataToSave)
+        : await updateEscopadoEntity('UsuarioAcesso', existingUserId, dataToSave);
 
       const resolvedRecordId = savedAccess?.id || existingUserId;
       if (!resolvedRecordId) {
@@ -481,15 +494,13 @@ export default function PermissoesUsuarios() {
         };
 
         if (perfilPersonalizadoSelecionado?.id) {
-          assertCudEntityAllowed('PerfilPermissao');
-          perfilPersonalizadoSelecionado = await atualizarEscopado(
+          perfilPersonalizadoSelecionado = await updateEscopadoEntity(
             'PerfilPermissao',
             perfilPersonalizadoSelecionado.id,
             payloadPerfilPersonalizado
           );
         } else {
-          assertCudEntityAllowed('PerfilPermissao');
-          perfilPersonalizadoSelecionado = await criarEscopado('PerfilPermissao', payloadPerfilPersonalizado);
+          perfilPersonalizadoSelecionado = await createEscopadoEntity('PerfilPermissao', payloadPerfilPersonalizado);
         }
         if (!perfilPersonalizadoSelecionado?.id) {
           throw new Error('Falha ao criar/atualizar perfil personalizado do usuário.');
@@ -501,8 +512,7 @@ export default function PermissoesUsuarios() {
           await markProfileAsLegacy(perfilDuplicado);
         }
 
-        assertCudEntityAllowed('UsuarioAcesso');
-        reloadedRecord = await atualizarEscopado('UsuarioAcesso', resolvedRecordId, {
+        reloadedRecord = await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilPersonalizadoSelecionado.id,
           perfil_nome: perfilPersonalizadoSelecionado.nome_perfil || payloadPerfilPersonalizado.nome_perfil,
         });
@@ -511,8 +521,7 @@ export default function PermissoesUsuarios() {
         if (perfilAtualEhCustomDoUsuario && perfilAtualDoUsuario?.id) {
           await markProfileAsLegacy(perfilAtualDoUsuario);
         }
-        assertCudEntityAllowed('UsuarioAcesso');
-        reloadedRecord = await atualizarEscopado('UsuarioAcesso', resolvedRecordId, {
+        reloadedRecord = await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilOrigemId || '',
           perfil_nome: perfilBaseSelecionado?.nome_perfil || '',
         });
@@ -584,8 +593,7 @@ export default function PermissoesUsuarios() {
     if (!confirmado) return;
 
     try {
-      assertCudEntityAllowed('UsuarioAcesso');
-      const updated = await atualizarEscopado('UsuarioAcesso', targetAcesso.id, { ativo: shouldBeActive });
+      const updated = await updateEscopadoEntity('UsuarioAcesso', targetAcesso.id, { ativo: shouldBeActive });
       refreshAcessosAfterLifecycleAction();
       const mensagem = shouldBeActive
         ? 'Acesso reativado com sucesso. O usuário voltou para a lista principal.'
@@ -632,8 +640,7 @@ export default function PermissoesUsuarios() {
     if (!confirmado) return;
 
     try {
-      assertCudEntityAllowed('UsuarioAcesso');
-      await excluirEscopado('UsuarioAcesso', targetAcesso.id);
+      await deleteEscopadoEntity('UsuarioAcesso', targetAcesso.id);
       if (selectedUser?.id === targetAcesso.id) {
         setSelectedUser(null);
       }
