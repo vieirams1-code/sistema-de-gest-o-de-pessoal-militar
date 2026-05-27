@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 
 const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
@@ -64,6 +65,43 @@ export default function ExtratoAtestadosMedicos() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportRowsToCsv = (rowsToExport) => {
+    const headers = ['ID', 'Data início', 'Militar', 'Lotação', 'Status', 'JISO', 'Dias'];
+    const csvRows = rowsToExport.map((row) => [
+      row.id || '',
+      row.data_inicio || '',
+      row.militar_nome || '',
+      row.lotacao_nome || row.estrutura_nome || '',
+      row.status || '',
+      row.necessita_jiso ? 'Sim' : 'Não',
+      row.dias ?? '',
+    ]);
+    const content = [headers, ...csvRows].map((line) => line.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';')).join('\n');
+    downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8' }), `extrato-atestados-${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  const handleExportarCsv = async () => {
+    if (selectedIds.size === 0) return;
+    setIsExporting(true);
+    try {
+      const response = await gerarExtratoAtestados({ formato: 'xlsx', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
+      const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
+      exportRowsToCsv(rowsToExport);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['extrato-atestados-medicos'],
@@ -182,12 +220,12 @@ export default function ExtratoAtestadosMedicos() {
 
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Ações (em breve)</CardTitle>
+          <CardTitle className="text-base">Ações</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled aria-disabled>Exportar Excel</Button>
-          <Button variant="outline" disabled aria-disabled>Exportar PDF</Button>
-          <Button variant="outline" disabled aria-disabled>Abrir anexos</Button>
+        <CardContent className="flex flex-wrap gap-2 items-center">
+          <Button variant="outline" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>Exportar CSV</Button>
+          <span className="text-xs text-slate-600">Exporta somente registros selecionados</span>
+          {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
         </CardContent>
       </Card>
 
