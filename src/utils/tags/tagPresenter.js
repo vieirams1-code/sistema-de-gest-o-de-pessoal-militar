@@ -1,4 +1,4 @@
-const TAG_COLOR_FALLBACK = '#6366F1';
+const TAG_COLOR_FALLBACK = '#64748b';
 
 function pickText(...values) {
   for (const value of values) {
