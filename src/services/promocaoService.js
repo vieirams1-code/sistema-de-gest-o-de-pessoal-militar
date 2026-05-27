@@ -494,12 +494,9 @@ export async function excluirCadeiaPromocaoMilitar({
   if (!motivoNormalizado) throw new Error('Motivo da exclusão definitiva é obrigatório.');
 
   const PromocaoMilitar = entities?.PromocaoMilitar;
-  const Promocao = entities?.Promocao;
   const Historico = entities?.HistoricoPromocaoMilitarV2;
-
-  if (!PromocaoMilitar || typeof PromocaoMilitar.delete !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para exclusão definitiva.');
-  if (!Promocao || typeof Promocao.delete !== 'function' || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para exclusão definitiva.');
-  if (!Historico || typeof Historico.delete !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para exclusão definitiva.');
+  if (!PromocaoMilitar || typeof PromocaoMilitar.get !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para exclusão definitiva.');
+  if (!Historico || typeof Historico.get !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para exclusão definitiva.');
 
   const item = typeof PromocaoMilitar.get === 'function' ? await PromocaoMilitar.get(itemId) : null;
   if (!item?.id) throw new Error('Item da promoção não encontrado.');
@@ -510,34 +507,23 @@ export async function excluirCadeiaPromocaoMilitar({
   const validacaoExclusao = podeExcluirDefinitivamentePromocaoMilitar({ item, historico: historicoRegistro });
   if (!validacaoExclusao.permitido) throw new Error(validacaoExclusao.motivo);
 
-  const resultadoRollback = await restaurarCadastroMilitarDaPromocao({
-    item,
-    historico: historicoRegistro,
-    militar: item?.militar,
-    entities,
-    contexto: 'exclusão definitiva',
+  const response = await base44.functions.invoke('excluirCadeiaPromocaoMilitarTx', {
+    body: {
+      promocaoMilitarId: itemId,
+      motivo: motivoNormalizado,
+    },
   });
-  const cadastroRestaurado = Boolean(resultadoRollback?.cadastroRestaurado);
-
-  if (historicoId) {
-    await Historico.delete(historicoId);
+  const data = response?.data || response || {};
+  if (data?.success === false) {
+    throw new Error(data?.motivo || 'Falha ao excluir definitivamente promoção militar.');
   }
 
-  await PromocaoMilitar.delete(itemId);
-
-  const vinculados = typeof PromocaoMilitar.filter === 'function'
-    ? await PromocaoMilitar.filter({ promocao_id: item.promocao_id })
-    : (typeof PromocaoMilitar.list === 'function'
-      ? (await PromocaoMilitar.list()).filter((registro) => texto(registro?.promocao_id) === texto(item.promocao_id))
-      : []);
-
-  if ((vinculados || []).length === 0) {
-    await Promocao.delete(item.promocao_id);
-    return { promocaoExcluida: true, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
-  }
-
-  await Promocao.update(item.promocao_id, { status: statusPromocaoPosReversao(vinculados) });
-  return { promocaoExcluida: false, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
+  return {
+    promocaoExcluida: Boolean(data?.promocaoExcluida),
+    promocaoMilitarExcluido: Boolean(data?.promocaoMilitarExcluido ?? true),
+    historicoExcluido: Boolean(data?.historicoExcluido ?? Boolean(historicoId)),
+    cadastroRestaurado: Boolean(data?.cadastroRestaurado),
+  };
 }
 
 export const STATUS_TURMA_OPERACIONAL = [
