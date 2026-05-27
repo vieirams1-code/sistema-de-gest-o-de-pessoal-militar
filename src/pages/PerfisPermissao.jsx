@@ -27,6 +27,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+
+const CUD_ENTITIES_ALLOWLIST = new Set(['PerfilPermissao', 'UsuarioAcesso']);
+
+const assertCudEntityAllowed = (entityName) => {
+  if (!CUD_ENTITIES_ALLOWLIST.has(entityName)) {
+    throw new Error(`Entidade não permitida para CUD escopado: ${entityName}.`);
+  }
+};
 
 const initialForm = {
   nome_perfil: '',
@@ -65,7 +74,10 @@ export default function PerfisPermissao() {
 
 
   const createMutation = useMutation({
-    mutationFn: async (data) => base44.entities.PerfilPermissao.create(data),
+    mutationFn: async (data) => {
+      assertCudEntityAllowed('PerfilPermissao');
+      return criarEscopado('PerfilPermissao', data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       closeForm();
@@ -76,7 +88,10 @@ export default function PerfisPermissao() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }) => base44.entities.PerfilPermissao.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      assertCudEntityAllowed('PerfilPermissao');
+      return atualizarEscopado('PerfilPermissao', id, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       closeForm();
@@ -87,7 +102,10 @@ export default function PerfisPermissao() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.PerfilPermissao.delete(id),
+    mutationFn: (id) => {
+      assertCudEntityAllowed('PerfilPermissao');
+      return excluirEscopado('PerfilPermissao', id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       setDeleteDialog({ open: false, id: null });
