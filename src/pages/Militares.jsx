@@ -47,6 +47,7 @@ import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/q
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
+import SelectionActionBar from '@/components/shared/SelectionActionBar';
 import { criarMilitarFuncaoEscopado, criarMilitarTagEscopado, encerrarMilitarFuncaoEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
 import {
@@ -1287,18 +1288,15 @@ export default function Militares() {
                 />
                 <span>Selecionar visíveis</span>
               </label>
-              {selectedMilitarIds.size > 0 && (
-                <p className="text-xs text-indigo-700">Ação aplicada apenas aos militares selecionados nesta tela.</p>
-              )}
             </div>
             {selectedMilitarIds.size > 0 && (
-              <div className="px-3 py-2 border-b bg-indigo-50 flex flex-wrap items-center gap-2 justify-between">
-                <p className="text-sm font-medium text-indigo-900">{selectedMilitarIds.size} militares selecionados</p>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setBulkPanelOpen(true)}>Gerenciar tags</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedMilitarIds(new Set())}>Limpar seleção</Button>
-                </div>
-              </div>
+              <SelectionActionBar
+                count={selectedMilitarIds.size}
+                label="militares selecionados"
+                helperText="Ação aplicada apenas aos militares selecionados nesta tela."
+                onManageTags={() => setBulkPanelOpen(true)}
+                onClear={() => setSelectedMilitarIds(new Set())}
+              />
             )}
             <div className="overflow-x-auto">
               <div

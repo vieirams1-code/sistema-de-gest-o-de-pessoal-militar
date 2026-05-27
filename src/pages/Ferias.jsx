@@ -71,6 +71,7 @@ import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient'
 import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
+import SelectionActionBar from '@/components/shared/SelectionActionBar';
 import { getFeriasTagFeriasId, getFeriasTagTagId } from '@/utils/funcoesTags/contratoCampos';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 
@@ -1151,10 +1152,15 @@ export default function Ferias() {
           {hasFeriasLoadError ? 'Falha ao carregar dados.' : `${filteredFerias.length} férias encontrada(s)`}
         </div>
         {selectedFeriasIds.length > 0 && (
-          <div className="mb-4">
-            <Button variant="outline" onClick={() => { setFeriasTagsBulkResultado(null); setFeriasTagsBulkOpen(true); }}>
-              Gerenciar Tags ({selectedFeriasIds.length})
-            </Button>
+          <div className="mb-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+            <SelectionActionBar
+              count={selectedFeriasIds.length}
+              label="férias selecionadas"
+              helperText="Ação aplicada apenas aos registros selecionados nesta tela."
+              onManageTags={() => { setFeriasTagsBulkResultado(null); setFeriasTagsBulkOpen(true); }}
+              onClear={() => setSelectedFeriasIds([])}
+              manageTagsLabel="Gerenciar tags"
+            />
           </div>
         )}
         {!isFeriasError && hasPartialDataWarning && (
