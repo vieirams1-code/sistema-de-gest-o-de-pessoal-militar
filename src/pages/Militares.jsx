@@ -1273,6 +1273,7 @@ export default function Militares() {
             />
           </div>
         ) : (
+          <TooltipProvider delayDuration={120}>
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="px-3 py-2 border-b bg-slate-50 flex flex-wrap items-center gap-3 justify-between">
               <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
@@ -1591,6 +1592,7 @@ export default function Militares() {
               )}
             </div>
           </div>
+          </TooltipProvider>
         )}
 
         {shouldShowLotacoesDebugPanel && (
