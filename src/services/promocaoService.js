@@ -459,39 +459,28 @@ export async function reverterPublicacaoPromocaoMilitar({
   });
   if (!validacaoReversao.permitido) throw new Error(validacaoReversao.motivo);
 
-  const trilhaAdmin = [
-    '[REVERSAO_ADMINISTRATIVA]',
-    `motivo=${motivoNormalizado}`,
-    texto(observacoes) ? `observacoes=${texto(observacoes)}` : '',
-    texto(usuario?.email) ? `usuario=${texto(usuario.email)}` : '',
-    `data=${new Date().toISOString()}`,
-  ].filter(Boolean).join(' | ');
-  await Historico.update(historicoId, {
-    status_registro: 'cancelado',
-    motivo_retificacao: motivoNormalizado,
-    observacoes: [texto(historicoRegistro?.observacoes), trilhaAdmin].filter(Boolean).join('\n'),
-  });
-
-  const resultadoRollback = await restaurarCadastroMilitarDaPromocao({
+  const payload = {
+    promocao,
     item,
-    historico: historicoRegistro,
-    militar: item?.militar,
-    entities,
-    contexto: 'reversão de publicação',
+    itensPromocao,
+    motivo: motivoNormalizado,
+    observacoes,
+    usuario,
+  };
+
+  const response = await base44.functions.invoke('reverterPublicacaoPromocaoMilitarTx', {
+    body: payload,
   });
-  const cadastroRestaurado = Boolean(resultadoRollback?.cadastroRestaurado);
+  const data = response?.data || response || {};
+  if (data?.success === false) {
+    throw new Error(data?.motivo || 'Falha ao reverter publicação da promoção militar.');
+  }
 
-  await PromocaoMilitar.update(item.id, {
-    status: 'cancelado',
-    publicado: false,
-  });
-
-  const itensAtualizados = (itensPromocao || []).map((registro) => (
-    String(registro?.id) === String(item.id) ? { ...registro, status: 'cancelado', publicado: false } : registro
-  ));
-  await Promocao.update(promocao.id, { status: statusPromocaoPosReversao(itensAtualizados) });
-
-  return { historicoCancelado: true, cadastroRestaurado, promocaoRecalculada: true };
+  return {
+    historicoCancelado: Boolean(data?.historicoCancelado ?? true),
+    cadastroRestaurado: Boolean(data?.cadastroRestaurado),
+    promocaoRecalculada: Boolean(data?.promocaoRecalculada ?? true),
+  };
 }
 
 export async function excluirCadeiaPromocaoMilitar({
