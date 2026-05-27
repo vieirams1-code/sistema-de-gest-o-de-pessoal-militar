@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, HeartPulse, RefreshCw } from 'lucide-react';
 
@@ -41,6 +41,29 @@ const STATUS_CLASSES = {
   critico_intercalado: 'bg-red-100 text-red-800 border-red-200',
   nao_classificado: 'bg-slate-100 text-slate-700 border-slate-200',
 };
+
+const AnaliseTableRow = memo(function AnaliseTableRow({ analise }) {
+  return (
+    <TableRow>
+      <TableCell className="font-medium text-slate-900">{analise.militar.nome}</TableCell>
+      <TableCell>{analise.militar.postoGraduacao}</TableCell>
+      <TableCell>{analise.militar.quadro}</TableCell>
+      <TableCell>{analise.militar.matricula}</TableCell>
+      <TableCell>{analise.militar.lotacao}</TableCell>
+      <TableCell className="text-right">{analise.quantidadeAtestadosRecebidos}</TableCell>
+      <TableCell className="text-right font-semibold">{analise.maiorSequenciaContinua}</TableCell>
+      <TableCell className="text-right font-semibold">{analise.diasJanela365}</TableCell>
+      <TableCell>
+        <Badge className={STATUS_CLASSES[analise.statusRisco] || STATUS_CLASSES.nao_classificado} variant="outline">
+          {STATUS_LABELS[analise.statusRisco] || STATUS_LABELS.nao_classificado}
+        </Badge>
+      </TableCell>
+      <TableCell className="min-w-72 text-xs text-slate-500">
+        {analise.lacunas.length ? analise.lacunas.join(' ') : 'Sem lacunas identificadas.'}
+      </TableCell>
+    </TableRow>
+  );
+});
 
 function montarAnalise(atestados, militaresPorId) {
   const grupos = agruparAtestadosPorMilitar(atestados);
@@ -116,7 +139,10 @@ export default function ControleAtestadosTemporarios() {
 
   const isLoading = isLoadingAtestados || isLoadingMilitares;
   const isFetching = isFetchingAtestados || isFetchingMilitares;
-  const refetch = () => Promise.all([refetchAtestados(), refetchMilitares()]);
+  const refetch = useCallback(() => Promise.all([refetchAtestados(), refetchMilitares()]), [refetchAtestados, refetchMilitares]);
+  const handleRefetch = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   const analises = useMemo(() => montarAnalise(bundle?.atestados || [], militaresPorId), [bundle?.atestados, militaresPorId]);
   const analisesFiltradas = useMemo(() => filtrarPorQuadroTemporario(analises, quadroFiltro), [analises, quadroFiltro]);
@@ -137,7 +163,7 @@ export default function ControleAtestadosTemporarios() {
               <p className="text-slate-500">Painel read-only para acompanhamento dos prazos de afastamento médico dos militares dos quadros temporários dentro do escopo do usuário.</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+          <Button variant="outline" onClick={handleRefetch} disabled={isFetching} className="gap-2">
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
@@ -198,24 +224,7 @@ export default function ControleAtestadosTemporarios() {
                   </TableHeader>
                   <TableBody>
                     {analisesFiltradas.map((analise) => (
-                      <TableRow key={analise.chave}>
-                        <TableCell className="font-medium text-slate-900">{analise.militar.nome}</TableCell>
-                        <TableCell>{analise.militar.postoGraduacao}</TableCell>
-                        <TableCell>{analise.militar.quadro}</TableCell>
-                        <TableCell>{analise.militar.matricula}</TableCell>
-                        <TableCell>{analise.militar.lotacao}</TableCell>
-                        <TableCell className="text-right">{analise.quantidadeAtestadosRecebidos}</TableCell>
-                        <TableCell className="text-right font-semibold">{analise.maiorSequenciaContinua}</TableCell>
-                        <TableCell className="text-right font-semibold">{analise.diasJanela365}</TableCell>
-                        <TableCell>
-                          <Badge className={STATUS_CLASSES[analise.statusRisco] || STATUS_CLASSES.nao_classificado} variant="outline">
-                            {STATUS_LABELS[analise.statusRisco] || STATUS_LABELS.nao_classificado}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="min-w-72 text-xs text-slate-500">
-                          {analise.lacunas.length ? analise.lacunas.join(' ') : 'Sem lacunas identificadas.'}
-                        </TableCell>
-                      </TableRow>
+                      <AnaliseTableRow key={analise.chave} analise={analise} />
                     ))}
                   </TableBody>
                 </Table>
