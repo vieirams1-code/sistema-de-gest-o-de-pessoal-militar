@@ -348,9 +348,9 @@ export default function ContratosDesignacao() {
           <div className="grid grid-cols-1 gap-3 border-b border-slate-200 bg-white p-4 lg:grid-cols-[minmax(18rem,1fr)_14rem_14rem]">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-              <input className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" placeholder="Buscar por militar, matrícula, contrato ou boletim..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+              <input className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" placeholder="Buscar por militar, matrícula, contrato ou boletim..." value={busca} onChange={(e) => { setBusca(e.target.value); setOffset(0); }} />
             </div>
-            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700" value={situacao} onChange={(e) => setSituacao(e.target.value)}>
+            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700" value={situacao} onChange={(e) => { setSituacao(e.target.value); setOffset(0); }}>
               <option value={FILTRO_SITUACAO.TODOS}>Situação: Todos</option>
               <option value={FILTRO_SITUACAO.ATIVOS}>Ativos</option>
               <option value={FILTRO_SITUACAO.ATIVOS_VENCENDO}>Ativos vencendo</option>
@@ -359,7 +359,7 @@ export default function ContratosDesignacao() {
               <option value={FILTRO_SITUACAO.CANCELADOS}>Cancelados</option>
               <option value={FILTRO_SITUACAO.SEM_DATA_FIM}>Sem data fim</option>
             </select>
-            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700" value={vencimento} onChange={(e) => setVencimento(e.target.value)}>
+            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700" value={vencimento} onChange={(e) => { setVencimento(e.target.value); setOffset(0); }}>
               <option value={FILTRO_VENCIMENTO.TODOS}>Vencimento: Todos</option>
               <option value={FILTRO_VENCIMENTO.VENCIDOS}>Vencidos</option>
               <option value={FILTRO_VENCIMENTO.ATE_30}>Até 30 dias</option>
