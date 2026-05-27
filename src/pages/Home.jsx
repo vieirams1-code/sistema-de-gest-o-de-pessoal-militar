@@ -23,6 +23,7 @@ import {
 import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
 import { buildAfastamentosVigentes } from '@/services/afastamentosVigentesService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
+import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
@@ -289,24 +290,10 @@ export default function Home() {
     },
     enabled: dashboardEnabled,
   });
-  const { data: jisos = [] } = useQuery({
+  const { data: jisoBundle = { atestados: [], jisos: [], meta: {} } } = useQuery({
     queryKey: ['dashboard-jisos', scopeKey],
     queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return base44.entities.JISO.list('-data_jiso');
-      }
-
-      if (!scopedIds?.length) return [];
-
-      try {
-        const listaEscopo = await base44.entities.JISO.filter({
-          militar_id: { in: scopedIds },
-        }, '-data_jiso');
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await base44.entities.JISO.list('-data_jiso');
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
+      return fetchScopedAtestadosBundle();
     },
     enabled: dashboardEnabled,
   });
@@ -387,15 +374,41 @@ export default function Home() {
   }, [atestados, registrosLivro]);
 
   const registrosRecentes = registrosLivro.slice(0, 5);
-  const jisosAgendadas = jisos
-    .filter((jiso) => {
-      if (!jiso?.data_jiso) return false;
+  const jisosAgendadas = React.useMemo(() => {
+    const bundleJisos = Array.isArray(jisoBundle?.jisos) ? jisoBundle.jisos : [];
+    const bundleAtestados = Array.isArray(jisoBundle?.atestados) ? jisoBundle.atestados : [];
+
+    const formaisPorAtestado = new Map();
+    for (const jiso of bundleJisos) {
+      if (!jiso?.data_jiso) continue;
       const dataJiso = new Date(`${jiso.data_jiso}T00:00:00`);
       const status = (jiso.status || '').trim();
       const statusFinalizada = status === 'Realizada' || status === 'Cancelada';
-      return dataJiso >= hoje && !statusFinalizada;
-    })
-    .sort((a, b) => new Date(`${a.data_jiso}T00:00:00`) - new Date(`${b.data_jiso}T00:00:00`));
+      if (dataJiso < hoje || statusFinalizada) continue;
+      formaisPorAtestado.set(String(jiso.atestado_id || jiso.id), jiso);
+    }
+
+    const fallbackAtestados = [];
+    for (const atestado of bundleAtestados) {
+      if (!atestado?.necessita_jiso || !atestado?.data_jiso_agendada) continue;
+      const dataAgendada = new Date(`${atestado.data_jiso_agendada}T00:00:00`);
+      if (dataAgendada < hoje) continue;
+      const atestadoKey = String(atestado.id);
+      if (formaisPorAtestado.has(atestadoKey)) continue;
+      fallbackAtestados.push({
+        id: `fallback-${atestado.id}`,
+        atestado_id: atestado.id,
+        militar_id: atestado.militar_id,
+        militar_nome: atestado.militar_nome,
+        militar_posto: atestado.militar_posto,
+        data_jiso: atestado.data_jiso_agendada,
+        status: 'Aguardando Registro',
+      });
+    }
+
+    return [...formaisPorAtestado.values(), ...fallbackAtestados]
+      .sort((a, b) => new Date(`${a.data_jiso}T00:00:00`) - new Date(`${b.data_jiso}T00:00:00`));
+  }, [jisoBundle, hoje]);
 
   const formatarHoraJiso = (jiso) => {
     const horaRaw = jiso.horario_jiso || jiso.horario || jiso.hora_jiso;
