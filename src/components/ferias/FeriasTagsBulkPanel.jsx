@@ -7,6 +7,7 @@ import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import { AlertCircle, Check, Loader2, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
 import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
+import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 
 function isAtivo(item) {
   return resolveTagVisual(item).ativo;
@@ -38,13 +39,13 @@ export default function FeriasTagsBulkPanel({
   const [motivo, setMotivo] = useState('');
 
   const { data: tags = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'tags'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'tags'),
     enabled: open,
     queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
   });
 
   const { data: grupos = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'grupos'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'grupos'),
     enabled: open,
     queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao'),
   });

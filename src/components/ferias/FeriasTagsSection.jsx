@@ -118,7 +118,7 @@ export default function FeriasTagsSection({ ferias }) {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTags('local', ferias.id) });
-    queryClient.invalidateQueries({ queryKey: ['ferias-tags'] });
+    queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTagsPrefix() });
   };
 
   const addMutation = useMutation({
