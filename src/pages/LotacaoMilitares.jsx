@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -142,66 +142,110 @@ export default function LotacaoMilitares() {
     return hasPartialDataWarning ? 'carregarMilitaresComMatriculas' : null;
   };
 
-  const lotacaoDebugData = (showTotalError || hasPartialDataWarning)
-    ? {
-      pagina: 'LotacaoMilitares',
-      usuario: null,
-      isAdmin,
-      queryKeyMilitares: militaresQueryKey,
-      queryKeyEstrutura: estruturaQueryKey,
-      queryKeyMatriculas: matriculasQueryKey,
-      status: {
-        militares: {
-          loading: loadingMilitares,
-          fetching: fetchingMilitares,
-          isError: isMilitaresError,
-          isSuccess: isMilitaresSuccess,
+  const lotacaoDebugData = useMemo(() => (
+    (showTotalError || hasPartialDataWarning)
+      ? {
+        pagina: 'LotacaoMilitares',
+        usuario: null,
+        isAdmin,
+        queryKeyMilitares: militaresQueryKey,
+        queryKeyEstrutura: estruturaQueryKey,
+        queryKeyMatriculas: matriculasQueryKey,
+        status: {
+          militares: {
+            loading: loadingMilitares,
+            fetching: fetchingMilitares,
+            isError: isMilitaresError,
+            isSuccess: isMilitaresSuccess,
+          },
+          estrutura: {
+            loading: loadingEstrutura,
+            fetching: fetchingEstrutura,
+            isError: isEstruturaError,
+            isSuccess: isEstruturaSuccess,
+          },
+          matriculas: {
+            loading: loadingMatriculas,
+            fetching: fetchingMatriculas,
+            isError: isMatriculasError,
+            isSuccess: isMatriculasSuccess,
+          },
         },
-        estrutura: {
-          loading: loadingEstrutura,
-          fetching: fetchingEstrutura,
-          isError: isEstruturaError,
-          isSuccess: isEstruturaSuccess,
+        erroPrincipal: militaresError || estruturaError || matriculasError
+          ? {
+            message: militaresError?.message || estruturaError?.message || matriculasError?.message || null,
+            name: militaresError?.name || estruturaError?.name || matriculasError?.name || null,
+            stack: (militaresError?.stack || estruturaError?.stack || matriculasError?.stack)
+              ? String(militaresError?.stack || estruturaError?.stack || matriculasError?.stack).split('\n').slice(0, 5).join('\n')
+              : null,
+          }
+          : null,
+        partialFailures: {
+          militares: militaresPartialFailures,
+          estrutura: estruturaPartialFailures,
+          matriculas: matriculasPartialFailures,
         },
-        matriculas: {
-          loading: loadingMatriculas,
-          fetching: fetchingMatriculas,
-          isError: isMatriculasError,
-          isSuccess: isMatriculasSuccess,
+        quantidades: {
+          militares: militares.length,
+          estrutura: estruturaRaw.length,
+          militaresEnriquecidos: militaresEnriquecidos.length,
         },
-      },
-      erroPrincipal: militaresError || estruturaError || matriculasError
-        ? {
-          message: militaresError?.message || estruturaError?.message || matriculasError?.message || null,
-          name: militaresError?.name || estruturaError?.name || matriculasError?.name || null,
-          stack: (militaresError?.stack || estruturaError?.stack || matriculasError?.stack)
-            ? String(militaresError?.stack || estruturaError?.stack || matriculasError?.stack).split('\n').slice(0, 5).join('\n')
-            : null,
-        }
-        : null,
-      partialFailures: {
-        militares: militaresPartialFailures,
-        estrutura: estruturaPartialFailures,
-        matriculas: matriculasPartialFailures,
-      },
-      quantidades: {
-        militares: militares.length,
-        estrutura: estruturaRaw.length,
-        militaresEnriquecidos: militaresEnriquecidos.length,
-      },
-      estagioProvavel: getEstagioProvavel(),
-      timestamps: {
-        generatedAt: new Date().toISOString(),
-      },
-    }
-    : null;
+        estagioProvavel: getEstagioProvavel(),
+        timestamps: {
+          generatedAt: new Date().toISOString(),
+        },
+      }
+      : null
+  ), [
+    showTotalError,
+    hasPartialDataWarning,
+    isAdmin,
+    militaresQueryKey,
+    estruturaQueryKey,
+    matriculasQueryKey,
+    loadingMilitares,
+    fetchingMilitares,
+    isMilitaresError,
+    isMilitaresSuccess,
+    loadingEstrutura,
+    fetchingEstrutura,
+    isEstruturaError,
+    isEstruturaSuccess,
+    loadingMatriculas,
+    fetchingMatriculas,
+    isMatriculasError,
+    isMatriculasSuccess,
+    militaresError,
+    estruturaError,
+    matriculasError,
+    militaresPartialFailures,
+    estruturaPartialFailures,
+    matriculasPartialFailures,
+    militares.length,
+    estruturaRaw.length,
+    militaresEnriquecidos.length,
+  ]);
 
   const estrutura = useMemo(() => {
     return estruturaRaw.map(item => ({ ...item, tipoNormalizado: normalizeTipo(item.tipo) }));
   }, [estruturaRaw]);
 
-  const setores = estrutura.filter(s => s.tipoNormalizado === 'Setor');
-  const getFilhos = (parentId, nivelTarget) => estrutura.filter(s => s.grupamento_id === parentId && s.tipoNormalizado === nivelTarget);
+  const setores = useMemo(() => estrutura.filter((s) => s.tipoNormalizado === 'Setor'), [estrutura]);
+
+  const filhosByParentAndNivel = useMemo(() => {
+    const mapa = new Map();
+    estrutura.forEach((item) => {
+      const key = `${item.grupamento_id ?? 'root'}::${item.tipoNormalizado}`;
+      if (!mapa.has(key)) mapa.set(key, []);
+      mapa.get(key).push(item);
+    });
+    return mapa;
+  }, [estrutura]);
+
+  const getFilhos = useCallback((parentId, nivelTarget) => {
+    const key = `${parentId ?? 'root'}::${nivelTarget}`;
+    return filhosByParentAndNivel.get(key) || [];
+  }, [filhosByParentAndNivel]);
 
   const militaresOperacionais = useMemo(() => {
     return filtrarMilitaresOperacionais(militaresEnriquecidos)
@@ -236,20 +280,20 @@ export default function LotacaoMilitares() {
       });
   }, [militaresOperacionais, searchMilitar, lotacaoAtualFiltro]);
 
-  const toggleExpand = (id, e) => {
+  const toggleExpand = useCallback((id, e) => {
     e.stopPropagation();
     setExpandedNodes(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  }, []);
 
-  const handleSelectNode = (node) => {
+  const handleSelectNode = useCallback((node) => {
     setSelectedNode(node);
-  };
+  }, []);
 
-  const toggleMilitar = (id) => {
+  const toggleMilitar = useCallback((id) => {
     setSelectedMilitares(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
+  }, []);
 
-  const toggleTodos = () => {
+  const toggleTodos = useCallback(() => {
     const ids = militaresFiltrados.map(m => m.id);
     const todosSelecionados = ids.every(id => selectedMilitares.includes(id));
     if (todosSelecionados) {
@@ -257,7 +301,7 @@ export default function LotacaoMilitares() {
     } else {
       setSelectedMilitares(prev => [...new Set([...prev, ...ids])]);
     }
-  };
+  }, [militaresFiltrados, selectedMilitares]);
 
   const moveMutation = useMutation({
     mutationFn: async ({ militaresIds, targetNode }) => {
