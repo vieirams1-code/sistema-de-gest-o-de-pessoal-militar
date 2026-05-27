@@ -1,5 +1,36 @@
 import { base44 } from '@/api/base44Client';
 
+
+const TAMANHO_LOTE_PADRAO = 20;
+
+function deduplicarOrdenarPorCreatedDate(registros = []) {
+  const map = new Map();
+  (registros || []).forEach((item) => map.set(item.id, item));
+  return Array.from(map.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+}
+
+async function listarPorMilitarIdsComFallbackInOperator({ entidade, militarIds = [], ordem = '-created_date', tamanhoLote = TAMANHO_LOTE_PADRAO }) {
+  if (!militarIds?.length) return [];
+
+  try {
+    return await entidade.filter({ militar_id: { in: militarIds } }, ordem);
+  } catch (erroInOperator) {
+    const resultados = [];
+
+    for (let inicio = 0; inicio < militarIds.length; inicio += tamanhoLote) {
+      const loteIds = militarIds.slice(inicio, inicio + tamanhoLote);
+      const consultas = loteIds.map((id) => entidade.filter({ militar_id: id }, ordem));
+      const lote = await Promise.allSettled(consultas);
+
+      lote.forEach((resultado) => {
+        if (resultado.status === 'fulfilled') resultados.push(...(resultado.value || []));
+      });
+    }
+
+    return resultados;
+  }
+}
+
 async function expandirMilitarIdsComMesclados(militarIds = []) {
   const idsBase = [...new Set((militarIds || []).filter(Boolean))];
   if (!idsBase.length) return [];
@@ -33,10 +64,13 @@ export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScop
   const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
   if (!militarIds?.length) return [];
 
-  const arrays = await Promise.all(militarIds.map((id) => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date')));
-  const map = new Map();
-  arrays.flat().forEach((item) => map.set(item.id, item));
-  return Array.from(map.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+  const registros = await listarPorMilitarIdsComFallbackInOperator({
+    entidade: base44.entities.PublicacaoExOfficio,
+    militarIds,
+    ordem: '-created_date',
+  });
+
+  return deduplicarOrdenarPorCreatedDate(registros);
 }
 
 export async function listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }) {
@@ -45,13 +79,15 @@ export async function listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScope
   const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
   if (!militarIds?.length) return [];
 
-  const arrays = await Promise.all(militarIds.map((id) => base44.entities.Atestado.filter({ militar_id: id }, '-created_date')));
-  const map = new Map();
-  arrays.flat().forEach((item) => {
-    if (item.nota_para_bg || item.numero_bg) map.set(item.id, item);
+  const registros = await listarPorMilitarIdsComFallbackInOperator({
+    entidade: base44.entities.Atestado,
+    militarIds,
+    ordem: '-created_date',
   });
 
-  return Array.from(map.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+  return deduplicarOrdenarPorCreatedDate(
+    registros.filter((item) => item.nota_para_bg || item.numero_bg)
+  );
 }
 
 export function calcularMetricasPublicacao(registros = [], { getStatusCanonico, isInconsistente }) {
