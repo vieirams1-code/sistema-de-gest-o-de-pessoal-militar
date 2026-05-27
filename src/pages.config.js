@@ -73,6 +73,7 @@ import Configuracoes from './pages/Configuracoes';
 import ControleAtestadosTemporarios from './pages/ControleAtestadosTemporarios';
 import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
+import ExtratoAtestadosMedicos from './pages/ExtratoAtestadosMedicos';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
 import FolhaAlteracoes from './pages/FolhaAlteracoes';
@@ -139,6 +140,7 @@ export const PAGES = {
     "ControleAtestadosTemporarios": ControleAtestadosTemporarios,
     "DetalheComportamento": DetalheComportamento,
     "EditarJISO": EditarJISO,
+    "ExtratoAtestadosMedicos": ExtratoAtestadosMedicos,
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
     "FolhaAlteracoes": FolhaAlteracoes,
