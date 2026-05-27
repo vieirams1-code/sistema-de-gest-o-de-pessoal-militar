@@ -195,3 +195,25 @@ test('retorno férias oficial com data_registro passa sem VAR_DESCONHECIDA', () 
   assert.equal(result.ok, true);
   assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
 });
+
+
+test('homologação de atestado aceita variáveis usadas no fluxo real', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'ExOfficio',
+    tipoRegistro: 'Homologação de Atestado',
+    template:
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{dias}} {{dias_extenso}} {{tipo_afastamento}} {{data_inicio}} {{data_termino}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
+test('homologação de atestado continua bloqueando variável desconhecida', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'ExOfficio',
+    tipoRegistro: 'Homologação de Atestado',
+    template: 'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{variavel_estranha}}',
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA' && f.severity === 'ERRO'), true);
+});

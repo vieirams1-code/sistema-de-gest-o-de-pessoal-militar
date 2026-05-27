@@ -400,7 +400,17 @@ const TEMPLATE_VAR_CONTRACT = {
   },
   [resolveTipoRegistroTemplate('Homologação de Atestado')]: {
     obrigatorias: ['nome_completo', 'posto_nome', 'matricula'],
-    opcionais: ['data_registro', 'quadro', 'quadro_nome', 'militar_quadro'],
+    opcionais: [
+      'data_registro',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      'dias',
+      'dias_extenso',
+      'tipo_afastamento',
+      'data_inicio',
+      'data_termino',
+    ],
     aliases: {
       posto: 'posto_nome',
       nome: 'nome_completo',
