@@ -56,6 +56,26 @@ function extractArquivoFileUri(raw: unknown): string {
   return '';
 }
 
+function safePreview(value: unknown) {
+  try {
+    return JSON.stringify(value, (_key, val) => {
+      if (typeof val === 'string' && val.length > 180) return `${val.slice(0, 180)}...[truncated]`;
+      return val;
+    }).slice(0, 360);
+  } catch (_e) {
+    return '[unserializable]';
+  }
+}
+
+function uriPattern(uri: string) {
+  if (uri.startsWith('file://')) return 'file://';
+  if (uri.startsWith('private://')) return 'private://';
+  if (uri.startsWith('https://')) return 'https://';
+  if (uri.startsWith('/')) return '/';
+  if (!uri) return 'empty';
+  return 'other';
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -71,20 +91,26 @@ Deno.serve(async (req) => {
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const scopedData = scopedResponse?.data ?? scopedResponse ?? {};
     const atestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
-    const atestado = atestados.find((item: Record<string, unknown>) => String(item?.id || '') === atestadoId);
-    if (!atestado) return Response.json({ error: 'Atestado fora do escopo do usuário.' }, { status: 403 });
+    const inScope = atestados.some((item: Record<string, unknown>) => String(item?.id || '') === atestadoId);
+    if (!inScope) return Response.json({ error: 'Atestado fora do escopo do usuário.', code: 'OUT_OF_SCOPE' }, { status: 403 });
 
-    const arquivoAtestado = extractArquivoFileUri(atestado?.arquivo_atestado);
-    if (!arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.' }, { status: 404 });
+    const atestadoOriginal = await base44.entities.Atestado.get(atestadoId);
+
+    const arquivoAtestadoRaw = atestadoOriginal?.arquivo_atestado;
+    const arquivoAtestado = extractArquivoFileUri(arquivoAtestadoRaw);
+    console.info('[getAtestadoAnexoSignedUrl] attachment_diagnostics', {
+      atestado_id: atestadoId,
+      arquivo_atestado_typeof: Array.isArray(arquivoAtestadoRaw) ? 'array' : typeof arquivoAtestadoRaw,
+      arquivo_atestado_preview: safePreview(arquivoAtestadoRaw),
+      file_uri_resolvido_preview: arquivoAtestado ? arquivoAtestado.slice(0, 220) : '',
+      file_uri_pattern: uriPattern(arquivoAtestado),
+    });
+
+    if (!arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.', code: 'NO_ATTACHMENT' }, { status: 404 });
 
     const location = parseStorageLocation(arquivoAtestado);
     if (!location) {
-      console.warn('[getAtestadoAnexoSignedUrl] anexo_invalido', {
-        atestado_id: atestadoId,
-        tipo_arquivo_atestado: Array.isArray(atestado?.arquivo_atestado) ? 'array' : typeof atestado?.arquivo_atestado,
-        arquivo_atestado_preview: typeof arquivoAtestado === 'string' ? arquivoAtestado.slice(0, 180) : '',
-      });
-      return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT' }, { status: 422 });
+      return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT', detail: { file_uri_pattern: uriPattern(arquivoAtestado) } }, { status: 422 });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
@@ -94,11 +120,26 @@ Deno.serve(async (req) => {
     const ttl = clampTtl(payload?.expires_in);
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
     const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, ttl);
-    if (signed.error || !signed.data?.signedUrl) return Response.json({ error: signed.error?.message || 'Falha ao gerar URL temporária.' }, { status: 500 });
+
+    console.info('[getAtestadoAnexoSignedUrl] signed_url_response', {
+      atestado_id: atestadoId,
+      has_data: Boolean(signed?.data),
+      keys_data: signed?.data ? Object.keys(signed.data) : [],
+      has_url: Boolean((signed as any)?.data?.url),
+      has_file_url: Boolean((signed as any)?.data?.file_url),
+      has_signed_url: Boolean((signed as any)?.data?.signedUrl ?? (signed as any)?.data?.signed_url),
+      has_download_url: Boolean((signed as any)?.data?.download_url),
+      error_message: signed?.error?.message || '',
+      error_status: (signed?.error as any)?.status || null,
+    });
+
+    if (signed.error || !signed.data?.signedUrl) {
+      return Response.json({ error: signed.error?.message || 'Falha ao gerar URL temporária.', code: 'SIGNED_URL_FAILED', detail: { status: (signed.error as any)?.status || null } }, { status: 500 });
+    }
 
     return Response.json({ url: signed.data.signedUrl, expires_in: ttl, atestado_id: atestadoId });
   } catch (error) {
-    const status = error?.response?.status || error?.status || 500;
-    return Response.json({ error: error?.message || 'Erro ao gerar URL temporária do anexo.' }, { status });
+    const status = (error as any)?.response?.status || (error as any)?.status || 500;
+    return Response.json({ error: (error as any)?.message || 'Erro ao gerar URL temporária do anexo.', code: 'UNEXPECTED_ERROR' }, { status });
   }
 });

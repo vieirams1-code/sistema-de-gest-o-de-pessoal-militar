@@ -55,7 +55,7 @@ function extractArquivoFileUri(raw: unknown): string {
   return '';
 }
 
-const sanitize = (v: unknown) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'militar';
+const sanitize = (v: unknown) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'militar';
 const inferExt = (path: string, ct: string | null) => {
   const e = String(path || '').split('.').pop() || '';
   if (/^[a-zA-Z0-9]{1,8}$/.test(e)) return e.toLowerCase();
@@ -80,12 +80,16 @@ Deno.serve(async (req) => {
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const scopedData = scopedResponse?.data ?? scopedResponse ?? {};
     const scopedAtestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
-    const byId = new Map(scopedAtestados.map((a: any) => [String(a?.id || ''), a]));
-    const autorizados = idsSelecionados.map((id) => byId.get(id)).filter(Boolean);
+    const scopedIds = new Set(scopedAtestados.map((a: any) => String(a?.id || '')));
+    const autorizadosIds = idsSelecionados.filter((id) => scopedIds.has(id));
+    const semEscopo = idsSelecionados.length - autorizadosIds.length;
+
+    const autorizadosOriginais = await Promise.all(autorizadosIds.map((id) => base44.entities.Atestado.get(id).catch(() => null)));
+    const autorizados = autorizadosOriginais.filter(Boolean);
     const comAnexo = autorizados.filter((a: any) => extractArquivoFileUri(a?.arquivo_atestado));
     const semAnexo = autorizados.length - comAnexo.length;
 
-    if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_ATTACHMENTS', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo } }, { status: 422 });
+    if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_ATTACHMENTS', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo, arquivos_fora_escopo: semEscopo } }, { status: 422 });
     if (comAnexo.length > MAX_FILES) return Response.json({ error: 'Limite de anexos excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_arquivos: MAX_FILES, quantidade_anexos: comAnexo.length, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
 
     const url = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
@@ -99,10 +103,7 @@ Deno.serve(async (req) => {
     for (const atestado of comAnexo) {
       const rawArquivo = extractArquivoFileUri(atestado?.arquivo_atestado);
       const location = parseStorageLocation(rawArquivo);
-      if (!location) {
-        console.warn('[gerarZipAnexosAtestados] anexo_invalido', { atestado_id: String(atestado?.id || ''), tipo_arquivo_atestado: Array.isArray(atestado?.arquivo_atestado) ? 'array' : typeof atestado?.arquivo_atestado });
-        continue;
-      }
+      if (!location) continue;
 
       const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
       if (signed.error || !signed.data?.signedUrl) continue;
@@ -115,8 +116,6 @@ Deno.serve(async (req) => {
         if (head.ok) {
           const size = Number(head.headers.get('content-length') || 0);
           if (Number.isFinite(size) && size > 0) estimatedBytes += size;
-        } else {
-          console.warn('[gerarZipAnexosAtestados] head_nao_ok', { atestado_id: String(atestado?.id || ''), status: head.status });
         }
       } catch (_headError) {
         console.warn('[gerarZipAnexosAtestados] head_falhou', { atestado_id: String(atestado?.id || '') });
@@ -134,10 +133,7 @@ Deno.serve(async (req) => {
     const zip = new JSZip();
     for (const item of prepared) {
       const res = await fetch(item.signedUrl);
-      if (!res.ok) {
-        console.warn('[gerarZipAnexosAtestados] fetch_signed_url_falhou', { atestado_id: String(item?.atestado?.id || ''), status: res.status });
-        continue;
-      }
+      if (!res.ok) continue;
       const buffer = await res.arrayBuffer();
       const safeMilitar = sanitize(item.atestado?.militar_nome || item.atestado?.militar_id);
       const atestadoId = sanitize(item.atestado?.id || 'atestado');
@@ -156,7 +152,7 @@ Deno.serve(async (req) => {
         'Cache-Control': 'no-store',
         'X-Quantidade-Anexos': String(prepared.length),
         'X-Arquivos-Ignorados-Sem-Anexo': String(semAnexo),
-        'X-Extrato-Parcial': String(autorizados.length < scopedAtestados.length),
+        'X-Extrato-Parcial': String(autorizadosIds.length < idsSelecionados.length),
       },
     });
   } catch (error) {
