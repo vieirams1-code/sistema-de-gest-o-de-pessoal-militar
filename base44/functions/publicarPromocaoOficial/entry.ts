@@ -7,6 +7,9 @@ const texto = (valor: unknown) => String(valor ?? '').trim();
 const normalizar = (valor: unknown) => texto(valor).toLowerCase();
 const dataSomente = (valor: unknown) => texto(valor).split('T')[0];
 
+const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ ?? new Set<string>();
+(globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ = EXECUCOES_EM_ANDAMENTO;
+
 function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, militar_id = null, payloadRecebido = null, motivo = '' }: any) {
   console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, militar_id, payloadRecebido, motivo });
 }
@@ -29,6 +32,8 @@ function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAl
   if (temAlteracoesPendentes) return montarErro({ etapa: 'validacao_entrada', motivo: 'alteracoes_pendentes', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
 
   const ordens = new Set<string>();
+  const militarIds = new Set<string>();
+  const itensComOrdem = [];
   for (const item of itens || []) {
     const itemId = texto(item?.id) || null;
     const militarId = texto(item?.militar_id) || null;
@@ -37,10 +42,20 @@ function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAl
 
     if (!itemId) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_sem_id', promocao_id: promocaoId, item_id: null, militar_id: militarId, payloadRecebido: item });
     if (!militarId) return montarErro({ etapa: 'validacao_entrada', motivo: 'militar_id_ausente', promocao_id: promocaoId, item_id: itemId, militar_id: null, payloadRecebido: item });
+    if (militarIds.has(militarId)) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_militar_id', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
     if (!Number.isFinite(ordem) || ordem <= 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_invalida', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
     if (ordens.has(String(ordem))) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_ordem', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
     ordens.add(String(ordem));
+    militarIds.add(militarId);
+    itensComOrdem.push({ itemId, militarId, ordem });
     if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_status_bloqueado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
+  }
+
+  const ordensOrdenadas = itensComOrdem.map((i: any) => i.ordem).sort((a: number, b: number) => a - b);
+  for (let i = 1; i < ordensOrdenadas.length; i += 1) {
+    if (ordensOrdenadas[i] <= ordensOrdenadas[i - 1]) {
+      return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_antiguidade_inconsistente', promocao_id: promocaoId, payloadRecebido: { ordens: ordensOrdenadas } });
+    }
   }
 
   return null;
@@ -74,6 +89,7 @@ async function parseBase44Payload(req: any) {
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
+  let lockId = '';
   try {
     const input = (globalThis as any)?.input;
     const parsedPayload = await parseBase44Payload(req);
@@ -116,50 +132,22 @@ Deno.serve(async (req) => {
       }
     );
 
-    const filtrosElegibilidade = {
-      sem_id: 0,
-      sem_militar_id: 0,
-      ordem_invalida: 0,
-      status_bloqueado: 0,
-    };
+    const filtrosElegibilidade = { sem_id: 0, sem_militar_id: 0, ordem_invalida: 0, status_bloqueado: 0 };
 
-    const itensElegiveis = (itens || []).filter((item: any) => {
-      const itemId = texto(item?.id);
-      const militarId = texto(item?.militar_id);
-      const ordem = Number(item?.ordem);
-      const status = normalizar(item?.status);
-      if (!itemId) {
-        filtrosElegibilidade.sem_id += 1;
-        return false;
-      }
-      if (!militarId) {
-        filtrosElegibilidade.sem_militar_id += 1;
-        return false;
-      }
-      if (!Number.isFinite(ordem) || ordem <= 0) {
-        filtrosElegibilidade.ordem_invalida += 1;
-        return false;
-      }
-      if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) {
-        filtrosElegibilidade.status_bloqueado += 1;
-        return false;
-      }
-      return true;
-    });
-
-    console.error('PROMOCAO_ITENS_ELEGIVEIS', {
-      promocao_id: promocaoId,
-      quantidade: itensElegiveis.length,
-      ids: itensElegiveis.map((i: any) => i?.id),
-      militar_ids: itensElegiveis.map((i: any) => i?.militar_id),
-      status: itensElegiveis.map((i: any) => i?.status),
-      filtro: filtrosElegibilidade,
-    });
+    const erroConcorrencia = promocaoId && EXECUCOES_EM_ANDAMENTO.has(texto(promocaoId))
+      ? montarErro({ etapa: 'controle_concorrencia', motivo: 'publicacao_em_andamento', promocao_id: texto(promocaoId), payloadRecebido: { promocao_id: promocaoId } })
+      : null;
+    if (erroConcorrencia) {
+      return Response.json({ ...erroConcorrencia, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [erroConcorrencia] }, { status: 409 });
+    }
 
     const erroValidacao = validarEntrada(promocao_id, promocao, itens, temAlteracoesPendentes);
     if (erroValidacao) {
       return Response.json({ ...erroValidacao, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [erroValidacao] }, { status: 400 });
     }
+
+    lockId = texto(promocaoId);
+    EXECUCOES_EM_ANDAMENTO.add(lockId);
 
     const Historico = base44.asServiceRole.entities.HistoricoPromocaoMilitarV2;
     const Militar = base44.asServiceRole.entities.Militar;
@@ -174,7 +162,7 @@ Deno.serve(async (req) => {
 
     const historicosAtivos = await Historico.filter({ status_registro: 'ativo' });
 
-    for (const item of itensElegiveis) {
+    for (const item of itens) {
       const itemId = texto(item?.id) || null;
       const militarId = texto(item?.militar_id) || null;
       console.error('PROCESSANDO_ITEM', { item_id: itemId, militar_id: militarId });
@@ -224,11 +212,12 @@ Deno.serve(async (req) => {
     }
 
     if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', payloadRecebido: payload });
-    await Promocao.update(promocaoId, { status: errors.length > 0 ? 'rascunho' : 'publicada' });
+    const statusFinal = publicados === 0 ? 'rascunho' : (publicados < itens.length ? 'publicada_parcial' : 'publicada');
+    await Promocao.update(promocaoId, { status: statusFinal });
 
     console.error('PUBLICACAO_RESULTADO', {
       totalRecebido: itens.length,
-      totalElegivel: itensElegiveis.length,
+      totalElegivel: itens.length,
       totalPublicado: publicados,
       filtro: filtrosElegibilidade,
     });
@@ -237,5 +226,7 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao', payloadRecebido: null });
     return Response.json({ ...erroInterno, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [{ ...erroInterno, message: erroInterno.motivo }] }, { status: 500 });
+  } finally {
+    if (lockId) EXECUCOES_EM_ANDAMENTO.delete(lockId);
   }
 });
