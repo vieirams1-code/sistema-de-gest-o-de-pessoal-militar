@@ -171,32 +171,42 @@ const TAG_DEFS = {
     border: 'border-amber-200',
   },
 };
-const MAX_TAGS_INLINE = 3;
+const MAX_TAGS_INLINE = 5;
 const CONSULTA_MILITAR_GRID_WIDTHS = {
-  nome: 'minmax(280px, 1.6fr)',
-  nome_completo: 'minmax(300px, 1.8fr)',
+  nome: 'minmax(300px, 1.6fr)',
+  nome_completo: 'minmax(320px, 1.8fr)',
   nome_guerra: 'minmax(220px, 1.2fr)',
-  posto_graduacao: '140px',
+  posto_graduacao: '150px',
+  graduacao: '150px',
   matricula: '130px',
-  quadro: '120px',
-  lotacao: 'minmax(180px, 1fr)',
+  quadro: '130px',
+  lotacao: 'minmax(200px, 1fr)',
   municipio: 'minmax(160px, 1fr)',
   cidade: 'minmax(160px, 1fr)',
-  municipio_cidade: 'minmax(160px, 1fr)',
-  email: 'minmax(220px, 1.2fr)',
-  email_pessoal: 'minmax(220px, 1.2fr)',
-  endereco: 'minmax(300px, 1.8fr)',
-  logradouro: 'minmax(300px, 1.8fr)',
+  municipio_cidade: 'minmax(170px, 1fr)',
+  email: 'minmax(230px, 1.2fr)',
+  email_pessoal: 'minmax(230px, 1.2fr)',
+  endereco: 'minmax(360px, 2fr)',
+  logradouro: 'minmax(360px, 2fr)',
   situacao_militar: '130px',
-  situacao_condicao_militar: '150px',
+  situacao_condicao_militar: '160px',
   status_cadastro: '130px',
-  origem_destino: 'minmax(180px, 1fr)',
-  obs: 'minmax(220px, 1fr)',
-  observacoes_administrativas: 'minmax(220px, 1fr)',
-  observacao: 'minmax(220px, 1fr)',
+  origem_destino: 'minmax(220px, 1fr)',
+  obs: 'minmax(260px, 1.2fr)',
+  observacao: 'minmax(260px, 1.2fr)',
+  observacoes_administrativas: 'minmax(260px, 1.2fr)',
 };
-const WRAP_COLUMN_KEYS = new Set(['endereco', 'logradouro', 'observacao', 'obs', 'observacoes_administrativas']);
-const DEFAULT_GRID_COLUMN_WIDTH = 'minmax(140px, 1fr)';
+const WRAP_COLUMN_KEYS = new Set([
+  'nome_completo',
+  'endereco',
+  'logradouro',
+  'lotacao',
+  'origem_destino',
+  'obs',
+  'observacao',
+  'observacoes_administrativas',
+]);
+const DEFAULT_GRID_COLUMN_WIDTH = 'minmax(180px, 1fr)';
 const SELECTION_COLUMN_WIDTH = '44px';
 const ACTIONS_COLUMN_WIDTH = '140px';
 
@@ -1456,19 +1466,40 @@ export default function Militares() {
                                       const label = def?.label || tagVisual?.nome || item?.nome || emoji || 'Tag';
                                       const Icon = def?.icon;
                                       return (
-                                        <span
-                                          key={`${emoji || label}-${idx}`}
-                                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border max-w-[110px] shrink-0 ${def?.bg || 'bg-slate-100'} ${def?.text || 'text-slate-700'} ${def?.border || 'border-slate-200'}`}
-                                        >
-                                          {Icon ? <Icon size={10} strokeWidth={3} /> : <IconeCatalogo value={tagVisual?.emoji || emoji || '🏷️'} />}
-                                          <span className="truncate">{label}</span>
-                                        </span>
+                                        <Tooltip key={`${emoji || label}-${idx}`}>
+                                          <TooltipTrigger asChild>
+                                            <span
+                                              className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border ${def?.bg || 'bg-slate-100'} ${def?.text || 'text-slate-700'} ${def?.border || 'border-slate-200'}`}
+                                            >
+                                              {Icon ? (
+                                                <Icon size={11} strokeWidth={3} />
+                                              ) : (
+                                                <IconeCatalogo value={tagVisual?.emoji || emoji || '🏷️'} />
+                                              )}
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>{label}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
                                       );
                                     })}
                                     {excessoTags > 0 && (
-                                      <span className="text-[10px] text-slate-500">
-                                        +{excessoTags}
-                                      </span>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border border-slate-200 bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">
+                                            +{excessoTags}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{tagsLinha.slice(MAX_TAGS_INLINE).map((tag) => (
+                                            resolveTagVisual({ nome: tag?.nome, emoji: String(tag?.emoji || '').trim() })?.nome
+                                            || tag?.nome
+                                            || String(tag?.emoji || '').trim()
+                                            || 'Tag'
+                                          )).join(', ')}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     )}
                                   </div>
                                 )}
