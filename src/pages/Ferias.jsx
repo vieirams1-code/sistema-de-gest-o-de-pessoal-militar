@@ -378,6 +378,7 @@ export default function Ferias() {
         ferias,
         feriasTags: Array.isArray(bundle.feriasTags) ? bundle.feriasTags : undefined,
         tagsCatalogo: Array.isArray(bundle.tagsCatalogo) ? bundle.tagsCatalogo : undefined,
+        registrosLivro: bundle.registrosLivro || [],
         partialFailures: Number(bundle.partialFailures || 0),
         meta: bundle.meta || {},
       };
@@ -389,47 +390,26 @@ export default function Ferias() {
   const tagsCatalogoFromBundle = feriasData?.tagsCatalogo;
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
-  const {
-    data: registrosLivroData = { registros: [], partialFailures: 0, meta: {} },
-    isLoading: isRegistrosLoading,
-    isFetching: isRegistrosFetching,
-    isSuccess: isRegistrosSuccess,
-    isError: isRegistrosError,
-    error: registrosError,
-    refetch: refetchRegistrosLivro,
-  } = useQuery({
-    queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
-    queryFn: async () => {
-      const bundle = await fetchScopedFeriasBundle();
-      return { registros: bundle.registrosLivro || [], partialFailures: Number(bundle.partialFailures || 0), meta: bundle.meta || {} };
-    },
-    enabled: isAccessResolved && canAccessModule('ferias'),
-  });
-  const registrosLivro = registrosLivroData?.registros || [];
-  const registrosPartialFailures = Number(registrosLivroData?.partialFailures || 0);
-  const hasPartialDataWarning = feriasPartialFailures > 0 || registrosPartialFailures > 0;
-  const hasFeriasLoadError = isFeriasError || isRegistrosError;
+  const registrosLivro = feriasData?.registrosLivro || [];
+  const registrosPartialFailures = feriasPartialFailures;
+  const hasPartialDataWarning = feriasPartialFailures > 0;
+  const hasFeriasLoadError = isFeriasError;
   const isPageLoading = isLoading;
   const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
-  const registrosLivroQueryKey = ['registros-livro-all', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
   const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
 
   const getFeriasEstagioProvavel = () => {
     const feriasErrorMessage = String(feriasError?.message || '').toLowerCase();
-    const registrosErrorMessage = String(registrosError?.message || '').toLowerCase();
-
     if (isAdmin && isFeriasError) return 'Ferias.list';
-    if (feriasErrorMessage.includes('429') || registrosErrorMessage.includes('429') || feriasErrorMessage.includes('rate limit') || registrosErrorMessage.includes('rate limit')) return 'getScopedFeriasBundle / rate limit';
+    if (feriasErrorMessage.includes('429') || feriasErrorMessage.includes('rate limit')) return 'getScopedFeriasBundle / rate limit';
     if (feriasErrorMessage.includes('férias dos militares do escopo')) return 'getScopedFeriasBundle';
-    if (registrosErrorMessage.includes('registros do livro dos militares do escopo')) return 'RegistroLivro.filter por militar';
-    if (feriasErrorMessage.includes('escopo') || registrosErrorMessage.includes('escopo')) return 'Militar.filter escopo';
+    if (feriasErrorMessage.includes('escopo')) return 'Militar.filter escopo';
     if (feriasErrorMessage.includes('férias dos militares acessíveis')) return 'getScopedFeriasBundle';
-    if (registrosErrorMessage.includes('registros do livro')) return 'RegistroLivro.filter por militar';
     if (isFeriasError || feriasPartialFailures > 0) return 'enriquecerFeriasComContextoMilitar';
     return 'getScopedFeriasBundle';
   };
 
-  const feriasDebugData = (isFeriasError || isRegistrosError || hasPartialDataWarning)
+  const feriasDebugData = (isFeriasError || hasPartialDataWarning)
     ? {
       pagina: 'Ferias',
       usuario: userEmail || null,
@@ -437,7 +417,6 @@ export default function Ferias() {
       modoAcesso: modoAcesso || null,
       scopeFilters: militarScopeFilters,
       queryKeyFerias: feriasQueryKey,
-      queryKeyRegistrosLivro: registrosLivroQueryKey,
       status: {
         ferias: {
           loading: isLoading,
@@ -445,25 +424,12 @@ export default function Ferias() {
           isError: isFeriasError,
           isSuccess: isFeriasSuccess,
         },
-        registrosLivro: {
-          loading: isRegistrosLoading,
-          fetching: isRegistrosFetching,
-          isError: isRegistrosError,
-          isSuccess: isRegistrosSuccess,
-        },
       },
       erroFerias: feriasError
         ? {
           message: feriasError.message || null,
           name: feriasError.name || null,
           stack: feriasError.stack ? String(feriasError.stack).split('\n').slice(0, 5).join('\n') : null,
-        }
-        : null,
-      erroRegistrosLivro: registrosError
-        ? {
-          message: registrosError.message || null,
-          name: registrosError.name || null,
-          stack: registrosError.stack ? String(registrosError.stack).split('\n').slice(0, 5).join('\n') : null,
         }
         : null,
       partialFailures: {
@@ -482,7 +448,7 @@ export default function Ferias() {
     : null;
   const isRateLimitScopedError = false;
   const retryFeriasLoad = async () => {
-    await Promise.all([refetchFerias(), refetchRegistrosLivro()]);
+    await refetchFerias();
   };
 
   const { data: creditosExtraFerias = [] } = useQuery({
@@ -558,7 +524,6 @@ export default function Ferias() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       setDeleteDialogOpen(false);
@@ -940,7 +905,6 @@ export default function Ferias() {
       });
 
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
       setEditDataModal({ open: false, ferias: null, novaData: '' });
     } catch (error) {
