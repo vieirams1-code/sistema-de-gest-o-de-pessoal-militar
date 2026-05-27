@@ -62,11 +62,13 @@ import {
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
 import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
 const STALE_TIME_MS = 5 * 60 * 1000;
+const VALOR_AUSENTE_ORDENACAO = Number.POSITIVE_INFINITY;
 
 const TIPO_ORDEM = { root: 0, setor: 1, subsetor: 2, unidade: 3 };
 
@@ -461,8 +463,30 @@ export default function Militares() {
     () => operacionais.map((m) => String(m?.id || '')).filter(Boolean),
     [operacionais],
   );
-
   const idsHash = useMemo(() => idsMilitaresCarregados.join('|'), [idsMilitaresCarregados]);
+  const cacheAntiguidade = getPosicaoOficialAntiguidadeFromCache(queryClient);
+  const hasOrdemOficialAntiguidade = cacheAntiguidade.hasOrdemOficialAntiguidade;
+  const { data: historicoPromocoesEfetivo = [] } = useQuery({
+    queryKey: ['historico-promocao-militares-efetivo', effectiveEmail || 'self', idsHash],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery && !hasOrdemOficialAntiguidade && idsMilitaresCarregados.length > 0,
+    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({
+      militar_id: { '$in': idsMilitaresCarregados },
+    }),
+  });
+
+  const ordemAntiguidadeMap = useMemo(() => {
+    const { posicaoOficialByMilitarId } = cacheAntiguidade;
+    if (hasOrdemOficialAntiguidade) return posicaoOficialByMilitarId;
+
+    // Fallback read-only: usa o mesmo motor da Prévia Geral quando o cache oficial não estiver disponível.
+    const previaAntiguidade = calcularPreviaAntiguidadeGeral({
+      militares: operacionais,
+      historicoPromocoes: historicoPromocoesEfetivo,
+    });
+    return new Map((previaAntiguidade?.itens || []).map((item) => [String(item?.militar_id || ''), Number(item?.posicao)]));
+  }, [cacheAntiguidade, hasOrdemOficialAntiguidade, operacionais, historicoPromocoesEfetivo]);
+
   const funcoesTagsScopeKey = useMemo(
     () => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }),
     [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail],
@@ -569,25 +593,37 @@ export default function Militares() {
   const filteredMilitares = useMemo(
     () => {
       const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
-      const { hasOrdemOficialAntiguidade, posicaoOficialByMilitarId } = getPosicaoOficialAntiguidadeFromCache(queryClient);
-      if (!hasOrdemOficialAntiguidade) {
-        if (import.meta.env.DEV) {
-          console.info('[Efetivo] Ordem oficial de Antiguidade indisponível no cache. Mantendo ordem original estável.');
-        }
-        return filtradosPorColuna;
-      }
+
+      const compararFallbackEstavel = (a, b) => {
+        const nomeA = String(a?.nome || '').trim();
+        const nomeB = String(b?.nome || '').trim();
+        if (nomeA !== nomeB) return nomeA.localeCompare(nomeB, 'pt-BR', { numeric: true });
+
+        const matriculaA = String(a?.matricula || '').trim();
+        const matriculaB = String(b?.matricula || '').trim();
+        if (matriculaA !== matriculaB) return matriculaA.localeCompare(matriculaB, 'pt-BR', { numeric: true });
+
+        return String(a?.id || '').localeCompare(String(b?.id || ''), 'pt-BR', { numeric: true });
+      };
 
       return filtradosPorColuna
         .map((militar, index) => ({ militar, index }))
         .sort((a, b) => {
-          const posA = posicaoOficialByMilitarId.get(String(a?.militar?.id || ''));
-          const posB = posicaoOficialByMilitarId.get(String(b?.militar?.id || ''));
-          if (Number.isFinite(posA) && Number.isFinite(posB)) return posA - posB;
+          const posA = ordemAntiguidadeMap.get(String(a?.militar?.id || ''));
+          const posB = ordemAntiguidadeMap.get(String(b?.militar?.id || ''));
+          const ordemA = Number.isFinite(posA) ? posA : VALOR_AUSENTE_ORDENACAO;
+          const ordemB = Number.isFinite(posB) ? posB : VALOR_AUSENTE_ORDENACAO;
+          if (ordemA !== ordemB) return ordemA - ordemB;
+
+          if (!Number.isFinite(posA) && !Number.isFinite(posB)) {
+            return compararFallbackEstavel(a.militar, b.militar);
+          }
+
           return a.index - b.index;
         })
         .map((item) => item.militar);
     },
-    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters, queryClient],
+    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters, ordemAntiguidadeMap],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(
