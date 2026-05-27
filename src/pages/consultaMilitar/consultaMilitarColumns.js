@@ -389,7 +389,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     minWidth: 90,
     align: 'center',
     nowrap: true,
-    accessor: (militar) => toText(getFirst(militar, ['sexo', 'genero', 'sexo_biologico'])),
+    accessor: (militar) => toText(getFirst(militar, ['sexo', 'genero', 'sexo_biologico', 'sexoBiologico', 'genero_militar'])),
   },
   {
     key: 'telefone',
