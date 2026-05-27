@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
+import { getAtestadoAnexoSignedUrlClient } from '@/services/getAtestadoAnexoSignedUrlClient';
 
 const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
@@ -21,6 +22,7 @@ const DEFAULT_COLUMNS = {
   necessita_jiso: true,
   medico: true,
   dias: true,
+  anexo: false,
 };
 
 const COLUMN_LABELS = {
@@ -32,6 +34,7 @@ const COLUMN_LABELS = {
   necessita_jiso: 'JISO',
   medico: 'Médico',
   dias: 'Dias',
+  anexo: 'Anexo',
 };
 
 const statusBadgeClass = (status) => {
@@ -66,6 +69,8 @@ export default function ExtratoAtestadosMedicos() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [isExporting, setIsExporting] = useState(false);
+  const [loadingAnexoById, setLoadingAnexoById] = useState({});
+  const [erroAnexoById, setErroAnexoById] = useState({});
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
@@ -162,6 +167,24 @@ export default function ExtratoAtestadosMedicos() {
       else next.add(id);
       return next;
     });
+  };
+
+  const handleAbrirAnexo = async (row) => {
+    const rowId = String(row?.id || '');
+    if (!rowId) return;
+    setLoadingAnexoById((prev) => ({ ...prev, [rowId]: true }));
+    setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
+    try {
+      const data = await getAtestadoAnexoSignedUrlClient(rowId);
+      if (!data?.url) throw new Error('Não foi possível gerar o link do anexo.');
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      const apiMessage = String(e?.message || '');
+      const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage);
+      setErroAnexoById((prev) => ({ ...prev, [rowId]: isMissing ? 'Sem anexo disponível para este atestado.' : 'Não foi possível abrir o anexo agora.' }));
+    } finally {
+      setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
+    }
   };
 
   if (loadingUser || !isAccessResolved) return null;
@@ -315,6 +338,7 @@ export default function ExtratoAtestadosMedicos() {
                   {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
                   {columns.medico && <th className="p-3 text-left">Médico</th>}
                   {columns.dias && <th className="p-3 text-left">Dias</th>}
+                  {columns.anexo && <th className="p-3 text-left">Anexo</th>}
                 </tr>
               </thead>
               <tbody>
@@ -334,6 +358,16 @@ export default function ExtratoAtestadosMedicos() {
                       {columns.necessita_jiso && <td className="p-3"><Badge variant="outline" className={row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
                       {columns.medico && <td className="p-3">{row.medico || '-'}</td>}
                       {columns.dias && <td className="p-3">{row.dias ?? '-'}</td>}
+                      {columns.anexo && (
+                        <td className="p-3">
+                          <div className="space-y-1">
+                            <Button variant="outline" size="sm" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
+                              {loadingAnexoById[row.id] ? 'Abrindo...' : 'Abrir'}
+                            </Button>
+                            {erroAnexoById[row.id] && <div className="text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
