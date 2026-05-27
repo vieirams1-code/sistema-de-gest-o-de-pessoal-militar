@@ -69,6 +69,15 @@ function rotuloAlerta(alerta) {
   return rotulosAlertas[alerta] || alerta;
 }
 
+const chipsInformativos = [
+  'Prévia não oficial',
+  'Read-only',
+  'Não gera publicação',
+  'Não grava snapshot',
+  'Sem persistência',
+  'Fonte: HistoricoPromocaoMilitarV2',
+];
+
 const resumoCards = [
   ['totalMilitaresEntrada', 'Militares na entrada'],
   ['totalMilitaresConsiderados', 'Militares considerados'],
@@ -271,8 +280,21 @@ export default function AntiguidadePrevia() {
     queryClient.setQueryData(ANTIGUIDADE_OFICIAL_ITENS_QUERY_KEY, resultado?.itens || []);
   }, [queryClient, resultado]);
 
-  const opcoesPosto = useMemo(() => opcoesUnicas(resultado?.itens, 'posto_graduacao'), [resultado]);
-  const opcoesQuadro = useMemo(() => opcoesUnicas(resultado?.itens, 'quadro'), [resultado]);
+  const itensResultado = resultado?.itens || [];
+
+  const itensComBuscaIndexada = useMemo(() => (
+    itensResultado.map((item) => ({
+      item,
+      buscaNormalizada: normalizarBusca([
+        item.nome,
+        item.matricula,
+        item.militar_id,
+      ].join(' ')),
+    }))
+  ), [itensResultado]);
+
+  const opcoesPosto = useMemo(() => opcoesUnicas(itensResultado, 'posto_graduacao'), [itensResultado]);
+  const opcoesQuadro = useMemo(() => opcoesUnicas(itensResultado, 'quadro'), [itensResultado]);
   const resumoAlertas = useMemo(() => {
     const contagemPorTipo = resultado?.alertasPorTipo || {};
     const tipos = Object.entries(contagemPorTipo)
@@ -297,14 +319,9 @@ export default function AntiguidadePrevia() {
 
   const itensFiltrados = useMemo(() => {
     const termo = normalizarBusca(filtros.busca);
-    return (resultado?.itens || []).filter((item) => {
+    return itensComBuscaIndexada.filter(({ item, buscaNormalizada }) => {
       if (termo) {
-        const alvo = normalizarBusca([
-          item.nome,
-          item.matricula,
-          item.militar_id,
-        ].join(' '));
-        if (!alvo.includes(termo)) return false;
+        if (!buscaNormalizada.includes(termo)) return false;
       }
 
       if (filtros.postoGraduacao !== TODOS && item.posto_graduacao !== filtros.postoGraduacao) return false;
@@ -315,8 +332,8 @@ export default function AntiguidadePrevia() {
       if (filtros.tipoAlerta !== TODOS && !item.alertas?.includes(filtros.tipoAlerta)) return false;
 
       return true;
-    });
-  }, [resultado, filtros]);
+    }).map(({ item }) => item);
+  }, [itensComBuscaIndexada, filtros]);
 
   const atualizarFiltro = (campo, valor) => setFiltros((atuais) => ({ ...atuais, [campo]: valor }));
   const limparFiltros = () => setFiltros(filtroInicial);
@@ -347,14 +364,7 @@ export default function AntiguidadePrevia() {
         <div className="space-y-3">
           <h1 className="text-2xl font-bold text-[#1e3a5f]">Prévia da Listagem de Antiguidade Geral</h1>
           <div className="flex flex-wrap gap-2">
-            {[
-              'Prévia não oficial',
-              'Read-only',
-              'Não gera publicação',
-              'Não grava snapshot',
-              'Sem persistência',
-              'Fonte: HistoricoPromocaoMilitarV2',
-            ].map((chip) => (
+            {chipsInformativos.map((chip) => (
               <Badge key={chip} variant="secondary" className="whitespace-nowrap bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
                 {chip}
               </Badge>
