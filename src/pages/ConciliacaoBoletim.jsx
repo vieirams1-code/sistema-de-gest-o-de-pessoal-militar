@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeftRight, FileSearch, Link2, Unlink2 } from 'lucide-react';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
@@ -501,16 +502,14 @@ export default function ConciliacaoBoletim() {
       if (isAdmin) return base44.entities.RegistroLivro.list('-created_date');
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.RegistroLivro.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
+
+      const bundle = await fetchScopedFeriasBundle();
       const m = new Map();
-      arrays.flat().forEach(item => m.set(item.id, item));
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+      (bundle?.registrosLivro || []).forEach((item) => {
+        if (!item?.id) return;
+        m.set(item.id, item);
+      });
+      return Array.from(m.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
     },
     enabled: isAccessResolved && hasAccess
   });
