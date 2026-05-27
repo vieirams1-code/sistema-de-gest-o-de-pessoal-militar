@@ -172,6 +172,7 @@ const TAG_DEFS = {
   },
 };
 const MAX_TAGS_INLINE = 3;
+const MILITARES_GRID_TEMPLATE = '44px 140px minmax(220px, 1.4fr) 130px 120px minmax(160px, 1fr) 120px 120px 140px';
 
 const POSTOS_GRADUACOES_OPCOES = [
   { value: 'Coronel', label: 'Coronel' },
@@ -1252,8 +1253,11 @@ export default function Militares() {
               </div>
             )}
             <div className="overflow-x-auto">
-              <div className="inline-flex min-w-full items-stretch border-b bg-slate-50 text-xs">
-                <div className="w-11 min-w-[44px] px-2 py-2" />
+              <div
+                className="grid min-w-full items-center border-b bg-slate-50 text-xs font-medium text-slate-600"
+                style={{ gridTemplateColumns: MILITARES_GRID_TEMPLATE }}
+              >
+                <div className="min-w-0 px-2 py-2" />
                 {sanitizedVisibleColumnKeys.map((key) => {
                 const column = columnMetaByKey.get(key);
                 const filterType = column?.futureFilterType;
@@ -1263,12 +1267,8 @@ export default function Militares() {
                   || (currentFilter?.type === 'multiselect' && Array.isArray(currentFilter?.selected) && currentFilter.selected.length > 0),
                 );
                 const multiselectOptions = columnFilterOptionsByKey.get(key) || [];
-                  const cellStyle = {
-                    minWidth: column?.minWidth || 120,
-                    width: column?.width || undefined,
-                  };
                   return (
-                    <div key={key} className={`px-2 py-2 ${getColumnClassName(column, { isHeader: true })}`} style={cellStyle}>
+                    <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column, { isHeader: true })}`}>
                       <div className="flex items-center gap-1 min-w-0">
                     <span className="truncate">{column?.label || key}</span>
                     {filterType && (
@@ -1345,7 +1345,7 @@ export default function Militares() {
                     </div>
                   );
                 })}
-                <div className="sticky right-0 z-10 w-[140px] min-w-[140px] bg-slate-50 px-2 py-2 text-right font-semibold text-slate-500">
+                <div className="min-w-0 bg-slate-50 px-2 py-2 text-right font-semibold text-slate-500">
                   Ações
                 </div>
               </div>
@@ -1375,8 +1375,12 @@ export default function Militares() {
               const destacarQuadro = isQuadroComDestaque(militar?.quadro);
 
               return (
-                <div key={militar.id} className={`inline-flex min-w-full items-stretch border-b text-sm ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}>
-                <div className="w-11 min-w-[44px] px-2 py-2 flex items-center justify-center">
+                <div
+                  key={militar.id}
+                  className={`grid min-w-full items-center border-b text-sm ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
+                  style={{ gridTemplateColumns: MILITARES_GRID_TEMPLATE }}
+                >
+                <div className="min-w-0 px-2 py-2 flex items-center justify-center">
                   <label>
                     <input
                       type="checkbox"
@@ -1395,10 +1399,6 @@ export default function Militares() {
                 </div>
                   {sanitizedVisibleColumnKeys.map((key) => {
                     const column = columnMetaByKey.get(key) || {};
-                    const cellStyle = {
-                      minWidth: column.minWidth || 120,
-                      width: column.width || undefined,
-                    };
                     if (key === 'nome') {
                       const tagsLinha = Array.isArray(emojisEfetivoByMilitar.get(String(militar.id))?.itens)
                         ? emojisEfetivoByMilitar.get(String(militar.id)).itens.filter(Boolean)
@@ -1406,9 +1406,8 @@ export default function Militares() {
                       const tagsVisiveis = tagsLinha.slice(0, MAX_TAGS_INLINE);
                       const excessoTags = Math.max(0, tagsLinha.length - MAX_TAGS_INLINE);
                       return (
-                        <div key={key} className={`px-2 py-2 min-w-0 ${getColumnClassName(column)}`} style={cellStyle}>
-                          <div className="py-3 px-4">
-                            <div className="flex flex-col">
+                        <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}>
+                            <div className="flex flex-col min-w-0">
                               <div className="flex items-center gap-2 min-w-0 max-w-full overflow-hidden">
                                 <span className="font-bold text-gray-900 truncate min-w-0 flex-1">{militar.nome_guerra || militar.nome_completo}</span>
                                 {Array.isArray(tagsVisiveis) && tagsVisiveis.length > 0 && (
@@ -1439,14 +1438,13 @@ export default function Militares() {
                               </div>
                               <span className="text-xs text-gray-500 mt-0.5 truncate">{militar.nome_completo}</span>
                             </div>
-                          </div>
                         </div>
                       );
                     }
-                    if (key === 'situacao_condicao_militar') return <div key={key} className={`px-2 py-2 min-w-0 ${getColumnClassName(column)}`} style={cellStyle}><CondicaoBadge militar={militar} /></div>;
+                    if (key === 'situacao_condicao_militar') return <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`}><CondicaoBadge militar={militar} /></div>;
                     if (key === 'situacao_militar') {
                       return (
-                        <div key={key} className={`px-2 py-2 ${getColumnClassName(column)}`} style={cellStyle}>
+                        <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`}>
                           {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
                             <Badge variant="outline" className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}>
                               {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
@@ -1457,11 +1455,11 @@ export default function Militares() {
                         </div>
                       );
                     }
-                    if (key === 'status_cadastro') return <div key={key} className={`px-2 py-2 ${getColumnClassName(column)}`} style={cellStyle}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
+                    if (key === 'status_cadastro') return <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
                     const value = columnMetaByKey.get(key)?.accessor?.(militar) || '—';
-                    return <div key={key} className={`px-2 py-2 ${getColumnClassName(column)}`.trim()} style={cellStyle}>{value}</div>;
+                    return <div key={key} className={`min-w-0 px-2 py-2 ${getColumnClassName(column)}`.trim()}>{value}</div>;
                   })}
-                <div className="sticky right-0 z-10 w-[140px] min-w-[140px] bg-white px-2 py-2 flex justify-end gap-1">
+                <div className="min-w-0 px-2 py-2 flex justify-end gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
                     <Eye className="w-4 h-4" />
                   </Button>
