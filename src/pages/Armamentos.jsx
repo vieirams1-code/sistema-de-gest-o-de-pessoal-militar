@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -76,7 +76,7 @@ export default function Armamentos() {
     return currentDate;
   }, []);
 
-  const getStatusBadge = (arma) => {
+  const getStatusBadge = useCallback((arma) => {
     const status = normalizeText(arma.status);
     const validade = parseDate(arma.validade_craf);
     const isExpired = validade ? validade < today : false;
@@ -102,12 +102,26 @@ export default function Armamentos() {
       label: 'Regular',
       className: 'bg-emerald-100 text-emerald-700',
     };
-  };
+  }, [today]);
 
-  const armamentosComStatus = useMemo(
-    () => armamentos.map((arma) => ({ ...arma, statusBadge: getStatusBadge(arma) })),
-    [armamentos],
-  );
+  const { armamentosComStatus, totalRegistrado, crafVencidoOuIrregular, crafRegular } = useMemo(() => {
+    let vencidoOuIrregular = 0;
+
+    const list = armamentos.map((arma) => {
+      const statusBadge = getStatusBadge(arma);
+      if (statusBadge.label !== 'Regular') vencidoOuIrregular += 1;
+      return { ...arma, statusBadge };
+    });
+
+    const total = list.length;
+
+    return {
+      armamentosComStatus: list,
+      totalRegistrado: total,
+      crafVencidoOuIrregular: vencidoOuIrregular,
+      crafRegular: total - vencidoOuIrregular,
+    };
+  }, [armamentos, getStatusBadge]);
 
   const filteredArmamentos = useMemo(() => {
     const normalizedTerm = normalizeText(searchTerm);
@@ -130,17 +144,6 @@ export default function Armamentos() {
       return terms.some((term) => normalizeText(term).includes(normalizedTerm));
     });
   }, [armamentosComStatus, searchTerm]);
-
-  const { totalRegistrado, crafVencidoOuIrregular, crafRegular } = useMemo(() => {
-    const total = armamentosComStatus.length;
-    const vencidoOuIrregular = armamentosComStatus.filter((arma) => arma.statusBadge.label !== 'Regular').length;
-
-    return {
-      totalRegistrado: total,
-      crafVencidoOuIrregular: vencidoOuIrregular,
-      crafRegular: total - vencidoOuIrregular,
-    };
-  }, [armamentosComStatus]);
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
