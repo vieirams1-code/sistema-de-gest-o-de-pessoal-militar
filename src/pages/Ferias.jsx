@@ -491,12 +491,32 @@ export default function Ferias() {
     queryKey: funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags),
     queryFn: async () => {
       if (feriasIdsEscopoTags.length === 0) return [];
-      const feriasIdsSet = new Set(feriasIdsEscopoTags);
-      const vinculos = await base44.entities.FeriasTag.list('-created_date');
-      return (vinculos || []).filter((item) => {
-        const feriasId = String(getFeriasTagFeriasId(item) || '');
-        return feriasIdsSet.has(feriasId);
+      const CHUNK_SIZE = 100;
+      const chunks = [];
+      for (let i = 0; i < feriasIdsEscopoTags.length; i += CHUNK_SIZE) {
+        chunks.push(feriasIdsEscopoTags.slice(i, i + CHUNK_SIZE));
+      }
+
+      const respostas = await Promise.all(
+        chunks.map((idsChunk) =>
+          base44.entities.FeriasTag.filter(
+            {
+              ferias_id: { $in: idsChunk.map(String) },
+            },
+            '-created_date',
+            1000,
+            0,
+          ),
+        ),
+      );
+
+      const dedupPorId = new Map();
+      respostas.flat().forEach((item) => {
+        if (!item?.id || dedupPorId.has(item.id)) return;
+        dedupPorId.set(item.id, item);
       });
+
+      return Array.from(dedupPorId.values());
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
