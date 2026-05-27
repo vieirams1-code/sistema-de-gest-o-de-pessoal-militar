@@ -1,15 +1,17 @@
+import { buildScopeKey } from './buildScopeKey';
+
 export const queryKeys = {
   lotacoes: {
-    root: () => ['lotacoes'],
+    root: (scope) => ['lotacoes', buildScopeKey(scope)],
   },
   funcoes: {
-    root: () => ['funcoes'],
+    root: (scope) => ['funcoes', buildScopeKey(scope)],
   },
   cards: {
-    root: () => ['cards'],
+    root: (scope) => ['cards', buildScopeKey(scope)],
   },
   ferias: {
-    edicao: () => ['ferias', 'edicao'],
+    edicao: (scope) => ['ferias', 'edicao', buildScopeKey(scope)],
   },
 };
 
