@@ -121,6 +121,11 @@ function clampOffset(raw) {
     if (!Number.isFinite(n) || n < 0) return OFFSET_DEFAULT;
     return n;
 }
+function toBooleanFlag(v) {
+    if (typeof v === 'boolean') return v;
+    const normalized = String(v || '').trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
 
 // Sanitiza array de militarIds: aceita apenas strings não vazias, dedup,
 // e impõe um teto de segurança (LIMIT_MAX) para evitar queries enormes.
@@ -322,6 +327,7 @@ Deno.serve(async (req) => {
             limit,
             offset,
             includeFoto,
+            debugFields,
             effectiveEmail,
             militarIds: militarIdsRaw,
         } = payload || {};
@@ -342,6 +348,7 @@ Deno.serve(async (req) => {
         const effLimit = clampLimit(limit);
         const effOffset = clampOffset(offset);
         const effIncludeFoto = includeFoto === true;
+        const effDebugFields = toBooleanFlag(debugFields);
         const militarIdsFiltro = sanitizeMilitarIds(militarIdsRaw);
         const aplicouFiltroMilitarIds = militarIdsFiltro !== null;
         const militarIdsSolicitados = aplicouFiltroMilitarIds ? militarIdsFiltro.length : 0;
@@ -749,6 +756,17 @@ Deno.serve(async (req) => {
         }
 
         const militaresProjetados = militares.map((m) => projetarMilitar(m, campos));
+        const sampleKeysRaw = Object.keys((militares || [])[0] || {});
+        const sampleKeysProjected = Object.keys((militaresProjetados || [])[0] || {});
+        const requiredDebugFields = ['cpf', 'rg', 'telefone', 'email_funcional', 'email_particular', 'data_nascimento', 'data_inclusao', 'cidade', 'condicao', 'status_cadastro', 'condicao_origem_destino', 'estrutura_nome', 'estrutura_tipo', 'sexo', 'tipo_sanguineo'];
+        const hasFields = requiredDebugFields.reduce((acc, field) => {
+            acc[field] = {
+                inSampleKeysRaw: sampleKeysRaw.includes(field),
+                inSampleKeysProjected: sampleKeysProjected.includes(field),
+                inPrimeiroMilitarRetornado: Object.prototype.hasOwnProperty.call((militaresProjetados || [])[0] || {}, field),
+            };
+            return acc;
+        }, {} as Record<string, { inSampleKeysRaw: boolean; inSampleKeysProjected: boolean; inPrimeiroMilitarRetornado: boolean }>);
 
         return Response.json({
             militares: militaresProjetados,
@@ -770,6 +788,7 @@ Deno.serve(async (req) => {
                 busca_aplicada: buscaAplicada,
                 busca_limitada_por_amostra: buscaLimitadaPorAmostra,
                 include_foto: effIncludeFoto,
+                debugFields: effDebugFields ? { sampleKeysRaw, sampleKeysProjected, hasFields } : undefined,
             },
         });
     } catch (error) {

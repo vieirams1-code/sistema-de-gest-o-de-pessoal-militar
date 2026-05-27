@@ -205,6 +205,7 @@ function militarCorrespondeOrigemDestino(militar, termo) {
 export default function Militares() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const debugFieldsEnabled = searchParams.get('debugFields') === 'true';
   const queryClient = useQueryClient();
   const {
     isAdmin,
@@ -380,6 +381,7 @@ export default function Militares() {
   // Filtros que são empurrados para o backend — quando mudam, reseta a paginação
   const backendFiltersKey = [
     isAdmin,
+    debugFieldsEnabled ? 'debugFields' : 'noDebugFields',
     lotacaoFilter,
     selectedPostos.join('|'),
     debouncedSearchTerm,
@@ -410,6 +412,7 @@ export default function Militares() {
         limit: PAGE_SIZE,
         offset: pageOffset,
         includeFoto: false,
+        debugFields: debugFieldsEnabled,
       };
       if (!incluirInativos) {
         payload.statusCadastro = 'Ativo';
@@ -425,8 +428,14 @@ export default function Militares() {
       }
 
       const { militares: lista, meta } = await fetchScopedMilitares(payload);
+      if (debugFieldsEnabled && typeof window !== 'undefined') {
+        console.info('[ConsultaMilitar][debugFields] meta.debugFields:', meta?.debugFields || null);
+      }
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       const comLotacao = enriquecidos.map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) }));
+      if (debugFieldsEnabled && typeof window !== 'undefined') {
+        console.info('[ConsultaMilitar][debugFields] Object.keys(militaresAcumulados[0]):', Object.keys((comLotacao || [])[0] || {}));
+      }
 
       return {
         militares: comLotacao,
