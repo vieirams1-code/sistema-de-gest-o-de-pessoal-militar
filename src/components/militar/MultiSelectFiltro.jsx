@@ -33,11 +33,12 @@ export default function MultiSelectFiltro({
   }, [options]);
 
   const resumo = useMemo(() => {
+    const getLabelText = (optValue) => optionsByValue.get(optValue)?.labelText || optionsByValue.get(optValue)?.label || optValue;
     if (!value || value.length === 0) return placeholder;
-    if (value.length === 1) return optionsByValue.get(value[0])?.label || value[0];
+    if (value.length === 1) return getLabelText(value[0]);
     if (value.length === 2) {
-      const a = optionsByValue.get(value[0])?.label || value[0];
-      const b = optionsByValue.get(value[1])?.label || value[1];
+      const a = getLabelText(value[0]);
+      const b = getLabelText(value[1]);
       return `${a} e ${b}`;
     }
     return `${value.length} selecionados`;

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import { useToast } from '@/components/ui/use-toast';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import {
@@ -35,8 +36,8 @@ function TagVinculoItem({ vinculo, removivel, onRemover, loading }) {
     <div className="rounded-lg border border-slate-200 p-3 space-y-2">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge style={{ backgroundColor: `${cor}22`, color: cor, borderColor: `${cor}55` }} className="border">
-            {resolveTagVisual(tag).emoji} {resolveTagVisual(tag).nome || 'Tag sem nome'}
+          <Badge style={{ backgroundColor: `${cor}22`, color: cor, borderColor: `${cor}55` }} className="border inline-flex items-center gap-1">
+            <IconeCatalogo value={resolveTagVisual(tag).emoji} /> {resolveTagVisual(tag).nome || 'Tag sem nome'}
           </Badge>
           <Badge variant="outline">{vinculo.status || '—'}</Badge>
           {grupo && <Badge variant="outline">Grupo: {grupo.nome}</Badge>}
@@ -175,7 +176,7 @@ export default function FeriasTagsSection({ ferias }) {
             <option value="">Selecione...</option>
             {tagsFiltradas.map((tag) => {
               const grupo = gruposAtivos.find((item) => String(item.id) === String(tag.tag_grupo_id));
-              return <option key={tag.id} value={tag.id}>{resolveTagVisual(tag).emoji} {resolveTagVisual(tag).nome} · {grupo?.nome || 'Sem grupo'}</option>;
+              return <option key={tag.id} value={tag.id}>{resolveTagVisual(tag).nome} · {grupo?.nome || 'Sem grupo'}</option>;
             })}
           </select>
         </div>

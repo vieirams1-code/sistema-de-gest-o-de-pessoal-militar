@@ -30,6 +30,7 @@ import {
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
+import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import CondicaoBadge from '@/components/militar/CondicaoBadge';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
@@ -1025,7 +1026,8 @@ export default function Militares() {
               placeholder="Todas"
               options={tagsAtivas.map((tag) => ({
                 value: String(tag.id),
-                label: `${resolveTagVisual(tag).emoji} ${resolveTagVisual(tag).nome}`,
+                labelText: `${resolveTagVisual(tag).nome}`,
+                label: <span className="inline-flex items-center gap-1"><IconeCatalogo value={resolveTagVisual(tag).emoji} />{resolveTagVisual(tag).nome}</span>,
               }))}
               value={tagsSelecionadas}
               onChange={setTagsSelecionadas}
