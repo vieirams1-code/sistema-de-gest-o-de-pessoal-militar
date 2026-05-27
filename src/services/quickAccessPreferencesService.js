@@ -48,13 +48,25 @@ function normalizePayload(payload = {}) {
   };
 }
 
+function getPreferenceEntity(client) {
+  if (!client?.entities) return null;
+
+  try {
+    const entity = client.entities.PreferenciaUsuario;
+    if (!entity || typeof entity.filter !== 'function') return null;
+    return entity;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchQuickAccessPreference(userEmail) {
   const email = String(userEmail || '').trim().toLowerCase();
   if (!email) return null;
 
   const client = await getClient();
-  const entity = client?.entities?.PreferenciaUsuario;
-  if (!entity || typeof entity.filter !== 'function') return null;
+  const entity = getPreferenceEntity(client);
+  if (!entity) return null;
 
   const registros = await entity.filter({ user_email: email, contexto: QUICK_ACCESS_CONTEXT }, '-updated_date');
   const preferencia = Array.isArray(registros) ? registros[0] : null;
@@ -74,8 +86,8 @@ export async function saveQuickAccessPreference({ userEmail, itensFixados = [], 
   if (!email) return null;
 
   const client = await getClient();
-  const entity = client?.entities?.PreferenciaUsuario;
-  if (!entity || typeof entity.filter !== 'function') return null;
+  const entity = getPreferenceEntity(client);
+  if (!entity) return null;
 
   const registros = await entity.filter({ user_email: email, contexto: QUICK_ACCESS_CONTEXT }, '-updated_date');
   const preferenciaExistente = Array.isArray(registros) ? registros[0] : null;
