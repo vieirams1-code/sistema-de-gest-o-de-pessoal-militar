@@ -222,7 +222,13 @@ Deno.serve(async (req) => {
       },
     });
   } catch (error) {
-    const status = (error as any)?.response?.status || (error as any)?.status || 500;
-    return Response.json({ error: (error as any)?.message || 'Erro ao gerar relatório DP/DINTEL de atestados.', meta: { status } }, { status });
+    const err = error as any;
+    const status = err?.response?.status || err?.status || 500;
+    const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.response?.data?.error;
+    const baseMessage = err?.message || 'Erro ao gerar relatório DP/DINTEL de atestados.';
+    const message = status === 429
+      ? 'Limite de requisições excedido ao gerar o relatório. Tente novamente em instantes.'
+      : (detail ? `${baseMessage} (${detail})` : baseMessage);
+    return Response.json({ error: message, code: status === 429 ? 'RATE_LIMITED' : 'REPORT_FAILED', meta: { status, detail: detail || null } }, { status });
   }
 });
