@@ -41,6 +41,18 @@ export function getEffectiveEmail() {
  * O effectiveEmail é injetado automaticamente quando presente no
  * sessionStorage (a menos que o caller já tenha passado um valor).
  *
+ * Payload suportado (campos opcionais):
+ *  - limit, offset, includeFoto, debugFields
+ *  - statusCadastro, situacaoMilitar, search, militarIds
+ *  - postoGraduacaoFiltro (string) | postoGraduacaoFiltros (array)
+ *  - lotacaoFiltro (string)
+ *  - quadrosFiltros (array)            — novo (P1)
+ *  - condicaoFiltro (string)           — novo (P1)
+ *  - movimentoFiltro ('entrada'|'saida') — novo (P1)
+ *  - funcoesIds (array)                — novo (P1)
+ *  - tagsIds (array)                   — novo (P1)
+ *  - gruposIds (array)                 — novo (P1)
+ *
  * @param {Object} payload
  * @returns {Promise<{ militares: Array, meta: Object }>}
  */

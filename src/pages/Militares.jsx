@@ -37,8 +37,7 @@ import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMil
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
-import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
-import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
+import { isQuadroComDestaque, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
@@ -457,6 +456,12 @@ export default function Militares() {
     debugFieldsEnabled ? 'debugFields' : 'noDebugFields',
     lotacaoFilter,
     selectedPostos.join('|'),
+    quadrosSelecionados.join('|'),
+    condicaoFilter,
+    movimentoFilter,
+    funcoesSelecionadas.join('|'),
+    tagsSelecionadas.join('|'),
+    gruposSelecionados.join('|'),
     debouncedSearchTerm,
     effectiveEmail || 'self',
     incluirInativos ? 'todos' : 'ativos',
@@ -491,6 +496,12 @@ export default function Militares() {
         payload.statusCadastro = 'Ativo';
       }
       if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;
+      if (quadrosSelecionados.length > 0) payload.quadrosFiltros = quadrosSelecionados;
+      if (condicaoFilter && condicaoFilter !== CONDICOES_TODAS) payload.condicaoFiltro = condicaoFilter;
+      if (movimentoFilter && movimentoFilter !== MOVIMENTO_TODOS) payload.movimentoFiltro = movimentoFilter;
+      if (funcoesSelecionadas.length > 0) payload.funcoesIds = funcoesSelecionadas;
+      if (tagsSelecionadas.length > 0) payload.tagsIds = tagsSelecionadas;
+      if (gruposSelecionados.length > 0) payload.gruposIds = gruposSelecionados;
       if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
       if (
         shouldShowLotacaoFilter
@@ -636,30 +647,26 @@ export default function Militares() {
     [],
   );
 
+  // Os filtros de quadro, condição, movimento, funções, tags e grupos já são
+  // aplicados no backend (getScopedMilitares P1). Aqui mantemos apenas:
+  //  - situação militar (ainda client-side por enquanto)
+  //  - busca por texto (já reforçada no backend, mas útil para textos como
+  //    origem/destino que o backend não cobre)
   const filteredMilitaresBase = useMemo(() => operacionais
-    .filter((m) => {
-      if (quadrosSelecionados.length === 0) return true;
-      return quadrosSelecionados.includes(normalizarQuadroLegado(m?.quadro));
-    })
     .filter((m) => {
       if (situacoesSelecionadas.length === 0) return true;
       const situacao = String(m?.situacao_militar || 'Ativa');
       return situacoesSelecionadas.includes(situacao);
     })
-    .filter((m) => {
-      if (condicaoFilter === CONDICOES_TODAS) return true;
-      const cond = String(m?.condicao || '').trim() || 'Efetivo';
-      return cond === condicaoFilter;
-    })
-    .filter((m) => {
-      if (movimentoFilter === MOVIMENTO_TODOS) return true;
-      return resolveMovimentoCondicao(m) === movimentoFilter;
-    })
     .filter((m) => (
       militarCorrespondeBusca(m, searchTerm)
       || militarCorrespondeOrigemDestino(m, searchTerm)
-    )), [operacionais, quadrosSelecionados, situacoesSelecionadas, condicaoFilter, movimentoFilter, searchTerm]);
+    )), [operacionais, situacoesSelecionadas, searchTerm]);
 
+  // filtrarMilitaresPorFuncoesETags é mantido como rede de segurança no
+  // caso de inconsistência transitória entre a página de militares e os
+  // hooks de vínculos (vinculosFuncoesAtivosFiltros/vinculosTagsAtivosFiltros).
+  // Idealmente, com backend já filtrando, esta operação é no-op.
   const filteredMilitaresComFuncoesTags = useMemo(() => filtrarMilitaresPorFuncoesETags({
     militares: filteredMilitaresBase,
     filtros: {

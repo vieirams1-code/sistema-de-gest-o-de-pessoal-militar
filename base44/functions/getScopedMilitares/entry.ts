@@ -141,6 +141,124 @@ function sanitizeMilitarIds(raw) {
     return set.size > 0 ? Array.from(set) : null;
 }
 
+// Sanitiza array genérico de IDs (strings não vazias, dedup, sem teto rígido
+// pois alimentam pré-resolução de catálogos).
+function sanitizeIdArray(raw) {
+    if (!Array.isArray(raw)) return null;
+    const set = new Set();
+    for (const v of raw) {
+        if (typeof v !== 'string') continue;
+        const trimmed = v.trim();
+        if (trimmed) set.add(trimmed);
+    }
+    return set.size > 0 ? Array.from(set) : null;
+}
+
+// Sanitiza array de strings com normalização leve (trim, dedup).
+function sanitizeStringArray(raw) {
+    if (!Array.isArray(raw)) return null;
+    const set = new Set();
+    for (const v of raw) {
+        if (typeof v !== 'string') continue;
+        const trimmed = v.trim();
+        if (trimmed) set.add(trimmed);
+    }
+    return set.size > 0 ? Array.from(set) : null;
+}
+
+// Normaliza valor de condicao (Efetivo, Adido, Agregado, Cedido,
+// "À Disposição", LTIP). Retorna null se não bater com a enumeração
+// suportada.
+const CONDICOES_VALIDAS = new Set(['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição', 'LTIP']);
+function sanitizeCondicao(raw) {
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    return CONDICOES_VALIDAS.has(trimmed) ? trimmed : null;
+}
+
+// =====================================================================
+// Pré-resolução de militarIds via vínculos (funções, tags, grupos)
+// =====================================================================
+//
+// Estratégia: cada filtro produz um Set de militarIds elegíveis. A
+// interseção desses Sets é aplicada via `id: { $in: ... }` na query
+// principal do Militar. Quando algum filtro resulta em conjunto vazio,
+// retornamos sentinela `__EMPTY__` para que o handler responda 0
+// resultados sem consultar Militar.
+// =====================================================================
+async function resolverMilitarIdsPorFuncoes(base44, funcoesIds) {
+    if (!funcoesIds || funcoesIds.length === 0) return null;
+    const vinculos = await fetchWithRetry(
+        () =>
+            base44.asServiceRole.entities.MilitarFuncao.filter(
+                { status: 'ativa', funcao_militar_id: { $in: funcoesIds } },
+                undefined,
+                LIMIT_MAX,
+                0,
+                ['militar_id']
+            ),
+        'militarFuncao.filter.por_funcoes'
+    );
+    const ids = new Set();
+    (vinculos || []).forEach((v) => v?.militar_id && ids.add(String(v.militar_id)));
+    return ids;
+}
+
+async function resolverMilitarIdsPorTags(base44, tagsIds) {
+    if (!tagsIds || tagsIds.length === 0) return null;
+    const vinculos = await fetchWithRetry(
+        () =>
+            base44.asServiceRole.entities.MilitarTag.filter(
+                { status: 'ativa', tag_id: { $in: tagsIds } },
+                undefined,
+                LIMIT_MAX,
+                0,
+                ['militar_id']
+            ),
+        'militarTag.filter.por_tags'
+    );
+    const ids = new Set();
+    (vinculos || []).forEach((v) => v?.militar_id && ids.add(String(v.militar_id)));
+    return ids;
+}
+
+async function resolverMilitarIdsPorGrupos(base44, gruposIds) {
+    if (!gruposIds || gruposIds.length === 0) return null;
+    // 1. Buscar tags que pertencem aos grupos
+    const tags = await fetchWithRetry(
+        () =>
+            base44.asServiceRole.entities.Tag.filter(
+                { grupo_id: { $in: gruposIds } },
+                undefined,
+                LIMIT_MAX,
+                0,
+                ['id']
+            ),
+        'tag.filter.por_grupos'
+    );
+    const tagIds = (tags || []).map((t) => t?.id).filter(Boolean);
+    if (tagIds.length === 0) return new Set();
+    // 2. Buscar vínculos MilitarTag por essas tags
+    return await resolverMilitarIdsPorTags(base44, tagIds);
+}
+
+// Calcula interseção de Sets de militarIds. Sets nulos são ignorados
+// (significa "sem filtro nessa dimensão").
+function intersectarMilitarIds(sets) {
+    const validos = sets.filter((s) => s instanceof Set);
+    if (validos.length === 0) return null;
+    if (validos.length === 1) return validos[0];
+    // Começa pelo menor para reduzir trabalho
+    validos.sort((a, b) => a.size - b.size);
+    const [base, ...resto] = validos;
+    const out = new Set();
+    base.forEach((id) => {
+        if (resto.every((s) => s.has(id))) out.add(id);
+    });
+    return out;
+}
+
 // =====================================================================
 // Resolução de escopo consolidado
 // =====================================================================
@@ -320,6 +438,12 @@ Deno.serve(async (req) => {
             lotacaoFiltro,
             postoGraduacaoFiltro,
             postoGraduacaoFiltros: postoGraduacaoFiltrosRaw,
+            quadrosFiltros: quadrosFiltrosRaw,
+            condicaoFiltro: condicaoFiltroRaw,
+            movimentoFiltro: movimentoFiltroRaw,
+            funcoesIds: funcoesIdsRaw,
+            tagsIds: tagsIdsRaw,
+            gruposIds: gruposIdsRaw,
             search,
             statusCadastro,
             situacaoMilitar,
@@ -333,9 +457,14 @@ Deno.serve(async (req) => {
         } = payload || {};
 
         // Sanitização: aceita 'entrada' | 'saida'
+        // movimentoFiltro (novo, P1) tem precedência sobre condicaoMovimento (legado).
         const condicaoMovimentoFiltro = (() => {
-            const v = String(condicaoMovimento || '').trim().toLowerCase();
-            return v === 'entrada' || v === 'saida' ? v : null;
+            const candidatos = [movimentoFiltroRaw, condicaoMovimento];
+            for (const c of candidatos) {
+                const v = String(c || '').trim().toLowerCase();
+                if (v === 'entrada' || v === 'saida') return v;
+            }
+            return null;
         })();
 
         // Suporte a múltiplos postos via $in (Lote 1C-A) — aditivo e
@@ -344,6 +473,13 @@ Deno.serve(async (req) => {
         const postoGraduacaoFiltros = Array.isArray(postoGraduacaoFiltrosRaw)
             ? [...new Set(postoGraduacaoFiltrosRaw.filter((p) => typeof p === 'string' && p.trim()))]
             : null;
+
+        // Novos filtros backend (P1)
+        const quadrosFiltros = sanitizeStringArray(quadrosFiltrosRaw);
+        const condicaoFiltro = sanitizeCondicao(condicaoFiltroRaw);
+        const funcoesIdsFiltro = sanitizeIdArray(funcoesIdsRaw);
+        const tagsIdsFiltro = sanitizeIdArray(tagsIdsRaw);
+        const gruposIdsFiltro = sanitizeIdArray(gruposIdsRaw);
 
         const effLimit = clampLimit(limit);
         const effOffset = clampOffset(offset);
@@ -470,9 +606,66 @@ Deno.serve(async (req) => {
         } else if (postoGraduacaoFiltro) {
             baseFilter.posto_graduacao = postoGraduacaoFiltro;
         }
+        if (quadrosFiltros && quadrosFiltros.length > 0) {
+            baseFilter.quadro = { $in: quadrosFiltros };
+        }
+        if (condicaoFiltro) baseFilter.condicao = condicaoFiltro;
         if (statusCadastro) baseFilter.status_cadastro = statusCadastro;
         if (situacaoMilitar) baseFilter.situacao_militar = situacaoMilitar;
         if (condicaoMovimentoFiltro) baseFilter.condicao_movimento = condicaoMovimentoFiltro;
+
+        // 6.b. Pré-resolução de filtros via vínculos (funções/tags/grupos).
+        // Cada filtro produz um Set de militarIds. A interseção é aplicada
+        // como `id: { $in: ... }` na query principal. Se algum Set ficar
+        // vazio, retornamos 0 resultados sem tocar em Militar.
+        const setsParaInterseccao = [];
+        let aplicouFiltroFuncoes = false;
+        let aplicouFiltroTags = false;
+        let aplicouFiltroGrupos = false;
+
+        if (funcoesIdsFiltro || tagsIdsFiltro || gruposIdsFiltro) {
+            const [setFuncoes, setTags, setGrupos] = await Promise.all([
+                resolverMilitarIdsPorFuncoes(base44, funcoesIdsFiltro),
+                resolverMilitarIdsPorTags(base44, tagsIdsFiltro),
+                resolverMilitarIdsPorGrupos(base44, gruposIdsFiltro),
+            ]);
+            if (setFuncoes) { setsParaInterseccao.push(setFuncoes); aplicouFiltroFuncoes = true; }
+            if (setTags) { setsParaInterseccao.push(setTags); aplicouFiltroTags = true; }
+            if (setGrupos) { setsParaInterseccao.push(setGrupos); aplicouFiltroGrupos = true; }
+        }
+
+        const militarIdsPorVinculo = intersectarMilitarIds(setsParaInterseccao);
+        // Quando aplicou algum filtro de vínculo mas a interseção é vazia,
+        // já podemos retornar 0 resultados.
+        if (militarIdsPorVinculo && militarIdsPorVinculo.size === 0) {
+            return Response.json(
+                {
+                    militares: [],
+                    meta: {
+                        ...baseMeta,
+                        returned: 0,
+                        militar_ids_retornados: 0,
+                        limit: effLimit,
+                        offset: effOffset,
+                        hasMore: false,
+                        offsetAplicadoNaConsulta: false,
+                        scope_tipo: isAdmin ? 'admin' : escopo.tipo,
+                        aplicou_filtro_funcoes: aplicouFiltroFuncoes,
+                        aplicou_filtro_tags: aplicouFiltroTags,
+                        aplicou_filtro_grupos: aplicouFiltroGrupos,
+                        reason: 'SEM_MILITARES_NOS_VINCULOS',
+                    },
+                },
+                { status: 200 }
+            );
+        }
+        // Aplica os ids resolvidos por vínculos ao baseFilter (interseção
+        // se já existir um `id` previamente — não é o caso aqui, mas a
+        // composição com `militarFilter.id = {$in: ...}` mais abaixo é
+        // tratada de forma cuidadosa).
+        if (militarIdsPorVinculo && militarIdsPorVinculo.size > 0) {
+            baseFilter.id = { $in: Array.from(militarIdsPorVinculo) };
+        }
 
         // 7. Aplicar escopo + lotacaoFiltro
         let militarFilter = { ...baseFilter };
@@ -505,7 +698,15 @@ Deno.serve(async (req) => {
                     { status: 200 }
                 );
             }
-            militarFilter.id = { $in: escopo.militarIds };
+            // Se já houver um filtro por id vindo de vínculos, fazer interseção.
+            const idsBase = (baseFilter.id && Array.isArray(baseFilter.id.$in))
+                ? baseFilter.id.$in
+                : null;
+            const idsEscopo = escopo.militarIds || [];
+            const idsFinais = idsBase
+                ? idsEscopo.filter((id) => idsBase.includes(id))
+                : idsEscopo;
+            militarFilter.id = { $in: idsFinais };
             usouFiltroProprios = true;
         } else if (escopo.tipo === 'estrutura') {
             const permitidos = escopo.estruturaIds || [];
@@ -578,13 +779,22 @@ Deno.serve(async (req) => {
 
         if (aplicouFiltroMilitarIds) {
             // Caminho dedicado: militarIds com interseção de escopo.
-            const idsSolicitadosSet = new Set(militarIdsFiltro);
+            // Se houver filtro por vínculos no baseFilter.id, intersectar
+            // com militarIdsFiltro ANTES de tudo.
+            const idsBaseVinculos = (baseFilter.id && Array.isArray(baseFilter.id.$in))
+                ? new Set(baseFilter.id.$in)
+                : null;
+            const militarIdsFiltroComVinculos = idsBaseVinculos
+                ? militarIdsFiltro.filter((id) => idsBaseVinculos.has(id))
+                : militarIdsFiltro;
+
+            const idsSolicitadosSet = new Set(militarIdsFiltroComVinculos);
             let idsPermitidosParaConsulta;
 
             if (isAdmin) {
-                idsPermitidosParaConsulta = militarIdsFiltro;
+                idsPermitidosParaConsulta = militarIdsFiltroComVinculos;
             } else if (escopo.tipo === 'proprio') {
-                idsPermitidosParaConsulta = militarIdsFiltro.filter((id) =>
+                idsPermitidosParaConsulta = militarIdsFiltroComVinculos.filter((id) =>
                     (escopo.militarIds || []).includes(id)
                 );
             } else if (escopo.tipo === 'estrutura') {
@@ -594,7 +804,7 @@ Deno.serve(async (req) => {
                 // Para simplificar e manter precisão, fazemos duas queries e unimos:
                 //   q1: id ∈ militarIds AND estrutura_id ∈ permitidos
                 //   q2: id ∈ militarIds AND id ∈ militarIdsProprios
-                idsPermitidosParaConsulta = militarIdsFiltro;
+                idsPermitidosParaConsulta = militarIdsFiltroComVinculos;
             } else {
                 idsPermitidosParaConsulta = [];
             }
@@ -707,7 +917,14 @@ Deno.serve(async (req) => {
                 (escopo.militarIdsProprios || []).length > 0 &&
                 !lotacaoFiltro
             ) {
-                const proprioFilter = { ...baseFilter, id: { $in: escopo.militarIdsProprios } };
+                // Se houver filtro por vínculos no baseFilter.id, intersectar com próprios.
+                const idsBaseVinculos = (baseFilter.id && Array.isArray(baseFilter.id.$in))
+                    ? baseFilter.id.$in
+                    : null;
+                const idsProprios = idsBaseVinculos
+                    ? (escopo.militarIdsProprios || []).filter((id) => idsBaseVinculos.includes(id))
+                    : (escopo.militarIdsProprios || []);
+                const proprioFilter = { ...baseFilter, id: { $in: idsProprios } };
                 const proprios = await fetchWithRetry(
                     () =>
                         base44.asServiceRole.entities.Militar.filter(
@@ -766,7 +983,7 @@ Deno.serve(async (req) => {
                 inPrimeiroMilitarRetornado: Object.prototype.hasOwnProperty.call((militaresProjetados || [])[0] || {}, field),
             };
             return acc;
-        }, {} as Record<string, { inSampleKeysRaw: boolean; inSampleKeysProjected: boolean; inPrimeiroMilitarRetornado: boolean }>);
+        }, {});
 
         return Response.json({
             militares: militaresProjetados,
@@ -782,6 +999,15 @@ Deno.serve(async (req) => {
                 aplicou_filtro_lotacao: !!lotacaoFiltro,
                 aplicou_filtro_posto: !!postoGraduacaoFiltro || (postoGraduacaoFiltros && postoGraduacaoFiltros.length > 0),
                 postos_solicitados: postoGraduacaoFiltros ? postoGraduacaoFiltros.length : (postoGraduacaoFiltro ? 1 : 0),
+                aplicou_filtro_quadros: !!(quadrosFiltros && quadrosFiltros.length > 0),
+                quadros_solicitados: quadrosFiltros ? quadrosFiltros.length : 0,
+                aplicou_filtro_condicao: !!condicaoFiltro,
+                aplicou_filtro_funcoes: aplicouFiltroFuncoes,
+                funcoes_solicitadas: funcoesIdsFiltro ? funcoesIdsFiltro.length : 0,
+                aplicou_filtro_tags: aplicouFiltroTags,
+                tags_solicitadas: tagsIdsFiltro ? tagsIdsFiltro.length : 0,
+                aplicou_filtro_grupos: aplicouFiltroGrupos,
+                grupos_solicitados: gruposIdsFiltro ? gruposIdsFiltro.length : 0,
                 aplicou_filtro_status: !!statusCadastro,
                 aplicou_filtro_situacao: !!situacaoMilitar,
                 aplicou_filtro_condicao_movimento: !!condicaoMovimentoFiltro,
