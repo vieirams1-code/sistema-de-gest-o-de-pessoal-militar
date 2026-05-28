@@ -209,7 +209,7 @@ export default function ExtratoAtestadosMedicos() {
         limite_excedido: isLimit,
       });
       if (isNoZipCompat) {
-        window.alert('Estes anexos antigos podem ser abertos individualmente, mas ainda não suportam ZIP. Cadastros novos com metadados de storage suportam compactação.');
+        window.alert('Os anexos selecionados são antigos. Eles podem ser abertos individualmente, mas ainda não suportam download em ZIP.');
       } else {
         const detail = e?.detail ? JSON.stringify(e.detail) : '-';
         const meta = e?.meta ? JSON.stringify(e.meta) : '-';
