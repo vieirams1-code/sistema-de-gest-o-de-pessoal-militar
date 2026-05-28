@@ -187,9 +187,15 @@ export default function ExtratoAtestadosMedicos() {
       const normalizedError = normalizeAttachmentError(e, {
         action: 'export_zip_anexos',
       });
-      setDiagnosticoAnexos((prev) => ({ ...prev, ultimoErroZip: normalizedError }));
+      const code = String(e?.code || '').toUpperCase();
+      const isLimit = code === 'LIMIT_EXCEEDED';
+      const isNoZipCompat = code === 'NO_ZIP_COMPATIBLE_ATTACHMENTS';
+      setDiagnosticoAnexos((prev) => ({
+        ...prev,
+        ultimoErroZip: normalizedError,
+        legacyAttachmentUnsupported: isNoZipCompat ? true : prev.legacyAttachmentUnsupported,
+      }));
       const msg = String(e?.message || 'Não foi possível gerar o ZIP agora.');
-      const isLimit = String(e?.code || '').toUpperCase() === 'LIMIT_EXCEEDED';
       await registrarAuditoria({
         acao: 'export_zip_anexos',
         quantidade_registros: selectedIds.size,
@@ -199,11 +205,16 @@ export default function ExtratoAtestadosMedicos() {
         extrato_parcial: false,
         quantidade_anexos: Number(e?.meta?.quantidade_anexos || 0),
         arquivos_ignorados_sem_anexo: Number(e?.meta?.arquivos_ignorados_sem_anexo || 0),
+        legacy_attachment_count: Number(e?.meta?.legacy_attachment_count || 0),
         limite_excedido: isLimit,
       });
-      const detail = e?.detail ? JSON.stringify(e.detail) : '-';
-      const meta = e?.meta ? JSON.stringify(e.meta) : '-';
-      window.alert(`Falha ao gerar ZIP\ncode=${String(e?.code || '-')}\nmessage=${msg}\ndetail=${detail}\nmeta=${meta}${isLimit ? '\n\nLimite: até 50 anexos e tamanho estimado até 100MB.' : ''}`);
+      if (isNoZipCompat) {
+        window.alert('Estes anexos antigos podem ser abertos individualmente, mas ainda não suportam ZIP. Cadastros novos com metadados de storage suportam compactação.');
+      } else {
+        const detail = e?.detail ? JSON.stringify(e.detail) : '-';
+        const meta = e?.meta ? JSON.stringify(e.meta) : '-';
+        window.alert(`Falha ao gerar ZIP\ncode=${String(e?.code || '-')}\nmessage=${msg}\ndetail=${detail}\nmeta=${meta}${isLimit ? '\n\nLimite: até 50 anexos e tamanho estimado até 100MB.' : ''}`);
+      }
     } finally {
       setIsExportingZip(false);
     }

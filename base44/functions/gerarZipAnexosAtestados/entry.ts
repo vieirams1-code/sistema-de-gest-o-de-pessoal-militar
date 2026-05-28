@@ -4,72 +4,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2.49.8';
 import JSZip from 'npm:jszip@3.10.1';
 
 const MAX_FILES = 50;
-const MAX_ESTIMATED_BYTES = 100 * 1024 * 1024;
-const SIGNED_URL_TTL_SECONDS = 120;
-const HEAD_TIMEOUT_MS = 4000;
-const BASE44_APP_FILES_PREFIX = '/api/apps/';
 const LEGACY_ATTACHMENT_UNSUPPORTED = 'LEGACY_ATTACHMENT_UNSUPPORTED';
 
 const normalizeIds = (value: unknown) => Array.isArray(value) ? value.map((x) => String(x || '').trim()).filter(Boolean) : [];
-
-function parseStorageLocation(fileRef: string) {
-  const t = String(fileRef || '').trim();
-  if (!t) return null;
-  const m = t.match(/^([^/]+)\/(.+)$/);
-  if (m && !t.startsWith('http://') && !t.startsWith('https://')) return { bucket: m[1], objectPath: m[2] };
-  try {
-    const u = new URL(t);
-    const k = '/storage/v1/object/';
-    const i = u.pathname.indexOf(k);
-    if (i === -1) return null;
-    const s = u.pathname.slice(i + k.length);
-    const n = s.startsWith('public/') || s.startsWith('sign/') || s.startsWith('authenticated/') ? s.split('/').slice(1).join('/') : s;
-    const p = n.split('/').filter(Boolean);
-    if (p.length < 2) return null;
-    return { bucket: p[0], objectPath: p.slice(1).join('/') };
-  } catch {
-    return null;
-  }
-}
-
-function extractArquivoFileUri(raw: unknown): string {
-  if (typeof raw === 'string') return raw.trim();
-  if (Array.isArray(raw)) {
-    for (const item of raw) {
-      const nested = extractArquivoFileUri(item);
-      if (nested) return nested;
-    }
-    return '';
-  }
-  if (raw && typeof raw === 'object') {
-    const obj = raw as Record<string, unknown>;
-    const directCandidates = [obj.file_uri, obj.url, obj.path, obj.fileUrl, obj.signedUrl];
-    for (const candidate of directCandidates) {
-      const nested = extractArquivoFileUri(candidate);
-      if (nested) return nested;
-    }
-    const nestedCandidates = [obj.arquivo_atestado, obj.file, obj.anexo, obj.value, obj.data];
-    for (const candidate of nestedCandidates) {
-      const nested = extractArquivoFileUri(candidate);
-      if (nested) return nested;
-    }
-  }
-  return '';
-}
-
-function parseBase44AppFileUrl(rawUrl: string): { appId: string; filePath: string; hostPathSanitized: string } | null {
-  try {
-    const u = new URL(rawUrl);
-    const parts = u.pathname.split('/').filter(Boolean);
-    if (parts.length < 5 || parts[0] !== 'api' || parts[1] !== 'apps' || parts[3] !== 'files') return null;
-    const appId = String(parts[2] || '').trim();
-    const filePath = parts.slice(4).join('/');
-    if (!appId || !filePath) return null;
-    return { appId, filePath, hostPathSanitized: `${u.host}${u.pathname}` };
-  } catch {
-    return null;
-  }
-}
 
 const sanitize = (v: unknown) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'militar';
 const inferExt = (path: string, ct: string | null) => {
@@ -102,85 +39,57 @@ Deno.serve(async (req) => {
 
     const autorizadosOriginais = await Promise.all(autorizadosIds.map((id) => base44.entities.Atestado.get(id).catch(() => null)));
     const autorizados = autorizadosOriginais.filter(Boolean);
-    const comAnexo = autorizados.filter((a: any) => String(a?.storage_bucket || '').trim() && String(a?.storage_object_path || '').trim() || extractArquivoFileUri(a?.arquivo_atestado));
-    const semAnexo = autorizados.length - comAnexo.length;
 
-    if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_VALID_ATTACHMENTS', detail: 'Nenhum atestado com arquivo_atestado utilizável foi encontrado no escopo autorizado.', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo, arquivos_fora_escopo: semEscopo } }, { status: 422 });
-    if (comAnexo.length > MAX_FILES) return Response.json({ error: 'Limite de anexos excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_arquivos: MAX_FILES, quantidade_anexos: comAnexo.length, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
+    // MODO PRODUÇÃO: ZIP somente para anexos com storage_bucket + storage_object_path.
+    // Anexos legados (sem storage metadata) são ignorados com code LEGACY_ATTACHMENT_UNSUPPORTED.
+    const temStorageMetadata = (a: any) => Boolean(String(a?.storage_bucket || '').trim() && String(a?.storage_object_path || '').trim());
+    const comStorageMetadata = autorizados.filter(temStorageMetadata);
+    const legadosSemStorage = autorizados.filter((a: any) => !temStorageMetadata(a));
+    const semAnexo = legadosSemStorage.length;
 
-    // Supabase é OPCIONAL: só inicializado se houver pelo menos um anexo
-    // que precise de signed URL (ou seja, anexos que NÃO são URLs HTTPS diretas).
+    if (!comStorageMetadata.length) {
+      return Response.json({
+        error: 'Os anexos selecionados são antigos e não possuem metadados compatíveis com ZIP.',
+        code: 'NO_ZIP_COMPATIBLE_ATTACHMENTS',
+        detail: 'Nenhum dos atestados selecionados possui storage_bucket + storage_object_path. Anexos antigos podem ser abertos individualmente, mas não suportam compactação em ZIP.',
+        meta: {
+          totalSelecionados: idsSelecionados.length,
+          legacy_attachment_count: legadosSemStorage.length,
+          unsupported_count: legadosSemStorage.length,
+          arquivos_fora_escopo: semEscopo,
+        },
+      }, { status: 422 });
+    }
+    if (comStorageMetadata.length > MAX_FILES) return Response.json({ error: 'Limite de anexos excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_arquivos: MAX_FILES, quantidade_anexos: comStorageMetadata.length, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
+
+    const comAnexo = comStorageMetadata;
+
+    // ZIP exige storage metadata, portanto Supabase é obrigatório.
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('BASE44_SUPABASE_SERVICE_ROLE_KEY');
-    const precisaSupabase = comAnexo.some((a: any) => {
-      const u = extractArquivoFileUri(a?.arquivo_atestado);
-      return u && !u.startsWith('http://') && !u.startsWith('https://');
-    });
-    if (precisaSupabase && (!supabaseUrl || !supabaseKey)) {
+    if (!supabaseUrl || !supabaseKey) {
       return Response.json({ error: 'Configuração de storage indisponível.', code: 'STORAGE_CONFIG_UNAVAILABLE', detail: 'SUPABASE_URL/BASE44_SUPABASE_URL ou SERVICE_ROLE_KEY ausentes para assinar anexos internos.', meta: { quantidade_anexos: comAnexo.length } }, { status: 500 });
     }
-    const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } }) : null;
-    const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string; storageLocation: { bucket: string; objectPath: string } | null; legacyAttachment: boolean }> = [];
+    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+    const prepared: Array<{ atestado: any; objectPath: string; storageLocation: { bucket: string; objectPath: string } }> = [];
     const skipped: Array<{ atestado_id: string; code: string; message: string }> = [];
-    let estimatedBytes = 0;
-    let legacyAttachmentCount = 0;
+    const legacyAttachmentCount = legadosSemStorage.length;
+
+    // Marca legados ignorados explicitamente em skipped para auditoria.
+    for (const legacy of legadosSemStorage) {
+      skipped.push({
+        atestado_id: String(legacy?.id || ''),
+        code: LEGACY_ATTACHMENT_UNSUPPORTED,
+        message: 'Anexo legado sem storage_bucket/storage_object_path. ZIP não suportado.',
+      });
+    }
 
     for (const atestado of comAnexo) {
-      const rawArquivo = extractArquivoFileUri(atestado?.arquivo_atestado);
-
-      let signedUrl: string | null = null;
-      let objectPath: string = '';
-      let storageLocation: { bucket: string; objectPath: string } | null = null;
-
-      const explicitBucket = String(atestado?.storage_bucket || '').trim();
-      const explicitObjectPath = String(atestado?.storage_object_path || '').trim();
-      if (explicitBucket && explicitObjectPath) {
-        storageLocation = { bucket: explicitBucket, objectPath: explicitObjectPath };
-      } else {
-        const parsedLocation = parseStorageLocation(rawArquivo);
-        if (parsedLocation) storageLocation = parsedLocation;
-        if (!storageLocation) legacyAttachmentCount += 1;
-      }
-
-      if ((rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) && !storageLocation) {
-        const base44FileUrl = parseBase44AppFileUrl(rawArquivo);
-        if (base44FileUrl) {
-          skipped.push({
-            atestado_id: String(atestado?.id || ''),
-            code: LEGACY_ATTACHMENT_UNSUPPORTED,
-            message: `URL Base44 não mapeável para storage nativo: ${base44FileUrl.hostPathSanitized}`,
-          });
-          continue;
-        }
-        signedUrl = rawArquivo;
-        try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
-      } else {
-        const location = storageLocation;
-        if (!location || !supabase) { skipped.push({ atestado_id: String(atestado?.id || ''), code: 'INVALID_FILE_REF', message: 'Referência de arquivo inválida para assinatura.' }); continue; }
-        const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
-        if (signed.error || !signed.data?.signedUrl) { skipped.push({ atestado_id: String(atestado?.id || ''), code: 'SIGNED_URL_FAILED', message: String(signed.error?.message || 'Falha ao gerar signed URL.') }); continue; }
-        signedUrl = signed.data.signedUrl;
-        objectPath = location.objectPath;
-      }
-
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), HEAD_TIMEOUT_MS);
-        const head = await fetch(signedUrl, { method: 'HEAD', signal: controller.signal });
-        clearTimeout(timeout);
-        if (head.ok) {
-          const size = Number(head.headers.get('content-length') || 0);
-          if (Number.isFinite(size) && size > 0) estimatedBytes += size;
-        }
-      } catch (_headError) {
-        console.warn('[gerarZipAnexosAtestados] head_falhou', { atestado_id: String(atestado?.id || '') });
-      }
-
-      if (estimatedBytes > MAX_ESTIMATED_BYTES) {
-        return Response.json({ error: 'Limite de tamanho excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_bytes: MAX_ESTIMATED_BYTES, tamanho_estimado_bytes: estimatedBytes, quantidade_anexos: prepared.length + 1, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
-      }
-
-      prepared.push({ atestado, signedUrl, objectPath, storageLocation, legacyAttachment: !explicitBucket || !explicitObjectPath });
+      const storageLocation = {
+        bucket: String(atestado?.storage_bucket || '').trim(),
+        objectPath: String(atestado?.storage_object_path || '').trim(),
+      };
+      prepared.push({ atestado, objectPath: storageLocation.objectPath, storageLocation });
     }
 
     if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os anexos falharam na etapa de preparação (referência inválida ou signed URL).', meta: { skipped, legacy_attachment_count: legacyAttachmentCount } }, { status: 422 });
@@ -188,36 +97,13 @@ Deno.serve(async (req) => {
     const zip = new JSZip();
     let addedFiles = 0;
     for (const item of prepared) {
-      let buffer: ArrayBuffer;
-      let contentType: string | null = null;
-      if (item.storageLocation && supabase) {
-        const downloaded = await supabase.storage.from(item.storageLocation.bucket).download(item.storageLocation.objectPath);
-        if (downloaded.error || !downloaded.data) {
-          skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_DOWNLOAD_FAILED', message: String(downloaded.error?.message || 'Falha no download via storage API') });
-          continue;
-        }
-        contentType = downloaded.data.type || null;
-        buffer = await downloaded.data.arrayBuffer();
-      } else {
-        let fetchedUrlPath = '';
-        try {
-          const u = new URL(item.signedUrl);
-          fetchedUrlPath = u.pathname;
-          if (u.pathname.includes(BASE44_APP_FILES_PREFIX)) {
-            skipped.push({ atestado_id: String(item.atestado?.id || ''), code: LEGACY_ATTACHMENT_UNSUPPORTED, message: `URL Base44 não suportada para fetch: ${u.host}${u.pathname}` });
-            continue;
-          }
-        } catch {
-          fetchedUrlPath = item.signedUrl;
-        }
-        const res = await fetch(item.signedUrl);
-        if (!res.ok) {
-          skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_FETCH_FAILED', message: `Falha no fetch do anexo (${fetchedUrlPath || 'url_externa'}): HTTP ${res.status}` });
-          continue;
-        }
-        contentType = res.headers.get('content-type');
-        buffer = await res.arrayBuffer();
+      const downloaded = await supabase.storage.from(item.storageLocation.bucket).download(item.storageLocation.objectPath);
+      if (downloaded.error || !downloaded.data) {
+        skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_DOWNLOAD_FAILED', message: String(downloaded.error?.message || 'Falha no download via storage API') });
+        continue;
       }
+      const contentType = downloaded.data.type || null;
+      const buffer = await downloaded.data.arrayBuffer();
       const safeMilitar = sanitize(item.atestado?.militar_nome || item.atestado?.militar_id);
       const atestadoId = sanitize(item.atestado?.id || 'atestado');
       const data = String(item.atestado?.data_inicio || '').slice(0, 10).replaceAll('-', '') || 'sem_data';
