@@ -50,7 +50,12 @@ export async function gerarRelatorioDpDintelAtestados(payload = {}) {
   const data = await parseJsonResponse(response);
 
   if (!response.ok || data?.error || !data?.base64) {
-    const error = new Error(String(data?.error || 'Falha ao gerar relatório DP/DINTEL.'));
+    const detail = data?.meta?.detail || data?.detail || response.statusText || '';
+    const baseMessage = String(data?.error || 'Falha ao gerar relatório DP/DINTEL.');
+    const fullMessage = response.status === 429
+      ? 'Limite de requisições excedido. Aguarde alguns segundos e tente novamente.'
+      : (detail && !baseMessage.includes(detail) ? `${baseMessage} (HTTP ${response.status}: ${detail})` : `${baseMessage} (HTTP ${response.status})`);
+    const error = new Error(fullMessage);
     error.code = String(data?.code || 'REPORT_FAILED');
     error.status = response.status;
     error.meta = data?.meta || {};
