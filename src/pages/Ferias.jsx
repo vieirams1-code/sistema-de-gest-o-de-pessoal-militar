@@ -1218,11 +1218,38 @@ export default function Ferias() {
               Limpar período
             </Button>
           </div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <MultiSelectFiltro label="Situação do período" options={situacaoPeriodoOptions} value={situacaoPeriodoFilter} onChange={setSituacaoPeriodoFilter} />
-            <MultiSelectFiltro label="Ano aquisitivo" options={anoAquisitivoOptions} value={anoAquisitivoFilter} onChange={setAnoAquisitivoFilter} />
-            <MultiSelectFiltro label="Status do gozo" options={statusGozoOptions} value={statusGozoFilter} onChange={setStatusGozoFilter} />
-            <MultiSelectFiltro label="Tags" options={[]} groupedOptions={tagsGroupedOptions} value={tagsFilter} onChange={setTagsFilter} />
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <MultiSelectFiltro
+              label="Situação do período"
+              options={situacaoPeriodoOptions}
+              value={situacaoPeriodoFilter}
+              onChange={setSituacaoPeriodoFilter}
+              triggerClassName="h-10 w-full"
+            />
+            <MultiSelectFiltro
+              label="Ano aquisitivo"
+              options={anoAquisitivoOptions}
+              value={anoAquisitivoFilter}
+              onChange={setAnoAquisitivoFilter}
+              triggerClassName="h-10 w-full"
+            />
+            <MultiSelectFiltro
+              label="Status do gozo"
+              options={statusGozoOptions}
+              value={statusGozoFilter}
+              onChange={setStatusGozoFilter}
+              triggerClassName="h-10 w-full"
+            />
+            <MultiSelectFiltro
+              label="Tags"
+              options={[]}
+              groupedOptions={tagsGroupedOptions}
+              value={tagsFilter}
+              onChange={setTagsFilter}
+              className="md:col-span-2 xl:col-span-1"
+              triggerClassName="h-10 w-full"
+              popoverClassName="md:min-w-[32rem]"
+            />
           </div>
           {customRangeError && <p className="text-xs text-red-600 mt-2">{customRangeError}</p>}
           <p className="text-xs text-slate-500 mt-2">{periodFilterLabel}</p>
