@@ -19,33 +19,55 @@ const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
   selected: true,
   data_inicio: true,
+  posto_graduacao: true,
   militar_nome: true,
-  lotacao_nome: true,
-  status: true,
   necessita_jiso: true,
   medico: true,
   dias: true,
-  anexo: false,
+  anexo: true,
 };
 
 const COLUMN_LABELS = {
   selected: 'Seleção',
   data_inicio: 'Data de início',
+  posto_graduacao: 'Posto/Grad.',
   militar_nome: 'Militar',
-  lotacao_nome: 'Lotação',
-  status: 'Status',
   necessita_jiso: 'JISO',
   medico: 'Médico',
   dias: 'Dias',
   anexo: 'Anexo',
 };
 
-const statusBadgeClass = (status) => {
-  const normalized = String(status || '').toLowerCase();
-  if (normalized === 'ativo') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-  if (normalized === 'encerrado') return 'bg-slate-100 text-slate-700 border-slate-300';
-  if (normalized === 'cancelado') return 'bg-rose-100 text-rose-700 border-rose-200';
-  return 'bg-amber-100 text-amber-700 border-amber-200';
+const POSTO_GRADUACAO_ABREVIACOES = {
+  '2 sargento': '2º Sgt',
+  '2o sargento': '2º Sgt',
+  'segundo sargento': '2º Sgt',
+  '3 sargento': '3º Sgt',
+  '3o sargento': '3º Sgt',
+  'terceiro sargento': '3º Sgt',
+  cabo: 'Cb',
+  soldado: 'Sd',
+  capitao: 'Cap',
+  major: 'Maj',
+  'tenente coronel': 'Ten Cel',
+  coronel: 'Cel',
+};
+
+const formatPostoGraduacaoAbreviado = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return '-';
+
+  const texto = String(valor).trim();
+  if (!texto) return '-';
+
+  const chave = texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[ºª]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  return POSTO_GRADUACAO_ABREVIACOES[chave] || texto;
 };
 
 const formatDateBr = (value) => {
@@ -89,12 +111,6 @@ const FormField = ({ id, label, children }) => (
     <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</Label>
     {children}
   </div>
-);
-
-const StatusBadge = ({ status }) => (
-  <Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(status)}`}>
-    {status || '-'}
-  </Badge>
 );
 
 export default function ExtratoAtestadosMedicos() {
@@ -484,9 +500,8 @@ export default function ExtratoAtestadosMedicos() {
                   <tr>
                     {columns.selected && <th className="p-3 text-left">Sel.</th>}
                     {columns.data_inicio && <th className="p-3 text-left">Início</th>}
+                    {columns.posto_graduacao && <th className="p-3 text-left">Posto/Grad.</th>}
                     {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
-                    {columns.lotacao_nome && <th className="p-3 text-left">Lotação</th>}
-                    {columns.status && <th className="p-3 text-left">Status</th>}
                     {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
                     {columns.medico && <th className="p-3 text-left">Médico</th>}
                     {columns.dias && <th className="p-3 text-left">Dias</th>}
@@ -495,18 +510,10 @@ export default function ExtratoAtestadosMedicos() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                    const lotacao = row.lotacao_nome || row.estrutura_nome;
-                    return (
-                      <tr key={row.id} className="hover:bg-blue-50/40">
                           {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
                           {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
+                          {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}
                           {columns.militar_nome && <td className="p-3 align-top font-semibold text-slate-950">{row.militar_nome || '-'}</td>}
-                          {columns.lotacao_nome && (
-                            <td className="p-3 align-top text-slate-700">
-                              {lotacao ? lotacao : <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">Lotação ausente</Badge>}
-                            </td>
-                          )}
-                          {columns.status && <td className="p-3 align-top"><StatusBadge status={row.status} /></td>}
                           {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
                           {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico || '-'}</td>}
                           {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
@@ -526,7 +533,6 @@ export default function ExtratoAtestadosMedicos() {
                               </div>
                             </td>
                           )}
-                      </tr>
                     );
                   })}
                 </tbody>
