@@ -16,27 +16,24 @@ import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClie
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 
 const PAGE_SIZE = 30;
-const DEFAULT_COLUMNS = {
-  selected: true,
-  data_inicio: true,
-  posto_graduacao: true,
-  militar_nome: true,
-  necessita_jiso: true,
-  medico: true,
-  dias: true,
-  anexo: true,
-};
+const TABLE_COLUMN_DEFINITIONS = Object.freeze([
+  { key: 'selected', label: 'Seleção', header: 'Sel.' },
+  { key: 'data_inicio', label: 'Data de início', header: 'Início' },
+  { key: 'posto_graduacao', label: 'Posto/Grad.', header: 'Posto/Grad.' },
+  { key: 'militar_nome', label: 'Militar', header: 'Militar' },
+  { key: 'necessita_jiso', label: 'JISO', header: 'JISO' },
+  { key: 'medico', label: 'Médico', header: 'Médico' },
+  { key: 'dias', label: 'Dias', header: 'Dias' },
+  { key: 'anexo', label: 'Anexo', header: 'Anexo' },
+]);
 
-const COLUMN_LABELS = {
-  selected: 'Seleção',
-  data_inicio: 'Data de início',
-  posto_graduacao: 'Posto/Grad.',
-  militar_nome: 'Militar',
-  necessita_jiso: 'JISO',
-  medico: 'Médico',
-  dias: 'Dias',
-  anexo: 'Anexo',
-};
+const DEFAULT_COLUMNS = Object.freeze(
+  TABLE_COLUMN_DEFINITIONS.reduce((acc, column) => ({ ...acc, [column.key]: true }), {}),
+);
+
+const COLUMN_LABELS = Object.freeze(
+  TABLE_COLUMN_DEFINITIONS.reduce((acc, column) => ({ ...acc, [column.key]: column.label }), {}),
+);
 
 const POSTO_GRADUACAO_ABREVIACOES = {
   '2 sargento': '2º Sgt',
@@ -475,10 +472,10 @@ export default function ExtratoAtestadosMedicos() {
             <CardTitle className="text-base text-slate-900">Colunas visíveis</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {Object.keys(DEFAULT_COLUMNS).map((col) => (
-              <label key={col} className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50">
-                <Checkbox checked={columns[col]} onCheckedChange={(v) => setColumns((c) => ({ ...c, [col]: Boolean(v) }))} />
-                <span>{COLUMN_LABELS[col]}</span>
+            {TABLE_COLUMN_DEFINITIONS.map(({ key }) => (
+              <label key={key} className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50">
+                <Checkbox checked={columns[key]} onCheckedChange={(v) => setColumns((c) => ({ ...c, [key]: Boolean(v) }))} />
+                <span>{COLUMN_LABELS[key]}</span>
               </label>
             ))}
           </CardContent>
@@ -498,14 +495,9 @@ export default function ExtratoAtestadosMedicos() {
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-100/95 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {columns.selected && <th className="p-3 text-left">Sel.</th>}
-                    {columns.data_inicio && <th className="p-3 text-left">Início</th>}
-                    {columns.posto_graduacao && <th className="p-3 text-left">Posto/Grad.</th>}
-                    {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
-                    {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
-                    {columns.medico && <th className="p-3 text-left">Médico</th>}
-                    {columns.dias && <th className="p-3 text-left">Dias</th>}
-                    {columns.anexo && <th className="p-3 text-left">Anexo</th>}
+                    {TABLE_COLUMN_DEFINITIONS.map(({ key, header }) => (
+                      columns[key] ? <th key={key} className="p-3 text-left">{header}</th> : null
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
