@@ -111,16 +111,20 @@ Deno.serve(async (req) => {
 
     if (!arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.', code: 'NO_ATTACHMENT' }, { status: 404 });
 
+    // PRIORIDADE 1: URL HTTPS/HTTP direta (Base44 storage e similares)
+    // — retorna a URL bruta sem tentar parsear como Supabase. Isso evita
+    // 422 em URLs que casualmente contêm '/' mas não são paths Supabase.
+    if (pattern === 'https://' || pattern === 'http://') {
+      return Response.json({
+        url: arquivoAtestado,
+        expires_in: 0,
+        atestado_id: atestadoId,
+        source: 'direct_public_url',
+      });
+    }
+
     const location = parseStorageLocation(arquivoAtestado);
     if (!location) {
-      if (pattern === 'https://' || pattern === 'http://') {
-        return Response.json({
-          url: arquivoAtestado,
-          expires_in: 0,
-          atestado_id: atestadoId,
-          source: 'direct_public_url',
-        });
-      }
       return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT', detail: { file_uri_pattern: pattern, file_uri_preview: arquivoAtestado.slice(0, 100) } }, { status: 422 });
     }
 

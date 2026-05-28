@@ -6,11 +6,18 @@ import MilitarConsultaRow from './MilitarConsultaRow';
 // MilitarConsultaVirtualList
 // ---------------------------------------------------------------------
 // Virtualiza a tabela de militares usando react-window. Renderiza apenas
-// as linhas visíveis (~10-20 por viewport) em vez de todas, reduzindo
-// drasticamente o custo de DOM em listas longas (centenas/milhares).
+// as linhas visíveis em vez de todas, reduzindo o custo de DOM em listas
+// longas (centenas/milhares).
 //
-// Calcula altura dinamicamente baseada no conteúdo disponível, com um
-// limite máximo razoável para manter o footer (paginação) visível.
+// IMPORTANTE (correção do duplo scroll horizontal):
+// - A List do react-window usa internamente `overflow:auto`, o que cria
+//   um scrollbar horizontal próprio quando a linha interna excede o
+//   `width` informado.
+// - Para evitar dois scrollbars empilhados (um da List interna + outro
+//   do container pai), passamos `style={{ overflowX: 'hidden' }}` para
+//   suprimir o scroll horizontal interno da List. O scroll horizontal
+//   passa a ser controlado APENAS pelo wrapper externo (overflow-x-auto
+//   em pages/Militares.jsx), que envolve header + List + footer juntos.
 // =====================================================================
 
 const ROW_HEIGHT = 64; // altura fixa por linha (nome em 2 linhas + paddings)
@@ -71,6 +78,7 @@ export default function MilitarConsultaVirtualList({
         itemSize={rowHeight}
         itemData={{ items, ...itemData }}
         overscanCount={6}
+        style={{ overflowX: 'hidden' }}
       >
         {renderRow}
       </List>

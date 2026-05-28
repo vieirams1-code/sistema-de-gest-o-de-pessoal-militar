@@ -92,35 +92,39 @@ Deno.serve(async (req) => {
     if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_ATTACHMENTS', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo, arquivos_fora_escopo: semEscopo } }, { status: 422 });
     if (comAnexo.length > MAX_FILES) return Response.json({ error: 'Limite de anexos excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_arquivos: MAX_FILES, quantidade_anexos: comAnexo.length, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
 
-    const url = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
-    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('BASE44_SUPABASE_SERVICE_ROLE_KEY');
-    if (!url || !key) return Response.json({ error: 'Configuração de storage indisponível.' }, { status: 500 });
-
-    const supabase = createClient(url, key, { auth: { persistSession: false } });
+    // Supabase é OPCIONAL: só inicializado se houver pelo menos um anexo
+    // que precise de signed URL (ou seja, anexos que NÃO são URLs HTTPS diretas).
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('BASE44_SUPABASE_SERVICE_ROLE_KEY');
+    const precisaSupabase = comAnexo.some((a: any) => {
+      const u = extractArquivoFileUri(a?.arquivo_atestado);
+      return u && !u.startsWith('http://') && !u.startsWith('https://');
+    });
+    if (precisaSupabase && (!supabaseUrl || !supabaseKey)) {
+      return Response.json({ error: 'Configuração de storage indisponível.' }, { status: 500 });
+    }
+    const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } }) : null;
     const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string }> = [];
     let estimatedBytes = 0;
 
     for (const atestado of comAnexo) {
       const rawArquivo = extractArquivoFileUri(atestado?.arquivo_atestado);
-      const location = parseStorageLocation(rawArquivo);
 
-      // Fonte do anexo: pode ser Supabase Storage (location != null) OU
-      // uma URL HTTPS direta (Base44 storage, ex.: base44.app/api/.../files/...).
-      // Para URLs externas, usamos a própria URL como signedUrl e o pathname
-      // como objectPath (para inferir a extensão do arquivo).
+      // Fonte do anexo: prioridade para URLs HTTPS/HTTP diretas (Base44 storage).
+      // Só tenta Supabase Storage quando NÃO for URL externa.
       let signedUrl: string | null = null;
       let objectPath: string = '';
 
-      if (location) {
+      if (rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) {
+        signedUrl = rawArquivo;
+        try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
+      } else {
+        const location = parseStorageLocation(rawArquivo);
+        if (!location || !supabase) continue;
         const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
         if (signed.error || !signed.data?.signedUrl) continue;
         signedUrl = signed.data.signedUrl;
         objectPath = location.objectPath;
-      } else if (rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) {
-        signedUrl = rawArquivo;
-        try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
-      } else {
-        continue;
       }
 
       try {
