@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronDown, ClipboardList, Download, FileArchive, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
+import { CalendarDays, ChevronDown, ClipboardList, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -13,7 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
-import { gerarZipAnexosAtestadosClient } from '@/services/gerarZipAnexosAtestadosClient';
 
 const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
@@ -165,15 +164,12 @@ export default function ExtratoAtestadosMedicos() {
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingZip, setIsExportingZip] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
   const [diagnosticoAnexos, setDiagnosticoAnexos] = useState({
     ultimoErroAbrirAnexo: null,
-    ultimoErroZip: null,
     legacyAttachmentHint: false,
-    legacyAttachmentUnsupported: false,
   });
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
 
@@ -259,60 +255,6 @@ export default function ExtratoAtestadosMedicos() {
     }
   };
 
-
-  const handleBaixarAnexosZip = async () => {
-    if (selectedIds.size === 0) return;
-    setIsExportingZip(true);
-    try {
-      const response = await gerarZipAnexosAtestadosClient(Array.from(selectedIds));
-      downloadBlob(response.blob, response.fileName);
-      await registrarAuditoria({
-        acao: 'export_zip_anexos',
-        quantidade_registros: selectedIds.size,
-        atestado_ids: Array.from(selectedIds),
-        modo_acesso: 'zip_signed_urls_backend',
-        escopo: 'scoped_atestados_bundle',
-        extrato_parcial: Boolean(response?.meta?.extrato_parcial),
-        quantidade_anexos: Number(response?.meta?.quantidade_anexos || 0),
-        arquivos_ignorados_sem_anexo: Number(response?.meta?.arquivos_ignorados_sem_anexo || 0),
-        legacy_attachment_count: Number(response?.meta?.legacy_attachment_count || 0),
-      });
-    } catch (e) {
-      const normalizedError = normalizeAttachmentError(e, {
-        action: 'export_zip_anexos',
-      });
-      const code = String(e?.code || '').toUpperCase();
-      const isLimit = code === 'LIMIT_EXCEEDED';
-      const isNoZipCompat = code === 'NO_ZIP_COMPATIBLE_ATTACHMENTS';
-      setDiagnosticoAnexos((prev) => ({
-        ...prev,
-        ultimoErroZip: normalizedError,
-        legacyAttachmentUnsupported: isNoZipCompat ? true : prev.legacyAttachmentUnsupported,
-      }));
-      const msg = String(e?.message || 'Não foi possível gerar o ZIP agora.');
-      await registrarAuditoria({
-        acao: 'export_zip_anexos',
-        quantidade_registros: selectedIds.size,
-        atestado_ids: Array.from(selectedIds),
-        modo_acesso: 'zip_signed_urls_backend',
-        escopo: 'scoped_atestados_bundle',
-        extrato_parcial: false,
-        quantidade_anexos: Number(e?.meta?.quantidade_anexos || 0),
-        arquivos_ignorados_sem_anexo: Number(e?.meta?.arquivos_ignorados_sem_anexo || 0),
-        legacy_attachment_count: Number(e?.meta?.legacy_attachment_count || 0),
-        limite_excedido: isLimit,
-      });
-      if (isNoZipCompat) {
-        window.alert('Os anexos selecionados são antigos. Eles podem ser abertos individualmente, mas ainda não suportam download em ZIP.');
-      } else {
-        const detail = e?.detail ? JSON.stringify(e.detail) : '-';
-        const meta = e?.meta ? JSON.stringify(e.meta) : '-';
-        window.alert(`Falha ao gerar ZIP\ncode=${String(e?.code || '-')}\nmessage=${msg}\ndetail=${detail}\nmeta=${meta}${isLimit ? '\n\nLimite: até 50 anexos e tamanho estimado até 100MB.' : ''}`);
-      }
-    } finally {
-      setIsExportingZip(false);
-    }
-  };
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['extrato-atestados-medicos'],
@@ -446,10 +388,6 @@ export default function ExtratoAtestadosMedicos() {
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar CSV
               </Button>
-              <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isExportingZip} onClick={handleBaixarAnexosZip}>
-                {isExportingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
-                Baixar anexos ZIP
-              </Button>
             </div>
           </div>
         </div>
@@ -471,7 +409,6 @@ export default function ExtratoAtestadosMedicos() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-full bg-slate-50 text-slate-700">Selecionados: {selectedIds.size}</Badge>
               {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
-              {isExportingZip && <span className="text-sm text-slate-700">Gerando ZIP...</span>}
             </div>
           </CardContent>
         </Card>
@@ -485,19 +422,13 @@ export default function ExtratoAtestadosMedicos() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo e geração de ZIP.</p>
-              {(diagnosticoAnexos.legacyAttachmentHint || diagnosticoAnexos.legacyAttachmentUnsupported) && (
-                <p className="rounded-lg border border-amber-200 bg-white/70 p-3 text-xs text-amber-800">Alguns anexos antigos podem não suportar compactação automática.</p>
+              <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo.</p>
+              {diagnosticoAnexos.legacyAttachmentHint && (
+                <p className="rounded-lg border border-amber-200 bg-white/70 p-3 text-xs text-amber-800">Alguns anexos antigos podem exigir abertura individual pelo link assinado.</p>
               )}
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="mb-1 text-xs font-semibold text-slate-700">Último erro de abrir anexo</p>
-                  <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticoAnexos.ultimoErroAbrirAnexo, null, 2) || '-'}</pre>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="mb-1 text-xs font-semibold text-slate-700">Último erro de ZIP</p>
-                  <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticoAnexos.ultimoErroZip, null, 2) || '-'}</pre>
-                </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="mb-1 text-xs font-semibold text-slate-700">Último erro de abrir anexo</p>
+                <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticoAnexos.ultimoErroAbrirAnexo, null, 2) || '-'}</pre>
               </div>
               <Button variant="outline" size="sm" className="bg-white" onClick={handleCopyDiagnostico}>Copiar diagnóstico</Button>
             </CardContent>
