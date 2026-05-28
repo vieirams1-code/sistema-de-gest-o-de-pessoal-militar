@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -8,11 +8,15 @@ import VisualizacoesGestor from '@/components/efetivo-gestor/VisualizacoesGestor
 import montarArvoreLotacaoMilitares from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { fetchPreviaAntiguidadeMilitares } from '@/services/getPreviaAntiguidadeMilitaresClient';
+import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
+import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
 
 export default function VisualizacaoGestorEfetivo() {
   const [busca, setBusca] = useState('');
   const { canAccessModule, isAccessResolved } = useCurrentUser();
   const effectiveEmail = getEffectiveEmail();
+  const queryClient = useQueryClient();
 
   const militaresQuery = useQuery({
     queryKey: ['gestor-efetivo-militares', effectiveEmail || 'self'],
@@ -25,6 +29,31 @@ export default function VisualizacaoGestorEfetivo() {
     enabled: isAccessResolved,
     queryFn: () => fetchScopedLotacoes({}),
   });
+
+
+  const idsMilitaresCarregados = useMemo(() => (militaresQuery.data?.militares || []).map((m) => String(m?.id || '')).filter(Boolean), [militaresQuery.data]);
+  const idsHash = useMemo(() => idsMilitaresCarregados.join('|'), [idsMilitaresCarregados]);
+  const cacheAntiguidade = getPosicaoOficialAntiguidadeFromCache(queryClient);
+  const hasOrdemOficialAntiguidade = cacheAntiguidade.hasOrdemOficialAntiguidade;
+
+  const { data: historicoPromocoesEfetivo = [] } = useQuery({
+    queryKey: ['historico-promocao-militares-efetivo-gestor', effectiveEmail || 'self', idsHash],
+    enabled: isAccessResolved && !hasOrdemOficialAntiguidade && idsMilitaresCarregados.length > 0,
+    queryFn: async () => {
+      const { historicoPromocoes } = await fetchPreviaAntiguidadeMilitares({ idsMilitares: idsMilitaresCarregados });
+      return historicoPromocoes;
+    },
+  });
+
+  const ordemAntiguidadeMap = useMemo(() => {
+    const { posicaoOficialByMilitarId } = cacheAntiguidade;
+    if (hasOrdemOficialAntiguidade) return posicaoOficialByMilitarId;
+    const previaAntiguidade = calcularPreviaAntiguidadeGeral({
+      militares: militaresQuery.data?.militares || [],
+      historicoPromocoes: historicoPromocoesEfetivo,
+    });
+    return new Map((previaAntiguidade?.itens || []).map((item) => [String(item?.militar_id || ''), Number(item?.posicao)]));
+  }, [cacheAntiguidade, hasOrdemOficialAntiguidade, militaresQuery.data, historicoPromocoesEfetivo]);
 
   const estrutura = useMemo(
     () => montarArvoreLotacaoMilitares(militaresQuery.data?.militares || [], lotacoesQuery.data?.lotacoes || []),
@@ -44,7 +73,7 @@ export default function VisualizacaoGestorEfetivo() {
           {militaresQuery.isLoading || lotacoesQuery.isLoading ? (
             <p className="text-sm text-slate-500">Carregando dados do efetivo...</p>
           ) : (
-            <VisualizacoesGestor estrutura={estrutura} filtro={busca} />
+            <VisualizacoesGestor estrutura={estrutura} filtro={busca} ordemAntiguidadeMap={ordemAntiguidadeMap} />
           )}
         </CardContent>
       </Card>
