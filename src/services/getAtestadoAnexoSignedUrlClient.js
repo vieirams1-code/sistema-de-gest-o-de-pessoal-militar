@@ -46,12 +46,6 @@ export async function abrirAnexoAtestadoEmNovaAba(atestadoId, preOpenedTab = nul
 
   console.info('[abrirAnexoAtestadoEmNovaAba] final_url', finalUrl.toString());
 
-  const directTab = typeof window !== 'undefined'
-    ? window.open(finalUrl.toString(), '_blank', 'noopener,noreferrer')
-    : null;
-
-  if (directTab) return { url: finalUrl.toString(), opened: true, strategy: 'direct' };
-
   if (preOpenedTab && !preOpenedTab.closed) {
     preOpenedTab.location.replace(finalUrl.toString());
     return { url: finalUrl.toString(), opened: true, strategy: 'preopened' };
