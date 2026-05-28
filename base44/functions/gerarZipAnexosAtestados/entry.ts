@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     const comAnexo = autorizados.filter((a: any) => extractArquivoFileUri(a?.arquivo_atestado));
     const semAnexo = autorizados.length - comAnexo.length;
 
-    if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_ATTACHMENTS', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo, arquivos_fora_escopo: semEscopo } }, { status: 422 });
+    if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_VALID_ATTACHMENTS', detail: 'Nenhum atestado com arquivo_atestado utilizável foi encontrado no escopo autorizado.', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo, arquivos_fora_escopo: semEscopo } }, { status: 422 });
     if (comAnexo.length > MAX_FILES) return Response.json({ error: 'Limite de anexos excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_arquivos: MAX_FILES, quantidade_anexos: comAnexo.length, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
 
     // Supabase é OPCIONAL: só inicializado se houver pelo menos um anexo
@@ -101,10 +101,11 @@ Deno.serve(async (req) => {
       return u && !u.startsWith('http://') && !u.startsWith('https://');
     });
     if (precisaSupabase && (!supabaseUrl || !supabaseKey)) {
-      return Response.json({ error: 'Configuração de storage indisponível.' }, { status: 500 });
+      return Response.json({ error: 'Configuração de storage indisponível.', code: 'STORAGE_CONFIG_UNAVAILABLE', detail: 'SUPABASE_URL/BASE44_SUPABASE_URL ou SERVICE_ROLE_KEY ausentes para assinar anexos internos.', meta: { quantidade_anexos: comAnexo.length } }, { status: 500 });
     }
     const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } }) : null;
     const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string }> = [];
+    const skipped: Array<{ atestado_id: string; code: string; message: string }> = [];
     let estimatedBytes = 0;
 
     for (const atestado of comAnexo) {
@@ -120,9 +121,9 @@ Deno.serve(async (req) => {
         try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
       } else {
         const location = parseStorageLocation(rawArquivo);
-        if (!location || !supabase) continue;
+        if (!location || !supabase) { skipped.push({ atestado_id: String(atestado?.id || ''), code: 'INVALID_FILE_REF', message: 'Referência de arquivo inválida para assinatura.' }); continue; }
         const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
-        if (signed.error || !signed.data?.signedUrl) continue;
+        if (signed.error || !signed.data?.signedUrl) { skipped.push({ atestado_id: String(atestado?.id || ''), code: 'SIGNED_URL_FAILED', message: String(signed.error?.message || 'Falha ao gerar signed URL.') }); continue; }
         signedUrl = signed.data.signedUrl;
         objectPath = location.objectPath;
       }
@@ -147,21 +148,35 @@ Deno.serve(async (req) => {
       prepared.push({ atestado, signedUrl, objectPath });
     }
 
-    if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_ATTACHMENTS' }, { status: 422 });
+    if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os anexos falharam na etapa de preparação (referência inválida ou signed URL).', meta: { skipped } }, { status: 422 });
 
     const zip = new JSZip();
+    let addedFiles = 0;
     for (const item of prepared) {
       const res = await fetch(item.signedUrl);
-      if (!res.ok) continue;
+      if (!res.ok) {
+        skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_FETCH_FAILED', message: `Falha no fetch do anexo: HTTP ${res.status}` });
+        continue;
+      }
       const buffer = await res.arrayBuffer();
       const safeMilitar = sanitize(item.atestado?.militar_nome || item.atestado?.militar_id);
       const atestadoId = sanitize(item.atestado?.id || 'atestado');
       const data = String(item.atestado?.data_inicio || '').slice(0, 10).replaceAll('-', '') || 'sem_data';
       const ext = inferExt(item.objectPath, res.headers.get('content-type'));
       zip.file(`${data}_${safeMilitar}_${atestadoId}.${ext}`, buffer);
+      addedFiles += 1;
     }
 
-    const zipBuffer = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    if (!addedFiles) {
+      return Response.json({ error: 'Nenhum arquivo válido pôde ser baixado para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os downloads de anexos falharam na etapa de fetch.', meta: { skipped } }, { status: 422 });
+    }
+
+    let zipBuffer: Uint8Array;
+    try {
+      zipBuffer = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    } catch (zipError) {
+      return Response.json({ error: 'Falha ao compactar anexos.', code: 'ZIP_GENERATION_FAILED', detail: String((zipError as any)?.message || zipError), meta: { skipped, quantidade_anexos_preparados: prepared.length, quantidade_anexos_adicionados: addedFiles } }, { status: 500 });
+    }
     const ts = new Date().toISOString().slice(0, 10);
     return new Response(zipBuffer, {
       status: 200,
@@ -169,13 +184,14 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="anexos-atestados-${ts}.zip"`,
         'Cache-Control': 'no-store',
-        'X-Quantidade-Anexos': String(prepared.length),
+        'X-Quantidade-Anexos': String(addedFiles),
         'X-Arquivos-Ignorados-Sem-Anexo': String(semAnexo),
-        'X-Extrato-Parcial': String(autorizadosIds.length < idsSelecionados.length),
+        'X-Extrato-Parcial': String(autorizadosIds.length < idsSelecionados.length || addedFiles < prepared.length),
+        'X-Arquivos-Ignorados-Falha': String(skipped.length),
       },
     });
   } catch (error) {
     const status = (error as any)?.response?.status || (error as any)?.status || 500;
-    return Response.json({ error: (error as any)?.message || 'Erro ao gerar ZIP dos anexos.' }, { status });
+    return Response.json({ error: (error as any)?.message || 'Erro ao gerar ZIP dos anexos.', code: String((error as any)?.code || 'ZIP_RUNTIME_ERROR'), detail: (error as any)?.detail || null, meta: (error as any)?.meta || null }, { status });
   }
 });
