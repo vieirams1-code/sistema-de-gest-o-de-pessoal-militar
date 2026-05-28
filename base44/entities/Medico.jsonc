@@ -1,0 +1,45 @@
+{
+  "name": "Medico",
+  "type": "object",
+  "title": "Médico",
+  "description": "Cadastro estruturado de médicos utilizados em atestados médicos.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "default": ""
+    },
+    "crm": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": [
+    "nome",
+    "crm"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

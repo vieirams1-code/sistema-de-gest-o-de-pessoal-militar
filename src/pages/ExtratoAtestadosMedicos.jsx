@@ -545,7 +545,7 @@ export default function ExtratoAtestadosMedicos() {
                           )}
                           {columns.status && <td className="p-3 align-top"><StatusBadge status={row.status} /></td>}
                           {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
-                          {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico || '-'}</td>}
+                          {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico_nome_snapshot || row.medico || '-'}</td>}
                           {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
                           {columns.anexo && (
                             <td className="p-3 align-top">

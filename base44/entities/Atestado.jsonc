@@ -20,6 +20,15 @@
     "crm_medico": {
       "type": "string"
     },
+    "medico_id": {
+      "type": "string"
+    },
+    "medico_nome_snapshot": {
+      "type": "string"
+    },
+    "medico_crm_snapshot": {
+      "type": "string"
+    },
     "arquivo_atestado": {
       "type": "string"
     },
@@ -39,7 +48,7 @@
       "type": "string",
       "enum": [
         "Afastamento Total",
-        "Esfor\u00e7o F\u00edsico"
+        "Esforço Físico"
       ],
       "default": "Afastamento Total"
     },
@@ -57,11 +66,11 @@
       "type": "string",
       "enum": [
         "Pai",
-        "M\u00e3e",
+        "Mãe",
         "Filho(a)",
-        "C\u00f4njuge",
-        "Irm\u00e3o(\u00e3)",
-        "Av\u00f4(\u00f3)",
+        "Cônjuge",
+        "Irmão(ã)",
+        "Avô(ó)",
         "Outro"
       ]
     },
@@ -94,7 +103,7 @@
         "comandante",
         "jiso"
       ],
-      "description": "Define o fluxo de homologa\u00e7\u00e3o: comandante (at\u00e9 15 dias) ou jiso (mais de 15 dias)"
+      "description": "Define o fluxo de homologação: comandante (até 15 dias) ou jiso (mais de 15 dias)"
     },
     "necessita_jiso": {
       "type": "boolean",
@@ -127,8 +136,8 @@
           "tipo": {
             "type": "string",
             "enum": [
-              "Prorroga\u00e7\u00e3o",
-              "Cassa\u00e7\u00e3o"
+              "Prorrogação",
+              "Cassação"
             ]
           },
           "dias_alterados": {
@@ -165,7 +174,7 @@
       "type": "string",
       "enum": [
         "Aguardando Nota",
-        "Aguardando Publica\u00e7\u00e3o",
+        "Aguardando Publicação",
         "Publicado"
       ],
       "default": "Aguardando Nota"
