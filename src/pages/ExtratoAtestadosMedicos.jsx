@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { CalendarDays, ChevronDown, ClipboardList, Download, FileArchive, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -54,6 +55,98 @@ const formatDateBr = (value) => {
   return new Intl.DateTimeFormat('pt-BR').format(date);
 };
 
+const KpiCard = ({ title, value, description, icon: Icon, tone = 'slate' }) => {
+  const toneClasses = {
+    slate: 'bg-slate-100 text-slate-700 border-slate-200',
+    blue: 'bg-blue-100 text-blue-700 border-blue-200',
+    indigo: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    amber: 'bg-amber-100 text-amber-700 border-amber-200',
+  };
+
+  return (
+    <Card className="rounded-xl border-slate-200 bg-white/95 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+            <p className="text-2xl font-bold text-slate-950">{value}</p>
+            {description && <p className="text-xs text-slate-500">{description}</p>}
+          </div>
+          {Icon && (
+            <span className={`rounded-xl border p-2 ${toneClasses[tone] || toneClasses.slate}`}>
+              <Icon className="h-5 w-5" />
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const FormField = ({ id, label, children }) => (
+  <div className="space-y-2">
+    <Label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</Label>
+    {children}
+  </div>
+);
+
+const StatusBadge = ({ status }) => (
+  <Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(status)}`}>
+    {status || '-'}
+  </Badge>
+);
+
+const formatHistoryValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+const HistoricoPanel = ({ row }) => {
+  const historico = Array.isArray(row?.historico) ? row.historico : null;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-inner">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <ClipboardList className="h-4 w-4 text-blue-700" />
+        Histórico do atestado
+      </div>
+      {!historico && (
+        <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
+          Histórico não carregado neste extrato.
+        </p>
+      )}
+      {historico && historico.length === 0 && (
+        <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
+          Nenhum evento de histórico informado para este registro.
+        </p>
+      )}
+      {historico && historico.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {historico.map((item, index) => {
+            const eventTitle = item?.evento || item?.acao || item?.status || item?.tipo || `Evento ${index + 1}`;
+            const eventDate = item?.data || item?.created_at || item?.timestamp || item?.quando;
+            const eventUser = item?.usuario || item?.responsavel || item?.autor;
+            return (
+              <div key={`${row?.id || 'historico'}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-semibold text-slate-900">{formatHistoryValue(eventTitle)}</p>
+                  {eventDate && <Badge variant="outline" className="shrink-0 bg-blue-50 text-blue-700 border-blue-200">{formatHistoryValue(eventDate)}</Badge>}
+                </div>
+                {eventUser && <p className="text-xs text-slate-500">Responsável: {formatHistoryValue(eventUser)}</p>}
+                {item?.observacao && <p className="mt-2 text-sm text-slate-600">{formatHistoryValue(item.observacao)}</p>}
+                {item?.cid && <p className="mt-2 text-xs font-semibold text-slate-500">CID: {formatHistoryValue(item.cid)}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function ExtratoAtestadosMedicos() {
   const { canAccessModule, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('atestados');
@@ -70,6 +163,7 @@ export default function ExtratoAtestadosMedicos() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
@@ -281,6 +375,15 @@ export default function ExtratoAtestadosMedicos() {
     });
   };
 
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleAbrirAnexo = async (row) => {
     const rowId = String(row?.id || '');
     if (!rowId) return;
@@ -327,227 +430,229 @@ export default function ExtratoAtestadosMedicos() {
   if (!hasAccess) return <AccessDenied modulo="Atestados" />;
 
   return (
-    <div className="p-6 space-y-5 bg-slate-50 min-h-full">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Extrato de Atestados Médicos</h1>
-        <Badge variant="outline" className="text-slate-700 bg-white">Workspace de análise</Badge>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Total carregado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-slate-900">{allRows.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Total filtrado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-slate-900">{filteredRows.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Total com JISO</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-indigo-700">{totalComJiso}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Soma dias afastamento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-slate-900">{somaDiasAfastamento}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Selecionados</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2">
-            <p className="text-2xl font-semibold text-slate-900">{selectedIds.size}</p>
-            <Badge className="bg-blue-100 text-blue-700 border-blue-200" variant="outline">Persistente entre páginas</Badge>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Ações</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2 items-center">
-          <Button variant="outline" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>Exportar CSV</Button>
-          <Button variant="outline" disabled={selectedIds.size === 0 || isExportingZip} onClick={handleBaixarAnexosZip}>Baixar anexos ZIP</Button>
-          <span className="text-xs text-slate-600">Exporta somente registros selecionados</span>
-          {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
-          {isExportingZip && <span className="text-sm text-slate-700">Gerando ZIP...</span>}
-        </CardContent>
-      </Card>
-
-      {canShowDiagnostics && (
-        <Card className="shadow-sm border-amber-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Diagnóstico de Anexos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo e geração de ZIP.</p>
-            {(diagnosticoAnexos.legacyAttachmentHint || diagnosticoAnexos.legacyAttachmentUnsupported) && (
-              <p className="text-xs text-amber-700">Alguns anexos antigos podem não suportar compactação automática.</p>
-            )}
-            <div className="grid md:grid-cols-2 gap-3">
-              <div className="rounded border p-2 bg-slate-50">
-                <p className="text-xs font-semibold text-slate-700 mb-1">Último erro de abrir anexo</p>
-                <pre className="text-[11px] whitespace-pre-wrap break-all">{JSON.stringify(diagnosticoAnexos.ultimoErroAbrirAnexo, null, 2) || '-'}</pre>
-              </div>
-              <div className="rounded border p-2 bg-slate-50">
-                <p className="text-xs font-semibold text-slate-700 mb-1">Último erro de ZIP</p>
-                <pre className="text-[11px] whitespace-pre-wrap break-all">{JSON.stringify(diagnosticoAnexos.ultimoErroZip, null, 2) || '-'}</pre>
+    <div className="min-h-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
+      <div className="mx-auto max-w-[1800px] space-y-5">
+        <div className="rounded-xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <Badge variant="outline" className="rounded-full bg-blue-50 text-blue-700 border-blue-200">Workspace de análise</Badge>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Extrato de Atestados Médicos</h1>
+                <p className="mt-1 text-sm text-slate-500">Consulta operacional com filtros reais, seleção persistente, exportações e anexos.</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleCopyDiagnostico}>Copiar diagnóstico</Button>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Exportar CSV
+              </Button>
+              <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isExportingZip} onClick={handleBaixarAnexosZip}>
+                {isExportingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
+                Baixar anexos ZIP
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <KpiCard title="Total carregado" value={allRows.length} description="Registros no extrato" icon={FileText} tone="slate" />
+          <KpiCard title="Total filtrado" value={filteredRows.length} description="Após filtros ativos" icon={Filter} tone="blue" />
+          <KpiCard title="Total com JISO" value={totalComJiso} description="Fluxo de homologação" icon={Stethoscope} tone="indigo" />
+          <KpiCard title="Dias afastamento" value={somaDiasAfastamento} description="Soma dos registros filtrados" icon={CalendarDays} tone="amber" />
+          <KpiCard title="Selecionados" value={selectedIds.size} description="Persistente entre páginas" icon={Users} tone="emerald" />
+        </div>
+
+        <Card className="rounded-xl border-slate-200 bg-white/95 shadow-sm">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Toolbar de ações</p>
+              <p className="text-xs text-slate-500">Exporta somente registros selecionados. A seleção permanece ao carregar mais itens.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="rounded-full bg-slate-50 text-slate-700">Selecionados: {selectedIds.size}</Badge>
+              {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
+              {isExportingZip && <span className="text-sm text-slate-700">Gerando ZIP...</span>}
+            </div>
           </CardContent>
         </Card>
-      )}
 
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filtros</CardTitle>
-        </CardHeader>
-        <CardContent className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="periodo-inicio">Período inicial</Label>
-            <Input id="periodo-inicio" type="date" value={filtros.periodoInicio} onChange={(e) => setFiltros((f) => ({ ...f, periodoInicio: e.target.value }))} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="periodo-fim">Período final</Label>
-            <Input id="periodo-fim" type="date" value={filtros.periodoFim} onChange={(e) => setFiltros((f) => ({ ...f, periodoFim: e.target.value }))} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="filtro-mes">Mês</Label>
-            <select id="filtro-mes" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.mes} onChange={(e) => setFiltros((f) => ({ ...f, mes: e.target.value }))}>
-              <option value="all">Todos</option>
-              {Array.from({ length: 12 }).map((_, i) => {
-                const month = String(i + 1).padStart(2, '0');
-                return <option key={month} value={month}>{month}</option>;
-              })}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="filtro-ano">Ano</Label>
-            <select id="filtro-ano" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.ano} onChange={(e) => setFiltros((f) => ({ ...f, ano: e.target.value }))}>
-              <option value="all">Todos</option>
-              {years.map((year) => <option key={year} value={year}>{year}</option>)}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="militar">Nome do militar</Label>
-            <Input id="militar" placeholder="Digite o nome" value={filtros.militar} onChange={(e) => setFiltros((f) => ({ ...f, militar: e.target.value }))} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lotacao">Lotação/estrutura</Label>
-            <Input id="lotacao" placeholder="Digite a lotação" value={filtros.lotacao} onChange={(e) => setFiltros((f) => ({ ...f, lotacao: e.target.value }))} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="status">Status do atestado</Label>
-            <select id="status" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.status} onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value }))}>
-              <option value="all">Todos os status</option><option value="Ativo">Ativo</option><option value="Encerrado">Encerrado</option><option value="Cancelado">Cancelado</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="jiso">Filtro de JISO</Label>
-            <select id="jiso" className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={filtros.jiso} onChange={(e) => setFiltros((f) => ({ ...f, jiso: e.target.value }))}>
-              <option value="all">Todos</option><option value="sim">Com JISO</option><option value="nao">Sem JISO</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
+        {canShowDiagnostics && (
+          <Card className="rounded-xl border-amber-300 bg-amber-50/70 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-amber-950">
+                <ShieldAlert className="h-5 w-5 text-amber-700" />
+                Diagnóstico de Anexos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo e geração de ZIP.</p>
+              {(diagnosticoAnexos.legacyAttachmentHint || diagnosticoAnexos.legacyAttachmentUnsupported) && (
+                <p className="rounded-lg border border-amber-200 bg-white/70 p-3 text-xs text-amber-800">Alguns anexos antigos podem não suportar compactação automática.</p>
+              )}
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="mb-1 text-xs font-semibold text-slate-700">Último erro de abrir anexo</p>
+                  <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticoAnexos.ultimoErroAbrirAnexo, null, 2) || '-'}</pre>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="mb-1 text-xs font-semibold text-slate-700">Último erro de ZIP</p>
+                  <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticoAnexos.ultimoErroZip, null, 2) || '-'}</pre>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="bg-white" onClick={handleCopyDiagnostico}>Copiar diagnóstico</Button>
+            </CardContent>
+          </Card>
+        )}
 
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Colunas visíveis</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {Object.keys(DEFAULT_COLUMNS).map((col) => (
-            <label key={col} className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
-              <Checkbox checked={columns[col]} onCheckedChange={(v) => setColumns((c) => ({ ...c, [col]: Boolean(v) }))} />
-              <span>{COLUMN_LABELS[col]}</span>
-            </label>
-          ))}
-        </CardContent>
-      </Card>
-
-      {isLoading && <div>Carregando extrato...</div>}
-      {isError && <div className="text-red-600">Erro ao carregar: {error?.message || 'desconhecido'}</div>}
-      {!isLoading && !isError && filteredRows.length === 0 && <div>Nenhum resultado encontrado.</div>}
-
-      {!isLoading && !isError && filteredRows.length > 0 && (
-        <>
-          <div className="text-sm text-slate-600">Itens selecionados no extrato: <span className="font-semibold">{selectedIds.size}</span></div>
-          <div className="overflow-auto border rounded-lg bg-white shadow-sm max-h-[65vh]">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-100 sticky top-0 z-10">
-                <tr>
-                  {columns.selected && <th className="p-3">Sel.</th>}
-                  {columns.data_inicio && <th className="p-3 text-left">Início</th>}
-                  {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
-                  {columns.lotacao_nome && <th className="p-3 text-left">Lotação</th>}
-                  {columns.status && <th className="p-3 text-left">Status</th>}
-                  {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
-                  {columns.medico && <th className="p-3 text-left">Médico</th>}
-                  {columns.dias && <th className="p-3 text-left">Dias</th>}
-                  {columns.anexo && <th className="p-3 text-left">Anexo</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const lotacao = row.lotacao_nome || row.estrutura_nome;
-                  return (
-                    <tr key={row.id} className="border-t hover:bg-slate-50">
-                      {columns.selected && <td className="p-3"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
-                      {columns.data_inicio && <td className="p-3">{formatDateBr(row.data_inicio)}</td>}
-                      {columns.militar_nome && <td className="p-3 font-medium">{row.militar_nome || '-'}</td>}
-                      {columns.lotacao_nome && (
-                        <td className="p-3">
-                          {lotacao ? lotacao : <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">Lotação ausente</Badge>}
-                        </td>
-                      )}
-                      {columns.status && <td className="p-3"><Badge variant="outline" className={statusBadgeClass(row.status)}>{row.status || '-'}</Badge></td>}
-                      {columns.necessita_jiso && <td className="p-3"><Badge variant="outline" className={row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
-                      {columns.medico && <td className="p-3">{row.medico || '-'}</td>}
-                      {columns.dias && <td className="p-3">{row.dias ?? '-'}</td>}
-                      {columns.anexo && (
-                        <td className="p-3">
-                          <div className="space-y-1">
-                            <Button variant="outline" size="sm" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
-                              {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
-                            </Button>
-                            {erroAnexoById[row.id] && <div className="text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
-                            {linkAnexoById[row.id] && (
-                              <a className="text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
-                                Abrir anexo
-                              </a>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
+        <Card className="rounded-xl border-slate-200 bg-white/95 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+              <Filter className="h-5 w-5 text-blue-700" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <FormField id="periodo-inicio" label="Período inicial">
+              <Input id="periodo-inicio" type="date" className="rounded-xl" value={filtros.periodoInicio} onChange={(e) => setFiltros((f) => ({ ...f, periodoInicio: e.target.value }))} />
+            </FormField>
+            <FormField id="periodo-fim" label="Período final">
+              <Input id="periodo-fim" type="date" className="rounded-xl" value={filtros.periodoFim} onChange={(e) => setFiltros((f) => ({ ...f, periodoFim: e.target.value }))} />
+            </FormField>
+            <FormField id="filtro-mes" label="Mês">
+              <select id="filtro-mes" className="h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={filtros.mes} onChange={(e) => setFiltros((f) => ({ ...f, mes: e.target.value }))}>
+                <option value="all">Todos</option>
+                {Array.from({ length: 12 }).map((_, i) => {
+                  const month = String(i + 1).padStart(2, '0');
+                  return <option key={month} value={month}>{month}</option>;
                 })}
-              </tbody>
-            </table>
-          </div>
+              </select>
+            </FormField>
+            <FormField id="filtro-ano" label="Ano">
+              <select id="filtro-ano" className="h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={filtros.ano} onChange={(e) => setFiltros((f) => ({ ...f, ano: e.target.value }))}>
+                <option value="all">Todos</option>
+                {years.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </FormField>
+            <FormField id="militar" label="Nome do militar">
+              <Input id="militar" placeholder="Digite o nome" className="rounded-xl" value={filtros.militar} onChange={(e) => setFiltros((f) => ({ ...f, militar: e.target.value }))} />
+            </FormField>
+            <FormField id="lotacao" label="Lotação/estrutura">
+              <Input id="lotacao" placeholder="Digite a lotação" className="rounded-xl" value={filtros.lotacao} onChange={(e) => setFiltros((f) => ({ ...f, lotacao: e.target.value }))} />
+            </FormField>
+            <FormField id="status" label="Status do atestado">
+              <select id="status" className="h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={filtros.status} onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value }))}>
+                <option value="all">Todos os status</option><option value="Ativo">Ativo</option><option value="Encerrado">Encerrado</option><option value="Cancelado">Cancelado</option>
+              </select>
+            </FormField>
+            <FormField id="jiso" label="Filtro de JISO">
+              <select id="jiso" className="h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={filtros.jiso} onChange={(e) => setFiltros((f) => ({ ...f, jiso: e.target.value }))}>
+                <option value="all">Todos</option><option value="sim">Com JISO</option><option value="nao">Sem JISO</option>
+              </select>
+            </FormField>
+          </CardContent>
+        </Card>
 
-          {visibleCount < filteredRows.length && (
-            <Button variant="outline" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>Carregar mais</Button>
-          )}
-        </>
-      )}
+        <Card className="rounded-xl border-slate-200 bg-white/95 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-slate-900">Colunas visíveis</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {Object.keys(DEFAULT_COLUMNS).map((col) => (
+              <label key={col} className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50">
+                <Checkbox checked={columns[col]} onCheckedChange={(v) => setColumns((c) => ({ ...c, [col]: Boolean(v) }))} />
+                <span>{COLUMN_LABELS[col]}</span>
+              </label>
+            ))}
+          </CardContent>
+        </Card>
+
+        {isLoading && <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-600 shadow-sm">Carregando extrato...</div>}
+        {isError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-rose-700 shadow-sm">Erro ao carregar: {error?.message || 'desconhecido'}</div>}
+        {!isLoading && !isError && filteredRows.length === 0 && <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-600 shadow-sm">Nenhum resultado encontrado.</div>}
+
+        {!isLoading && !isError && filteredRows.length > 0 && (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+              <span>Itens selecionados no extrato: <span className="font-semibold text-slate-900">{selectedIds.size}</span></span>
+              <span>Exibindo <span className="font-semibold text-slate-900">{rows.length}</span> de <span className="font-semibold text-slate-900">{filteredRows.length}</span> filtrados</span>
+            </div>
+            <div className="overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm max-h-[65vh]">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-100/95 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="w-12 p-3 text-left">Detalhe</th>
+                    {columns.selected && <th className="p-3 text-left">Sel.</th>}
+                    {columns.data_inicio && <th className="p-3 text-left">Início</th>}
+                    {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
+                    {columns.lotacao_nome && <th className="p-3 text-left">Lotação</th>}
+                    {columns.status && <th className="p-3 text-left">Status</th>}
+                    {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
+                    {columns.medico && <th className="p-3 text-left">Médico</th>}
+                    {columns.dias && <th className="p-3 text-left">Dias</th>}
+                    {columns.anexo && <th className="p-3 text-left">Anexo</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map((row) => {
+                    const lotacao = row.lotacao_nome || row.estrutura_nome;
+                    const isExpanded = expandedIds.has(row.id);
+                    return (
+                      <React.Fragment key={row.id}>
+                        <tr className="hover:bg-blue-50/40">
+                          <td className="p-3 align-top">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0" onClick={() => toggleExpanded(row.id)} aria-label={isExpanded ? 'Recolher histórico' : 'Expandir histórico'}>
+                              <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </Button>
+                          </td>
+                          {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
+                          {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
+                          {columns.militar_nome && <td className="p-3 align-top font-semibold text-slate-950">{row.militar_nome || '-'}</td>}
+                          {columns.lotacao_nome && (
+                            <td className="p-3 align-top text-slate-700">
+                              {lotacao ? lotacao : <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">Lotação ausente</Badge>}
+                            </td>
+                          )}
+                          {columns.status && <td className="p-3 align-top"><StatusBadge status={row.status} /></td>}
+                          {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
+                          {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico || '-'}</td>}
+                          {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
+                          {columns.anexo && (
+                            <td className="p-3 align-top">
+                              <div className="space-y-1">
+                                <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
+                                  {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                                  {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
+                                </Button>
+                                {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
+                                {linkAnexoById[row.id] && (
+                                  <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
+                                    Abrir anexo
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-slate-50/60">
+                            <td colSpan={1 + Object.values(columns).filter(Boolean).length} className="p-4">
+                              <HistoricoPanel row={row} />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {visibleCount < filteredRows.length && (
+              <Button variant="outline" className="rounded-full bg-white shadow-sm" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>Carregar mais</Button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
