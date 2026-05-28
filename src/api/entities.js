@@ -2,6 +2,8 @@ import { base44 } from './base44Client';
 
 export const Query = base44.entities.Query;
 
+export const Medico = base44.entities.Medico;
+
 export const PunicaoDisciplinar = base44.entities.PunicaoDisciplinar;
 export const ImportacaoMilitares = base44.entities.ImportacaoMilitares;
 export const ImportacaoAlteracoesLegado = base44.entities.ImportacaoAlteracoesLegado;

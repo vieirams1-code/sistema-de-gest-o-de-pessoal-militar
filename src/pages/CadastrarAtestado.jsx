@@ -13,6 +13,8 @@ import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import CidSelector from '@/components/atestado/CidSelector';
+import MedicoSelector from '@/components/atestado/MedicoSelector';
+import { normalizeCrm } from '@/components/atestado/medicoUtils';
 import DateCalculator from '@/components/atestado/DateCalculator';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -29,6 +31,9 @@ const initialFormData = {
   militar_matricula_vinculo: '',
   medico: '',
   crm_medico: '',
+  medico_id: '',
+  medico_nome_snapshot: '',
+  medico_crm_snapshot: '',
   arquivo_atestado: '',
   storage_bucket: '',
   storage_object_path: '',
@@ -159,6 +164,32 @@ export default function CadastrarAtestado() {
     setFormData(prev => ({ ...prev, ...militarData }));
   };
 
+
+  const handleMedicoSelect = (medico) => {
+    const nome = String(medico?.nome || '').trim();
+    const crm = normalizeCrm(medico?.crm || '');
+    setFormData(prev => ({
+      ...prev,
+      medico_id: medico?.id || '',
+      medico_nome_snapshot: nome,
+      medico_crm_snapshot: crm,
+      // Mantém campos legados preenchidos para listagens/relatórios antigos.
+      medico: nome,
+      crm_medico: crm,
+    }));
+  };
+
+  const handleMedicoClear = () => {
+    setFormData(prev => ({
+      ...prev,
+      medico_id: '',
+      medico_nome_snapshot: '',
+      medico_crm_snapshot: '',
+      medico: '',
+      crm_medico: '',
+    }));
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -210,8 +241,16 @@ export default function CadastrarAtestado() {
 
     setLoading(true);
 
+    const medicoNomeSnapshot = String(formData.medico_nome_snapshot || formData.medico || '').trim();
+    const medicoCrmSnapshot = normalizeCrm(formData.medico_crm_snapshot || formData.crm_medico || '');
+
     const dataToSave = {
       ...formData,
+      medico_nome_snapshot: medicoNomeSnapshot,
+      medico_crm_snapshot: medicoCrmSnapshot,
+      // Campos legados preservados e espelhados para compatibilidade com telas antigas.
+      medico: medicoNomeSnapshot,
+      crm_medico: medicoCrmSnapshot,
       dias: formData.dias ? parseInt(formData.dias) : 0,
     };
 
@@ -314,23 +353,15 @@ export default function CadastrarAtestado() {
           {/* Dados do Atestado */}
           <FormSection title="Dados do Atestado" icon={FileText}>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  label="Nome do Médico"
-                  name="medico"
-                  value={formData.medico}
-                  onChange={handleChange}
-                  placeholder="Dr(a)..."
-                />
-
-                <FormField
-                  label="CRM do Médico"
-                  name="crm_medico"
-                  value={formData.crm_medico}
-                  onChange={handleChange}
-                  placeholder="Ex.: CRM/UF 123456"
-                />
-              </div>
+              <MedicoSelector
+                value={formData.medico_id}
+                nomeSnapshot={formData.medico_nome_snapshot}
+                crmSnapshot={formData.medico_crm_snapshot}
+                legadoNome={formData.medico}
+                legadoCrm={formData.crm_medico}
+                onMedicoSelect={handleMedicoSelect}
+                onClear={handleMedicoClear}
+              />
 
               <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
                 <Checkbox
