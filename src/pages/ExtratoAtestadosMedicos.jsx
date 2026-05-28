@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronDown, ClipboardList, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
+import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
+import { gerarRelatorioDpDintelAtestados } from '@/services/gerarRelatorioDpDintelAtestadosClient';
 import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 
@@ -96,58 +97,8 @@ const StatusBadge = ({ status }) => (
   </Badge>
 );
 
-const formatHistoryValue = (value) => {
-  if (value === null || value === undefined || value === '') return '-';
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-};
-
-const HistoricoPanel = ({ row }) => {
-  const historico = Array.isArray(row?.historico) ? row.historico : null;
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-inner">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-        <ClipboardList className="h-4 w-4 text-blue-700" />
-        Histórico do atestado
-      </div>
-      {!historico && (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
-          Histórico não carregado neste extrato.
-        </p>
-      )}
-      {historico && historico.length === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
-          Nenhum evento de histórico informado para este registro.
-        </p>
-      )}
-      {historico && historico.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {historico.map((item, index) => {
-            const eventTitle = item?.evento || item?.acao || item?.status || item?.tipo || `Evento ${index + 1}`;
-            const eventDate = item?.data || item?.created_at || item?.timestamp || item?.quando;
-            const eventUser = item?.usuario || item?.responsavel || item?.autor;
-            return (
-              <div key={`${row?.id || 'historico'}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <p className="font-semibold text-slate-900">{formatHistoryValue(eventTitle)}</p>
-                  {eventDate && <Badge variant="outline" className="shrink-0 bg-blue-50 text-blue-700 border-blue-200">{formatHistoryValue(eventDate)}</Badge>}
-                </div>
-                {eventUser && <p className="text-xs text-slate-500">Responsável: {formatHistoryValue(eventUser)}</p>}
-                {item?.observacao && <p className="mt-2 text-sm text-slate-600">{formatHistoryValue(item.observacao)}</p>}
-                {item?.cid && <p className="mt-2 text-xs font-semibold text-slate-500">CID: {formatHistoryValue(item.cid)}</p>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default function ExtratoAtestadosMedicos() {
-  const { canAccessModule, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('atestados');
   const [filtros, setFiltros] = useState({
     periodoInicio: '',
@@ -162,8 +113,8 @@ export default function ExtratoAtestadosMedicos() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
@@ -172,6 +123,7 @@ export default function ExtratoAtestadosMedicos() {
     legacyAttachmentHint: false,
   });
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
+  const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
 
   const normalizeAttachmentError = (error, context = {}) => ({
     code: String(error?.code || ''),
@@ -193,7 +145,7 @@ export default function ExtratoAtestadosMedicos() {
         window.alert('Diagnóstico copiado para a área de transferência.');
         return;
       }
-    } catch (_e) {
+    } catch {
       // fallback abaixo
     }
     window.prompt('Copie manualmente o diagnóstico:', payload);
@@ -256,6 +208,27 @@ export default function ExtratoAtestadosMedicos() {
   };
 
 
+  const handleGerarRelatorioDpDintel = async () => {
+    if (selectedIds.size === 0 || !canGenerateDpDintelReport) return;
+    setIsGeneratingReport(true);
+    try {
+      const response = await gerarRelatorioDpDintelAtestados({ idsSelecionados: Array.from(selectedIds), incluirHistorico: false });
+      downloadBlob(response.blob, response.fileName);
+      await registrarAuditoria({
+        acao: 'gerar_relatorio_dp_dintel_pdf_sem_historico',
+        quantidade_registros: Number(response?.meta?.totalSelecionado || selectedIds.size),
+        atestado_ids: Array.from(selectedIds),
+        incluiu_sensiveis: Boolean(response?.meta?.sensiveis_incluidos),
+        sensiveis_bloqueados: Boolean(response?.meta?.sensiveis_bloqueados),
+        modo_acesso: 'relatorio_dp_dintel_pdf',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: Boolean(response?.meta?.extrato_parcial),
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['extrato-atestados-medicos'],
     queryFn: () => fetchScopedExtratoAtestados(),
@@ -310,15 +283,6 @@ export default function ExtratoAtestadosMedicos() {
 
   const toggleSelection = (id) => {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleExpanded = (id) => {
-    setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -388,6 +352,12 @@ export default function ExtratoAtestadosMedicos() {
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar CSV
               </Button>
+              {canGenerateDpDintelReport && (
+                <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isGeneratingReport} onClick={handleGerarRelatorioDpDintel}>
+                  {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  PDF DP/DINTEL sem histórico
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -409,6 +379,7 @@ export default function ExtratoAtestadosMedicos() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-full bg-slate-50 text-slate-700">Selecionados: {selectedIds.size}</Badge>
               {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
+              {isGeneratingReport && <span className="text-sm text-slate-700">Gerando relatório DP/DINTEL...</span>}
             </div>
           </CardContent>
         </Card>
@@ -511,7 +482,6 @@ export default function ExtratoAtestadosMedicos() {
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-100/95 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="w-12 p-3 text-left">Detalhe</th>
                     {columns.selected && <th className="p-3 text-left">Sel.</th>}
                     {columns.data_inicio && <th className="p-3 text-left">Início</th>}
                     {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
@@ -526,15 +496,8 @@ export default function ExtratoAtestadosMedicos() {
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
                     const lotacao = row.lotacao_nome || row.estrutura_nome;
-                    const isExpanded = expandedIds.has(row.id);
                     return (
-                      <React.Fragment key={row.id}>
-                        <tr className="hover:bg-blue-50/40">
-                          <td className="p-3 align-top">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0" onClick={() => toggleExpanded(row.id)} aria-label={isExpanded ? 'Recolher histórico' : 'Expandir histórico'}>
-                              <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                            </Button>
-                          </td>
+                      <tr key={row.id} className="hover:bg-blue-50/40">
                           {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
                           {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
                           {columns.militar_nome && <td className="p-3 align-top font-semibold text-slate-950">{row.militar_nome || '-'}</td>}
@@ -563,15 +526,7 @@ export default function ExtratoAtestadosMedicos() {
                               </div>
                             </td>
                           )}
-                        </tr>
-                        {isExpanded && (
-                          <tr className="bg-slate-50/60">
-                            <td colSpan={1 + Object.values(columns).filter(Boolean).length} className="p-4">
-                              <HistoricoPanel row={row} />
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
+                      </tr>
                     );
                   })}
                 </tbody>
