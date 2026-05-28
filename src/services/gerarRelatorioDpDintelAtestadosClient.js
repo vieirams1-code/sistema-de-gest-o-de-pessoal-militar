@@ -15,15 +15,18 @@ function readEffectiveEmailFromStorage() {
 }
 
 const buildBase44FunctionHeaders = () => {
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
+  const headers = { 'Content-Type': 'application/json' };
   if (appParams.appId) headers['X-App-Id'] = appParams.appId;
   if (appParams.functionsVersion) headers['Base44-Functions-Version'] = appParams.functionsVersion;
-
   return headers;
 };
+
+function base64ToBlob(base64, mimeType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType || 'application/pdf' });
+}
 
 async function parseJsonResponse(response) {
   try {
@@ -33,22 +36,22 @@ async function parseJsonResponse(response) {
   }
 }
 
-export async function gerarExtratoAtestados(payload = {}) {
+export async function gerarRelatorioDpDintelAtestados(payload = {}) {
   const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : readEffectiveEmailFromStorage();
-  const finalPayload = { ...payload };
+  const finalPayload = { ...payload, incluirHistorico: false };
   if (effectiveEmail) finalPayload.effectiveEmail = effectiveEmail;
   else delete finalPayload.effectiveEmail;
 
-  const response = await base44.functions.fetch('gerarExtratoAtestados', {
+  const response = await base44.functions.fetch('gerarRelatorioDpDintelAtestados', {
     method: 'POST',
     headers: buildBase44FunctionHeaders(),
     body: JSON.stringify(finalPayload),
   });
-
   const data = await parseJsonResponse(response);
 
-  if (!response.ok || data?.error) {
-    const error = new Error(String(data?.error || 'Falha ao gerar extrato de atestados.'));
+  if (!response.ok || data?.error || !data?.base64) {
+    const error = new Error(String(data?.error || 'Falha ao gerar relatório DP/DINTEL.'));
+    error.code = String(data?.code || 'REPORT_FAILED');
     error.status = response.status;
     error.meta = data?.meta || {};
     error.raw = { response: { status: response.status, statusText: response.statusText }, data };
@@ -56,13 +59,8 @@ export async function gerarExtratoAtestados(payload = {}) {
   }
 
   return {
-    formato: data.formato === 'pdf' ? 'pdf' : 'xlsx',
-    atestados: Array.isArray(data.atestados) ? data.atestados : [],
-    extrato_parcial: Boolean(data.extrato_parcial),
-    meta: {
-      ...(data.meta || {}),
-      sensiveis_incluidos: Boolean(data?.meta?.sensiveis_incluidos),
-      sensiveis_bloqueados: Boolean(data?.meta?.sensiveis_bloqueados),
-    },
+    blob: base64ToBlob(data.base64, data.mimeType || 'application/pdf'),
+    fileName: data.fileName || `relatorio-dp-dintel-atestados-sem-historico-${new Date().toISOString().slice(0, 10)}.pdf`,
+    meta: data.meta || {},
   };
 }

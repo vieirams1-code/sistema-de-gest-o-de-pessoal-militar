@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
+import { gerarRelatorioDpDintelAtestados } from '@/services/gerarRelatorioDpDintelAtestadosClient';
 import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 
@@ -113,7 +114,7 @@ const FormField = ({ id, label, children }) => (
 );
 
 export default function ExtratoAtestadosMedicos() {
-  const { canAccessModule, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('atestados');
   const [filtros, setFiltros] = useState({
     periodoInicio: '',
@@ -129,6 +130,7 @@ export default function ExtratoAtestadosMedicos() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
@@ -137,6 +139,7 @@ export default function ExtratoAtestadosMedicos() {
     legacyAttachmentHint: false,
   });
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
+  const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
 
   const normalizeAttachmentError = (error, context = {}) => ({
     code: String(error?.code || ''),
@@ -158,7 +161,7 @@ export default function ExtratoAtestadosMedicos() {
         window.alert('Diagnóstico copiado para a área de transferência.');
         return;
       }
-    } catch (_e) {
+    } catch {
       // fallback abaixo
     }
     window.prompt('Copie manualmente o diagnóstico:', payload);
@@ -220,6 +223,27 @@ export default function ExtratoAtestadosMedicos() {
     }
   };
 
+
+  const handleGerarRelatorioDpDintel = async () => {
+    if (selectedIds.size === 0 || !canGenerateDpDintelReport) return;
+    setIsGeneratingReport(true);
+    try {
+      const response = await gerarRelatorioDpDintelAtestados({ idsSelecionados: Array.from(selectedIds), incluirHistorico: false });
+      downloadBlob(response.blob, response.fileName);
+      await registrarAuditoria({
+        acao: 'gerar_relatorio_dp_dintel_pdf_sem_historico',
+        quantidade_registros: Number(response?.meta?.totalSelecionado || selectedIds.size),
+        atestado_ids: Array.from(selectedIds),
+        incluiu_sensiveis: Boolean(response?.meta?.sensiveis_incluidos),
+        sensiveis_bloqueados: Boolean(response?.meta?.sensiveis_bloqueados),
+        modo_acesso: 'relatorio_dp_dintel_pdf',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: Boolean(response?.meta?.extrato_parcial),
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['extrato-atestados-medicos'],
@@ -344,6 +368,12 @@ export default function ExtratoAtestadosMedicos() {
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar CSV
               </Button>
+              {canGenerateDpDintelReport && (
+                <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isGeneratingReport} onClick={handleGerarRelatorioDpDintel}>
+                  {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  PDF DP/DINTEL sem histórico
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -365,6 +395,7 @@ export default function ExtratoAtestadosMedicos() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-full bg-slate-50 text-slate-700">Selecionados: {selectedIds.size}</Badge>
               {isExporting && <span className="text-sm text-slate-700">Gerando extrato...</span>}
+              {isGeneratingReport && <span className="text-sm text-slate-700">Gerando relatório DP/DINTEL...</span>}
             </div>
           </CardContent>
         </Card>
@@ -479,10 +510,6 @@ export default function ExtratoAtestadosMedicos() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                    const postoGraduacao = formatPostoGraduacaoAbreviado(row.militar_posto || row.posto_graduacao || row.posto || row.graduacao);
-                    return (
-                      <React.Fragment key={row.id}>
-                        <tr className="hover:bg-blue-50/40">
                           {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
                           {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
                           {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}
@@ -506,8 +533,6 @@ export default function ExtratoAtestadosMedicos() {
                               </div>
                             </td>
                           )}
-                        </tr>
-                      </React.Fragment>
                     );
                   })}
                 </tbody>

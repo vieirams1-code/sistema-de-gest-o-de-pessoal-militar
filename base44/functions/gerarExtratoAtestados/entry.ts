@@ -29,16 +29,27 @@ function sanitizeAtestado(atestado: Record<string, unknown>, incluirSensivel: bo
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    const authUser = await base44.auth.me();
+    if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
+
     let payload: Record<string, unknown> = {};
     try {
       payload = await req.json();
-    } catch {
+    } catch (_e) {
       payload = {};
     }
 
     const formato = payload?.formato === 'pdf' ? 'pdf' : 'xlsx';
     const incluirSensivelSolicitado = Boolean(payload?.incluirSensivel);
-    const idsSelecionados = Array.isArray(payload?.idsSelecionados) ? payload.idsSelecionados.map((id) => String(id)) : [];
+    const idsSelecionados = Array.isArray(payload?.idsSelecionados)
+      ? payload.idsSelecionados.map((id) => String(id)).filter(Boolean)
+      : [];
+
+    const userPermsResponse = await base44.functions.invoke('getUserPermissions', payload);
+    const userPerms = userPermsResponse?.data ?? userPermsResponse ?? {};
+    const actions = (userPerms?.actions && typeof userPerms.actions === 'object') ? userPerms.actions : {};
+    const podeVerSensivel = Boolean(userPerms?.isAdmin || actions?.ver_dados_sensiveis_atestado);
+    const incluirSensivel = incluirSensivelSolicitado && podeVerSensivel;
 
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const data = scopedResponse?.data ?? scopedResponse ?? {};
@@ -46,15 +57,16 @@ Deno.serve(async (req) => {
 
     const scopedIdSet = new Set(scopedAtestados.map((a: any) => String(a?.id)).filter(Boolean));
     const selectedIdSet = new Set(idsSelecionados.filter((id) => scopedIdSet.has(id)));
+    const shouldExportAllScoped = idsSelecionados.length === 0;
 
     const atestadosSelecionados = scopedAtestados
-      .filter((atestado: any) => selectedIdSet.has(String(atestado?.id)))
+      .filter((atestado: any) => shouldExportAllScoped || selectedIdSet.has(String(atestado?.id)))
       .map((atestado: any) => sanitizeAtestado(atestado, incluirSensivel));
 
     return Response.json({
       formato,
       atestados: atestadosSelecionados,
-      extrato_parcial: atestadosSelecionados.length < scopedAtestados.length,
+      extrato_parcial: shouldExportAllScoped ? false : atestadosSelecionados.length < scopedAtestados.length,
       meta: {
         totalNoEscopo: scopedAtestados.length,
         totalSelecionado: atestadosSelecionados.length,
@@ -67,8 +79,3 @@ Deno.serve(async (req) => {
     return Response.json({ error: (error as any)?.message || 'Erro ao gerar extrato de atestados.', meta: { status } }, { status });
   }
 });
-    const userPermsResponse = await base44.functions.invoke('getUserPermissions', payload);
-    const userPerms = userPermsResponse?.data ?? userPermsResponse ?? {};
-    const actions = (userPerms?.actions && typeof userPerms.actions === 'object') ? userPerms.actions : {};
-    const podeVerSensivel = Boolean(actions?.ver_dados_sensiveis_atestado);
-    const incluirSensivel = incluirSensivelSolicitado && podeVerSensivel;
