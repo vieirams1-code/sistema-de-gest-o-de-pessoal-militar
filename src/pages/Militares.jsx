@@ -29,7 +29,7 @@ import {
 } from '@/services/matriculaMilitarViewService';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
-import MilitarConsultaVirtualList from '@/components/militar/MilitarConsultaVirtualList';
+import MilitarConsultaRow from '@/components/militar/MilitarConsultaRow';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
@@ -64,6 +64,8 @@ import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPo
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
+const FRONTEND_PAGE_SIZE_OPTIONS = [25, 50, 100];
+const DEFAULT_FRONTEND_PAGE_SIZE = 50;
 const STALE_TIME_MS = 5 * 60 * 1000;
 const VALOR_AUSENTE_ORDENACAO = Number.POSITIVE_INFINITY;
 
@@ -197,6 +199,8 @@ export default function Militares() {
   const [draftVisibleColumnKeys, setDraftVisibleColumnKeys] = useState([]);
   const previousColumnsDialogOpenRef = useRef(false);
   const [columnFilters, setColumnFilters] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [frontendPageSize, setFrontendPageSize] = useState(DEFAULT_FRONTEND_PAGE_SIZE);
   const { toast } = useToast();
 
   const allowedColumnKeysSignature = useMemo(
@@ -644,7 +648,23 @@ export default function Militares() {
       return base.filter((key) => key !== columnKey);
     });
   };
-  const allFilteredSelected = filteredMilitares.length > 0 && filteredMilitares.every((m) => selectedMilitarIds.has(String(m.id)));
+
+  const totalPages = Math.max(1, Math.ceil(filteredMilitares.length / frontendPageSize));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [frontendPageSize, backendFiltersKey, debouncedSearchTerm, activeColumnFilterKeys.join('|')]);
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
+
+  const paginatedMilitares = useMemo(() => {
+    const start = (currentPage - 1) * frontendPageSize;
+    return filteredMilitares.slice(start, start + frontendPageSize);
+  }, [filteredMilitares, currentPage, frontendPageSize]);
+
+  const allFilteredSelected = paginatedMilitares.length > 0 && paginatedMilitares.every((m) => selectedMilitarIds.has(String(m.id)));
   const tagsPresentesSelecionados = useMemo(() => montarTagsPresentesNosSelecionados({
     selectedMilitarIds: selectedMilitarIdsArray,
     vinculosTagsAtivos: vinculosTagsAtivosFiltros,
@@ -1169,7 +1189,7 @@ export default function Militares() {
                   type="checkbox"
                   checked={allFilteredSelected}
                   onChange={(e) => {
-                    if (e.target.checked) setSelectedMilitarIds(new Set(filteredMilitares.map((m) => String(m.id))));
+                    if (e.target.checked) setSelectedMilitarIds((prev) => new Set([...prev, ...paginatedMilitares.map((m) => String(m.id))]));
                     else setSelectedMilitarIds(new Set());
                   }}
                 />
@@ -1304,44 +1324,67 @@ export default function Militares() {
                 </div>
               </div>
             )}
-              <MilitarConsultaVirtualList
-                items={filteredMilitares}
-                itemData={{
-                  militaresGridTemplate,
-                  sanitizedVisibleColumnKeys,
-                  columnMetaByKey,
-                  getColumnClassName,
-                  emojisEfetivoByMilitar,
-                  selectedMilitarIds,
-                  onToggleSelection: handleToggleRowSelection,
-                  isAdmin,
-                  canAccessAction,
-                  onPromocaoAtual: handlePromocaoAtualRow,
-                  onAskDelete: handleAskDeleteRow,
-                }}
-              />
+              {paginatedMilitares.map((militar) => (
+                <MilitarConsultaRow
+                  key={militar.id}
+                  militar={militar}
+                  militaresGridTemplate={militaresGridTemplate}
+                  sanitizedVisibleColumnKeys={sanitizedVisibleColumnKeys}
+                  columnMetaByKey={columnMetaByKey}
+                  getColumnClassName={getColumnClassName}
+                  emojisEfetivoByMilitar={emojisEfetivoByMilitar}
+                  isSelected={selectedMilitarIds.has(String(militar.id))}
+                  onToggleSelection={handleToggleRowSelection}
+                  isAdmin={isAdmin}
+                  canAccessAction={canAccessAction}
+                  onPromocaoAtual={handlePromocaoAtualRow}
+                  onAskDelete={handleAskDeleteRow}
+                />
+              ))}
             </div>
-            <div className="px-3 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-t bg-slate-50/60">
-              <p className="text-xs text-slate-600">
-                Exibindo <span className="font-semibold text-slate-800">{filteredMilitares.length}</span>
-                {filteredMilitares.length !== militares.length && (
-                  <> de <span className="font-semibold text-slate-800">{militares.length}</span> carregados</>
-                )}
+            <div className="px-3 py-3 flex flex-col gap-3 border-t bg-slate-50/60">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <p className="text-xs text-slate-600">
+                  Exibindo <span className="font-semibold text-slate-800">{paginatedMilitares.length}</span> de <span className="font-semibold text-slate-800">{filteredMilitares.length}</span> filtrados
+                  {filteredMilitares.length !== militares.length && (
+                    <> • <span className="font-semibold text-slate-800">{militares.length}</span> carregados</>
+                  )}
+                  {hasMoreBackend && (
+                    <span className="ml-1 text-amber-700">• há mais resultados não carregados</span>
+                  )}
+                </p>
                 {hasMoreBackend && (
-                  <span className="ml-1 text-amber-700">• há mais resultados não carregados</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={carregarMais}
+                    disabled={isFetching}
+                    className="border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f] hover:text-white"
+                  >
+                    {isFetching ? 'Carregando…' : 'Carregar mais militares'}
+                  </Button>
                 )}
-              </p>
-              {hasMoreBackend && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={carregarMais}
-                  disabled={isFetching}
-                  className="border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f] hover:text-white"
-                >
-                  {isFetching ? 'Carregando…' : 'Carregar mais militares'}
-                </Button>
-              )}
+              </div>
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <span>Militares por página</span>
+                  <Select value={String(frontendPageSize)} onValueChange={(value) => setFrontendPageSize(Number(value))}>
+                    <SelectTrigger className="h-8 w-[90px] bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FRONTEND_PAGE_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 self-end md:self-auto">
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={currentPage <= 1}>Anterior</Button>
+                  <span className="text-xs text-slate-600">Página <span className="font-semibold text-slate-800">{currentPage}</span> de <span className="font-semibold text-slate-800">{totalPages}</span></span>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))} disabled={currentPage >= totalPages}>Próxima</Button>
+                </div>
+              </div>
             </div>
           </div>
           </TooltipProvider>
