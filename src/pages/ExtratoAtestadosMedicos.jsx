@@ -74,6 +74,7 @@ export default function ExtratoAtestadosMedicos() {
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
+  const [linkAnexoById, setLinkAnexoById] = useState({});
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
@@ -162,7 +163,9 @@ export default function ExtratoAtestadosMedicos() {
         arquivos_ignorados_sem_anexo: Number(e?.meta?.arquivos_ignorados_sem_anexo || 0),
         limite_excedido: isLimit,
       });
-      window.alert(isLimit ? 'Limite excedido: selecione até 50 anexos e tamanho estimado até 100MB.' : msg.includes('Nenhum selecionado possui anexo') ? 'Nenhum selecionado possui anexo para download.' : 'Não foi possível gerar o ZIP agora.');
+      const detail = e?.detail ? JSON.stringify(e.detail) : '-';
+      const meta = e?.meta ? JSON.stringify(e.meta) : '-';
+      window.alert(`Falha ao gerar ZIP\ncode=${String(e?.code || '-')}\nmessage=${msg}\ndetail=${detail}\nmeta=${meta}${isLimit ? '\n\nLimite: até 50 anexos e tamanho estimado até 100MB.' : ''}`);
     } finally {
       setIsExportingZip(false);
     }
@@ -234,10 +237,10 @@ export default function ExtratoAtestadosMedicos() {
     if (!rowId) return;
     setLoadingAnexoById((prev) => ({ ...prev, [rowId]: true }));
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
+    setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     try {
-      // Abre nova aba dentro do user-gesture e depois redireciona para a signed URL,
-      // evitando bloqueio de popup do navegador após await.
-      await abrirAnexoAtestadoEmNovaAba(rowId);
+      const preOpenedTab = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
+      await abrirAnexoAtestadoEmNovaAba(rowId, preOpenedTab);
       await registrarAuditoria({
         acao: 'abrir_anexo',
         quantidade_registros: 1,
@@ -255,8 +258,10 @@ export default function ExtratoAtestadosMedicos() {
       const status = Number(e?.status || e?.raw?.response?.status || 0) || '-';
       const rawPayload = e?.raw ? JSON.stringify(e.raw) : '';
       const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage) || code === 'NO_ATTACHMENT';
+      const popupUrl = String(e?.detail?.url || '');
       const fullError = `status=${status} | code=${code || '-'} | message=${apiMessage || '-'}${safeDetail ? ` | detail=${safeDetail}` : ''}${rawPayload ? ` | raw=${rawPayload.slice(0, 500)}` : ''}`;
       setErroAnexoById((prev) => ({ ...prev, [rowId]: isMissing ? `Sem anexo disponível. ${fullError}` : `Falha ao abrir anexo. ${fullError}` }));
+      if (popupUrl) setLinkAnexoById((prev) => ({ ...prev, [rowId]: popupUrl }));
       console.error('[ExtratoAtestadosMedicos] erro abrir anexo', { rowId, status, code, message: apiMessage, detail: e?.detail || null, raw: e?.raw || null });
     } finally {
       setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
@@ -443,6 +448,11 @@ export default function ExtratoAtestadosMedicos() {
                               {loadingAnexoById[row.id] ? 'Abrindo...' : 'Abrir'}
                             </Button>
                             {erroAnexoById[row.id] && <div className="text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
+                            {linkAnexoById[row.id] && (
+                              <a className="text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
+                                Abrir anexo em nova aba
+                              </a>
+                            )}
                           </div>
                         </td>
                       )}
