@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronDown, ClipboardList, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
+import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -18,33 +18,55 @@ const PAGE_SIZE = 30;
 const DEFAULT_COLUMNS = {
   selected: true,
   data_inicio: true,
+  posto_graduacao: true,
   militar_nome: true,
-  lotacao_nome: true,
-  status: true,
   necessita_jiso: true,
   medico: true,
   dias: true,
-  anexo: false,
+  anexo: true,
 };
 
 const COLUMN_LABELS = {
   selected: 'Seleção',
   data_inicio: 'Data de início',
+  posto_graduacao: 'Posto/Grad.',
   militar_nome: 'Militar',
-  lotacao_nome: 'Lotação',
-  status: 'Status',
   necessita_jiso: 'JISO',
   medico: 'Médico',
   dias: 'Dias',
   anexo: 'Anexo',
 };
 
-const statusBadgeClass = (status) => {
-  const normalized = String(status || '').toLowerCase();
-  if (normalized === 'ativo') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-  if (normalized === 'encerrado') return 'bg-slate-100 text-slate-700 border-slate-300';
-  if (normalized === 'cancelado') return 'bg-rose-100 text-rose-700 border-rose-200';
-  return 'bg-amber-100 text-amber-700 border-amber-200';
+const POSTO_GRADUACAO_ABREVIACOES = {
+  '2 sargento': '2º Sgt',
+  '2o sargento': '2º Sgt',
+  'segundo sargento': '2º Sgt',
+  '3 sargento': '3º Sgt',
+  '3o sargento': '3º Sgt',
+  'terceiro sargento': '3º Sgt',
+  cabo: 'Cb',
+  soldado: 'Sd',
+  capitao: 'Cap',
+  major: 'Maj',
+  'tenente coronel': 'Ten Cel',
+  coronel: 'Cel',
+};
+
+const formatPostoGraduacaoAbreviado = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return '-';
+
+  const texto = String(valor).trim();
+  if (!texto) return '-';
+
+  const chave = texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[ºª]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  return POSTO_GRADUACAO_ABREVIACOES[chave] || texto;
 };
 
 const formatDateBr = (value) => {
@@ -90,62 +112,6 @@ const FormField = ({ id, label, children }) => (
   </div>
 );
 
-const StatusBadge = ({ status }) => (
-  <Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(status)}`}>
-    {status || '-'}
-  </Badge>
-);
-
-const formatHistoryValue = (value) => {
-  if (value === null || value === undefined || value === '') return '-';
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-};
-
-const HistoricoPanel = ({ row }) => {
-  const historico = Array.isArray(row?.historico) ? row.historico : null;
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-inner">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-        <ClipboardList className="h-4 w-4 text-blue-700" />
-        Histórico do atestado
-      </div>
-      {!historico && (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
-          Histórico não carregado neste extrato.
-        </p>
-      )}
-      {historico && historico.length === 0 && (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
-          Nenhum evento de histórico informado para este registro.
-        </p>
-      )}
-      {historico && historico.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {historico.map((item, index) => {
-            const eventTitle = item?.evento || item?.acao || item?.status || item?.tipo || `Evento ${index + 1}`;
-            const eventDate = item?.data || item?.created_at || item?.timestamp || item?.quando;
-            const eventUser = item?.usuario || item?.responsavel || item?.autor;
-            return (
-              <div key={`${row?.id || 'historico'}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <p className="font-semibold text-slate-900">{formatHistoryValue(eventTitle)}</p>
-                  {eventDate && <Badge variant="outline" className="shrink-0 bg-blue-50 text-blue-700 border-blue-200">{formatHistoryValue(eventDate)}</Badge>}
-                </div>
-                {eventUser && <p className="text-xs text-slate-500">Responsável: {formatHistoryValue(eventUser)}</p>}
-                {item?.observacao && <p className="mt-2 text-sm text-slate-600">{formatHistoryValue(item.observacao)}</p>}
-                {item?.cid && <p className="mt-2 text-xs font-semibold text-slate-500">CID: {formatHistoryValue(item.cid)}</p>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default function ExtratoAtestadosMedicos() {
   const { canAccessModule, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('atestados');
@@ -162,7 +128,6 @@ export default function ExtratoAtestadosMedicos() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [isExporting, setIsExporting] = useState(false);
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
@@ -310,15 +275,6 @@ export default function ExtratoAtestadosMedicos() {
 
   const toggleSelection = (id) => {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleExpanded = (id) => {
-    setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -511,12 +467,10 @@ export default function ExtratoAtestadosMedicos() {
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-100/95 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="w-12 p-3 text-left">Detalhe</th>
                     {columns.selected && <th className="p-3 text-left">Sel.</th>}
                     {columns.data_inicio && <th className="p-3 text-left">Início</th>}
+                    {columns.posto_graduacao && <th className="p-3 text-left">Posto/Grad.</th>}
                     {columns.militar_nome && <th className="p-3 text-left">Militar</th>}
-                    {columns.lotacao_nome && <th className="p-3 text-left">Lotação</th>}
-                    {columns.status && <th className="p-3 text-left">Status</th>}
                     {columns.necessita_jiso && <th className="p-3 text-left">JISO</th>}
                     {columns.medico && <th className="p-3 text-left">Médico</th>}
                     {columns.dias && <th className="p-3 text-left">Dias</th>}
@@ -525,25 +479,14 @@ export default function ExtratoAtestadosMedicos() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                    const lotacao = row.lotacao_nome || row.estrutura_nome;
-                    const isExpanded = expandedIds.has(row.id);
+                    const postoGraduacao = formatPostoGraduacaoAbreviado(row.militar_posto || row.posto_graduacao || row.posto || row.graduacao);
                     return (
                       <React.Fragment key={row.id}>
                         <tr className="hover:bg-blue-50/40">
-                          <td className="p-3 align-top">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0" onClick={() => toggleExpanded(row.id)} aria-label={isExpanded ? 'Recolher histórico' : 'Expandir histórico'}>
-                              <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                            </Button>
-                          </td>
                           {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
                           {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
+                          {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}
                           {columns.militar_nome && <td className="p-3 align-top font-semibold text-slate-950">{row.militar_nome || '-'}</td>}
-                          {columns.lotacao_nome && (
-                            <td className="p-3 align-top text-slate-700">
-                              {lotacao ? lotacao : <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">Lotação ausente</Badge>}
-                            </td>
-                          )}
-                          {columns.status && <td className="p-3 align-top"><StatusBadge status={row.status} /></td>}
                           {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
                           {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico || '-'}</td>}
                           {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
@@ -564,13 +507,6 @@ export default function ExtratoAtestadosMedicos() {
                             </td>
                           )}
                         </tr>
-                        {isExpanded && (
-                          <tr className="bg-slate-50/60">
-                            <td colSpan={1 + Object.values(columns).filter(Boolean).length} className="p-4">
-                              <HistoricoPanel row={row} />
-                            </td>
-                          </tr>
-                        )}
                       </React.Fragment>
                     );
                   })}
