@@ -18,8 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, FileText, ChevronDown, Car, HeartPulse, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Users, Filter, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,7 +29,7 @@ import {
 } from '@/services/matriculaMilitarViewService';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
-import CondicaoBadge from '@/components/militar/CondicaoBadge';
+import MilitarConsultaVirtualList from '@/components/militar/MilitarConsultaVirtualList';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
@@ -68,109 +67,6 @@ const PAGE_SIZE = 300;
 const STALE_TIME_MS = 5 * 60 * 1000;
 const VALOR_AUSENTE_ORDENACAO = Number.POSITIVE_INFINITY;
 
-const TIPO_ORDEM = { root: 0, setor: 1, subsetor: 2, unidade: 3 };
-
-function normalizeLotacaoType(item = {}) {
-  const tipoRaw = String(item?.estrutura_tipo || item?.tipo || item?.subgrupamento_tipo || '').toLowerCase();
-  if (tipoRaw.includes('setor') || tipoRaw.includes('grupamento')) return 'setor';
-  if (tipoRaw.includes('subsetor') || tipoRaw.includes('subgrupamento')) return 'subsetor';
-  if (tipoRaw.includes('unidade')) return 'unidade';
-
-  if (!item?.parent_id && !item?.grupamento_id) return 'setor';
-  return 'unidade';
-}
-
-function buildLotacoesTree(flatLotacoes = []) {
-  const byId = new Map();
-
-  flatLotacoes.forEach((item) => {
-    const id = String(item?.id || '');
-    if (!id) return;
-
-    const nome = String(item?.nome || '').trim();
-    const sigla = String(item?.sigla || '').trim();
-    const tipo = normalizeLotacaoType(item);
-    const subtitle = [sigla, tipo !== 'unidade' ? tipo.toUpperCase() : ''].filter(Boolean).join(' • ');
-
-    const parentId = String(
-      item?.parent_id
-      || item?.setor_pai_id
-      || item?.grupamento_id
-      || item?.grupamento_raiz_id
-      || ''
-    ).trim();
-
-    byId.set(id, {
-      id,
-      label: nome || sigla || id,
-      subtitle: subtitle || undefined,
-      type: tipo,
-      parentId,
-      children: [],
-    });
-  });
-
-  const roots = [];
-  byId.forEach((node) => {
-    if (node.parentId && byId.has(node.parentId) && node.parentId !== node.id) {
-      byId.get(node.parentId).children.push(node);
-    } else {
-      roots.push(node);
-    }
-  });
-
-  const sortNodes = (nodes) => {
-    nodes.sort((a, b) => {
-      const typeDiff = (TIPO_ORDEM[a.type] ?? 99) - (TIPO_ORDEM[b.type] ?? 99);
-      if (typeDiff !== 0) return typeDiff;
-      return a.label.localeCompare(b.label, 'pt-BR');
-    });
-    nodes.forEach((node) => sortNodes(node.children));
-    return nodes;
-  };
-
-  return sortNodes(roots).map(({ parentId, ...node }) => node);
-}
-
-const statusBadgeClass = {
-  Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  Inativo: 'bg-slate-100 text-slate-700 border-slate-200',
-  Reserva: 'bg-amber-100 text-amber-700 border-amber-200',
-  Reforma: 'bg-blue-100 text-blue-700 border-blue-200',
-  Falecido: 'bg-red-100 text-red-700 border-red-200',
-};
-
-const SITUACAO_MILITAR_BADGES = {
-  'Designado': { label: 'Designado', className: 'bg-sky-50 text-sky-700 border-sky-200' },
-  'Convocado': { label: 'Convocado', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  'Reserva Remunerada': { label: 'Reserva Remunerada', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  'Reformado': { label: 'Reformado', className: 'bg-slate-100 text-slate-600 border-slate-200' },
-};
-
-const TAG_DEFS = {
-  '🚑': {
-    label: 'Junta Médica',
-    icon: HeartPulse,
-    bg: 'bg-rose-100',
-    text: 'text-rose-700',
-    border: 'border-rose-200',
-  },
-  '🚗': {
-    label: 'Viatura',
-    icon: Car,
-    bg: 'bg-indigo-100',
-    text: 'text-indigo-700',
-    border: 'border-indigo-200',
-  },
-  '⚠️': {
-    label: 'Restrição',
-    icon: AlertTriangle,
-    bg: 'bg-amber-100',
-    text: 'text-amber-700',
-    border: 'border-amber-200',
-  },
-};
-const MAX_TAGS_INLINE = 5;
 const CONSULTA_MILITAR_GRID_WIDTHS = {
   nome: 'minmax(300px, 1.6fr)',
   nome_completo: 'minmax(320px, 1.8fr)',
@@ -415,8 +311,10 @@ export default function Militares() {
       .filter((item) => String(item?.id || '').trim() && String(item?.nome || '').trim());
   }, [lotacoesData]);
 
+  // Árvore hierárquica de lotações vem pronta do backend (getScopedLotacoes).
+  // Aqui apenas envelopamos com o nó raiz "Todas as lotações" usado pelo seletor.
   const lotacoesTree = useMemo(() => {
-    const lotacoesEstruturadas = buildLotacoesTree(lotacoesDisponiveis);
+    const lotacoesEstruturadas = Array.isArray(lotacoesData?.lotacoesTree) ? lotacoesData.lotacoesTree : [];
     return [{
       id: TODAS_LOTACOES_VALUE,
       label: 'Todas as lotações',
@@ -424,7 +322,7 @@ export default function Militares() {
       type: 'root',
       children: lotacoesEstruturadas,
     }];
-  }, [lotacoesDisponiveis]);
+  }, [lotacoesData]);
 
   const lotacoesDisponiveisIds = useMemo(
     () => new Set(lotacoesDisponiveis.map((item) => String(item.id))),
@@ -912,6 +810,23 @@ export default function Militares() {
     [filteredMilitares, selectedMilitarIds],
   );
 
+  // Handlers estáveis para a lista virtualizada (evita re-render desnecessário das linhas)
+  const handleToggleRowSelection = useCallback((id, checked) => {
+    setSelectedMilitarIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  const handleAskDeleteRow = useCallback((militar) => {
+    setMilitarToDelete(militar);
+    setDeleteDialogOpen(true);
+  }, []);
+  const handlePromocaoAtualRow = useCallback((militar) => {
+    setMilitarPromocaoAtual(militar);
+  }, []);
+
   const handleExportExcel = ({ mode }) => {
     const isSelectedMode = mode === 'selected';
     const militaresParaExportar = isSelectedMode ? filteredSelectedMilitares : filteredMilitares;
@@ -1389,155 +1304,22 @@ export default function Militares() {
                 </div>
               </div>
             )}
-              {filteredMilitares.map((militar) => {
-              const destacarQuadro = isQuadroComDestaque(militar?.quadro);
-
-              return (
-                <div
-                  key={militar.id}
-                  className={`grid min-w-full items-center border-b text-sm ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
-                  style={{ gridTemplateColumns: militaresGridTemplate }}
-                >
-                <div className="min-w-0 px-2 py-2 flex items-center justify-center">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={selectedMilitarIds.has(String(militar.id))}
-                      onChange={(e) => {
-                        const id = String(militar.id);
-                        setSelectedMilitarIds((prev) => {
-                          const next = new Set(prev);
-                          if (e.target.checked) next.add(id);
-                          else next.delete(id);
-                          return next;
-                        });
-                      }}
-                    />
-                  </label>
-                </div>
-                  {sanitizedVisibleColumnKeys.map((key) => {
-                    const column = columnMetaByKey.get(key) || {};
-                    if (key === 'nome') {
-                      const tagsLinha = Array.isArray(emojisEfetivoByMilitar.get(String(militar.id))?.itens)
-                        ? emojisEfetivoByMilitar.get(String(militar.id)).itens.filter(Boolean)
-                        : [];
-                      const tagsVisiveis = tagsLinha.slice(0, MAX_TAGS_INLINE);
-                      const excessoTags = Math.max(0, tagsLinha.length - MAX_TAGS_INLINE);
-                      return (
-                        <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}>
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-2 min-w-0 max-w-full overflow-hidden">
-                                <span className="font-bold text-gray-900 truncate min-w-0 flex-1">{militar.nome_guerra || militar.nome_completo}</span>
-                                {Array.isArray(tagsVisiveis) && tagsVisiveis.length > 0 && (
-                                  <div className="flex gap-1 items-center overflow-hidden min-w-0 shrink">
-                                    {tagsVisiveis.map((item, idx) => {
-                                      const emoji = String(item?.emoji || '').trim();
-                                      const tagVisual = resolveTagVisual({ nome: item?.nome, emoji });
-                                      const def = TAG_DEFS[emoji];
-                                      const label = def?.label || tagVisual?.nome || item?.nome || emoji || 'Tag';
-                                      const Icon = def?.icon;
-                                      return (
-                                        <Tooltip key={`${emoji || label}-${idx}`}>
-                                          <TooltipTrigger asChild>
-                                            <span
-                                              className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border ${def?.bg || 'bg-slate-100'} ${def?.text || 'text-slate-700'} ${def?.border || 'border-slate-200'}`}
-                                            >
-                                              {Icon ? (
-                                                <Icon size={11} strokeWidth={3} />
-                                              ) : (
-                                                <IconeCatalogo value={tagVisual?.emoji || emoji || '🏷️'} />
-                                              )}
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <p>{label}</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      );
-                                    })}
-                                    {excessoTags > 0 && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border border-slate-200 bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">
-                                            +{excessoTags}
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>{tagsLinha.slice(MAX_TAGS_INLINE).map((tag) => (
-                                            resolveTagVisual({ nome: tag?.nome, emoji: String(tag?.emoji || '').trim() })?.nome
-                                            || tag?.nome
-                                            || String(tag?.emoji || '').trim()
-                                            || 'Tag'
-                                          )).join(', ')}</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-xs text-gray-500 mt-0.5 whitespace-normal break-words leading-snug">
-                                {militar.nome_completo}
-                              </span>
-                            </div>
-                        </div>
-                      );
-                    }
-                    if (key === 'situacao_condicao_militar') return <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}><CondicaoBadge militar={militar} /></div>;
-                    if (key === 'situacao_militar') {
-                      return (
-                        <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}>
-                          {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
-                            <Badge variant="outline" className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}>
-                              {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-slate-400">—</span>
-                          )}
-                        </div>
-                      );
-                    }
-                    if (key === 'status_cadastro') return <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
-                    const value = columnMetaByKey.get(key)?.accessor?.(militar) || '—';
-                    return (
-                      <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`.trim()}>
-                        <span className={WRAP_COLUMN_KEYS.has(key)
-                          ? 'block whitespace-normal break-words leading-snug'
-                          : 'block truncate'}
-                        >
-                          {value}
-                        </span>
-                      </div>
-                    );
-                  })}
-                <div className="min-w-0 px-2 py-2 flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  {canAccessAction('editar_militares') && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)}>
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  )}
-                  {isAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      title="Registrar promoção atual"
-                      onClick={() => setMilitarPromocaoAtual(militar)}
-                    >
-                      <CalendarClock className="w-4 h-4" />
-                    </Button>
-                  )}
-                  {canAccessAction('excluir_militares') && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => { setMilitarToDelete(militar); setDeleteDialogOpen(true); }}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-                </div>
-              );
-              })}
+              <MilitarConsultaVirtualList
+                items={filteredMilitares}
+                itemData={{
+                  militaresGridTemplate,
+                  sanitizedVisibleColumnKeys,
+                  columnMetaByKey,
+                  getColumnClassName,
+                  emojisEfetivoByMilitar,
+                  selectedMilitarIds,
+                  onToggleSelection: handleToggleRowSelection,
+                  isAdmin,
+                  canAccessAction,
+                  onPromocaoAtual: handlePromocaoAtualRow,
+                  onAskDelete: handleAskDeleteRow,
+                }}
+              />
             </div>
             <div className="px-3 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-t bg-slate-50/60">
               <p className="text-xs text-slate-600">

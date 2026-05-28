@@ -86,6 +86,74 @@ async function fetchWithRetry(queryFn, label = 'query') {
     throw lastError;
 }
 
+// =====================================================================
+// Construção de árvore hierárquica de lotações
+// ---------------------------------------------------------------------
+// Replica a função `buildLotacoesTree` antes existente em
+// pages/Militares.jsx para que o frontend receba a árvore pronta e não
+// precise reconstruí-la a cada render.
+// =====================================================================
+const TIPO_ORDEM_TREE = { root: 0, setor: 1, subsetor: 2, unidade: 3 };
+
+function normalizeLotacaoTipoTree(item = {}) {
+    const tipoRaw = String(item?.estrutura_tipo || item?.tipo || item?.subgrupamento_tipo || '').toLowerCase();
+    if (tipoRaw.includes('setor') || tipoRaw.includes('grupamento')) return 'setor';
+    if (tipoRaw.includes('subsetor') || tipoRaw.includes('subgrupamento')) return 'subsetor';
+    if (tipoRaw.includes('unidade')) return 'unidade';
+    if (!item?.parent_id && !item?.grupamento_id) return 'setor';
+    return 'unidade';
+}
+
+function buildLotacoesTree(flatLotacoes = []) {
+    const byId = new Map();
+
+    (flatLotacoes || []).forEach((item) => {
+        const id = String(item?.id || '');
+        if (!id) return;
+        const nome = String(item?.nome || '').trim();
+        const sigla = String(item?.sigla || '').trim();
+        const tipo = normalizeLotacaoTipoTree(item);
+        const subtitle = [sigla, tipo !== 'unidade' ? tipo.toUpperCase() : ''].filter(Boolean).join(' • ');
+        const parentId = String(
+            item?.parent_id
+            || item?.setor_pai_id
+            || item?.grupamento_id
+            || item?.grupamento_raiz_id
+            || ''
+        ).trim();
+
+        byId.set(id, {
+            id,
+            label: nome || sigla || id,
+            subtitle: subtitle || undefined,
+            type: tipo,
+            parentId,
+            children: [],
+        });
+    });
+
+    const roots = [];
+    byId.forEach((node) => {
+        if (node.parentId && byId.has(node.parentId) && node.parentId !== node.id) {
+            byId.get(node.parentId).children.push(node);
+        } else {
+            roots.push(node);
+        }
+    });
+
+    const sortNodes = (nodes) => {
+        nodes.sort((a, b) => {
+            const typeDiff = (TIPO_ORDEM_TREE[a.type] ?? 99) - (TIPO_ORDEM_TREE[b.type] ?? 99);
+            if (typeDiff !== 0) return typeDiff;
+            return a.label.localeCompare(b.label, 'pt-BR');
+        });
+        nodes.forEach((node) => sortNodes(node.children));
+        return nodes;
+    };
+
+    return sortNodes(roots).map(({ parentId, ...node }) => node);
+}
+
 function isLotacaoAtiva(item) {
     // Mesma heurística usada antes no frontend: se algum dos flags marca
     // o item como inativo/excluído/arquivado, descartamos.
@@ -341,8 +409,12 @@ Deno.serve(async (req) => {
             .filter(isLotacaoAtiva)
             .map((item) => projetar(item, CAMPOS_SUBGRUPAMENTO));
 
+        // 9. Construir árvore hierárquica (movida do frontend)
+        const lotacoesTree = buildLotacoesTree(filtradas);
+
         return Response.json({
             lotacoes: filtradas,
+            lotacoesTree,
             meta: {
                 ...baseMeta,
                 returned: filtradas.length,

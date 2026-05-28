@@ -53,6 +53,7 @@ export async function fetchScopedLotacoes(payload = {}) {
   const data = response?.data ?? response ?? {};
   return {
     lotacoes: Array.isArray(data.lotacoes) ? data.lotacoes : [],
+    lotacoesTree: Array.isArray(data.lotacoesTree) ? data.lotacoesTree : [],
     meta: data.meta || {},
   };
 }
