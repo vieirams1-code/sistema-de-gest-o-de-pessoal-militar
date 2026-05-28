@@ -30,6 +30,10 @@ const initialFormData = {
   medico: '',
   crm_medico: '',
   arquivo_atestado: '',
+  storage_bucket: '',
+  storage_object_path: '',
+  arquivo_original_nome: '',
+  arquivo_mime_type: '',
   tipo_afastamento: 'Afastamento Total',
   cid_10: '',
   cid_descricao: '',
@@ -46,6 +50,64 @@ const initialFormData = {
   encaminhado_jiso: false,
   data_jiso_agendada: '',
   observacoes: ''
+};
+
+
+const extractUploadMetadata = (uploadResponse, file) => {
+  const payload = uploadResponse && typeof uploadResponse === 'object' ? uploadResponse : {};
+  const fileUrl = String(payload.file_url || payload.url || payload.signedUrl || '').trim();
+
+  const bucket = String(
+    payload.storage_bucket
+    || payload.bucket
+    || payload.bucket_name
+    || payload.storageBucket
+    || payload?.storage?.bucket
+    || ''
+  ).trim();
+
+  const objectPath = String(
+    payload.storage_object_path
+    || payload.object_path
+    || payload.path
+    || payload.objectPath
+    || payload.key
+    || payload?.storage?.object_path
+    || payload?.storage?.path
+    || ''
+  ).trim();
+
+  let inferredBucket = bucket;
+  let inferredObjectPath = objectPath;
+
+  if ((!inferredBucket || !inferredObjectPath) && fileUrl) {
+    try {
+      const marker = '/storage/v1/object/';
+      const url = new URL(fileUrl);
+      const idx = url.pathname.indexOf(marker);
+      if (idx >= 0) {
+        const suffix = url.pathname.slice(idx + marker.length);
+        const normalized = suffix.startsWith('public/') || suffix.startsWith('authenticated/') || suffix.startsWith('sign/')
+          ? suffix.split('/').slice(1).join('/')
+          : suffix;
+        const parts = normalized.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+          if (!inferredBucket) inferredBucket = parts[0];
+          if (!inferredObjectPath) inferredObjectPath = parts.slice(1).join('/');
+        }
+      }
+    } catch (_e) {
+      // noop
+    }
+  }
+
+  return {
+    arquivo_atestado: fileUrl,
+    storage_bucket: inferredBucket,
+    storage_object_path: inferredObjectPath,
+    arquivo_original_nome: String(payload.original_name || payload.file_name || file?.name || '').trim(),
+    arquivo_mime_type: String(payload.mime_type || payload.content_type || file?.type || '').trim(),
+  };
 };
 
 export default function CadastrarAtestado() {
@@ -103,8 +165,13 @@ export default function CadastrarAtestado() {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      handleChange('arquivo_atestado', file_url);
+      const uploadResponse = await base44.integrations.Core.UploadFile({ file });
+      const metadata = extractUploadMetadata(uploadResponse, file);
+      handleChange('arquivo_atestado', metadata.arquivo_atestado);
+      handleChange('storage_bucket', metadata.storage_bucket);
+      handleChange('storage_object_path', metadata.storage_object_path);
+      handleChange('arquivo_original_nome', metadata.arquivo_original_nome);
+      handleChange('arquivo_mime_type', metadata.arquivo_mime_type);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
@@ -115,6 +182,10 @@ export default function CadastrarAtestado() {
 
   const handleRemoveFile = () => {
     handleChange('arquivo_atestado', '');
+    handleChange('storage_bucket', '');
+    handleChange('storage_object_path', '');
+    handleChange('arquivo_original_nome', '');
+    handleChange('arquivo_mime_type', '');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 

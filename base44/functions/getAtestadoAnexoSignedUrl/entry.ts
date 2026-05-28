@@ -67,6 +67,13 @@ function safePreview(value: unknown) {
   }
 }
 
+function getStorageLocationFromAtestado(atestado: Record<string, unknown>) {
+  const bucket = String(atestado?.storage_bucket || '').trim();
+  const objectPath = String(atestado?.storage_object_path || '').trim();
+  if (!bucket || !objectPath) return null;
+  return { bucket, objectPath };
+}
+
 function uriPattern(uri: string) {
   if (uri.startsWith('file://')) return 'file://';
   if (uri.startsWith('private://')) return 'private://';
@@ -97,7 +104,9 @@ Deno.serve(async (req) => {
 
     const atestadoOriginal = await base44.entities.Atestado.get(atestadoId);
 
-    const arquivoAtestadoRaw = atestadoOriginal?.arquivo_atestado;
+    const atestadoRecord = (atestadoOriginal || {}) as Record<string, unknown>;
+    const storageLocation = getStorageLocationFromAtestado(atestadoRecord);
+    const arquivoAtestadoRaw = atestadoRecord?.arquivo_atestado;
     const arquivoAtestado = extractArquivoFileUri(arquivoAtestadoRaw);
     const pattern = uriPattern(arquivoAtestado);
 
@@ -107,25 +116,29 @@ Deno.serve(async (req) => {
       arquivo_atestado_preview: safePreview(arquivoAtestadoRaw),
       file_uri_resolvido_preview: arquivoAtestado ? arquivoAtestado.slice(0, 220) : '',
       file_uri_pattern: pattern,
+      storage_bucket: String(atestadoRecord?.storage_bucket || ''),
+      storage_object_path_preview: String(atestadoRecord?.storage_object_path || '').slice(0, 180),
     });
 
-    if (!arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.', code: 'NO_ATTACHMENT' }, { status: 404 });
+    if (!storageLocation && !arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.', code: 'NO_ATTACHMENT' }, { status: 404 });
 
-    // PRIORIDADE 1: URL HTTPS/HTTP direta (Base44 storage e similares)
-    // — retorna a URL bruta sem tentar parsear como Supabase. Isso evita
-    // 422 em URLs que casualmente contêm '/' mas não são paths Supabase.
-    if (pattern === 'https://' || pattern === 'http://') {
-      return Response.json({
-        url: arquivoAtestado,
-        expires_in: 0,
-        atestado_id: atestadoId,
-        source: 'direct_public_url',
-      });
-    }
+    let location = storageLocation;
+    const legacyAttachment = !storageLocation;
 
-    const location = parseStorageLocation(arquivoAtestado);
     if (!location) {
-      return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT', detail: { file_uri_pattern: pattern, file_uri_preview: arquivoAtestado.slice(0, 100) } }, { status: 422 });
+      if (pattern === 'https://' || pattern === 'http://') {
+        return Response.json({
+          url: arquivoAtestado,
+          expires_in: 0,
+          atestado_id: atestadoId,
+          source: 'direct_public_url',
+          legacy_attachment: true,
+        });
+      }
+      location = parseStorageLocation(arquivoAtestado);
+      if (!location) {
+        return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT', detail: { file_uri_pattern: pattern, file_uri_preview: arquivoAtestado.slice(0, 100) }, legacy_attachment: true }, { status: 422 });
+      }
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('BASE44_SUPABASE_URL');
@@ -153,7 +166,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: signed.error?.message || 'Falha ao gerar URL temporária.', code: 'SIGNED_URL_FAILED', detail: { status: (signed.error as any)?.status || null, storage_error: signed.error?.message || null } }, { status: 500 });
     }
 
-    return Response.json({ url: resolvedSignedUrl, expires_in: ttl, atestado_id: atestadoId, source: 'signed_url' });
+    return Response.json({ url: resolvedSignedUrl, expires_in: ttl, atestado_id: atestadoId, source: 'signed_url', legacy_attachment: legacyAttachment });
   } catch (error) {
     const status = (error as any)?.response?.status || (error as any)?.status || 500;
     return Response.json({ error: (error as any)?.message || 'Erro ao gerar URL temporária do anexo.', code: 'UNEXPECTED_ERROR' }, { status });

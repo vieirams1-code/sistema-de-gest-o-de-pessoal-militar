@@ -8,6 +8,7 @@ const MAX_ESTIMATED_BYTES = 100 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 120;
 const HEAD_TIMEOUT_MS = 4000;
 const BASE44_APP_FILES_PREFIX = '/api/apps/';
+const LEGACY_ATTACHMENT_UNSUPPORTED = 'LEGACY_ATTACHMENT_UNSUPPORTED';
 
 const normalizeIds = (value: unknown) => Array.isArray(value) ? value.map((x) => String(x || '').trim()).filter(Boolean) : [];
 
@@ -101,7 +102,7 @@ Deno.serve(async (req) => {
 
     const autorizadosOriginais = await Promise.all(autorizadosIds.map((id) => base44.entities.Atestado.get(id).catch(() => null)));
     const autorizados = autorizadosOriginais.filter(Boolean);
-    const comAnexo = autorizados.filter((a: any) => extractArquivoFileUri(a?.arquivo_atestado));
+    const comAnexo = autorizados.filter((a: any) => String(a?.storage_bucket || '').trim() && String(a?.storage_object_path || '').trim() || extractArquivoFileUri(a?.arquivo_atestado));
     const semAnexo = autorizados.length - comAnexo.length;
 
     if (!comAnexo.length) return Response.json({ error: 'Nenhum selecionado possui anexo.', code: 'NO_VALID_ATTACHMENTS', detail: 'Nenhum atestado com arquivo_atestado utilizável foi encontrado no escopo autorizado.', meta: { quantidade_anexos: 0, arquivos_ignorados_sem_anexo: semAnexo, arquivos_fora_escopo: semEscopo } }, { status: 422 });
@@ -119,9 +120,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Configuração de storage indisponível.', code: 'STORAGE_CONFIG_UNAVAILABLE', detail: 'SUPABASE_URL/BASE44_SUPABASE_URL ou SERVICE_ROLE_KEY ausentes para assinar anexos internos.', meta: { quantidade_anexos: comAnexo.length } }, { status: 500 });
     }
     const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } }) : null;
-    const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string; storageLocation: { bucket: string; objectPath: string } | null }> = [];
+    const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string; storageLocation: { bucket: string; objectPath: string } | null; legacyAttachment: boolean }> = [];
     const skipped: Array<{ atestado_id: string; code: string; message: string }> = [];
     let estimatedBytes = 0;
+    let legacyAttachmentCount = 0;
 
     for (const atestado of comAnexo) {
       const rawArquivo = extractArquivoFileUri(atestado?.arquivo_atestado);
@@ -130,15 +132,22 @@ Deno.serve(async (req) => {
       let objectPath: string = '';
       let storageLocation: { bucket: string; objectPath: string } | null = null;
 
-      const parsedLocation = parseStorageLocation(rawArquivo);
-      if (parsedLocation) storageLocation = parsedLocation;
+      const explicitBucket = String(atestado?.storage_bucket || '').trim();
+      const explicitObjectPath = String(atestado?.storage_object_path || '').trim();
+      if (explicitBucket && explicitObjectPath) {
+        storageLocation = { bucket: explicitBucket, objectPath: explicitObjectPath };
+      } else {
+        const parsedLocation = parseStorageLocation(rawArquivo);
+        if (parsedLocation) storageLocation = parsedLocation;
+        if (!storageLocation) legacyAttachmentCount += 1;
+      }
 
       if ((rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) && !storageLocation) {
         const base44FileUrl = parseBase44AppFileUrl(rawArquivo);
         if (base44FileUrl) {
           skipped.push({
             atestado_id: String(atestado?.id || ''),
-            code: 'UNSUPPORTED_BASE44_FILE_URL',
+            code: LEGACY_ATTACHMENT_UNSUPPORTED,
             message: `URL Base44 não mapeável para storage nativo: ${base44FileUrl.hostPathSanitized}`,
           });
           continue;
@@ -171,10 +180,10 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Limite de tamanho excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_bytes: MAX_ESTIMATED_BYTES, tamanho_estimado_bytes: estimatedBytes, quantidade_anexos: prepared.length + 1, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
       }
 
-      prepared.push({ atestado, signedUrl, objectPath, storageLocation });
+      prepared.push({ atestado, signedUrl, objectPath, storageLocation, legacyAttachment: !explicitBucket || !explicitObjectPath });
     }
 
-    if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os anexos falharam na etapa de preparação (referência inválida ou signed URL).', meta: { skipped } }, { status: 422 });
+    if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os anexos falharam na etapa de preparação (referência inválida ou signed URL).', meta: { skipped, legacy_attachment_count: legacyAttachmentCount } }, { status: 422 });
 
     const zip = new JSZip();
     let addedFiles = 0;
@@ -195,7 +204,7 @@ Deno.serve(async (req) => {
           const u = new URL(item.signedUrl);
           fetchedUrlPath = u.pathname;
           if (u.pathname.includes(BASE44_APP_FILES_PREFIX)) {
-            skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'UNSUPPORTED_BASE44_FILE_URL', message: `URL Base44 não suportada para fetch: ${u.host}${u.pathname}` });
+            skipped.push({ atestado_id: String(item.atestado?.id || ''), code: LEGACY_ATTACHMENT_UNSUPPORTED, message: `URL Base44 não suportada para fetch: ${u.host}${u.pathname}` });
             continue;
           }
         } catch {
@@ -238,6 +247,7 @@ Deno.serve(async (req) => {
         'X-Arquivos-Ignorados-Sem-Anexo': String(semAnexo),
         'X-Extrato-Parcial': String(autorizadosIds.length < idsSelecionados.length || addedFiles < prepared.length),
         'X-Arquivos-Ignorados-Falha': String(skipped.length),
+        'X-Legacy-Attachment-Count': String(legacyAttachmentCount),
       },
     });
   } catch (error) {
