@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
-import { abrirAnexoAtestadoEmNovaAba } from '@/services/getAtestadoAnexoSignedUrlClient';
+import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 import { gerarZipAnexosAtestadosClient } from '@/services/gerarZipAnexosAtestadosClient';
 
@@ -274,8 +274,8 @@ export default function ExtratoAtestadosMedicos() {
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     try {
-      const preOpenedTab = typeof window !== 'undefined' ? window.open('about:blank', '_blank', 'noopener,noreferrer') : null;
-      await abrirAnexoAtestadoEmNovaAba(rowId, preOpenedTab);
+      const result = await obterLinkAnexoAtestado(rowId);
+      setLinkAnexoById((prev) => ({ ...prev, [rowId]: result.url }));
       await registrarAuditoria({
         acao: 'abrir_anexo',
         quantidade_registros: 1,
@@ -298,10 +298,8 @@ export default function ExtratoAtestadosMedicos() {
       const status = Number(e?.status || e?.raw?.response?.status || 0) || '-';
       const rawPayload = e?.raw ? JSON.stringify(e.raw) : '';
       const isMissing = /não possui arquivo|nao possui arquivo|anexo/i.test(apiMessage) || code === 'NO_ATTACHMENT';
-      const popupUrl = String(e?.detail?.url || '');
       const fullError = `status=${status} | code=${code || '-'} | message=${apiMessage || '-'}${safeDetail ? ` | detail=${safeDetail}` : ''}${rawPayload ? ` | raw=${rawPayload.slice(0, 500)}` : ''}`;
       setErroAnexoById((prev) => ({ ...prev, [rowId]: isMissing ? `Sem anexo disponível. ${fullError}` : `Falha ao abrir anexo. ${fullError}` }));
-      if (popupUrl) setLinkAnexoById((prev) => ({ ...prev, [rowId]: popupUrl }));
       console.error('[ExtratoAtestadosMedicos] erro abrir anexo', { rowId, status, code, message: apiMessage, detail: e?.detail || null, raw: e?.raw || null });
     } finally {
       setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
@@ -507,12 +505,12 @@ export default function ExtratoAtestadosMedicos() {
                         <td className="p-3">
                           <div className="space-y-1">
                             <Button variant="outline" size="sm" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
-                              {loadingAnexoById[row.id] ? 'Abrindo...' : 'Abrir'}
+                              {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
                             </Button>
                             {erroAnexoById[row.id] && <div className="text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
                             {linkAnexoById[row.id] && (
                               <a className="text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
-                                Abrir anexo em nova aba
+                                Abrir anexo
                               </a>
                             )}
                           </div>

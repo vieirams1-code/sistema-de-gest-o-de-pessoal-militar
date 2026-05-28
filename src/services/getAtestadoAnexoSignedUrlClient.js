@@ -25,7 +25,7 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
 // Estratégia: abre a aba IMEDIATAMENTE (dentro do user-gesture do clique),
 // depois faz o await pela signed URL e atualiza `popup.location`. Sem isso,
 // muitos navegadores bloqueiam window.open chamado após await.
-export async function abrirAnexoAtestadoEmNovaAba(atestadoId, preOpenedTab = null) {
+export async function obterLinkAnexoAtestado(atestadoId) {
   const { url } = await getAtestadoAnexoSignedUrlClient(atestadoId);
   let finalUrl;
   try {
@@ -43,16 +43,5 @@ export async function abrirAnexoAtestadoEmNovaAba(atestadoId, preOpenedTab = nul
     error.detail = { url: finalUrl.toString(), protocol: finalUrl.protocol };
     throw error;
   }
-
-  console.info('[abrirAnexoAtestadoEmNovaAba] final_url', finalUrl.toString());
-
-  if (preOpenedTab && !preOpenedTab.closed) {
-    preOpenedTab.location.replace(finalUrl.toString());
-    return { url: finalUrl.toString(), opened: true, strategy: 'preopened' };
-  }
-
-  const error = new Error('O navegador bloqueou a abertura automática da nova aba.');
-  error.code = 'POPUP_BLOCKED';
-  error.detail = { url };
-  throw error;
+  return { url: finalUrl.toString() };
 }
