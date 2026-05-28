@@ -34,6 +34,7 @@ import CondicaoBadge from '@/components/militar/CondicaoBadge';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { fetchPreviaAntiguidadeMilitares } from '@/services/getPreviaAntiguidadeMilitaresClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import { isQuadroComDestaque, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
@@ -562,9 +563,12 @@ export default function Militares() {
     queryKey: ['historico-promocao-militares-efetivo', effectiveEmail || 'self', idsHash],
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery && !hasOrdemOficialAntiguidade && idsMilitaresCarregados.length > 0,
-    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({
-      militar_id: { '$in': idsMilitaresCarregados },
-    }),
+    queryFn: async () => {
+      const { historicoPromocoes } = await fetchPreviaAntiguidadeMilitares({
+        idsMilitares: idsMilitaresCarregados,
+      });
+      return historicoPromocoes;
+    },
   });
 
   const ordemAntiguidadeMap = useMemo(() => {
