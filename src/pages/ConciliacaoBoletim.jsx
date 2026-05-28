@@ -11,6 +11,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
+import { listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
 
 const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
 const PDFJS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
@@ -516,45 +517,14 @@ export default function ConciliacaoBoletim() {
 
   const { data: publicacoesExOfficio = [], isLoading: isLoadingExOfficio } = useQuery({
     queryKey: ['conciliacao-publicacoes-ex-officio'],
-    queryFn: async () => {
-      if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
-      const m = new Map();
-      arrays.flat().forEach(item => m.set(item.id, item));
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
-    },
+    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasAccess
   });
 
 
   const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['conciliacao-atestados-publicacao'],
-    queryFn: async () => {
-      if (isAdmin) {
-        const all = await base44.entities.Atestado.list('-created_date');
-        return all.filter((a) => a.nota_para_bg || a.numero_bg);
-      }
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
-      const m = new Map();
-      arrays.flat().forEach(item => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
-    },
+    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasAccess
   });
 
