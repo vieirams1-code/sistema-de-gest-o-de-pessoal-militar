@@ -960,53 +960,118 @@ Deno.serve(async (req) => {
                 militares = Array.from(mapa.values()).slice(0, effLimit);
             }
         } else {
-            const amostra = await fetchWithRetry(
+            // Lote 1 (SGP-MIL-001): busca textual aplicada diretamente no filtro
+            // via $regex/$or, eliminando a varredura em memória sobre amostra de
+            // até LIMIT_MAX. Resultados deixam de ficar limitados a 300 registros
+            // pré-filtrados.
+            //
+            // Regras:
+            // - `search`: OR entre nome_completo, nome_guerra, matricula
+            // - `origemDestinoBusca`: OR entre condicao_origem_destino, destino
+            // - Se ambos forem fornecidos com o mesmo valor: um único OR
+            //   abrangendo todos os 5 campos (alinhado ao comportamento legado).
+            // - Se ambos forem fornecidos com valores distintos: AND entre os
+            //   dois grupos OR.
+            const termRaw = temBuscaTexto ? String(search).trim() : null;
+            const termoOrigemDestinoRaw = temBuscaOrigemDestino ? String(origemDestinoBusca).trim() : null;
+            const buscaCombinadaOR = !!termRaw && !!termoOrigemDestinoRaw && termRaw === termoOrigemDestinoRaw;
+
+            const queryMilitarFilter = { ...militarFilter };
+            const andConditions = [];
+
+            if (buscaCombinadaOR) {
+                andConditions.push({
+                    $or: [
+                        { nome_completo: { $regex: termRaw, $options: 'i' } },
+                        { nome_guerra: { $regex: termRaw, $options: 'i' } },
+                        { matricula: { $regex: termRaw, $options: 'i' } },
+                        { condicao_origem_destino: { $regex: termRaw, $options: 'i' } },
+                        { destino: { $regex: termRaw, $options: 'i' } },
+                    ],
+                });
+            } else {
+                if (termRaw) {
+                    andConditions.push({
+                        $or: [
+                            { nome_completo: { $regex: termRaw, $options: 'i' } },
+                            { nome_guerra: { $regex: termRaw, $options: 'i' } },
+                            { matricula: { $regex: termRaw, $options: 'i' } },
+                        ],
+                    });
+                }
+                if (termoOrigemDestinoRaw) {
+                    andConditions.push({
+                        $or: [
+                            { condicao_origem_destino: { $regex: termoOrigemDestinoRaw, $options: 'i' } },
+                            { destino: { $regex: termoOrigemDestinoRaw, $options: 'i' } },
+                        ],
+                    });
+                }
+            }
+
+            if (andConditions.length > 0) {
+                queryMilitarFilter.$and = Array.isArray(queryMilitarFilter.$and)
+                    ? [...queryMilitarFilter.$and, ...andConditions]
+                    : andConditions;
+            }
+
+            const fetchLimit = effLimit + 1;
+            const result = await fetchWithRetry(
                 () =>
                     base44.asServiceRole.entities.Militar.filter(
-                        militarFilter,
+                        queryMilitarFilter,
                         '-nome_completo',
-                        LIMIT_MAX,
-                        0,
+                        fetchLimit,
+                        effOffset,
                         campos
                     ),
                 'militar.filter.search'
             );
-            offsetAplicadoNaConsulta = false;
-            buscaLimitadaPorAmostra = (amostra || []).length >= LIMIT_MAX;
-
-            const term = temBuscaTexto ? normalizeText(String(search).trim()) : null;
-            const termoOrigemDestino = temBuscaOrigemDestino ? normalizeText(origemDestinoBusca) : null;
-            // Quando search e origemDestinoBusca têm o mesmo valor, aplicamos
-            // OR entre as duas dimensões (alinhado ao comportamento legado
-            // de "busca única" da página Militares). Quando vêm valores
-            // distintos, aplicamos AND.
-            const buscaCombinadaOR = !!term && !!termoOrigemDestino && term === termoOrigemDestino;
-            let filtrados = (amostra || []).filter((m) => {
-                const matchSearch = term
-                    ? (
-                        normalizeText(m.nome_completo).includes(term) ||
-                        normalizeText(m.nome_guerra).includes(term) ||
-                        normalizeText(m.matricula).includes(term)
-                    )
-                    : null;
-                const matchOrigemDestino = termoOrigemDestino
-                    ? (
-                        normalizeText(m.condicao_origem_destino).includes(termoOrigemDestino) ||
-                        normalizeText(m.destino).includes(termoOrigemDestino)
-                    )
-                    : null;
-
-                if (buscaCombinadaOR) return matchSearch || matchOrigemDestino;
-                if (matchSearch === false) return false;
-                if (matchOrigemDestino === false) return false;
-                return true;
-            });
+            offsetAplicadoNaConsulta = true;
             buscaAplicada = true;
+            buscaLimitadaPorAmostra = false;
+            const arr = result || [];
+            hasMore = arr.length > effLimit;
+            militares = hasMore ? arr.slice(0, effLimit) : arr;
 
-            const total = filtrados.length;
-            const pageSlice = filtrados.slice(effOffset, effOffset + effLimit);
-            hasMore = effOffset + pageSlice.length < total || buscaLimitadaPorAmostra;
-            militares = pageSlice;
+            // Mesma fusão com militares "próprios" aplicada no caminho semBusca,
+            // para que a busca textual não esconda militares do próprio escopo
+            // quando o usuário tem acesso por estrutura + próprios.
+            if (
+                !isAdmin &&
+                escopo.tipo === 'estrutura' &&
+                usouFiltroProprios &&
+                (escopo.militarIdsProprios || []).length > 0 &&
+                !lotacaoFiltro
+            ) {
+                const idsBaseVinculos = (baseFilter.id && Array.isArray(baseFilter.id.$in))
+                    ? baseFilter.id.$in
+                    : null;
+                const idsProprios = idsBaseVinculos
+                    ? (escopo.militarIdsProprios || []).filter((id) => idsBaseVinculos.includes(id))
+                    : (escopo.militarIdsProprios || []);
+                const proprioFilter = { ...baseFilter, id: { $in: idsProprios } };
+                if (andConditions.length > 0) {
+                    proprioFilter.$and = Array.isArray(proprioFilter.$and)
+                        ? [...proprioFilter.$and, ...andConditions]
+                        : andConditions;
+                }
+                const proprios = await fetchWithRetry(
+                    () =>
+                        base44.asServiceRole.entities.Militar.filter(
+                            proprioFilter,
+                            '-nome_completo',
+                            LIMIT_MAX,
+                            0,
+                            campos
+                        ),
+                    'militar.filter.search.proprios'
+                );
+                const mapa = new Map();
+                militares.forEach((m) => m?.id && mapa.set(m.id, m));
+                (proprios || []).forEach((m) => m?.id && !mapa.has(m.id) && mapa.set(m.id, m));
+                militares = Array.from(mapa.values()).slice(0, effLimit);
+            }
         }
 
         const militaresProjetados = militares.map((m) => projetarMilitar(m, campos));
