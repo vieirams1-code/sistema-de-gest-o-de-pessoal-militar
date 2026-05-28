@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEstruturaOrganizacional, atualizarEstruturaOrganizacional, excluirEstruturaOrganizacional } from '@/services/cudEstruturaOrganizacionalClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Pencil, Trash2, Building2, Check, X, ChevronRight, ChevronDown, GitMerge, GitBranch, MapPin } from 'lucide-react';
@@ -80,7 +81,7 @@ export default function EstruturaOrganizacional() {
   const unidades = estrutura.filter(s => s.tipoNormalizado === 'Unidade');
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Subgrupamento.create(data),
+    mutationFn: (data) => criarEstruturaOrganizacional(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['estruturaOrganizacional'] });
       setNewData({ nome: '', sigla: '', descricao: '', tipo: 'Setor', grupamento_id: '' });
@@ -89,7 +90,7 @@ export default function EstruturaOrganizacional() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Subgrupamento.update(id, data),
+    mutationFn: ({ id, data }) => atualizarEstruturaOrganizacional(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['estruturaOrganizacional'] });
       setEditingId(null);
@@ -97,7 +98,7 @@ export default function EstruturaOrganizacional() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Subgrupamento.delete(id),
+    mutationFn: (id) => excluirEstruturaOrganizacional(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['estruturaOrganizacional'] });
       setDeleteDialog({ open: false, id: null });
