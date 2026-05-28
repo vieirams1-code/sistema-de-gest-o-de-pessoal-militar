@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Configuração de storage indisponível.', code: 'STORAGE_CONFIG_UNAVAILABLE', detail: 'SUPABASE_URL/BASE44_SUPABASE_URL ou SERVICE_ROLE_KEY ausentes para assinar anexos internos.', meta: { quantidade_anexos: comAnexo.length } }, { status: 500 });
     }
     const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } }) : null;
-    const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string }> = [];
+    const prepared: Array<{ atestado: any; signedUrl: string; objectPath: string; storageLocation: { bucket: string; objectPath: string } | null }> = [];
     const skipped: Array<{ atestado_id: string; code: string; message: string }> = [];
     let estimatedBytes = 0;
 
@@ -115,12 +115,16 @@ Deno.serve(async (req) => {
       // Só tenta Supabase Storage quando NÃO for URL externa.
       let signedUrl: string | null = null;
       let objectPath: string = '';
+      let storageLocation: { bucket: string; objectPath: string } | null = null;
 
-      if (rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) {
+      const parsedLocation = parseStorageLocation(rawArquivo);
+      if (parsedLocation) storageLocation = parsedLocation;
+
+      if ((rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) && !storageLocation) {
         signedUrl = rawArquivo;
         try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
       } else {
-        const location = parseStorageLocation(rawArquivo);
+        const location = storageLocation;
         if (!location || !supabase) { skipped.push({ atestado_id: String(atestado?.id || ''), code: 'INVALID_FILE_REF', message: 'Referência de arquivo inválida para assinatura.' }); continue; }
         const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
         if (signed.error || !signed.data?.signedUrl) { skipped.push({ atestado_id: String(atestado?.id || ''), code: 'SIGNED_URL_FAILED', message: String(signed.error?.message || 'Falha ao gerar signed URL.') }); continue; }
@@ -145,7 +149,7 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Limite de tamanho excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_bytes: MAX_ESTIMATED_BYTES, tamanho_estimado_bytes: estimatedBytes, quantidade_anexos: prepared.length + 1, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
       }
 
-      prepared.push({ atestado, signedUrl, objectPath });
+      prepared.push({ atestado, signedUrl, objectPath, storageLocation });
     }
 
     if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os anexos falharam na etapa de preparação (referência inválida ou signed URL).', meta: { skipped } }, { status: 422 });
@@ -153,16 +157,29 @@ Deno.serve(async (req) => {
     const zip = new JSZip();
     let addedFiles = 0;
     for (const item of prepared) {
-      const res = await fetch(item.signedUrl);
-      if (!res.ok) {
-        skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_FETCH_FAILED', message: `Falha no fetch do anexo: HTTP ${res.status}` });
-        continue;
+      let buffer: ArrayBuffer;
+      let contentType: string | null = null;
+      if (item.storageLocation && supabase) {
+        const downloaded = await supabase.storage.from(item.storageLocation.bucket).download(item.storageLocation.objectPath);
+        if (downloaded.error || !downloaded.data) {
+          skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_DOWNLOAD_FAILED', message: String(downloaded.error?.message || 'Falha no download via storage API') });
+          continue;
+        }
+        contentType = downloaded.data.type || null;
+        buffer = await downloaded.data.arrayBuffer();
+      } else {
+        const res = await fetch(item.signedUrl);
+        if (!res.ok) {
+          skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_FETCH_FAILED', message: `Falha no fetch do anexo: HTTP ${res.status}` });
+          continue;
+        }
+        contentType = res.headers.get('content-type');
+        buffer = await res.arrayBuffer();
       }
-      const buffer = await res.arrayBuffer();
       const safeMilitar = sanitize(item.atestado?.militar_nome || item.atestado?.militar_id);
       const atestadoId = sanitize(item.atestado?.id || 'atestado');
       const data = String(item.atestado?.data_inicio || '').slice(0, 10).replaceAll('-', '') || 'sem_data';
-      const ext = inferExt(item.objectPath, res.headers.get('content-type'));
+      const ext = inferExt(item.objectPath, contentType);
       zip.file(`${data}_${safeMilitar}_${atestadoId}.${ext}`, buffer);
       addedFiles += 1;
     }
