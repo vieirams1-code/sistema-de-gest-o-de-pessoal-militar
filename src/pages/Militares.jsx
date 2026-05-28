@@ -560,6 +560,61 @@ export default function Militares() {
     [],
   );
 
+  const tagsPorGrupoFiltro = useMemo(() => {
+    const gruposById = new Map((gruposAtivos || []).map((grupo) => [String(grupo?.id || ''), grupo]));
+    const semGrupoKey = '__sem_grupo__';
+    const gruposMap = new Map();
+
+    (tagsAtivas || []).forEach((tag) => {
+      const tagId = String(tag?.id || '');
+      if (!tagId) return;
+      const rawGrupoId = tag?.grupo_id;
+      const grupoId = rawGrupoId === null || rawGrupoId === undefined || rawGrupoId === ''
+        ? semGrupoKey
+        : String(rawGrupoId);
+      if (!gruposMap.has(grupoId)) gruposMap.set(grupoId, []);
+      gruposMap.get(grupoId).push(tag);
+    });
+
+    const groups = [];
+
+    (gruposAtivos || []).forEach((grupo) => {
+      const grupoId = String(grupo?.id || '');
+      if (!grupoId) return;
+      const tagsDoGrupo = gruposMap.get(grupoId) || [];
+      groups.push({
+        id: grupoId,
+        label: `${grupo?.emoji || '🗂️'} ${grupo?.nome || 'Grupo sem nome'}`,
+        title: `${grupo?.emoji || '🗂️'} ${grupo?.nome || 'Grupo sem nome'}`,
+        count: tagsDoGrupo.length,
+        options: tagsDoGrupo.map((tag) => ({
+          value: String(tag.id),
+          labelText: `${resolveTagVisual(tag).nome}`,
+          searchText: `${resolveTagVisual(tag).nome}`,
+          label: <span className="inline-flex items-center gap-1"><IconeCatalogo value={resolveTagVisual(tag).emoji} />{resolveTagVisual(tag).nome}</span>,
+        })),
+      });
+    });
+
+    if (gruposMap.has(semGrupoKey)) {
+      const tagsSemGrupo = gruposMap.get(semGrupoKey) || [];
+      groups.push({
+        id: semGrupoKey,
+        label: `🏷️ Sem grupo`,
+        title: '🏷️ Sem grupo',
+        count: tagsSemGrupo.length,
+        options: tagsSemGrupo.map((tag) => ({
+          value: String(tag.id),
+          labelText: `${resolveTagVisual(tag).nome}`,
+          searchText: `${resolveTagVisual(tag).nome}`,
+          label: <span className="inline-flex items-center gap-1"><IconeCatalogo value={resolveTagVisual(tag).emoji} />{resolveTagVisual(tag).nome}</span>,
+        })),
+      });
+    }
+
+    return { groups };
+  }, [tagsAtivas, gruposAtivos]);
+
   // Todos os filtros relevantes (quadro, condição, movimento, funções, tags,
   // grupos, situação militar, busca por nome/matrícula e busca por
   // origem/destino) são aplicados no backend (getScopedMilitares P1/P2).
@@ -1056,6 +1111,8 @@ export default function Militares() {
                 labelText: `${resolveTagVisual(tag).nome}`,
                 label: <span className="inline-flex items-center gap-1"><IconeCatalogo value={resolveTagVisual(tag).emoji} />{resolveTagVisual(tag).nome}</span>,
               }))}
+              groupedOptions={tagsPorGrupoFiltro}
+              groupSearchPlaceholder="Buscar tag no grupo..."
               value={tagsSelecionadas}
               onChange={setTagsSelecionadas}
               triggerClassName="w-full"

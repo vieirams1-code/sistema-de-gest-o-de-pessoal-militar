@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 /**
  * Multisseleção padronizada para a tela Efetivo/Militares.
@@ -23,8 +24,19 @@ export default function MultiSelectFiltro({
   onChange,
   className = '',
   triggerClassName = '',
+  groupedOptions = null,
+  groupSearchPlaceholder = 'Buscar...',
 }) {
   const [open, setOpen] = useState(false);
+  const [activeGroup, setActiveGroup] = useState(null);
+  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!open) {
+      setActiveGroup(null);
+      setGroupSearchTerm('');
+    }
+  }, [open]);
 
   const optionsByValue = useMemo(() => {
     const map = new Map();
@@ -57,6 +69,23 @@ export default function MultiSelectFiltro({
     onChange([]);
   };
 
+  const groupedModeEnabled = useMemo(
+    () => Boolean(groupedOptions?.groups?.length),
+    [groupedOptions],
+  );
+
+  const activeGroupData = useMemo(
+    () => groupedOptions?.groups?.find((group) => group.id === activeGroup) || null,
+    [groupedOptions, activeGroup],
+  );
+
+  const filteredGroupOptions = useMemo(() => {
+    if (!activeGroupData?.options) return [];
+    const term = groupSearchTerm.trim().toLowerCase();
+    if (!term) return activeGroupData.options;
+    return activeGroupData.options.filter((opt) => String(opt?.labelText || opt?.searchText || '').toLowerCase().includes(term));
+  }, [activeGroupData, groupSearchTerm]);
+
   return (
     <div className={className}>
       {label && <label className="text-xs font-medium text-slate-600 mb-1 block">{label}</label>}
@@ -87,7 +116,59 @@ export default function MultiSelectFiltro({
         </PopoverTrigger>
         <PopoverContent align="start" className="p-0 w-64 max-h-80 overflow-auto">
           <div className="py-1">
-            {options.length === 0 ? (
+            {groupedModeEnabled && !activeGroupData ? (
+              groupedOptions.groups.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                  onClick={() => setActiveGroup(group.id)}
+                >
+                  <span className="truncate text-left">{group.label}</span>
+                  <span className="text-xs text-slate-500 shrink-0">({group.count})</span>
+                </button>
+              ))
+            ) : groupedModeEnabled && activeGroupData ? (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => { setActiveGroup(null); setGroupSearchTerm(''); }}
+                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Voltar aos grupos
+                </button>
+                <div className="px-3 pb-2">
+                  <div className="text-xs font-medium text-slate-700 mb-1.5">{activeGroupData.title || activeGroupData.label}</div>
+                  {activeGroupData.enableSearch !== false && (
+                    <Input
+                      value={groupSearchTerm}
+                      onChange={(e) => setGroupSearchTerm(e.target.value)}
+                      placeholder={groupSearchPlaceholder}
+                      className="h-8 text-xs"
+                    />
+                  )}
+                </div>
+                {filteredGroupOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-slate-500">Nenhuma opção.</div>
+                ) : (
+                  filteredGroupOptions.map((opt) => {
+                    const checked = value.includes(opt.value);
+                    return (
+                      <label
+                        key={opt.value}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => toggle(opt.value)}
+                        />
+                        <span className="truncate">{opt.label}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            ) : options.length === 0 ? (
               <div className="px-3 py-2 text-xs text-slate-500">Nenhuma opção.</div>
             ) : (
               options.map((opt) => {
