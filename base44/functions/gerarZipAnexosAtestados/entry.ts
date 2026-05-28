@@ -5,6 +5,8 @@ import JSZip from 'npm:jszip@3.10.1';
 
 const MAX_FILES = 50;
 const LEGACY_ATTACHMENT_UNSUPPORTED = 'LEGACY_ATTACHMENT_UNSUPPORTED';
+const NO_ZIP_COMPATIBLE_ATTACHMENTS = 'NO_ZIP_COMPATIBLE_ATTACHMENTS';
+const LEGACY_ATTACHMENT_REASON = 'Anexo legado sem metadados de storage; pode ser aberto individualmente, mas não compactado.';
 
 const normalizeIds = (value: unknown) => Array.isArray(value) ? value.map((x) => String(x || '').trim()).filter(Boolean) : [];
 
@@ -35,30 +37,50 @@ Deno.serve(async (req) => {
     const scopedAtestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
     const scopedIds = new Set(scopedAtestados.map((a: any) => String(a?.id || '')));
     const autorizadosIds = idsSelecionados.filter((id) => scopedIds.has(id));
-    const semEscopo = idsSelecionados.length - autorizadosIds.length;
 
     const autorizadosOriginais = await Promise.all(autorizadosIds.map((id) => base44.entities.Atestado.get(id).catch(() => null)));
     const autorizados = autorizadosOriginais.filter(Boolean);
 
+    const skipped: Array<{ atestado_id: string; code: string; reason: string }> = [];
+    const skipLegacyAttachment = (atestado: any) => {
+      skipped.push({
+        atestado_id: String(atestado?.id || ''),
+        code: LEGACY_ATTACHMENT_UNSUPPORTED,
+        reason: LEGACY_ATTACHMENT_REASON,
+      });
+    };
+    const buildNoZipCompatibleResponse = () => Response.json({
+      error: 'Nenhum anexo selecionado possui metadados compatíveis com ZIP.',
+      code: NO_ZIP_COMPATIBLE_ATTACHMENTS,
+      message: 'Nenhum anexo selecionado possui metadados compatíveis com ZIP.',
+      detail: 'Anexos antigos podem ser abertos individualmente, mas não compactados automaticamente.',
+      meta: {
+        totalSelecionados: idsSelecionados.length,
+        legacy_attachment_count: skipped.filter((item) => item.code === LEGACY_ATTACHMENT_UNSUPPORTED).length,
+        unsupported_count: skipped.length,
+        skipped,
+      },
+    }, { status: 422 });
+
     // MODO PRODUÇÃO: ZIP somente para anexos com storage_bucket + storage_object_path.
-    // Anexos legados (sem storage metadata) são ignorados com code LEGACY_ATTACHMENT_UNSUPPORTED.
-    const temStorageMetadata = (a: any) => Boolean(String(a?.storage_bucket || '').trim() && String(a?.storage_object_path || '').trim());
-    const comStorageMetadata = autorizados.filter(temStorageMetadata);
-    const legadosSemStorage = autorizados.filter((a: any) => !temStorageMetadata(a));
-    const semAnexo = legadosSemStorage.length;
+    // Anexos legados (sem storage metadata) são ignorados antes de qualquer signed URL, fetch,
+    // download, HEAD ou interpretação de arquivo_atestado/file_url/url HTTP/Base44 legado.
+    const comStorageMetadata: any[] = [];
+    for (const atestado of autorizados) {
+      const storage_bucket = String(atestado?.storage_bucket || '').trim();
+      const storage_object_path = String(atestado?.storage_object_path || '').trim();
+      if (!storage_bucket || !storage_object_path) {
+        skipLegacyAttachment(atestado);
+        continue;
+      }
+      comStorageMetadata.push({ ...atestado, storage_bucket, storage_object_path });
+    }
+
+    const semAnexo = skipped.length;
+    const legacyAttachmentCount = skipped.filter((item) => item.code === LEGACY_ATTACHMENT_UNSUPPORTED).length;
 
     if (!comStorageMetadata.length) {
-      return Response.json({
-        error: 'Os anexos selecionados são antigos e não possuem metadados compatíveis com ZIP.',
-        code: 'NO_ZIP_COMPATIBLE_ATTACHMENTS',
-        detail: 'Nenhum dos atestados selecionados possui storage_bucket + storage_object_path. Anexos antigos podem ser abertos individualmente, mas não suportam compactação em ZIP.',
-        meta: {
-          totalSelecionados: idsSelecionados.length,
-          legacy_attachment_count: legadosSemStorage.length,
-          unsupported_count: legadosSemStorage.length,
-          arquivos_fora_escopo: semEscopo,
-        },
-      }, { status: 422 });
+      return buildNoZipCompatibleResponse();
     }
     if (comStorageMetadata.length > MAX_FILES) return Response.json({ error: 'Limite de anexos excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_arquivos: MAX_FILES, quantidade_anexos: comStorageMetadata.length, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
 
@@ -72,34 +94,37 @@ Deno.serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
     const prepared: Array<{ atestado: any; objectPath: string; storageLocation: { bucket: string; objectPath: string } }> = [];
-    const skipped: Array<{ atestado_id: string; code: string; message: string }> = [];
-    const legacyAttachmentCount = legadosSemStorage.length;
-
-    // Marca legados ignorados explicitamente em skipped para auditoria.
-    for (const legacy of legadosSemStorage) {
-      skipped.push({
-        atestado_id: String(legacy?.id || ''),
-        code: LEGACY_ATTACHMENT_UNSUPPORTED,
-        message: 'Anexo legado sem storage_bucket/storage_object_path. ZIP não suportado.',
-      });
-    }
 
     for (const atestado of comAnexo) {
+      const storage_bucket = String(atestado?.storage_bucket || '').trim();
+      const storage_object_path = String(atestado?.storage_object_path || '').trim();
+      if (!storage_bucket || !storage_object_path) {
+        skipLegacyAttachment(atestado);
+        continue;
+      }
+
       const storageLocation = {
-        bucket: String(atestado?.storage_bucket || '').trim(),
-        objectPath: String(atestado?.storage_object_path || '').trim(),
+        bucket: storage_bucket,
+        objectPath: storage_object_path,
       };
       prepared.push({ atestado, objectPath: storageLocation.objectPath, storageLocation });
     }
 
-    if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os anexos falharam na etapa de preparação (referência inválida ou signed URL).', meta: { skipped, legacy_attachment_count: legacyAttachmentCount } }, { status: 422 });
+    if (!prepared.length) return buildNoZipCompatibleResponse();
 
     const zip = new JSZip();
     let addedFiles = 0;
     for (const item of prepared) {
-      const downloaded = await supabase.storage.from(item.storageLocation.bucket).download(item.storageLocation.objectPath);
+      const storage_bucket = String(item.storageLocation?.bucket || '').trim();
+      const storage_object_path = String(item.storageLocation?.objectPath || '').trim();
+      if (!storage_bucket || !storage_object_path) {
+        skipLegacyAttachment(item.atestado);
+        continue;
+      }
+
+      const downloaded = await supabase.storage.from(storage_bucket).download(storage_object_path);
       if (downloaded.error || !downloaded.data) {
-        skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_DOWNLOAD_FAILED', message: String(downloaded.error?.message || 'Falha no download via storage API') });
+        skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_DOWNLOAD_FAILED', reason: String(downloaded.error?.message || 'Falha no download via storage API') });
         continue;
       }
       const contentType = downloaded.data.type || null;
@@ -113,7 +138,7 @@ Deno.serve(async (req) => {
     }
 
     if (!addedFiles) {
-      return Response.json({ error: 'Nenhum arquivo válido pôde ser baixado para compactação.', code: 'NO_VALID_ATTACHMENTS', detail: 'Todos os downloads de anexos falharam na etapa de fetch.', meta: { skipped } }, { status: 422 });
+      return buildNoZipCompatibleResponse();
     }
 
     let zipBuffer: Uint8Array;
