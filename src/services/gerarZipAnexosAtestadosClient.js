@@ -1,13 +1,26 @@
+import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 
+const buildBase44FunctionHeaders = () => {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (appParams.appId) {
+    headers['X-App-Id'] = appParams.appId;
+  }
+
+  if (appParams.functionsVersion) {
+    headers['Base44-Functions-Version'] = appParams.functionsVersion;
+  }
+
+  return headers;
+};
+
 export async function gerarZipAnexosAtestadosClient(idsSelecionados = []) {
-  const response = await fetch(`${appParams.serverUrl}/functions/v1/gerarZipAnexosAtestados`, {
+  const response = await base44.functions.fetch('gerarZipAnexosAtestados', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${appParams.token}`,
-      apikey: appParams.appId,
-    },
+    headers: buildBase44FunctionHeaders(),
     body: JSON.stringify({ idsSelecionados }),
   });
 
