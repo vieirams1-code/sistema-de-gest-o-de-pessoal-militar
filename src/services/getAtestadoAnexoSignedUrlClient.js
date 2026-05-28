@@ -27,16 +27,34 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
 // muitos navegadores bloqueiam window.open chamado após await.
 export async function abrirAnexoAtestadoEmNovaAba(atestadoId, preOpenedTab = null) {
   const { url } = await getAtestadoAnexoSignedUrlClient(atestadoId);
+  let finalUrl;
+  try {
+    finalUrl = new URL(String(url), window.location.origin);
+  } catch (_e) {
+    const error = new Error('URL de anexo inválida retornada pelo backend.');
+    error.code = 'INVALID_ATTACHMENT_URL';
+    error.detail = { url };
+    throw error;
+  }
+
+  if (!/^https?:$/.test(finalUrl.protocol)) {
+    const error = new Error('URL de anexo não é HTTP/HTTPS.');
+    error.code = 'INVALID_ATTACHMENT_URL_PROTOCOL';
+    error.detail = { url: finalUrl.toString(), protocol: finalUrl.protocol };
+    throw error;
+  }
+
+  console.info('[abrirAnexoAtestadoEmNovaAba] final_url', finalUrl.toString());
 
   const directTab = typeof window !== 'undefined'
-    ? window.open(url, '_blank', 'noopener,noreferrer')
+    ? window.open(finalUrl.toString(), '_blank', 'noopener,noreferrer')
     : null;
 
-  if (directTab) return { url, opened: true, strategy: 'direct' };
+  if (directTab) return { url: finalUrl.toString(), opened: true, strategy: 'direct' };
 
   if (preOpenedTab && !preOpenedTab.closed) {
-    preOpenedTab.location.href = url;
-    return { url, opened: true, strategy: 'preopened' };
+    preOpenedTab.location.replace(finalUrl.toString());
+    return { url: finalUrl.toString(), opened: true, strategy: 'preopened' };
   }
 
   const error = new Error('O navegador bloqueou a abertura automática da nova aba.');
