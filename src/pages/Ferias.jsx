@@ -567,7 +567,6 @@ export default function Ferias() {
     }
     return `Período: ${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
   }, [periodStart, periodEnd, periodFilterType, selectedMonth]);
-  const selectedFerias = useMemo(() => filteredFerias.filter((item) => selectedFeriasIds.includes(String(item.id))), [filteredFerias, selectedFeriasIds]);
 
   const feriasTagsAtivasMap = useMemo(() => {
     const mapa = new Map();
@@ -624,6 +623,8 @@ export default function Ferias() {
       return matchesSearch && matchesStatus && matchesSituacao && matchesAno && matchesGozo && matchesTags && inicio <= filtroFim && fim >= filtroInicio;
     }).sort((a, b) => (getDataInicioFerias(a)?.getTime() || Infinity) - (getDataInicioFerias(b)?.getTime() || Infinity));
   }, [ferias, searchTerm, statusFilter, periodStart, periodEnd, registrosLivro, feriasTagsAtivasMap, situacaoPeriodoFilter, anoAquisitivoFilter, statusGozoFilter, tagsFilter]);
+
+  const selectedFerias = useMemo(() => filteredFerias.filter((item) => selectedFeriasIds.includes(String(item.id))), [filteredFerias, selectedFeriasIds]);
 
   const tagsStatusById = useMemo(() => {
     const status = {};
