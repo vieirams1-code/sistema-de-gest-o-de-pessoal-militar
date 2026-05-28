@@ -1,0 +1,6 @@
+import { base44 } from '@/api/base44Client';
+function extrairMensagemErro(err, fallback) { const data = err?.response?.data || err?.data; if (data?.error) return data.error; if (typeof data === 'string' && data) return data; return err?.message || fallback; }
+async function invocar(payload) { try { const response = await base44.functions.invoke('cudEstruturaOrganizacional', payload); const body = response?.data ?? response; if (body?.error) throw new Error(body.error); return body; } catch (err) { throw new Error(extrairMensagemErro(err, 'Falha ao executar cudEstruturaOrganizacional.')); } }
+export async function criarEstruturaOrganizacional(data) { const resp = await invocar({ operation: 'create', data: data || {} }); return resp?.data || resp; }
+export async function atualizarEstruturaOrganizacional(registroId, data) { if (!registroId) throw new Error('registroId é obrigatório em atualizarEstruturaOrganizacional.'); const resp = await invocar({ operation: 'update', registroId: String(registroId), data: data || {} }); return resp?.data || resp; }
+export async function excluirEstruturaOrganizacional(registroId) { if (!registroId) throw new Error('registroId é obrigatório em excluirEstruturaOrganizacional.'); const resp = await invocar({ operation: 'delete', registroId: String(registroId) }); return resp?.data || resp; }
