@@ -4,7 +4,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 // Constantes
 // =====================================================================
 const LIMIT_DEFAULT = 100;
-const LIMIT_MAX = 300;
+// Lote 4 (SGP-MIL-003): teto elevado de 300 → 1000 para evitar truncamento
+// silencioso nas queries auxiliares de pré-resolução (MilitarFuncao,
+// MilitarTag, Tag por grupo, Subgrupamento descendentes) que alimentam o
+// filtro `id ∈ {...}` da consulta principal. LIMIT_DEFAULT permanece em 100
+// (paginação padrão da página de Consulta Militar).
+const LIMIT_MAX = 1000;
 const OFFSET_DEFAULT = 0;
 
 const RETRY_MAX_ATTEMPTS = 3;
