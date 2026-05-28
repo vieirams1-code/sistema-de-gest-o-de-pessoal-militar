@@ -186,7 +186,6 @@ export default function Militares() {
   const [debouncedPostos, setDebouncedPostos] = useState([]);
   const [quadrosSelecionados, setQuadrosSelecionados] = useState([]);
   const [situacoesSelecionadas, setSituacoesSelecionadas] = useState([]);
-  const [funcoesSelecionadas, setFuncoesSelecionadas] = useState([]);
   const [tagsSelecionadas, setTagsSelecionadas] = useState([]);
   const [gruposSelecionados, setGruposSelecionados] = useState([]);
   const [condicaoFilter, setCondicaoFilter] = useState(CONDICOES_TODAS);
@@ -364,7 +363,6 @@ export default function Militares() {
     quadrosSelecionados.join('|'),
     condicaoFilter,
     movimentoFilter,
-    funcoesSelecionadas.join('|'),
     tagsSelecionadas.join('|'),
     gruposSelecionados.join('|'),
     situacoesSelecionadas.join('|'),
@@ -405,7 +403,6 @@ export default function Militares() {
       if (quadrosSelecionados.length > 0) payload.quadrosFiltros = quadrosSelecionados;
       if (condicaoFilter && condicaoFilter !== CONDICOES_TODAS) payload.condicaoFiltro = condicaoFilter;
       if (movimentoFilter && movimentoFilter !== MOVIMENTO_TODOS) payload.movimentoFiltro = movimentoFilter;
-      if (funcoesSelecionadas.length > 0) payload.funcoesIds = funcoesSelecionadas.map(normalizeScopedId);
       if (tagsSelecionadas.length > 0) payload.tagsIds = tagsSelecionadas.map(normalizeScopedId);
       if (gruposSelecionados.length > 0) payload.gruposIds = gruposSelecionados.map(normalizeScopedId);
       if (situacoesSelecionadas.length > 0) payload.situacaoMilitarFiltros = situacoesSelecionadas;
@@ -1049,17 +1046,6 @@ export default function Militares() {
               options={SITUACOES_OPCOES}
               value={situacoesSelecionadas}
               onChange={setSituacoesSelecionadas}
-              triggerClassName="w-full"
-            />
-            <MultiSelectFiltro
-              label="Funções"
-              placeholder="Todas"
-              options={funcoesAtivas.map((funcao) => ({
-                value: String(funcao.id),
-                label: `${funcao.emoji || '⭐'} ${funcao.nome}`,
-              }))}
-              value={funcoesSelecionadas}
-              onChange={setFuncoesSelecionadas}
               triggerClassName="w-full"
             />
             <MultiSelectFiltro
