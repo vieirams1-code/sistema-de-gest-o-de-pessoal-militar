@@ -77,6 +77,7 @@ import { getFeriasTagFeriasId, getFeriasTagTagId } from '@/utils/funcoesTags/con
 import { isFeriasTagVinculoAtivo } from '@/utils/funcoesTags/feriasTags';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
+import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -232,6 +233,54 @@ function getCadeiaOperacional(ferias, registrosLivro) {
   );
 }
 
+function normalizeText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function isTagCatalogoAtiva(tag) {
+  const status = normalizeText(tag?.status);
+  if (status && ['inativa', 'arquivada', 'removida', 'inactive', 'archived'].includes(status)) return false;
+  if (tag?.ativo === false || tag?.is_ativo === false || tag?.isActive === false || tag?.archived === true) return false;
+  return true;
+}
+
+function deriveAnoAquisitivo(ferias) {
+  const ref = String(ferias?.periodo_aquisitivo_ref || '').trim();
+  if (ref) return ref;
+  if (ferias?.periodo_aquisitivo_id) return 'nao-classificado';
+  return 'nao-classificado';
+}
+
+function deriveStatusGozo(ferias, cadeia) {
+  const status = normalizeText(ferias?.status);
+  const temSaida = cadeia.some((e) => ['Saída Férias', 'Nova Saída / Retomada'].includes(e?.tipo_registro));
+  const temRetorno = cadeia.some((e) => e?.tipo_registro === 'Retorno Férias');
+  const temInterrupcao = cadeia.some((e) => e?.tipo_registro === 'Interrupção de Férias');
+  const ultimo = cadeia[cadeia.length - 1];
+  if (ultimo?.tipo_registro === 'Retorno Férias' || ['gozada', 'encerrada'].includes(status)) return 'finalizado';
+  if (ultimo?.tipo_registro === 'Saída Férias' || ultimo?.tipo_registro === 'Nova Saída / Retomada' || status === 'em curso') return 'em-gozo';
+  if (temInterrupcao || (status === 'interrompida' && temSaida && !temRetorno)) return 'parcial';
+  if (!temSaida && ['prevista', 'autorizada'].includes(status)) return 'nao-iniciado';
+  return 'nao-classificado';
+}
+
+function deriveSituacaoPeriodo(ferias, cadeia, statusGozo) {
+  const status = normalizeText(ferias?.status);
+  const temSaida = cadeia.some((e) => ['Saída Férias', 'Nova Saída / Retomada'].includes(e?.tipo_registro));
+  const temRetorno = cadeia.some((e) => e?.tipo_registro === 'Retorno Férias');
+  const inicio = parseFeriasDateStart(ferias?.data_inicio);
+  const fim = parseFeriasDateStart(ferias?.data_fim || ferias?.data_retorno);
+  const dataIncoerente = inicio && fim && inicio > fim;
+  if (dataIncoerente) return 'problemas';
+  if (statusGozo === 'em-gozo') return 'em-gozo';
+  if (statusGozo === 'finalizado') return 'finalizado';
+  if (statusGozo === 'nao-iniciado' || (!temSaida && ['prevista', 'autorizada'].includes(status))) return 'em-aberto';
+  if ((status === 'gozada' || status === 'encerrada') && !temRetorno) return 'problemas';
+  if (temRetorno && ['prevista', 'autorizada'].includes(status)) return 'problemas';
+  if (statusGozo === 'nao-classificado') return 'nao-classificado';
+  return 'nao-classificado';
+}
+
 function getEstadoAtualDaCadeia(cadeia) {
   if (!cadeia.length) {
     return {
@@ -331,6 +380,10 @@ export default function Ferias() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [situacaoPeriodoFilter, setSituacaoPeriodoFilter] = useState([]);
+  const [anoAquisitivoFilter, setAnoAquisitivoFilter] = useState([]);
+  const [statusGozoFilter, setStatusGozoFilter] = useState([]);
+  const [tagsFilter, setTagsFilter] = useState([]);
   const [periodFilterType, setPeriodFilterType] = useState('none');
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
@@ -505,34 +558,6 @@ export default function Ferias() {
     },
   });
 
-  const filteredFerias = useMemo(() => {
-    const hasPeriodFilter = Boolean(periodStart && periodEnd);
-    const hasValidPeriod = !hasPeriodFilter || parseISO(`${periodEnd}T00:00:00`) >= parseISO(`${periodStart}T00:00:00`);
-    return ferias.filter((f) => {
-      const matchesSearch = feriasCorrespondeBusca(f, searchTerm);
-      const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
-      if (!hasPeriodFilter || !hasValidPeriod) return matchesSearch && matchesStatus;
-
-      const { inicio, fim } = getFeriasIntervalo(f);
-      if (!inicio || !fim || Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
-        return false;
-      }
-
-      const filtroInicio = parseISO(`${periodStart}T00:00:00`);
-      const filtroFim = parseISO(`${periodEnd}T00:00:00`);
-      const hasIntersection = inicio <= filtroFim && fim >= filtroInicio;
-      return matchesSearch && matchesStatus && hasIntersection;
-    }).sort((a, b) => {
-      const inicioA = getDataInicioFerias(a);
-      const inicioB = getDataInicioFerias(b);
-
-      if (!inicioA && !inicioB) return 0;
-      if (!inicioA) return 1;
-      if (!inicioB) return -1;
-      return inicioA.getTime() - inicioB.getTime();
-    });
-  }, [ferias, searchTerm, statusFilter, periodStart, periodEnd]);
-
   const periodFilterLabel = useMemo(() => {
     if (!periodStart || !periodEnd) return 'Período: Todos';
     if (periodFilterType === 'month' && selectedMonth) {
@@ -561,6 +586,45 @@ export default function Ferias() {
     return mapa;
   }, [feriasTagsVinculos]);
 
+  const tagsAtivasCatalogo = useMemo(() => (tagsCatalogo || []).filter((tag) => isTagCatalogoAtiva(tag)), [tagsCatalogo]);
+  const tagCatalogoById = useMemo(() => new Map((tagsCatalogo || []).map((tag) => [String(tag.id), tag])), [tagsCatalogo]);
+  const tagsGroupedOptions = useMemo(() => {
+    const grupos = new Map();
+    tagsAtivasCatalogo.forEach((tag) => {
+      const nomeGrupo = String(tag?.grupo || tag?.group || tag?.categoria || 'Sem grupo').trim() || 'Sem grupo';
+      if (!grupos.has(nomeGrupo)) grupos.set(nomeGrupo, []);
+      grupos.get(nomeGrupo).push({ value: String(tag.id), label: `${getTagEmoji(tag)} ${tag.nome || `Tag #${tag.id}`}`.trim(), labelText: tag.nome || `Tag #${tag.id}` });
+    });
+    return { groups: [...grupos.entries()].map(([nome, options]) => ({ id: nome, label: nome, title: nome, count: options.length, options })).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')) };
+  }, [tagsAtivasCatalogo]);
+  const anoAquisitivoOptions = useMemo(() => [...new Set(ferias.map((f) => deriveAnoAquisitivo(f)))].sort((a, b) => a.localeCompare(b, 'pt-BR')).map((value) => ({ value, label: value === 'nao-classificado' ? 'Não classificado' : value })), [ferias]);
+  const statusGozoOptions = [{ value: 'nao-iniciado', label: 'Não iniciado' }, { value: 'parcial', label: 'Parcial' }, { value: 'em-gozo', label: 'Em gozo' }, { value: 'finalizado', label: 'Finalizado' }, { value: 'nao-classificado', label: 'Não classificado' }];
+  const situacaoPeriodoOptions = [{ value: 'em-aberto', label: 'Em aberto' }, { value: 'em-gozo', label: 'Em gozo' }, { value: 'finalizado', label: 'Finalizado' }, { value: 'problemas', label: 'Problemas' }, { value: 'nao-classificado', label: 'Não classificado' }];
+
+  const filteredFerias = useMemo(() => {
+    const hasPeriodFilter = Boolean(periodStart && periodEnd);
+    const hasValidPeriod = !hasPeriodFilter || parseISO(`${periodEnd}T00:00:00`) >= parseISO(`${periodStart}T00:00:00`);
+    return ferias.filter((f) => {
+      const matchesSearch = feriasCorrespondeBusca(f, searchTerm);
+      const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
+      const cadeia = getCadeiaOperacional(f, registrosLivro);
+      const gozo = deriveStatusGozo(f, cadeia);
+      const situacao = deriveSituacaoPeriodo(f, cadeia, gozo);
+      const ano = deriveAnoAquisitivo(f);
+      const tagIdsDaFerias = [...(feriasTagsAtivasMap.get(String(f.id))?.keys() || [])];
+      const matchesSituacao = situacaoPeriodoFilter.length === 0 || situacaoPeriodoFilter.includes(situacao);
+      const matchesAno = anoAquisitivoFilter.length === 0 || anoAquisitivoFilter.includes(ano);
+      const matchesGozo = statusGozoFilter.length === 0 || statusGozoFilter.includes(gozo);
+      const matchesTags = tagsFilter.length === 0 || tagsFilter.some((tagId) => tagIdsDaFerias.includes(String(tagId)));
+      if (!hasPeriodFilter || !hasValidPeriod) return matchesSearch && matchesStatus && matchesSituacao && matchesAno && matchesGozo && matchesTags;
+      const { inicio, fim } = getFeriasIntervalo(f);
+      if (!inicio || !fim || Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return false;
+      const filtroInicio = parseISO(`${periodStart}T00:00:00`);
+      const filtroFim = parseISO(`${periodEnd}T00:00:00`);
+      return matchesSearch && matchesStatus && matchesSituacao && matchesAno && matchesGozo && matchesTags && inicio <= filtroFim && fim >= filtroInicio;
+    }).sort((a, b) => (getDataInicioFerias(a)?.getTime() || Infinity) - (getDataInicioFerias(b)?.getTime() || Infinity));
+  }, [ferias, searchTerm, statusFilter, periodStart, periodEnd, registrosLivro, feriasTagsAtivasMap, situacaoPeriodoFilter, anoAquisitivoFilter, statusGozoFilter, tagsFilter]);
+
   const tagsStatusById = useMemo(() => {
     const status = {};
     if (selectedFerias.length === 0) {
@@ -580,9 +644,6 @@ export default function Ferias() {
     return status;
   }, [selectedFerias, feriasTagsAtivasMap]);
 
-  const tagCatalogoById = useMemo(() => {
-    return new Map((tagsCatalogo || []).map((tag) => [String(tag.id), tag]));
-  }, [tagsCatalogo]);
 
   const feriasTagsVisuaisMap = useMemo(() => {
     const mapa = new Map();
@@ -1156,6 +1217,12 @@ export default function Ferias() {
               Limpar período
             </Button>
           </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <MultiSelectFiltro label="Situação do período" options={situacaoPeriodoOptions} value={situacaoPeriodoFilter} onChange={setSituacaoPeriodoFilter} />
+            <MultiSelectFiltro label="Ano aquisitivo" options={anoAquisitivoOptions} value={anoAquisitivoFilter} onChange={setAnoAquisitivoFilter} />
+            <MultiSelectFiltro label="Status do gozo" options={statusGozoOptions} value={statusGozoFilter} onChange={setStatusGozoFilter} />
+            <MultiSelectFiltro label="Tags" options={[]} groupedOptions={tagsGroupedOptions} value={tagsFilter} onChange={setTagsFilter} />
+          </div>
           {customRangeError && <p className="text-xs text-red-600 mt-2">{customRangeError}</p>}
           <p className="text-xs text-slate-500 mt-2">{periodFilterLabel}</p>
         </div>
@@ -1212,12 +1279,12 @@ export default function Ferias() {
               Nenhuma férias encontrada
             </h3>
             <p className="text-slate-500 mb-6">
-              {searchTerm || statusFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || situacaoPeriodoFilter.length || anoAquisitivoFilter.length || statusGozoFilter.length || tagsFilter.length
                 ? 'Tente ajustar os filtros'
                 : 'Comece cadastrando as primeiras férias'}
             </p>
 
-            {!searchTerm && statusFilter === 'all' && (
+            {!searchTerm && statusFilter === 'all' && !situacaoPeriodoFilter.length && !anoAquisitivoFilter.length && !statusGozoFilter.length && !tagsFilter.length && (
               <Button
                 onClick={() => navigate(createPageUrl('CadastrarFerias'))}
                 className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
