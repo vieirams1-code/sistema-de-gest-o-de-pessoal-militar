@@ -26,6 +26,7 @@ export default function MultiSelectFiltro({
   triggerClassName = '',
   groupedOptions = null,
   groupSearchPlaceholder = 'Buscar...',
+  popoverClassName = '',
 }) {
   const [open, setOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState(null);
@@ -114,7 +115,7 @@ export default function MultiSelectFiltro({
             </span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="p-0 w-64 max-h-80 overflow-auto">
+        <PopoverContent align="start" className={`p-0 w-[var(--radix-popover-trigger-width)] min-w-64 max-h-80 overflow-auto ${popoverClassName}`}>
           <div className="py-1">
             {groupedModeEnabled && !activeGroupData ? (
               groupedOptions.groups.map((group) => (
