@@ -386,8 +386,8 @@ export default function Ferias() {
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
   const ferias = feriasData?.ferias || [];
-  const feriasTagsFromBundle = feriasData?.feriasTags;
-  const tagsCatalogoFromBundle = feriasData?.tagsCatalogo;
+  const feriasTagsFromBundle = Array.isArray(feriasData?.feriasTags) ? feriasData.feriasTags : [];
+  const tagsCatalogoFromBundle = Array.isArray(feriasData?.tagsCatalogo) ? feriasData.tagsCatalogo : [];
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
   const registrosLivro = feriasData?.registrosLivro || [];
@@ -461,55 +461,12 @@ export default function Ferias() {
     [ferias],
   );
 
-  // Fallback: só busca via FeriasTag.filter quando o bundle ainda não retorna feriasTags
-  // (compatibilidade com versões antigas do backend). Quando o bundle traz, este fallback fica desabilitado.
-  const bundleProvidesFeriasTags = Array.isArray(feriasTagsFromBundle);
-  const { data: feriasTagsFallback = [] } = useQuery({
-    queryKey: funcoesTagsKeys.feriasTagsBulk('local', feriasIdsEscopoTags),
-    queryFn: async () => {
-      if (feriasIdsEscopoTags.length === 0) return [];
-      const CHUNK_SIZE = 100;
-      const chunks = [];
-      for (let i = 0; i < feriasIdsEscopoTags.length; i += CHUNK_SIZE) {
-        chunks.push(feriasIdsEscopoTags.slice(i, i + CHUNK_SIZE));
-      }
-
-      const respostas = await Promise.all(
-        chunks.map((idsChunk) =>
-          base44.entities.FeriasTag.filter(
-            {
-              ferias_id: { $in: idsChunk.map(String) },
-            },
-            '-created_date',
-            1000,
-            0,
-          ),
-        ),
-      );
-
-      const dedupPorId = new Map();
-      respostas.flat().forEach((item) => {
-        if (!item?.id || dedupPorId.has(item.id)) return;
-        dedupPorId.set(item.id, item);
-      });
-
-      return Array.from(dedupPorId.values());
-    },
-    enabled: isAccessResolved && canAccessModule('ferias') && !bundleProvidesFeriasTags,
-  });
-
-  const feriasTagsVinculos = bundleProvidesFeriasTags ? feriasTagsFromBundle : feriasTagsFallback;
-
-  const bundleProvidesTagsCatalogo = Array.isArray(tagsCatalogoFromBundle) && tagsCatalogoFromBundle.length > 0;
-  const { data: tagsCatalogoFallback = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'tags'],
-    queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
-    enabled: isAccessResolved && canAccessModule('ferias') && !bundleProvidesTagsCatalogo,
-  });
-
-  // Quando o catálogo vindo do bundle cobre apenas as tags vinculadas, usamos como fonte primária para os chips;
-  // mas para o modal "Gerenciar tags" continua existindo a query do FeriasTagsBulkPanel (mostra todas as tags ativas).
-  const tagsCatalogo = bundleProvidesTagsCatalogo ? tagsCatalogoFromBundle : tagsCatalogoFallback;
+  // Lote 2 (SGP-FER-001): bundle sempre retorna feriasTags e tagsCatalogo —
+  // fallbacks via FeriasTag.filter / Tag.list foram removidos.
+  // O modal "Gerenciar tags" (FeriasTagsBulkPanel) mantém sua query própria
+  // para listar todas as tags ativas, independente das vinculadas.
+  const feriasTagsVinculos = feriasTagsFromBundle;
+  const tagsCatalogo = tagsCatalogoFromBundle;
 
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
