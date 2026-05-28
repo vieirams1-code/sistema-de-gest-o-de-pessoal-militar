@@ -36,7 +36,7 @@ import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import { fetchPreviaAntiguidadeMilitares } from '@/services/getPreviaAntiguidadeMilitaresClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
-import { isQuadroComDestaque, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
