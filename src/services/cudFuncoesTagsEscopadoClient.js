@@ -6,13 +6,14 @@ function criarErroSemantico(message, extras = {}) {
   return err;
 }
 
-async function invocar(payload) {
+async function invocar(payload, { unwrapData = true } = {}) {
   try {
     console.debug('[CUD_FUNCOES_TAGS_REQUEST]', payload);
     const response = await base44.functions.invoke('cudFuncoesTagsEscopado', payload);
     console.debug('[CUD_FUNCOES_TAGS_RESPONSE]', response);
     const body = response?.data ?? response;
     if (body?.error) throw new Error(body.error);
+    if (!unwrapData) return body;
     return body?.data || body;
   } catch (error) {
     console.debug('[CUD_FUNCOES_TAGS_ERROR]', error);
@@ -57,6 +58,15 @@ export const removerMilitarTagEscopado = (id, data) => invocar({ entidade: 'Mili
 export const criarFeriasTagEscopado = (data) => invocar({ entidade: 'FeriasTag', operacao: 'create', data });
 export const removerFeriasTagEscopado = (id, data) => invocar({ entidade: 'FeriasTag', operacao: 'remover', id, data });
 
+// ============================================================
+// Bulk — agrupa vários itens em UMA chamada à function
+// itens: { acao: 'aplicar'|'remover'|'encerrar', militar_id|ferias_id, tag_id|funcao_militar_id, id?, motivo?, data? }
+// retorna: { total, sucesso, falhas, resultados: [...] }
+// ============================================================
+export const bulkMilitarFuncoesEscopado = (itens) => invocar({ entidade: 'MilitarFuncao', operacao: 'bulk', itens }, { unwrapData: false });
+export const bulkMilitarTagsEscopado = (itens) => invocar({ entidade: 'MilitarTag', operacao: 'bulk', itens }, { unwrapData: false });
+export const bulkFeriasTagsEscopado = (itens) => invocar({ entidade: 'FeriasTag', operacao: 'bulk', itens }, { unwrapData: false });
+
 export const criarFuncaoMilitarEscopado = (data) => invocar({ entidade: 'FuncaoMilitar', operacao: 'create', data });
 export const atualizarFuncaoMilitarEscopado = (id, data) => invocar({ entidade: 'FuncaoMilitar', operacao: 'update', id, data });
 export const desativarFuncaoMilitarEscopado = (id, data) => invocar({ entidade: 'FuncaoMilitar', operacao: 'desativar', id, data });
@@ -70,4 +80,3 @@ export const criarTagEscopado = (data) => invocar({ entidade: 'Tag', operacao: '
 export const atualizarTagEscopado = (id, data) => invocar({ entidade: 'Tag', operacao: 'update', id, data });
 export const desativarTagEscopado = (id, data) => invocar({ entidade: 'Tag', operacao: 'desativar', id, data });
 export const excluirTagEscopado = (id) => invocar({ entidade: 'Tag', operacao: 'delete', id });
-

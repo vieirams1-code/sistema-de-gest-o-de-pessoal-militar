@@ -45,7 +45,7 @@ import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatal
 import { base44 } from '@/api/base44Client';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
-import { criarMilitarFuncaoEscopado, criarMilitarTagEscopado, encerrarMilitarFuncaoEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import { bulkMilitarFuncoesEscopado, bulkMilitarTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
 import {
   CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
@@ -852,47 +852,33 @@ export default function Militares() {
     let erros = 0;
 
     try {
-      const criacoesFuncoes = await Promise.allSettled(
-        deltaFuncoesCriar.map((item) => criarMilitarFuncaoEscopado({ ...item, status: 'ativa', data_inicio: hoje, motivo: motivo || undefined })),
-      );
-      criacoesFuncoes.forEach((resultado) => {
-        if (resultado.status === 'fulfilled') { funcoesCriadas += 1; return; }
-        if (!isErroDuplicidade(resultado.reason)) erros += 1;
-      });
+      // Funções — UMA chamada bulk (aplicar + encerrar)
+      const itensFuncoes = [
+        ...deltaFuncoesCriar.map((it) => ({ acao: 'aplicar', militar_id: it.militar_id, funcao_militar_id: it.funcao_militar_id, motivo: motivo || undefined, data: hoje })),
+        ...deltaFuncoesRemover.map((v) => ({ acao: 'encerrar', id: v.id, militar_id: v.militar_id, funcao_militar_id: getFuncaoMilitarId(v), motivo: motivo || undefined, data: hoje })),
+      ];
+      if (itensFuncoes.length > 0) {
+        const resFn = await bulkMilitarFuncoesEscopado(itensFuncoes);
+        (resFn?.resultados || []).forEach((r) => {
+          if (r.ok && r.acao === 'aplicar' && !r.skipped) funcoesCriadas += 1;
+          else if (r.ok && r.acao === 'encerrar' && !r.skipped) funcoesEncerradas += 1;
+          else if (!r.ok && !isErroDuplicidade({ message: r.error })) erros += 1;
+        });
+      }
 
-      const remocoesFuncoes = await Promise.allSettled(
-        deltaFuncoesRemover.map((vinculo) => encerrarMilitarFuncaoEscopado(vinculo.id, { data_fim: hoje, motivo: motivo || undefined })),
-      );
-      remocoesFuncoes.forEach((resultado) => {
-        if (resultado.status === 'fulfilled') { funcoesEncerradas += 1; return; }
-        erros += 1;
-      });
-
-      // FUTURO:
-      // validar exclusividade institucional por unidade
-
-      const criacoes = await Promise.allSettled(
-        paraCriar.map((item) => criarMilitarTagEscopado({ ...item, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined })),
-      );
-      criacoes.forEach((resultado) => {
-        if (resultado.status === 'fulfilled') {
-          aplicadas += 1;
-          return;
-        }
-        const erro = resultado.reason || {};
-        if (!isErroDuplicidade(erro)) erros += 1;
-      });
-
-      const remocoes = await Promise.allSettled(
-        paraRemover.map((vinculo) => removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined })),
-      );
-      remocoes.forEach((resultado) => {
-        if (resultado.status === 'fulfilled') {
-          removidas += 1;
-          return;
-        }
-        erros += 1;
-      });
+      // Tags — UMA chamada bulk (aplicar + remover)
+      const itensTags = [
+        ...paraCriar.map((it) => ({ acao: 'aplicar', militar_id: it.militar_id, tag_id: it.tag_id, motivo: motivo || undefined, data: hoje })),
+        ...paraRemover.map((v) => ({ acao: 'remover', id: v.id, militar_id: v.militar_id, tag_id: getMilitarTagTagId(v), motivo: motivo || undefined, data: hoje })),
+      ];
+      if (itensTags.length > 0) {
+        const resTag = await bulkMilitarTagsEscopado(itensTags);
+        (resTag?.resultados || []).forEach((r) => {
+          if (r.ok && r.acao === 'aplicar' && !r.skipped) aplicadas += 1;
+          else if (r.ok && r.acao === 'remover' && !r.skipped) removidas += 1;
+          else if (!r.ok && !isErroDuplicidade({ message: r.error })) erros += 1;
+        });
+      }
 
       setSelectedMilitarIds(new Set());
       setBulkPanelOpen(false);

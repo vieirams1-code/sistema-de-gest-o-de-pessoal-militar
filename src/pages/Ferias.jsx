@@ -68,7 +68,7 @@ import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFer
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import { getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
-import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import { bulkFeriasTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
@@ -654,7 +654,6 @@ export default function Ferias() {
           tag_id: tagId,
           tag_nome: tagNomePorId.get(String(tagId)),
           ferias_nome: f?.militar_nome || f?.periodo_aquisitivo_ref || `Férias #${f.id}`,
-          promise: criarFeriasTagEscopado({ ferias_id: f.id, tag_id: tagId, status: 'ativa', data_aplicacao: now, motivo: 'Bulk férias' }),
         });
       });
       ativos.forEach((vinculo, tagId) => {
@@ -665,21 +664,39 @@ export default function Ferias() {
         removidas += 1;
         operacoes.push({
           acao: 'remover',
+          id: vinculo.id,
           ferias_id: f.id,
           tag_id: tagId,
           tag_nome: tagNomePorId.get(String(tagId)),
           ferias_nome: f?.militar_nome || f?.periodo_aquisitivo_ref || `Férias #${f.id}`,
-          promise: removerFeriasTagEscopado(vinculo.id, { status: 'removida', data_remocao: now, motivo: 'Bulk férias' }),
         });
       });
     });
 
-    const resultados = await Promise.allSettled(operacoes.map((item) => item.promise));
-    const falhas = resultados.reduce((acc, resultado, index) => {
-      if (resultado.status !== 'rejected') return acc;
+    // UMA única chamada bulk para todas as operações
+    let resultadosBackend = [];
+    if (operacoes.length > 0) {
+      try {
+        const itensBulk = operacoes.map((op) => ({
+          acao: op.acao,
+          id: op.id,
+          ferias_id: op.ferias_id,
+          tag_id: op.tag_id,
+          motivo: 'Bulk férias',
+          data: now,
+        }));
+        const resp = await bulkFeriasTagsEscopado(itensBulk);
+        resultadosBackend = Array.isArray(resp?.resultados) ? resp.resultados : [];
+      } catch (error) {
+        // erro global: marca todas como falhadas
+        resultadosBackend = operacoes.map(() => ({ ok: false, error: error?.message || 'Falha na requisição bulk.' }));
+      }
+    }
+
+    const falhas = resultadosBackend.reduce((acc, resultado, index) => {
+      if (resultado?.ok) return acc;
       const operacao = operacoes[index];
-      const motivo = resultado.reason?.message || resultado.reason?.error || 'Falha não identificada';
-      acc.push({ ...operacao, motivo });
+      acc.push({ ...operacao, motivo: resultado?.error || 'Falha não identificada' });
       return acc;
     }, []);
 
