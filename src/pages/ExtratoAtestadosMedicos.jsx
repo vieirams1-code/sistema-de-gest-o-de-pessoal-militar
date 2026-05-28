@@ -78,6 +78,8 @@ export default function ExtratoAtestadosMedicos() {
   const [diagnosticoAnexos, setDiagnosticoAnexos] = useState({
     ultimoErroAbrirAnexo: null,
     ultimoErroZip: null,
+    legacyAttachmentHint: false,
+    legacyAttachmentUnsupported: false,
   });
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
 
@@ -179,6 +181,7 @@ export default function ExtratoAtestadosMedicos() {
         extrato_parcial: Boolean(response?.meta?.extrato_parcial),
         quantidade_anexos: Number(response?.meta?.quantidade_anexos || 0),
         arquivos_ignorados_sem_anexo: Number(response?.meta?.arquivos_ignorados_sem_anexo || 0),
+        legacy_attachment_count: Number(response?.meta?.legacy_attachment_count || 0),
       });
     } catch (e) {
       const normalizedError = normalizeAttachmentError(e, {
@@ -276,6 +279,9 @@ export default function ExtratoAtestadosMedicos() {
     try {
       const result = await obterLinkAnexoAtestado(rowId);
       setLinkAnexoById((prev) => ({ ...prev, [rowId]: result.url }));
+      if (result.legacy_attachment) {
+        setDiagnosticoAnexos((prev) => ({ ...prev, legacyAttachmentHint: true }));
+      }
       await registrarAuditoria({
         acao: 'abrir_anexo',
         quantidade_registros: 1,
@@ -380,6 +386,9 @@ export default function ExtratoAtestadosMedicos() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo e geração de ZIP.</p>
+            {(diagnosticoAnexos.legacyAttachmentHint || diagnosticoAnexos.legacyAttachmentUnsupported) && (
+              <p className="text-xs text-amber-700">Alguns anexos antigos podem não suportar compactação automática.</p>
+            )}
             <div className="grid md:grid-cols-2 gap-3">
               <div className="rounded border p-2 bg-slate-50">
                 <p className="text-xs font-semibold text-slate-700 mb-1">Último erro de abrir anexo</p>

@@ -31,6 +31,7 @@ export async function gerarZipAnexosAtestadosClient(idsSelecionados = []) {
       arquivos_ignorados_sem_anexo: Number(response.headers.get('x-arquivos-ignorados-sem-anexo') || 0),
       extrato_parcial: response.headers.get('x-extrato-parcial') === 'true',
       arquivos_ignorados_falha: Number(response.headers.get('x-arquivos-ignorados-falha') || 0),
+      legacy_attachment_count: Number(response.headers.get('x-legacy-attachment-count') || 0),
     },
   };
 }

@@ -18,6 +18,7 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
     expires_in: Number(data?.expires_in) || 0,
     atestado_id: data?.atestado_id ? String(data.atestado_id) : '',
     source: String(data?.source || ''),
+    legacy_attachment: Boolean(data?.legacy_attachment),
   };
 }
 
@@ -26,7 +27,7 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
 // depois faz o await pela signed URL e atualiza `popup.location`. Sem isso,
 // muitos navegadores bloqueiam window.open chamado após await.
 export async function obterLinkAnexoAtestado(atestadoId) {
-  const { url } = await getAtestadoAnexoSignedUrlClient(atestadoId);
+  const { url, legacy_attachment } = await getAtestadoAnexoSignedUrlClient(atestadoId);
   let finalUrl;
   try {
     finalUrl = new URL(String(url), window.location.origin);
@@ -43,5 +44,5 @@ export async function obterLinkAnexoAtestado(atestadoId) {
     error.detail = { url: finalUrl.toString(), protocol: finalUrl.protocol };
     throw error;
   }
-  return { url: finalUrl.toString() };
+  return { url: finalUrl.toString(), legacy_attachment: Boolean(legacy_attachment) };
 }
