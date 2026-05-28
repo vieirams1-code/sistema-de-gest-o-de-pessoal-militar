@@ -142,6 +142,17 @@ const MOVIMENTO_OPCOES = [
 ];
 const CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY = 'consulta_militar_column_filters_v1';
 
+
+const normalizeScopedId = (value) => {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'number') return value;
+  const text = String(value).trim();
+  if (!text) return text;
+  if (/^-?\d+$/.test(text)) return Number(text);
+  return text;
+};
+
+
 function normalizeVisibleColumns(rawValue, allowedColumns) {
   const validKeys = new Set((allowedColumns || []).map((col) => col.key));
   const defaultKeys = (allowedColumns || []).filter((col) => col.defaultVisible).map((col) => col.key);
@@ -394,9 +405,9 @@ export default function Militares() {
       if (quadrosSelecionados.length > 0) payload.quadrosFiltros = quadrosSelecionados;
       if (condicaoFilter && condicaoFilter !== CONDICOES_TODAS) payload.condicaoFiltro = condicaoFilter;
       if (movimentoFilter && movimentoFilter !== MOVIMENTO_TODOS) payload.movimentoFiltro = movimentoFilter;
-      if (funcoesSelecionadas.length > 0) payload.funcoesIds = funcoesSelecionadas;
-      if (tagsSelecionadas.length > 0) payload.tagsIds = tagsSelecionadas;
-      if (gruposSelecionados.length > 0) payload.gruposIds = gruposSelecionados;
+      if (funcoesSelecionadas.length > 0) payload.funcoesIds = funcoesSelecionadas.map(normalizeScopedId);
+      if (tagsSelecionadas.length > 0) payload.tagsIds = tagsSelecionadas.map(normalizeScopedId);
+      if (gruposSelecionados.length > 0) payload.gruposIds = gruposSelecionados.map(normalizeScopedId);
       if (situacoesSelecionadas.length > 0) payload.situacaoMilitarFiltros = situacoesSelecionadas;
       if (debouncedSearchTerm) {
         // O mesmo termo digitado é avaliado pelo backend como busca (nome,
@@ -630,6 +641,10 @@ export default function Militares() {
   );
 
   const selectedMilitarIdsArray = useMemo(() => Array.from(selectedMilitarIds), [selectedMilitarIds]);
+  const selectedMilitaresById = useMemo(
+    () => new Map(operacionais.map((militar) => [String(militar?.id || ""), militar]).filter(([id]) => Boolean(id))),
+    [operacionais],
+  );
   const atualizarDraftColunas = (columnKey, shouldEnable) => {
     const validKeys = new Set((allowedColumns || []).map((col) => col.key));
     if (!validKeys.has(columnKey)) return;
@@ -737,9 +752,10 @@ export default function Militares() {
     const paraCriar = [];
 
     selectedMilitarIdsArray.forEach((militarId) => {
+      const militarOriginalId = selectedMilitaresById.get(String(militarId))?.id ?? militarId;
       desejadasSet.forEach((tagId) => {
         const chave = `${String(militarId)}::${String(tagId)}`;
-        if (!ativosTagsSet.has(chave)) paraCriar.push({ militar_id: militarId, tag_id: tagId });
+        if (!ativosTagsSet.has(chave)) paraCriar.push({ militar_id: normalizeScopedId(militarOriginalId), tag_id: normalizeScopedId(tagId) });
       });
     });
 
@@ -751,9 +767,10 @@ export default function Militares() {
     const deltaFuncoesCriar = [];
 
     selectedMilitarIdsArray.forEach((militarId) => {
+      const militarOriginalId = selectedMilitaresById.get(String(militarId))?.id ?? militarId;
       desejadasFuncoesSet.forEach((funcaoId) => {
         const chave = `${String(militarId)}::${String(funcaoId)}`;
-        if (!ativosFuncoesSet.has(chave)) deltaFuncoesCriar.push({ militar_id: militarId, funcao_militar_id: funcaoId });
+        if (!ativosFuncoesSet.has(chave)) deltaFuncoesCriar.push({ militar_id: normalizeScopedId(militarOriginalId), funcao_militar_id: normalizeScopedId(funcaoId) });
       });
     });
 
@@ -805,14 +822,13 @@ export default function Militares() {
       setSelectedMilitarIds(new Set());
       setBulkPanelOpen(false);
 
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresFuncoesFiltros(funcoesTagsScopeKey, idsHash) });
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash) });
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags') });
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos') });
-      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
-      queryClient.invalidateQueries({ queryKey: ['militares-funcoes-filtros'] });
-      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
-      queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresFuncoesFiltros(funcoesTagsScopeKey, idsHash) }),
+        queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash) }),
+        queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags') }),
+        queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos') }),
+        queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] }),
+      ]);
 
       toast({
         title: 'Funções e tags atualizadas com sucesso.',
