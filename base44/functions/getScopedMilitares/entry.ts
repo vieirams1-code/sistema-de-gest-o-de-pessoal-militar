@@ -447,6 +447,8 @@ Deno.serve(async (req) => {
             search,
             statusCadastro,
             situacaoMilitar,
+            situacaoMilitarFiltros: situacaoMilitarFiltrosRaw,
+            origemDestinoBusca: origemDestinoBuscaRaw,
             condicaoMovimento,
             limit,
             offset,
@@ -480,6 +482,12 @@ Deno.serve(async (req) => {
         const funcoesIdsFiltro = sanitizeIdArray(funcoesIdsRaw);
         const tagsIdsFiltro = sanitizeIdArray(tagsIdsRaw);
         const gruposIdsFiltro = sanitizeIdArray(gruposIdsRaw);
+
+        // Novos filtros backend (P2)
+        const situacaoMilitarFiltros = sanitizeStringArray(situacaoMilitarFiltrosRaw);
+        const origemDestinoBusca = typeof origemDestinoBuscaRaw === 'string' && origemDestinoBuscaRaw.trim()
+            ? origemDestinoBuscaRaw.trim()
+            : null;
 
         const effLimit = clampLimit(limit);
         const effOffset = clampOffset(offset);
@@ -611,7 +619,12 @@ Deno.serve(async (req) => {
         }
         if (condicaoFiltro) baseFilter.condicao = condicaoFiltro;
         if (statusCadastro) baseFilter.status_cadastro = statusCadastro;
-        if (situacaoMilitar) baseFilter.situacao_militar = situacaoMilitar;
+        // situacaoMilitarFiltros (array, P2) tem precedência sobre situacaoMilitar (string, legado).
+        if (situacaoMilitarFiltros && situacaoMilitarFiltros.length > 0) {
+            baseFilter.situacao_militar = { $in: situacaoMilitarFiltros };
+        } else if (situacaoMilitar) {
+            baseFilter.situacao_militar = situacaoMilitar;
+        }
         if (condicaoMovimentoFiltro) baseFilter.condicao_movimento = condicaoMovimentoFiltro;
 
         // 6.b. Pré-resolução de filtros via vínculos (funções/tags/grupos).
@@ -769,7 +782,12 @@ Deno.serve(async (req) => {
         // sentido cruzar) e ignoramos a paginação completa — a interseção
         // resultante é o conjunto autoritativo, e aplicamos limit/offset apenas
         // no slice final.
-        const semBusca = aplicouFiltroMilitarIds || !search || !String(search).trim();
+        // Quando há `search` ou `origemDestinoBusca`, usamos o caminho de
+        // amostra + filtro em memória, pois ambos exigem substring match
+        // que o filtro nativo do Base44 não cobre de forma confiável.
+        const temBuscaTexto = Boolean(search && String(search).trim());
+        const temBuscaOrigemDestino = Boolean(origemDestinoBusca);
+        const semBusca = aplicouFiltroMilitarIds || (!temBuscaTexto && !temBuscaOrigemDestino);
 
         let militares = [];
         let offsetAplicadoNaConsulta = false;
@@ -956,13 +974,32 @@ Deno.serve(async (req) => {
             offsetAplicadoNaConsulta = false;
             buscaLimitadaPorAmostra = (amostra || []).length >= LIMIT_MAX;
 
-            const term = normalizeText(String(search).trim());
+            const term = temBuscaTexto ? normalizeText(String(search).trim()) : null;
+            const termoOrigemDestino = temBuscaOrigemDestino ? normalizeText(origemDestinoBusca) : null;
+            // Quando search e origemDestinoBusca têm o mesmo valor, aplicamos
+            // OR entre as duas dimensões (alinhado ao comportamento legado
+            // de "busca única" da página Militares). Quando vêm valores
+            // distintos, aplicamos AND.
+            const buscaCombinadaOR = !!term && !!termoOrigemDestino && term === termoOrigemDestino;
             let filtrados = (amostra || []).filter((m) => {
-                return (
-                    normalizeText(m.nome_completo).includes(term) ||
-                    normalizeText(m.nome_guerra).includes(term) ||
-                    normalizeText(m.matricula).includes(term)
-                );
+                const matchSearch = term
+                    ? (
+                        normalizeText(m.nome_completo).includes(term) ||
+                        normalizeText(m.nome_guerra).includes(term) ||
+                        normalizeText(m.matricula).includes(term)
+                    )
+                    : null;
+                const matchOrigemDestino = termoOrigemDestino
+                    ? (
+                        normalizeText(m.condicao_origem_destino).includes(termoOrigemDestino) ||
+                        normalizeText(m.destino).includes(termoOrigemDestino)
+                    )
+                    : null;
+
+                if (buscaCombinadaOR) return matchSearch || matchOrigemDestino;
+                if (matchSearch === false) return false;
+                if (matchOrigemDestino === false) return false;
+                return true;
             });
             buscaAplicada = true;
 
@@ -1009,8 +1046,10 @@ Deno.serve(async (req) => {
                 aplicou_filtro_grupos: aplicouFiltroGrupos,
                 grupos_solicitados: gruposIdsFiltro ? gruposIdsFiltro.length : 0,
                 aplicou_filtro_status: !!statusCadastro,
-                aplicou_filtro_situacao: !!situacaoMilitar,
+                aplicou_filtro_situacao: !!situacaoMilitar || !!(situacaoMilitarFiltros && situacaoMilitarFiltros.length > 0),
+                situacoes_solicitadas: situacaoMilitarFiltros ? situacaoMilitarFiltros.length : (situacaoMilitar ? 1 : 0),
                 aplicou_filtro_condicao_movimento: !!condicaoMovimentoFiltro,
+                aplicou_filtro_origem_destino: !!origemDestinoBusca,
                 busca_aplicada: buscaAplicada,
                 busca_limitada_por_amostra: buscaLimitadaPorAmostra,
                 include_foto: effIncludeFoto,

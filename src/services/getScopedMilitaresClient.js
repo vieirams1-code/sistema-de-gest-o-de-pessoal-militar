@@ -52,6 +52,8 @@ export function getEffectiveEmail() {
  *  - funcoesIds (array)                — novo (P1)
  *  - tagsIds (array)                   — novo (P1)
  *  - gruposIds (array)                 — novo (P1)
+ *  - situacaoMilitarFiltros (array)    — novo (P2)
+ *  - origemDestinoBusca (string)       — novo (P2)
  *
  * @param {Object} payload
  * @returns {Promise<{ militares: Array, meta: Object }>}

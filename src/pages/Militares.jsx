@@ -27,7 +27,6 @@ import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
   getLotacaoAtualMilitar,
-  militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
@@ -41,7 +40,6 @@ import { isQuadroComDestaque, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibi
 import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
-import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
@@ -256,13 +254,6 @@ function normalizeVisibleColumns(rawValue, allowedColumns) {
 }
 
 
-function militarCorrespondeOrigemDestino(militar, termo) {
-  const q = String(termo || '').trim().toLowerCase();
-  if (!q) return true;
-  const texto = String(militar?.condicao_origem_destino || militar?.destino || '').toLowerCase();
-  return texto.includes(q);
-}
-
 export default function Militares() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -462,6 +453,7 @@ export default function Militares() {
     funcoesSelecionadas.join('|'),
     tagsSelecionadas.join('|'),
     gruposSelecionados.join('|'),
+    situacoesSelecionadas.join('|'),
     debouncedSearchTerm,
     effectiveEmail || 'self',
     incluirInativos ? 'todos' : 'ativos',
@@ -502,7 +494,14 @@ export default function Militares() {
       if (funcoesSelecionadas.length > 0) payload.funcoesIds = funcoesSelecionadas;
       if (tagsSelecionadas.length > 0) payload.tagsIds = tagsSelecionadas;
       if (gruposSelecionados.length > 0) payload.gruposIds = gruposSelecionados;
-      if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
+      if (situacoesSelecionadas.length > 0) payload.situacaoMilitarFiltros = situacoesSelecionadas;
+      if (debouncedSearchTerm) {
+        // O mesmo termo digitado é avaliado pelo backend como busca (nome,
+        // nome_guerra, matricula) e também como busca em origem/destino.
+        // Mantém o comportamento OR anterior (client-side) sem onerar a UI.
+        payload.search = debouncedSearchTerm;
+        payload.origemDestinoBusca = debouncedSearchTerm;
+      }
       if (
         shouldShowLotacaoFilter
         && lotacaoFilter !== TODAS_LOTACOES_VALUE
@@ -647,37 +646,13 @@ export default function Militares() {
     [],
   );
 
-  // Os filtros de quadro, condição, movimento, funções, tags e grupos já são
-  // aplicados no backend (getScopedMilitares P1). Aqui mantemos apenas:
-  //  - situação militar (ainda client-side por enquanto)
-  //  - busca por texto (já reforçada no backend, mas útil para textos como
-  //    origem/destino que o backend não cobre)
-  const filteredMilitaresBase = useMemo(() => operacionais
-    .filter((m) => {
-      if (situacoesSelecionadas.length === 0) return true;
-      const situacao = String(m?.situacao_militar || 'Ativa');
-      return situacoesSelecionadas.includes(situacao);
-    })
-    .filter((m) => (
-      militarCorrespondeBusca(m, searchTerm)
-      || militarCorrespondeOrigemDestino(m, searchTerm)
-    )), [operacionais, situacoesSelecionadas, searchTerm]);
-
-  // filtrarMilitaresPorFuncoesETags é mantido como rede de segurança no
-  // caso de inconsistência transitória entre a página de militares e os
-  // hooks de vínculos (vinculosFuncoesAtivosFiltros/vinculosTagsAtivosFiltros).
-  // Idealmente, com backend já filtrando, esta operação é no-op.
-  const filteredMilitaresComFuncoesTags = useMemo(() => filtrarMilitaresPorFuncoesETags({
-    militares: filteredMilitaresBase,
-    filtros: {
-      funcoesIds: funcoesSelecionadas,
-      tagsIds: tagsSelecionadas,
-      gruposIds: gruposSelecionados,
-    },
-    vinculosFuncoesAtivos: vinculosFuncoesAtivosFiltros,
-    vinculosTagsAtivos: vinculosTagsAtivosFiltros,
-    tagsAtivas,
-  }), [filteredMilitaresBase, funcoesSelecionadas, tagsSelecionadas, gruposSelecionados, vinculosFuncoesAtivosFiltros, vinculosTagsAtivosFiltros, tagsAtivas]);
+  // Todos os filtros relevantes (quadro, condição, movimento, funções, tags,
+  // grupos, situação militar, busca por nome/matrícula e busca por
+  // origem/destino) são aplicados no backend (getScopedMilitares P1/P2).
+  // Aqui não há mais filtragem client-side desses critérios — a página passa
+  // a renderizar o conjunto operacional retornado pelo backend conforme a
+  // paginação acumulada.
+  const filteredMilitaresComFuncoesTags = operacionais;
 
   const filteredMilitares = useMemo(
     () => {
