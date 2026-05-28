@@ -7,6 +7,7 @@ const MAX_FILES = 50;
 const MAX_ESTIMATED_BYTES = 100 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 120;
 const HEAD_TIMEOUT_MS = 4000;
+const BASE44_APP_FILES_PREFIX = '/api/apps/';
 
 const normalizeIds = (value: unknown) => Array.isArray(value) ? value.map((x) => String(x || '').trim()).filter(Boolean) : [];
 
@@ -53,6 +54,20 @@ function extractArquivoFileUri(raw: unknown): string {
     }
   }
   return '';
+}
+
+function parseBase44AppFileUrl(rawUrl: string): { appId: string; filePath: string; hostPathSanitized: string } | null {
+  try {
+    const u = new URL(rawUrl);
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (parts.length < 5 || parts[0] !== 'api' || parts[1] !== 'apps' || parts[3] !== 'files') return null;
+    const appId = String(parts[2] || '').trim();
+    const filePath = parts.slice(4).join('/');
+    if (!appId || !filePath) return null;
+    return { appId, filePath, hostPathSanitized: `${u.host}${u.pathname}` };
+  } catch {
+    return null;
+  }
 }
 
 const sanitize = (v: unknown) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'militar';
@@ -111,8 +126,6 @@ Deno.serve(async (req) => {
     for (const atestado of comAnexo) {
       const rawArquivo = extractArquivoFileUri(atestado?.arquivo_atestado);
 
-      // Fonte do anexo: prioridade para URLs HTTPS/HTTP diretas (Base44 storage).
-      // Só tenta Supabase Storage quando NÃO for URL externa.
       let signedUrl: string | null = null;
       let objectPath: string = '';
       let storageLocation: { bucket: string; objectPath: string } | null = null;
@@ -121,6 +134,15 @@ Deno.serve(async (req) => {
       if (parsedLocation) storageLocation = parsedLocation;
 
       if ((rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) && !storageLocation) {
+        const base44FileUrl = parseBase44AppFileUrl(rawArquivo);
+        if (base44FileUrl) {
+          skipped.push({
+            atestado_id: String(atestado?.id || ''),
+            code: 'UNSUPPORTED_BASE44_FILE_URL',
+            message: `URL Base44 não mapeável para storage nativo: ${base44FileUrl.hostPathSanitized}`,
+          });
+          continue;
+        }
         signedUrl = rawArquivo;
         try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
       } else {
@@ -168,9 +190,20 @@ Deno.serve(async (req) => {
         contentType = downloaded.data.type || null;
         buffer = await downloaded.data.arrayBuffer();
       } else {
+        let fetchedUrlPath = '';
+        try {
+          const u = new URL(item.signedUrl);
+          fetchedUrlPath = u.pathname;
+          if (u.pathname.includes(BASE44_APP_FILES_PREFIX)) {
+            skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'UNSUPPORTED_BASE44_FILE_URL', message: `URL Base44 não suportada para fetch: ${u.host}${u.pathname}` });
+            continue;
+          }
+        } catch {
+          fetchedUrlPath = item.signedUrl;
+        }
         const res = await fetch(item.signedUrl);
         if (!res.ok) {
-          skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_FETCH_FAILED', message: `Falha no fetch do anexo: HTTP ${res.status}` });
+          skipped.push({ atestado_id: String(item.atestado?.id || ''), code: 'ATTACHMENT_FETCH_FAILED', message: `Falha no fetch do anexo (${fetchedUrlPath || 'url_externa'}): HTTP ${res.status}` });
           continue;
         }
         contentType = res.headers.get('content-type');
