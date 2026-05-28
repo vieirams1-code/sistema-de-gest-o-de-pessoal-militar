@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
-import { getAtestadoAnexoSignedUrlClient } from '@/services/getAtestadoAnexoSignedUrlClient';
+import { abrirAnexoAtestadoEmNovaAba } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 import { gerarZipAnexosAtestadosClient } from '@/services/gerarZipAnexosAtestadosClient';
 
@@ -235,9 +235,9 @@ export default function ExtratoAtestadosMedicos() {
     setLoadingAnexoById((prev) => ({ ...prev, [rowId]: true }));
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     try {
-      const data = await getAtestadoAnexoSignedUrlClient(rowId);
-      if (!data?.url) throw new Error('Não foi possível gerar o link do anexo.');
-      window.open(data.url, '_blank', 'noopener,noreferrer');
+      // Abre nova aba dentro do user-gesture e depois redireciona para a signed URL,
+      // evitando bloqueio de popup do navegador após await.
+      await abrirAnexoAtestadoEmNovaAba(rowId);
       await registrarAuditoria({
         acao: 'abrir_anexo',
         quantidade_registros: 1,

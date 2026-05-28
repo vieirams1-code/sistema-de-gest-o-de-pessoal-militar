@@ -42,6 +42,8 @@ import {
   RefreshCw,
   ShieldAlert,
   MessageSquareText,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import FamiliaFeriasPanel from '@/components/ferias/FamiliaFeriasPanel';
@@ -335,6 +337,21 @@ export default function Ferias() {
   const [periodEnd, setPeriodEnd] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [customRangeError, setCustomRangeError] = useState('');
+
+  // UI: meses iniciam recolhidos; apenas o mês atual (yyyy-MM) começa expandido.
+  // O usuário pode expandir/recolher manualmente cada mês.
+  const [expandedMonths, setExpandedMonths] = useState(() => {
+    const now = new Date();
+    return new Set([format(now, 'yyyy-MM')]);
+  });
+  const toggleMonth = (sortKey) => {
+    setExpandedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(sortKey)) next.delete(sortKey);
+      else next.add(sortKey);
+      return next;
+    });
+  };
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [feriasToDelete, setFeriasToDelete] = useState(null);
@@ -1213,17 +1230,25 @@ export default function Ferias() {
           </div>
         ) : (
           <div className="space-y-8">
-            {gruposOrdenados.map((grupo) => (
+            {gruposOrdenados.map((grupo) => {
+              const isExpanded = expandedMonths.has(grupo.sortKey);
+              return (
               <div key={grupo.sortKey}>
-                <div className="flex items-center gap-3 mb-3">
+                <button
+                  type="button"
+                  onClick={() => toggleMonth(grupo.sortKey)}
+                  className="flex items-center gap-3 mb-3 w-full text-left group"
+                >
                   <div className="w-2 h-2 rounded-full bg-[#1e3a5f]" />
-                  <h2 className="text-base font-semibold text-[#1e3a5f] capitalize">
+                  <h2 className="text-base font-semibold text-[#1e3a5f] capitalize group-hover:text-[#2d4a6f]">
                     {grupo.label}
                   </h2>
                   <div className="flex-1 h-px bg-slate-200" />
                   <span className="text-xs text-slate-400">{grupo.items.length} registro(s)</span>
-                </div>
+                  {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
 
+                {isExpanded && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
@@ -1569,8 +1594,10 @@ export default function Ferias() {
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -20,3 +20,24 @@ export async function getAtestadoAnexoSignedUrlClient(atestado_id) {
     source: String(data?.source || ''),
   };
 }
+
+// Abre o anexo do atestado em uma nova aba de forma segura para navegadores modernos.
+// Estratégia: abre a aba IMEDIATAMENTE (dentro do user-gesture do clique),
+// depois faz o await pela signed URL e atualiza `popup.location`. Sem isso,
+// muitos navegadores bloqueiam window.open chamado após await.
+export async function abrirAnexoAtestadoEmNovaAba(atestadoId) {
+  const popup = typeof window !== 'undefined' ? window.open('about:blank', '_blank', 'noopener,noreferrer') : null;
+  try {
+    const { url } = await getAtestadoAnexoSignedUrlClient(atestadoId);
+    if (popup && !popup.closed) {
+      popup.location.href = url;
+    } else {
+      // Popup bloqueado: fallback que mantém o user-gesture (não ideal, mas evita perda total)
+      window.location.assign(url);
+    }
+    return { url };
+  } catch (error) {
+    if (popup && !popup.closed) popup.close();
+    throw error;
+  }
+}

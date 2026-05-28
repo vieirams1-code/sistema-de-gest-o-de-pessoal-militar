@@ -103,15 +103,30 @@ Deno.serve(async (req) => {
     for (const atestado of comAnexo) {
       const rawArquivo = extractArquivoFileUri(atestado?.arquivo_atestado);
       const location = parseStorageLocation(rawArquivo);
-      if (!location) continue;
 
-      const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
-      if (signed.error || !signed.data?.signedUrl) continue;
+      // Fonte do anexo: pode ser Supabase Storage (location != null) OU
+      // uma URL HTTPS direta (Base44 storage, ex.: base44.app/api/.../files/...).
+      // Para URLs externas, usamos a própria URL como signedUrl e o pathname
+      // como objectPath (para inferir a extensão do arquivo).
+      let signedUrl: string | null = null;
+      let objectPath: string = '';
+
+      if (location) {
+        const signed = await supabase.storage.from(location.bucket).createSignedUrl(location.objectPath, SIGNED_URL_TTL_SECONDS);
+        if (signed.error || !signed.data?.signedUrl) continue;
+        signedUrl = signed.data.signedUrl;
+        objectPath = location.objectPath;
+      } else if (rawArquivo.startsWith('http://') || rawArquivo.startsWith('https://')) {
+        signedUrl = rawArquivo;
+        try { objectPath = new URL(rawArquivo).pathname; } catch { objectPath = rawArquivo; }
+      } else {
+        continue;
+      }
 
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), HEAD_TIMEOUT_MS);
-        const head = await fetch(signed.data.signedUrl, { method: 'HEAD', signal: controller.signal });
+        const head = await fetch(signedUrl, { method: 'HEAD', signal: controller.signal });
         clearTimeout(timeout);
         if (head.ok) {
           const size = Number(head.headers.get('content-length') || 0);
@@ -125,7 +140,7 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Limite de tamanho excedido.', code: 'LIMIT_EXCEEDED', meta: { limite_bytes: MAX_ESTIMATED_BYTES, tamanho_estimado_bytes: estimatedBytes, quantidade_anexos: prepared.length + 1, arquivos_ignorados_sem_anexo: semAnexo, limite_excedido: true } }, { status: 422 });
       }
 
-      prepared.push({ atestado, signedUrl: signed.data.signedUrl, objectPath: location.objectPath });
+      prepared.push({ atestado, signedUrl, objectPath });
     }
 
     if (!prepared.length) return Response.json({ error: 'Nenhum anexo autorizado disponível para compactação.', code: 'NO_ATTACHMENTS' }, { status: 422 });
