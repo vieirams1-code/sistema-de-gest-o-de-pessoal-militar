@@ -135,6 +135,11 @@ export default function CardItem({ card, onClick }) {
         </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5 min-w-0">
+          {card.arquivado === true && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              Arquivado
+            </span>
+          )}
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 truncate max-w-full" title={atestadoVinculado?.status_jiso || 'JISO em análise'}>
             {atestadoVinculado?.status_jiso || 'JISO em análise'}
           </span>
@@ -193,6 +198,12 @@ export default function CardItem({ card, onClick }) {
       onClick={() => onClick(card)}
       className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md hover:border-slate-300 cursor-pointer transition-all group"
     >
+      {card.arquivado === true && (
+        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mb-2 bg-amber-100 text-amber-800 border border-amber-200">
+          Arquivado
+        </div>
+      )}
+
       {card.etiqueta_texto && (
         <div
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mb-2 text-white"

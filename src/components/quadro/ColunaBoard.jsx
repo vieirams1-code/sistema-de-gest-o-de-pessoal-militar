@@ -13,7 +13,8 @@ export default function ColunaBoard({
   dragDisabled = false,
 }) {
   const [hover, setHover] = useState(false);
-  const ativos = cards.filter((c) => !c.arquivado);
+  const cardsVisiveis = cards;
+  const ativos = cards.filter((c) => c.arquivado !== true);
   const cor = coluna.cor || '#64748b';
   const colunaFixa = coluna.fixa || coluna.origem_coluna === 'automacao' || (coluna.nome || '').trim().toUpperCase() === 'JISO';
 
@@ -61,8 +62,8 @@ export default function ColunaBoard({
             {...provided.droppableProps}
             className={`flex-1 overflow-y-auto px-2 py-2 space-y-2 min-h-[120px] max-h-[calc(100vh-200px)] ${snapshot.isDraggingOver ? 'bg-blue-50/60' : ''}`}
           >
-            {ativos.map((card, index) => (
-              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={dragDisabled}>
+            {cardsVisiveis.map((card, index) => (
+              <Draggable key={card.id} draggableId={card.id} index={index} isDragDisabled={dragDisabled || card.arquivado === true}>
                 {(dragProvided, dragSnapshot) => (
                   <div
                     ref={dragProvided.innerRef}
@@ -76,7 +77,7 @@ export default function ColunaBoard({
               </Draggable>
             ))}
             {provided.placeholder}
-            {ativos.length === 0 && !snapshot.isDraggingOver && (
+            {cardsVisiveis.length === 0 && !snapshot.isDraggingOver && (
               <div className="flex items-center justify-center h-16 rounded-lg border-2 border-dashed border-slate-200">
                 <span className="text-xs text-slate-300">Vazio</span>
               </div>

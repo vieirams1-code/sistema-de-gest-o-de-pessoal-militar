@@ -35,6 +35,8 @@ import {
   Plus,
   Check,
   Trash2,
+  Archive,
+  RotateCcw,
   AlertTriangle,
   SquareCheckBig,
   ListTodo,
@@ -840,32 +842,57 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     }
   };
 
-  const excluirCard = async () => {
+  const alternarArquivamentoCard = async () => {
     if (deletingCard) return;
     if (!canAccessAction('arquivar_card')) {
-      alert('Ação negada: você não tem permissão para arquivar cards.');
+      alert('Ação negada: você não tem permissão para arquivar/restaurar cards.');
       return;
     }
 
+    const arquivado = card.arquivado === true;
     const confirmar = window.confirm(
-      `Arquivar o card "${card.titulo}"?\n\n` +
-        `Ele deixará de aparecer no quadro, mas o histórico permanecerá salvo.`
+      arquivado
+        ? `Restaurar o card "${card.titulo}" para a visão principal?`
+        : `Arquivar o card "${card.titulo}"?\n\nEle deixará de aparecer no quadro por padrão, mas continuará acessível ao ativar "Mostrar arquivados".`
     );
 
     if (!confirmar) return;
 
     setDeletingCard(true);
     try {
-      await base44.entities.CardOperacional.update(card.id, {
-        arquivado: true,
-        status: 'Arquivado',
+      const agora = new Date().toISOString();
+      const payload = arquivado
+        ? {
+            arquivado: false,
+            ...(card.status === 'Arquivado' ? { status: 'Ativo' } : {}),
+          }
+        : {
+            arquivado: true,
+          };
+
+      await base44.entities.CardOperacional.update(card.id, payload);
+
+      await base44.entities.CardComentario.create({
+        card_id: card.id,
+        mensagem: arquivado ? 'Card restaurado.' : 'Card arquivado.',
+        tipo_registro: 'Sistema',
+        data_hora: agora,
+        origem_automatica: true,
+        autor_nome: 'Sistema',
       });
 
-      onCardUpdate?.({
+      const novoComentariosCount = (card.comentarios_count || 0) + 1;
+      const payloadComContador = {
         id: card.id,
-        arquivado: true,
-        status: 'Arquivado',
+        ...payload,
+        comentarios_count: novoComentariosCount,
+      };
+
+      await base44.entities.CardOperacional.update(card.id, {
+        comentarios_count: novoComentariosCount,
       });
+
+      onCardUpdate?.(payloadComContador);
 
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
@@ -875,7 +902,9 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
       queryClient.invalidateQueries({ queryKey: ['vinculos', card.id] });
 
-      onClose?.();
+      if (!arquivado) {
+        onClose?.();
+      }
     } finally {
       setDeletingCard(false);
     }
@@ -915,6 +944,12 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                   </span>
                 )}
 
+                {card.arquivado === true && (
+                  <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-semibold">
+                    Arquivado
+                  </span>
+                )}
+
                 {card.origem_tipo && card.origem_tipo !== 'Manual' && (
                   <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded font-medium">
                     {card.origem_tipo}
@@ -929,15 +964,17 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 variant="outline"
                 size="sm"
                 className="h-8 text-xs border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                onClick={excluirCard}
+                onClick={alternarArquivamentoCard}
                 disabled={deletingCard}
               >
                 {deletingCard ? (
                   <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : card.arquivado === true ? (
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
                 ) : (
-                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  <Archive className="w-3.5 h-3.5 mr-1" />
                 )}
-                Excluir card
+                {card.arquivado === true ? 'Restaurar' : 'Arquivar'}
               </Button>
 
               <button
