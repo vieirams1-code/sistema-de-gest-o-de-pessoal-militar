@@ -55,7 +55,7 @@ const formatDateBr = (value) => {
 };
 
 export default function ExtratoAtestadosMedicos() {
-  const { canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('atestados');
   const [filtros, setFiltros] = useState({
     periodoInicio: '',
@@ -75,6 +75,37 @@ export default function ExtratoAtestadosMedicos() {
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
+  const [diagnosticoAnexos, setDiagnosticoAnexos] = useState({
+    ultimoErroAbrirAnexo: null,
+    ultimoErroZip: null,
+  });
+  const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
+
+  const normalizeAttachmentError = (error, context = {}) => ({
+    code: String(error?.code || ''),
+    message: String(error?.message || ''),
+    detail: error?.detail ?? null,
+    meta: error?.meta ?? null,
+    status: Number(error?.status || error?.raw?.response?.status || 0) || null,
+    raw: error?.raw ?? null,
+    atestado_id: context.atestado_id ? String(context.atestado_id) : null,
+    action: context.action || 'unknown',
+    timestamp: new Date().toISOString(),
+  });
+
+  const handleCopyDiagnostico = async () => {
+    const payload = JSON.stringify(diagnosticoAnexos, null, 2);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+        window.alert('Diagnóstico copiado para a área de transferência.');
+        return;
+      }
+    } catch (_e) {
+      // fallback abaixo
+    }
+    window.prompt('Copie manualmente o diagnóstico:', payload);
+  };
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
@@ -150,6 +181,10 @@ export default function ExtratoAtestadosMedicos() {
         arquivos_ignorados_sem_anexo: Number(response?.meta?.arquivos_ignorados_sem_anexo || 0),
       });
     } catch (e) {
+      const normalizedError = normalizeAttachmentError(e, {
+        action: 'export_zip_anexos',
+      });
+      setDiagnosticoAnexos((prev) => ({ ...prev, ultimoErroZip: normalizedError }));
       const msg = String(e?.message || 'Não foi possível gerar o ZIP agora.');
       const isLimit = String(e?.code || '').toUpperCase() === 'LIMIT_EXCEEDED';
       await registrarAuditoria({
@@ -239,7 +274,7 @@ export default function ExtratoAtestadosMedicos() {
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     try {
-      const preOpenedTab = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
+      const preOpenedTab = typeof window !== 'undefined' ? window.open('about:blank', '_blank', 'noopener,noreferrer') : null;
       await abrirAnexoAtestadoEmNovaAba(rowId, preOpenedTab);
       await registrarAuditoria({
         acao: 'abrir_anexo',
@@ -252,6 +287,11 @@ export default function ExtratoAtestadosMedicos() {
         extrato_parcial: false,
       });
     } catch (e) {
+      const normalizedError = normalizeAttachmentError(e, {
+        action: 'abrir_anexo',
+        atestado_id: rowId,
+      });
+      setDiagnosticoAnexos((prev) => ({ ...prev, ultimoErroAbrirAnexo: normalizedError }));
       const apiMessage = String(e?.message || '');
       const code = String(e?.code || '');
       const safeDetail = e?.detail ? JSON.stringify(e.detail) : '';
@@ -334,6 +374,28 @@ export default function ExtratoAtestadosMedicos() {
           {isExportingZip && <span className="text-sm text-slate-700">Gerando ZIP...</span>}
         </CardContent>
       </Card>
+
+      {canShowDiagnostics && (
+        <Card className="shadow-sm border-amber-300">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Diagnóstico de Anexos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo e geração de ZIP.</p>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="rounded border p-2 bg-slate-50">
+                <p className="text-xs font-semibold text-slate-700 mb-1">Último erro de abrir anexo</p>
+                <pre className="text-[11px] whitespace-pre-wrap break-all">{JSON.stringify(diagnosticoAnexos.ultimoErroAbrirAnexo, null, 2) || '-'}</pre>
+              </div>
+              <div className="rounded border p-2 bg-slate-50">
+                <p className="text-xs font-semibold text-slate-700 mb-1">Último erro de ZIP</p>
+                <pre className="text-[11px] whitespace-pre-wrap break-all">{JSON.stringify(diagnosticoAnexos.ultimoErroZip, null, 2) || '-'}</pre>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleCopyDiagnostico}>Copiar diagnóstico</Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
