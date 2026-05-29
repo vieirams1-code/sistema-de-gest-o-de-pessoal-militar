@@ -1,4 +1,5 @@
 import { formatarMatriculaPadrao, normalizarMatricula } from './militarIdentidadeService.js';
+import { normalizarTextoBusca, somenteDigitos } from '@/utils/normalizarBuscaMilitar';
 
 const STATUS_MESCLADO = 'mesclado';
 
@@ -133,34 +134,52 @@ export function filtrarMilitaresOperacionais(militares = [], { incluirInativos =
 }
 
 export function militarCorrespondeBusca(militar = {}, termo = '') {
-  const query = String(termo || '').trim().toLowerCase();
+  const query = String(termo || '').trim();
   if (!query) return true;
 
+  // Normaliza o termo de busca (sem acentos, minúsculas)
+  const queryNormalizado = normalizarTextoBusca(query);
+  const querySomenteDigitos = somenteDigitos(query);
+
+  // Campos de texto para busca normalizada (sem acentos)
   const camposTexto = [
     militar?.nome_completo,
     militar?.nome_guerra,
-    militar?.matricula_atual,
-    militar?.matricula,
-    militar?.cpf,
-    militar?.rg,
+    militar?.posto_graduacao,
+    militar?.quadro,
     militar?.lotacao_atual,
     militar?.lotacao,
     militar?.estrutura_nome,
     militar?.subgrupamento_nome,
     militar?.grupamento_nome,
-    militar?.posto_graduacao,
-    militar?.quadro,
-  ].map((v) => String(v || '').toLowerCase());
+  ].map((v) => normalizarTextoBusca(v));
 
-  if (camposTexto.some((campo) => campo.includes(query))) return true;
+  // Busca em campos de texto normalizados
+  if (camposTexto.some((campo) => campo.includes(queryNormalizado))) return true;
 
-  const queryNorm = normalizarMatricula(query);
-  if (!queryNorm) return false;
+  // Busca em CPF e RG (sem máscara)
+  const cpfNormalizado = normalizarTextoBusca(militar?.cpf);
+  const rgNormalizado = normalizarTextoBusca(militar?.rg);
 
-  return (militar?.matriculas_historico || []).some((mat) => {
-    const matNorm = normalizarMatricula(mat?.matricula_normalizada || mat?.matricula);
-    return matNorm.includes(queryNorm);
-  });
+  if (querySomenteDigitos) {
+    if (cpfNormalizado && somenteDigitos(cpfNormalizado).includes(querySomenteDigitos)) return true;
+    if (rgNormalizado && somenteDigitos(rgNormalizado).includes(querySomenteDigitos)) return true;
+  }
+
+  // Busca em matrícula: tanto formatada quanto sem máscara
+  const queryMatriculaDigitos = somenteDigitos(query);
+  if (queryMatriculaDigitos) {
+    const matriculaAtualDigitos = somenteDigitos(militar?.matricula_atual || militar?.matricula || '');
+    if (matriculaAtualDigitos && matriculaAtualDigitos.includes(queryMatriculaDigitos)) return true;
+
+    // Busca em histórico de matrículas
+    if ((militar?.matriculas_historico || []).some((mat) => {
+      const matDigitos = somenteDigitos(mat?.matricula_formatada || mat?.matricula || '');
+      return matDigitos && matDigitos.includes(queryMatriculaDigitos);
+    })) return true;
+  }
+
+  return false;
 }
 
 export function getLotacaoAtualMilitar(militar = {}) {
