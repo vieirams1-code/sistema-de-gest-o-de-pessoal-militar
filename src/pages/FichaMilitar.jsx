@@ -381,18 +381,26 @@ export default function FichaMilitar() {
       ]
     }));
 
-    historico.filter(h => h.motivo !== 'Manual').forEach(h => lista.push({
-      tipo: 'comportamento', data: h.data_alteracao, id: h.id, raw: h,
-      titulo: `Comportamento: ${h.comportamento_anterior || 'N/D'} → ${h.comportamento_novo}`,
-      resumo: `Motivo: ${h.motivo}`, subtipo: h.motivo,
-      detalhes: [
-        { label: 'Anterior', valor: h.comportamento_anterior },
-        { label: 'Novo', valor: h.comportamento_novo },
-        { label: 'Motivo', valor: h.motivo },
-        { label: 'Data', valor: formatDate(h.data_alteracao) },
-        { label: 'Observações', valor: h.observacoes },
-      ]
-    }));
+    historico
+      .filter(h => {
+        if (h.motivo === 'Manual') return false;
+        if (!h.data_alteracao) return false;
+        if (!h.comportamento_novo || h.comportamento_novo === 'N/D') return false;
+        if (h.comportamento_anterior === h.comportamento_novo) return false;
+        return true;
+      })
+      .forEach(h => lista.push({
+        tipo: 'comportamento', data: h.data_alteracao, id: h.id, raw: h,
+        titulo: `Comportamento: ${h.comportamento_anterior || 'Implantação'} → ${h.comportamento_novo}`,
+        resumo: `Motivo: ${h.motivo}`, subtipo: h.motivo,
+        detalhes: [
+          { label: 'Anterior', valor: h.comportamento_anterior || 'Nenhum (implantação)' },
+          { label: 'Novo', valor: h.comportamento_novo },
+          { label: 'Motivo', valor: h.motivo },
+          { label: 'Data', valor: formatDate(h.data_alteracao) },
+          { label: 'Observações', valor: h.observacoes },
+        ]
+      }));
 
     return lista.sort((a, b) => {
       if (!a.data && !b.data) return 0;
