@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -173,7 +173,6 @@ export default function ExtratoAtestadosMedicos() {
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState('');
-  const [encaminhamentoError, setEncaminhamentoError] = useState('');
   const [loadingEncaminhamentoByKey, setLoadingEncaminhamentoByKey] = useState({});
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
@@ -228,46 +227,6 @@ export default function ExtratoAtestadosMedicos() {
       await registrarAuditoriaExtratoAtestadosClient(payload);
     } catch (error) {
       console.warn('[ExtratoAtestadosMedicos] auditoria warning', error);
-    }
-  };
-
-  const exportRowsToCsv = (rowsToExport) => {
-    const headers = ['ID', 'Data início', 'Posto/Grad.', 'Militar', 'JISO', 'Médico', 'Dias'];
-    const csvRows = rowsToExport.map((row) => [
-      row.id || '',
-      row.data_inicio || '',
-      formatPostoGraduacaoAbreviado(getPostoGraduacaoAtestado(row)),
-      row.militar_nome || '',
-      row.necessita_jiso ? 'Sim' : 'Não',
-      row.medico_nome_snapshot || row.medico || '',
-      row.dias ?? '',
-    ]);
-    const content = [headers, ...csvRows].map((line) => line.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';')).join('\n');
-    downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8' }), `extrato-atestados-${new Date().toISOString().slice(0, 10)}.csv`);
-  };
-
-  const handleExportarCsv = async () => {
-    if (selectedIds.size === 0) return;
-    setIsExporting(true);
-    try {
-      const response = await gerarExtratoAtestados({ formato: 'csv', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
-      const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
-      exportRowsToCsv(rowsToExport);
-      await registrarAuditoria({
-        acao: 'export_csv',
-        quantidade_registros: rowsToExport.length,
-        atestado_ids: rowsToExport.map((row) => row?.id).filter(Boolean),
-        incluiu_sensiveis: Boolean(response?.meta?.sensiveis_incluidos),
-        sensiveis_bloqueados: Boolean(response?.meta?.sensiveis_bloqueados),
-        modo_acesso: 'exportacao',
-        escopo: 'scoped_atestados_bundle',
-        extrato_parcial: Boolean(response?.extrato_parcial),
-      });
-      toast.success('Arquivo CSV gerado com sucesso!');
-    } catch (e) {
-      toast.error('Falha ao exportar arquivo CSV.');
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -458,14 +417,12 @@ export default function ExtratoAtestadosMedicos() {
     if (!enviado) {
       motivo = window.prompt(`Informe o motivo para desmarcar ${destino}:`) || '';
       if (!motivo.trim()) {
-        setEncaminhamentoError('Motivo é obrigatório ao desmarcar encaminhamento DP/DINTEL.');
         toast.error(`Motivo é obrigatório ao desmarcar encaminhamento ${destino}.`);
         return;
       }
     }
 
     const loadingKey = `${atestadoId}:${destino}`;
-    setEncaminhamentoError('');
     setLoadingEncaminhamentoByKey((prev) => ({ ...prev, [loadingKey]: true }));
     try {
       const result = await alterarEncaminhamentoAtestado({
@@ -475,7 +432,6 @@ export default function ExtratoAtestadosMedicos() {
         expected_versao: Number(row?.encaminhamento?.versao || 0),
         motivo,
       });
-      if (result?.encaminhamento) atualizarEncaminhamentoNoCache(result.encaminhamento);
       if (result?.encaminhamento) {
         atualizarEncaminhamentoNoCache(result.encaminhamento);
         queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
@@ -483,11 +439,9 @@ export default function ExtratoAtestadosMedicos() {
       }
     } catch (e) {
       if (e?.code === 'ENCAMINHAMENTO_CONFLICT') {
-        setEncaminhamentoError('Encaminhamento alterado por outro usuário. Os dados foram recarregados; tente novamente.');
         toast.error('Encaminhamento alterado por outro usuário. Os dados foram recarregados.');
         queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
       } else {
-        setEncaminhamentoError(e?.message || 'Falha ao alterar encaminhamento DP/DINTEL.');
         toast.error(e?.message || `Falha ao alterar encaminhamento ${destino}.`);
       }
     } finally {
@@ -553,10 +507,6 @@ export default function ExtratoAtestadosMedicos() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-              <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Exportar CSV
-              </Button>
               <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarExcel}>
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                 Exportar Excel
@@ -580,11 +530,6 @@ export default function ExtratoAtestadosMedicos() {
           {!canManageEncaminhamento && (
             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               Para marcar/desmarcar DP/DINTEL, é necessária a permissão perm_gerir_encaminhamento_dp_dintel_atestado.
-            </p>
-          )}
-          {encaminhamentoError && (
-            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {encaminhamentoError}
             </p>
           )}
         </div>
