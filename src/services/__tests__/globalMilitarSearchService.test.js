@@ -46,6 +46,27 @@ test('busca global encontra militar por CPF', () => {
   assert.equal(resultados[0].id, 'm1');
 });
 
+test('busca global encontra militar por lotação, posto ou quadro', () => {
+  const militares = [
+    ...militaresMock,
+    {
+      id: 'm3',
+      nome_completo: 'Ana Pereira',
+      nome_guerra: 'Ana',
+      matricula: '555444',
+      matricula_atual: '555444',
+      cpf: '22233344455',
+      posto_graduacao: 'Tenente',
+      lotacao: 'Companhia Alfa',
+      quadro: 'Quadro de Saúde',
+    },
+  ];
+
+  const resultados = filtrarMilitaresGlobal(militares, 'saúde', { limit: 10 });
+  assert.equal(resultados.length, 1);
+  assert.equal(resultados[0].id, 'm3');
+});
+
 test('atalhos respeitam permissões', () => {
   const permissoes = new Set(['visualizar_militares', 'visualizar_medalhas']);
   const atalhos = construirAtalhosMilitar({

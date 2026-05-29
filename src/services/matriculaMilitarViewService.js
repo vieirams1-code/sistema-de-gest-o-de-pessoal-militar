@@ -143,6 +143,13 @@ export function militarCorrespondeBusca(militar = {}, termo = '') {
     militar?.matricula,
     militar?.cpf,
     militar?.rg,
+    militar?.lotacao_atual,
+    militar?.lotacao,
+    militar?.estrutura_nome,
+    militar?.subgrupamento_nome,
+    militar?.grupamento_nome,
+    militar?.posto_graduacao,
+    militar?.quadro,
   ].map((v) => String(v || '').toLowerCase());
 
   if (camposTexto.some((campo) => campo.includes(query))) return true;
