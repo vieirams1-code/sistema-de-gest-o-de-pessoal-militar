@@ -40,6 +40,43 @@ async function listarEncaminhamentos(base44: ReturnType<typeof createClientFromR
   return rows;
 }
 
+function buildHistoricoPorMilitar(atestados: Record<string, unknown>[]) {
+  const porMilitar = new Map<string, Record<string, unknown>[]>();
+  for (const item of atestados) {
+    const militarId = normalizeId(item?.militar_id);
+    if (!militarId) continue;
+    if (!porMilitar.has(militarId)) porMilitar.set(militarId, []);
+    porMilitar.get(militarId)!.push(item);
+  }
+  for (const [militarId, lista] of porMilitar) {
+    lista.sort((a, b) => {
+      const da = String(a?.data_inicio || '');
+      const db = String(b?.data_inicio || '');
+      return db.localeCompare(da);
+    });
+    porMilitar.set(militarId, lista);
+  }
+  return porMilitar;
+}
+
+function montarHistoricoDoAtestado(atestado: Record<string, unknown>, todosDoMilitar: Record<string, unknown>[]) {
+  const idAtual = normalizeId(atestado?.id);
+  return todosDoMilitar
+    .filter((outro) => normalizeId(outro?.id) !== idAtual)
+    .map((outro) => ({
+      id: outro?.id,
+      data_movimento: outro?.data_inicio,
+      data_termino: outro?.data_termino || outro?.data_fim || null,
+      dias: outro?.dias ?? null,
+      descricao: [
+        outro?.necessita_jiso ? 'JISO' : null,
+        outro?.medico_nome_snapshot || outro?.medico || null,
+        outro?.dias ? `${outro.dias} dia(s)` : null,
+      ].filter(Boolean).join(' • ') || 'Atestado anterior',
+      status: outro?.status || '',
+    }));
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -59,8 +96,19 @@ Deno.serve(async (req) => {
     const atestadoIds = Array.from(new Set(atestadosRaw.map((item) => normalizeId(item?.id)).filter(Boolean)));
     const encaminhamentos = atestadoIds.length ? await listarEncaminhamentos(base44, atestadoIds) : [];
 
+    const historicoPorMilitar = buildHistoricoPorMilitar(atestadosRaw);
+
+    const atestadosComHistorico = atestadosRaw.map((item) => {
+      const militarId = normalizeId(item?.militar_id);
+      const todosDoMilitar = historicoPorMilitar.get(militarId) || [];
+      return {
+        ...sanitizeAtestado(item),
+        historico: montarHistoricoDoAtestado(item, todosDoMilitar),
+      };
+    });
+
     return Response.json({
-      atestados: atestadosRaw.map((item) => sanitizeAtestado(item)),
+      atestados: atestadosComHistorico,
       jisos,
       encaminhamentos,
       meta: data.meta || {},
