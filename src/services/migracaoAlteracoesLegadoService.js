@@ -1296,7 +1296,10 @@ export function exportarModeloMigracaoAlteracoesLegado(nomeArquivo = 'modelo-alt
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = nomeArquivo.endsWith('.xlsx') ? nomeArquivo : `${nomeArquivo}.xlsx`;
+  const nomeArquivoSeguro = typeof nomeArquivo === 'string' && nomeArquivo.trim()
+    ? nomeArquivo.trim()
+    : 'modelo-alteracoes-legado.xlsx';
+  link.download = nomeArquivoSeguro.endsWith('.xlsx') ? nomeArquivoSeguro : `${nomeArquivoSeguro}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
