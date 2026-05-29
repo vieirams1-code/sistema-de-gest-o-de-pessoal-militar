@@ -177,15 +177,16 @@ export default function ExtratoAtestadosMedicos() {
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
-  const [diagnosticoAnexos, setDiagnosticoAnexos] = useState({
-    ultimoErroAbrirAnexo: null,
+  const [diagnosticos, setDiagnosticos] = useState({
+    ultimaAcaoExecutada: null,
+    ultimoErroAcao: null,
     legacyAttachmentHint: false,
   });
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
   const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
   const canManageEncaminhamento = canAccessAction('gerir_encaminhamento_dp_dintel_atestado');
 
-  const normalizeAttachmentError = (error, context = {}) => ({
+  const normalizeActionError = (error, context = {}) => ({
     code: String(error?.code || ''),
     message: String(error?.message || ''),
     detail: error?.detail ?? null,
@@ -193,16 +194,17 @@ export default function ExtratoAtestadosMedicos() {
     status: Number(error?.status || error?.raw?.response?.status || 0) || null,
     raw: error?.raw ?? null,
     atestado_id: context.atestado_id ? String(context.atestado_id) : null,
+    selectedIds: context.selectedIds || null,
     action: context.action || 'unknown',
     timestamp: new Date().toISOString(),
   });
 
   const handleCopyDiagnostico = async () => {
-    const payload = JSON.stringify(diagnosticoAnexos, null, 2);
+    const payload = JSON.stringify(diagnosticos, null, 2);
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(payload);
-        window.alert('Diagnóstico copiado para a área de transferência.');
+        toast.success('Diagnóstico copiado para a área de transferência.');
         return;
       }
     } catch {
@@ -233,6 +235,10 @@ export default function ExtratoAtestadosMedicos() {
   const handleExportarExcel = async () => {
     if (selectedIds.size === 0) return;
     setIsExporting(true);
+    
+    console.info('[EXPORT_EXCEL_CLICK]', { selectedIds: Array.from(selectedIds) });
+    setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'exportar_excel', timestamp: new Date().toISOString(), selectedIds: Array.from(selectedIds) }, ultimoErroAcao: null }));
+
     try {
       const response = await gerarExtratoAtestados({ formato: 'xlsx', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
       const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
@@ -269,6 +275,7 @@ export default function ExtratoAtestadosMedicos() {
       });
       toast.success('Arquivo Excel gerado com sucesso!');
     } catch (e) {
+      setDiagnosticos((prev) => ({ ...prev, ultimoErroAcao: normalizeActionError(e, { action: 'exportar_excel', selectedIds: Array.from(selectedIds) }) }));
       toast.error('Falha ao exportar arquivo Excel.');
     } finally {
       setIsExporting(false);
@@ -287,6 +294,10 @@ export default function ExtratoAtestadosMedicos() {
       return;
     }
     setIsGeneratingReport(true);
+
+    console.info('[PDF_DP_DINTEL_CLICK]', { selectedIds: Array.from(selectedIds) });
+    setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'pdf_dp_dintel', timestamp: new Date().toISOString(), selectedIds: Array.from(selectedIds) }, ultimoErroAcao: null }));
+
     try {
       const response = await gerarRelatorioDpDintelAtestados({ idsSelecionados: Array.from(selectedIds), incluirHistorico: false });
       downloadBlob(response.blob, response.fileName);
@@ -301,6 +312,7 @@ export default function ExtratoAtestadosMedicos() {
         extrato_parcial: Boolean(response?.meta?.extrato_parcial),
       });
     } catch (e) {
+      setDiagnosticos((prev) => ({ ...prev, ultimoErroAcao: normalizeActionError(e, { action: 'pdf_dp_dintel', selectedIds: Array.from(selectedIds) }) }));
       const message = String(e?.message || 'Falha ao gerar o PDF DP/DINTEL.');
       const isPermissionError = e?.status === 403 || e?.code === 'FORBIDDEN_REPORT_PERMISSION';
       setReportError(isPermissionError
@@ -422,6 +434,10 @@ export default function ExtratoAtestadosMedicos() {
       }
     }
 
+    const actionName = `${enviado ? 'MARCAR' : 'DESMARCAR'}_${destino}`;
+    console.info(`[${actionName}_CLICK]`, { atestadoId, destino, enviado });
+    setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: actionName, timestamp: new Date().toISOString(), atestado_id: atestadoId }, ultimoErroAcao: null }));
+
     const loadingKey = `${atestadoId}:${destino}`;
     setLoadingEncaminhamentoByKey((prev) => ({ ...prev, [loadingKey]: true }));
     try {
@@ -438,6 +454,7 @@ export default function ExtratoAtestadosMedicos() {
         toast.success(`${destino} ${enviado ? 'marcado' : 'desmarcado'} com sucesso!`);
       }
     } catch (e) {
+      setDiagnosticos((prev) => ({ ...prev, ultimoErroAcao: normalizeActionError(e, { action: actionName, atestado_id: atestadoId }) }));
       if (e?.code === 'ENCAMINHAMENTO_CONFLICT') {
         toast.error('Encaminhamento alterado por outro usuário. Os dados foram recarregados.');
         queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
@@ -455,11 +472,15 @@ export default function ExtratoAtestadosMedicos() {
     setLoadingAnexoById((prev) => ({ ...prev, [rowId]: true }));
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
+
+    console.info('[ABRIR_ANEXO_CLICK]', { rowId });
+    setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'abrir_anexo', timestamp: new Date().toISOString(), atestado_id: rowId }, ultimoErroAcao: null }));
+
     try {
       const result = await obterLinkAnexoAtestado(rowId);
       setLinkAnexoById((prev) => ({ ...prev, [rowId]: result.url }));
       if (result.legacy_attachment) {
-        setDiagnosticoAnexos((prev) => ({ ...prev, legacyAttachmentHint: true }));
+        setDiagnosticos((prev) => ({ ...prev, legacyAttachmentHint: true }));
       }
       await registrarAuditoria({
         acao: 'abrir_anexo',
@@ -472,11 +493,11 @@ export default function ExtratoAtestadosMedicos() {
         extrato_parcial: false,
       });
     } catch (e) {
-      const normalizedError = normalizeAttachmentError(e, {
+      const normalizedError = normalizeActionError(e, {
         action: 'abrir_anexo',
         atestado_id: rowId,
       });
-      setDiagnosticoAnexos((prev) => ({ ...prev, ultimoErroAbrirAnexo: normalizedError }));
+      setDiagnosticos((prev) => ({ ...prev, ultimoErroAcao: normalizedError }));
       const apiMessage = String(e?.message || '');
       const code = String(e?.code || '');
       const safeDetail = e?.detail ? JSON.stringify(e.detail) : '';
@@ -557,23 +578,29 @@ export default function ExtratoAtestadosMedicos() {
         </Card>
 
         {canShowDiagnostics && (
-          <Card className="rounded-xl border-amber-300 bg-amber-50/70 shadow-sm">
+          <Card className="rounded-xl border-amber-300 bg-amber-50/70 shadow-sm mb-4">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base text-amber-950">
                 <ShieldAlert className="h-5 w-5 text-amber-700" />
-                Diagnóstico de Anexos
+                Diagnóstico de Ações (DEV)
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-slate-600">Painel temporário para suporte de erros de abertura de anexo.</p>
-              {diagnosticoAnexos.legacyAttachmentHint && (
+              <p className="text-xs text-slate-600">Painel temporário para suporte de erros nas ações do extrato.</p>
+              {diagnosticos.legacyAttachmentHint && (
                 <p className="rounded-lg border border-amber-200 bg-white/70 p-3 text-xs text-amber-800">Alguns anexos antigos podem exigir abertura individual pelo link assinado.</p>
               )}
-              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <p className="mb-1 text-xs font-semibold text-slate-700">Último erro de abrir anexo</p>
-                <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticoAnexos.ultimoErroAbrirAnexo, null, 2) || '-'}</pre>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm overflow-auto">
+                  <p className="mb-1 text-xs font-semibold text-slate-700">Última ação executada</p>
+                  <pre className="text-[11px] whitespace-pre-wrap break-all text-slate-600">{JSON.stringify(diagnosticos.ultimaAcaoExecutada, null, 2) || 'Nenhuma ação registrada na sessão'}</pre>
+                </div>
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 shadow-sm overflow-auto">
+                  <p className="mb-1 text-xs font-semibold text-rose-700">Último erro de ação</p>
+                  <pre className="text-[11px] whitespace-pre-wrap break-all text-rose-600">{JSON.stringify(diagnosticos.ultimoErroAcao, null, 2) || 'Nenhum erro na sessão'}</pre>
+                </div>
               </div>
-              <Button variant="outline" size="sm" className="bg-white" onClick={handleCopyDiagnostico}>Copiar diagnóstico</Button>
+              <Button variant="outline" size="sm" className="bg-white" onClick={handleCopyDiagnostico}>Copiar diagnóstico completo</Button>
             </CardContent>
           </Card>
         )}
