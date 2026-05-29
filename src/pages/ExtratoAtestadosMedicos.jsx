@@ -67,6 +67,15 @@ const formatPostoGraduacaoAbreviado = (valor) => {
   return POSTO_GRADUACAO_ABREVIACOES[chave] || texto;
 };
 
+const getPostoGraduacaoAtestado = (row) => (
+  row?.militar_posto_graduacao
+  || row?.militar_posto
+  || row?.posto_graduacao
+  || row?.posto
+  || row?.graduacao
+  || '-'
+);
+
 const formatDateBr = (value) => {
   if (!value) return '-';
   const date = new Date(`${value}T00:00:00`);
@@ -184,14 +193,14 @@ export default function ExtratoAtestadosMedicos() {
   };
 
   const exportRowsToCsv = (rowsToExport) => {
-    const headers = ['ID', 'Data início', 'Militar', 'Lotação', 'Status', 'JISO', 'Dias'];
+    const headers = ['ID', 'Data início', 'Posto/Grad.', 'Militar', 'JISO', 'Médico', 'Dias'];
     const csvRows = rowsToExport.map((row) => [
       row.id || '',
       row.data_inicio || '',
+      formatPostoGraduacaoAbreviado(getPostoGraduacaoAtestado(row)),
       row.militar_nome || '',
-      row.lotacao_nome || row.estrutura_nome || '',
-      row.status || '',
       row.necessita_jiso ? 'Sim' : 'Não',
+      row.medico_nome_snapshot || row.medico || '',
       row.dias ?? '',
     ]);
     const content = [headers, ...csvRows].map((line) => line.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';')).join('\n');
@@ -502,7 +511,7 @@ export default function ExtratoAtestadosMedicos() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                    const postoGraduacao = formatPostoGraduacaoAbreviado(row.posto_graduacao);
+                    const postoGraduacao = formatPostoGraduacaoAbreviado(getPostoGraduacaoAtestado(row));
                     return (
                       <tr key={row.id} className="hover:bg-slate-50">
                         {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
