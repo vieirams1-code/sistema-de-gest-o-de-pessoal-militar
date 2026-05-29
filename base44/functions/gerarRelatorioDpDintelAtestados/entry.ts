@@ -2,10 +2,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const CHUNK_SIZE = 200;
 const SENSITIVE_REDACTED = 'Restrito';
+const REPORT_PERMISSION = 'perm_gerar_relatorio_dp_dintel_atestados';
+const SENSITIVE_PERMISSION = 'perm_ver_dados_sensiveis_atestado';
 
 function text(value) {
   const raw = value === null || value === undefined ? '' : String(value);
   return raw.trim();
+}
+
+function normalizeId(value) {
+  return text(value);
 }
 
 function firstText(...values) {
@@ -153,9 +159,11 @@ function buildReportLines(atestados, militaresMap, podeVerSensivel) {
     const nomeCompleto = firstText(atestado?.militar_nome_completo, atestado?.nome_completo, atestado?.militar_nome, militar?.nome_completo, militar?.nome);
     const nomeGuerra = firstText(atestado?.nome_guerra, atestado?.militar_nome_guerra, militar?.nome_guerra);
     const matricula = firstText(atestado?.matricula, atestado?.militar_matricula, militar?.matricula);
-    const medico = podeVerSensivel ? firstText(atestado?.medico, atestado?.nome_medico, atestado?.profissional_saude) : SENSITIVE_REDACTED;
-    const crm = podeVerSensivel ? firstText(atestado?.crm_medico, atestado?.crm, atestado?.medico_crm) : SENSITIVE_REDACTED;
-    const cid = podeVerSensivel ? firstText(atestado?.cid_10, atestado?.cid, atestado?.cid_descricao) : SENSITIVE_REDACTED;
+    const medico = podeVerSensivel ? firstText(atestado?.medico_nome_snapshot, atestado?.medico, atestado?.nome_medico, atestado?.profissional_saude) : SENSITIVE_REDACTED;
+    const crm = podeVerSensivel ? firstText(atestado?.medico_crm_snapshot, atestado?.crm_medico, atestado?.crm, atestado?.medico_crm) : SENSITIVE_REDACTED;
+    const cidCodigo = firstText(atestado?.cid_10, atestado?.cid);
+    const cidDescricao = firstText(atestado?.cid_descricao);
+    const cid = podeVerSensivel ? firstText([cidCodigo, cidDescricao].filter(Boolean).join(' - '), cidCodigo, cidDescricao) : SENSITIVE_REDACTED;
     const dias = firstText(atestado?.dias, atestado?.dias_afastamento, atestado?.quantidade_dias);
     const tipoAfastamento = firstText(atestado?.tipo_afastamento, atestado?.tipo, atestado?.natureza_afastamento);
 
@@ -189,19 +197,31 @@ Deno.serve(async (req) => {
     const isAdmin = Boolean(permissions?.isAdmin);
     const podeGerarRelatorio = Boolean(isAdmin || actions?.gerar_relatorio_dp_dintel_atestados);
     if (!podeGerarRelatorio) {
-      return Response.json({ error: 'Permissão perm_gerar_relatorio_dp_dintel_atestados é obrigatória.', code: 'FORBIDDEN_REPORT_PERMISSION' }, { status: 403 });
+      return Response.json({ error: `Permissão ${REPORT_PERMISSION} é obrigatória para gerar o PDF DP/DINTEL.`, code: 'FORBIDDEN_REPORT_PERMISSION' }, { status: 403 });
     }
 
     const podeVerSensivel = Boolean(isAdmin || actions?.ver_dados_sensiveis_atestado);
-    const idsSelecionados = Array.isArray(payload?.idsSelecionados) ? payload.idsSelecionados.map((id) => String(id)).filter(Boolean) : [];
+    const idsSelecionados = Array.isArray(payload?.idsSelecionados)
+      ? Array.from(new Set(payload.idsSelecionados.map(normalizeId).filter(Boolean)))
+      : [];
+    if (!idsSelecionados.length) {
+      return Response.json({ error: 'Selecione ao menos um atestado para gerar o PDF DP/DINTEL.', code: 'NO_SELECTED_ATESTADOS' }, { status: 400 });
+    }
 
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const scopedData = scopedResponse?.data ?? scopedResponse ?? {};
     const scopedAtestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
-    const scopedIdSet = new Set(scopedAtestados.map((a) => text(a?.id)).filter(Boolean));
-    const selectedIdSet = new Set(idsSelecionados.filter((id) => scopedIdSet.has(id)));
-    const shouldUseAllScoped = idsSelecionados.length === 0;
-    const atestados = scopedAtestados.filter((atestado) => shouldUseAllScoped || selectedIdSet.has(text(atestado?.id)));
+    const scopedIdSet = new Set(scopedAtestados.map((a) => normalizeId(a?.id)).filter(Boolean));
+    const idsForaDoEscopo = idsSelecionados.filter((id) => !scopedIdSet.has(id));
+    if (idsForaDoEscopo.length) {
+      return Response.json({
+        error: 'Um ou mais atestados selecionados não pertencem ao escopo permitido do usuário.',
+        code: 'SELECTED_ATESTADOS_OUT_OF_SCOPE',
+        meta: { idsForaDoEscopo },
+      }, { status: 403 });
+    }
+    const selectedIdSet = new Set(idsSelecionados);
+    const atestados = scopedAtestados.filter((atestado) => selectedIdSet.has(normalizeId(atestado?.id)));
 
     const militaresMap = await loadMilitaresMap(base44, atestados);
     const pdfBytes = buildPdf(buildReportLines(atestados, militaresMap, podeVerSensivel));
@@ -215,10 +235,12 @@ Deno.serve(async (req) => {
       meta: {
         totalNoEscopo: scopedAtestados.length,
         totalSelecionado: atestados.length,
+        idsSelecionados: idsSelecionados.length,
         incluirHistorico: false,
         sensiveis_incluidos: podeVerSensivel,
         sensiveis_bloqueados: !podeVerSensivel,
-        extrato_parcial: shouldUseAllScoped ? false : atestados.length < scopedAtestados.length,
+        permissao_sensiveis: SENSITIVE_PERMISSION,
+        extrato_parcial: atestados.length < scopedAtestados.length,
       },
     });
   } catch (error) {
