@@ -502,17 +502,6 @@ export default function ExtratoAtestadosMedicos() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                    const postoGraduacao = formatPostoGraduacaoAbreviado(
-                      row.militar_posto_graduacao
-                        || row.militar_posto
-                        || row.posto_graduacao
-                        || row.posto
-                        || row.graduacao
-                        || '-',
-                    );
-
-                    return (
-                      <tr key={row.id} className="hover:bg-slate-50/70">
                         {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
                         {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
                         {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}

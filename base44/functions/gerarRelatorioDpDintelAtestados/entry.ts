@@ -3,12 +3,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const CHUNK_SIZE = 200;
 const SENSITIVE_REDACTED = 'Restrito';
 
-function text(value: unknown) {
+function text(value) {
   const raw = value === null || value === undefined ? '' : String(value);
   return raw.trim();
 }
 
-function firstText(...values: unknown[]) {
+function firstText(...values) {
   for (const value of values) {
     const normalized = text(value);
     if (normalized) return normalized;
@@ -16,7 +16,7 @@ function firstText(...values: unknown[]) {
   return '';
 }
 
-function escapePdfText(value: unknown) {
+function escapePdfText(value) {
   return text(value)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -26,10 +26,10 @@ function escapePdfText(value: unknown) {
     .replace(/\)/g, '\\)');
 }
 
-function wrapText(value: unknown, maxChars = 92) {
+function wrapText(value, maxChars = 92) {
   const normalized = text(value).replace(/\s+/g, ' ') || '-';
   const words = normalized.split(' ');
-  const lines: string[] = [];
+  const lines = [];
   let current = '';
   for (const word of words) {
     const next = current ? `${current} ${word}` : word;
@@ -44,7 +44,7 @@ function wrapText(value: unknown, maxChars = 92) {
   return lines.length ? lines : ['-'];
 }
 
-function formatDateBr(value: unknown) {
+function formatDateBr(value) {
   const raw = text(value);
   if (!raw) return '-';
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -54,11 +54,11 @@ function formatDateBr(value: unknown) {
 
 function pdfDate() {
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, '0');
   return `${pad(now.getUTCDate())}/${pad(now.getUTCMonth() + 1)}/${now.getUTCFullYear()} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())} UTC`;
 }
 
-function uint8ToBase64(bytes: Uint8Array) {
+function uint8ToBase64(bytes) {
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
@@ -67,15 +67,15 @@ function uint8ToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-function buildPdf(lines: string[]) {
+function buildPdf(lines) {
   const encoder = new TextEncoder();
-  const objects: string[] = [];
-  const pages: number[] = [];
+  const objects = [];
+  const pages = [];
   const pageHeight = 842;
   const startY = 800;
   const minY = 46;
   const lineHeight = 13;
-  let current: string[] = [];
+  let current = [];
   let y = startY;
 
   const flushPage = () => {
@@ -124,13 +124,13 @@ function buildPdf(lines: string[]) {
   return encoder.encode(pdf);
 }
 
-async function loadMilitaresMap(base44: any, atestados: Record<string, unknown>[]) {
+async function loadMilitaresMap(base44, atestados) {
   const ids = Array.from(new Set(atestados.map((a) => text(a?.militar_id)).filter(Boolean)));
-  const map = new Map<string, Record<string, unknown>>();
+  const map = new Map();
   for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
     const chunk = ids.slice(i, i + CHUNK_SIZE);
     const rows = await base44.asServiceRole.entities.Militar.filter({ id: { $in: chunk } }, undefined, CHUNK_SIZE, 0);
-    (rows || []).forEach((militar: Record<string, unknown>) => {
+    (rows || []).forEach((militar) => {
       const id = text(militar?.id);
       if (id) map.set(id, militar);
     });
@@ -138,8 +138,8 @@ async function loadMilitaresMap(base44: any, atestados: Record<string, unknown>[
   return map;
 }
 
-function buildReportLines(atestados: Record<string, unknown>[], militaresMap: Map<string, Record<string, unknown>>, podeVerSensivel: boolean) {
-  const lines: string[] = [
+function buildReportLines(atestados, militaresMap, podeVerSensivel) {
+  const lines = [
     'RELATORIO DP/DINTEL - ATESTADOS MEDICOS',
     `Gerado em: ${pdfDate()}`,
     'Modo: sem historico',
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
 
-    let payload: Record<string, unknown> = {};
+    let payload = {};
     try { payload = await req.json(); } catch (_e) { payload = {}; }
 
     const incluirHistorico = Boolean(payload?.incluirHistorico);
@@ -198,10 +198,10 @@ Deno.serve(async (req) => {
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const scopedData = scopedResponse?.data ?? scopedResponse ?? {};
     const scopedAtestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
-    const scopedIdSet = new Set(scopedAtestados.map((a: Record<string, unknown>) => text(a?.id)).filter(Boolean));
+    const scopedIdSet = new Set(scopedAtestados.map((a) => text(a?.id)).filter(Boolean));
     const selectedIdSet = new Set(idsSelecionados.filter((id) => scopedIdSet.has(id)));
     const shouldUseAllScoped = idsSelecionados.length === 0;
-    const atestados = scopedAtestados.filter((atestado: Record<string, unknown>) => shouldUseAllScoped || selectedIdSet.has(text(atestado?.id)));
+    const atestados = scopedAtestados.filter((atestado) => shouldUseAllScoped || selectedIdSet.has(text(atestado?.id)));
 
     const militaresMap = await loadMilitaresMap(base44, atestados);
     const pdfBytes = buildPdf(buildReportLines(atestados, militaresMap, podeVerSensivel));
@@ -222,7 +222,12 @@ Deno.serve(async (req) => {
       },
     });
   } catch (error) {
-    const status = (error as any)?.response?.status || (error as any)?.status || 500;
-    return Response.json({ error: (error as any)?.message || 'Erro ao gerar relatório DP/DINTEL de atestados.', meta: { status } }, { status });
+    const status = error?.response?.status || error?.status || 500;
+    const detail = error?.response?.data?.detail || error?.response?.data?.message || error?.response?.data?.error;
+    const baseMessage = error?.message || 'Erro ao gerar relatório DP/DINTEL de atestados.';
+    const message = status === 429
+      ? 'Limite de requisições excedido ao gerar o relatório. Tente novamente em instantes.'
+      : (detail ? `${baseMessage} (${detail})` : baseMessage);
+    return Response.json({ error: message, code: status === 429 ? 'RATE_LIMITED' : 'REPORT_FAILED', meta: { status, detail: detail || null } }, { status });
   }
 });

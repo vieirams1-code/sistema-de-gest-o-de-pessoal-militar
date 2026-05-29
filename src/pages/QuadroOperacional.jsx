@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, LayoutDashboard, Plus, Search, RefreshCw } from 'lucide-react';
 import ColunaBoard from '@/components/quadro/ColunaBoard';
 import CardDetalheModal from '@/components/quadro/CardDetalheModal';
@@ -110,6 +111,7 @@ export default function QuadroOperacionalPage() {
   const canGerirQuadro = canAccessAction('gerir_quadro');
 
   const [busca, setBusca] = useState('');
+  const [mostrarArquivados, setMostrarArquivados] = useState(false);
   const [cardAberto, setCardAberto] = useState(null);
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
   const [salvandoCard, setSalvandoCard] = useState(false);
@@ -130,11 +132,13 @@ export default function QuadroOperacionalPage() {
   const fetchCardsDoQuadro = async () => {
     if (!colunas.length) return [];
     
-    let filters = { arquivado: false };
+    const filters = {};
     if (!isAdmin) filters.militar_id = { $in: await fetchAccessibleMilitarIds() };
     const cardsBrutos = await base44.entities.CardOperacional.filter(filters, '-created_date', 500);
     const colunasIds = new Set(colunas.map((coluna) => coluna.id));
-    return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
+    return cardsBrutos.filter((card) =>
+      colunasIds.has(card.coluna_id) && (mostrarArquivados || card.arquivado !== true)
+    );
   };
 
   const { data: quadros = [], isLoading: loadQ } = useQuery({
@@ -151,7 +155,7 @@ export default function QuadroOperacionalPage() {
   });
 
   const { data: cards = [], isLoading: loadCards } = useQuery({
-    queryKey: ['cards', quadro?.id],
+    queryKey: ['cards', quadro?.id, mostrarArquivados],
     queryFn: fetchCardsDoQuadro,
     enabled: isAccessResolved && hasAccess && !!quadro?.id && colunas.length > 0,
   });
@@ -272,7 +276,7 @@ export default function QuadroOperacionalPage() {
       ? [...sourceCards]
       : [...(grouped[destinationColunaId] || [])];
 
-    const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
+    const previousCards = queryClient.getQueryData(['cards', quadro?.id, mostrarArquivados]);
     let movedCard = null;
 
     try {
@@ -306,7 +310,7 @@ export default function QuadroOperacionalPage() {
           ordem: ordemNova,
         };
 
-        queryClient.setQueryData(['cards', quadro?.id], (current = []) =>
+        queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], (current = []) =>
           substituirCardNaLista(current, movedCardAtualizado)
         );
 
@@ -345,7 +349,7 @@ export default function QuadroOperacionalPage() {
         comentarios_count: (movedCard.comentarios_count || 0) + 1,
       };
 
-      queryClient.setQueryData(['cards', quadro?.id], (current = []) =>
+      queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], (current = []) =>
         substituirCardNaLista(current, movedCardAtualizado)
       );
 
@@ -375,7 +379,7 @@ export default function QuadroOperacionalPage() {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', movedCard.id] });
     } catch (error) {
-      queryClient.setQueryData(['cards', quadro?.id], previousCards);
+      queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], previousCards);
 
       if (cardAberto?.id === movedCard?.id) {
         const cardAnterior = Array.isArray(previousCards)
@@ -595,7 +599,7 @@ export default function QuadroOperacionalPage() {
           </div>
           <div>
             <h1 className="text-sm font-bold text-white">{quadro?.nome || 'Quadro Operacional'}</h1>
-            <p className="text-[11px] text-white/50">{colunas.length} colunas · {cardsComResumo.length} cards</p>
+            <p className="text-[11px] text-white/50">{colunas.length} colunas · {cardsComResumo.length} cards{mostrarArquivados ? ' (inclui arquivados)' : ''}</p>
           </div>
         </div>
 
@@ -612,6 +616,16 @@ export default function QuadroOperacionalPage() {
               <Plus className="w-3.5 h-3.5 mr-1" /> Coluna
             </Button>
           </div>
+
+
+          <label className="flex items-center gap-2 h-8 px-2 rounded-lg bg-white/10 border border-white/10 text-[11px] font-medium text-white/80 whitespace-nowrap">
+            <Switch
+              checked={mostrarArquivados}
+              onCheckedChange={setMostrarArquivados}
+              className="data-[state=checked]:bg-amber-400 data-[state=unchecked]:bg-white/20"
+            />
+            Mostrar arquivados
+          </label>
 
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
@@ -689,12 +703,15 @@ export default function QuadroOperacionalPage() {
           onClose={() => setCardAberto(null)}
           onCardUpdate={(payload) => {
             setCardAberto((prev) => (prev ? { ...prev, ...payload } : prev));
-            queryClient.setQueryData(['cards', quadro?.id], (old = []) => (
+            queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], (old = []) => (
               Array.isArray(old)
-                ? old.map((item) => (item.id === payload.id ? { ...item, ...payload } : item))
+                ? old
+                    .map((item) => (item.id === payload.id ? { ...item, ...payload } : item))
+                    .filter((item) => mostrarArquivados || item.arquivado !== true)
                 : old
             ));
             queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
+            queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id, mostrarArquivados] });
           }}
         />
       )}
