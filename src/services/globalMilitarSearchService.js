@@ -1,4 +1,5 @@
 import { militarCorrespondeBusca } from './matriculaMilitarViewService.js';
+import { normalizarTextoBusca } from '@/utils/normalizarBuscaMilitar';
 
 function toLower(value) {
   return String(value || '').toLowerCase();
@@ -6,12 +7,12 @@ function toLower(value) {
 
 export function ordenarResultadosMilitar(militares = []) {
   return [...militares].sort((a, b) => {
-    const postoA = toLower(a?.posto_graduacao);
-    const postoB = toLower(b?.posto_graduacao);
+    const postoA = normalizarTextoBusca(a?.posto_graduacao);
+    const postoB = normalizarTextoBusca(b?.posto_graduacao);
     if (postoA !== postoB) return postoA.localeCompare(postoB, 'pt-BR');
 
-    const guerraA = toLower(a?.nome_guerra || a?.nome_completo);
-    const guerraB = toLower(b?.nome_guerra || b?.nome_completo);
+    const guerraA = normalizarTextoBusca(a?.nome_guerra || a?.nome_completo);
+    const guerraB = normalizarTextoBusca(b?.nome_guerra || b?.nome_completo);
     return guerraA.localeCompare(guerraB, 'pt-BR');
   });
 }
