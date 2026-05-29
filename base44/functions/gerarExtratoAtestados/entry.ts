@@ -15,6 +15,8 @@ const SENSITIVE_FIELDS = [
   'retorno',
   'crm_medico',
   'medico',
+  'medico_nome_snapshot',
+  'medico_crm_snapshot',
 ];
 
 function sanitizeAtestado(atestado: Record<string, unknown>, incluirSensivel: boolean) {
