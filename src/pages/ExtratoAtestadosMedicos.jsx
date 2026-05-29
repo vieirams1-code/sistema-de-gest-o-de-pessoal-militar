@@ -137,6 +137,7 @@ export default function ExtratoAtestadosMedicos() {
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState('');
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
@@ -231,7 +232,15 @@ export default function ExtratoAtestadosMedicos() {
 
 
   const handleGerarRelatorioDpDintel = async () => {
-    if (selectedIds.size === 0 || !canGenerateDpDintelReport) return;
+    setReportError('');
+    if (selectedIds.size === 0) {
+      setReportError('Selecione ao menos um atestado para gerar o PDF DP/DINTEL.');
+      return;
+    }
+    if (!canGenerateDpDintelReport) {
+      setReportError('Permissão perm_gerar_relatorio_dp_dintel_atestados é obrigatória para gerar o PDF DP/DINTEL.');
+      return;
+    }
     setIsGeneratingReport(true);
     try {
       const response = await gerarRelatorioDpDintelAtestados({ idsSelecionados: Array.from(selectedIds), incluirHistorico: false });
@@ -246,6 +255,12 @@ export default function ExtratoAtestadosMedicos() {
         escopo: 'scoped_atestados_bundle',
         extrato_parcial: Boolean(response?.meta?.extrato_parcial),
       });
+    } catch (e) {
+      const message = String(e?.message || 'Falha ao gerar o PDF DP/DINTEL.');
+      const isPermissionError = e?.status === 403 || e?.code === 'FORBIDDEN_REPORT_PERMISSION';
+      setReportError(isPermissionError
+        ? 'Permissão perm_gerar_relatorio_dp_dintel_atestados é obrigatória para gerar o PDF DP/DINTEL.'
+        : message);
     } finally {
       setIsGeneratingReport(false);
     }
@@ -374,14 +389,22 @@ export default function ExtratoAtestadosMedicos() {
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar CSV
               </Button>
-              {canGenerateDpDintelReport && (
-                <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isGeneratingReport} onClick={handleGerarRelatorioDpDintel}>
-                  {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                  PDF DP/DINTEL sem histórico
-                </Button>
-              )}
+              <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isGeneratingReport || !canGenerateDpDintelReport} onClick={handleGerarRelatorioDpDintel}>
+                {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                PDF DP/DINTEL
+              </Button>
             </div>
           </div>
+          {!canGenerateDpDintelReport && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Para gerar o PDF DP/DINTEL, é necessária a permissão perm_gerar_relatorio_dp_dintel_atestados.
+            </p>
+          )}
+          {reportError && (
+            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {reportError}
+            </p>
+          )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
