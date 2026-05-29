@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -248,13 +247,36 @@ export default function ExtratoAtestadosMedicos() {
   };
 
   const handleExportarCsv = async () => {
+    if (selectedIds.size === 0) return;
+    setIsExporting(true);
+    try {
+      const response = await gerarExtratoAtestados({ formato: 'csv', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
+      const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
+      exportRowsToCsv(rowsToExport);
+      await registrarAuditoria({
+        acao: 'export_csv',
+        quantidade_registros: rowsToExport.length,
+        atestado_ids: rowsToExport.map((row) => row?.id).filter(Boolean),
+        incluiu_sensiveis: Boolean(response?.meta?.sensiveis_incluidos),
+        sensiveis_bloqueados: Boolean(response?.meta?.sensiveis_bloqueados),
+        modo_acesso: 'exportacao',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: Boolean(response?.extrato_parcial),
+      });
+      toast.success('Arquivo CSV gerado com sucesso!');
+    } catch (e) {
+      toast.error('Falha ao exportar arquivo CSV.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleExportarExcel = async () => {
     if (selectedIds.size === 0) return;
     setIsExporting(true);
     try {
       const response = await gerarExtratoAtestados({ formato: 'xlsx', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
       const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
-      exportRowsToCsv(rowsToExport);
 
       const excelData = rowsToExport.map((row) => {
         const localRow = allRows.find(r => r.id === row.id) || row;
@@ -277,7 +299,6 @@ export default function ExtratoAtestadosMedicos() {
       XLSX.writeFile(workbook, `extrato-atestados-${new Date().toISOString().slice(0, 10)}.xlsx`);
 
       await registrarAuditoria({
-        acao: 'export_csv',
         acao: 'export_excel',
         quantidade_registros: rowsToExport.length,
         atestado_ids: rowsToExport.map((row) => row?.id).filter(Boolean),
@@ -535,6 +556,7 @@ export default function ExtratoAtestadosMedicos() {
               <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar CSV
+              </Button>
               <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarExcel}>
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                 Exportar Excel
@@ -707,7 +729,6 @@ export default function ExtratoAtestadosMedicos() {
                     const postoGraduacao = formatPostoGraduacaoAbreviado(getPostoGraduacaoAtestado(row));
                     const isExpanded = expandedRows.has(row.id);
                     return (
-                      <tr key={row.id} className="hover:bg-slate-50">
                       <React.Fragment key={row.id}>
                       <tr className="hover:bg-slate-50">
                         <td className="p-3 align-top">
