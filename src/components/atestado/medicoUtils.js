@@ -14,6 +14,12 @@ export function medicoDisplayName(medico = {}) {
   return `${nome} — CRM ${crm}`;
 }
 
+export function compactCrm(value) {
+  return normalizeCrm(value).replace(/[^A-Z0-9]/g, '');
+}
+
 export function isSameCrm(a, b) {
-  return normalizeCrm(a) === normalizeCrm(b);
+  const compactA = compactCrm(a);
+  const compactB = compactCrm(b);
+  return !!compactA && !!compactB && compactA === compactB;
 }
