@@ -136,7 +136,8 @@ export const permissionStructure = [
           { key: 'perm_excluir_atestados', label: 'Excluir Atestados', sensitive: true },
           { key: 'perm_excluir_atestado', label: 'Excluir Atestado', sensitive: true },
           { key: 'perm_ver_dados_sensiveis_atestado', label: 'Ver dados sensíveis de atestado', sensitive: true },
-          { key: 'perm_gerar_relatorio_dp_dintel_atestados', label: 'Gerar relatório DP/DINTEL de atestados', sensitive: true }
+          { key: 'perm_gerar_relatorio_dp_dintel_atestados', label: 'Gerar relatório DP/DINTEL de atestados', sensitive: true },
+          { key: 'perm_gerir_encaminhamento_dp_dintel_atestado', label: 'Gerir encaminhamento DP/DINTEL de atestado', sensitive: true }
         ]
       },
       {
