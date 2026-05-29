@@ -1,0 +1,26 @@
+{
+  "name": "AtestadoEncaminhamento",
+  "type": "object",
+  "title": "Encaminhamento DP/DINTEL de Atestado",
+  "description": "Estado atual de controle operacional de encaminhamento de atestados médicos para DP e DINTEL.",
+  "properties": {
+    "atestado_id": { "type": "string" },
+    "militar_id": { "type": "string" },
+    "enviado_dp": { "type": "boolean", "default": false },
+    "enviado_dp_em": { "type": "string", "default": "" },
+    "enviado_dp_por_id": { "type": "string", "default": "" },
+    "enviado_dp_por_email": { "type": "string", "default": "" },
+    "enviado_dp_por_nome": { "type": "string", "default": "" },
+    "enviado_dintel": { "type": "boolean", "default": false },
+    "enviado_dintel_em": { "type": "string", "default": "" },
+    "enviado_dintel_por_id": { "type": "string", "default": "" },
+    "enviado_dintel_por_email": { "type": "string", "default": "" },
+    "enviado_dintel_por_nome": { "type": "string", "default": "" },
+    "versao": { "type": "number", "default": 0 },
+    "atualizado_em": { "type": "string", "default": "" },
+    "atualizado_por_id": { "type": "string", "default": "" },
+    "atualizado_por_email": { "type": "string", "default": "" },
+    "atualizado_por_nome": { "type": "string", "default": "" }
+  },
+  "required": ["atestado_id", "militar_id"]
+}

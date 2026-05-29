@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { fetchScopedExtratoAtestados } from '@/services/getScopedExtratoAtestadosClient';
@@ -14,6 +14,7 @@ import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 import { gerarRelatorioDpDintelAtestados } from '@/services/gerarRelatorioDpDintelAtestadosClient';
 import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
+import { alterarEncaminhamentoAtestado } from '@/services/alterarEncaminhamentoAtestadoClient';
 
 const PAGE_SIZE = 30;
 const TABLE_COLUMN_DEFINITIONS = Object.freeze([
@@ -24,6 +25,8 @@ const TABLE_COLUMN_DEFINITIONS = Object.freeze([
   { key: 'necessita_jiso', label: 'JISO', header: 'JISO' },
   { key: 'medico', label: 'Médico', header: 'Médico' },
   { key: 'dias', label: 'Dias', header: 'Dias' },
+  { key: 'dp', label: 'DP', header: 'DP' },
+  { key: 'dintel', label: 'DINTEL', header: 'DINTEL' },
   { key: 'anexo', label: 'Anexo', header: 'Anexo' },
 ]);
 
@@ -83,6 +86,33 @@ const formatDateBr = (value) => {
   return new Intl.DateTimeFormat('pt-BR').format(date);
 };
 
+
+const buildDefaultEncaminhamento = (row) => ({
+  atestado_id: String(row?.id || ''),
+  militar_id: String(row?.militar_id || ''),
+  enviado_dp: false,
+  enviado_dintel: false,
+  versao: 0,
+});
+
+const getEncaminhamentoStatus = (encaminhamento, destino) => {
+  const field = destino === 'DP' ? 'enviado_dp' : 'enviado_dintel';
+  return Boolean(encaminhamento?.[field]);
+};
+
+const EncaminhamentoBadge = ({ enviado }) => (
+  <Badge
+    variant="outline"
+    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+      enviado
+        ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+        : 'bg-amber-100 text-amber-700 border-amber-200'
+    }`}
+  >
+    {enviado ? 'Enviado' : 'Pendente'}
+  </Badge>
+);
+
 const KpiCard = ({ title, value, description, icon: Icon, tone = 'slate' }) => {
   const toneClasses = {
     slate: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -121,6 +151,7 @@ const FormField = ({ id, label, children }) => (
 
 export default function ExtratoAtestadosMedicos() {
   const { canAccessModule, canAccessAction, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const queryClient = useQueryClient();
   const hasAccess = canAccessModule('atestados');
   const [filtros, setFiltros] = useState({
     periodoInicio: '',
@@ -129,6 +160,7 @@ export default function ExtratoAtestadosMedicos() {
     lotacao: '',
     status: 'all',
     jiso: 'all',
+    encaminhamento: 'all',
     mes: 'all',
     ano: 'all',
   });
@@ -138,6 +170,8 @@ export default function ExtratoAtestadosMedicos() {
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState('');
+  const [encaminhamentoError, setEncaminhamentoError] = useState('');
+  const [loadingEncaminhamentoByKey, setLoadingEncaminhamentoByKey] = useState({});
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
   const [linkAnexoById, setLinkAnexoById] = useState({});
@@ -147,6 +181,7 @@ export default function ExtratoAtestadosMedicos() {
   });
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
   const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
+  const canManageEncaminhamento = canAccessAction('gerir_encaminhamento_dp_dintel_atestado');
 
   const normalizeAttachmentError = (error, context = {}) => ({
     code: String(error?.code || ''),
@@ -272,7 +307,19 @@ export default function ExtratoAtestadosMedicos() {
     enabled: isAccessResolved && hasAccess,
   });
 
-  const allRows = Array.isArray(data?.atestados) ? data.atestados : [];
+  const encaminhamentosByAtestadoId = useMemo(() => {
+    const map = new Map();
+    (Array.isArray(data?.encaminhamentos) ? data.encaminhamentos : []).forEach((encaminhamento) => {
+      const atestadoId = String(encaminhamento?.atestado_id || '').trim();
+      if (atestadoId) map.set(atestadoId, encaminhamento);
+    });
+    return map;
+  }, [data?.encaminhamentos]);
+
+  const allRows = useMemo(() => (Array.isArray(data?.atestados) ? data.atestados : []).map((row) => ({
+    ...row,
+    encaminhamento: encaminhamentosByAtestadoId.get(String(row?.id || '').trim()) || buildDefaultEncaminhamento(row),
+  })), [data?.atestados, encaminhamentosByAtestadoId]);
 
   const years = useMemo(() => {
     const uniqueYears = new Set();
@@ -303,6 +350,11 @@ export default function ExtratoAtestadosMedicos() {
     const isJiso = Boolean(a.necessita_jiso) || String(a.fluxo_homologacao || '').toLowerCase() === 'jiso';
     if (filtros.jiso === 'sim' && !isJiso) return false;
     if (filtros.jiso === 'nao' && isJiso) return false;
+
+    if (filtros.encaminhamento === 'pendentes_dp' && getEncaminhamentoStatus(a.encaminhamento, 'DP')) return false;
+    if (filtros.encaminhamento === 'enviados_dp' && !getEncaminhamentoStatus(a.encaminhamento, 'DP')) return false;
+    if (filtros.encaminhamento === 'pendentes_dintel' && getEncaminhamentoStatus(a.encaminhamento, 'DINTEL')) return false;
+    if (filtros.encaminhamento === 'enviados_dintel' && !getEncaminhamentoStatus(a.encaminhamento, 'DINTEL')) return false;
     return true;
   }), [allRows, filtros]);
 
@@ -325,6 +377,54 @@ export default function ExtratoAtestadosMedicos() {
       else next.add(id);
       return next;
     });
+  };
+
+
+
+  const atualizarEncaminhamentoNoCache = (encaminhamentoAtualizado) => {
+    queryClient.setQueryData(['extrato-atestados-medicos'], (oldData) => {
+      if (!oldData) return oldData;
+      const atualizados = Array.isArray(oldData.encaminhamentos) ? oldData.encaminhamentos : [];
+      const atestadoId = String(encaminhamentoAtualizado?.atestado_id || '');
+      const semAtual = atualizados.filter((item) => String(item?.atestado_id || '') !== atestadoId);
+      return { ...oldData, encaminhamentos: [...semAtual, encaminhamentoAtualizado] };
+    });
+  };
+
+  const handleAlterarEncaminhamento = async (row, destino, enviado) => {
+    const atestadoId = String(row?.id || '');
+    if (!atestadoId || !canManageEncaminhamento) return;
+    let motivo = '';
+    if (!enviado) {
+      motivo = window.prompt(`Informe o motivo para desmarcar ${destino}:`) || '';
+      if (!motivo.trim()) {
+        setEncaminhamentoError('Motivo é obrigatório ao desmarcar encaminhamento DP/DINTEL.');
+        return;
+      }
+    }
+
+    const loadingKey = `${atestadoId}:${destino}`;
+    setEncaminhamentoError('');
+    setLoadingEncaminhamentoByKey((prev) => ({ ...prev, [loadingKey]: true }));
+    try {
+      const result = await alterarEncaminhamentoAtestado({
+        atestado_id: atestadoId,
+        destino,
+        enviado,
+        expected_versao: Number(row?.encaminhamento?.versao || 0),
+        motivo,
+      });
+      if (result?.encaminhamento) atualizarEncaminhamentoNoCache(result.encaminhamento);
+    } catch (e) {
+      if (e?.code === 'ENCAMINHAMENTO_CONFLICT') {
+        setEncaminhamentoError('Encaminhamento alterado por outro usuário. Os dados foram recarregados; tente novamente.');
+        queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
+      } else {
+        setEncaminhamentoError(e?.message || 'Falha ao alterar encaminhamento DP/DINTEL.');
+      }
+    } finally {
+      setLoadingEncaminhamentoByKey((prev) => ({ ...prev, [loadingKey]: false }));
+    }
   };
 
   const handleAbrirAnexo = async (row) => {
@@ -403,6 +503,16 @@ export default function ExtratoAtestadosMedicos() {
           {reportError && (
             <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
               {reportError}
+            </p>
+          )}
+          {!canManageEncaminhamento && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Para marcar/desmarcar DP/DINTEL, é necessária a permissão perm_gerir_encaminhamento_dp_dintel_atestado.
+            </p>
+          )}
+          {encaminhamentoError && (
+            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {encaminhamentoError}
             </p>
           )}
         </div>
@@ -496,6 +606,15 @@ export default function ExtratoAtestadosMedicos() {
                 <option value="all">Todos</option><option value="sim">Com JISO</option><option value="nao">Sem JISO</option>
               </select>
             </FormField>
+            <FormField id="encaminhamento" label="Encaminhamento">
+              <select id="encaminhamento" className="h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={filtros.encaminhamento} onChange={(e) => setFiltros((f) => ({ ...f, encaminhamento: e.target.value }))}>
+                <option value="all">Todos</option>
+                <option value="pendentes_dp">Pendentes DP</option>
+                <option value="enviados_dp">Enviados DP</option>
+                <option value="pendentes_dintel">Pendentes DINTEL</option>
+                <option value="enviados_dintel">Enviados DINTEL</option>
+              </select>
+            </FormField>
           </CardContent>
         </Card>
 
@@ -544,6 +663,42 @@ export default function ExtratoAtestadosMedicos() {
                         {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
                         {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico_nome_snapshot || row.medico || '-'}</td>}
                         {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
+                        {columns.dp && (
+                          <td className="p-3 align-top">
+                            <div className="space-y-2">
+                              <EncaminhamentoBadge enviado={getEncaminhamentoStatus(row.encaminhamento, 'DP')} />
+                              {canManageEncaminhamento && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 rounded-full bg-white px-2 text-xs"
+                                  disabled={Boolean(loadingEncaminhamentoByKey[`${row.id}:DP`])}
+                                  onClick={() => handleAlterarEncaminhamento(row, 'DP', !getEncaminhamentoStatus(row.encaminhamento, 'DP'))}
+                                >
+                                  {loadingEncaminhamentoByKey[`${row.id}:DP`] ? 'Salvando...' : (getEncaminhamentoStatus(row.encaminhamento, 'DP') ? 'Desmarcar DP' : 'Marcar DP')}
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                        {columns.dintel && (
+                          <td className="p-3 align-top">
+                            <div className="space-y-2">
+                              <EncaminhamentoBadge enviado={getEncaminhamentoStatus(row.encaminhamento, 'DINTEL')} />
+                              {canManageEncaminhamento && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 rounded-full bg-white px-2 text-xs"
+                                  disabled={Boolean(loadingEncaminhamentoByKey[`${row.id}:DINTEL`])}
+                                  onClick={() => handleAlterarEncaminhamento(row, 'DINTEL', !getEncaminhamentoStatus(row.encaminhamento, 'DINTEL'))}
+                                >
+                                  {loadingEncaminhamentoByKey[`${row.id}:DINTEL`] ? 'Salvando...' : (getEncaminhamentoStatus(row.encaminhamento, 'DINTEL') ? 'Desmarcar DINTEL' : 'Marcar DINTEL')}
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        )}
                         {columns.anexo && (
                           <td className="p-3 align-top">
                             <div className="space-y-1">
