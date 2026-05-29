@@ -166,7 +166,8 @@ Deno.serve(async (req) => {
       user: userSnapshot,
     });
 
-    return Response.json({ encaminhamento: atualizado, meta: { acao, permissao: REQUIRED_PERMISSION } });
+    const encaminhamentoFinal = { ...encaminhamento, ...atualizado, atestado_id: atestadoId };
+    return Response.json({ encaminhamento: encaminhamentoFinal, meta: { acao, permissao: REQUIRED_PERMISSION } });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     return Response.json({ error: error?.message || 'Erro ao alterar encaminhamento de atestado.', code: 'ALTERAR_ENCAMINHAMENTO_FAILED', meta: { status } }, { status });

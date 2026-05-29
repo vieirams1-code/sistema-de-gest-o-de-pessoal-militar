@@ -429,14 +429,25 @@ export default function ExtratoAtestadosMedicos() {
     if (!enviado) {
       motivo = window.prompt(`Informe o motivo para desmarcar ${destino}:`) || '';
       if (!motivo.trim()) {
-        toast.error(`Motivo é obrigatório ao desmarcar encaminhamento ${destino}.`);
+        toast.error('Informe o motivo da desmarcação.');
         return;
       }
     }
 
+    console.info('DP_DINTEL_CLICK', { atestadoId, destino, enviado });
     const actionName = `${enviado ? 'MARCAR' : 'DESMARCAR'}_${destino}`;
-    console.info(`[${actionName}_CLICK]`, { atestadoId, destino, enviado });
-    setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: actionName, timestamp: new Date().toISOString(), atestado_id: atestadoId }, ultimoErroAcao: null }));
+    setDiagnosticos((prev) => ({ 
+      ...prev, 
+      ultimaAcaoExecutada: { 
+        action: actionName, 
+        timestamp: new Date().toISOString(), 
+        atestado_id: atestadoId,
+        destino,
+        enviado_solicitado: enviado,
+        encaminhamento_no_row: row?.encaminhamento || null
+      }, 
+      ultimoErroAcao: null 
+    }));
 
     const loadingKey = `${atestadoId}:${destino}`;
     setLoadingEncaminhamentoByKey((prev) => ({ ...prev, [loadingKey]: true }));
@@ -448,16 +459,29 @@ export default function ExtratoAtestadosMedicos() {
         expected_versao: Number(row?.encaminhamento?.versao || 0),
         motivo,
       });
+      
+      console.info('DP_DINTEL_RESPONSE', result);
+      setDiagnosticos((prev) => ({
+        ...prev,
+        ultimaAcaoExecutada: {
+          ...prev.ultimaAcaoExecutada,
+          response: result
+        }
+      }));
+
       if (result?.encaminhamento) {
         atualizarEncaminhamentoNoCache(result.encaminhamento);
-        queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
-        toast.success(`${destino} ${enviado ? 'marcado' : 'desmarcado'} com sucesso!`);
+        await queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
+        console.info('DP_DINTEL_REFETCH_DONE');
+        toast.success(`${destino} ${enviado ? 'marcado como enviado' : 'desmarcado'} com sucesso.`);
+      } else {
+        throw new Error('Resposta sem encaminhamento atualizado.');
       }
     } catch (e) {
       setDiagnosticos((prev) => ({ ...prev, ultimoErroAcao: normalizeActionError(e, { action: actionName, atestado_id: atestadoId }) }));
-      if (e?.code === 'ENCAMINHAMENTO_CONFLICT') {
-        toast.error('Encaminhamento alterado por outro usuário. Os dados foram recarregados.');
-        queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
+      if (e?.code === 'ENCAMINHAMENTO_CONFLICT' || e?.status === 409) {
+        toast.error('Este atestado foi alterado por outro usuário. Recarregue a tela e tente novamente.');
+        await queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
       } else {
         toast.error(e?.message || `Falha ao alterar encaminhamento ${destino}.`);
       }
