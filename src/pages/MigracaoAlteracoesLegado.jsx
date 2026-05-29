@@ -16,6 +16,7 @@ import {
   atualizarTipoPublicacaoLinhaAnalise,
   atualizarDestinoLinhaAnalise,
   atualizarMotivoDestinoLinhaAnalise,
+  exportarModeloMigracaoAlteracoesLegado,
   exportarRelatorioMigracaoAlteracoesLegado,
   importarAnaliseAlteracoesLegado,
   salvarAnaliseHistoricoAlteracoesLegado,
@@ -240,7 +241,7 @@ export default function MigracaoAlteracoesLegado() {
                 <li>Vínculo com militar e tipo final podem ser revisados manualmente antes da importação.</li>
               </ul>
             </div>
-            <UploadMigracaoAlteracoesLegado file={arquivo} onFileChange={setArquivo} onAnalisar={handleAnalisar} loading={carregando} />
+            <UploadMigracaoAlteracoesLegado file={arquivo} onFileChange={setArquivo} onAnalisar={handleAnalisar} onDownloadModelo={exportarModeloMigracaoAlteracoesLegado} loading={carregando} />
           </>
         )}
 
