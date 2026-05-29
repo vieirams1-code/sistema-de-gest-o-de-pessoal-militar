@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { strFromU8, unzipSync } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { atualizarHistoricoImportacaoAlteracoesLegado, criarHistoricoImportacaoAlteracoesLegado } from '@/services/importacaoAlteracoesLegadoService';
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 import { gerarChaveOrigemLinhaDeterministica, gerarHashLotePorTabelaDeterministico } from '@/services/migracaoAlteracoesLegadoIdempotencia';
@@ -40,6 +40,31 @@ export const DESTINO_FINAL = {
   IGNORAR: 'IGNORAR',
   EXCLUIDO_DO_LOTE: 'EXCLUIDO_DO_LOTE',
 };
+
+const MODELO_MIGRACAO_ALTERACOES_LEGADO_HEADERS = [
+  'Nota ID',
+  'Cargo',
+  'Nome Guerra',
+  'Nome Completo',
+  'Matrícula',
+  'Lotação',
+  'Tipo BG',
+  'Matéria',
+  'Submatéria',
+  'Status',
+  'Link Download',
+  'Conteúdo (Trecho)',
+  'Número BG',
+  'Data Publicação',
+  'Tipo Publicação Sugerido',
+  'Confiança Classificação',
+  'Revisão Manual',
+  'Motivo Classificação',
+  'Regra Usada',
+  'Observação Classificação',
+  'Destino Sugerido',
+  'Motivo Destino',
+];
 
 const HEADER_ALIAS = {
   nota_id_legado: ['nota id', 'nota_id', 'nota', 'numero_nota'],
@@ -1199,6 +1224,79 @@ export function exportarRelatorioMigracaoAlteracoesLegado(relatorio, nomeArquivo
   const link = document.createElement('a');
   link.href = url;
   link.download = nomeArquivo;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function colunaExcel(indice) {
+  let valor = indice + 1;
+  let coluna = '';
+  while (valor > 0) {
+    const resto = (valor - 1) % 26;
+    coluna = String.fromCharCode(65 + resto) + coluna;
+    valor = Math.floor((valor - 1) / 26);
+  }
+  return coluna;
+}
+
+function escaparXml(valor = '') {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function montarSheetXmlModelo(headers) {
+  const celulasCabecalho = headers.map((header, index) => {
+    const ref = `${colunaExcel(index)}1`;
+    return `<c r="${ref}" t="inlineStr"><is><t>${escaparXml(header)}</t></is></c>`;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData><row r="1">${celulasCabecalho}</row></sheetData>
+</worksheet>`;
+}
+
+function gerarModeloMigracaoAlteracoesLegadoXlsx() {
+  const sheetXml = montarSheetXmlModelo(MODELO_MIGRACAO_ALTERACOES_LEGADO_HEADERS);
+  const arquivos = {
+    '[Content_Types].xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`),
+    '_rels/.rels': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`),
+    'xl/workbook.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="AlteracoesLegado" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`),
+    'xl/_rels/workbook.xml.rels': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`),
+    'xl/worksheets/sheet1.xml': strToU8(sheetXml),
+  };
+
+  return zipSync(arquivos, { level: 6 });
+}
+
+export function exportarModeloMigracaoAlteracoesLegado(nomeArquivo = 'modelo-alteracoes-legado.xlsx') {
+  const data = gerarModeloMigracaoAlteracoesLegadoXlsx();
+  const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo.endsWith('.xlsx') ? nomeArquivo : `${nomeArquivo}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

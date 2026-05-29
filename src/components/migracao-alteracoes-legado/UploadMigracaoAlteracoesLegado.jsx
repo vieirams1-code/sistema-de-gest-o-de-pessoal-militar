@@ -1,8 +1,8 @@
 import React from 'react';
-import { Upload, FileSpreadsheet } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function UploadMigracaoAlteracoesLegado({ file, onFileChange, onAnalisar, loading }) {
+export default function UploadMigracaoAlteracoesLegado({ file, onFileChange, onAnalisar, onDownloadModelo, loading }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
       <div className="flex items-center gap-3">
@@ -12,6 +12,7 @@ export default function UploadMigracaoAlteracoesLegado({ file, onFileChange, onA
         <div>
           <h2 className="font-semibold text-slate-800">Upload da planilha de alterações legado</h2>
           <p className="text-sm text-slate-500">Envie um arquivo CSV ou Excel (.xlsx) contendo as alterações históricas publicadas.</p>
+          <p className="text-xs text-slate-400">Se necessário, baixe a planilha padrão com os cabeçalhos esperados para usar como modelo.</p>
         </div>
       </div>
 
@@ -22,10 +23,14 @@ export default function UploadMigracaoAlteracoesLegado({ file, onFileChange, onA
         className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button disabled={!file || loading} onClick={onAnalisar} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
           <Upload className="w-4 h-4 mr-2" />
           {loading ? 'Analisando...' : 'Analisar arquivo'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onDownloadModelo} disabled={loading}>
+          <Download className="w-4 h-4 mr-2" />
+          Baixar planilha padrão
         </Button>
         {file && <span className="text-sm text-slate-500">Arquivo: {file.name}</span>}
       </div>
