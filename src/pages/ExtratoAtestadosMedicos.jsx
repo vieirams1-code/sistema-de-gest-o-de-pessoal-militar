@@ -502,29 +502,41 @@ export default function ExtratoAtestadosMedicos() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
-                          {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
-                          {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
-                          {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}
-                          {columns.militar_nome && <td className="p-3 align-top font-semibold text-slate-950">{row.militar_nome || '-'}</td>}
-                          {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
-                          {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico_nome_snapshot || row.medico || '-'}</td>}
-                          {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
-                          {columns.anexo && (
-                            <td className="p-3 align-top">
-                              <div className="space-y-1">
-                                <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
-                                  {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-                                  {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
-                                </Button>
-                                {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
-                                {linkAnexoById[row.id] && (
-                                  <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
-                                    Abrir anexo
-                                  </a>
-                                )}
-                              </div>
-                            </td>
-                          )}
+                    const postoGraduacao = formatPostoGraduacaoAbreviado(
+                      row.militar_posto_graduacao
+                        || row.militar_posto
+                        || row.posto_graduacao
+                        || row.posto
+                        || row.graduacao
+                        || '-',
+                    );
+
+                    return (
+                      <tr key={row.id} className="hover:bg-slate-50/70">
+                        {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
+                        {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
+                        {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}
+                        {columns.militar_nome && <td className="p-3 align-top font-semibold text-slate-950">{row.militar_nome || '-'}</td>}
+                        {columns.necessita_jiso && <td className="p-3 align-top"><Badge variant="outline" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${row.necessita_jiso ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{row.necessita_jiso ? 'Sim' : 'Não'}</Badge></td>}
+                        {columns.medico && <td className="p-3 align-top text-slate-700">{row.medico_nome_snapshot || row.medico || '-'}</td>}
+                        {columns.dias && <td className="p-3 align-top text-slate-700">{row.dias ?? '-'}</td>}
+                        {columns.anexo && (
+                          <td className="p-3 align-top">
+                            <div className="space-y-1">
+                              <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
+                                {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                                {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
+                              </Button>
+                              {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
+                              {linkAnexoById[row.id] && (
+                                <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
+                                  Abrir anexo
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
                     );
                   })}
                 </tbody>
