@@ -204,7 +204,7 @@ export default function GlobalMilitarSearch() {
               <span className="inline-flex items-center gap-1"><UserRound className="w-3.5 h-3.5" /> {militar.nome_completo || '-'}</span>
               <span className="inline-flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> {militar.matricula || '-'}</span>
               {(militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao) && (
-                <span className="inline-flex items-center gap-1 col-span-full sm:col-auto"><Building2 className="w-3.5 h-3.5" /> {militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao}</span>
+                <span className="inline-flex items-center gap-1 col-span-full sm:col-auto"><Building2 className="w-3.5 h-3.5" /> {militar.subgrupamento_nome || militar.grupamento_nome || militar.[...]
               )}
             </div>
 
