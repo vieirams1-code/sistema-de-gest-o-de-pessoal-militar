@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarDays, Download, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
+import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -164,6 +167,7 @@ export default function ExtratoAtestadosMedicos() {
     mes: 'all',
     ano: 'all',
   });
+  const [expandedRows, setExpandedRows] = useState(() => new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
@@ -244,14 +248,37 @@ export default function ExtratoAtestadosMedicos() {
   };
 
   const handleExportarCsv = async () => {
+  const handleExportarExcel = async () => {
     if (selectedIds.size === 0) return;
     setIsExporting(true);
     try {
       const response = await gerarExtratoAtestados({ formato: 'xlsx', idsSelecionados: Array.from(selectedIds), incluirSensivel: false });
       const rowsToExport = Array.isArray(response?.atestados) ? response.atestados : [];
       exportRowsToCsv(rowsToExport);
+
+      const excelData = rowsToExport.map((row) => {
+        const localRow = allRows.find(r => r.id === row.id) || row;
+        return {
+          'ID': row.id || '',
+          'Data início': formatDateBr(row.data_inicio),
+          'Posto/Grad.': formatPostoGraduacaoAbreviado(getPostoGraduacaoAtestado(row)),
+          'Militar': row.militar_nome || '',
+          'JISO': row.necessita_jiso ? 'Sim' : 'Não',
+          'Médico': row.medico_nome_snapshot || row.medico || '',
+          'Dias': row.dias ?? '',
+          'DP': getEncaminhamentoStatus(localRow.encaminhamento, 'DP') ? 'Enviado' : 'Pendente',
+          'DINTEL': getEncaminhamentoStatus(localRow.encaminhamento, 'DINTEL') ? 'Enviado' : 'Pendente',
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Atestados');
+      XLSX.writeFile(workbook, `extrato-atestados-${new Date().toISOString().slice(0, 10)}.xlsx`);
+
       await registrarAuditoria({
         acao: 'export_csv',
+        acao: 'export_excel',
         quantidade_registros: rowsToExport.length,
         atestado_ids: rowsToExport.map((row) => row?.id).filter(Boolean),
         incluiu_sensiveis: Boolean(response?.meta?.sensiveis_incluidos),
@@ -260,6 +287,9 @@ export default function ExtratoAtestadosMedicos() {
         escopo: 'scoped_atestados_bundle',
         extrato_parcial: Boolean(response?.extrato_parcial),
       });
+      toast.success('Arquivo Excel gerado com sucesso!');
+    } catch (e) {
+      toast.error('Falha ao exportar arquivo Excel.');
     } finally {
       setIsExporting(false);
     }
@@ -370,6 +400,15 @@ export default function ExtratoAtestadosMedicos() {
     [filteredRows],
   );
 
+  const toggleExpansion = (id) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const toggleSelection = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -399,6 +438,7 @@ export default function ExtratoAtestadosMedicos() {
       motivo = window.prompt(`Informe o motivo para desmarcar ${destino}:`) || '';
       if (!motivo.trim()) {
         setEncaminhamentoError('Motivo é obrigatório ao desmarcar encaminhamento DP/DINTEL.');
+        toast.error(`Motivo é obrigatório ao desmarcar encaminhamento ${destino}.`);
         return;
       }
     }
@@ -415,12 +455,19 @@ export default function ExtratoAtestadosMedicos() {
         motivo,
       });
       if (result?.encaminhamento) atualizarEncaminhamentoNoCache(result.encaminhamento);
+      if (result?.encaminhamento) {
+        atualizarEncaminhamentoNoCache(result.encaminhamento);
+        queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
+        toast.success(`${destino} ${enviado ? 'marcado' : 'desmarcado'} com sucesso!`);
+      }
     } catch (e) {
       if (e?.code === 'ENCAMINHAMENTO_CONFLICT') {
         setEncaminhamentoError('Encaminhamento alterado por outro usuário. Os dados foram recarregados; tente novamente.');
+        toast.error('Encaminhamento alterado por outro usuário. Os dados foram recarregados.');
         queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
       } else {
         setEncaminhamentoError(e?.message || 'Falha ao alterar encaminhamento DP/DINTEL.');
+        toast.error(e?.message || `Falha ao alterar encaminhamento ${destino}.`);
       }
     } finally {
       setLoadingEncaminhamentoByKey((prev) => ({ ...prev, [loadingKey]: false }));
@@ -488,6 +535,9 @@ export default function ExtratoAtestadosMedicos() {
               <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarCsv}>
                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Exportar CSV
+              <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarExcel}>
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                Exportar Excel
               </Button>
               <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isGeneratingReport || !canGenerateDpDintelReport} onClick={handleGerarRelatorioDpDintel}>
                 {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
@@ -646,6 +696,7 @@ export default function ExtratoAtestadosMedicos() {
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-100/95 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
+                    <th className="p-3 w-10"></th>
                     {TABLE_COLUMN_DEFINITIONS.map(({ key, header }) => (
                       columns[key] ? <th key={key} className="p-3 text-left">{header}</th> : null
                     ))}
@@ -654,8 +705,16 @@ export default function ExtratoAtestadosMedicos() {
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row) => {
                     const postoGraduacao = formatPostoGraduacaoAbreviado(getPostoGraduacaoAtestado(row));
+                    const isExpanded = expandedRows.has(row.id);
                     return (
                       <tr key={row.id} className="hover:bg-slate-50">
+                      <React.Fragment key={row.id}>
+                      <tr className="hover:bg-slate-50">
+                        <td className="p-3 align-top">
+                          <button onClick={() => toggleExpansion(row.id)} className="text-slate-500 hover:text-slate-800 transition-colors">
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                        </td>
                         {columns.selected && <td className="p-3 align-top"><Checkbox checked={selectedIds.has(row.id)} onCheckedChange={() => toggleSelection(row.id)} /></td>}
                         {columns.data_inicio && <td className="p-3 align-top font-medium text-slate-700">{formatDateBr(row.data_inicio)}</td>}
                         {columns.posto_graduacao && <td className="p-3 align-top text-slate-700">{postoGraduacao}</td>}
@@ -716,6 +775,30 @@ export default function ExtratoAtestadosMedicos() {
                           </td>
                         )}
                       </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50/50">
+                          <td colSpan={Object.values(columns).filter(Boolean).length + 2} className="p-4 border-t border-slate-100">
+                            <div className="text-sm text-slate-700 ml-4">
+                              {row.historico && row.historico.length > 0 ? (
+                                <div className="space-y-2">
+                                  <p className="font-semibold text-xs uppercase text-slate-500">Histórico de Movimentações</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {row.historico.map((h, i) => (
+                                      <div key={i} className="rounded-lg bg-white border border-slate-200 p-2 shadow-sm flex gap-3 text-xs">
+                                        <span className="font-semibold">{formatDateBr(h.data_movimento) || h.data || '-'}</span>
+                                        <span className="text-slate-600">{h.descricao || h.status || '-'}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="italic text-slate-500">Histórico não carregado neste extrato.</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
