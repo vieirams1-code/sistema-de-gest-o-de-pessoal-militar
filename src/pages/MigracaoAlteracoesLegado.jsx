@@ -12,7 +12,6 @@ import ResumoMigracaoAlteracoesLegadoCards from '@/components/migracao-alteracoe
 import TabelaPreviaMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado';
 import SelecaoMilitarDestino from '@/components/migracao-alteracoes-legado/SelecaoMilitarDestino';
 import {
-  analisarArquivoMigracaoAlteracoesLegado,
   atualizarMilitarLinhaAnalise,
   atualizarTipoPublicacaoLinhaAnalise,
   atualizarDestinoLinhaAnalise,
@@ -20,17 +19,17 @@ import {
   exportarModeloMigracaoAlteracoesLegado,
   exportarRelatorioMigracaoAlteracoesLegado,
   importarAnaliseAlteracoesLegado,
-  salvarAnaliseHistoricoAlteracoesLegado,
 } from '@/services/migracaoAlteracoesLegadoService';
+import {
+  analisarArquivoMigracaoAlteracoesLegadoSimplificado,
+  STATUS_LINHA_SIMPLIFICADO,
+} from '@/services/migracaoAlteracoesLegadoSimplificadoService';
 
 const filtros = [
   { id: 'TODOS', label: 'Todos' },
-  { id: 'APTO', label: 'Aptos' },
-  { id: 'APTO_COM_ALERTA', label: 'Aptos com alerta' },
-  { id: 'REVISAR', label: 'Revisar' },
-  { id: 'IGNORADO', label: 'Ignorados' },
-  { id: 'EXCLUIDO_DO_LOTE', label: 'Excluídos do lote' },
+  { id: 'APTO', label: 'Prontas' },
   { id: 'ERRO', label: 'Erros' },
+  { id: 'REVISAR', label: 'Duplicadas' },
 ];
 
 const filtrosDestino = [
@@ -43,16 +42,93 @@ const filtrosDestino = [
 
 function filtrarBusca(linha, termo) {
   if (!termo) return true;
+  const t = linha.transformado || {};
   const alvo = [
-    linha.transformado.militar_nome,
-    linha.transformado.nome_completo_legado,
-    linha.transformado.nome_guerra_legado,
-    linha.transformado.matricula_legado,
-    linha.transformado.materia_legado,
-    linha.transformado.nota_id_legado,
-    linha.transformado.numero_bg,
+    t.militar_nome,
+    t.nota_id_legado,
+    t.numero_bg,
+    t.materia_legado,
+    t.conteudo_trecho_legado,
   ].join(' ').toLowerCase();
   return alvo.includes(termo.toLowerCase());
+}
+
+/**
+ * Lote 2 — mapeia o retorno da análise simplificada para o shape que a
+ * TabelaPreviaMigracaoAlteracoesLegado já entende (sem alterar a tabela).
+ *
+ * Mapeamento de status simplificado -> status atual da tabela:
+ *  - 'pronta'    -> APTO
+ *  - 'erro'      -> ERRO
+ *  - 'duplicada' -> REVISAR (linha visivelmente bloqueada via revisões)
+ */
+function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnapshot) {
+  const snapshot = analiseSimples.militarDestino || {};
+  const militarNome = snapshot.nome_completo || militarDestinoSnapshot?.nome_completo || militarDestinoSnapshot?.militar_nome || '';
+  const militarMatricula = snapshot.matricula
+    || militarDestinoSnapshot?.militar_matricula_atual
+    || militarDestinoSnapshot?.matricula
+    || militarDestinoSnapshot?.militar_matricula
+    || '';
+
+  const mapStatus = {
+    [STATUS_LINHA_SIMPLIFICADO.PRONTA]: 'APTO',
+    [STATUS_LINHA_SIMPLIFICADO.ERRO]: 'ERRO',
+    [STATUS_LINHA_SIMPLIFICADO.DUPLICADA]: 'REVISAR',
+  };
+
+  const linhas = analiseSimples.linhas.map((linha) => ({
+    linhaNumero: linha.rowIndex,
+    status: mapStatus[linha.status] || 'ERRO',
+    statusSimplificado: linha.status,
+    original: {},
+    transformado: {
+      militar_id: snapshot.id || '',
+      militar_nome: militarNome,
+      militar_matricula: militarMatricula,
+      militar_matricula_atual: militarMatricula,
+      nota_id_legado: linha.numero_nota,
+      numero_bg: linha.numero_bg_br,
+      data_bg_br: linha.data_bg_br,
+      materia_legado: linha.tipo_legado,
+      tipo_publicacao_sugerido: linha.tipo_classificado,
+      tipo_publicacao_confirmado: linha.tipo_classificado,
+      conteudo_trecho_legado: linha.texto_publicado,
+      destino_final: linha.status === STATUS_LINHA_SIMPLIFICADO.PRONTA ? 'IMPORTAR' : 'PENDENTE_CLASSIFICACAO',
+      motivo_destino: linha.erros[0] || linha.avisos[0] || '',
+    },
+    erros: linha.erros,
+    alertas: linha.avisos,
+    revisoes: linha.status === STATUS_LINHA_SIMPLIFICADO.DUPLICADA ? ['Suspeita de duplicidade detectada na análise simplificada.'] : [],
+    observacoes: [],
+    ajustes_manuais: [],
+    recusada: linha.recusada,
+  }));
+
+  const resumo = {
+    total_linhas: analiseSimples.resumo.total_linhas,
+    total_aptas: analiseSimples.resumo.total_prontas,
+    total_aptas_com_alerta: 0,
+    total_revisar: analiseSimples.resumo.total_duplicadas,
+    total_ignoradas: 0,
+    total_erros: analiseSimples.resumo.total_erros,
+    total_excluidas_lote: 0,
+    total_pendentes_classificacao: 0,
+    total_alertas: analiseSimples.resumo.total_com_avisos,
+    total_duplicidades: analiseSimples.resumo.total_duplicadas,
+  };
+
+  return {
+    arquivo: { ...analiseSimples.arquivo, hash: '', hash_lote: '' },
+    lote_ja_processado: false,
+    lote_original_id: null,
+    versao_regra_migracao: analiseSimples.versao_regra,
+    tipo_publicacao_neutro: 'LEGADO_NAO_CLASSIFICADO',
+    tipos_publicacao_validos: [],
+    linhas,
+    resumo,
+    fluxo_simplificado: true,
+  };
 }
 
 export default function MigracaoAlteracoesLegado() {
@@ -100,42 +176,28 @@ export default function MigracaoAlteracoesLegado() {
     try {
       setCarregando(true);
       setHistoricoId(null);
-      setHistoricoDisponivel(true);
+      setHistoricoDisponivel(false);
       setResultadoImportacao(null);
-      setAvisoHistorico('');
-      // Lote 1: deixamos de carregar Militar.list() global. O fluxo antigo
-      // (ainda ativo neste lote) recebe apenas o militar pré-selecionado
-      // como universo possível de vinculação na TabelaPreviaMigracaoAlteracoesLegado.
-      // A nova análise simplificada será implementada nos próximos lotes.
-      const [resultado, usuario] = await Promise.all([
-        analisarArquivoMigracaoAlteracoesLegado(arquivo),
-        base44.auth.me(),
-      ]);
+      setAvisoHistorico('Lote 2: análise simplificada não grava histórico. A persistência será reintroduzida em lote posterior.');
+
+      // Lote 2 — Análise simplificada pelo militar destino selecionado.
+      const analiseSimples = await analisarArquivoMigracaoAlteracoesLegadoSimplificado(arquivo, {
+        militarDestinoId,
+        militarDestinoSnapshot,
+      });
+      const analiseAdaptada = adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnapshot);
+
       const militarDestinoParaLista = militarDestinoSnapshot
         ? { id: militarDestinoId, ...militarDestinoSnapshot }
         : { id: militarDestinoId };
-      const listaMilitares = [militarDestinoParaLista];
-      setMilitares(listaMilitares);
-      setAnalise(resultado);
-      if (resultado?.lote_ja_processado) {
-        toast({
-          title: 'Lote já processado anteriormente',
-          description: 'Mesmo hash de conteúdo identificado. Estados anteriores serão reaproveitados quando possível.',
-        });
-      } else {
-        toast({ title: 'Análise concluída', description: 'Prévia da migração de alterações legado gerada com sucesso.' });
-      }
+      setMilitares([militarDestinoParaLista]);
+      setAnalise(analiseAdaptada);
 
-      try {
-        const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
-        setHistoricoId(historico?.id || null);
-        setHistoricoDisponivel(Boolean(historico?.id));
-        setAvisoHistorico('');
-      } catch (historicoError) {
-        setHistoricoId(null);
-        setHistoricoDisponivel(false);
-        setAvisoHistorico(historicoError?.message || 'Análise sem histórico: a entidade de histórico não está disponível no ambiente.');
-      }
+      const r = analiseSimples.resumo;
+      toast({
+        title: 'Análise concluída',
+        description: `Prontas: ${r.total_prontas} · Erros: ${r.total_erros} · Duplicadas: ${r.total_duplicadas}`,
+      });
     } catch (error) {
       setAnalise(null);
       setHistoricoId(null);
@@ -359,9 +421,18 @@ export default function MigracaoAlteracoesLegado() {
             />
 
             <div className="flex flex-wrap gap-2">
-              <Button disabled={!podeImportar} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
-              <Button disabled={!podeImportar} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true, false)}>Importar aptas e aptas com alerta</Button>
-              <Button disabled={!podeImportar} className="bg-indigo-600 hover:bg-indigo-700" onClick={() => handleImportar(true, true)}>Importar incluindo pendentes de classificação</Button>
+              {!analise.fluxo_simplificado && (
+                <>
+                  <Button disabled={!podeImportar} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
+                  <Button disabled={!podeImportar} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true, false)}>Importar aptas e aptas com alerta</Button>
+                  <Button disabled={!podeImportar} className="bg-indigo-600 hover:bg-indigo-700" onClick={() => handleImportar(true, true)}>Importar incluindo pendentes de classificação</Button>
+                </>
+              )}
+              {analise.fluxo_simplificado && (
+                <div className="w-full rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-900 px-3 py-2 text-xs">
+                  Lote 2: apenas análise. Edição inline, recusa e importação serão habilitadas nos próximos lotes.
+                </div>
+              )}
               <Button variant="outline" onClick={() => exportarRelatorioMigracaoAlteracoesLegado({ ...analise, estado: 'Analise' }, `relatorio-analise-alteracoes-legado-${analise.arquivo.nome}.json`)}>
                 <Download className="w-4 h-4 mr-2" /> Exportar relatório
               </Button>
