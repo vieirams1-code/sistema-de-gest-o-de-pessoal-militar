@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import UploadMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/UploadMigracaoAlteracoesLegado';
 import ResumoMigracaoAlteracoesLegadoCards from '@/components/migracao-alteracoes-legado/ResumoMigracaoAlteracoesLegadoCards';
 import TabelaPreviaMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado';
+import SelecaoMilitarDestino from '@/components/migracao-alteracoes-legado/SelecaoMilitarDestino';
 import {
   analisarArquivoMigracaoAlteracoesLegado,
   atualizarMilitarLinhaAnalise,
@@ -69,6 +70,11 @@ export default function MigracaoAlteracoesLegado() {
   const [avisoHistorico, setAvisoHistorico] = useState('');
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
   const [militares, setMilitares] = useState([]);
+  // Lote 1 — novo fluxo simplificado: militar de destino selecionado antes do upload.
+  // Armazenamos o id (string) e um snapshot mínimo retornado pelo MilitarSelector
+  // (nome, posto, matrícula e — quando disponível — lotação).
+  const [militarDestinoId, setMilitarDestinoId] = useState('');
+  const [militarDestinoSnapshot, setMilitarDestinoSnapshot] = useState(null);
 
   const linhasFiltradas = useMemo(() => {
     if (!analise) return [];
@@ -210,6 +216,22 @@ export default function MigracaoAlteracoesLegado() {
     setBusca('');
     setFiltro('TODOS');
     setFiltroDestino('TODOS');
+    setMilitarDestinoId('');
+    setMilitarDestinoSnapshot(null);
+  };
+
+  const handleSelecionarMilitarDestino = (novoId) => {
+    setMilitarDestinoId(novoId || '');
+    if (!novoId) {
+      setMilitarDestinoSnapshot(null);
+      // Limpa o arquivo escolhido para evitar inconsistência visual quando o
+      // usuário troca/limpa o militar antes de analisar a planilha.
+      setArquivo(null);
+    }
+  };
+
+  const handleMilitarDestinoSelect = (snapshot) => {
+    setMilitarDestinoSnapshot(snapshot || null);
   };
 
   if (isLoading || !isAccessResolved) return null;
@@ -233,15 +255,30 @@ export default function MigracaoAlteracoesLegado() {
             <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 text-sm">
               <p className="font-semibold mb-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Regras desta migração</p>
               <ul className="list-disc pl-6 space-y-1">
-                <li>Cada linha da planilha bruta do legado gera um registro individual em PublicacaoExOfficio.</li>
+                <li>A importação é feita por militar selecionado: todas as linhas da planilha serão vinculadas a esse militar.</li>
+                <li>Cada linha da planilha gera um registro individual em PublicacaoExOfficio.</li>
                 <li>Registros válidos entram como publicados, com BG e data BG obrigatórios.</li>
                 <li>A origem legado é marcada com <code>origem_registro=legado</code> e <code>importado_legado=true</code>.</li>
                 <li>Nota ID legado é preservada em campo próprio, separado do número do BG.</li>
-                <li>Sem correspondência segura de tipo, o padrão é <code>PENDENTE_CLASSIFICACAO</code> com <code>LEGADO_NAO_CLASSIFICADO</code>.</li>
-                <li>Vínculo com militar e tipo final podem ser revisados manualmente antes da importação.</li>
+                <li>O sistema não tenta mais identificar o militar pela planilha.</li>
               </ul>
             </div>
-            <UploadMigracaoAlteracoesLegado file={arquivo} onFileChange={setArquivo} onAnalisar={handleAnalisar} onDownloadModelo={exportarModeloMigracaoAlteracoesLegado} loading={carregando} />
+
+            <SelecaoMilitarDestino
+              militarId={militarDestinoId}
+              militarSnapshot={militarDestinoSnapshot}
+              onChangeMilitarId={handleSelecionarMilitarDestino}
+              onMilitarSelect={handleMilitarDestinoSelect}
+              disabled={carregando}
+            />
+
+            {militarDestinoId ? (
+              <UploadMigracaoAlteracoesLegado file={arquivo} onFileChange={setArquivo} onAnalisar={handleAnalisar} onDownloadModelo={exportarModeloMigracaoAlteracoesLegado} loading={carregando} />
+            ) : (
+              <div className="bg-white border border-dashed border-slate-300 rounded-xl p-6 text-center text-sm text-slate-500">
+                Selecione um militar para habilitar o envio da planilha.
+              </div>
+            )}
           </>
         )}
 
