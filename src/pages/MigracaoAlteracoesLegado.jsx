@@ -89,6 +89,10 @@ export default function MigracaoAlteracoesLegado() {
   const podeImportar = !!analise && !carregando;
 
   const handleAnalisar = async () => {
+    if (!militarDestinoId) {
+      toast({ title: 'Selecione um militar', description: 'Escolha o militar destino antes de analisar a planilha.', variant: 'destructive' });
+      return;
+    }
     if (!arquivo) {
       toast({ title: 'Arquivo obrigatório', description: 'Selecione um arquivo antes de iniciar a análise.', variant: 'destructive' });
       return;
@@ -99,11 +103,18 @@ export default function MigracaoAlteracoesLegado() {
       setHistoricoDisponivel(true);
       setResultadoImportacao(null);
       setAvisoHistorico('');
-      const [resultado, usuario, listaMilitares] = await Promise.all([
+      // Lote 1: deixamos de carregar Militar.list() global. O fluxo antigo
+      // (ainda ativo neste lote) recebe apenas o militar pré-selecionado
+      // como universo possível de vinculação na TabelaPreviaMigracaoAlteracoesLegado.
+      // A nova análise simplificada será implementada nos próximos lotes.
+      const [resultado, usuario] = await Promise.all([
         analisarArquivoMigracaoAlteracoesLegado(arquivo),
         base44.auth.me(),
-        base44.entities.Militar.list('-created_date', 10000),
       ]);
+      const militarDestinoParaLista = militarDestinoSnapshot
+        ? { id: militarDestinoId, ...militarDestinoSnapshot }
+        : { id: militarDestinoId };
+      const listaMilitares = [militarDestinoParaLista];
       setMilitares(listaMilitares);
       setAnalise(resultado);
       if (resultado?.lote_ja_processado) {
