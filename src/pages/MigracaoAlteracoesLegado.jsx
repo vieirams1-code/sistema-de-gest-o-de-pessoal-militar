@@ -418,6 +418,7 @@ export default function MigracaoAlteracoesLegado() {
               onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
               onSelecionarDestinoFinal={handleAjusteDestinoFinal}
               onAlterarMotivoDestino={handleAjusteMotivoDestino}
+              somenteLeitura={analise.fluxo_simplificado === true}
             />
 
             <div className="flex flex-wrap gap-2">
