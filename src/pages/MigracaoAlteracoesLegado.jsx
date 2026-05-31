@@ -7,9 +7,11 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { useToast } from '@/components/ui/use-toast';
 import { base44 } from '@/api/base44Client';
+import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 import UploadMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/UploadMigracaoAlteracoesLegado';
 import ResumoMigracaoAlteracoesLegadoCards from '@/components/migracao-alteracoes-legado/ResumoMigracaoAlteracoesLegadoCards';
 import TabelaPreviaMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado';
+import TabelaRevisaoSimplificadaAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaRevisaoSimplificadaAlteracoesLegado';
 import SelecaoMilitarDestino from '@/components/migracao-alteracoes-legado/SelecaoMilitarDestino';
 import {
   atualizarMilitarLinhaAnalise,
@@ -24,12 +26,25 @@ import {
   analisarArquivoMigracaoAlteracoesLegadoSimplificado,
   STATUS_LINHA_SIMPLIFICADO,
 } from '@/services/migracaoAlteracoesLegadoSimplificadoService';
+import {
+  atualizarLinhaRevisaoSimplificada,
+  gerarResumoRevisaoSimplificada,
+  revalidarLinhasRevisaoSimplificada,
+} from '@/services/migracaoAlteracoesLegadoSimplificadoEdicao';
 
 const filtros = [
   { id: 'TODOS', label: 'Todos' },
   { id: 'APTO', label: 'Prontas' },
   { id: 'ERRO', label: 'Erros' },
   { id: 'REVISAR', label: 'Duplicadas' },
+];
+
+const filtrosSimplificados = [
+  { id: 'TODOS', label: 'Todos' },
+  { id: 'pronta', label: 'Prontas' },
+  { id: 'erro', label: 'Erros' },
+  { id: 'duplicada', label: 'Duplicadas' },
+  { id: 'recusada', label: 'Recusadas' },
 ];
 
 const filtrosDestino = [
@@ -49,13 +64,18 @@ function filtrarBusca(linha, termo) {
     t.numero_bg,
     t.materia_legado,
     t.conteudo_trecho_legado,
+    linha.numero_nota,
+    linha.numero_bg_br,
+    linha.tipo_legado,
+    linha.tipo_classificado,
+    linha.texto_publicado,
   ].join(' ').toLowerCase();
   return alvo.includes(termo.toLowerCase());
 }
 
 /**
- * Lote 2 — mapeia o retorno da análise simplificada para o shape que a
- * TabelaPreviaMigracaoAlteracoesLegado já entende (sem alterar a tabela).
+ * Mapeia o retorno da análise simplificada para o shape compartilhado pela
+ * página e preserva os campos próprios da tabela editável do lote 3.
  *
  * Mapeamento de status simplificado -> status atual da tabela:
  *  - 'pronta'    -> APTO
@@ -77,7 +97,8 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
     [STATUS_LINHA_SIMPLIFICADO.DUPLICADA]: 'REVISAR',
   };
 
-  const linhas = analiseSimples.linhas.map((linha) => ({
+  const numerosNotaImportados = analiseSimples.numerosNotaJaExistentes || [];
+  const linhas = revalidarLinhasRevisaoSimplificada(analiseSimples.linhas.map((linha) => ({
     linhaNumero: linha.rowIndex,
     status: mapStatus[linha.status] || 'ERRO',
     statusSimplificado: linha.status,
@@ -103,20 +124,16 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
     observacoes: [],
     ajustes_manuais: [],
     recusada: linha.recusada,
-  }));
+    numero_nota: linha.numero_nota,
+    numero_bg_br: linha.numero_bg_br,
+    data_bg_br: linha.data_bg_br,
+    tipo_legado: linha.tipo_legado,
+    tipo_classificado: linha.tipo_classificado,
+    texto_publicado: linha.texto_publicado,
+    numerosNotaImportados,
+  })));
 
-  const resumo = {
-    total_linhas: analiseSimples.resumo.total_linhas,
-    total_aptas: analiseSimples.resumo.total_prontas,
-    total_aptas_com_alerta: 0,
-    total_revisar: analiseSimples.resumo.total_duplicadas,
-    total_ignoradas: 0,
-    total_erros: analiseSimples.resumo.total_erros,
-    total_excluidas_lote: 0,
-    total_pendentes_classificacao: 0,
-    total_alertas: analiseSimples.resumo.total_com_avisos,
-    total_duplicidades: analiseSimples.resumo.total_duplicadas,
-  };
+  const resumo = gerarResumoRevisaoSimplificada(linhas);
 
   return {
     arquivo: { ...analiseSimples.arquivo, hash: '', hash_lote: '' },
@@ -157,7 +174,7 @@ export default function MigracaoAlteracoesLegado() {
     return analise.linhas.filter((linha) => {
       const statusValido = filtro === 'TODOS' ? true : linha.status === filtro;
       const destinoLinha = linha.transformado?.destino_final || 'IMPORTAR';
-      const destinoValido = filtroDestino === 'TODOS' ? true : destinoLinha === filtroDestino;
+      const destinoValido = analise.fluxo_simplificado || filtroDestino === 'TODOS' || destinoLinha === filtroDestino;
       return statusValido && destinoValido && filtrarBusca(linha, busca.trim());
     });
   }, [analise, filtro, filtroDestino, busca]);
@@ -178,14 +195,22 @@ export default function MigracaoAlteracoesLegado() {
       setHistoricoId(null);
       setHistoricoDisponivel(false);
       setResultadoImportacao(null);
-      setAvisoHistorico('Lote 2: análise simplificada não grava histórico. A persistência será reintroduzida em lote posterior.');
+      setAvisoHistorico('Lote 3: revisão simplificada não grava histórico. A persistência será reintroduzida em lote posterior.');
 
       // Lote 2 — Análise simplificada pelo militar destino selecionado.
-      const analiseSimples = await analisarArquivoMigracaoAlteracoesLegadoSimplificado(arquivo, {
-        militarDestinoId,
-        militarDestinoSnapshot,
-      });
+      const [analiseSimples, tiposPublicacaoCustom] = await Promise.all([
+        analisarArquivoMigracaoAlteracoesLegadoSimplificado(arquivo, {
+          militarDestinoId,
+          militarDestinoSnapshot,
+        }),
+        base44.entities.TipoPublicacaoCustom.list('-created_date').catch(() => []),
+      ]);
       const analiseAdaptada = adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnapshot);
+      analiseAdaptada.tipos_publicacao_validos = Array.from(new Set(
+        getTiposRPFiltrados({ tiposCustom: tiposPublicacaoCustom })
+          .map((tipo) => tipo?.label || tipo?.value)
+          .filter(Boolean),
+      )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
       const militarDestinoParaLista = militarDestinoSnapshot
         ? { id: militarDestinoId, ...militarDestinoSnapshot }
@@ -278,6 +303,18 @@ export default function MigracaoAlteracoesLegado() {
     if (!analise) return;
     const proxima = atualizarMotivoDestinoLinhaAnalise(analise, linha.linhaNumero, motivoDestino);
     setAnalise(proxima);
+  };
+
+  const handleAlterarLinhaSimplificada = (linha, alteracoes) => {
+    setAnalise((atual) => {
+      if (!atual?.fluxo_simplificado) return atual;
+      const linhas = atualizarLinhaRevisaoSimplificada(atual.linhas, linha.linhaNumero, alteracoes);
+      return { ...atual, linhas, resumo: gerarResumoRevisaoSimplificada(linhas) };
+    });
+  };
+
+  const handleAlternarRecusaSimplificada = (linha) => {
+    handleAlterarLinhaSimplificada(linha, { recusada: !linha.recusada });
   };
 
   const reiniciarFluxo = () => {
@@ -377,26 +414,28 @@ export default function MigracaoAlteracoesLegado() {
                     <SelectValue placeholder="Filtrar status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filtros.map((item) => (
+                    {(analise.fluxo_simplificado ? filtrosSimplificados : filtros).map((item) => (
                       <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Destino final</p>
-                <Select value={filtroDestino} onValueChange={setFiltroDestino}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filtrar destino" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filtrosDestino.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!analise.fluxo_simplificado && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Destino final</p>
+                  <Select value={filtroDestino} onValueChange={setFiltroDestino}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filtrar destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filtrosDestino.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <Button variant="outline" onClick={() => setAnalise((valorAtual) => ({ ...valorAtual }))}>
                 <RefreshCcw className="w-4 h-4 mr-2" /> Atualizar
@@ -410,16 +449,24 @@ export default function MigracaoAlteracoesLegado() {
               </div>
             )}
 
-            <TabelaPreviaMigracaoAlteracoesLegado
-              linhas={linhasFiltradas}
-              militares={militares}
-              tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
-              onSelecionarMilitar={handleAjusteMilitar}
-              onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
-              onSelecionarDestinoFinal={handleAjusteDestinoFinal}
-              onAlterarMotivoDestino={handleAjusteMotivoDestino}
-              somenteLeitura={analise.fluxo_simplificado === true}
-            />
+            {analise.fluxo_simplificado ? (
+              <TabelaRevisaoSimplificadaAlteracoesLegado
+                linhas={linhasFiltradas}
+                tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
+                onAlterarLinha={handleAlterarLinhaSimplificada}
+                onAlternarRecusa={handleAlternarRecusaSimplificada}
+              />
+            ) : (
+              <TabelaPreviaMigracaoAlteracoesLegado
+                linhas={linhasFiltradas}
+                militares={militares}
+                tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
+                onSelecionarMilitar={handleAjusteMilitar}
+                onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
+                onSelecionarDestinoFinal={handleAjusteDestinoFinal}
+                onAlterarMotivoDestino={handleAjusteMotivoDestino}
+              />
+            )}
 
             <div className="flex flex-wrap gap-2">
               {!analise.fluxo_simplificado && (
@@ -431,7 +478,7 @@ export default function MigracaoAlteracoesLegado() {
               )}
               {analise.fluxo_simplificado && (
                 <div className="w-full rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-900 px-3 py-2 text-xs">
-                  Lote 2: apenas análise. Edição inline, recusa e importação serão habilitadas nos próximos lotes.
+                  Lote 3: revise, corrija ou recuse linhas antes de concluir. A importação permanece desabilitada neste lote.
                 </div>
               )}
               <Button variant="outline" onClick={() => exportarRelatorioMigracaoAlteracoesLegado({ ...analise, estado: 'Analise' }, `relatorio-analise-alteracoes-legado-${analise.arquivo.nome}.json`)}>

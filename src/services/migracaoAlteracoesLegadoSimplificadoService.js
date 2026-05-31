@@ -337,6 +337,7 @@ function gerarResumo(linhas) {
  * @returns {Promise<{
  *   arquivo: { nome: string, tamanho: number, tipo: string },
  *   militarDestino: { id, nome_completo, posto_graduacao, matricula, lotacao },
+ *   numerosNotaJaExistentes: string[],
  *   linhas: Array<{
  *     rowIndex: number,
  *     status: 'pronta'|'erro'|'duplicada',
@@ -443,6 +444,7 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
       tipo: file?.type || 'application/octet-stream',
     },
     militarDestino: buildSnapshotMilitar(militarDestinoSnapshot, militarDestinoId),
+    numerosNotaJaExistentes: Array.from(numerosNotaJaExistentes),
     linhas,
     resumo: gerarResumo(linhas),
     versao_regra: 'lote2.v1.0.0',

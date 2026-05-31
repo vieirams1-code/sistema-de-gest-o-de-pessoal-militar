@@ -34,13 +34,16 @@ test('lote 2 mantém consulta de publicações escopada ao militar e status simp
   assert.match(conteudo, /DUPLICADA: 'duplicada'/);
 });
 
-test('lote 2 bloqueia ações legadas e edição inline no modo simplificado', async () => {
+test('lote 3 usa tabela própria editável sem expor controles legados no modo simplificado', async () => {
   const pagina = await read('pages/MigracaoAlteracoesLegado.jsx');
-  const tabela = await read('components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado.jsx');
-  assert.match(pagina, /somenteLeitura=\{analise\.fluxo_simplificado === true\}/);
+  const tabela = await read('components/migracao-alteracoes-legado/TabelaRevisaoSimplificadaAlteracoesLegado.jsx');
+  assert.match(pagina, /analise\.fluxo_simplificado \? \(/);
+  assert.match(pagina, /<TabelaRevisaoSimplificadaAlteracoesLegado/);
   assert.match(pagina, /\{!analise\.fluxo_simplificado && \(/);
-  assert.match(tabela, /\{somenteLeitura \? \(/);
-  assert.match(tabela, /Edição, recusa e importação permanecem bloqueadas/);
+  assert.match(tabela, /Número nota/);
+  assert.match(tabela, /Texto publicado/);
+  assert.match(tabela, /Restaurar/);
+  assert.match(tabela, /Recusar/);
 });
 
 test('lote 2 aceita CSV e XLSX, bloqueia XLS e protege runtime Node sem DOMParser', async () => {
