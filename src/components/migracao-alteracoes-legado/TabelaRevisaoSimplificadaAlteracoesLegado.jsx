@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, XCircle } from 'lucide-react';
+import { RotateCcw, XCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,14 +10,26 @@ import { cn } from '@/lib/utils';
 
 const statusClass = {
   pronta: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  erro: 'bg-rose-100 text-rose-800 border-rose-200',
-  duplicada: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  erro: 'bg-orange-100 text-orange-800 border-orange-200',
+  duplicada: 'bg-red-100 text-red-800 border-red-200',
   recusada: 'bg-slate-200 text-slate-700 border-slate-300',
 };
 
-function ListaMensagens({ itens, vazio = '—' }) {
+function ListaMensagens({ itens, tipo = 'aviso', vazio = '—' }) {
   if (!itens?.length) return <span className="text-slate-400">{vazio}</span>;
-  return <div className="space-y-1">{itens.map((item) => <p key={item}>{item}</p>)}</div>;
+  
+  const Icon = tipo === 'erro' ? AlertCircle : AlertTriangle;
+
+  return (
+    <div className="space-y-1.5">
+      {itens.map((item, idx) => (
+        <p key={idx} className="flex items-start gap-1.5 leading-snug">
+          <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>{item}</span>
+        </p>
+      ))}
+    </div>
+  );
 }
 
 export default function TabelaRevisaoSimplificadaAlteracoesLegado({
@@ -44,28 +56,47 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
             <TableHead className="min-w-56">Status publicação</TableHead>
             <TableHead className="min-w-36">Número nota</TableHead>
             <TableHead className="min-w-32">Número BG/BR</TableHead>
+            <TableHead className="min-w-32">Tipo BG</TableHead>
             <TableHead className="min-w-36">Data BG/BR</TableHead>
-            <TableHead className="min-w-40">Tipo legado</TableHead>
+            <TableHead className="min-w-40">Matéria</TableHead>
             <TableHead className="min-w-52">Tipo classificado</TableHead>
             <TableHead className="min-w-80">Texto publicado</TableHead>
             <TableHead className="min-w-64">Erros</TableHead>
             <TableHead className="min-w-64">Avisos</TableHead>
-            <TableHead>Ação</TableHead>
+            <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {linhas.map((linha) => {
             const desabilitada = linha.recusada;
+            const isDuplicada = linha.statusSimplificado === 'duplicada';
             const valorTipo = linha.tipo_classificado || '__fallback__';
+            
+            const statusVisual = desabilitada 
+              ? 'recusada' 
+              : (linha.statusSimplificado || linha.status?.toLowerCase() || 'erro');
+            
+            const badgeLabel = desabilitada ? 'RECUSADA' : statusVisual.toUpperCase();
+            
+            const tipoBg = linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado || '—';
+            const materia = linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado || '—';
+
             return (
-              <TableRow key={linha.linhaNumero} className={cn(desabilitada && 'bg-slate-50 opacity-75')}>
-                <TableCell><Badge className={cn('border capitalize', statusClass[linha.status])}>{linha.status}</Badge></TableCell>
+              <TableRow 
+                key={linha.linhaNumero} 
+                className={cn(
+                  desabilitada && 'bg-slate-100 opacity-60 text-slate-500 grayscale',
+                  !desabilitada && isDuplicada && 'border-2 border-red-400 bg-red-50/40'
+                )}
+              >
+                <TableCell><Badge className={cn('border', statusClass[statusVisual] || statusClass.erro)}>{badgeLabel}</Badge></TableCell>
                 <TableCell>{linha.linhaNumero}</TableCell>
                 <TableCell className="text-xs font-medium text-slate-700">{linha.status_publicacao}</TableCell>
-                <TableCell><Input disabled={desabilitada} value={linha.numero_nota} onChange={(e) => onAlterarLinha(linha, { numero_nota: e.target.value })} /></TableCell>
-                <TableCell><Input disabled={desabilitada} value={linha.numero_bg_br} onChange={(e) => onAlterarLinha(linha, { numero_bg_br: e.target.value })} /></TableCell>
-                <TableCell><Input disabled={desabilitada} value={linha.data_bg_br} onChange={(e) => onAlterarLinha(linha, { data_bg_br: e.target.value })} placeholder="dd/mm/aaaa" /></TableCell>
-                <TableCell className="text-xs text-slate-700">{linha.tipo_legado || '—'}</TableCell>
+                <TableCell><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(e) => onAlterarLinha(linha, { numero_nota: e.target.value })} /></TableCell>
+                <TableCell><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(e) => onAlterarLinha(linha, { numero_bg_br: e.target.value })} /></TableCell>
+                <TableCell className="text-xs font-medium">{tipoBg}</TableCell>
+                <TableCell><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(e) => onAlterarLinha(linha, { data_bg_br: e.target.value })} placeholder="dd/mm/aaaa" /></TableCell>
+                <TableCell className="text-xs font-medium">{materia}</TableCell>
                 <TableCell>
                   <Select disabled={desabilitada} value={valorTipo} onValueChange={(valor) => onAlterarLinha(linha, { tipo_classificado: valor === '__fallback__' ? '' : valor })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -75,9 +106,9 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell><Textarea disabled={desabilitada} value={linha.texto_publicado} onChange={(e) => onAlterarLinha(linha, { texto_publicado: e.target.value })} className="min-h-20" /></TableCell>
-                <TableCell className="text-xs text-rose-700"><ListaMensagens itens={linha.erros} /></TableCell>
-                <TableCell className="text-xs text-amber-700"><ListaMensagens itens={linha.avisos} /></TableCell>
+                <TableCell><Textarea disabled={desabilitada} value={linha.texto_publicado || ''} onChange={(e) => onAlterarLinha(linha, { texto_publicado: e.target.value })} className="min-h-20" /></TableCell>
+                <TableCell className="text-xs text-rose-700 font-medium"><ListaMensagens itens={linha.erros} tipo="erro" /></TableCell>
+                <TableCell className="text-xs text-amber-700 font-medium"><ListaMensagens itens={linha.avisos} tipo="aviso" /></TableCell>
                 <TableCell>
                   <Button type="button" variant="outline" size="sm" className={cn(!desabilitada && 'text-rose-700 border-rose-200')} onClick={() => onAlternarRecusa(linha)}>
                     {desabilitada ? <RotateCcw className="w-4 h-4 mr-1" /> : <XCircle className="w-4 h-4 mr-1" />}

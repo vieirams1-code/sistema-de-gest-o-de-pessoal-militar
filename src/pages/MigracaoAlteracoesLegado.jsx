@@ -133,6 +133,7 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
       tipo_publicacao_confirmado: linha.tipo_classificado,
       conteudo_trecho_legado: linha.texto_publicado,
       status_publicacao: linha.status_publicacao,
+      tipo_bg_legado: linha.tipo_bg_legado,
       destino_final: linha.status === STATUS_LINHA_SIMPLIFICADO.PRONTA ? 'IMPORTAR' : 'PENDENTE_CLASSIFICACAO',
       motivo_destino: linha.erros[0] || linha.avisos[0] || '',
     },
@@ -147,6 +148,7 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
     data_bg_br: linha.data_bg_br,
     tipo_legado: linha.tipo_legado,
     tipo_classificado: linha.tipo_classificado,
+    tipo_bg_legado: linha.tipo_bg_legado,
     texto_publicado: linha.texto_publicado,
     status_publicacao: linha.status_publicacao,
     numerosNotaImportados,
@@ -509,7 +511,39 @@ export default function MigracaoAlteracoesLegado() {
         {analise && !resultadoImportacao && (
           <div className="space-y-4">
             {analise.fluxo_simplificado ? (
-              <ResumoImpactoMigracaoSimplificada linhas={analise.linhas} />
+              <div className="space-y-4">
+                <ResumoImpactoMigracaoSimplificada linhas={analise.linhas} />
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  <div className="bg-white border border-slate-200 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500">Total</p>
+                    <p className="text-lg font-bold text-slate-700">{analise.linhas.length}</p>
+                  </div>
+                  <div className="bg-white border border-emerald-200 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500">Prontas</p>
+                    <p className="text-lg font-bold text-emerald-700">{analise.linhas.filter(l => l.statusSimplificado === 'pronta' && !l.recusada).length}</p>
+                  </div>
+                  <div className="bg-white border border-indigo-200 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500">Publicadas</p>
+                    <p className="text-lg font-bold text-indigo-700">{analise.linhas.filter(l => l.status_publicacao === 'PUBLICADO' && !l.recusada).length}</p>
+                  </div>
+                  <div className="bg-white border border-sky-200 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500">Aguardando pub.</p>
+                    <p className="text-lg font-bold text-sky-700">{analise.linhas.filter(l => l.status_publicacao === 'AGUARDANDO_PUBLICACAO' && !l.recusada).length}</p>
+                  </div>
+                  <div className="bg-white border border-amber-200 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500">Duplicadas</p>
+                    <p className="text-lg font-bold text-amber-700">{analise.linhas.filter(l => l.statusSimplificado === 'duplicada' && !l.recusada).length}</p>
+                  </div>
+                  <div className="bg-white border border-rose-200 rounded-xl p-3 text-center">
+                    <p className="text-xs text-slate-500">Erros</p>
+                    <p className="text-lg font-bold text-rose-700">{analise.linhas.filter(l => l.statusSimplificado === 'erro' && !l.recusada).length}</p>
+                  </div>
+                  <div className="bg-white border border-slate-300 rounded-xl p-3 text-center opacity-70">
+                    <p className="text-xs text-slate-500">Recusadas</p>
+                    <p className="text-lg font-bold text-slate-600">{analise.linhas.filter(l => l.recusada).length}</p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <ResumoMigracaoAlteracoesLegadoCards resumo={analise.resumo} />
             )}

@@ -51,6 +51,8 @@ const HEADER_ALIAS_SIMPLIFICADO = {
     'br',
     'bg/br',
     'bgbr',
+    'bg numero',
+    'bg número',
   ],
   data_bg_br: [
     'data_bg_br',
@@ -63,10 +65,22 @@ const HEADER_ALIAS_SIMPLIFICADO = {
     'data publicação',
     'data',
   ],
+  tipo_bg_legado: [
+    'tipo_bg_legado',
+    'tipo_bg',
+    'tipo bg',
+    'tipo do bg',
+  ],
   tipo_legado: [
     'tipo_legado',
     'tipo legado',
     'tipo legado bg',
+    'materia',
+    'matéria',
+    'materia_legado',
+    'matéria_legado',
+    'materia legado',
+    'matéria legado',
   ],
   tipo_classificado: [
     'tipo_classificado',
@@ -322,9 +336,10 @@ function gerarResumo(linhas) {
     if (l.status === STATUS_LINHA_SIMPLIFICADO.PRONTA) acc.total_prontas += 1;
     if (l.status === STATUS_LINHA_SIMPLIFICADO.ERRO) acc.total_erros += 1;
     if (l.status === STATUS_LINHA_SIMPLIFICADO.DUPLICADA) acc.total_duplicadas += 1;
+    if (l.recusada) acc.total_recusadas += 1;
     if (l.avisos?.length) acc.total_com_avisos += 1;
     return acc;
-  }, { total_linhas: 0, total_prontas: 0, total_erros: 0, total_duplicadas: 0, total_com_avisos: 0 });
+  }, { total_linhas: 0, total_prontas: 0, total_erros: 0, total_duplicadas: 0, total_com_avisos: 0, total_recusadas: 0 });
 }
 
 /**
@@ -397,6 +412,7 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
     const dataBgBrNormalizada = dataBgIso ? formatarIsoParaBr(dataBgIso) : limparTexto(dataBgBrBruta);
     const tipoLegado = get('tipo_legado');
     const tipoClassificado = get('tipo_classificado');
+    const tipoBgLegado = get('tipo_bg_legado');
 
     const erros = [];
     const avisos = [];
@@ -432,6 +448,7 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
       data_bg_br: dataBgBrNormalizada,
       tipo_legado: tipoLegado,
       tipo_classificado: tipoClassificado,
+      tipo_bg_legado: tipoBgLegado,
       texto_publicado: textoPublicado,
       status_publicacao: calcularStatusPublicacaoLegado({
         numero_nota: numeroNotaBruto,

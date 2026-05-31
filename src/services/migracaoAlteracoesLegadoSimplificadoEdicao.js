@@ -43,7 +43,8 @@ function sincronizarTransformado(linha) {
     nota_id_legado: linha.numero_nota,
     numero_bg: linha.numero_bg_br,
     data_bg_br: linha.data_bg_br,
-    materia_legado: linha.tipo_legado,
+    materia_legado: linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado,
+    tipo_bg_legado: linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado,
     tipo_publicacao_sugerido: linha.tipo_classificado || linha.tipo_legado,
     tipo_publicacao_confirmado: linha.tipo_classificado || linha.tipo_legado,
     conteudo_trecho_legado: linha.texto_publicado,
@@ -90,6 +91,7 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
     if (linha.recusada) {
       return {
         ...linha,
+        statusSimplificado: STATUS_REVISAO_SIMPLIFICADA.RECUSADA,
         status: STATUS_REVISAO_SIMPLIFICADA.RECUSADA,
         status_publicacao: calcularStatusPublicacaoLegado(linha),
         erros: [],
@@ -123,7 +125,14 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
       numero_bg_br: linha.numero_bg_br,
       data_bg_br: linha.data_bg_br,
     });
-    const proxima = { ...linha, status, status_publicacao: statusPublicacao, erros, avisos };
+    const proxima = {
+      ...linha,
+      status,
+      statusSimplificado: status,
+      status_publicacao: statusPublicacao,
+      erros,
+      avisos
+    };
     return { ...proxima, transformado: sincronizarTransformado(proxima) };
   });
 }
