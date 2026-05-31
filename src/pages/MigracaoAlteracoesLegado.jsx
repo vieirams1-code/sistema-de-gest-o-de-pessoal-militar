@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 import UploadMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/UploadMigracaoAlteracoesLegado';
 import ResumoMigracaoAlteracoesLegadoCards from '@/components/migracao-alteracoes-legado/ResumoMigracaoAlteracoesLegadoCards';
+import ResumoImpactoMigracaoSimplificada from '@/components/migracao-alteracoes-legado/ResumoImpactoMigracaoSimplificada';
 import TabelaPreviaMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado';
 import TabelaRevisaoSimplificadaAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaRevisaoSimplificadaAlteracoesLegado';
 import SelecaoMilitarDestino from '@/components/migracao-alteracoes-legado/SelecaoMilitarDestino';
@@ -396,7 +397,11 @@ export default function MigracaoAlteracoesLegado() {
 
         {analise && !resultadoImportacao && (
           <div className="space-y-4">
-            <ResumoMigracaoAlteracoesLegadoCards resumo={analise.resumo} />
+            {analise.fluxo_simplificado ? (
+              <ResumoImpactoMigracaoSimplificada linhas={analise.linhas} />
+            ) : (
+              <ResumoMigracaoAlteracoesLegadoCards resumo={analise.resumo} />
+            )}
 
             <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 lg:grid-cols-[1.3fr,220px,240px,auto] gap-3 items-end">
               <div className="relative">
