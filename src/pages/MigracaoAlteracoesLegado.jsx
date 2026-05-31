@@ -32,6 +32,7 @@ import {
   gerarResumoRevisaoSimplificada,
   revalidarLinhasRevisaoSimplificada,
 } from '@/services/migracaoAlteracoesLegadoSimplificadoEdicao';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 
 const filtros = [
   { id: 'TODOS', label: 'Todos' },
@@ -55,6 +56,21 @@ const filtrosDestino = [
   { id: 'IGNORAR', label: 'IGNORAR' },
   { id: 'EXCLUIDO_DO_LOTE', label: 'EXCLUIDO_DO_LOTE' },
 ];
+
+function normalizarNotaLegado(nota) {
+  if (!nota) return '';
+  let n = String(nota).trim().toUpperCase();
+  n = n.replace(/^(NOTA|Nº|N°|NO\.|NR\.?|NÚMERO|NUMERO)\s*/g, '');
+  n = n.replace(/^[:.\-/\s]+/, '');
+  n = n.replace(/\s+/g, '');
+  n = n.replace(/^0+(?=\d)/, '');
+  return n;
+}
+
+function normalizarStatusPublicacao(status) {
+  const s = String(status || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, '_');
+  return s === 'PUBLICADO' ? 'PUBLICADO' : 'AGUARDANDO_PUBLICACAO';
+}
 
 function filtrarBusca(linha, termo) {
   if (!termo) return true;
@@ -284,6 +300,101 @@ export default function MigracaoAlteracoesLegado() {
     }
   };
 
+  const handleImportarSimplificado = async () => {
+    if (!analise?.fluxo_simplificado) return;
+
+    setCarregando(true);
+    const linhasParaImportar = analise.linhas.filter((l) => l.statusSimplificado === 'pronta' && !l.recusada);
+
+    if (linhasParaImportar.length === 0) {
+      toast({ title: 'Aviso', description: 'Nenhuma alteração pronta para importação.', variant: 'destructive' });
+      setCarregando(false);
+      return;
+    }
+
+    const falhas = [];
+    let importadas = 0;
+
+    const militarId = linhasParaImportar[0].transformado.militar_id;
+    let notasExistentes = new Set();
+    try {
+      const existingPubs = await base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, 'nota_id_legado');
+      notasExistentes = new Set(existingPubs.map((p) => p.nota_id_legado).filter(Boolean));
+    } catch (e) {
+      console.warn("Falha ao buscar publicações existentes", e);
+    }
+
+    for (const linha of linhasParaImportar) {
+      try {
+        if (linha.numero_nota && notasExistentes.has(linha.numero_nota)) {
+          throw new Error('Nota já importada para este militar.');
+        }
+
+        const tipo_final = linha.tipo_classificado || linha.tipo_legado || 'Pendente de classificação';
+
+        const payload = {
+          militar_id: linha.transformado.militar_id,
+          militar_nome: linha.transformado.militar_nome,
+          militar_matricula: linha.transformado.militar_matricula_atual || linha.transformado.militar_matricula,
+          nota_id_legado: linha.numero_nota,
+          numero_bg: linha.numero_bg_br,
+          data_bg: linha.data_bg_br,
+          tipo_legado: linha.tipo_legado,
+          tipo: tipo_final,
+          tipo_registro: tipo_final,
+          texto_publicado: linha.texto_publicado,
+          status: linha.status_publicacao || 'Aguardando Publicação',
+          origem_registro: 'legado',
+          importado_legado: true,
+        };
+
+        await criarEscopado('PublicacaoExOfficio', payload);
+        importadas++;
+        if (linha.numero_nota) notasExistentes.add(linha.numero_nota);
+      } catch (error) {
+        falhas.push({
+          linhaNumero: linha.linhaNumero,
+          erro: error.message || 'Erro desconhecido ao gravar.',
+        });
+      }
+    }
+
+    setCarregando(false);
+
+    if (falhas.length > 0) {
+      toast({
+        title: 'Importação parcial',
+        description: `Foram importadas ${importadas} alterações. Ocorreram ${falhas.length} falhas.`,
+        variant: 'destructive',
+      });
+      setAnalise((prev) => {
+        const novasLinhas = prev.linhas.map((l) => {
+          const falha = falhas.find((f) => f.linhaNumero === l.linhaNumero);
+          if (falha) {
+            return { ...l, statusSimplificado: 'erro', status: 'ERRO', erros: [falha.erro] };
+          }
+          if (l.statusSimplificado === 'pronta' && !l.recusada) {
+            return null;
+          }
+          return l;
+        }).filter(Boolean);
+
+        return { ...prev, linhas: novasLinhas, resumo: gerarResumoRevisaoSimplificada(novasLinhas) };
+      });
+    } else {
+      toast({
+        title: 'Importação concluída',
+        description: `Todas as ${importadas} alterações válidas foram importadas com sucesso.`,
+      });
+      setResultadoImportacao({
+        statusImportacao: 'Sucesso',
+        totalImportadas: importadas,
+        totalNaoImportadas: analise.linhas.length - linhasParaImportar.length,
+        relatorio: { ...analise, estado: 'Importado' },
+      });
+    }
+  };
+
   const handleAjusteMilitar = (linha, militar) => {
     if (!analise) return;
     const proxima = atualizarMilitarLinhaAnalise(analise, linha.linhaNumero, militar);
@@ -484,9 +595,14 @@ export default function MigracaoAlteracoesLegado() {
                 </>
               )}
               {analise.fluxo_simplificado && (
-                <div className="w-full rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-900 px-3 py-2 text-xs">
-                  Lote 3: revise, corrija ou recuse linhas antes de concluir. A importação permanece desabilitada neste lote.
-                </div>
+                <>
+                  <Button disabled={!podeImportar || carregando} className="bg-emerald-700 hover:bg-emerald-800" onClick={handleImportarSimplificado}>
+                    Finalizar importação
+                  </Button>
+                  <div className="w-full rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-900 px-3 py-2 text-xs flex items-center">
+                    Lote 4: Importação efetiva das alterações. Apenas linhas prontas e não recusadas serão gravadas.
+                  </div>
+                </>
               )}
               <Button variant="outline" onClick={() => exportarRelatorioMigracaoAlteracoesLegado({ ...analise, estado: 'Analise' }, `relatorio-analise-alteracoes-legado-${analise.arquivo.nome}.json`)}>
                 <Download className="w-4 h-4 mr-2" /> Exportar relatório
