@@ -24,3 +24,29 @@ test('classificação pendentes legado permanece com descrição de ferramenta a
   assert.match(conteudo, /Ferramenta administrativa de migração/);
   assert.match(conteudo, /LEGADO_NAO_CLASSIFICADO/);
 });
+
+test('lote 2 mantém consulta de publicações escopada ao militar e status simplificados', async () => {
+  const conteudo = await read('services/migracaoAlteracoesLegadoSimplificadoService.js');
+  assert.match(conteudo, /PublicacaoExOfficio\.filter\(\s*\{ militar_id: militarId \},\s*'-created_date',\s*5000,\s*\)/);
+  assert.doesNotMatch(conteudo, /base44\.entities\.Militar\.list\(/);
+  assert.match(conteudo, /PRONTA: 'pronta'/);
+  assert.match(conteudo, /ERRO: 'erro'/);
+  assert.match(conteudo, /DUPLICADA: 'duplicada'/);
+});
+
+test('lote 2 bloqueia ações legadas e edição inline no modo simplificado', async () => {
+  const pagina = await read('pages/MigracaoAlteracoesLegado.jsx');
+  const tabela = await read('components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado.jsx');
+  assert.match(pagina, /somenteLeitura=\{analise\.fluxo_simplificado === true\}/);
+  assert.match(pagina, /\{!analise\.fluxo_simplificado && \(/);
+  assert.match(tabela, /\{somenteLeitura \? \(/);
+  assert.match(tabela, /Edição, recusa e importação permanecem bloqueadas/);
+});
+
+test('lote 2 aceita CSV e XLSX, bloqueia XLS e protege runtime Node sem DOMParser', async () => {
+  const conteudo = await read('services/migracaoAlteracoesLegadoSimplificadoService.js');
+  assert.match(conteudo, /nome\.endsWith\('\.csv'\)/);
+  assert.match(conteudo, /nome\.endsWith\('\.xlsx'\)/);
+  assert.match(conteudo, /nome\.endsWith\('\.xls'\).*Formato \.xls não suportado/);
+  assert.match(conteudo, /typeof DOMParser === 'undefined'/);
+});

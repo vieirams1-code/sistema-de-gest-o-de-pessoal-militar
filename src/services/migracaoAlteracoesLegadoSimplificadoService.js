@@ -177,7 +177,12 @@ function getZipText(arquivosZip, caminho) {
   return strFromU8(conteudo);
 }
 
-function parseXml(s) { return new DOMParser().parseFromString(s, 'application/xml'); }
+function parseXml(s) {
+  if (typeof DOMParser === 'undefined') {
+    throw new Error('Leitura de .xlsx requer DOMParser disponível no navegador. Use CSV neste runtime.');
+  }
+  return new DOMParser().parseFromString(s, 'application/xml');
+}
 
 function resolverCaminho(base, destino) {
   if (!destino) return null;
