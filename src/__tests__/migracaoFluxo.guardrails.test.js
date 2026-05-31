@@ -42,6 +42,8 @@ test('lote 3 usa tabela própria editável sem expor controles legados no modo s
   assert.match(pagina, /\{!analise\.fluxo_simplificado && \(/);
   assert.match(tabela, /Número nota/);
   assert.match(tabela, /Texto publicado/);
+  assert.match(tabela, /Status publicação/);
+  assert.match(tabela, /linha\.status_publicacao/);
   assert.match(tabela, /Restaurar/);
   assert.match(tabela, /Recusar/);
 });
@@ -52,4 +54,20 @@ test('lote 2 aceita CSV e XLSX, bloqueia XLS e protege runtime Node sem DOMParse
   assert.match(conteudo, /nome\.endsWith\('\.xlsx'\)/);
   assert.match(conteudo, /nome\.endsWith\('\.xls'\).*Formato \.xls não suportado/);
   assert.match(conteudo, /typeof DOMParser === 'undefined'/);
+});
+
+test('lote 3.1 calcula publicação legado sem AGUARDANDO_NOTA e prepara persistência futura', async () => {
+  const analise = await read('services/migracaoAlteracoesLegadoSimplificadoService.js');
+  const edicao = await read('services/migracaoAlteracoesLegadoSimplificadoEdicao.js');
+  const status = await read('services/migracaoAlteracoesLegadoStatusPublicacao.js');
+  const pagina = await read('pages/MigracaoAlteracoesLegado.jsx');
+
+  assert.match(analise, /const CAMPOS_OBRIGATORIOS = \['numero_nota', 'texto_publicado'\]/);
+  assert.match(analise, /status_publicacao: calcularStatusPublicacaoLegado/);
+  assert.match(edicao, /status_publicacao: statusPublicacao/);
+  assert.match(edicao, /const statusPublicacao = calcularStatusPublicacaoLegado/);
+  assert.match(pagina, /status_publicacao: linha\.status_publicacao/);
+  assert.match(status, /AGUARDANDO_PUBLICACAO: 'AGUARDANDO_PUBLICACAO'/);
+  assert.match(status, /PUBLICADO: 'PUBLICADO'/);
+  assert.doesNotMatch(status, /AGUARDANDO_NOTA/);
 });

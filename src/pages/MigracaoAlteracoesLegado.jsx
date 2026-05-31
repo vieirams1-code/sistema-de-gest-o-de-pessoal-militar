@@ -115,6 +115,7 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
       tipo_publicacao_sugerido: linha.tipo_classificado,
       tipo_publicacao_confirmado: linha.tipo_classificado,
       conteudo_trecho_legado: linha.texto_publicado,
+      status_publicacao: linha.status_publicacao,
       destino_final: linha.status === STATUS_LINHA_SIMPLIFICADO.PRONTA ? 'IMPORTAR' : 'PENDENTE_CLASSIFICACAO',
       motivo_destino: linha.erros[0] || linha.avisos[0] || '',
     },
@@ -130,6 +131,7 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
     tipo_legado: linha.tipo_legado,
     tipo_classificado: linha.tipo_classificado,
     texto_publicado: linha.texto_publicado,
+    status_publicacao: linha.status_publicacao,
     numerosNotaImportados,
   })));
 
