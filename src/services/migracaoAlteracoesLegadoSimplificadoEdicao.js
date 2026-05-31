@@ -1,3 +1,5 @@
+import { calcularStatusPublicacaoLegado } from './migracaoAlteracoesLegadoStatusPublicacao.js';
+
 export const STATUS_REVISAO_SIMPLIFICADA = Object.freeze({
   PRONTA: 'pronta',
   ERRO: 'erro',
@@ -31,6 +33,11 @@ function dataBgBrValida(valor) {
 }
 
 function sincronizarTransformado(linha) {
+  const statusPublicacao = calcularStatusPublicacaoLegado({
+    numero_nota: linha.numero_nota,
+    numero_bg_br: linha.numero_bg_br,
+    data_bg_br: linha.data_bg_br,
+  });
   return {
     ...linha.transformado,
     nota_id_legado: linha.numero_nota,
@@ -40,6 +47,7 @@ function sincronizarTransformado(linha) {
     tipo_publicacao_sugerido: linha.tipo_classificado || linha.tipo_legado,
     tipo_publicacao_confirmado: linha.tipo_classificado || linha.tipo_legado,
     conteudo_trecho_legado: linha.texto_publicado,
+    status_publicacao: statusPublicacao,
     destino_final: linha.recusada ? 'IGNORAR' : 'IMPORTAR',
   };
 }
@@ -83,6 +91,7 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
       return {
         ...linha,
         status: STATUS_REVISAO_SIMPLIFICADA.RECUSADA,
+        status_publicacao: calcularStatusPublicacaoLegado(linha),
         erros: [],
         avisos: [],
         transformado: sincronizarTransformado(linha),
@@ -109,7 +118,12 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
       erros.push('Número da nota duplicado na própria análise.');
     }
 
-    const proxima = { ...linha, status, erros, avisos };
+    const statusPublicacao = calcularStatusPublicacaoLegado({
+      numero_nota: linha.numero_nota,
+      numero_bg_br: linha.numero_bg_br,
+      data_bg_br: linha.data_bg_br,
+    });
+    const proxima = { ...linha, status, status_publicacao: statusPublicacao, erros, avisos };
     return { ...proxima, transformado: sincronizarTransformado(proxima) };
   });
 }

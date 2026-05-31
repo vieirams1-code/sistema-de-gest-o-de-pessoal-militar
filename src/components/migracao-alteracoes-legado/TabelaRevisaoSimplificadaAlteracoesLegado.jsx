@@ -41,6 +41,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           <TableRow>
             <TableHead>Status</TableHead>
             <TableHead>Linha</TableHead>
+            <TableHead className="min-w-56">Status publicação</TableHead>
             <TableHead className="min-w-36">Número nota</TableHead>
             <TableHead className="min-w-32">Número BG/BR</TableHead>
             <TableHead className="min-w-36">Data BG/BR</TableHead>
@@ -60,6 +61,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               <TableRow key={linha.linhaNumero} className={cn(desabilitada && 'bg-slate-50 opacity-75')}>
                 <TableCell><Badge className={cn('border capitalize', statusClass[linha.status])}>{linha.status}</Badge></TableCell>
                 <TableCell>{linha.linhaNumero}</TableCell>
+                <TableCell className="text-xs font-medium text-slate-700">{linha.status_publicacao}</TableCell>
                 <TableCell><Input disabled={desabilitada} value={linha.numero_nota} onChange={(e) => onAlterarLinha(linha, { numero_nota: e.target.value })} /></TableCell>
                 <TableCell><Input disabled={desabilitada} value={linha.numero_bg_br} onChange={(e) => onAlterarLinha(linha, { numero_bg_br: e.target.value })} /></TableCell>
                 <TableCell><Input disabled={desabilitada} value={linha.data_bg_br} onChange={(e) => onAlterarLinha(linha, { data_bg_br: e.target.value })} placeholder="dd/mm/aaaa" /></TableCell>

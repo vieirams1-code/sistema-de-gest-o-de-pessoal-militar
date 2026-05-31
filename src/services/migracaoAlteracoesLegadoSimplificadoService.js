@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { strFromU8, unzipSync } from 'fflate';
+import { calcularStatusPublicacaoLegado } from './migracaoAlteracoesLegadoStatusPublicacao';
 
 /**
  * Lote 2 — Análise simplificada da planilha de Migração de Alterações Legado.
@@ -347,6 +348,7 @@ function gerarResumo(linhas) {
  *     tipo_legado: string,
  *     tipo_classificado: string,
  *     texto_publicado: string,
+ *     status_publicacao: 'AGUARDANDO_PUBLICACAO'|'PUBLICADO',
  *     erros: string[],
  *     avisos: string[],
  *     recusada: boolean,
@@ -431,6 +433,11 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
       tipo_legado: tipoLegado,
       tipo_classificado: tipoClassificado,
       texto_publicado: textoPublicado,
+      status_publicacao: calcularStatusPublicacaoLegado({
+        numero_nota: numeroNotaBruto,
+        numero_bg_br: numeroBgBr,
+        data_bg_br: dataBgBrNormalizada,
+      }),
       erros,
       avisos,
       recusada: false,
@@ -447,6 +454,6 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
     numerosNotaJaExistentes: Array.from(numerosNotaJaExistentes),
     linhas,
     resumo: gerarResumo(linhas),
-    versao_regra: 'lote2.v1.0.0',
+    versao_regra: 'lote3.1.v1.0.0',
   };
 }
