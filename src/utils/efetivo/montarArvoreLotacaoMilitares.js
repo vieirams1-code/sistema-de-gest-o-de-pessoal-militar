@@ -2,6 +2,82 @@ const TEXTO_SETOR_FALLBACK = 'CMB';
 const TEXTO_SUBSETOR_FALLBACK = '1º GBM';
 const TEXTO_UNIDADE_FALLBACK = 'Unidade não informada';
 
+const POSTOS_OFICIAIS = new Set([
+  'ASP OFICIAL',
+  'ASPIRANTE',
+  'ASPIRANTE A OFICIAL',
+  '2º TEN',
+  '2 TEN',
+  '2º TENENTE',
+  '2 TENENTE',
+  '1º TEN',
+  '1 TEN',
+  '1º TENENTE',
+  '1 TENENTE',
+  'CAP',
+  'CAPITAO',
+  'MAJ',
+  'MAJOR',
+  'TEN CEL',
+  'TENENTE CORONEL',
+  'CORONEL',
+]);
+
+function normalizarTextoClassificacao(valor) {
+  return String(valor || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
+export function obterSexoMilitar(militar) {
+  const sexo = normalizarTextoClassificacao(
+    militar?.sexo
+    || militar?.genero
+    || militar?.sexo_biologico
+    || militar?.dados_pessoais?.sexo,
+  );
+
+  if (['F', 'FEM', 'FEMININO', 'MULHER'].includes(sexo)) return 'F';
+  if (['M', 'MASC', 'MASCULINO', 'HOMEM'].includes(sexo)) return 'M';
+  return 'NI';
+}
+
+export function obterGrupoHierarquicoMilitar(militar) {
+  const posto = normalizarTextoClassificacao(
+    militar?.posto_graduacao_resolvido
+    || militar?.posto_graduacao
+    || militar?.postoGraduacao
+    || militar?.posto
+    || militar?.graduacao
+    || militar?.pg,
+  );
+
+  // Subtenente é praça, apesar de conter o texto "tenente".
+  if (posto.includes('SUBTENENTE') || posto === 'ST' || posto === 'SUB TEN') return 'praca';
+  if (POSTOS_OFICIAIS.has(posto)) return 'oficial';
+  if (posto.includes('TENENTE') || posto.includes('CAPITAO') || posto.includes('MAJOR') || posto.includes('CORONEL') || posto.includes('ASP')) return 'oficial';
+  return 'praca';
+}
+
+export function calcularResumoEfetivo(militares = []) {
+  const resumo = { oficiais: 0, pracas: 0, homens: 0, mulheres: 0, sexoNaoInformado: 0 };
+
+  for (const militar of militares || []) {
+    if (obterGrupoHierarquicoMilitar(militar) === 'oficial') resumo.oficiais += 1;
+    else resumo.pracas += 1;
+
+    const sexo = obterSexoMilitar(militar);
+    if (sexo === 'M') resumo.homens += 1;
+    else if (sexo === 'F') resumo.mulheres += 1;
+    else resumo.sexoNaoInformado += 1;
+  }
+
+  return resumo;
+}
+
 function textoValido(valor) {
   if (valor === null || valor === undefined || typeof valor === 'object') return '';
   const texto = String(valor).trim();
@@ -196,7 +272,18 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
         .map((subsetor) => ({
           subsetorNome: subsetor.subsetorNome,
           subsetorSigla: subsetor.subsetorSigla,
-          unidades: Array.from(subsetor.unidadesMap.values()).sort((a, b) => a.unidadeNome.localeCompare(b.unidadeNome, 'pt-BR')),
+          unidades: Array.from(subsetor.unidadesMap.values())
+            .map((unidade) => {
+              const militares = unidade.militares || [];
+              return {
+                ...unidade,
+                resumoEfetivo: calcularResumoEfetivo(militares),
+                militares,
+                oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'),
+                pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial'),
+              };
+            })
+            .sort((a, b) => a.unidadeNome.localeCompare(b.unidadeNome, 'pt-BR')),
         }))
         .sort((a, b) => a.subsetorNome.localeCompare(b.subsetorNome, 'pt-BR')),
     }))

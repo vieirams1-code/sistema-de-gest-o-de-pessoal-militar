@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft, GitBranch } from 'lucide-react';
+import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft, GitBranch, X } from 'lucide-react';
 import { classificarMilitar, ordenarMilitaresAntiguidade, resolvePostoGraduacao } from '@/utils/efetivo/gestorClassificacao';
 import { filtrarUnidadesCartoes } from '@/utils/efetivo/visualizacaoGestor';
+import { calcularResumoEfetivo, obterGrupoHierarquicoMilitar, obterSexoMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 
 const summarizeMilitares = (militares = []) => {
   const oficiais = militares.filter((m) => classificarMilitar(m) === 'oficial').length;
@@ -35,6 +36,9 @@ const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
       setorNome: setor.setorNome,
       subsetorNome: subsetor.subsetorNome,
       militares: unidade.militares || [],
+      resumoEfetivo: unidade.resumoEfetivo || calcularResumoEfetivo(unidade.militares),
+      oficiais: unidade.oficiais || [],
+      pracas: unidade.pracas || [],
       filhos: [],
     })),
   })),
@@ -61,42 +65,146 @@ const TotalBadge = ({ total }) => (
   <Badge variant="outline" className="shrink-0 border-slate-200 bg-white text-slate-600">{total}</Badge>
 );
 
-const UnidadeTreeCard = ({ no, expandedUnits, onToggleUnit }) => {
-  const expanded = Boolean(expandedUnits[no.id]);
+const obterNomeExibicaoMilitar = (militar) => (
+  militar?.nome_guerra_resolvido
+  || militar?.nome_guerra
+  || militar?.nomeGuerra
+  || militar?.nome
+  || militar?.nome_completo
+  || 'Militar'
+);
+
+const obterPostoExibicaoMilitar = (militar) => (
+  militar?.posto_graduacao_resolvido
+  || militar?.posto_graduacao
+  || militar?.postoGraduacao
+  || militar?.posto
+  || militar?.graduacao
+  || ''
+);
+
+const obterMatriculaExibicaoMilitar = (militar) => militar?.matricula || militar?.matricula_funcional || militar?.numero_matricula || '';
+
+const MetricaUnidade = ({ tipo, label, valor }) => {
+  const config = {
+    oficiais: 'border-blue-100 bg-blue-50 text-blue-700',
+    pracas: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    homens: 'border-slate-200 bg-slate-50 text-slate-700',
+    mulheres: 'border-pink-100 bg-pink-50 text-pink-700',
+  };
+  const icones = { oficiais: '★', pracas: '◆', homens: '👨', mulheres: '👩' };
 
   return (
-    <div className="relative flex min-w-0 flex-col pt-6">
-      <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
-      <div className="flex min-h-[168px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-2.5">
-            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><MapPin className="h-4 w-4" /></div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">Unidade</p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-900">{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
-              {no.descricao ? <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{no.descricao}</p> : null}
-            </div>
-          </div>
-          <TotalBadge total={no.militares.length} />
-        </div>
-        <button type="button" onClick={() => onToggleUnit(no.id)} className="mt-auto flex items-center gap-1 pt-4 text-left text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800">
-          <Users className="h-3.5 w-3.5" /> {expanded ? 'Ocultar membros' : 'Ver membros'}
-        </button>
-        {expanded ? (
-          <div className="mt-3 max-h-52 space-y-2 overflow-y-auto border-t border-slate-100 pt-3 pr-1">
-            {no.militares.length > 0
-              ? no.militares.map((m) => <MembroChip key={`${m.id || m.matricula}-${no.id}`} militar={m} />)
-              : <p className="text-xs text-slate-400">Nenhum militar nesta unidade.</p>}
-          </div>
-        ) : null}
+    <div className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${config[tipo]}`}>
+      <span className="text-sm leading-none">{icones[tipo]}</span>
+      <div className="min-w-0">
+        <div className="text-[9px] font-bold uppercase tracking-wide opacity-80">{label}</div>
+        <div className="text-sm font-black leading-none">{valor || 0}</div>
       </div>
     </div>
   );
 };
 
-const SubsetorTree = ({ no, expandedUnits, onToggleUnit }) => {
+const LinhaMilitarEfetivo = ({ militar, indice }) => {
+  const nome = obterNomeExibicaoMilitar(militar);
+  const posto = obterPostoExibicaoMilitar(militar);
+  const matricula = obterMatriculaExibicaoMilitar(militar);
+  const sexo = obterSexoMilitar(militar);
+  const tituloSexo = sexo === 'F' ? 'Mulher' : sexo === 'M' ? 'Homem' : 'Sexo não informado';
+
+  return (
+    <div className="grid grid-cols-[42px_1fr_46px] items-center border-b border-slate-100 px-4 py-3 last:border-b-0">
+      <div className="text-xs font-bold text-slate-400">{indice + 1}</div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-bold text-slate-900" title={nome}>{nome}</div>
+        <div className="mt-0.5 truncate text-xs text-slate-500">{[posto, matricula ? `Matrícula ${matricula}` : ''].filter(Boolean).join(' • ')}</div>
+      </div>
+      <div className="text-center text-lg" title={tituloSexo}>{sexo === 'F' ? '👩' : sexo === 'M' ? '👨' : '•'}</div>
+    </div>
+  );
+};
+
+const SecaoEfetivo = ({ titulo, militares, observacao }) => (
+  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+      <div>
+        <div className="text-sm font-black text-slate-900">{titulo}</div>
+        {observacao ? <div className="mt-0.5 text-xs text-slate-500">{observacao}</div> : null}
+      </div>
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{militares?.length || 0}</span>
+    </div>
+    {militares?.length ? (
+      <div>{militares.map((militar, indice) => <LinhaMilitarEfetivo key={militar.id || militar.matricula || `${titulo}-${indice}`} militar={militar} indice={indice} />)}</div>
+    ) : <div className="px-4 py-6 text-center text-sm text-slate-500">Nenhum militar neste grupo.</div>}
+  </section>
+);
+
+const ModalEfetivoUnidade = ({ unidade, onClose }) => {
+  if (!unidade) return null;
+  const subtitulo = [unidade.sigla, unidade.descricao].filter(Boolean).join(' • ');
+  const resumo = unidade.resumoEfetivo || {};
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-efetivo-titulo">
+      <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <header className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50 px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="modal-efetivo-titulo" className="text-lg font-black text-slate-900">Efetivo — {unidade.nome}</h2>
+              {subtitulo ? <p className="mt-1 text-sm text-slate-500">{subtitulo}</p> : null}
+              <p className="mt-1 text-xs text-slate-500">Ordenado por antiguidade dentro de cada grupo.</p>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Fechar">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <MetricaUnidade tipo="oficiais" label="Oficiais" valor={resumo.oficiais} />
+            <MetricaUnidade tipo="pracas" label="Praças" valor={resumo.pracas} />
+            <MetricaUnidade tipo="homens" label="Homens" valor={resumo.homens} />
+            <MetricaUnidade tipo="mulheres" label="Mulheres" valor={resumo.mulheres} />
+          </div>
+        </header>
+        <main className="flex-1 space-y-4 overflow-y-auto bg-white p-5">
+          <SecaoEfetivo titulo="Oficiais" militares={unidade.oficiais || []} />
+          <SecaoEfetivo titulo="Praças" observacao="Inclui Subtenentes." militares={unidade.pracas || []} />
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const UnidadeTreeCard = ({ no, onVerMembros }) => (
+  <div className="relative flex min-w-0 flex-col pt-6">
+    <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+    <div className="flex w-[280px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><MapPin className="h-4 w-4" /></div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">Unidade</p>
+            <p className="mt-0.5 text-sm font-semibold text-slate-900">{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            {no.descricao ? <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{no.descricao}</p> : null}
+          </div>
+        </div>
+        <TotalBadge total={no.militares.length} />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <MetricaUnidade tipo="oficiais" label="Oficiais" valor={no.resumoEfetivo?.oficiais} />
+        <MetricaUnidade tipo="pracas" label="Praças" valor={no.resumoEfetivo?.pracas} />
+        <MetricaUnidade tipo="homens" label="Homens" valor={no.resumoEfetivo?.homens} />
+        <MetricaUnidade tipo="mulheres" label="Mulheres" valor={no.resumoEfetivo?.mulheres} />
+      </div>
+      <button type="button" onClick={() => onVerMembros(no)} className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+        <span>Ver membros ({no.militares.length})</span><span className="text-slate-400">↗</span>
+      </button>
+    </div>
+  </div>
+);
+
+const SubsetorTree = ({ no, onVerMembros }) => {
   const unidades = no.filhos || [];
-  const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(250px, 1fr))` };
+  const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(280px, 1fr))` };
 
   return (
     <div className="relative flex min-w-0 flex-col items-center pt-6">
@@ -116,9 +224,9 @@ const SubsetorTree = ({ no, expandedUnits, onToggleUnit }) => {
       {unidades.length > 0 ? (
         <div className="relative w-full pt-8">
           <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
-          {unidades.length > 1 ? <div className="absolute left-[calc(125px)] right-[calc(125px)] top-8 h-px bg-slate-300" /> : null}
+          {unidades.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-5" style={unitGridStyle}>
-            {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} expandedUnits={expandedUnits} onToggleUnit={onToggleUnit} />)}
+            {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} onVerMembros={onVerMembros} />)}
           </div>
         </div>
       ) : null}
@@ -126,7 +234,7 @@ const SubsetorTree = ({ no, expandedUnits, onToggleUnit }) => {
   );
 };
 
-const SetorTree = ({ no, expandedUnits, onToggleUnit }) => {
+const SetorTree = ({ no, onVerMembros }) => {
   const subsetores = no.filhos || [];
   const subsetorGridStyle = { gridTemplateColumns: `repeat(${Math.max(subsetores.length, 1)}, minmax(280px, 1fr))` };
 
@@ -149,7 +257,7 @@ const SetorTree = ({ no, expandedUnits, onToggleUnit }) => {
           <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
           {subsetores.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-8" style={subsetorGridStyle}>
-            {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} expandedUnits={expandedUnits} onToggleUnit={onToggleUnit} />)}
+            {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} onVerMembros={onVerMembros} />)}
           </div>
         </div>
       ) : null}
@@ -187,7 +295,7 @@ const renderListaNode = (no, level, expanded, onToggle) => {
 
 export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidadeMap }) {
   const [activeView, setActiveView] = useState('arvore');
-  const [expandedUnitsTree, setExpandedUnitsTree] = useState({});
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState(null);
   const [expandedListNodes, setExpandedListNodes] = useState({});
   const [buscaCartoes, setBuscaCartoes] = useState('');
 
@@ -198,7 +306,15 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
       ...subsetor,
       unidades: (subsetor.unidades || []).map((unidade) => ({
         ...unidade,
-        militares: ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap),
+        ...(() => {
+          const militares = ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap);
+          return {
+            militares,
+            resumoEfetivo: calcularResumoEfetivo(militares),
+            oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'),
+            pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial'),
+          };
+        })(),
       })).filter((u) => !q || u.militares.length > 0),
     })).filter((ss) => !q || ss.unidades.length > 0),
   })).filter((s) => !q || s.subsetores.length > 0), [estrutura, q, ordemAntiguidadeMap]);
@@ -215,7 +331,6 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
     });
   }, [nos]);
 
-  const toggleUnit = (id) => setExpandedUnitsTree((prev) => ({ ...prev, [id]: !prev[id] }));
   const toggleListNode = (id) => setExpandedListNodes((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
@@ -231,7 +346,7 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
         </div>
       </div>
 
-      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max items-start justify-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} expandedUnits={expandedUnitsTree} onToggleUnit={toggleUnit} />)}</div></div> : null}
+      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max items-start justify-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} onVerMembros={setUnidadeSelecionada} />)}</div></div> : null}
 
       {activeView === 'lista' ? <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">{nos.map((no) => renderListaNode(no, 0, expandedListNodes, toggleListNode))}</div> : null}
 
@@ -265,6 +380,8 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
           </div>
         </div>
       ) : null}
+
+      <ModalEfetivoUnidade unidade={unidadeSelecionada} onClose={() => setUnidadeSelecionada(null)} />
     </div>
   );
 }
