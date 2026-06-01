@@ -38,6 +38,13 @@ test('buildPreviewTemplateVars retorna aliases de quadro coerentes', () => {
   assert.equal(vars.militar_quadro, vars.quadro);
 });
 
+test('buildPreviewTemplateVars resolve variáveis canônicas de médico e CRM no preview', () => {
+  const vars = buildPreviewTemplateVars();
+  const saida = aplicarTemplate('{{medico_nome}}|{{medico_crm}}', vars);
+
+  assert.equal(saida, 'Dra. Maria Souza|CRM 12345');
+});
+
 test('buildPreviewTemplateVars usa mesmo contrato para posto_nome', () => {
   const vars = buildPreviewTemplateVars({ posto_abreviatura: 'Maj', quadro: 'QOSAU' });
   const esperado = montarPostoNomeTemplate({ abreviatura: 'Maj', quadro: 'QOSAU', source: vars });

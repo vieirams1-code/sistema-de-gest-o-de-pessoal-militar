@@ -39,6 +39,39 @@ test('buildTemplateVarsContrato usa fallback de matrícula para "-"', () => {
   assert.equal(vars.matricula, '-');
 });
 
+
+test('buildTemplateVarsContrato mapeia aliases de médico e CRM para as variáveis canônicas', () => {
+  const varsLegado = buildTemplateVarsContrato({
+    nome_medico: 'Dra. Ana Souza',
+    crm_medico: 'CRM 12345',
+  });
+  assert.equal(varsLegado.medico_nome, 'Dra. Ana Souza');
+  assert.equal(varsLegado.medico_crm, 'CRM 12345');
+
+  const varsAlternativas = buildTemplateVarsContrato({
+    medico: 'Dr. Bruno Lima',
+    crm: 'CRM 67890',
+  });
+  assert.equal(varsAlternativas.medico_nome, 'Dr. Bruno Lima');
+  assert.equal(varsAlternativas.medico_crm, 'CRM 67890');
+});
+
+test('buildTemplateVarsContrato prioriza snapshots do atestado para médico e CRM', () => {
+  const vars = buildTemplateVarsContrato({
+    medico_nome_snapshot: 'Dra. Snapshot',
+    medico_nome: 'Dra. Canônica',
+    nome_medico: 'Dra. Legado',
+    medico: 'Dra. Alternativa',
+    medico_crm_snapshot: 'CRM SNAPSHOT',
+    medico_crm: 'CRM CANÔNICO',
+    crm_medico: 'CRM LEGADO',
+    crm: 'CRM ALTERNATIVO',
+  });
+
+  assert.equal(vars.medico_nome, 'Dra. Snapshot');
+  assert.equal(vars.medico_crm, 'CRM SNAPSHOT');
+});
+
 test('composeTemplateVarsRP preserva matrícula específica do RP', () => {
   const vars = composeTemplateVarsRP({
     formData: { campo_legado: 'ok', matricula: 'FORM-1' },

@@ -52,6 +52,9 @@ export const montarPostoNomeTemplate = ({ abreviatura, posto, quadro, source } =
   return [postoResolvido, quadroResolvido].filter(Boolean).join(' ');
 };
 
+const firstNonEmptyTemplateValue = (...candidatos) =>
+  candidatos.map((valor) => String(valor || '').trim()).find(Boolean) || '';
+
 export function buildTemplateVarsContrato(source = {}) {
   const nomeCompleto = String(
     source?.nome_completo ??
@@ -68,6 +71,19 @@ export function buildTemplateVarsContrato(source = {}) {
     quadro,
     source,
   });
+
+  const medicoNome = firstNonEmptyTemplateValue(
+    source?.medico_nome_snapshot,
+    source?.medico_nome,
+    source?.nome_medico,
+    source?.medico
+  );
+  const medicoCrm = firstNonEmptyTemplateValue(
+    source?.medico_crm_snapshot,
+    source?.medico_crm,
+    source?.crm_medico,
+    source?.crm
+  );
 
   const matricula = [
     source?.matricula_documental,
@@ -88,6 +104,8 @@ export function buildTemplateVarsContrato(source = {}) {
     quadro_nome: quadro,
     militar_quadro: quadro,
     matricula,
+    ...(medicoNome ? { medico_nome: medicoNome } : {}),
+    ...(medicoCrm ? { medico_crm: medicoCrm } : {}),
   };
 }
 
