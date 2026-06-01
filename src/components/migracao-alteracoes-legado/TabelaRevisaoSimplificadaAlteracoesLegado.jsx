@@ -30,11 +30,9 @@ const statusDaLinha = (linha) => linha.recusada
   : (linha.statusSimplificado || linha.status?.toLowerCase() || 'erro');
 const possuiAviso = (linha) => linha.avisos?.length > 0;
 const possuiMensagemErro = (linha) => linha.erros?.length > 0;
-const possuiErro = (linha) => linha.statusSimplificado === 'erro';
+const possuiErro = (linha) => linha.statusSimplificado === 'erro' || possuiMensagemErro(linha);
 const possuiDuplicidade = (linha) => linha.statusSimplificado === 'duplicada';
-const estaPendente = (linha) => !linha.recusada && (
-  !possuiClassificacao(linha) || possuiErro(linha) || possuiMensagemErro(linha) || possuiDuplicidade(linha) || possuiAviso(linha)
-);
+const estaPendenteClassificacao = (linha) => !linha.recusada && !possuiClassificacao(linha);
 const estaPronta = (linha) => !linha.recusada && linha.statusSimplificado === 'pronta' && possuiClassificacao(linha)
   && !possuiMensagemErro(linha) && !possuiAviso(linha);
 
@@ -42,15 +40,18 @@ function ListaMensagens({ itens, tipo = 'aviso' }) {
   if (!itens?.length) return null;
 
   const Icon = tipo === 'erro' ? AlertCircle : AlertTriangle;
+  const itensVisiveis = itens.slice(0, 2);
+  const quantidadeOculta = itens.length - itensVisiveis.length;
 
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1">
-      {itens.map((item, idx) => (
-        <p key={idx} className="flex min-w-0 items-start gap-1 leading-snug">
+    <div className="space-y-0.5">
+      {itensVisiveis.map((item, idx) => (
+        <p key={idx} className="flex min-w-0 items-start gap-1 leading-tight">
           <Icon className="mt-0.5 h-3 w-3 shrink-0" />
           <span>{item}</span>
         </p>
       ))}
+      {quantidadeOculta > 0 && <p className="text-[10px] italic opacity-80">+ {quantidadeOculta} mensagens</p>}
     </div>
   );
 }
@@ -108,9 +109,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
     if (filtroClassificacao === 'classificados' && !possuiClassificacao(linha)) return false;
     if (filtroClassificacao === 'sem-classificacao' && possuiClassificacao(linha)) return false;
 
-    if (filtroOperacional === 'pendentes') return estaPendente(linha);
-    if (filtroOperacional === 'prontas') return estaPronta(linha);
+    if (filtroOperacional === 'pendentes-classificacao') return estaPendenteClassificacao(linha);
     if (filtroOperacional === 'erros') return possuiErro(linha);
+    if (filtroOperacional === 'avisos') return possuiAviso(linha);
+    if (filtroOperacional === 'prontas') return estaPronta(linha);
     if (filtroOperacional === 'duplicadas') return possuiDuplicidade(linha);
     if (filtroOperacional === 'recusadas') return linha.recusada === true;
     return true;
@@ -118,11 +120,12 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
 
   const contadores = useMemo(() => ({
     total: linhasFiltradas.length,
-    pendentes: linhasFiltradas.filter(estaPendente).length,
+    pendentesClassificacao: linhasFiltradas.filter(estaPendenteClassificacao).length,
     prontas: linhasFiltradas.filter(estaPronta).length,
     semClassificacao: linhasFiltradas.filter((linha) => !possuiClassificacao(linha)).length,
     classificados: linhasFiltradas.filter(possuiClassificacao).length,
     erros: linhasFiltradas.filter(possuiErro).length,
+    avisos: linhasFiltradas.filter(possuiAviso).length,
     duplicadas: linhasFiltradas.filter(possuiDuplicidade).length,
     recusadas: linhasFiltradas.filter((linha) => linha.recusada).length,
   }), [linhasFiltradas]);
@@ -130,7 +133,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   const linhasDuplicadasParaRecusar = linhasFiltradas.filter((linha) => possuiDuplicidade(linha) && !linha.recusada);
   const linhasComErroParaRecusar = linhasFiltradas.filter((linha) => possuiErro(linha) && !linha.recusada);
   const linhasParaRestaurar = linhasFiltradas.filter((linha) => linha.recusada);
-  const alternarRecusaEmLote = (linhasAplicaveis) => linhasAplicaveis.forEach((linha) => onAlternarRecusa(linha));
+  const alternarRecusaEmLote = (linhasAplicaveis, mensagemConfirmacao) => {
+    if (!window.confirm(mensagemConfirmacao)) return;
+    linhasAplicaveis.forEach((linha) => onAlternarRecusa(linha));
+  };
 
   useEffect(() => {
     if (!linhasFiltradas.length) {
@@ -168,8 +174,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   }, [linhasFiltradas, selecionadaIndex]);
 
   return (
-    <section className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:h-[calc(100vh-220px)] lg:flex-row">
-      <aside className="flex max-h-[440px] w-full shrink-0 flex-col border-b border-slate-200 bg-slate-50 lg:h-full lg:max-h-full lg:w-[360px] lg:border-b-0 lg:border-r xl:w-[410px]">
+    <section className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:min-h-[calc(100vh-220px)] lg:flex-row">
+      <aside className="flex max-h-[440px] w-full shrink-0 flex-col border-b border-slate-200 bg-slate-50 lg:max-h-[calc(100vh-220px)] lg:w-[360px] lg:border-b-0 lg:border-r xl:w-[410px]">
         <div className="shrink-0 space-y-1.5 border-b border-slate-200 bg-slate-100 p-2.5">
           <div>
             <h3 className="text-sm font-semibold text-slate-700">Revisão simplificada</h3>
@@ -184,10 +190,11 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               <SelectTrigger className="h-8 bg-white text-xs" aria-label="Filtro operacional"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendentes">Pendentes de revisão</SelectItem>
-                <SelectItem value="prontas">Prontas</SelectItem>
-                <SelectItem value="erros">Erros</SelectItem>
+                <SelectItem value="pendentes-classificacao">Pendentes de classificação</SelectItem>
+                <SelectItem value="erros">Com erro</SelectItem>
+                <SelectItem value="avisos">Com aviso</SelectItem>
                 <SelectItem value="duplicadas">Duplicadas</SelectItem>
+                <SelectItem value="prontas">Prontas</SelectItem>
                 <SelectItem value="recusadas">Recusadas</SelectItem>
               </SelectContent>
             </Select>
@@ -202,18 +209,19 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           </div>
           <div className="flex flex-wrap gap-1">
             <Contador rotulo="Total filtrado" valor={contadores.total} />
-            <Contador rotulo="Pendentes" valor={contadores.pendentes} destaque="border-amber-200 bg-amber-50 text-amber-700" />
+            <Contador rotulo="Pendentes classificação" valor={contadores.pendentesClassificacao} destaque="border-amber-200 bg-amber-50 text-amber-700" />
             <Contador rotulo="Prontas" valor={contadores.prontas} destaque="border-emerald-200 bg-emerald-50 text-emerald-700" />
             <Contador rotulo="Classificados" valor={contadores.classificados} destaque="border-indigo-200 bg-indigo-50 text-indigo-700" />
             <Contador rotulo="Sem classificação" valor={contadores.semClassificacao} destaque="border-amber-200 bg-amber-50 text-amber-700" />
             <Contador rotulo="Erros" valor={contadores.erros} destaque="border-orange-200 bg-orange-50 text-orange-700" />
+            <Contador rotulo="Avisos" valor={contadores.avisos} destaque="border-amber-200 bg-amber-50 text-amber-700" />
             <Contador rotulo="Duplicadas" valor={contadores.duplicadas} destaque="border-red-200 bg-red-50 text-red-700" />
             <Contador rotulo="Recusadas" valor={contadores.recusadas} />
           </div>
           <div className="flex flex-wrap gap-1">
-            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasDuplicadasParaRecusar.length} onClick={() => alternarRecusaEmLote(linhasDuplicadasParaRecusar)}>Recusar duplicadas</Button>
-            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasComErroParaRecusar.length} onClick={() => alternarRecusaEmLote(linhasComErroParaRecusar)}>Recusar erros</Button>
-            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasParaRestaurar.length} onClick={() => alternarRecusaEmLote(linhasParaRestaurar)}><RotateCcw className="mr-1 h-3 w-3" />Restaurar todas</Button>
+            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasDuplicadasParaRecusar.length} onClick={() => alternarRecusaEmLote(linhasDuplicadasParaRecusar, `Recusar ${linhasDuplicadasParaRecusar.length} linhas duplicadas visíveis no filtro atual?`)}>Recusar duplicadas</Button>
+            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasComErroParaRecusar.length} onClick={() => alternarRecusaEmLote(linhasComErroParaRecusar, `Recusar ${linhasComErroParaRecusar.length} linhas com erro visíveis no filtro atual?`)}>Recusar erros</Button>
+            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasParaRestaurar.length} onClick={() => alternarRecusaEmLote(linhasParaRestaurar, `Restaurar ${linhasParaRestaurar.length} linhas recusadas visíveis no filtro atual?`)}><RotateCcw className="mr-1 h-3 w-3" />Restaurar todas</Button>
           </div>
         </div>
 
@@ -270,6 +278,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                   <h3 className="text-sm font-bold text-slate-800">Linha {linha.linhaNumero}</h3>
                   <Badge className={cn('border px-1.5 py-0 text-[10px]', statusClass[statusVisual] || statusClass.erro)}>{statusVisual.toUpperCase()}</Badge>
                   <span className="text-[11px] text-slate-500">Status publicação: <strong className="text-slate-700">{linha.status_publicacao || '—'}</strong></span>
+                  <span className="text-[11px] text-slate-500">Registro {selecionadaIndex + 1} de {linhasFiltradas.length}</span>
                 </div>
                 <div className="flex gap-1">
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handlePrev} disabled={selecionadaIndex <= 0}><ChevronLeft className="h-3.5 w-3.5" /> Anterior</Button>
@@ -277,7 +286,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                 </div>
               </div>
 
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2.5">
+              <div className="flex flex-1 flex-col gap-1.5 p-2">
                 <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1.5 md:grid-cols-5">
                   <CampoCompacto rotulo="Nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                   <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
@@ -300,15 +309,15 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                 </div>
 
                 {(linha.erros?.length > 0 || linha.avisos?.length > 0) && (
-                  <div className="grid max-h-24 grid-cols-1 gap-1.5 overflow-y-auto md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
                     {linha.erros?.length > 0 && <div className="rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-[11px] text-rose-700"><h4 className="font-semibold text-rose-800">Erros bloqueantes</h4><ListaMensagens itens={linha.erros} tipo="erro" /></div>}
                     {linha.avisos?.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-1.5 text-[11px] text-amber-700"><h4 className="font-semibold text-amber-800">Avisos</h4><ListaMensagens itens={linha.avisos} /></div>}
                   </div>
                 )}
 
-                <div className="flex min-h-[160px] flex-1 flex-col">
+                <div className="flex min-h-[110px] flex-1 flex-col">
                   <label className="mb-1 block text-xs font-semibold text-slate-700">Texto publicado</label>
-                  <Textarea disabled={desabilitada} value={linha.texto_publicado || ''} onChange={(event) => onAlterarLinha(linha, { texto_publicado: event.target.value })} className="min-h-[160px] flex-1 resize-y p-2.5 font-mono text-sm leading-snug" placeholder="Conteúdo do texto publicado..." />
+                  <Textarea disabled={desabilitada} value={linha.texto_publicado || ''} onChange={(event) => onAlterarLinha(linha, { texto_publicado: event.target.value })} className="min-h-[110px] flex-1 resize-y p-2 font-mono text-sm leading-snug" placeholder="Conteúdo do texto publicado..." />
                 </div>
               </div>
 
