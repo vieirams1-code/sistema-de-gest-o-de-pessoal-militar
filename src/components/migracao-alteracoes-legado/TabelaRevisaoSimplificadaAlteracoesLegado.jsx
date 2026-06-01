@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, RotateCcw, Search, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, Pencil, RotateCcw, Search, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -81,8 +82,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
 }) {
   const [selecionadaId, setSelecionadaId] = useState(null);
   const [pesquisa, setPesquisa] = useState('');
-  const [filtroClassificacao, setFiltroClassificacao] = useState('todos');
+  const [mostrarClassificados, setMostrarClassificados] = useState(false);
+  const [mostrarPendentes, setMostrarPendentes] = useState(true);
   const [filtroOperacional, setFiltroOperacional] = useState('todos');
+  const [textoEmEdicaoId, setTextoEmEdicaoId] = useState(null);
 
   const linhasPesquisadas = useMemo(() => {
     const termo = normalizar(pesquisa.trim());
@@ -106,8 +109,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   }, [linhas, pesquisa]);
 
   const linhasFiltradas = useMemo(() => linhasPesquisadas.filter((linha) => {
-    if (filtroClassificacao === 'classificados' && !possuiClassificacao(linha)) return false;
-    if (filtroClassificacao === 'sem-classificacao' && possuiClassificacao(linha)) return false;
+    if (possuiClassificacao(linha) && !mostrarClassificados) return false;
+    if (!possuiClassificacao(linha) && !mostrarPendentes) return false;
 
     if (filtroOperacional === 'pendentes-classificacao') return estaPendenteClassificacao(linha);
     if (filtroOperacional === 'erros') return possuiErro(linha);
@@ -116,7 +119,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
     if (filtroOperacional === 'duplicadas') return possuiDuplicidade(linha);
     if (filtroOperacional === 'recusadas') return linha.recusada === true;
     return true;
-  }), [filtroClassificacao, filtroOperacional, linhasPesquisadas]);
+  }), [filtroOperacional, linhasPesquisadas, mostrarClassificados, mostrarPendentes]);
 
   const contadores = useMemo(() => ({
     total: linhasFiltradas.length,
@@ -149,12 +152,29 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   const selecionadaIndex = linhasFiltradas.findIndex((linha) => linha.linhaNumero === selecionadaId);
   const selecionada = selecionadaIndex >= 0 ? linhasFiltradas[selecionadaIndex] : null;
 
+  useEffect(() => {
+    setTextoEmEdicaoId(null);
+  }, [selecionadaId, selecionada?.recusada]);
+
   const handleNext = () => {
     if (selecionadaIndex < linhasFiltradas.length - 1) setSelecionadaId(linhasFiltradas[selecionadaIndex + 1].linhaNumero);
   };
 
   const handlePrev = () => {
     if (selecionadaIndex > 0) setSelecionadaId(linhasFiltradas[selecionadaIndex - 1].linhaNumero);
+  };
+
+  const handleClassificarLinha = (linha, valor) => {
+    const tipoClassificado = valor === '__fallback__' ? '' : valor;
+    onAlterarLinha(linha, { tipo_classificado: tipoClassificado });
+    if (!tipoClassificado) return;
+
+    const linhasAposSelecionada = [
+      ...linhasFiltradas.slice(selecionadaIndex + 1),
+      ...linhasFiltradas.slice(0, selecionadaIndex),
+    ];
+    const proximaPendente = linhasAposSelecionada.find(estaPendenteClassificacao);
+    if (proximaPendente) setSelecionadaId(proximaPendente.linhaNumero);
   };
 
   useEffect(() => {
@@ -185,27 +205,27 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
             <Input value={pesquisa} onChange={(event) => setPesquisa(event.target.value)} placeholder="Pesquisar nota, BG, matéria, texto..." className="h-8 bg-white pl-8 text-xs" />
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            <Select value={filtroOperacional} onValueChange={setFiltroOperacional}>
-              <SelectTrigger className="h-8 bg-white text-xs" aria-label="Filtro operacional"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendentes-classificacao">Pendentes de classificação</SelectItem>
-                <SelectItem value="erros">Com erro</SelectItem>
-                <SelectItem value="avisos">Com aviso</SelectItem>
-                <SelectItem value="duplicadas">Duplicadas</SelectItem>
-                <SelectItem value="prontas">Prontas</SelectItem>
-                <SelectItem value="recusadas">Recusadas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filtroClassificacao} onValueChange={setFiltroClassificacao}>
-              <SelectTrigger className="h-8 bg-white text-xs" aria-label="Filtro de classificação"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="sem-classificacao">Apenas sem classificação</SelectItem>
-                <SelectItem value="classificados">Apenas classificados</SelectItem>
-              </SelectContent>
-            </Select>
+          <Select value={filtroOperacional} onValueChange={setFiltroOperacional}>
+            <SelectTrigger className="h-8 bg-white text-xs" aria-label="Filtro operacional"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="pendentes-classificacao">Pendentes de classificação</SelectItem>
+              <SelectItem value="erros">Com erro</SelectItem>
+              <SelectItem value="avisos">Com aviso</SelectItem>
+              <SelectItem value="duplicadas">Duplicadas</SelectItem>
+              <SelectItem value="prontas">Prontas</SelectItem>
+              <SelectItem value="recusadas">Recusadas</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-[11px] text-slate-700">
+            <label className="flex items-center gap-1.5">
+              <Checkbox checked={mostrarPendentes} onCheckedChange={(checked) => setMostrarPendentes(Boolean(checked))} />
+              Mostrar pendentes
+            </label>
+            <label className="flex items-center gap-1.5">
+              <Checkbox checked={mostrarClassificados} onCheckedChange={(checked) => setMostrarClassificados(Boolean(checked))} />
+              Mostrar classificados
+            </label>
           </div>
           <div className="flex flex-wrap gap-1">
             <Contador rotulo="Total filtrado" valor={contadores.total} />
@@ -242,22 +262,22 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               )}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <Badge className={cn('border px-1 py-0 text-[9px]', statusClass[statusVisual] || statusClass.erro)}>{statusVisual.toUpperCase()}</Badge>
                     <span className="text-[11px] font-bold text-slate-700">Linha {linha.linhaNumero}</span>
-                    <Badge variant="outline" className={cn('px-1 py-0 text-[9px]', classificada ? 'border-emerald-300 text-emerald-700' : 'border-amber-300 text-amber-700')}>{classificada ? 'CLASSIFICADO' : 'SEM CLASSIFICAÇÃO'}</Badge>
+                    <Badge className={cn('border px-1 py-0 text-[9px]', statusClass[statusVisual] || statusClass.erro)}>{statusVisual.toUpperCase()}</Badge>
                   </div>
                   <Button type="button" variant="ghost" size="icon" title={linha.recusada ? 'Restaurar linha' : 'Recusar linha'} className="h-5 w-5 shrink-0" onClick={(event) => { event.stopPropagation(); onAlternarRecusa(linha); }}>
                     {linha.recusada ? <RotateCcw className="h-3.5 w-3.5 text-slate-600" /> : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
                   </Button>
                 </div>
-                <div className="mt-0.5 grid grid-cols-3 gap-x-1 text-[10px] leading-tight text-slate-600">
+                <Badge variant="outline" className={cn('mt-1 px-1 py-0 text-[9px]', classificada ? 'border-emerald-400 bg-emerald-100 font-semibold text-emerald-800' : 'border-amber-400 bg-amber-200 font-bold text-amber-900')}>
+                  {classificada && <Check className="mr-0.5 h-3 w-3" />}
+                  {classificada ? 'CLASSIFICADO' : 'SEM CLASSIFICAÇÃO'}
+                </Badge>
+                <div className="mt-1 grid grid-cols-2 gap-x-1 text-[10px] leading-tight text-slate-600">
                   <span><strong>Nota:</strong> {linha.numero_nota || '—'}</span>
                   <span><strong>BG:</strong> {linha.numero_bg_br || '—'}</span>
-                  <span><strong>Data:</strong> {linha.data_bg_br || '—'}</span>
-                  <span className="truncate" title={tipoBgDaLinha(linha)}><strong>Tipo:</strong> {tipoBgDaLinha(linha)}</span>
                   <span className="col-span-2 truncate" title={materiaDaLinha(linha)}><strong>Matéria:</strong> {materiaDaLinha(linha)}</span>
                 </div>
-                <p className="mt-0.5 truncate text-[10px] leading-tight text-slate-500">{linha.texto_publicado || 'Sem texto publicado.'}</p>
               </div>
             );
           })}
@@ -270,6 +290,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           const desabilitada = linha.recusada;
           const statusVisual = statusDaLinha(linha);
           const valorTipo = possuiClassificacao(linha) ? linha.tipo_classificado : '__fallback__';
+          const textoEmEdicao = textoEmEdicaoId === linha.linhaNumero;
 
           return (
             <>
@@ -286,47 +307,59 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                 </div>
               </div>
 
-              <div className="flex flex-1 flex-col gap-1.5 p-2">
-                <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1.5 md:grid-cols-5">
-                  <CampoCompacto rotulo="Nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                  <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                  <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                  <CampoCompacto rotulo="Tipo BG"><Input disabled value={tipoBgDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
-                  <CampoCompacto rotulo="Matéria" className="col-span-2 md:col-span-1"><Input disabled value={materiaDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
-                </div>
+              <div className="flex min-h-0 flex-1 overflow-hidden">
+                <div className="flex w-[300px] shrink-0 flex-col gap-1.5 border-r border-slate-200 bg-slate-50 p-2">
+                  <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5">
+                    <CampoCompacto rotulo="Nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Tipo BG"><Input disabled value={tipoBgDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Matéria" className="col-span-2"><Input disabled value={materiaDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
+                  </div>
 
-                <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-1.5">
-                  <div className="flex items-center gap-2">
-                    <label className="shrink-0 text-[11px] font-semibold text-indigo-800">Tipo classificado</label>
-                    <Select disabled={desabilitada} value={valorTipo} onValueChange={(valor) => onAlterarLinha(linha, { tipo_classificado: valor === '__fallback__' ? '' : valor })}>
-                      <SelectTrigger className="h-8 bg-white text-xs border-indigo-200"><SelectValue /></SelectTrigger>
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-1.5">
+                    <label className="mb-1 block text-[11px] font-semibold text-indigo-800">Tipo classificado</label>
+                    <Select disabled={desabilitada} value={valorTipo} onValueChange={(valor) => handleClassificarLinha(linha, valor)}>
+                      <SelectTrigger className="h-8 border-indigo-200 bg-white text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__fallback__">{linha.tipo_legado || 'Sem classificação'}</SelectItem>
                         {tiposPublicacaoValidos.map((tipo) => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                {(linha.erros?.length > 0 || linha.avisos?.length > 0) && (
-                  <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
-                    {linha.erros?.length > 0 && <div className="rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-[11px] text-rose-700"><h4 className="font-semibold text-rose-800">Erros bloqueantes</h4><ListaMensagens itens={linha.erros} tipo="erro" /></div>}
-                    {linha.avisos?.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-1.5 text-[11px] text-amber-700"><h4 className="font-semibold text-amber-800">Avisos</h4><ListaMensagens itens={linha.avisos} /></div>}
+                  {(linha.erros?.length > 0 || linha.avisos?.length > 0) && (
+                    <div className="grid grid-cols-1 gap-1">
+                      {linha.erros?.length > 0 && <div className="rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-[11px] text-rose-700"><h4 className="font-semibold text-rose-800">Erros bloqueantes</h4><ListaMensagens itens={linha.erros} tipo="erro" /></div>}
+                      {linha.avisos?.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-1.5 text-[11px] text-amber-700"><h4 className="font-semibold text-amber-800">Avisos</h4><ListaMensagens itens={linha.avisos} /></div>}
+                    </div>
+                  )}
+
+                  <div className="mt-auto flex shrink-0 flex-col gap-1.5 border-t border-slate-200 pt-2">
+                    <span className="text-xs text-slate-500">Registro {selecionadaIndex + 1} de {linhasFiltradas.length}</span>
+                    <Button type="button" size="sm" variant={desabilitada ? 'outline' : 'destructive'} className={cn('h-8 w-full', !desabilitada && 'bg-rose-600 hover:bg-rose-700')} onClick={() => onAlternarRecusa(linha)}>
+                      {desabilitada ? <RotateCcw className="mr-1.5 h-4 w-4" /> : <XCircle className="mr-1.5 h-4 w-4" />}
+                      {desabilitada ? 'Restaurar linha' : 'Recusar linha'}
+                    </Button>
                   </div>
-                )}
-
-                <div className="flex min-h-[110px] flex-1 flex-col">
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">Texto publicado</label>
-                  <Textarea disabled={desabilitada} value={linha.texto_publicado || ''} onChange={(event) => onAlterarLinha(linha, { texto_publicado: event.target.value })} className="min-h-[110px] flex-1 resize-y p-2 font-mono text-sm leading-snug" placeholder="Conteúdo do texto publicado..." />
                 </div>
-              </div>
 
-              <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-3 py-1.5">
-                <span className="text-xs text-slate-500">Registro {selecionadaIndex + 1} de {linhasFiltradas.length}</span>
-                <Button type="button" size="sm" variant={desabilitada ? 'outline' : 'destructive'} className={cn('h-8', !desabilitada && 'bg-rose-600 hover:bg-rose-700')} onClick={() => onAlternarRecusa(linha)}>
-                  {desabilitada ? <RotateCcw className="mr-1.5 h-4 w-4" /> : <XCircle className="mr-1.5 h-4 w-4" />}
-                  {desabilitada ? 'Restaurar linha' : 'Recusar linha'}
-                </Button>
+                <div className="flex min-w-0 flex-1 flex-col bg-white p-2">
+                  <div className="mb-1 flex shrink-0 items-center justify-between gap-2">
+                    <label className="block text-xs font-semibold text-slate-700">Texto publicado</label>
+                    <Button type="button" variant="outline" size="sm" disabled={desabilitada} className="h-7 px-2 text-xs" onClick={() => setTextoEmEdicaoId(textoEmEdicao ? null : linha.linhaNumero)}>
+                      {textoEmEdicao ? <Check className="mr-1 h-3.5 w-3.5" /> : <Pencil className="mr-1 h-3.5 w-3.5" />}
+                      {textoEmEdicao ? 'Concluir edição' : 'Editar texto'}
+                    </Button>
+                  </div>
+                  {textoEmEdicao ? (
+                    <Textarea disabled={desabilitada} value={linha.texto_publicado || ''} onChange={(event) => onAlterarLinha(linha, { texto_publicado: event.target.value })} className="min-h-[110px] flex-1 resize-y p-2 font-mono text-sm leading-snug" placeholder="Conteúdo do texto publicado..." />
+                  ) : (
+                    <div className="min-h-[110px] flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-sm leading-snug text-slate-700">
+                      {linha.texto_publicado || <span className="text-slate-400">Sem texto publicado.</span>}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           );
