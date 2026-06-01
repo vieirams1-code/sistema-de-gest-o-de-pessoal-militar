@@ -231,7 +231,7 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
         </div>
       </div>
 
-      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max flex-col items-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} expandedUnits={expandedUnitsTree} onToggleUnit={toggleUnit} />)}</div></div> : null}
+      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max items-start justify-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} expandedUnits={expandedUnitsTree} onToggleUnit={toggleUnit} />)}</div></div> : null}
 
       {activeView === 'lista' ? <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">{nos.map((no) => renderListaNode(no, 0, expandedListNodes, toggleListNode))}</div> : null}
 
