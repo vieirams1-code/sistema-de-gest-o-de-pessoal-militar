@@ -81,6 +81,7 @@ import Home from './pages/Home';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
 import IndicacoesDomPedroII from './pages/IndicacoesDomPedroII';
 import Medalhas from './pages/Medalhas';
+import Medicos from './pages/Medicos';
 import Militares from './pages/Militares';
 import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
 import PlanoAnualFerias from './pages/PlanoAnualFerias';
@@ -147,6 +148,7 @@ export const PAGES = {
     "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
     "IndicacoesDomPedroII": IndicacoesDomPedroII,
     "Medalhas": Medalhas,
+    "Medicos": Medicos,
     "Militares": Militares,
     "PeriodosAquisitivos": PeriodosAquisitivos,
     "PlanoAnualFerias": PlanoAnualFerias,

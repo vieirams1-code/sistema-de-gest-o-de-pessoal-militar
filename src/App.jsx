@@ -25,6 +25,7 @@ const adminOnlyPages = new Set([
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
+  'Medicos',
 ]);
 
 
@@ -37,6 +38,7 @@ const moduleGuardByPage = {
   Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  Medicos: { moduleKey: 'atestados', moduleName: 'Atestados' },
   ControleAtestadosTemporarios: { moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios', moduleName: 'Controle de Atestados' },
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },

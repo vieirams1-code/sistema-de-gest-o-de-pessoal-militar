@@ -33,6 +33,7 @@ import {
   PanelLeftClose,
   Pin,
   Tags as TagsIcon,
+  Stethoscope,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -108,6 +109,7 @@ const menuGroups = [
         items: [
           { name: 'Atestados', page: 'Atestados', icon: HeartPulse, viewPermission: 'visualizar_atestados' },
           { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, viewPermission: 'visualizar_atestados' },
+          { name: 'Cadastro de Médicos', page: 'Medicos', icon: Stethoscope, adminOnly: true, moduleKey: 'atestados' },
           { name: 'Controle Temporários', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
         ],
       },
