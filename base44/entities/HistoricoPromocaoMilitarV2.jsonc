@@ -6,93 +6,78 @@
   "properties": {
     "militar_id": {
       "type": "string",
-      "description": "ID do militar"
+      "default": ""
     },
     "promocao_id": {
       "type": "string",
-      "description": "ID opcional da Promoção/Lote ao qual este histórico individual pertence"
+      "default": ""
     },
     "posto_graduacao_anterior": {
       "type": "string",
-      "description": "Posto/gradua\u00e7\u00e3o anterior \u00e0 promo\u00e7\u00e3o"
+      "default": ""
     },
     "quadro_anterior": {
       "type": "string",
-      "description": "Quadro anterior \u00e0 promo\u00e7\u00e3o"
+      "default": ""
     },
     "posto_graduacao_novo": {
       "type": "string",
-      "description": "Novo posto/gradua\u00e7\u00e3o ap\u00f3s a promo\u00e7\u00e3o"
+      "default": ""
     },
     "quadro_novo": {
       "type": "string",
-      "description": "Novo quadro ap\u00f3s a promo\u00e7\u00e3o"
+      "default": ""
     },
     "data_promocao": {
       "type": "string",
       "format": "date",
-      "description": "Data efetiva da promo\u00e7\u00e3o"
+      "default": ""
     },
     "data_publicacao": {
       "type": "string",
       "format": "date",
-      "description": "Data de publica\u00e7\u00e3o do ato"
+      "default": ""
     },
     "boletim_referencia": {
       "type": "string",
-      "description": "Refer\u00eancia do boletim (BG/DOEMS)"
+      "default": ""
     },
     "ato_referencia": {
       "type": "string",
-      "description": "Refer\u00eancia do ato/portaria/decreto"
+      "default": ""
     },
     "antiguidade_referencia_ordem": {
       "type": "number",
-      "description": "Ordem de antiguidade de refer\u00eancia no momento da promo\u00e7\u00e3o"
+      "default": 0
     },
     "antiguidade_referencia_id": {
       "type": "string",
-      "description": "ID do item de antiguidade de refer\u00eancia"
+      "default": ""
     },
     "origem_dado": {
       "type": "string",
-      "enum": [
-        "manual",
-        "importacao",
-        "migracao",
-        "sistema"
-      ],
-      "default": "manual",
-      "description": "Origem do dado"
+      "default": "manual"
     },
     "status_registro": {
       "type": "string",
-      "enum": [
-        "ativo",
-        "retificado",
-        "cancelado"
-      ],
-      "default": "ativo",
-      "description": "Status do registro"
+      "default": "ativo"
     },
     "motivo_retificacao": {
       "type": "string",
-      "description": "Motivo de retifica\u00e7\u00e3o ou cancelamento"
+      "default": ""
     },
     "observacoes": {
       "type": "string",
-      "description": "Observa\u00e7\u00f5es adicionais"
+      "default": ""
     },
     "created_by": {
       "type": "string",
-      "description": "Usu\u00e1rio que criou o registro"
+      "default": ""
     },
     "updated_by": {
       "type": "string",
-      "description": "Usu\u00e1rio que atualizou o registro pela \u00faltima vez"
+      "default": ""
     }
   },
-  "required": [
-    "militar_id"
-  ]
+  "required": []
 }

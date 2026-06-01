@@ -1,8 +1,8 @@
 {
   "name": "ExtracaoEfetivoExportLog",
   "type": "object",
-  "title": "Log de Exportação da Extração do Efetivo",
-  "description": "Registro persistente de auditoria pré-exportação da Extração do Efetivo, contendo somente metadados sanitizados.",
+  "title": "Log de Exporta\u00e7\u00e3o da Extra\u00e7\u00e3o do Efetivo",
+  "description": "Registro persistente de auditoria pr\u00e9-exporta\u00e7\u00e3o da Extra\u00e7\u00e3o do Efetivo, contendo somente metadados sanitizados.",
   "properties": {
     "acao": {
       "type": "string",
@@ -26,7 +26,10 @@
     },
     "tipo_exportacao": {
       "type": "string",
-      "enum": ["parcial", "completo"],
+      "enum": [
+        "parcial",
+        "completo"
+      ],
       "default": "parcial"
     },
     "quantidade_carregada": {
@@ -55,7 +58,11 @@
     },
     "status_exportacao": {
       "type": "string",
-      "enum": ["registrada", "bloqueada", "erro_pre_exportacao"],
+      "enum": [
+        "registrada",
+        "bloqueada",
+        "erro_pre_exportacao"
+      ],
       "default": "registrada"
     },
     "versao": {
@@ -66,5 +73,6 @@
       "type": "string",
       "default": "extracao-efetivo-catalogo-v1"
     }
-  }
+  },
+  "required": []
 }

@@ -1,20 +1,57 @@
 {
   "name": "PossivelDuplicidadeMilitar",
   "type": "object",
-  "description": "Fila de revisão humana para suspeitas de duplicidade entre militares.",
+  "title": "Poss\u00edvel Duplicidade de Militar",
+  "description": "Fila de revis\u00e3o humana para suspeitas de duplicidade sem merge autom\u00e1tico.",
   "properties": {
-    "militar_existente_id": { "type": "string", "description": "Militar já existente potencialmente relacionado." },
-    "militar_candidato_id": { "type": "string", "description": "Militar candidato (quando já existir um id específico)." },
-    "payload_novo_cadastro": { "type": "string", "description": "Snapshot do payload suspeito recebido no fluxo de origem." },
-    "snapshot_comparativo": { "type": "string", "description": "Snapshot comparativo entre registros envolvidos." },
-    "motivo": { "type": "string", "description": "Motivo operacional da suspeita." },
-    "nivel_confianca": { "type": "number", "description": "Score de confiança da suspeita." },
-    "status": { "type": "string", "description": "PENDENTE, CONFIRMADO_DUPLICADO, DESCARTADO ou MESCLADO." },
-    "origem_fluxo": { "type": "string", "description": "Fluxo onde a suspeita foi gerada: manual, importacao, etc." },
-    "criado_por": { "type": "string", "description": "Usuário que originou a pendência." },
-    "resolvido_por": { "type": "string", "description": "Usuário que resolveu a pendência." },
-    "created_at": { "type": "string", "format": "date-time", "description": "Data/hora de criação da pendência." },
-    "resolved_at": { "type": "string", "format": "date-time", "description": "Data/hora de resolução da pendência." }
+    "militar_existente_id": {
+      "type": "string",
+      "default": ""
+    },
+    "militar_candidato_id": {
+      "type": "string",
+      "default": ""
+    },
+    "payload_novo_cadastro": {
+      "type": "string",
+      "default": ""
+    },
+    "snapshot_comparativo": {
+      "type": "string",
+      "default": ""
+    },
+    "motivo": {
+      "type": "string",
+      "default": ""
+    },
+    "nivel_confianca": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "default": "PENDENTE"
+    },
+    "origem_fluxo": {
+      "type": "string",
+      "default": ""
+    },
+    "criado_por": {
+      "type": "string",
+      "default": ""
+    },
+    "resolvido_por": {
+      "type": "string",
+      "default": ""
+    },
+    "created_at": {
+      "type": "date",
+      "default": ""
+    },
+    "resolved_at": {
+      "type": "date",
+      "default": ""
+    }
   },
-  "required": ["status", "motivo"]
+  "required": []
 }

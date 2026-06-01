@@ -1,0 +1,61 @@
+{
+  "name": "PublicacaoCompilada",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo da publica\u00e7\u00e3o compilada"
+    },
+    "tipo_lote": {
+      "type": "string",
+      "description": "Tipo do lote de publica\u00e7\u00e3o"
+    },
+    "status": {
+      "type": "string",
+      "description": "Status da publica\u00e7\u00e3o compilada"
+    },
+    "nota_para_bg": {
+      "type": "string",
+      "description": "Nota para o Boletim Geral"
+    },
+    "numero_bg": {
+      "type": "string",
+      "description": "N\u00famero do Boletim Geral"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do Boletim Geral"
+    },
+    "nota_conciliada_boletim": {
+      "type": "string",
+      "description": "Nota conciliada do boletim"
+    },
+    "texto_publicacao": {
+      "type": "string",
+      "description": "Texto gerado para publica\u00e7\u00e3o"
+    },
+    "quantidade_itens": {
+      "type": "number",
+      "description": "Quantidade de itens no lote"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se a publica\u00e7\u00e3o compilada est\u00e1 ativa"
+    },
+    "escopo_inicial": {
+      "type": "string",
+      "description": "Escopo inicial da publica\u00e7\u00e3o"
+    },
+    "origem": {
+      "type": "string",
+      "description": "Origem da publica\u00e7\u00e3o compilada"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es adicionais"
+    }
+  },
+  "required": []
+}

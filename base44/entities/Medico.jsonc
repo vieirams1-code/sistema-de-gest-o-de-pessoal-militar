@@ -1,8 +1,8 @@
 {
   "name": "Medico",
   "type": "object",
-  "title": "Médico",
-  "description": "Cadastro estruturado de médicos utilizados em atestados médicos.",
+  "title": "M\u00e9dico",
+  "description": "Cadastro estruturado de m\u00e9dicos utilizados em atestados m\u00e9dicos.",
   "properties": {
     "nome": {
       "type": "string",

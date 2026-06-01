@@ -1,0 +1,77 @@
+{
+  "name": "PunicaoDisciplinar",
+  "type": "object",
+  "title": "Puni\u00e7\u00e3o Disciplinar",
+  "description": "Registro disciplinar de puni\u00e7\u00f5es para c\u00e1lculo de comportamento e acompanhamento operacional.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "militar_nome": {
+      "type": "string",
+      "default": ""
+    },
+    "posto_graduacao": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_punicao": {
+      "type": "string",
+      "default": ""
+    },
+    "data_punicao": {
+      "type": "date",
+      "default": ""
+    },
+    "dias_punicao": {
+      "type": "integer",
+      "default": 0
+    },
+    "data_inicio_cumprimento": {
+      "type": "date",
+      "default": ""
+    },
+    "data_fim_cumprimento": {
+      "type": "date",
+      "default": ""
+    },
+    "agravada_prisao_em_separado": {
+      "type": "boolean",
+      "default": false
+    },
+    "status_punicao": {
+      "type": "string",
+      "default": ""
+    },
+    "boletim_numero": {
+      "type": "string",
+      "default": ""
+    },
+    "boletim_data": {
+      "type": "date",
+      "default": ""
+    },
+    "autoridade_aplicadora": {
+      "type": "string",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "publicada_no_livro": {
+      "type": "boolean",
+      "default": false
+    },
+    "card_operacional_id": {
+      "type": "string",
+      "default": ""
+    },
+    "created_by": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,288 @@
+{
+  "name": "Demanda",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo da demanda"
+    },
+    "assunto_resumido": {
+      "type": "string"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "proxima_acao": {
+      "type": "string",
+      "description": "Pr\u00f3xima a\u00e7\u00e3o esperada (texto livre)"
+    },
+    "origem_tipo": {
+      "type": "string",
+      "enum": [
+        "TARS",
+        "EMS",
+        "Verbal",
+        "Interno",
+        "Documento F\u00edsico",
+        "E-mail",
+        "Outro"
+      ]
+    },
+    "origem_numero_protocolo": {
+      "type": "string"
+    },
+    "origem_data": {
+      "type": "string",
+      "format": "date"
+    },
+    "origem_observacoes": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome_snapshot": {
+      "type": "string"
+    },
+    "militar_posto_snapshot": {
+      "type": "string"
+    },
+    "militar_matricula_snapshot": {
+      "type": "string"
+    },
+    "unidade_responsavel": {
+      "type": "string"
+    },
+    "setor_responsavel": {
+      "type": "string"
+    },
+    "responsavel_atual_id": {
+      "type": "string"
+    },
+    "responsavel_atual_nome": {
+      "type": "string"
+    },
+    "criado_por_id": {
+      "type": "string"
+    },
+    "criado_por_nome": {
+      "type": "string"
+    },
+    "encaminhado_por_id": {
+      "type": "string"
+    },
+    "encaminhado_por_nome": {
+      "type": "string"
+    },
+    "aguardando_decisao_de_id": {
+      "type": "string"
+    },
+    "aguardando_decisao_de_nome": {
+      "type": "string"
+    },
+    "aguardando_assinatura_de_id": {
+      "type": "string"
+    },
+    "aguardando_assinatura_de_nome": {
+      "type": "string"
+    },
+    "aguardando_retorno_de": {
+      "type": "string",
+      "description": "Nome/setor aguardando retorno externo"
+    },
+    "data_ultimo_encaminhamento": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "data_ultima_decisao": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "data_ultimo_retorno": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decisao_tipo": {
+      "type": "string",
+      "enum": [
+        "Aprovado",
+        "Solicitar ajuste",
+        "Encaminhar para assinatura",
+        "Concluir",
+        "Arquivar"
+      ]
+    },
+    "decisao_texto": {
+      "type": "string",
+      "description": "Texto da decis\u00e3o registrada pelo chefe"
+    },
+    "decisao_data": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decisao_por_nome": {
+      "type": "string"
+    },
+    "decisao_por_id": {
+      "type": "string"
+    },
+    "assinatura_status": {
+      "type": "string",
+      "enum": [
+        "Pendente",
+        "Assinado",
+        "Devolvido"
+      ]
+    },
+    "assinatura_data": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "assinatura_observacao": {
+      "type": "string"
+    },
+    "assinatura_por_nome": {
+      "type": "string"
+    },
+    "assinatura_por_id": {
+      "type": "string"
+    },
+    "retorno_externo_status": {
+      "type": "string",
+      "enum": [
+        "Aguardando",
+        "Recebido"
+      ]
+    },
+    "retorno_externo_texto": {
+      "type": "string",
+      "description": "Texto do retorno do comando superior"
+    },
+    "retorno_externo_data": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "prioridade": {
+      "type": "string",
+      "enum": [
+        "Baixa",
+        "M\u00e9dia",
+        "Alta",
+        "Urgente"
+      ],
+      "default": "M\u00e9dia"
+    },
+    "criticidade": {
+      "type": "string",
+      "enum": [
+        "Rotina",
+        "Prazo Pr\u00f3ximo",
+        "Prazo Vencido",
+        "Impacta Efetivo",
+        "Determina\u00e7\u00e3o de Comando",
+        "Sens\u00edvel"
+      ],
+      "default": "Rotina"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Aberta",
+        "Em Andamento",
+        "Conclu\u00edda",
+        "Arquivada",
+        "Cancelada"
+      ],
+      "default": "Aberta"
+    },
+    "etapa_fluxo": {
+      "type": "string",
+      "enum": [
+        "Recebido",
+        "Triagem",
+        "Aguardando decis\u00e3o do chefe",
+        "Aguardando assinatura do chefe",
+        "Em elabora\u00e7\u00e3o",
+        "Aguardando documento",
+        "Aguardando comando superior",
+        "Retornado para execu\u00e7\u00e3o",
+        "Conclu\u00eddo",
+        "Arquivado"
+      ],
+      "default": "Recebido"
+    },
+    "data_entrada": {
+      "type": "string",
+      "format": "date"
+    },
+    "prazo_interno": {
+      "type": "string",
+      "format": "date"
+    },
+    "prazo_final": {
+      "type": "string",
+      "format": "date"
+    },
+    "possui_processo_formal": {
+      "type": "boolean",
+      "default": false
+    },
+    "processo_id": {
+      "type": "string"
+    },
+    "tipo_demanda": {
+      "type": "string",
+      "enum": [
+        "Administrativa",
+        "Operacional",
+        "Pessoal",
+        "Sa\u00fade",
+        "Jur\u00eddica",
+        "Log\u00edstica",
+        "Outro"
+      ]
+    },
+    "categoria": {
+      "type": "string"
+    },
+    "subtipo": {
+      "type": "string"
+    },
+    "exige_documentacao": {
+      "type": "boolean",
+      "default": false
+    },
+    "exige_assinatura": {
+      "type": "boolean",
+      "default": false
+    },
+    "impacto_no_efetivo": {
+      "type": "boolean",
+      "default": false
+    },
+    "afastamento_relacionado_id": {
+      "type": "string"
+    },
+    "atestado_relacionado_id": {
+      "type": "string"
+    },
+    "ferias_relacionada_id": {
+      "type": "string"
+    },
+    "observacoes_internas": {
+      "type": "string"
+    },
+    "concluida_em": {
+      "type": "string",
+      "format": "date"
+    },
+    "motivo_conclusao": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "titulo",
+    "etapa_fluxo",
+    "prioridade"
+  ]
+}

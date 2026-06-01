@@ -162,7 +162,7 @@ function formatarDataExtenso(dataStr) {
   return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
+export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [], atestadosDisponiveis = [], medicosDisponiveis = [] } = {}) {
   const postoBase = formData.militar_posto || militar?.posto_graduacao || militar?.posto || '';
   const postoAbreviado = abreviarPosto(postoBase);
   const quadroBase = resolveQuadroTemplate({
@@ -175,6 +175,14 @@ export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = 
   const dadosPublicacaoReferencia = extrairDadosPublicacaoReferencia({ formData, publicacoesDisponiveis });
   const dataBgRefExtenso = formatarDataExtenso(dadosPublicacaoReferencia.data_bg_ref);
 
+  // Quando o tipo é "Homologação de Atestado", mesclar dados do atestado selecionado para resolver {{medico_nome}} e {{medico_crm}}.
+  const atestadoSelecionado = formData.atestado_homologado_id
+    ? (atestadosDisponiveis || []).find(a => a.id === formData.atestado_homologado_id) || {}
+    : {};
+  const medicoVinculado = atestadoSelecionado?.medico_id
+    ? (medicosDisponiveis || []).find(m => m.id === atestadoSelecionado.medico_id) || null
+    : null;
+
   const sourceRP = {
     ...formData,
     militar,
@@ -184,6 +192,16 @@ export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = 
     militar_quadro: quadroBase,
     matricula: formData.militar_matricula || militar?.matricula || '',
     militar_matricula: formData.militar_matricula || militar?.matricula || '',
+    // Médico do atestado selecionado (Homologação de Atestado).
+    medico_nome_snapshot: atestadoSelecionado?.medico_nome_snapshot || atestadoSelecionado?.medico || medicoVinculado?.nome || '',
+    medico_crm_snapshot: atestadoSelecionado?.medico_crm_snapshot || atestadoSelecionado?.crm_medico || medicoVinculado?.crm || '',
+    medico: atestadoSelecionado?.medico || atestadoSelecionado?.medico_nome_snapshot || medicoVinculado?.nome || '',
+    crm_medico: atestadoSelecionado?.crm_medico || atestadoSelecionado?.medico_crm_snapshot || medicoVinculado?.crm || '',
+    // Datas/dias do atestado selecionado para compor o texto.
+    data_inicio: atestadoSelecionado?.data_inicio || formData.data_inicio || '',
+    data_termino: atestadoSelecionado?.data_termino || formData.data_termino || '',
+    dias: atestadoSelecionado?.dias ?? formData.dias ?? '',
+    tipo_afastamento: atestadoSelecionado?.tipo_afastamento || formData.tipo_afastamento || '',
   };
 
   const rpSpecificOverrides = {
@@ -473,6 +491,30 @@ export default function CadastrarRegistroRP() {
     refetchOnWindowFocus: false,
   });
 
+  // Fetch médico do atestado selecionado (for Homologação de Atestado) — fallback para CRM/nome quando o atestado não tem snapshot.
+  const atestadoHomologadoSelecionado = useMemo(() => {
+    if (!formData.atestado_homologado_id) return null;
+    return atestadosMilitar.find(a => a.id === formData.atestado_homologado_id) || null;
+  }, [formData.atestado_homologado_id, atestadosMilitar]);
+
+  const {
+    data: medicoAtestadoSelecionado = null,
+  } = useQuery({
+    queryKey: ['medico-atestado-rp', atestadoHomologadoSelecionado?.medico_id || null],
+    queryFn: async () => {
+      const rows = await base44.entities.Medico.filter({ id: atestadoHomologadoSelecionado.medico_id });
+      return rows?.[0] || null;
+    },
+    enabled: Boolean(atestadoHomologadoSelecionado?.medico_id),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const medicosDisponiveisRP = useMemo(
+    () => (medicoAtestadoSelecionado ? [medicoAtestadoSelecionado] : []),
+    [medicoAtestadoSelecionado]
+  );
+
   // Fetch publicacoes do militar (for Apostila/Tornar sem Efeito)
   const {
     data: publicacoesMilitar = [],
@@ -737,6 +779,16 @@ export default function CadastrarRegistroRP() {
 
     if (textoEditadoManualmente && formData.texto_publicacao) return;
 
+    // Guard: para "Homologação de Atestado", aguardar a query do médico vinculado resolver
+    // antes de gerar o texto, evitando que {{medico_crm}} fique como placeholder literal.
+    if (
+      formData.tipo_registro === 'Homologação de Atestado'
+      && atestadoHomologadoSelecionado?.medico_id
+      && !medicoAtestadoSelecionado
+    ) {
+      return;
+    }
+
     const textoGerado = aplicarTemplate(
       templateAtivoSelecionado.template,
       montarVariaveisTemplateRP({
@@ -744,6 +796,8 @@ export default function CadastrarRegistroRP() {
         militar: militarSelecionado,
         user,
         publicacoesDisponiveis: publicacoesMilitar,
+        atestadosDisponiveis: atestadosMilitar,
+        medicosDisponiveis: medicosDisponiveisRP,
       }),
     );
 
@@ -760,6 +814,11 @@ export default function CadastrarRegistroRP() {
     militarSelecionado,
     textoEditadoManualmente,
     user,
+    atestadoHomologadoSelecionado?.id,
+    atestadoHomologadoSelecionado?.medico_id,
+    medicoAtestadoSelecionado,
+    atestadosMilitar,
+    medicosDisponiveisRP,
   ]);
 
   const handleChange = (name, value) => {

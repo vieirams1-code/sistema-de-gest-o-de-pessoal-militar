@@ -1,0 +1,247 @@
+{
+  "name": "UsuarioAcesso",
+  "type": "object",
+  "properties": {
+    "nome_usuario": {
+      "type": "string",
+      "description": "Nome de exibi\u00e7\u00e3o do usu\u00e1rio"
+    },
+    "user_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email do usu\u00e1rio autenticado \u2014 chave de v\u00ednculo principal"
+    },
+    "tipo_acesso": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "setor",
+        "subsetor",
+        "unidade",
+        "proprio"
+      ],
+      "description": "N\u00edvel de acesso do usu\u00e1rio no sistema"
+    },
+    "grupamento_id": {
+      "type": "string",
+      "description": "ID do grupamento (usado em tipo_acesso: setor ou subsetor)"
+    },
+    "grupamento_nome": {
+      "type": "string",
+      "description": "Nome do grupamento (denormalizado)"
+    },
+    "subgrupamento_id": {
+      "type": "string",
+      "description": "ID do subgrupamento (usado em tipo_acesso: subsetor)"
+    },
+    "subgrupamento_nome": {
+      "type": "string",
+      "description": "Nome do subgrupamento (denormalizado)"
+    },
+    "subgrupamento_tipo": {
+      "type": "string",
+      "enum": [
+        "Grupamento",
+        "Subgrupamento",
+        "Unidade"
+      ],
+      "description": "Tipo do subgrupamento vinculado"
+    },
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar vinculado (usado em tipo_acesso: proprio)"
+    },
+    "militar_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email funcional/particular do militar vinculado"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Define se o acesso est\u00e1 ativo. O frontend filtra por ativo = true"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es sobre o acesso ou restri\u00e7\u00f5es espec\u00edficas"
+    },
+    "perfil_id": {
+      "type": "string",
+      "description": "ID do perfil de permiss\u00e3o vinculado (PerfilPermissao)"
+    },
+    "perfil_nome": {
+      "type": "string",
+      "description": "Nome do perfil vinculado (denormalizado)"
+    },
+    "acesso_militares": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Efetivo / Militares"
+    },
+    "acesso_ferias": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo F\u00e9rias"
+    },
+    "acesso_livro": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Livro"
+    },
+    "acesso_publicacoes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Publica\u00e7\u00f5es"
+    },
+    "acesso_atestados": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Atestados"
+    },
+    "acesso_armamentos": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Armamentos"
+    },
+    "acesso_medalhas": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Medalhas"
+    },
+    "acesso_templates": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Templates de Texto"
+    },
+    "acesso_configuracoes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Configura\u00e7\u00f5es"
+    },
+    "acesso_quadro_operacional": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o de acesso ao m\u00f3dulo Quadro Operacional"
+    },
+    "perm_admin_mode": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para ativar modo administrador avan\u00e7ado"
+    },
+    "perm_gerir_cadeia_ferias": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar a cadeia de f\u00e9rias (interrup\u00e7\u00f5es, retomadas)"
+    },
+    "perm_excluir_ferias": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para excluir registros de f\u00e9rias"
+    },
+    "perm_recalcular_ferias": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para recalcular saldos de f\u00e9rias"
+    },
+    "perm_gerir_templates": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para criar/editar/excluir templates de texto"
+    },
+    "perm_gerir_permissoes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar acessos e permiss\u00f5es de outros usu\u00e1rios"
+    },
+    "perm_gerir_estrutura": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar estrutura organizacional (grupamentos/subgrupamentos)"
+    },
+    "perm_gerir_configuracoes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar configura\u00e7\u00f5es do sistema"
+    },
+    "perm_editar_publicacoes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para editar publica\u00e7\u00f5es existentes"
+    },
+    "perm_publicar_bg": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para publicar em Boletim Geral"
+    },
+    "perm_tornar_sem_efeito_publicacao": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para tornar publica\u00e7\u00f5es sem efeito"
+    },
+    "perm_apostilar_publicacao": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para apostilar publica\u00e7\u00f5es"
+    },
+    "perm_publicar_ata_jiso": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para publicar ata de JISO"
+    },
+    "perm_publicar_homologacao": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para publicar homologa\u00e7\u00f5es"
+    },
+    "perm_gerir_jiso": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar JISOs"
+    },
+    "perm_registrar_decisao_jiso": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para registrar decis\u00e3o de JISO"
+    },
+    "perm_excluir_atestado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para excluir atestados"
+    },
+    "perm_gerir_quadro": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar o Quadro Operacional"
+    },
+    "perm_mover_card": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para mover cards no Quadro Operacional"
+    },
+    "perm_gerir_colunas": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar colunas do Quadro Operacional"
+    },
+    "perm_arquivar_card": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para arquivar cards"
+    },
+    "perm_gerir_acoes_operacionais": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para gerenciar a\u00e7\u00f5es operacionais"
+    },
+    "perm_excluir_acao_operacional": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permiss\u00e3o para excluir a\u00e7\u00f5es operacionais"
+    }
+  },
+  "required": [
+    "user_email",
+    "tipo_acesso",
+    "ativo"
+  ]
+}

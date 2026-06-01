@@ -1,0 +1,25 @@
+{
+  "name": "QuadroOperacional",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "ordem": {
+      "type": "number"
+    },
+    "cor_tema": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}

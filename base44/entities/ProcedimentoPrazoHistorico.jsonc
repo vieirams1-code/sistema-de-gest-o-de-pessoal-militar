@@ -1,7 +1,7 @@
 {
   "name": "ProcedimentoPrazoHistorico",
   "type": "object",
-  "title": "Histórico de Prazos do Procedimento",
+  "title": "Hist\u00f3rico de Prazos do Procedimento",
   "properties": {
     "procedimento_id": {
       "type": "string",
@@ -23,5 +23,6 @@
       "type": "date",
       "default": ""
     }
-  }
+  },
+  "required": []
 }

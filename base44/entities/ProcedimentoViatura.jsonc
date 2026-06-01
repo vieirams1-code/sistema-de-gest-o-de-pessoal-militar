@@ -1,7 +1,7 @@
 {
   "name": "ProcedimentoViatura",
   "type": "object",
-  "title": "Viatura/Materiais de Inquérito Técnico",
+  "title": "Viatura/Materiais de Inqu\u00e9rito T\u00e9cnico",
   "properties": {
     "procedimento_id": {
       "type": "string",
@@ -35,5 +35,6 @@
       "type": "string",
       "default": ""
     }
-  }
+  },
+  "required": []
 }

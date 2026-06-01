@@ -2,7 +2,7 @@
   "name": "Tag",
   "type": "object",
   "title": "Tag",
-  "description": "Tag aplicável a militares, férias e/ou atestados com suporte a escopo.",
+  "description": "Tag aplic\u00e1vel a militares, f\u00e9rias e/ou atestados com suporte a escopo.",
   "properties": {
     "grupo_id": {
       "type": "string",
@@ -84,5 +84,11 @@
   },
   "required": [
     "nome"
-  ]
+  ],
+  "_security": {
+    "read": true,
+    "create": "admin",
+    "update": "admin",
+    "delete": "admin"
+  }
 }

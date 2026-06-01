@@ -1,0 +1,117 @@
+{
+  "name": "CardOperacional",
+  "type": "object",
+  "properties": {
+    "coluna_id": {
+      "type": "string"
+    },
+    "ordem": {
+      "type": "number",
+      "default": 0
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Ativo",
+        "Conclu\u00eddo",
+        "Arquivado"
+      ],
+      "default": "Ativo"
+    },
+    "prioridade": {
+      "type": "string",
+      "enum": [
+        "Baixa",
+        "M\u00e9dia",
+        "Alta",
+        "Urgente"
+      ],
+      "default": "M\u00e9dia"
+    },
+    "prazo": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome_snapshot": {
+      "type": "string"
+    },
+    "origem_tipo": {
+      "type": "string",
+      "enum": [
+        "Manual",
+        "TARS",
+        "EMS",
+        "Atestado",
+        "F\u00e9rias",
+        "Publica\u00e7\u00e3o",
+        "Processo",
+        "Prazo"
+      ]
+    },
+    "origem_modulo": {
+      "type": "string",
+      "enum": [
+        "Atestados",
+        "F\u00e9rias",
+        "Publica\u00e7\u00f5es",
+        "Militar",
+        "Processos",
+        "Livro",
+        "Externo"
+      ]
+    },
+    "origem_registro_id": {
+      "type": "string"
+    },
+    "protocolo": {
+      "type": "string"
+    },
+    "etiqueta_cor": {
+      "type": "string"
+    },
+    "etiqueta_texto": {
+      "type": "string"
+    },
+    "checklist_resumo": {
+      "type": "string"
+    },
+    "comentarios_count": {
+      "type": "number",
+      "default": 0
+    },
+    "arquivado": {
+      "type": "boolean",
+      "default": false
+    },
+    "criado_automaticamente": {
+      "type": "boolean",
+      "default": false
+    },
+    "tipo_automacao": {
+      "type": "string"
+    },
+    "responsavel_nome": {
+      "type": "string"
+    },
+    "responsavel_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "coluna_id",
+    "titulo"
+  ]
+}

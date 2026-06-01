@@ -2,21 +2,27 @@
   "name": "TagGrupo",
   "type": "object",
   "title": "Grupo de Tags",
-  "description": "Agrupamento l\u00f3gico de tags aplic\u00e1veis a militares e/ou f\u00e9rias.",
+  "description": "Agrupamento de tags por contexto visual e de aplicabilidade.",
   "properties": {
     "nome": {
       "type": "string",
-      "description": "Nome do grupo de tags"
+      "default": ""
     },
-    "aplicabilidade": {
+    "descricao": {
       "type": "string",
-      "enum": [
-        "militar",
-        "ferias",
-        "ambos"
-      ],
-      "default": "ambos",
-      "description": "Onde o grupo se aplica"
+      "default": ""
+    },
+    "icone": {
+      "type": "string",
+      "default": ""
+    },
+    "emoji": {
+      "type": "string",
+      "default": ""
+    },
+    "cor": {
+      "type": "string",
+      "default": ""
     },
     "tipo_visual": {
       "type": "string",
@@ -29,13 +35,14 @@
       ],
       "default": "normal"
     },
-    "emoji": {
+    "aplicabilidade": {
       "type": "string",
-      "default": "\ud83c\udff7\ufe0f"
-    },
-    "cor": {
-      "type": "string",
-      "default": "#64748B"
+      "enum": [
+        "militar",
+        "ferias",
+        "ambos"
+      ],
+      "default": "ambos"
     },
     "ordem_exibicao": {
       "type": "number",
@@ -43,19 +50,40 @@
     },
     "escopo_tipo": {
       "type": "string",
+      "enum": [
+        "global",
+        "grupamento",
+        "subgrupamento",
+        "unidade",
+        "setor",
+        "subsetor"
+      ],
       "default": "global"
+    },
+    "escopo_id": {
+      "type": "string",
+      "default": ""
     },
     "ativo": {
       "type": "boolean",
       "default": true
     },
-    "observacoes": {
+    "created_by": {
+      "type": "string",
+      "default": ""
+    },
+    "updated_by": {
       "type": "string",
       "default": ""
     }
   },
   "required": [
-    "nome",
-    "aplicabilidade"
-  ]
+    "nome"
+  ],
+  "_security": {
+    "read": true,
+    "create": "admin",
+    "update": "admin",
+    "delete": "admin"
+  }
 }

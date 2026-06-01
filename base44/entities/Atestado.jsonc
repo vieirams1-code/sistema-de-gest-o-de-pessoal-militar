@@ -15,19 +15,24 @@
       "type": "string"
     },
     "medico": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado \u2014 nome do m\u00e9dico (texto livre). Mantido para compatibilidade com publica\u00e7\u00f5es antigas."
     },
     "crm_medico": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado \u2014 CRM do m\u00e9dico (texto livre). Mantido para compatibilidade com publica\u00e7\u00f5es antigas."
     },
     "medico_id": {
-      "type": "string"
+      "type": "string",
+      "description": "ID do m\u00e9dico vinculado ao atestado (entidade Medico)."
     },
     "medico_nome_snapshot": {
-      "type": "string"
+      "type": "string",
+      "description": "Snapshot do nome do m\u00e9dico no momento do cadastro do atestado."
     },
     "medico_crm_snapshot": {
-      "type": "string"
+      "type": "string",
+      "description": "Snapshot do CRM do m\u00e9dico no momento do cadastro do atestado."
     },
     "arquivo_atestado": {
       "type": "string"
@@ -48,7 +53,7 @@
       "type": "string",
       "enum": [
         "Afastamento Total",
-        "Esforço Físico"
+        "Esfor\u00e7o F\u00edsico"
       ],
       "default": "Afastamento Total"
     },
@@ -66,11 +71,11 @@
       "type": "string",
       "enum": [
         "Pai",
-        "Mãe",
+        "M\u00e3e",
         "Filho(a)",
-        "Cônjuge",
-        "Irmão(ã)",
-        "Avô(ó)",
+        "C\u00f4njuge",
+        "Irm\u00e3o(\u00e3)",
+        "Av\u00f4(\u00f3)",
         "Outro"
       ]
     },
@@ -103,7 +108,7 @@
         "comandante",
         "jiso"
       ],
-      "description": "Define o fluxo de homologação: comandante (até 15 dias) ou jiso (mais de 15 dias)"
+      "description": "Define o fluxo de homologa\u00e7\u00e3o: comandante (at\u00e9 15 dias) ou jiso (mais de 15 dias)"
     },
     "necessita_jiso": {
       "type": "boolean",
@@ -136,8 +141,8 @@
           "tipo": {
             "type": "string",
             "enum": [
-              "Prorrogação",
-              "Cassação"
+              "Prorroga\u00e7\u00e3o",
+              "Cassa\u00e7\u00e3o"
             ]
           },
           "dias_alterados": {
@@ -174,7 +179,7 @@
       "type": "string",
       "enum": [
         "Aguardando Nota",
-        "Aguardando Publicação",
+        "Aguardando Publica\u00e7\u00e3o",
         "Publicado"
       ],
       "default": "Aguardando Nota"
@@ -187,15 +192,14 @@
         "Homologado pelo Comandante"
       ]
     },
+    "arquivo_ata_jiso": {
+      "type": "string"
+    },
     "apostilada_por_id": {
       "type": "string"
     },
     "tornada_sem_efeito_por_id": {
       "type": "string"
-    },
-    "render_metadata": {
-      "type": "object",
-      "description": "Metadados de renderização de template"
     },
     "observacoes": {
       "type": "string"

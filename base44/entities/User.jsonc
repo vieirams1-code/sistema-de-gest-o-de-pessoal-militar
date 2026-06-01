@@ -1,0 +1,36 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user",
+      "description": "Papel do usu\u00e1rio no sistema"
+    },
+    "subgrupamento_id": {
+      "type": "string",
+      "description": "ID do subgrupamento ou grupamento ao qual o usu\u00e1rio pertence"
+    },
+    "subgrupamento_nome": {
+      "type": "string",
+      "description": "Nome do subgrupamento/grupamento (denormalizado)"
+    },
+    "subgrupamento_tipo": {
+      "type": "string",
+      "enum": [
+        "Grupamento",
+        "Subgrupamento"
+      ],
+      "description": "Tipo do escopo: Grupamento (acesso a todos os subgrupamentos filhos) ou Subgrupamento (acesso restrito)"
+    }
+  },
+  "required": [
+    "subgrupamento_id",
+    "subgrupamento_nome",
+    "subgrupamento_tipo"
+  ]
+}

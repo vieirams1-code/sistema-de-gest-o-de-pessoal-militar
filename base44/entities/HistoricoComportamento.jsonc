@@ -1,0 +1,49 @@
+{
+  "name": "HistoricoComportamento",
+  "type": "object",
+  "title": "Hist\u00f3rico de Comportamento",
+  "description": "Linha do tempo disciplinar do militar no m\u00f3dulo Justi\u00e7a e Disciplina.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "data_vigencia": {
+      "type": "date",
+      "default": ""
+    },
+    "comportamento": {
+      "type": "string",
+      "default": "Bom"
+    },
+    "comportamento_anterior": {
+      "type": "string",
+      "default": ""
+    },
+    "motivo_mudanca": {
+      "type": "string",
+      "default": ""
+    },
+    "fundamento_legal": {
+      "type": "string",
+      "default": ""
+    },
+    "origem_tipo": {
+      "type": "string",
+      "default": ""
+    },
+    "origem_id": {
+      "type": "string",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "created_by": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": []
+}

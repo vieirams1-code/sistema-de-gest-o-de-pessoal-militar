@@ -1,0 +1,45 @@
+{
+  "name": "ImpedimentoMedalha",
+  "type": "object",
+  "title": "Impedimento de Medalha",
+  "description": "Registra bloqueios tempor\u00e1rios ou gerais para indica\u00e7\u00e3o de medalhas.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_medalha_id": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_medalha_codigo": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "data_inicio": {
+      "type": "date",
+      "default": ""
+    },
+    "data_fim": {
+      "type": "date",
+      "default": ""
+    },
+    "motivo": {
+      "type": "string",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "created_at": {
+      "type": "datetime",
+      "default": ""
+    }
+  },
+  "required": []
+}

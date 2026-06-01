@@ -1,16 +1,16 @@
 {
   "name": "MilitarTag",
   "type": "object",
-  "title": "V\u00ednculo Militar x Tag",
-  "description": "Associa\u00e7\u00e3o entre um militar e uma tag.",
+  "title": "Militar x Tag",
+  "description": "Vincula\u00e7\u00e3o de tags a militares com controle de ciclo de vida.",
   "properties": {
     "militar_id": {
       "type": "string",
-      "description": "ID do militar vinculado"
+      "default": ""
     },
     "tag_id": {
       "type": "string",
-      "description": "ID da tag"
+      "default": ""
     },
     "status": {
       "type": "string",
@@ -22,17 +22,23 @@
     },
     "data_aplicacao": {
       "type": "string",
-      "format": "date"
+      "format": "date",
+      "default": ""
     },
     "data_remocao": {
       "type": "string",
-      "format": "date"
+      "format": "date",
+      "default": ""
     },
     "motivo": {
       "type": "string",
       "default": ""
     },
-    "observacoes": {
+    "created_by": {
+      "type": "string",
+      "default": ""
+    },
+    "updated_by": {
       "type": "string",
       "default": ""
     }
@@ -40,5 +46,11 @@
   "required": [
     "militar_id",
     "tag_id"
-  ]
+  ],
+  "_security": {
+    "read": true,
+    "create": "admin",
+    "update": "admin",
+    "delete": "admin"
+  }
 }

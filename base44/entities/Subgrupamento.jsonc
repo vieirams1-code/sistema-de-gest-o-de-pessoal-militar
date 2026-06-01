@@ -1,0 +1,61 @@
+{
+  "name": "Subgrupamento",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do n\u00f3 da estrutura (ex: 1\u00b0 GBM, 1\u00aa Cia, Se\u00e7\u00e3o de Sa\u00fade)"
+    },
+    "sigla": {
+      "type": "string",
+      "description": "Sigla do n\u00f3 (ex: 1GBM, 1CIA)"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do n\u00f3"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "Grupamento",
+        "Subgrupamento",
+        "Unidade"
+      ],
+      "default": "Subgrupamento",
+      "description": "N\u00edvel na hierarquia: Grupamento (raiz) \u2192 Subgrupamento (n\u00edvel 2) \u2192 Unidade (n\u00edvel 3)"
+    },
+    "parent_id": {
+      "type": "string",
+      "description": "ID do n\u00f3 pai na hierarquia (null para Grupamentos raiz)"
+    },
+    "parent_nome": {
+      "type": "string",
+      "description": "Nome do n\u00f3 pai (denormalizado)"
+    },
+    "grupamento_raiz_id": {
+      "type": "string",
+      "description": "ID do Grupamento raiz (n\u00edvel 1) ao qual este n\u00f3 pertence, independente da profundidade"
+    },
+    "grupamento_raiz_nome": {
+      "type": "string",
+      "description": "Nome do Grupamento raiz (denormalizado)"
+    },
+    "grupamento_id": {
+      "type": "string",
+      "description": "Campo legado \u2014 ID do Grupamento pai direto. Mantido para compatibilidade."
+    },
+    "grupamento_nome": {
+      "type": "string",
+      "description": "Campo legado \u2014 Nome do Grupamento pai (denormalizado). Mantido para compatibilidade."
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o n\u00f3 est\u00e1 ativo na estrutura organizacional"
+    }
+  },
+  "required": [
+    "nome",
+    "tipo"
+  ]
+}

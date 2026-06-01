@@ -1,7 +1,7 @@
 {
   "name": "ProcedimentoPendencia",
   "type": "object",
-  "title": "Pendência do Procedimento",
+  "title": "Pend\u00eancia do Procedimento",
   "properties": {
     "procedimento_id": {
       "type": "string",
@@ -27,5 +27,6 @@
       "type": "string",
       "default": ""
     }
-  }
+  },
+  "required": []
 }

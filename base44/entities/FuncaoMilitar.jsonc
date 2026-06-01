@@ -2,58 +2,89 @@
   "name": "FuncaoMilitar",
   "type": "object",
   "title": "Fun\u00e7\u00e3o Militar",
-  "description": "Cat\u00e1logo de fun\u00e7\u00f5es atribu\u00edveis a militares (institucionais e personalizadas).",
+  "description": "Cat\u00e1logo de fun\u00e7\u00f5es militares institucionais e personalizadas por escopo.",
   "properties": {
     "nome": {
       "type": "string",
-      "description": "Nome da fun\u00e7\u00e3o"
+      "default": ""
+    },
+    "descricao": {
+      "type": "string",
+      "default": ""
     },
     "institucional_chave": {
       "type": "string",
-      "description": "Chave institucional \u00fanica (comandante, subcomandante) ou vazio para fun\u00e7\u00f5es personalizadas",
-      "default": ""
+      "enum": [
+        "comandante",
+        "subcomandante",
+        null
+      ],
+      "default": null
     },
     "prioridade_lista": {
       "type": "number",
-      "description": "Prioridade de ordena\u00e7\u00e3o na lista (1=Comandante, 2=Subcomandante, >=10 personalizadas)",
       "default": 10
-    },
-    "emoji": {
-      "type": "string",
-      "description": "Emoji exibido junto \u00e0 fun\u00e7\u00e3o",
-      "default": "\u2b50"
-    },
-    "cor": {
-      "type": "string",
-      "description": "Cor hex usada na decora\u00e7\u00e3o visual",
-      "default": "#1D4ED8"
-    },
-    "aplicabilidade": {
-      "type": "string",
-      "enum": [
-        "militar",
-        "ferias",
-        "ambos"
-      ],
-      "default": "ambos",
-      "description": "Onde a fun\u00e7\u00e3o \u00e9 aplic\u00e1vel"
     },
     "escopo_tipo": {
       "type": "string",
-      "description": "Tipo de escopo da fun\u00e7\u00e3o (institucional, global, restrito)",
+      "enum": [
+        "global",
+        "grupamento",
+        "subgrupamento",
+        "unidade",
+        "setor",
+        "subsetor"
+      ],
       "default": "global"
+    },
+    "escopo_id": {
+      "type": "string",
+      "default": ""
+    },
+    "estrutura_id": {
+      "type": "string",
+      "default": ""
+    },
+    "estrutura_nome": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_estrutura": {
+      "type": "string",
+      "default": ""
     },
     "ativa": {
       "type": "boolean",
-      "default": true,
-      "description": "Indica se a fun\u00e7\u00e3o est\u00e1 ativa no cat\u00e1logo"
+      "default": true
     },
-    "observacoes": {
+    "icone": {
+      "type": "string",
+      "default": ""
+    },
+    "emoji": {
+      "type": "string",
+      "default": ""
+    },
+    "cor": {
+      "type": "string",
+      "default": ""
+    },
+    "created_by": {
+      "type": "string",
+      "default": ""
+    },
+    "updated_by": {
       "type": "string",
       "default": ""
     }
   },
   "required": [
     "nome"
-  ]
+  ],
+  "_security": {
+    "read": true,
+    "create": "admin",
+    "update": "admin",
+    "delete": "admin"
+  }
 }

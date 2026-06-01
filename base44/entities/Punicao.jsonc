@@ -1,0 +1,64 @@
+{
+  "name": "Punicao",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar"
+    },
+    "militar_nome": {
+      "type": "string",
+      "description": "Nome do militar (denormalizado)"
+    },
+    "militar_posto": {
+      "type": "string",
+      "description": "Posto do militar (denormalizado)"
+    },
+    "militar_matricula": {
+      "type": "string",
+      "description": "Matr\u00edcula do militar (denormalizado)"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "Advert\u00eancia Verbal",
+        "Repreens\u00e3o",
+        "Deten\u00e7\u00e3o",
+        "Pris\u00e3o"
+      ],
+      "description": "Tipo de puni\u00e7\u00e3o"
+    },
+    "data_aplicacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de aplica\u00e7\u00e3o da puni\u00e7\u00e3o"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio (para Deten\u00e7\u00e3o e Pris\u00e3o)"
+    },
+    "data_termino": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de t\u00e9rmino (para Deten\u00e7\u00e3o e Pris\u00e3o)"
+    },
+    "motivo": {
+      "type": "string",
+      "description": "Motivo da puni\u00e7\u00e3o"
+    },
+    "documento_referencia": {
+      "type": "string",
+      "description": "Documento de refer\u00eancia"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "militar_id",
+    "tipo",
+    "data_aplicacao"
+  ]
+}

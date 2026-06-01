@@ -1,0 +1,61 @@
+{
+  "name": "TipoPublicacaoCustom",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do tipo de publica\u00e7\u00e3o (ex: Publica\u00e7\u00e3o de Curso)"
+    },
+    "modulo": {
+      "type": "string",
+      "enum": [
+        "Livro",
+        "Publica\u00e7\u00e3o Ex Officio"
+      ],
+      "description": "M\u00f3dulo onde este tipo aparecer\u00e1"
+    },
+    "campos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "chave": {
+            "type": "string",
+            "description": "Identificador interno do campo (sem espa\u00e7os)"
+          },
+          "label": {
+            "type": "string",
+            "description": "Nome exibido para o usu\u00e1rio"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "text",
+              "date",
+              "number",
+              "textarea"
+            ],
+            "description": "Tipo do campo"
+          },
+          "obrigatorio": {
+            "type": "boolean"
+          }
+        }
+      },
+      "description": "Campos din\u00e2micos deste tipo"
+    },
+    "template": {
+      "type": "string",
+      "description": "Template do texto de publica\u00e7\u00e3o com vari\u00e1veis {{campo}}"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "nome",
+    "modulo",
+    "template"
+  ]
+}

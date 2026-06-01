@@ -1,99 +1,94 @@
 {
   "name": "ImportacaoMilitares",
   "type": "object",
+  "title": "Importa\u00e7\u00e3o de Militares",
+  "description": "Hist\u00f3rico e auditoria de lotes de migra\u00e7\u00e3o de militares do sistema legado.",
   "properties": {
     "nome_arquivo": {
       "type": "string",
-      "description": "Nome do arquivo CSV importado"
+      "default": ""
     },
     "tipo_arquivo": {
       "type": "string",
-      "description": "Tipo MIME do arquivo"
+      "default": ""
     },
     "hash_arquivo": {
       "type": "string",
-      "description": "Hash SHA-256 do arquivo para detec\u00e7\u00e3o de duplicatas"
+      "default": ""
     },
     "data_importacao": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Data e hora da importa\u00e7\u00e3o"
+      "type": "date",
+      "default": ""
     },
     "importado_por": {
       "type": "string",
-      "description": "E-mail do usu\u00e1rio que realizou a importa\u00e7\u00e3o"
+      "default": ""
     },
     "importado_por_nome": {
       "type": "string",
-      "description": "Nome do usu\u00e1rio que realizou a importa\u00e7\u00e3o"
+      "default": ""
     },
     "total_linhas": {
       "type": "number",
-      "default": 0,
-      "description": "Total de linhas no arquivo"
+      "default": 0
     },
     "total_aptas": {
       "type": "number",
-      "default": 0,
-      "description": "Total de linhas aptas para importa\u00e7\u00e3o"
+      "default": 0
     },
     "total_aptas_com_alerta": {
       "type": "number",
-      "default": 0,
-      "description": "Total de linhas aptas com alertas"
+      "default": 0
+    },
+    "total_revisar": {
+      "type": "number",
+      "default": 0
+    },
+    "total_ignoradas": {
+      "type": "number",
+      "default": 0
     },
     "total_duplicadas": {
       "type": "number",
-      "default": 0,
-      "description": "Total de linhas duplicadas"
+      "default": 0
     },
     "total_erros": {
       "type": "number",
-      "default": 0,
-      "description": "Total de linhas com erro"
+      "default": 0
     },
     "total_importadas": {
       "type": "number",
-      "default": 0,
-      "description": "Total de militares efetivamente importados"
+      "default": 0
     },
     "total_nao_importadas": {
       "type": "number",
-      "default": 0,
-      "description": "Total de linhas n\u00e3o importadas"
+      "default": 0
     },
     "status_importacao": {
       "type": "string",
-      "enum": [
-        "Analisado",
-        "Importando",
-        "Importado",
-        "Importado Parcial",
-        "Falhou"
-      ],
-      "default": "Analisado",
-      "description": "Status atual da importa\u00e7\u00e3o"
+      "default": "Analisado"
     },
     "importar_linhas_com_alerta": {
       "type": "boolean",
-      "default": false,
-      "description": "Se a importa\u00e7\u00e3o incluiu linhas com alerta"
+      "default": false
     },
     "versao_regra_migracao": {
       "type": "string",
-      "description": "Vers\u00e3o das regras de migra\u00e7\u00e3o aplicadas"
+      "default": "v1.0.0"
     },
     "relatorio_json": {
       "type": "string",
-      "description": "Relat\u00f3rio completo da importa\u00e7\u00e3o em formato JSON serializado"
+      "default": ""
     },
     "observacoes": {
       "type": "string",
-      "description": "Observa\u00e7\u00f5es adicionais sobre a importa\u00e7\u00e3o"
+      "default": ""
+    },
+    "oculto_no_historico": {
+      "type": "boolean",
+      "default": false,
+      "description": "Campo legado de oculta\u00e7\u00e3o (descontinuado). A exclus\u00e3o real do lote deve usar remo\u00e7\u00e3o f\u00edsica do registro."
     }
   },
-  "required": [
-    "nome_arquivo",
-    "data_importacao"
-  ]
+  "required": []
 }

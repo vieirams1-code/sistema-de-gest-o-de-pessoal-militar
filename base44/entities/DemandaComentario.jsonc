@@ -1,0 +1,46 @@
+{
+  "name": "DemandaComentario",
+  "type": "object",
+  "properties": {
+    "demanda_id": {
+      "type": "string"
+    },
+    "autor_nome": {
+      "type": "string"
+    },
+    "autor_id": {
+      "type": "string"
+    },
+    "tipo_registro": {
+      "type": "string",
+      "enum": [
+        "Coment\u00e1rio",
+        "Encaminhamento",
+        "Decis\u00e3o",
+        "Assinatura",
+        "Retorno externo",
+        "Atualiza\u00e7\u00e3o interna",
+        "Sistema"
+      ]
+    },
+    "mensagem": {
+      "type": "string"
+    },
+    "etapa_no_momento": {
+      "type": "string"
+    },
+    "criado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "visivel_no_historico": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "demanda_id",
+    "tipo_registro",
+    "mensagem"
+  ]
+}

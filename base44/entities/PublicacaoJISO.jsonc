@@ -1,0 +1,90 @@
+{
+  "name": "PublicacaoJISO",
+  "type": "object",
+  "properties": {
+    "atestado_id": {
+      "type": "string",
+      "description": "ID do atestado relacionado"
+    },
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar"
+    },
+    "militar_nome": {
+      "type": "string",
+      "description": "Nome do militar (denormalizado)"
+    },
+    "militar_posto": {
+      "type": "string",
+      "description": "Posto do militar (denormalizado)"
+    },
+    "militar_matricula": {
+      "type": "string",
+      "description": "Matr\u00edcula do militar (denormalizado)"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "Ata JISO"
+      ],
+      "default": "Ata JISO",
+      "description": "Tipo de publica\u00e7\u00e3o"
+    },
+    "data_jiso": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da JISO"
+    },
+    "finalidade_jiso": {
+      "type": "string",
+      "description": "Finalidade da JISO"
+    },
+    "secao_jiso": {
+      "type": "string",
+      "description": "Se\u00e7\u00e3o JISO (ex: qwe)"
+    },
+    "ata_numero": {
+      "type": "string",
+      "description": "N\u00famero da ata"
+    },
+    "nup": {
+      "type": "string",
+      "description": "NUP"
+    },
+    "parecer": {
+      "type": "string",
+      "description": "Parecer da JISO"
+    },
+    "texto_publicacao": {
+      "type": "string",
+      "description": "Texto gerado para publica\u00e7\u00e3o"
+    },
+    "nota_para_bg": {
+      "type": "string",
+      "description": "N\u00famero da nota para o BG"
+    },
+    "numero_bg": {
+      "type": "string",
+      "description": "N\u00famero do Boletim Geral"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do Boletim Geral"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Aguardando Nota",
+        "Aguardando Publica\u00e7\u00e3o",
+        "Publicado"
+      ],
+      "default": "Aguardando Nota",
+      "description": "Status da publica\u00e7\u00e3o"
+    }
+  },
+  "required": [
+    "militar_id",
+    "data_jiso"
+  ]
+}

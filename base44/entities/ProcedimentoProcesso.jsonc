@@ -62,11 +62,12 @@
     },
     "prioridade_risco": {
       "type": "string",
-      "default": "Média"
+      "default": "M\u00e9dia"
     },
     "prorrogacoes_count": {
       "type": "integer",
       "default": 0
     }
-  }
+  },
+  "required": []
 }

@@ -1,0 +1,32 @@
+{
+  "name": "ColunaOperacional",
+  "type": "object",
+  "properties": {
+    "quadro_id": {
+      "type": "string"
+    },
+    "nome": {
+      "type": "string"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "tipo_coluna": {
+      "type": "string"
+    },
+    "ordem": {
+      "type": "number"
+    },
+    "cor": {
+      "type": "string"
+    },
+    "ativa": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "quadro_id",
+    "nome"
+  ]
+}

@@ -57,22 +57,5 @@
       "default": ""
     }
   },
-  "rls": {
-    "read": {
-      "$or": [
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {}
-      ]
-    },
-    "write": {
-      "user_condition": {
-        "role": "admin"
-      }
-    }
-  },
   "required": []
 }

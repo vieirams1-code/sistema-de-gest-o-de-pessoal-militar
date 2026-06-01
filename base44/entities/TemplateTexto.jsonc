@@ -1,0 +1,53 @@
+{
+  "name": "TemplateTexto",
+  "type": "object",
+  "title": "Template de Texto",
+  "description": "Templates de texto parametriz\u00e1veis utilizados pelos m\u00f3dulos operacionais do sistema.",
+  "properties": {
+    "modulo": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_registro": {
+      "type": "string",
+      "default": ""
+    },
+    "nome": {
+      "type": "string",
+      "default": ""
+    },
+    "template": {
+      "type": "string",
+      "default": ""
+    },
+    "item_template": {
+      "type": "string",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "escopo": {
+      "type": "string",
+      "default": "GLOBAL"
+    },
+    "setor_id": {
+      "type": "string",
+      "default": ""
+    },
+    "subsetor_id": {
+      "type": "string",
+      "default": ""
+    },
+    "unidade_id": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": []
+}

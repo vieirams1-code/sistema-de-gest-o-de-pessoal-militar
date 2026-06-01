@@ -1,0 +1,115 @@
+{
+  "name": "TransicaoDesignacaoOperacao",
+  "type": "object",
+  "title": "Opera\u00e7\u00e3o de Transi\u00e7\u00e3o Manual de Designa\u00e7\u00e3o",
+  "description": "Registro de auditoria por per\u00edodo aquisitivo para futura transi\u00e7\u00e3o manual de designa\u00e7\u00e3o. N\u00e3o executa altera\u00e7\u00f5es operacionais por si s\u00f3.",
+  "properties": {
+    "lote_id": {
+      "type": "string",
+      "default": ""
+    },
+    "militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "contrato_designacao_id": {
+      "type": "string",
+      "default": ""
+    },
+    "periodo_aquisitivo_id": {
+      "type": "string",
+      "default": ""
+    },
+    "acao": {
+      "type": "string",
+      "enum": [
+        "manter",
+        "marcar_legado_ativa",
+        "marcar_indenizado",
+        "excluir_cadeia_operacional",
+        "cancelar_periodo_futuro_indevido"
+      ],
+      "default": ""
+    },
+    "acao_sugerida": {
+      "type": "string",
+      "default": ""
+    },
+    "override_sugestao": {
+      "type": "boolean",
+      "default": false
+    },
+    "motivo": {
+      "type": "string",
+      "default": ""
+    },
+    "observacao": {
+      "type": "string",
+      "default": ""
+    },
+    "documento_json": {
+      "type": "string",
+      "default": ""
+    },
+    "estado_anterior_json": {
+      "type": "string",
+      "default": ""
+    },
+    "estado_posterior_json": {
+      "type": "string",
+      "default": ""
+    },
+    "riscos_json": {
+      "type": "string",
+      "default": ""
+    },
+    "alertas_json": {
+      "type": "string",
+      "default": ""
+    },
+    "conflitos_json": {
+      "type": "string",
+      "default": ""
+    },
+    "bloqueantes_json": {
+      "type": "string",
+      "default": ""
+    },
+    "status_operacao": {
+      "type": "string",
+      "enum": [
+        "registrada",
+        "aplicada",
+        "ignorada",
+        "bloqueada",
+        "falhou",
+        "revertida"
+      ],
+      "default": "registrada"
+    },
+    "aplicado_por": {
+      "type": "string",
+      "default": ""
+    },
+    "aplicado_em": {
+      "type": "date",
+      "default": ""
+    },
+    "rollback_em": {
+      "type": "date",
+      "default": ""
+    },
+    "rollback_por": {
+      "type": "string",
+      "default": ""
+    },
+    "rollback_motivo": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": [
+    "lote_id",
+    "periodo_aquisitivo_id"
+  ]
+}

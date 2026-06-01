@@ -1,18 +1,48 @@
 {
   "name": "ConfiguracaoAntiguidade",
   "type": "object",
-  "description": "Configuração versionada da regra de cálculo de antiguidade.",
+  "title": "Configura\u00e7\u00e3o de Antiguidade",
   "properties": {
-    "nome_configuracao": { "type": "string" },
-    "ativo": { "type": "boolean", "default": false },
-    "versao_regra": { "type": "string", "default": "antiguidade.v1" },
-    "ordem_postos": { "type": "object" },
-    "ordem_quadros": { "type": "object" },
-    "politica_desempate": { "type": "string", "enum": ["antiguidade_referencia", "pendencia_obrigatoria"], "default": "pendencia_obrigatoria" },
-    "permite_desempate_por_nome_visual": { "type": "boolean", "default": false },
-    "vigencia_inicio": { "type": "string", "format": "date" },
-    "vigencia_fim": { "type": "string", "format": "date" },
-    "observacoes": { "type": "string" }
+    "nome_configuracao": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": false
+    },
+    "versao_regra": {
+      "type": "string",
+      "default": "antiguidade.v1"
+    },
+    "ordem_postos": {
+      "type": "json",
+      "default": "[]"
+    },
+    "ordem_quadros": {
+      "type": "json",
+      "default": "[]"
+    },
+    "politica_desempate": {
+      "type": "string",
+      "default": "pendencia_obrigatoria"
+    },
+    "permite_desempate_por_nome_visual": {
+      "type": "boolean",
+      "default": false
+    },
+    "vigencia_inicio": {
+      "type": "date",
+      "default": ""
+    },
+    "vigencia_fim": {
+      "type": "date",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    }
   },
-  "required": ["nome_configuracao", "ativo", "versao_regra", "ordem_postos", "ordem_quadros", "politica_desempate", "permite_desempate_por_nome_visual", "vigencia_inicio"]
+  "required": []
 }

@@ -1,0 +1,31 @@
+{
+  "name": "CardChecklistItem",
+  "type": "object",
+  "properties": {
+    "card_id": {
+      "type": "string"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "concluido": {
+      "type": "boolean",
+      "default": false
+    },
+    "ordem": {
+      "type": "number"
+    },
+    "obrigatorio": {
+      "type": "boolean",
+      "default": false
+    },
+    "data_conclusao": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "card_id",
+    "titulo"
+  ]
+}

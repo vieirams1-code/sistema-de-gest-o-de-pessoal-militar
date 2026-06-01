@@ -1,0 +1,30 @@
+{
+  "name": "CardVinculo",
+  "type": "object",
+  "properties": {
+    "card_id": {
+      "type": "string"
+    },
+    "tipo_vinculo": {
+      "type": "string",
+      "enum": [
+        "Militar",
+        "Atestado",
+        "F\u00e9rias",
+        "Publica\u00e7\u00e3o",
+        "Processo",
+        "Documento"
+      ]
+    },
+    "registro_id": {
+      "type": "string"
+    },
+    "titulo_vinculo": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "card_id",
+    "tipo_vinculo"
+  ]
+}

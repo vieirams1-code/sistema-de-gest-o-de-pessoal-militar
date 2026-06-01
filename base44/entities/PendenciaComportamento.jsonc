@@ -1,0 +1,54 @@
+{
+  "name": "PendenciaComportamento",
+  "type": "object",
+  "title": "Pend\u00eancia de Comportamento",
+  "description": "Sugest\u00f5es de altera\u00e7\u00e3o de comportamento disciplinar pendentes de confirma\u00e7\u00e3o manual.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "militar_nome": {
+      "type": "string",
+      "default": ""
+    },
+    "comportamento_atual": {
+      "type": "string",
+      "default": "Bom"
+    },
+    "comportamento_sugerido": {
+      "type": "string",
+      "default": "Bom"
+    },
+    "fundamento_legal": {
+      "type": "string",
+      "default": ""
+    },
+    "detalhes_calculo": {
+      "type": "string",
+      "default": ""
+    },
+    "data_detectada": {
+      "type": "string",
+      "default": ""
+    },
+    "status_pendencia": {
+      "type": "string",
+      "enum": [
+        "Pendente",
+        "Aplicada",
+        "Descartada"
+      ],
+      "default": "Pendente"
+    },
+    "confirmado_por": {
+      "type": "string",
+      "default": ""
+    },
+    "data_confirmacao": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": []
+}

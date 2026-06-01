@@ -1,0 +1,18 @@
+{
+  "name": "Lotacao",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da lota\u00e7\u00e3o"
+    },
+    "ativa": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se a lota\u00e7\u00e3o est\u00e1 ativa"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}

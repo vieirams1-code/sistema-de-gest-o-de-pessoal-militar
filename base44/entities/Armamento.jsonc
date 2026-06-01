@@ -1,0 +1,110 @@
+{
+  "name": "Armamento",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar"
+    },
+    "militar_nome": {
+      "type": "string",
+      "description": "Nome do militar (denormalizado)"
+    },
+    "militar_posto": {
+      "type": "string",
+      "description": "Posto do militar (denormalizado)"
+    },
+    "militar_matricula": {
+      "type": "string",
+      "description": "Matr\u00edcula do militar (denormalizado)"
+    },
+    "tipo": {
+      "type": "string",
+      "description": "Tipo do armamento"
+    },
+    "calibre": {
+      "type": "string",
+      "description": "Calibre"
+    },
+    "cad_bm": {
+      "type": "string",
+      "description": "CAD BM"
+    },
+    "marca": {
+      "type": "string",
+      "description": "Marca"
+    },
+    "numero_serie": {
+      "type": "string",
+      "description": "N\u00famero de s\u00e9rie"
+    },
+    "numero_sigma": {
+      "type": "string",
+      "description": "N\u00famero SIGMA"
+    },
+    "data_expedicao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de expedi\u00e7\u00e3o"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Ativo",
+        "Vendido",
+        "Extraviado",
+        "Furtado",
+        "Baixado"
+      ],
+      "default": "Ativo",
+      "description": "Status do armamento"
+    },
+    "data_baixa": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da baixa"
+    },
+    "motivo_baixa": {
+      "type": "string",
+      "description": "Motivo da baixa"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "militar_id",
+    "tipo",
+    "numero_serie"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

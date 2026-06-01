@@ -1,0 +1,65 @@
+{
+  "name": "SolicitacaoAtualizacao",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "campo_chave": {
+      "type": "string",
+      "description": "Nome interno do campo a ser alterado (ex: cpf, telefone)"
+    },
+    "campo_label": {
+      "type": "string",
+      "description": "Nome leg\u00edvel do campo (ex: CPF, Telefone)"
+    },
+    "valor_atual": {
+      "type": "string"
+    },
+    "valor_proposto": {
+      "type": "string"
+    },
+    "justificativa": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendente",
+        "Aprovada",
+        "Rejeitada"
+      ],
+      "default": "Pendente"
+    },
+    "data_solicitacao": {
+      "type": "string",
+      "format": "date"
+    },
+    "usuario_decisao": {
+      "type": "string"
+    },
+    "data_decisao": {
+      "type": "string",
+      "format": "date"
+    },
+    "observacao_decisao": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "militar_id",
+    "campo_chave",
+    "campo_label",
+    "valor_proposto",
+    "data_solicitacao"
+  ]
+}
