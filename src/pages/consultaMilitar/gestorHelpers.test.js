@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolvePostoGraduacao, classificarMilitar, ordenarMilitaresAntiguidade } from '../../utils/efetivo/gestorClassificacao.js';
 import { filtrarUnidadesCartoes } from '../../utils/efetivo/visualizacaoGestor.js';
+import montarArvoreLotacaoMilitares from '../../utils/efetivo/montarArvoreLotacaoMilitares.js';
 
 test('resolve posto_graduacao com precedência', () => {
   assert.equal(resolvePostoGraduacao({ posto_graduacao: 'Capitão', posto_grad: 'Soldado' }), 'CAPITÃO');
@@ -28,4 +29,31 @@ test('busca local de cartões filtra por unidade/sigla/setor/subsetor', () => {
   assert.equal(filtrarUnidadesCartoes(unidades, 'norte').length, 1);
   assert.equal(filtrarUnidadesCartoes(unidades, '2gbm')[0].unidadeNome, '2º GBM');
   assert.equal(filtrarUnidadesCartoes(unidades, 'operacional')[0].unidadeSigla, '1GBM');
+});
+
+test('árvore do gestor agrupa unidades irmãs sem repetir setor e subsetor', () => {
+  const setor = { nome: 'Operacional', sigla: 'OP' };
+  const subsetor = { nome: 'Área Metropolitana', sigla: 'AM', parent: setor };
+  const lotacoes = [
+    { id: 'cg', nome: 'Campo Grande', descricao: 'Sede regional', parent: subsetor },
+    { id: 'nas', nome: 'Nova Alvorada do Sul', parent: subsetor },
+    { id: 'sid', nome: 'Sidrolândia', parent: subsetor },
+  ];
+  const militares = [
+    { id: '1', estrutura_id: 'cg' },
+    { id: '2', estrutura_id: 'nas' },
+    { id: '3', estrutura_id: 'sid' },
+  ];
+
+  const arvore = montarArvoreLotacaoMilitares(militares, lotacoes);
+
+  assert.equal(arvore.length, 1);
+  assert.equal(arvore[0].setorNome, 'Operacional');
+  assert.equal(arvore[0].subsetores.length, 1);
+  assert.deepEqual(arvore[0].subsetores[0].unidades.map((unidade) => unidade.unidadeNome), [
+    'Campo Grande',
+    'Nova Alvorada do Sul',
+    'Sidrolândia',
+  ]);
+  assert.equal(arvore[0].subsetores[0].unidades[0].unidadeDescricao, 'Sede regional');
 });
