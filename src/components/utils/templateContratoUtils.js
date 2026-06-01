@@ -53,7 +53,10 @@ export const montarPostoNomeTemplate = ({ abreviatura, posto, quadro, source } =
 };
 
 const firstNonEmptyTemplateValue = (...candidatos) =>
-  candidatos.map((valor) => String(valor || '').trim()).find(Boolean) || '';
+  candidatos
+    .filter((valor) => typeof valor === 'string' || typeof valor === 'number')
+    .map((valor) => String(valor).trim())
+    .find(Boolean) || '';
 
 export function buildTemplateVarsContrato(source = {}) {
   const nomeCompleto = String(
@@ -76,13 +79,21 @@ export function buildTemplateVarsContrato(source = {}) {
     source?.medico_nome_snapshot,
     source?.medico_nome,
     source?.nome_medico,
-    source?.medico
+    source?.medico,
+    source?.medico?.nome,
+    source?.medico_snapshot?.nome,
+    source?.dados_medico?.nome
   );
   const medicoCrm = firstNonEmptyTemplateValue(
     source?.medico_crm_snapshot,
+    source?.crm_medico_snapshot,
+    source?.crm_snapshot,
     source?.medico_crm,
     source?.crm_medico,
-    source?.crm
+    source?.crm,
+    source?.medico?.crm,
+    source?.medico_snapshot?.crm,
+    source?.dados_medico?.crm
   );
 
   const matricula = [
