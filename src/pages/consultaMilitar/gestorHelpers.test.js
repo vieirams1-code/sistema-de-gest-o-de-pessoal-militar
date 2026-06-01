@@ -107,3 +107,21 @@ test('árvore do gestor incorpora marcadores não informados à única raiz real
     'Sidrolândia',
   ]);
 });
+
+test('calcula resumo do efetivo por unidade separando oficiais, praças, homens e mulheres', () => {
+  const arvore = montarArvoreLotacaoMilitares([
+    { id: '1', nome_guerra: 'Oficial M', posto_graduacao: 'Capitão', sexo: 'M', lotacao: 'Campo Grande', grupamento_nome: 'CMB', subgrupamento_nome: '1º GBM' },
+    { id: '2', nome_guerra: 'Oficial F', posto_graduacao: '1º Tenente', sexo: 'F', lotacao: 'Campo Grande', grupamento_nome: 'CMB', subgrupamento_nome: '1º GBM' },
+    { id: '3', nome_guerra: 'Subtenente', posto_graduacao: 'Subtenente', sexo: 'M', lotacao: 'Campo Grande', grupamento_nome: 'CMB', subgrupamento_nome: '1º GBM' },
+    { id: '4', nome_guerra: 'Cabo F', posto_graduacao: 'Cabo', sexo: 'F', lotacao: 'Campo Grande', grupamento_nome: 'CMB', subgrupamento_nome: '1º GBM' },
+  ]);
+
+  const unidade = arvore[0].subsetores[0].unidades[0];
+
+  assert.equal(unidade.resumoEfetivo.oficiais, 2);
+  assert.equal(unidade.resumoEfetivo.pracas, 2);
+  assert.equal(unidade.resumoEfetivo.homens, 2);
+  assert.equal(unidade.resumoEfetivo.mulheres, 2);
+  assert.deepEqual(unidade.oficiais.map((militar) => militar.nome_guerra), ['Oficial M', 'Oficial F']);
+  assert.deepEqual(unidade.pracas.map((militar) => militar.nome_guerra), ['Subtenente', 'Cabo F']);
+});
