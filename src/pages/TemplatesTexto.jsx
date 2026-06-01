@@ -595,6 +595,8 @@ const VARS_POR_TIPO = {
       { v: '{{tipo_afastamento}}', desc: 'Tipo de afastamento' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
       { v: '{{data_termino}}', desc: 'Data de término' },
+      { v: '{{medico_nome}}', desc: 'Nome do médico responsável' },
+      { v: '{{medico_crm}}', desc: 'CRM do médico responsável' },
     ]
   },
   'Apostila': {
