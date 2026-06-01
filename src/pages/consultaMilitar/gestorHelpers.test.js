@@ -57,3 +57,53 @@ test('árvore do gestor agrupa unidades irmãs sem repetir setor e subsetor', ()
   ]);
   assert.equal(arvore[0].subsetores[0].unidades[0].unidadeDescricao, 'Sede regional');
 });
+
+test('árvore do gestor usa raiz institucional consolidada para lotações planas sem setor ou subsetor', () => {
+  const lotacoes = [
+    { id: 'cg', nome: 'Campo Grande' },
+    { id: 'nas', nome: 'Nova Alvorada do Sul' },
+    { id: 'sid', nome: 'Sidrolândia' },
+  ];
+  const militares = [
+    { id: '1', estrutura_id: 'cg' },
+    { id: '2', estrutura_id: 'nas' },
+    { id: '3', estrutura_id: 'sid' },
+  ];
+
+  const arvore = montarArvoreLotacaoMilitares(militares, lotacoes);
+
+  assert.equal(arvore.length, 1);
+  assert.equal(arvore[0].setorNome, 'CMB');
+  assert.equal(arvore[0].subsetores.length, 1);
+  assert.equal(arvore[0].subsetores[0].subsetorNome, '1º GBM');
+  assert.deepEqual(arvore[0].subsetores[0].unidades.map((unidade) => unidade.unidadeNome), [
+    'Campo Grande',
+    'Nova Alvorada do Sul',
+    'Sidrolândia',
+  ]);
+});
+
+test('árvore do gestor incorpora marcadores não informados à única raiz real disponível', () => {
+  const lotacoes = [
+    { id: 'cg', nome: 'Campo Grande', setor_nome: 'CMB', subsetor_nome: '1º GBM' },
+    { id: 'nas', nome: 'Nova Alvorada do Sul', setor_nome: 'Setor não informado', subsetor_nome: 'Subsetor não informado' },
+    { id: 'sid', nome: 'Sidrolândia', setor_nome: 'CMB', subsetor_nome: '1º GBM' },
+  ];
+  const militares = [
+    { id: '1', estrutura_id: 'cg' },
+    { id: '2', estrutura_id: 'nas' },
+    { id: '3', estrutura_id: 'sid' },
+  ];
+
+  const arvore = montarArvoreLotacaoMilitares(militares, lotacoes);
+
+  assert.equal(arvore.length, 1);
+  assert.equal(arvore[0].setorNome, 'CMB');
+  assert.equal(arvore[0].subsetores.length, 1);
+  assert.equal(arvore[0].subsetores[0].subsetorNome, '1º GBM');
+  assert.deepEqual(arvore[0].subsetores[0].unidades.map((unidade) => unidade.unidadeNome), [
+    'Campo Grande',
+    'Nova Alvorada do Sul',
+    'Sidrolândia',
+  ]);
+});
