@@ -12,8 +12,70 @@ function limparTexto(valor) {
   return String(valor).trim();
 }
 
-function normalizarNumeroNota(valor) {
+export function normalizarNumeroNota(valor) {
   return limparTexto(valor).toUpperCase().replace(/\s+/g, '');
+}
+
+export function resolverTipoFinalMigracaoLegado(linha = {}) {
+  const tipoClassificado = limparTexto(linha.tipo_classificado);
+  if (tipoClassificado && tipoClassificado !== '__fallback__') {
+    return { tipoFinal: tipoClassificado, classificacaoPendente: false };
+  }
+
+  const tipoLegado = limparTexto(
+    linha.materia_legado
+      || linha.tipo_legado
+      || linha.transformado?.materia_legado,
+  );
+  return { tipoFinal: tipoLegado, classificacaoPendente: Boolean(tipoLegado) };
+}
+
+export function resolverDataPublicacaoMigracaoLegado(linha = {}) {
+  return limparTexto(linha.data_bg_br || linha.transformado?.data_bg_br || linha.data_bg);
+}
+
+function normalizarStatusPublicacaoParaSchema(status) {
+  return status === 'PUBLICADO' ? 'Publicado' : 'Aguardando Publicação';
+}
+
+export function montarPayloadPublicacaoExOfficioMigracaoLegado(linha = {}) {
+  const notaNormalizada = normalizarNumeroNota(linha.numero_nota);
+  const textoPublicacao = limparTexto(linha.texto_publicado);
+  const dataPublicacao = resolverDataPublicacaoMigracaoLegado(linha);
+  const { tipoFinal, classificacaoPendente } = resolverTipoFinalMigracaoLegado(linha);
+
+  if (!notaNormalizada) throw new Error('Número da nota é obrigatório.');
+  if (!textoPublicacao) throw new Error('Texto publicado é obrigatório.');
+  if (!dataPublicacao || !dataBgBrValida(dataPublicacao)) {
+    throw new Error('Data da publicação ausente. Preencha a data do BG/BR antes de importar.');
+  }
+  if (!tipoFinal) throw new Error('Tipo/matéria ausente. Classifique manualmente antes de importar.');
+
+  const statusPublicacao = calcularStatusPublicacaoLegado({
+    numero_nota: notaNormalizada,
+    numero_bg_br: linha.numero_bg_br,
+    data_bg_br: dataPublicacao,
+  });
+
+  return {
+    militar_id: linha.transformado?.militar_id,
+    militar_nome: linha.transformado?.militar_nome,
+    militar_matricula: linha.transformado?.militar_matricula_atual || linha.transformado?.militar_matricula,
+    nota_id_legado: notaNormalizada,
+    numero_bg: linha.numero_bg_br,
+    data_bg: linha.data_bg_br || undefined,
+    data_publicacao: dataPublicacao,
+    materia_legado: limparTexto(linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado) || undefined,
+    tipo_bg_legado: limparTexto(linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado) || undefined,
+    tipo_legado: limparTexto(linha.tipo_legado) || undefined,
+    tipo: tipoFinal,
+    tipo_registro: tipoFinal,
+    texto_publicacao: textoPublicacao,
+    classificacao_pendente: classificacaoPendente,
+    status: normalizarStatusPublicacaoParaSchema(statusPublicacao),
+    origem_registro: 'legado',
+    importado_legado: true,
+  };
 }
 
 function dataBgBrValida(valor) {
@@ -36,17 +98,17 @@ function sincronizarTransformado(linha) {
   const statusPublicacao = calcularStatusPublicacaoLegado({
     numero_nota: linha.numero_nota,
     numero_bg_br: linha.numero_bg_br,
-    data_bg_br: linha.data_bg_br,
+    data_bg_br: resolverDataPublicacaoMigracaoLegado(linha),
   });
   return {
     ...linha.transformado,
     nota_id_legado: linha.numero_nota,
     numero_bg: linha.numero_bg_br,
-    data_bg_br: linha.data_bg_br,
+    data_bg_br: resolverDataPublicacaoMigracaoLegado(linha),
     materia_legado: linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado,
     tipo_bg_legado: linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado,
-    tipo_publicacao_sugerido: linha.tipo_classificado || linha.tipo_legado,
-    tipo_publicacao_confirmado: linha.tipo_classificado || linha.tipo_legado,
+    tipo_publicacao_sugerido: resolverTipoFinalMigracaoLegado(linha).tipoFinal,
+    tipo_publicacao_confirmado: resolverTipoFinalMigracaoLegado(linha).tipoFinal,
     conteudo_trecho_legado: linha.texto_publicado,
     status_publicacao: statusPublicacao,
     destino_final: linha.recusada ? 'IGNORAR' : 'IMPORTAR',
@@ -106,13 +168,19 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
     if (!numeroNota) erros.push('Número da nota é obrigatório.');
     if (!limparTexto(linha.texto_publicado)) erros.push('Texto publicado é obrigatório.');
     if (!limparTexto(linha.numero_bg_br)) avisos.push('Número do BG/BR ausente.');
-    if (!limparTexto(linha.data_bg_br)) avisos.push('Data do BG/BR ausente.');
-    else if (!dataBgBrValida(linha.data_bg_br)) avisos.push('Data do BG/BR inválida; valor preservado, mas precisa ser revisado.');
-    if (!limparTexto(linha.tipo_legado)) avisos.push('Tipo legado ausente.');
-    if (!limparTexto(linha.tipo_classificado)) avisos.push('Tipo classificado ausente; usando tipo legado como fallback.');
+    const dataPublicacao = resolverDataPublicacaoMigracaoLegado(linha);
+    if (!dataPublicacao || !dataBgBrValida(dataPublicacao)) {
+      erros.push('Data da publicação ausente. Preencha a data do BG/BR antes de importar.');
+    }
+    const { tipoFinal } = resolverTipoFinalMigracaoLegado(linha);
+    if (!tipoFinal) erros.push('Tipo/matéria ausente. Classifique manualmente antes de importar.');
+    if (!limparTexto(linha.tipo_legado) && !limparTexto(linha.materia_legado) && !limparTexto(linha.transformado?.materia_legado)) avisos.push('Tipo legado ausente.');
+    if (!limparTexto(linha.tipo_classificado) || limparTexto(linha.tipo_classificado) === '__fallback__') {
+      if (tipoFinal) avisos.push('Tipo classificado ausente; usando tipo legado como fallback.');
+    }
 
     let status = erros.length ? STATUS_REVISAO_SIMPLIFICADA.ERRO : STATUS_REVISAO_SIMPLIFICADA.PRONTA;
-    if (!erros.length && numeroNota && linha.numerosNotaImportados?.includes(numeroNota)) {
+    if (!erros.length && numeroNota && linha.numerosNotaImportados?.some((nota) => normalizarNumeroNota(nota) === numeroNota)) {
       status = STATUS_REVISAO_SIMPLIFICADA.DUPLICADA;
       erros.push('Nota já importada anteriormente para este militar.');
     } else if (!erros.length && numeroNota && (contagemNotasAtivas.get(numeroNota) || 0) > 1) {
@@ -123,7 +191,7 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
     const statusPublicacao = calcularStatusPublicacaoLegado({
       numero_nota: linha.numero_nota,
       numero_bg_br: linha.numero_bg_br,
-      data_bg_br: linha.data_bg_br,
+      data_bg_br: resolverDataPublicacaoMigracaoLegado(linha),
     });
     const proxima = {
       ...linha,

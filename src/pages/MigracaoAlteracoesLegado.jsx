@@ -30,6 +30,8 @@ import {
 import {
   atualizarLinhaRevisaoSimplificada,
   gerarResumoRevisaoSimplificada,
+  montarPayloadPublicacaoExOfficioMigracaoLegado,
+  normalizarNumeroNota,
   revalidarLinhasRevisaoSimplificada,
 } from '@/services/migracaoAlteracoesLegadoSimplificadoEdicao';
 import { criarEscopado } from '@/services/cudEscopadoClient';
@@ -56,21 +58,6 @@ const filtrosDestino = [
   { id: 'IGNORAR', label: 'IGNORAR' },
   { id: 'EXCLUIDO_DO_LOTE', label: 'EXCLUIDO_DO_LOTE' },
 ];
-
-function normalizarNotaLegado(nota) {
-  if (!nota) return '';
-  let n = String(nota).trim().toUpperCase();
-  n = n.replace(/^(NOTA|Nº|N°|NO\.|NR\.?|NÚMERO|NUMERO)\s*/g, '');
-  n = n.replace(/^[:.\-/\s]+/, '');
-  n = n.replace(/\s+/g, '');
-  n = n.replace(/^0+(?=\d)/, '');
-  return n;
-}
-
-function normalizarStatusPublicacao(status) {
-  const s = String(status || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, '_');
-  return s === 'PUBLICADO' ? 'PUBLICADO' : 'AGUARDANDO_PUBLICACAO';
-}
 
 function filtrarBusca(linha, termo) {
   if (!termo) return true;
@@ -321,38 +308,23 @@ export default function MigracaoAlteracoesLegado() {
     let notasExistentes = new Set();
     try {
       const existingPubs = await base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, 'nota_id_legado');
-      notasExistentes = new Set(existingPubs.map((p) => p.nota_id_legado).filter(Boolean));
+      notasExistentes = new Set(existingPubs.map((p) => normalizarNumeroNota(p.nota_id_legado)).filter(Boolean));
     } catch (e) {
       console.warn("Falha ao buscar publicações existentes", e);
     }
 
     for (const linha of linhasParaImportar) {
       try {
-        if (linha.numero_nota && notasExistentes.has(linha.numero_nota)) {
+        const notaNormalizada = normalizarNumeroNota(linha.numero_nota);
+        if (notaNormalizada && notasExistentes.has(notaNormalizada)) {
           throw new Error('Nota já importada para este militar.');
         }
 
-        const tipo_final = linha.tipo_classificado || linha.tipo_legado || 'Pendente de classificação';
-
-        const payload = {
-          militar_id: linha.transformado.militar_id,
-          militar_nome: linha.transformado.militar_nome,
-          militar_matricula: linha.transformado.militar_matricula_atual || linha.transformado.militar_matricula,
-          nota_id_legado: linha.numero_nota,
-          numero_bg: linha.numero_bg_br,
-          data_bg: linha.data_bg_br,
-          tipo_legado: linha.tipo_legado,
-          tipo: tipo_final,
-          tipo_registro: tipo_final,
-          texto_publicado: linha.texto_publicado,
-          status: linha.status_publicacao || 'Aguardando Publicação',
-          origem_registro: 'legado',
-          importado_legado: true,
-        };
+        const payload = montarPayloadPublicacaoExOfficioMigracaoLegado(linha);
 
         await criarEscopado('PublicacaoExOfficio', payload);
         importadas++;
-        if (linha.numero_nota) notasExistentes.add(linha.numero_nota);
+        if (notaNormalizada) notasExistentes.add(notaNormalizada);
       } catch (error) {
         falhas.push({
           linhaNumero: linha.linhaNumero,
