@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft } from 'lucide-react';
+import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft, GitBranch } from 'lucide-react';
 import { classificarMilitar, ordenarMilitaresAntiguidade, resolvePostoGraduacao } from '@/utils/efetivo/gestorClassificacao';
 import { filtrarUnidadesCartoes } from '@/utils/efetivo/visualizacaoGestor';
 
@@ -17,18 +17,21 @@ const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
   tipo: 'Setor',
   nome: setor.setorNome,
   sigla: setor.setorSigla,
+  discreto: setor.setorNome === 'Setor não informado',
   militares: [],
   filhos: (setor.subsetores || []).map((subsetor, ssIdx) => ({
     id: `subsetor-${sIdx}-${ssIdx}-${subsetor.subsetorNome}`,
     tipo: 'Subsetor',
     nome: subsetor.subsetorNome,
     sigla: subsetor.subsetorSigla,
+    discreto: subsetor.subsetorNome === 'Subsetor não informado',
     militares: [],
     filhos: (subsetor.unidades || []).map((unidade, uIdx) => ({
       id: `unidade-${sIdx}-${ssIdx}-${uIdx}-${unidade.unidadeNome}`,
       tipo: 'Unidade',
       nome: unidade.unidadeNome,
       sigla: unidade.unidadeSigla,
+      descricao: unidade.unidadeDescricao,
       setorNome: setor.setorNome,
       subsetorNome: subsetor.subsetorNome,
       militares: unidade.militares || [],
@@ -48,49 +51,109 @@ const ResumoInstitucional = ({ resumo }) => (
 );
 
 const MembroChip = ({ militar }) => (
-  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
-    <span className="font-semibold text-slate-800">{resolvePostoGraduacao(militar) || 'S/Posto'}</span>{' '}
-    <span className="text-slate-700">{militar.nome_guerra || militar.nome_completo || 'Sem nome'}</span>
+  <div className="rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs shadow-sm">
+    <p className="truncate font-semibold text-slate-800">{militar.nome_guerra || militar.nome_completo || 'Sem nome'}</p>
+    <p className="mt-0.5 truncate text-[11px] text-slate-500">{resolvePostoGraduacao(militar) || 'S/Posto'}</p>
   </div>
 );
 
-const TreeNode = ({ no, expandedUnits, onToggleUnit }) => {
-  const [expandedNode, setExpandedNode] = useState(true);
-  const isUnidade = no.tipo === 'Unidade';
-  const corTipo = isUnidade ? 'border-l-4 border-l-emerald-400' : no.tipo === 'Subsetor' ? 'border-l-4 border-l-purple-400' : 'border-l-4 border-l-blue-400';
-  const resumo = isUnidade ? summarizeMilitares(no.militares) : null;
+const TotalBadge = ({ total }) => (
+  <Badge variant="outline" className="shrink-0 border-slate-200 bg-white text-slate-600">{total}</Badge>
+);
+
+const UnidadeTreeCard = ({ no, expandedUnits, onToggleUnit }) => {
+  const expanded = Boolean(expandedUnits[no.id]);
 
   return (
-    <div className="flex flex-col items-center">
-      <div className={`w-[300px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${corTipo}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs text-slate-500">{no.tipo}</p>
-            <p className="text-sm font-semibold text-slate-900">{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+    <div className="relative flex min-w-0 flex-col pt-6">
+      <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+      <div className="flex min-h-[168px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><MapPin className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">Unidade</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900">{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+              {no.descricao ? <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{no.descricao}</p> : null}
+            </div>
           </div>
-          <Badge variant="outline">{countTotal(no)}</Badge>
+          <TotalBadge total={no.militares.length} />
         </div>
-        {isUnidade ? (
-          <>
-            <ResumoInstitucional resumo={resumo} />
-            <button type="button" onClick={() => onToggleUnit(no.id)} className="mt-3 text-xs font-medium text-emerald-700">
-              {expandedUnits[no.id] ? 'Ocultar membros' : 'Ver membros'}
-            </button>
-            {expandedUnits[no.id] ? <div className="mt-2 space-y-2">{no.militares.map((m) => <MembroChip key={`${m.id || m.matricula}-${no.id}`} militar={m} />)}</div> : null}
-          </>
+        <button type="button" onClick={() => onToggleUnit(no.id)} className="mt-auto flex items-center gap-1 pt-4 text-left text-xs font-semibold text-emerald-700 transition-colors hover:text-emerald-800">
+          <Users className="h-3.5 w-3.5" /> {expanded ? 'Ocultar membros' : 'Ver membros'}
+        </button>
+        {expanded ? (
+          <div className="mt-3 max-h-52 space-y-2 overflow-y-auto border-t border-slate-100 pt-3 pr-1">
+            {no.militares.length > 0
+              ? no.militares.map((m) => <MembroChip key={`${m.id || m.matricula}-${no.id}`} militar={m} />)
+              : <p className="text-xs text-slate-400">Nenhum militar nesta unidade.</p>}
+          </div>
         ) : null}
       </div>
-      {no.filhos?.length ? <div className="h-8 w-px bg-slate-300" /> : null}
-      {no.filhos?.length && expandedNode ? (
-        <>
-          <div className="h-px w-full bg-slate-300" />
-          <div className="mt-4 flex flex-wrap justify-center gap-6">
-            {no.filhos.map((filho) => <TreeNode key={filho.id} no={filho} expandedUnits={expandedUnits} onToggleUnit={onToggleUnit} />)}
-          </div>
-        </>
-      ) : null}
-      {no.filhos?.length ? <button type="button" className="mt-2 text-xs text-slate-600" onClick={() => setExpandedNode((p) => !p)}>{expandedNode ? 'Recolher nível' : 'Expandir nível'}</button> : null}
     </div>
+  );
+};
+
+const SubsetorTree = ({ no, expandedUnits, onToggleUnit }) => {
+  const unidades = no.filhos || [];
+  const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(250px, 1fr))` };
+
+  return (
+    <div className="relative flex min-w-0 flex-col items-center pt-6">
+      <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+      <div className="w-[280px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="rounded-lg bg-purple-50 p-2 text-purple-600"><GitBranch className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-purple-700">Subsetor</p>
+              <p className={`mt-0.5 text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            </div>
+          </div>
+          <TotalBadge total={countTotal(no)} />
+        </div>
+      </div>
+      {unidades.length > 0 ? (
+        <div className="relative w-full pt-8">
+          <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
+          {unidades.length > 1 ? <div className="absolute left-[calc(125px)] right-[calc(125px)] top-8 h-px bg-slate-300" /> : null}
+          <div className="grid gap-5" style={unitGridStyle}>
+            {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} expandedUnits={expandedUnits} onToggleUnit={onToggleUnit} />)}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const SetorTree = ({ no, expandedUnits, onToggleUnit }) => {
+  const subsetores = no.filhos || [];
+  const subsetorGridStyle = { gridTemplateColumns: `repeat(${Math.max(subsetores.length, 1)}, minmax(280px, 1fr))` };
+
+  return (
+    <section className="flex min-w-max flex-col items-center rounded-2xl border border-slate-200 bg-white/60 px-5 py-6 shadow-sm">
+      <div className="w-[300px] rounded-xl border border-slate-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="rounded-lg bg-blue-50 p-2 text-blue-600"><Building2 className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700">Setor</p>
+              <p className={`mt-0.5 text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            </div>
+          </div>
+          <TotalBadge total={countTotal(no)} />
+        </div>
+      </div>
+      {subsetores.length > 0 ? (
+        <div className="relative w-full pt-8">
+          <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
+          {subsetores.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
+          <div className="grid gap-8" style={subsetorGridStyle}>
+            {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} expandedUnits={expandedUnits} onToggleUnit={onToggleUnit} />)}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 };
 
@@ -168,7 +231,7 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
         </div>
       </div>
 
-      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-6"><div className="flex min-w-max justify-center gap-8">{nos.map((no) => <TreeNode key={no.id} no={no} expandedUnits={expandedUnitsTree} onToggleUnit={toggleUnit} />)}</div></div> : null}
+      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max flex-col items-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} expandedUnits={expandedUnitsTree} onToggleUnit={toggleUnit} />)}</div></div> : null}
 
       {activeView === 'lista' ? <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">{nos.map((no) => renderListaNode(no, 0, expandedListNodes, toggleListNode))}</div> : null}
 

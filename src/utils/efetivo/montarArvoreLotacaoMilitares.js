@@ -24,7 +24,15 @@ export function resolverNomesEstrutura(militar = {}, lotacoesById = new Map()) {
     SEM_SETOR,
   );
 
-  return { setorNome, subsetorNome, unidadeNome };
+  return {
+    setorNome,
+    setorSigla: estrutura?.parent?.parent?.sigla,
+    subsetorNome,
+    subsetorSigla: estrutura?.parent?.sigla,
+    unidadeNome,
+    unidadeSigla: estrutura?.sigla,
+    unidadeDescricao: estrutura?.descricao,
+  };
 }
 
 export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = []) {
@@ -32,25 +40,29 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
   const tree = new Map();
 
   (militares || []).forEach((militar) => {
-    const { setorNome, subsetorNome, unidadeNome } = resolverNomesEstrutura(militar, lotacoesById);
+    const { setorNome, setorSigla, subsetorNome, subsetorSigla, unidadeNome, unidadeSigla, unidadeDescricao } = resolverNomesEstrutura(militar, lotacoesById);
 
-    if (!tree.has(setorNome)) tree.set(setorNome, new Map());
-    const subsetores = tree.get(setorNome);
+    if (!tree.has(setorNome)) tree.set(setorNome, { setorSigla, subsetores: new Map() });
+    const setor = tree.get(setorNome);
 
-    if (!subsetores.has(subsetorNome)) subsetores.set(subsetorNome, new Map());
-    const unidades = subsetores.get(subsetorNome);
+    if (!setor.subsetores.has(subsetorNome)) setor.subsetores.set(subsetorNome, { subsetorSigla, unidades: new Map() });
+    const subsetor = setor.subsetores.get(subsetorNome);
 
-    if (!unidades.has(unidadeNome)) unidades.set(unidadeNome, []);
-    unidades.get(unidadeNome).push(militar);
+    if (!subsetor.unidades.has(unidadeNome)) subsetor.unidades.set(unidadeNome, { unidadeSigla, unidadeDescricao, militares: [] });
+    subsetor.unidades.get(unidadeNome).militares.push(militar);
   });
 
-  return Array.from(tree.entries()).map(([setorNome, subsetores]) => ({
+  return Array.from(tree.entries()).map(([setorNome, setor]) => ({
     setorNome,
-    subsetores: Array.from(subsetores.entries()).map(([subsetorNome, unidades]) => ({
+    setorSigla: setor.setorSigla,
+    subsetores: Array.from(setor.subsetores.entries()).map(([subsetorNome, subsetor]) => ({
       subsetorNome,
-      unidades: Array.from(unidades.entries()).map(([unidadeNome, militaresUnidade]) => ({
+      subsetorSigla: subsetor.subsetorSigla,
+      unidades: Array.from(subsetor.unidades.entries()).map(([unidadeNome, unidade]) => ({
         unidadeNome,
-        militares: militaresUnidade,
+        unidadeSigla: unidade.unidadeSigla,
+        unidadeDescricao: unidade.unidadeDescricao,
+        militares: unidade.militares,
       })),
     })),
   }));
