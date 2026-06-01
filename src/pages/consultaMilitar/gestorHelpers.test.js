@@ -125,3 +125,62 @@ test('calcula resumo do efetivo por unidade separando oficiais, praças, homens 
   assert.deepEqual(unidade.oficiais.map((militar) => militar.nome_guerra), ['Oficial M', 'Oficial F']);
   assert.deepEqual(unidade.pracas.map((militar) => militar.nome_guerra), ['Subtenente', 'Cabo F']);
 });
+
+test('não descarta militares ao montar a árvore mesmo com lotação incompleta', () => {
+  const militares = [
+    { id: '1', nome_guerra: 'A', lotacao: 'Campo Grande', posto_graduacao: 'Cabo' },
+    { id: '2', nome_guerra: 'B', estrutura_nome: 'Campo Grande', posto_graduacao: 'Soldado' },
+    { id: '3', nome_guerra: 'C', lotacao: '', posto_graduacao: 'Soldado' },
+  ];
+
+  const arvore = montarArvoreLotacaoMilitares({ militares, lotacoes: [] });
+  const total = arvore.reduce((setores, setor) => setores + setor.subsetores.reduce((subsetores, subsetor) => subsetores + subsetor.unidades.reduce((unidades, unidade) => unidades + unidade.militares.length, 0), 0), 0);
+
+  assert.equal(total, militares.length);
+});
+
+test('soma resumoEfetivo no setor e subsetor a partir das unidades subordinadas', () => {
+  const arvore = montarArvoreLotacaoMilitares({
+    militares: [
+      { id: '1', nome_guerra: 'A', posto_graduacao: 'Capitão', sexo: 'M', lotacao: 'Campo Grande' },
+      { id: '2', nome_guerra: 'B', posto_graduacao: 'Cabo', sexo: 'F', lotacao: 'Campo Grande' },
+      { id: '3', nome_guerra: 'C', posto_graduacao: 'Soldado', sexo: 'M', lotacao: 'Sidrolândia' },
+    ],
+  });
+
+  const setor = arvore[0];
+  const subsetor = setor.subsetores[0];
+  assert.equal(setor.total, 3);
+  assert.equal(subsetor.total, 3);
+  assert.equal(setor.resumoEfetivo.oficiais, 1);
+  assert.equal(setor.resumoEfetivo.pracas, 2);
+  assert.equal(setor.resumoEfetivo.homens, 2);
+  assert.equal(setor.resumoEfetivo.mulheres, 1);
+  assert.deepEqual(subsetor.resumoEfetivo, setor.resumoEfetivo);
+});
+
+test('normaliza tags dos militares e calcula resumoTags da unidade', () => {
+  const arvore = montarArvoreLotacaoMilitares({
+    militares: [
+      { id: '1', nome_guerra: 'A', posto_graduacao: 'Cabo', lotacao: 'Campo Grande', tags: ['COV', 'MOB'] },
+      { id: '2', nome_guerra: 'B', posto_graduacao: 'Soldado', lotacao: 'Campo Grande', tags: [{ nome: 'COV' }] },
+    ],
+  });
+
+  const unidade = arvore[0].subsetores[0].unidades[0];
+  assert.ok(unidade.militares[0].tags_resolvidas.length > 0);
+  assert.equal(unidade.resumoTags.find((tag) => tag.nome === 'COV')?.total, 2);
+  assert.equal(unidade.resumoTags.find((tag) => tag.nome === 'MOB')?.total, 1);
+});
+
+test('vincula militar por campos alternativos e aceita lotação embutida como objeto', () => {
+  const arvore = montarArvoreLotacaoMilitares({
+    lotacoes: [{ id: 'cg', unidade_id: 'unidade-cg', nome: 'Campo Grande', setor_nome: 'CMB', subsetor_nome: '1º GBM' }],
+    militares: [
+      { id: '1', unidade_id: 'unidade-cg' },
+      { id: '2', lotacao_obj: { nome: 'Sidrolândia', setor_nome: 'CMB', subsetor_nome: '1º GBM' } },
+    ],
+  });
+
+  assert.deepEqual(arvore[0].subsetores[0].unidades.map((unidade) => unidade.unidadeNome), ['Campo Grande', 'Sidrolândia']);
+});
