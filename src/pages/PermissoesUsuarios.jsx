@@ -103,6 +103,7 @@ export default function PermissoesUsuarios() {
     || canAccessAction('excluir_usuarios_acesso')
   );
   const canHardDeleteAccess = hasAccess && canAccessAction('excluir_usuarios_acesso');
+  const isAdministrator = normalizeAccessMode(acessoLogado?.tipo_acesso) === 'admin' || isSuperAdmin(null, acessoLogado);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);
@@ -499,7 +500,6 @@ export default function PermissoesUsuarios() {
         && String(perfilAtualDoUsuario?.usuario_vinculado_id || '') === String(usuarioVinculadoId);
 
       let perfilFinal = perfilAtualDoUsuario;
-      let reloadedRecord = reloadedAccess;
 
       if (possuiAjusteManual) {
         const perfisPersonalizadosRemotos = await base44.entities.PerfilPermissao.filter({
@@ -543,7 +543,7 @@ export default function PermissoesUsuarios() {
           await markProfileAsLegacy(perfilDuplicado);
         }
 
-        reloadedRecord = await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
+        await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilPersonalizadoSelecionado.id,
           perfil_nome: perfilPersonalizadoSelecionado.nome_perfil || payloadPerfilPersonalizado.nome_perfil,
         });
@@ -552,7 +552,7 @@ export default function PermissoesUsuarios() {
         if (perfilAtualEhCustomDoUsuario && perfilAtualDoUsuario?.id) {
           await markProfileAsLegacy(perfilAtualDoUsuario);
         }
-        reloadedRecord = await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
+        await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilOrigemId || '',
           perfil_nome: perfilBaseSelecionado?.nome_perfil || '',
         });
@@ -573,14 +573,18 @@ export default function PermissoesUsuarios() {
       });
       setSelectedProfileSource(reloadedProfile || null);
       setLoadedProfilePermissions(reloadedProfile ? resolveProfilePermissions({ profileSource: reloadedProfile }).permissions : null);
+      // O retorno do update pode não refletir integralmente o estado persistido.
+      // Recarregamos o UsuarioAcesso após todas as alterações de escopo/perfil para
+      // impedir que selectedUser mantenha campos antigos em memória.
+      const refreshedAccess = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
       const resolvedReloaded = await resolveUserPermissions({
-        userSource: reloadedRecord,
+        userSource: refreshedAccess,
         profileSource: reloadedProfile || {},
         preferProfilePermissions: true,
       });
       const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(targetIsSuperAdmin ? fullAccessPermissions : reloadedPermissions);
-      setSelectedUser(reloadedRecord);
+      setSelectedUser(refreshedAccess);
       if (targetIsSuperAdmin) {
         setTechnicalWarning('Superadmin protegido: alterações críticas foram preservadas com acesso total.');
       }
@@ -661,17 +665,22 @@ export default function PermissoesUsuarios() {
       alert('Por segurança, desative/arquive o usuário antes da exclusão definitiva.');
       return;
     }
-    if (targetAcesso.militar_id) {
-      alert('Exclusão definitiva bloqueada: há vínculo com militar. Mantenha o registro arquivado para preservar histórico.');
-      return;
-    }
-    const confirmado = window.confirm(
-      `Excluir DEFINITIVAMENTE "${targetAcesso.nome_usuario || targetAcesso.user_email}"?\n\nEsta ação não pode ser desfeita.`
-    );
-    if (!confirmado) return;
-
     try {
-      await deleteEscopadoEntity('UsuarioAcesso', targetAcesso.id);
+      // A decisão deve usar o banco, não o selectedUser potencialmente obsoleto.
+      const acessoAtual = await base44.entities.UsuarioAcesso.get(targetAcesso.id);
+      if (acessoAtual.militar_id) {
+        const mensagemBloqueio = isAdministrator
+          ? `Exclusão definitiva bloqueada. O registro ainda possui militar_id vinculado: ${acessoAtual.militar_id}`
+          : 'Exclusão definitiva bloqueada: há vínculo com militar. Mantenha o registro arquivado para preservar histórico.';
+        alert(mensagemBloqueio);
+        return;
+      }
+      const confirmado = window.confirm(
+        `Excluir DEFINITIVAMENTE "${acessoAtual.nome_usuario || acessoAtual.user_email}"?\n\nEsta ação não pode ser desfeita.`
+      );
+      if (!confirmado) return;
+
+      await deleteEscopadoEntity('UsuarioAcesso', acessoAtual.id);
       if (selectedUser?.id === targetAcesso.id) {
         setSelectedUser(null);
       }
