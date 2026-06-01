@@ -410,6 +410,8 @@ const TEMPLATE_VAR_CONTRACT = {
       'tipo_afastamento',
       'data_inicio',
       'data_termino',
+      'medico_nome',
+      'medico_crm',
     ],
     aliases: {
       posto: 'posto_nome',

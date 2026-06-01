@@ -202,7 +202,7 @@ test('homologação de atestado aceita variáveis usadas no fluxo real', () => {
     modulo: 'ExOfficio',
     tipoRegistro: 'Homologação de Atestado',
     template:
-      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{dias}} {{dias_extenso}} {{tipo_afastamento}} {{data_inicio}} {{data_termino}}',
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{dias}} {{dias_extenso}} {{tipo_afastamento}} {{data_inicio}} {{data_termino}} {{medico_nome}} {{medico_crm}}',
   });
   assert.equal(result.ok, true);
   assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
