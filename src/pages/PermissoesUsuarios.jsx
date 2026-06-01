@@ -186,6 +186,18 @@ export default function PermissoesUsuarios() {
       : acessos.filter((u) => u.ativo !== false)
   ), [acessos, showInactiveArchived]);
 
+  // PARTE C — Contagem de duplicidades por user_email (normalizado).
+  // Considera TODOS os acessos (ativos + inativos) para refletir o estado real do banco.
+  const duplicidadesPorEmail = useMemo(() => {
+    const contagem = new Map();
+    (acessos || []).forEach((u) => {
+      const emailNormalizado = (u?.user_email || '').trim().toLowerCase();
+      if (!emailNormalizado) return;
+      contagem.set(emailNormalizado, (contagem.get(emailNormalizado) || 0) + 1);
+    });
+    return contagem;
+  }, [acessos]);
+
   const filteredAcessos = useMemo(() => {
     const query = userSearch.trim().toLowerCase();
     if (!query) return visibleAcessos;
@@ -374,6 +386,23 @@ export default function PermissoesUsuarios() {
     if (!isNewAcesso && !existingUserId) {
       alert('Não foi possível identificar o usuário selecionado. Recarregue e tente novamente.');
       return;
+    }
+
+    // PARTE B — Bloqueio de criação duplicada por e-mail.
+    // Normaliza o e-mail e verifica se já existe UsuarioAcesso (ativo ou inativo) com o mesmo e-mail.
+    // Consulta direta ao backend para não depender do cache do React Query.
+    if (isNewAcesso) {
+      const emailNormalizado = userUserEmail.trim().toLowerCase();
+      try {
+        const existentes = await base44.entities.UsuarioAcesso.filter({ user_email: emailNormalizado });
+        if (Array.isArray(existentes) && existentes.length > 0) {
+          alert('Já existe acesso cadastrado para este e-mail. Edite o registro existente.');
+          return;
+        }
+      } catch (err) {
+        alert(err?.message || 'Não foi possível validar duplicidade de e-mail. Tente novamente.');
+        return;
+      }
     }
 
     setSavingUser(true);
@@ -719,30 +748,47 @@ export default function PermissoesUsuarios() {
                 {filteredAcessos.length === 0 ? (
                   <p className="text-center text-slate-400 py-10 text-sm">Nenhum acesso cadastrado</p>
                 ) : (
-                  filteredAcessos.map((u) => (
-                    <div 
-                      key={u.id} 
-                      onClick={() => handleSelectAcesso(u)} 
-                      className={`p-2.5 rounded-xl border cursor-pointer transition-all ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
+                  filteredAcessos.map((u) => {
+                    const emailKey = (u?.user_email || '').trim().toLowerCase();
+                    const totalDuplicados = emailKey ? (duplicidadesPorEmail.get(emailKey) || 0) : 0;
+                    const isDuplicado = totalDuplicados > 1;
+                    const isSelecionado = selectedUser?.id === u.id;
+                    return (
+                    <div
+                      key={u.id}
+                      onClick={() => handleSelectAcesso(u)}
+                      className={`p-2.5 rounded-xl border cursor-pointer transition-all ${isSelecionado ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
                     >
                       <div className="flex justify-between items-start mb-1.5 gap-2">
-                        <div className={`font-semibold text-sm truncate ${selectedUser?.id === u.id ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
+                        <div className={`font-semibold text-sm truncate ${isSelecionado ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
                           {u.nome_usuario || u.user_email}
-                          {!u.ativo && <span className={`ml-1.5 text-xs font-semibold ${selectedUser?.id === u.id ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>}
+                          {!u.ativo && <span className={`ml-1.5 text-xs font-semibold ${isSelecionado ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>}
                         </div>
                         <div className="shrink-0 [&_.bg-emerald-100]:bg-white/20 [&_.text-emerald-800]:text-white [&_.bg-emerald-50]:bg-white/20 [&_.text-emerald-700]:text-white [&_.border-emerald-200]:border-white/30 [&_.bg-blue-100]:bg-white/20 [&_.text-blue-800]:text-white [&_.bg-amber-100]:bg-white/20 [&_.text-amber-800]:text-white [&_.text-slate-500]:text-white">
                           {getTipoBadge(u)}
                         </div>
                       </div>
-                      <div className={`text-xs mb-2 truncate ${selectedUser?.id === u.id ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
-                      
-                      {u.perfil_nome && (
-                        <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block truncate max-w-full ${selectedUser?.id === u.id ? 'bg-white/20 text-white border border-white/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'}`}>
-                          Perfil: {u.perfil_nome}
-                        </div>
-                      )}
+                      <div className={`text-xs mb-2 truncate ${isSelecionado ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {u.perfil_nome && (
+                          <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block truncate max-w-full ${isSelecionado ? 'bg-white/20 text-white border border-white/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'}`}>
+                            Perfil: {u.perfil_nome}
+                          </div>
+                        )}
+                        {isDuplicado && (
+                          <div
+                            title={`Existem ${totalDuplicados} registros com este e-mail no banco. Edite o registro correto e considere arquivar/excluir os demais.`}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 border ${isSelecionado ? 'bg-white/20 text-white border-white/40' : 'bg-red-50 text-red-700 border-red-200'}`}
+                          >
+                            <BadgeAlert className="w-3 h-3" />
+                            Duplicado ({totalDuplicados} registros)
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
             </div>

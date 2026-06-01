@@ -28,6 +28,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'PublicacaoExOfficio',
   'CreditoExtraFerias',
   'ContratoDesignacaoMilitar',
+  'PerfilPermissao',
+  'UsuarioAcesso',
 ]);
 
 
