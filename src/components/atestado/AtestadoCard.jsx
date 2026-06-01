@@ -26,7 +26,6 @@ import JisoHistoricoModal from './JisoHistoricoModal';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
   aplicarTemplate,
-  buildTemplateVarsContrato,
 } from '@/components/utils/templateUtils';
 import {
   calcStatusPublicacao,
@@ -41,6 +40,7 @@ import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContex
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
+import { buildAtestadoTemplateVarsContrato } from './atestadoTemplateVars';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -108,16 +108,26 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     enabled: !!atestado?.militar_id,
     staleTime: 30000,
   });
+  const { data: medicoCadastrado = null, isLoading: isLoadingMedicoCadastrado } = useQuery({
+    queryKey: ['medico-atestado-template', atestado?.medico_id],
+    queryFn: async () => {
+      const rows = await base44.entities.Medico.filter({ id: atestado.medico_id });
+      return rows?.[0] || null;
+    },
+    enabled: !!atestado?.medico_id,
+    staleTime: 30000,
+  });
 
   const diasExtensoMap = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
   const matriculaOperacional = montarLabelMilitarAtestado(atestado, { contexto: 'operacional' });
   const matriculaDocumental = montarLabelMilitarAtestado(atestado, { contexto: 'documental' });
 
-  const varsContratoTemplate = buildTemplateVarsContrato({
-    ...atestado,
+  const varsContratoTemplate = buildAtestadoTemplateVarsContrato({
+    atestado,
+    medicoCadastrado,
     militar: militarAtestado,
-    matricula_documental: matriculaDocumental,
-    matricula_operacional: matriculaOperacional,
+    matriculaDocumental,
+    matriculaOperacional,
   });
 
   const gerarTextoHomologacao = (form) => {
@@ -127,16 +137,6 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
     });
     if (!tmpl?.template) return null;
-    console.log('ATESTADO_HOMOLOGACAO', atestado);
-    console.log('VARS_CONTRATO_HOMOLOGACAO', varsContratoTemplate);
-    console.log('CRM_DEBUG', {
-      medico_crm_snapshot: atestado?.medico_crm_snapshot,
-      crm_medico: atestado?.crm_medico,
-      medico: atestado?.medico,
-      medico_id: atestado?.medico_id,
-      medico_nome_snapshot: atestado?.medico_nome_snapshot,
-      medico_crm_resultante: varsContratoTemplate?.medico_crm
-    });
     return aplicarTemplate(tmpl.template, {
       ...varsContratoTemplate,
       dias: String(atestado.dias),
@@ -165,6 +165,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   };
 
   const handleOpenHomologacao = () => {
+    if (atestado?.medico_id && isLoadingMedicoCadastrado) {
+      alert('Aguarde o carregamento dos dados do médico para gerar a homologação.');
+      return;
+    }
     const texto = gerarTextoHomologacao({});
     if (texto === null) {
       alert("Template obrigatório não encontrado para 'Homologação de Atestado'. Entre em contato com o administrador.");
