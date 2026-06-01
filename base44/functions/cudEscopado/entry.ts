@@ -44,6 +44,8 @@ const ENTIDADES_PERMITIDAS = new Set([
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
+const ENTIDADES_SEM_ESCOPO_MILITAR = new Set(['PerfilPermissao', 'UsuarioAcesso']);
+const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
 // =====================================================================
 // PERMISSIONS_MAP — Validação funcional por entidade × operação
@@ -97,8 +99,8 @@ const PERMISSIONS_MAP = {
     delete: 'gerir_permissoes',
   },
   UsuarioAcesso: {
-    create: 'gerir_permissoes_usuarios',
-    update: 'gerir_permissoes_usuarios',
+    create: 'gerir_permissoes',
+    update: 'gerir_permissoes',
     delete: 'excluir_usuarios_acesso',
   },
 };
@@ -518,6 +520,17 @@ function getEntity(base44, entityName) {
   return base44.asServiceRole.entities[entityName];
 }
 
+async function buscarUsuarioAcessoPorEmail(base44, email) {
+  const emailNormalizado = normalizeEmail(email);
+  if (!emailNormalizado) return null;
+
+  const acessos = await fetchWithRetry(
+    () => base44.asServiceRole.entities.UsuarioAcesso.list(),
+    'UsuarioAcesso.list:duplicate-check',
+  );
+  return (acessos || []).find((acesso) => normalizeEmail(acesso?.user_email) === emailNormalizado) || null;
+}
+
 async function buscarRegistroExistente(base44, entityName, registroId) {
   const entity = getEntity(base44, entityName);
   try {
@@ -602,6 +615,8 @@ Deno.serve(async (req) => {
     const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
 
     // ---- Identificar militar_id alvo ----
+    // Entidades administrativas não pertencem ao escopo de um militar específico.
+    const exigeEscopoMilitar = !ENTIDADES_SEM_ESCOPO_MILITAR.has(entityName);
     let militarAlvoId = null;
     let registroExistente = null;
 
@@ -619,7 +634,7 @@ Deno.serve(async (req) => {
       militarAlvoId = registroExistente.militar_id ? String(registroExistente.militar_id) : null;
     }
 
-    if (!militarAlvoId) {
+    if (exigeEscopoMilitar && !militarAlvoId) {
       return Response.json(
         { error: 'Não foi possível identificar o militar_id alvo desta operação.' },
         { status: 400 },
@@ -627,7 +642,7 @@ Deno.serve(async (req) => {
     }
 
     // ---- Bloqueio de troca de militar_id em update por restrito ----
-    if (operation === 'update' && !targetIsAdmin) {
+    if (exigeEscopoMilitar && operation === 'update' && !targetIsAdmin) {
       if (data && Object.prototype.hasOwnProperty.call(data, 'militar_id')) {
         const militarIdNoPayload = data.militar_id ? String(data.militar_id) : null;
         if (militarIdNoPayload && militarIdNoPayload !== militarAlvoId) {
@@ -640,7 +655,7 @@ Deno.serve(async (req) => {
     }
 
     // ---- Validação de escopo ----
-    if (!targetIsAdmin) {
+    if (exigeEscopoMilitar && !targetIsAdmin) {
       const idsPermitidos = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
       if (idsPermitidos !== null) {
         const setPermitidos = new Set(idsPermitidos.map(String));
@@ -715,6 +730,17 @@ Deno.serve(async (req) => {
     }
 
     let dataValidada = data;
+    if (entityName === 'UsuarioAcesso' && operation === 'create') {
+      const emailNormalizado = normalizeEmail(data?.user_email);
+      if (!emailNormalizado) {
+        return Response.json({ error: 'user_email é obrigatório para criar UsuarioAcesso.' }, { status: 400 });
+      }
+      const acessoExistente = await buscarUsuarioAcessoPorEmail(base44, emailNormalizado);
+      if (acessoExistente) {
+        return Response.json({ error: DUPLICATE_ACCESS_MESSAGE }, { status: 409 });
+      }
+      dataValidada = { ...data, user_email: emailNormalizado };
+    }
     if (entityName === 'ContratoDesignacaoMilitar') {
       dataValidada = await prepararContratoDesignacaoMilitar({
         base44,
@@ -738,7 +764,7 @@ Deno.serve(async (req) => {
       );
     } else if (operation === 'update') {
       // Em update por restrito, garantimos que militar_id permaneça o canônico.
-      const dataSegura = !targetIsAdmin && dataValidada
+      const dataSegura = exigeEscopoMilitar && !targetIsAdmin && dataValidada
         ? { ...dataValidada, militar_id: militarAlvoId }
         : dataValidada;
       resultado = await fetchWithRetry(
