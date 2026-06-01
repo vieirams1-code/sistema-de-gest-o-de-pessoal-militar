@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, Pencil, RotateCcw, Search, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, ChevronsUpDown, Pencil, RotateCcw, Search, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -86,6 +88,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   const [mostrarPendentes, setMostrarPendentes] = useState(true);
   const [filtroOperacional, setFiltroOperacional] = useState('todos');
   const [textoEmEdicaoId, setTextoEmEdicaoId] = useState(null);
+  const [tipoPopoverAbertoId, setTipoPopoverAbertoId] = useState(null);
 
   const linhasPesquisadas = useMemo(() => {
     const termo = normalizar(pesquisa.trim());
@@ -154,6 +157,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
 
   useEffect(() => {
     setTextoEmEdicaoId(null);
+    setTipoPopoverAbertoId(null);
   }, [selecionadaId, selecionada?.recusada]);
 
   const handleNext = () => {
@@ -289,7 +293,6 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           const linha = selecionada;
           const desabilitada = linha.recusada;
           const statusVisual = statusDaLinha(linha);
-          const valorTipo = possuiClassificacao(linha) ? linha.tipo_classificado : '__fallback__';
           const textoEmEdicao = textoEmEdicaoId === linha.linhaNumero;
 
           return (
@@ -319,13 +322,65 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
 
                   <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-1.5">
                     <label className="mb-1 block text-[11px] font-semibold text-indigo-800">Tipo classificado</label>
-                    <Select disabled={desabilitada} value={valorTipo} onValueChange={(valor) => handleClassificarLinha(linha, valor)}>
-                      <SelectTrigger className="h-8 border-indigo-200 bg-white text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__fallback__">{linha.tipo_legado || 'Sem classificação'}</SelectItem>
-                        {tiposPublicacaoValidos.map((tipo) => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={tipoPopoverAbertoId === linha.linhaNumero} onOpenChange={(open) => setTipoPopoverAbertoId(open ? linha.linhaNumero : null)}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={tipoPopoverAbertoId === linha.linhaNumero}
+                          disabled={desabilitada}
+                          className={cn(
+                            'h-8 w-full justify-between border-indigo-200 bg-white px-2 text-xs font-normal',
+                            !possuiClassificacao(linha) && 'text-slate-500'
+                          )}
+                        >
+                          <span className="truncate">
+                            {possuiClassificacao(linha) ? linha.tipo_classificado : 'Pesquisar tipo de publicação...'}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[420px] p-0" align="start">
+                        <Command
+                          filter={(value, search) => {
+                            if (normalizar(value).includes(normalizar(search))) return 1;
+                            return 0;
+                          }}
+                        >
+                          <CommandInput placeholder="Pesquisar tipo..." className="h-8 text-xs" />
+                          <CommandList>
+                            <CommandEmpty className="py-3 text-center text-xs text-slate-500">Nenhum tipo encontrado</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="usar tipo legado sem classificacao manual"
+                                onSelect={() => {
+                                  handleClassificarLinha(linha, '__fallback__');
+                                  setTipoPopoverAbertoId(null);
+                                }}
+                                className="text-xs text-slate-600 italic"
+                              >
+                                <Check className={cn('mr-2 h-3.5 w-3.5 shrink-0', !possuiClassificacao(linha) ? 'opacity-100' : 'opacity-0')} />
+                                <span className="truncate">Usar tipo legado / sem classificação manual</span>
+                              </CommandItem>
+                              {tiposPublicacaoValidos.map((tipo) => (
+                                <CommandItem
+                                  key={tipo}
+                                  value={tipo}
+                                  onSelect={() => {
+                                    handleClassificarLinha(linha, tipo);
+                                    setTipoPopoverAbertoId(null);
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <Check className={cn('mr-2 h-3.5 w-3.5 shrink-0', linha.tipo_classificado === tipo ? 'opacity-100' : 'opacity-0')} />
+                                  <span className="truncate">{tipo}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   {(linha.erros?.length > 0 || linha.avisos?.length > 0) && (
