@@ -36,6 +36,8 @@ const assertCudEntityAllowed = (entityName) => {
 const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
 const fullAccessPermissions = buildFullAccessPermissions();
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
+const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
 const normalizeAccessMode = (value) => {
   const normalized = (value || '').toString().trim().toLowerCase();
@@ -191,7 +193,7 @@ export default function PermissoesUsuarios() {
   const duplicidadesPorEmail = useMemo(() => {
     const contagem = new Map();
     (acessos || []).forEach((u) => {
-      const emailNormalizado = (u?.user_email || '').trim().toLowerCase();
+      const emailNormalizado = normalizeEmail(u?.user_email);
       if (!emailNormalizado) return;
       contagem.set(emailNormalizado, (contagem.get(emailNormalizado) || 0) + 1);
     });
@@ -392,11 +394,11 @@ export default function PermissoesUsuarios() {
     // Normaliza o e-mail e verifica se já existe UsuarioAcesso (ativo ou inativo) com o mesmo e-mail.
     // Consulta direta ao backend para não depender do cache do React Query.
     if (isNewAcesso) {
-      const emailNormalizado = userUserEmail.trim().toLowerCase();
+      const emailNormalizado = normalizeEmail(userUserEmail);
       try {
-        const existentes = await base44.entities.UsuarioAcesso.filter({ user_email: emailNormalizado });
-        if (Array.isArray(existentes) && existentes.length > 0) {
-          alert('Já existe acesso cadastrado para este e-mail. Edite o registro existente.');
+        const existentes = await base44.entities.UsuarioAcesso.list();
+        if ((existentes || []).some((acesso) => normalizeEmail(acesso?.user_email) === emailNormalizado)) {
+          alert(DUPLICATE_ACCESS_MESSAGE);
           return;
         }
       } catch (err) {
@@ -439,7 +441,7 @@ export default function PermissoesUsuarios() {
 
       const baseData = {
         nome_usuario: userNomeUsuario,
-        user_email: userUserEmail.trim(),
+        user_email: normalizeEmail(userUserEmail),
         ativo: targetIsSuperAdmin ? true : userAtivo,
         perfil_id: perfilOrigemId || '',
         perfil_nome: perfilBaseSelecionado?.nome_perfil || appliedProfileState.nome || '',
@@ -749,7 +751,7 @@ export default function PermissoesUsuarios() {
                   <p className="text-center text-slate-400 py-10 text-sm">Nenhum acesso cadastrado</p>
                 ) : (
                   filteredAcessos.map((u) => {
-                    const emailKey = (u?.user_email || '').trim().toLowerCase();
+                    const emailKey = normalizeEmail(u?.user_email);
                     const totalDuplicados = emailKey ? (duplicidadesPorEmail.get(emailKey) || 0) : 0;
                     const isDuplicado = totalDuplicados > 1;
                     const isSelecionado = selectedUser?.id === u.id;
