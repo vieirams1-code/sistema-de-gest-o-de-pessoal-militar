@@ -21,7 +21,11 @@ export default function VisualizacaoGestorEfetivo() {
   const militaresQuery = useQuery({
     queryKey: ['gestor-efetivo-militares', effectiveEmail || 'self'],
     enabled: isAccessResolved,
-    queryFn: () => fetchScopedMilitares({}),
+    queryFn: async () => {
+      const data = await fetchScopedMilitares({});
+      console.log("VISAO_GESTOR_MILITARES", data.militares.length);
+      return data;
+    },
   });
 
   const lotacoesQuery = useQuery({
