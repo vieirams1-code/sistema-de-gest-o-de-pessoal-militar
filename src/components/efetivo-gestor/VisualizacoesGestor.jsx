@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft, GitBranch, X } from 'lucide-react';
 import { classificarMilitar, ordenarMilitaresAntiguidade, resolvePostoGraduacao } from '@/utils/efetivo/gestorClassificacao';
 import { filtrarUnidadesCartoes } from '@/utils/efetivo/visualizacaoGestor';
-import { calcularResumoEfetivo, obterGrupoHierarquicoMilitar, obterSexoMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
+import { calcularResumoEfetivo, calcularResumoTags, obterGrupoHierarquicoMilitar, obterSexoMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 
 const summarizeMilitares = (militares = []) => {
   const oficiais = militares.filter((m) => classificarMilitar(m) === 'oficial').length;
@@ -20,6 +20,8 @@ const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
   sigla: setor.setorSigla,
   discreto: setor.setorNome === 'Setor não informado',
   militares: [],
+  resumoEfetivo: setor.resumoEfetivo,
+  resumoTags: setor.resumoTags || [],
   filhos: (setor.subsetores || []).map((subsetor, ssIdx) => ({
     id: `subsetor-${sIdx}-${ssIdx}-${subsetor.subsetorNome}`,
     tipo: 'Subsetor',
@@ -27,6 +29,8 @@ const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
     sigla: subsetor.subsetorSigla,
     discreto: subsetor.subsetorNome === 'Subsetor não informado',
     militares: [],
+    resumoEfetivo: subsetor.resumoEfetivo,
+    resumoTags: subsetor.resumoTags || [],
     filhos: (subsetor.unidades || []).map((unidade, uIdx) => ({
       id: `unidade-${sIdx}-${ssIdx}-${uIdx}-${unidade.unidadeNome}`,
       tipo: 'Unidade',
@@ -37,6 +41,8 @@ const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
       subsetorNome: subsetor.subsetorNome,
       militares: unidade.militares || [],
       resumoEfetivo: unidade.resumoEfetivo || calcularResumoEfetivo(unidade.militares),
+      resumoTags: unidade.resumoTags || calcularResumoTags(unidade.militares),
+      total: unidade.total ?? unidade.militares?.length ?? 0,
       oficiais: unidade.oficiais || [],
       pracas: unidade.pracas || [],
       filhos: [],
@@ -105,6 +111,15 @@ const MetricaUnidade = ({ tipo, label, valor }) => {
   );
 };
 
+const ResumoMetricasEfetivo = ({ resumo, compacto = false }) => (
+  <div className={compacto ? 'mt-3 grid grid-cols-4 gap-1.5' : 'mt-3 grid grid-cols-2 gap-2 md:grid-cols-4'}>
+    <MetricaUnidade tipo="oficiais" label="Oficiais" valor={resumo?.oficiais || 0} />
+    <MetricaUnidade tipo="pracas" label="Praças" valor={resumo?.pracas || 0} />
+    <MetricaUnidade tipo="homens" label="Homens" valor={resumo?.homens || 0} />
+    <MetricaUnidade tipo="mulheres" label="Mulheres" valor={resumo?.mulheres || 0} />
+  </div>
+);
+
 const LinhaMilitarEfetivo = ({ militar, indice }) => {
   const nome = obterNomeExibicaoMilitar(militar);
   const posto = obterPostoExibicaoMilitar(militar);
@@ -118,6 +133,12 @@ const LinhaMilitarEfetivo = ({ militar, indice }) => {
       <div className="min-w-0">
         <div className="truncate text-sm font-bold text-slate-900" title={nome}>{nome}</div>
         <div className="mt-0.5 truncate text-xs text-slate-500">{[posto, matricula ? `Matrícula ${matricula}` : ''].filter(Boolean).join(' • ')}</div>
+        {militar?.tags_resolvidas?.length ? (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {militar.tags_resolvidas.slice(0, 4).map((tag) => <span key={tag.id || tag.nome} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{tag.nome}</span>)}
+            {militar.tags_resolvidas.length > 4 ? <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-400">+{militar.tags_resolvidas.length - 4}</span> : null}
+          </div>
+        ) : null}
       </div>
       <div className="text-center text-lg" title={tituloSexo}>{sexo === 'F' ? '👩' : sexo === 'M' ? '👨' : '•'}</div>
     </div>
@@ -158,12 +179,7 @@ const ModalEfetivoUnidade = ({ unidade, onClose }) => {
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-            <MetricaUnidade tipo="oficiais" label="Oficiais" valor={resumo.oficiais} />
-            <MetricaUnidade tipo="pracas" label="Praças" valor={resumo.pracas} />
-            <MetricaUnidade tipo="homens" label="Homens" valor={resumo.homens} />
-            <MetricaUnidade tipo="mulheres" label="Mulheres" valor={resumo.mulheres} />
-          </div>
+          <ResumoMetricasEfetivo resumo={resumo} />
         </header>
         <main className="flex-1 space-y-4 overflow-y-auto bg-white p-5">
           <SecaoEfetivo titulo="Oficiais" militares={unidade.oficiais || []} />
@@ -174,7 +190,45 @@ const ModalEfetivoUnidade = ({ unidade, onClose }) => {
   );
 };
 
-const UnidadeTreeCard = ({ no, onVerMembros }) => (
+const ModalResumoUnidade = ({ unidade, onClose }) => {
+  if (!unidade) return null;
+  const resumo = unidade.resumoEfetivo || {};
+  const tags = unidade.resumoTags || [];
+  const subtitulo = [unidade.sigla, unidade.descricao].filter(Boolean).join(' • ');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-resumo-titulo">
+      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <header className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50 px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="modal-resumo-titulo" className="text-lg font-black text-slate-900">Resumo — {unidade.nome}</h2>
+              {subtitulo ? <p className="mt-1 text-sm text-slate-500">{subtitulo}</p> : null}
+              <p className="mt-1 text-xs text-slate-500">Totais calculados a partir dos militares carregados da unidade.</p>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Fechar"><X className="h-4 w-4" /></button>
+          </div>
+          <ResumoMetricasEfetivo resumo={resumo} />
+        </header>
+        <main className="grid gap-4 overflow-y-auto p-5 md:grid-cols-[1fr_1fr]">
+          <section className="rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="text-sm font-black text-slate-900">Composição</div><div className="text-xs text-slate-500">Resumo do efetivo da unidade</div></div>
+            <div className="divide-y divide-slate-100">
+              {[[ 'Total', unidade.total ?? unidade.militares?.length ?? 0 ], [ 'Oficiais', resumo.oficiais || 0 ], [ 'Praças', resumo.pracas || 0 ], [ 'Homens', resumo.homens || 0 ], [ 'Mulheres', resumo.mulheres || 0 ]].map(([label, valor]) => <div key={label} className="flex justify-between px-4 py-3 text-sm"><span>{label}</span><strong>{valor}</strong></div>)}
+              {resumo.sexoNaoInformado ? <div className="flex justify-between px-4 py-3 text-sm"><span>Sexo não informado</span><strong>{resumo.sexoNaoInformado}</strong></div> : null}
+            </div>
+          </section>
+          <section className="rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="text-sm font-black text-slate-900">Tags</div><div className="text-xs text-slate-500">Quantidade de militares por tag</div></div>
+            {tags.length ? <div className="divide-y divide-slate-100">{tags.map((tag) => <div key={tag.id || tag.nome} className="flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-slate-700">{tag.nome}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{tag.total}</span></div>)}</div> : <div className="px-4 py-8 text-center text-sm text-slate-500">Nenhuma tag encontrada nos militares desta unidade.</div>}
+          </section>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
   <div className="relative flex min-w-0 flex-col pt-6">
     <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
     <div className="flex w-[280px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
@@ -189,27 +243,23 @@ const UnidadeTreeCard = ({ no, onVerMembros }) => (
         </div>
         <TotalBadge total={no.militares.length} />
       </div>
+      <ResumoMetricasEfetivo resumo={no.resumoEfetivo} />
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <MetricaUnidade tipo="oficiais" label="Oficiais" valor={no.resumoEfetivo?.oficiais} />
-        <MetricaUnidade tipo="pracas" label="Praças" valor={no.resumoEfetivo?.pracas} />
-        <MetricaUnidade tipo="homens" label="Homens" valor={no.resumoEfetivo?.homens} />
-        <MetricaUnidade tipo="mulheres" label="Mulheres" valor={no.resumoEfetivo?.mulheres} />
+        <button type="button" onClick={() => onVerMembros(no)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Ver membros</button>
+        <button type="button" onClick={() => onVerResumo(no)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100">Resumo</button>
       </div>
-      <button type="button" onClick={() => onVerMembros(no)} className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-        <span>Ver membros ({no.militares.length})</span><span className="text-slate-400">↗</span>
-      </button>
     </div>
   </div>
 );
 
-const SubsetorTree = ({ no, onVerMembros }) => {
+const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
   const unidades = no.filhos || [];
   const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(280px, 1fr))` };
 
   return (
     <div className="relative flex min-w-0 flex-col items-center pt-6">
       <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
-      <div className="w-[280px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
+      <div className="w-[320px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2.5">
             <div className="rounded-lg bg-purple-50 p-2 text-purple-600"><GitBranch className="h-4 w-4" /></div>
@@ -220,13 +270,14 @@ const SubsetorTree = ({ no, onVerMembros }) => {
           </div>
           <TotalBadge total={countTotal(no)} />
         </div>
+        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} compacto />
       </div>
       {unidades.length > 0 ? (
         <div className="relative w-full pt-8">
           <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
           {unidades.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-5" style={unitGridStyle}>
-            {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} onVerMembros={onVerMembros} />)}
+            {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
         </div>
       ) : null}
@@ -234,13 +285,13 @@ const SubsetorTree = ({ no, onVerMembros }) => {
   );
 };
 
-const SetorTree = ({ no, onVerMembros }) => {
+const SetorTree = ({ no, onVerMembros, onVerResumo }) => {
   const subsetores = no.filhos || [];
   const subsetorGridStyle = { gridTemplateColumns: `repeat(${Math.max(subsetores.length, 1)}, minmax(280px, 1fr))` };
 
   return (
     <section className="flex min-w-max flex-col items-center rounded-2xl border border-slate-200 bg-white/60 px-5 py-6 shadow-sm">
-      <div className="w-[300px] rounded-xl border border-slate-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm">
+      <div className="w-[320px] rounded-xl border border-slate-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2.5">
             <div className="rounded-lg bg-blue-50 p-2 text-blue-600"><Building2 className="h-4 w-4" /></div>
@@ -251,13 +302,14 @@ const SetorTree = ({ no, onVerMembros }) => {
           </div>
           <TotalBadge total={countTotal(no)} />
         </div>
+        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} compacto />
       </div>
       {subsetores.length > 0 ? (
         <div className="relative w-full pt-8">
           <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
           {subsetores.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-8" style={subsetorGridStyle}>
-            {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} onVerMembros={onVerMembros} />)}
+            {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
         </div>
       ) : null}
@@ -296,28 +348,23 @@ const renderListaNode = (no, level, expanded, onToggle) => {
 export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidadeMap }) {
   const [activeView, setActiveView] = useState('arvore');
   const [unidadeSelecionada, setUnidadeSelecionada] = useState(null);
+  const [unidadeResumoSelecionada, setUnidadeResumoSelecionada] = useState(null);
   const [expandedListNodes, setExpandedListNodes] = useState({});
   const [buscaCartoes, setBuscaCartoes] = useState('');
 
   const q = String(filtro || '').trim().toLowerCase();
-  const filtrada = useMemo(() => (estrutura || []).map((setor) => ({
-    ...setor,
-    subsetores: (setor.subsetores || []).map((subsetor) => ({
-      ...subsetor,
-      unidades: (subsetor.unidades || []).map((unidade) => ({
-        ...unidade,
-        ...(() => {
-          const militares = ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap);
-          return {
-            militares,
-            resumoEfetivo: calcularResumoEfetivo(militares),
-            oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'),
-            pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial'),
-          };
-        })(),
-      })).filter((u) => !q || u.militares.length > 0),
-    })).filter((ss) => !q || ss.unidades.length > 0),
-  })).filter((s) => !q || s.subsetores.length > 0), [estrutura, q, ordemAntiguidadeMap]);
+  const filtrada = useMemo(() => (estrutura || []).map((setor) => {
+    const subsetores = (setor.subsetores || []).map((subsetor) => {
+      const unidades = (subsetor.unidades || []).map((unidade) => {
+        const militares = ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap);
+        return { ...unidade, total: militares.length, militares, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'), pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial') };
+      }).filter((unidade) => !q || unidade.militares.length > 0);
+      const militares = unidades.flatMap((unidade) => unidade.militares);
+      return { ...subsetor, total: militares.length, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), unidades };
+    }).filter((subsetor) => !q || subsetor.unidades.length > 0);
+    const militares = subsetores.flatMap((subsetor) => subsetor.unidades.flatMap((unidade) => unidade.militares));
+    return { ...setor, total: militares.length, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), subsetores };
+  }).filter((setor) => !q || setor.subsetores.length > 0), [estrutura, q, ordemAntiguidadeMap]);
 
   const nos = useMemo(() => montarNos(filtrada), [filtrada]);
   const unidades = useMemo(() => filtrada.flatMap((setor) => (setor.subsetores || []).flatMap((subsetor) => (subsetor.unidades || []).map((u) => ({ ...u, setorNome: setor.setorNome, subsetorNome: subsetor.subsetorNome })))), [filtrada]);
@@ -346,7 +393,7 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
         </div>
       </div>
 
-      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max items-start justify-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} onVerMembros={setUnidadeSelecionada} />)}</div></div> : null}
+      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max items-start justify-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} onVerMembros={setUnidadeSelecionada} onVerResumo={setUnidadeResumoSelecionada} />)}</div></div> : null}
 
       {activeView === 'lista' ? <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">{nos.map((no) => renderListaNode(no, 0, expandedListNodes, toggleListNode))}</div> : null}
 
@@ -382,6 +429,7 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
       ) : null}
 
       <ModalEfetivoUnidade unidade={unidadeSelecionada} onClose={() => setUnidadeSelecionada(null)} />
+      <ModalResumoUnidade unidade={unidadeResumoSelecionada} onClose={() => setUnidadeResumoSelecionada(null)} />
     </div>
   );
 }

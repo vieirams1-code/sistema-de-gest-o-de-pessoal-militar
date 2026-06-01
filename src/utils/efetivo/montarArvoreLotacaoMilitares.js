@@ -82,10 +82,7 @@ function textoValido(valor) {
   if (valor === null || valor === undefined || typeof valor === 'object') return '';
   const texto = String(valor).trim();
   if (!texto) return '';
-  if (/^não informado$/i.test(texto)) return '';
-  if (/^setor não informado$/i.test(texto)) return '';
-  if (/^subsetor não informado$/i.test(texto)) return '';
-  if (/^unidade não informada$/i.test(texto)) return '';
+  if (['nao informado', 'setor nao informado', 'subsetor nao informado', 'unidade nao informada'].includes(normalizarChave(texto))) return '';
   return texto;
 }
 
@@ -98,10 +95,11 @@ function primeiroTextoValido(...valores) {
 }
 
 function normalizarChave(valor) {
-  return String(valor || '')
+  return String(valor ?? '')
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
     .toLowerCase();
 }
 
@@ -153,6 +151,7 @@ function obterUnidade(militar, lotacao) {
     militar?.lotacao,
     militar?.estrutura_nome,
     militar?.unidade_nome,
+    militar?.lotacao_nome,
     TEXTO_UNIDADE_FALLBACK,
   );
 }
@@ -165,15 +164,29 @@ function obterDescricaoUnidade(militar, lotacao) {
   return primeiroTextoValido(lotacao?.descricao, lotacao?.descricao_curta, lotacao?.caminho, militar?.lotacao_descricao);
 }
 
+function coletarChavesLotacao(lotacao) {
+  return [
+    lotacao?.id,
+    lotacao?.estrutura_id,
+    lotacao?.lotacao_id,
+    lotacao?.unidade_id,
+    lotacao?.subgrupamento_id,
+    lotacao?.grupamento_id,
+    lotacao?.nome,
+    lotacao?.estrutura_nome,
+    lotacao?.lotacao,
+    lotacao?.unidade_nome,
+    lotacao?.sigla,
+    lotacao?.codigo,
+  ].map(normalizarChave).filter(Boolean);
+}
+
 function criarIndiceLotacoes(lotacoes = []) {
   const mapa = new Map();
 
   for (const lotacao of lotacoes || []) {
-    const ids = [lotacao?.id, lotacao?.estrutura_id, lotacao?.lotacao_id, lotacao?.nome, lotacao?.estrutura_nome, lotacao?.sigla];
-
-    for (const id of ids) {
-      const chave = normalizarChave(id);
-      if (chave && !mapa.has(chave)) mapa.set(chave, lotacao);
+    for (const chave of coletarChavesLotacao(lotacao)) {
+      if (!mapa.has(chave)) mapa.set(chave, lotacao);
     }
   }
 
@@ -181,14 +194,98 @@ function criarIndiceLotacoes(lotacoes = []) {
 }
 
 function encontrarLotacaoDoMilitar(militar, indiceLotacoes) {
-  const candidatos = [militar?.estrutura_id, militar?.lotacao_id, militar?.lotacao?.id, militar?.lotacao, militar?.estrutura_nome, militar?.unidade_nome];
+  if (!militar) return null;
+
+  const lotacaoObjeto = militar.lotacao_obj
+    || militar.lotacaoObjeto
+    || militar.lotacao_atual
+    || militar.lotacaoAtual
+    || militar.estrutura
+    || militar.unidade
+    || (typeof militar.lotacao === 'object' ? militar.lotacao : null);
+
+  if (lotacaoObjeto && typeof lotacaoObjeto === 'object') return lotacaoObjeto;
+
+  const candidatos = [
+    militar?.estrutura_id,
+    militar?.lotacao_id,
+    militar?.unidade_id,
+    militar?.subgrupamento_id,
+    militar?.grupamento_id,
+    militar?.estrutura_nome,
+    militar?.lotacao,
+    militar?.unidade_nome,
+    militar?.subgrupamento_nome,
+    militar?.grupamento_nome,
+    militar?.estrutura_sigla,
+    militar?.lotacao_sigla,
+  ];
 
   for (const candidato of candidatos) {
-    const chave = normalizarChave(typeof candidato === 'object' ? candidato?.nome : candidato);
+    const chave = normalizarChave(candidato);
     if (chave && indiceLotacoes.has(chave)) return indiceLotacoes.get(chave);
   }
 
-  return militar?.lotacao && typeof militar.lotacao === 'object' ? militar.lotacao : null;
+  return null;
+}
+
+export function normalizarTagsMilitar(militar) {
+  const fontes = [militar?.tags_resolvidas, militar?.tags, militar?.marcadores, militar?.tags_operacionais, militar?.tagsOperacionais];
+  const tags = [];
+
+  for (const fonte of fontes) {
+    if (!fonte) continue;
+    if (Array.isArray(fonte)) {
+      for (const item of fonte) {
+        if (!item) continue;
+        if (typeof item === 'string') {
+          const nome = item.trim();
+          if (nome) tags.push({ id: normalizarChave(nome), nome });
+        } else if (typeof item === 'object') {
+          const nome = primeiroTextoValido(item.nome, item.label, item.titulo, item.name, item.tag);
+          if (nome) tags.push({ id: item.id || normalizarChave(nome), nome, cor: item.cor || item.color });
+        }
+      }
+    } else if (typeof fonte === 'string') {
+      fonte.split(/[;,|]/).map((item) => item.trim()).filter(Boolean).forEach((nome) => tags.push({ id: normalizarChave(nome), nome }));
+    }
+  }
+
+  const deduplicadas = new Map();
+  for (const tag of tags) {
+    const chave = normalizarChave(tag.id || tag.nome);
+    if (chave && !deduplicadas.has(chave)) deduplicadas.set(chave, tag);
+  }
+  return Array.from(deduplicadas.values());
+}
+
+function criarResumoVazio() {
+  return { oficiais: 0, pracas: 0, homens: 0, mulheres: 0, sexoNaoInformado: 0 };
+}
+
+function somarResumoEfetivo(destino, origem) {
+  const resumo = destino || criarResumoVazio();
+  const item = origem || criarResumoVazio();
+  resumo.oficiais += item.oficiais || 0;
+  resumo.pracas += item.pracas || 0;
+  resumo.homens += item.homens || 0;
+  resumo.mulheres += item.mulheres || 0;
+  resumo.sexoNaoInformado += item.sexoNaoInformado || 0;
+  return resumo;
+}
+
+export function calcularResumoTags(militares = []) {
+  const mapa = new Map();
+  for (const militar of militares || []) {
+    for (const tag of normalizarTagsMilitar(militar)) {
+      const chave = normalizarChave(tag.nome || tag);
+      if (!chave) continue;
+      const existente = mapa.get(chave) || { id: chave, nome: tag.nome || String(tag), total: 0 };
+      existente.total += 1;
+      mapa.set(chave, existente);
+    }
+  }
+  return Array.from(mapa.values()).sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function unicoNomeInformado(registros, campo) {
@@ -215,6 +312,11 @@ export function resolverNomesEstrutura(militar = {}, lotacoesById = new Map()) {
 }
 
 export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = []) {
+  if (!Array.isArray(militares) && militares && typeof militares === 'object') {
+    lotacoes = militares.lotacoes || [];
+    militares = militares.militares || [];
+  }
+
   const indiceLotacoes = criarIndiceLotacoes(lotacoes);
   const registros = (militares || []).map((militar) => {
     const lotacao = encontrarLotacaoDoMilitar(militar, indiceLotacoes);
@@ -223,6 +325,7 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
         ...militar,
         nome_guerra_resolvido: obterNomeGuerra(militar),
         posto_graduacao_resolvido: obterPostoGraduacao(militar),
+        tags_resolvidas: normalizarTagsMilitar(militar),
       },
       setorNome: obterSetor(militar, lotacao),
       setorSigla: primeiroTextoValido(lotacao?.setor_sigla, lotacao?.grupamento_sigla, lotacao?.parent?.parent?.sigla),
@@ -253,39 +356,46 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
     const setorKey = normalizarChave(registro.setorNome);
     const subsetorKey = `${setorKey}::${normalizarChave(registro.subsetorNome)}`;
     const unidadeKey = `${subsetorKey}::${normalizarChave(registro.unidadeNome)}`;
-
     if (!setoresMap.has(setorKey)) setoresMap.set(setorKey, { setorNome: registro.setorNome, setorSigla: registro.setorSigla, subsetoresMap: new Map() });
     const setor = setoresMap.get(setorKey);
-
     if (!setor.subsetoresMap.has(subsetorKey)) setor.subsetoresMap.set(subsetorKey, { subsetorNome: registro.subsetorNome, subsetorSigla: registro.subsetorSigla, unidadesMap: new Map() });
     const subsetor = setor.subsetoresMap.get(subsetorKey);
-
     if (!subsetor.unidadesMap.has(unidadeKey)) subsetor.unidadesMap.set(unidadeKey, { unidadeNome: registro.unidadeNome, unidadeSigla: registro.unidadeSigla, unidadeDescricao: registro.unidadeDescricao, militares: [] });
     subsetor.unidadesMap.get(unidadeKey).militares.push(registro.militar);
   }
 
-  return Array.from(setoresMap.values())
-    .map((setor) => ({
-      setorNome: setor.setorNome,
-      setorSigla: setor.setorSigla,
-      subsetores: Array.from(setor.subsetoresMap.values())
-        .map((subsetor) => ({
-          subsetorNome: subsetor.subsetorNome,
-          subsetorSigla: subsetor.subsetorSigla,
-          unidades: Array.from(subsetor.unidadesMap.values())
-            .map((unidade) => {
-              const militares = unidade.militares || [];
-              return {
-                ...unidade,
-                resumoEfetivo: calcularResumoEfetivo(militares),
-                militares,
-                oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'),
-                pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial'),
-              };
-            })
-            .sort((a, b) => a.unidadeNome.localeCompare(b.unidadeNome, 'pt-BR')),
-        }))
-        .sort((a, b) => a.subsetorNome.localeCompare(b.subsetorNome, 'pt-BR')),
-    }))
-    .sort((a, b) => a.setorNome.localeCompare(b.setorNome, 'pt-BR'));
+  const resultado = Array.from(setoresMap.values()).map((setor) => {
+    const subsetores = Array.from(setor.subsetoresMap.values()).map((subsetor) => {
+      const unidades = Array.from(subsetor.unidadesMap.values()).map((unidade) => {
+        const militaresDaUnidade = unidade.militares || [];
+        return {
+          ...unidade,
+          total: militaresDaUnidade.length,
+          resumoEfetivo: calcularResumoEfetivo(militaresDaUnidade),
+          resumoTags: calcularResumoTags(militaresDaUnidade),
+          militares: militaresDaUnidade,
+          oficiais: militaresDaUnidade.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'),
+          pracas: militaresDaUnidade.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial'),
+        };
+      }).sort((a, b) => a.unidadeNome.localeCompare(b.unidadeNome, 'pt-BR'));
+      const resumoEfetivo = criarResumoVazio();
+      const todosMilitares = [];
+      for (const unidade of unidades) {
+        somarResumoEfetivo(resumoEfetivo, unidade.resumoEfetivo);
+        todosMilitares.push(...unidade.militares);
+      }
+      return { subsetorNome: subsetor.subsetorNome, subsetorSigla: subsetor.subsetorSigla, total: todosMilitares.length, resumoEfetivo, resumoTags: calcularResumoTags(todosMilitares), unidades };
+    }).sort((a, b) => a.subsetorNome.localeCompare(b.subsetorNome, 'pt-BR'));
+    const resumoEfetivo = criarResumoVazio();
+    const todosMilitares = [];
+    for (const subsetor of subsetores) {
+      somarResumoEfetivo(resumoEfetivo, subsetor.resumoEfetivo);
+      for (const unidade of subsetor.unidades) todosMilitares.push(...unidade.militares);
+    }
+    return { setorNome: setor.setorNome, setorSigla: setor.setorSigla, total: todosMilitares.length, resumoEfetivo, resumoTags: calcularResumoTags(todosMilitares), subsetores };
+  }).sort((a, b) => a.setorNome.localeCompare(b.setorNome, 'pt-BR'));
+
+  const totalArvore = resultado.reduce((totalSetores, setor) => totalSetores + setor.subsetores.reduce((totalSubsetores, subsetor) => totalSubsetores + subsetor.unidades.reduce((totalUnidades, unidade) => totalUnidades + (unidade.militares?.length || 0), 0), 0), 0);
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production' && totalArvore !== militares.length) console.warn(`Total da árvore (${totalArvore}) difere do total de militares carregados (${militares.length}).`);
+  return resultado;
 }
