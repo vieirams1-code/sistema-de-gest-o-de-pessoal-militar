@@ -72,6 +72,27 @@ test('buildTemplateVarsContrato prioriza snapshots do atestado para médico e CR
   assert.equal(vars.medico_crm, 'CRM SNAPSHOT');
 });
 
+
+test('buildTemplateVarsContrato resolve nome e CRM no texto da homologação pelo comandante', () => {
+  const template = '... emitido pelo(a) {{medico_nome}}, {{medico_crm}}.';
+  const vars = buildTemplateVarsContrato({
+    medico_nome_snapshot: 'Fabio Fernandes Albres',
+    medico_crm_snapshot: 'CRM 12345',
+  });
+  const texto = template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+
+  assert.equal(texto, '... emitido pelo(a) Fabio Fernandes Albres, CRM 12345.');
+  assert.doesNotMatch(texto, /\{\{medico_crm\}\}/);
+});
+
+test('buildTemplateVarsContrato normaliza aliases adicionais de CRM do médico', () => {
+  assert.equal(buildTemplateVarsContrato({ crm_medico_snapshot: 'CRM SNAPSHOT LEGADO' }).medico_crm, 'CRM SNAPSHOT LEGADO');
+  assert.equal(buildTemplateVarsContrato({ crm_snapshot: 'CRM SNAPSHOT' }).medico_crm, 'CRM SNAPSHOT');
+  assert.equal(buildTemplateVarsContrato({ medico: { crm: 'CRM MEDICO' } }).medico_crm, 'CRM MEDICO');
+  assert.equal(buildTemplateVarsContrato({ medico_snapshot: { crm: 'CRM SNAPSHOT ANINHADO' } }).medico_crm, 'CRM SNAPSHOT ANINHADO');
+  assert.equal(buildTemplateVarsContrato({ dados_medico: { crm: 'CRM DADOS' } }).medico_crm, 'CRM DADOS');
+});
+
 test('composeTemplateVarsRP preserva matrícula específica do RP', () => {
   const vars = composeTemplateVarsRP({
     formData: { campo_legado: 'ok', matricula: 'FORM-1' },
