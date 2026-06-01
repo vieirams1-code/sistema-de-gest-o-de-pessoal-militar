@@ -127,6 +127,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
     });
     if (!tmpl?.template) return null;
+    console.log('ATESTADO_HOMOLOGACAO', atestado);
+    console.log('VARS_CONTRATO_HOMOLOGACAO', varsContratoTemplate);
+    console.log('CRM_DEBUG', {
+      medico_crm_snapshot: atestado?.medico_crm_snapshot,
+      crm_medico: atestado?.crm_medico,
+      medico: atestado?.medico,
+      medico_id: atestado?.medico_id,
+      medico_nome_snapshot: atestado?.medico_nome_snapshot,
+      medico_crm_resultante: varsContratoTemplate?.medico_crm
+    });
     return aplicarTemplate(tmpl.template, {
       ...varsContratoTemplate,
       dias: String(atestado.dias),
