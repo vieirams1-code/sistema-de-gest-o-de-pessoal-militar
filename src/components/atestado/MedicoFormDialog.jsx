@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { isSameCrm, medicoDisplayName, normalizeCrm } from './medicoUtils';
+import { isSameCrm, medicoDisplayName, normalizeCrm, normalizeMedicoForm } from './medicoUtils';
 
 export default function MedicoFormDialog({ open, onOpenChange, initialSearch = '', onMedicoSaved }) {
   const [form, setForm] = useState({ nome: '', crm: '', observacoes: '' });
@@ -56,8 +56,8 @@ export default function MedicoFormDialog({ open, onOpenChange, initialSearch = '
     event.preventDefault();
     setError('');
 
-    const nome = String(form.nome || '').trim();
-    if (!nome || !normalizedCrm) {
+    const normalizedForm = normalizeMedicoForm(form);
+    if (!normalizedForm.nome || !normalizedForm.crm) {
       setError('Informe nome e CRM do médico.');
       return;
     }
@@ -72,10 +72,8 @@ export default function MedicoFormDialog({ open, onOpenChange, initialSearch = '
       }
 
       const created = await base44.entities.Medico.create({
-        nome,
-        crm: normalizedCrm,
+        ...normalizedForm,
         ativo: true,
-        observacoes: String(form.observacoes || '').trim(),
       });
       onMedicoSaved?.(created);
       onOpenChange(false);
