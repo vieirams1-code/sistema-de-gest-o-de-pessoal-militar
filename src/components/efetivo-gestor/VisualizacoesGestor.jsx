@@ -143,44 +143,6 @@ function SecaoEfetivo({ titulo, militares, observacao, totalOriginal }) {
   );
 }
 
-const TreeNode = ({ no, expandedUnits, onToggleUnit }) => {
-  const [expandedNode, setExpandedNode] = useState(true);
-  const isUnidade = no.tipo === 'Unidade';
-  const corTipo = isUnidade ? 'border-l-4 border-l-emerald-400' : no.tipo === 'Subsetor' ? 'border-l-4 border-l-purple-400' : 'border-l-4 border-l-blue-400';
-  const resumo = isUnidade ? summarizeMilitares(no.militares) : null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-resumo-titulo">
-      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <header className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50 px-5 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 id="modal-resumo-titulo" className="text-lg font-black text-slate-900">Resumo — {unidade.nome}</h2>
-              {subtitulo ? <p className="mt-1 text-sm text-slate-500">{subtitulo}</p> : null}
-              <p className="mt-1 text-xs text-slate-500">Totais calculados a partir dos militares carregados da unidade.</p>
-            </div>
-            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Fechar"><X className="h-4 w-4" /></button>
-          </div>
-          <ResumoMetricasEfetivo resumo={resumo} />
-        </header>
-        <main className="grid gap-4 overflow-y-auto p-5 md:grid-cols-[1fr_1fr]">
-          <section className="rounded-2xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="text-sm font-black text-slate-900">Composição</div><div className="text-xs text-slate-500">Resumo do efetivo da unidade</div></div>
-            <div className="divide-y divide-slate-100">
-              {[[ 'Total', unidade.total ?? unidade.militares?.length ?? 0 ], [ 'Oficiais', resumo.oficiais || 0 ], [ 'Praças', resumo.pracas || 0 ], [ 'Homens', resumo.homens || 0 ], [ 'Mulheres', resumo.mulheres || 0 ]].map(([label, valor]) => <div key={label} className="flex justify-between px-4 py-3 text-sm"><span>{label}</span><strong>{valor}</strong></div>)}
-              {resumo.sexoNaoInformado ? <div className="flex justify-between px-4 py-3 text-sm"><span>Sexo não informado</span><strong>{resumo.sexoNaoInformado}</strong></div> : null}
-            </div>
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="text-sm font-black text-slate-900">Tags</div><div className="text-xs text-slate-500">Quantidade de militares por tag</div></div>
-            {tags.length ? <div className="divide-y divide-slate-100">{tags.map((tag) => <div key={tag.id || tag.nome} className="flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-slate-700">{tag.nome}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{tag.total}</span></div>)}</div> : <div className="px-4 py-8 text-center text-sm text-slate-500">Nenhuma tag encontrada nos militares desta unidade.</div>}
-          </section>
-        </main>
-      </div>
-    </div>
-  );
-};
-
 const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
   <div className="relative flex min-w-0 flex-col pt-6">
     <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
@@ -223,15 +185,6 @@ const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
           </div>
           <TotalBadge total={countTotal(no)} />
         </div>
-        {isUnidade ? (
-          <>
-            <ResumoInstitucional resumo={resumo} />
-            <button type="button" onClick={() => onToggleUnit(no.id)} className="mt-3 text-xs font-medium text-emerald-700">
-              {expandedUnits[no.id] ? 'Ocultar membros' : 'Ver membros'}
-            </button>
-            {expandedUnits[no.id] ? <div className="mt-2 space-y-2">{no.militares.map((m) => <MembroChip key={`${m.id || m.matricula}-${no.id}`} militar={m} />)}</div> : null}
-          </>
-        ) : null}
       </div>
       {unidades.length > 0 ? (
         <div className="relative w-full pt-8">
