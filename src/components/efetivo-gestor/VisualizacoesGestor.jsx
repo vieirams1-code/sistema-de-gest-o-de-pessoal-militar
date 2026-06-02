@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft } from 'lucide-react';
+import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft, GitBranch, X } from 'lucide-react';
 import { classificarMilitar, ordenarMilitaresAntiguidade, resolvePostoGraduacao } from '@/utils/efetivo/gestorClassificacao';
 import { filtrarUnidadesCartoes } from '@/utils/efetivo/visualizacaoGestor';
+import { calcularResumoEfetivo, calcularResumoTags, obterGrupoHierarquicoMilitar, obterSexoMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 
 const summarizeMilitares = (militares = []) => {
   const oficiais = militares.filter((m) => classificarMilitar(m) === 'oficial').length;
@@ -57,21 +58,33 @@ const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
   tipo: 'Setor',
   nome: setor.setorNome,
   sigla: setor.setorSigla,
+  discreto: setor.setorNome === 'Setor não informado',
   militares: [],
+  resumoEfetivo: setor.resumoEfetivo,
+  resumoTags: setor.resumoTags || [],
   filhos: (setor.subsetores || []).map((subsetor, ssIdx) => ({
     id: `subsetor-${sIdx}-${ssIdx}-${subsetor.subsetorNome}`,
     tipo: 'Subsetor',
     nome: subsetor.subsetorNome,
     sigla: subsetor.subsetorSigla,
+    discreto: subsetor.subsetorNome === 'Subsetor não informado',
     militares: [],
+    resumoEfetivo: subsetor.resumoEfetivo,
+    resumoTags: subsetor.resumoTags || [],
     filhos: (subsetor.unidades || []).map((unidade, uIdx) => ({
       id: `unidade-${sIdx}-${ssIdx}-${uIdx}-${unidade.unidadeNome}`,
       tipo: 'Unidade',
       nome: unidade.unidadeNome,
       sigla: unidade.unidadeSigla,
+      descricao: unidade.unidadeDescricao,
       setorNome: setor.setorNome,
       subsetorNome: subsetor.subsetorNome,
       militares: unidade.militares || [],
+      resumoEfetivo: unidade.resumoEfetivo || calcularResumoEfetivo(unidade.militares),
+      resumoTags: unidade.resumoTags || calcularResumoTags(unidade.militares),
+      total: unidade.total ?? unidade.militares?.length ?? 0,
+      oficiais: unidade.oficiais || [],
+      pracas: unidade.pracas || [],
       filhos: [],
     })),
   })),
@@ -88,9 +101,9 @@ const ResumoInstitucional = ({ resumo }) => (
 );
 
 const MembroChip = ({ militar }) => (
-  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
-    <span className="font-semibold text-slate-800">{resolvePostoGraduacao(militar) || 'S/Posto'}</span>{' '}
-    <span className="text-slate-700">{militar.nome_guerra || militar.nome_completo || 'Sem nome'}</span>
+  <div className="rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs shadow-sm">
+    <p className="truncate font-semibold text-slate-800">{militar.nome_guerra || militar.nome_completo || 'Sem nome'}</p>
+    <p className="mt-0.5 truncate text-[11px] text-slate-500">{resolvePostoGraduacao(militar) || 'S/Posto'}</p>
   </div>
 );
 
@@ -132,60 +145,83 @@ function SecaoEfetivo({ titulo, militares, observacao, totalOriginal }) {
 
 const TreeNode = ({ no, expandedUnits, onToggleUnit }) => {
   const [expandedNode, setExpandedNode] = useState(true);
-  const [buscaMembros, setBuscaMembros] = useState('');
-  const [tagsSelecionadasModal, setTagsSelecionadasModal] = useState([]);
-
   const isUnidade = no.tipo === 'Unidade';
   const corTipo = isUnidade ? 'border-l-4 border-l-emerald-400' : no.tipo === 'Subsetor' ? 'border-l-4 border-l-purple-400' : 'border-l-4 border-l-blue-400';
   const resumo = isUnidade ? summarizeMilitares(no.militares) : null;
 
-  useEffect(() => {
-    if (!expandedUnits[no.id]) {
-      setBuscaMembros('');
-      setTagsSelecionadasModal([]);
-    }
-  }, [expandedUnits, no.id]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-resumo-titulo">
+      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <header className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50 px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="modal-resumo-titulo" className="text-lg font-black text-slate-900">Resumo — {unidade.nome}</h2>
+              {subtitulo ? <p className="mt-1 text-sm text-slate-500">{subtitulo}</p> : null}
+              <p className="mt-1 text-xs text-slate-500">Totais calculados a partir dos militares carregados da unidade.</p>
+            </div>
+            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" aria-label="Fechar"><X className="h-4 w-4" /></button>
+          </div>
+          <ResumoMetricasEfetivo resumo={resumo} />
+        </header>
+        <main className="grid gap-4 overflow-y-auto p-5 md:grid-cols-[1fr_1fr]">
+          <section className="rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="text-sm font-black text-slate-900">Composição</div><div className="text-xs text-slate-500">Resumo do efetivo da unidade</div></div>
+            <div className="divide-y divide-slate-100">
+              {[[ 'Total', unidade.total ?? unidade.militares?.length ?? 0 ], [ 'Oficiais', resumo.oficiais || 0 ], [ 'Praças', resumo.pracas || 0 ], [ 'Homens', resumo.homens || 0 ], [ 'Mulheres', resumo.mulheres || 0 ]].map(([label, valor]) => <div key={label} className="flex justify-between px-4 py-3 text-sm"><span>{label}</span><strong>{valor}</strong></div>)}
+              {resumo.sexoNaoInformado ? <div className="flex justify-between px-4 py-3 text-sm"><span>Sexo não informado</span><strong>{resumo.sexoNaoInformado}</strong></div> : null}
+            </div>
+          </section>
+          <section className="rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="text-sm font-black text-slate-900">Tags</div><div className="text-xs text-slate-500">Quantidade de militares por tag</div></div>
+            {tags.length ? <div className="divide-y divide-slate-100">{tags.map((tag) => <div key={tag.id || tag.nome} className="flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-slate-700">{tag.nome}</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{tag.total}</span></div>)}</div> : <div className="px-4 py-8 text-center text-sm text-slate-500">Nenhuma tag encontrada nos militares desta unidade.</div>}
+          </section>
+        </main>
+      </div>
+    </div>
+  );
+};
 
-  const tagsDisponiveisModal = useMemo(() => {
-    if (!isUnidade) return [];
-    const mapa = new Map();
-    for (const militar of no.militares || []) {
-      for (const tag of getTagsDoMilitarModal(militar)) {
-        const id = getTagIdLocal(tag);
-        const nome = getTagNomeLocal(tag);
-        if (!id || !nome) continue;
-        if (!mapa.has(id)) mapa.set(id, { id, nome, total: 0 });
-        mapa.get(id).total += 1;
-      }
-    }
-    return Array.from(mapa.values()).sort((a, b) => {
-      if (b.total !== a.total) return b.total - a.total;
-      return a.nome.localeCompare(b.nome, "pt-BR");
-    });
-  }, [no.militares, isUnidade]);
+const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
+  <div className="relative flex min-w-0 flex-col pt-6">
+    <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+    <div className="flex w-[320px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><MapPin className="h-4 w-4" /></div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">Unidade</p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-900" title={`${no.nome}${no.sigla ? ` (${no.sigla})` : ''}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            {no.descricao ? <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{no.descricao}</p> : null}
+          </div>
+        </div>
+        <TotalBadge total={no.militares.length} />
+      </div>
+      <ResumoMetricasEfetivo resumo={no.resumoEfetivo} />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => onVerMembros(no)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Ver membros</button>
+        <button type="button" onClick={() => onVerResumo(no)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100">Resumo</button>
+      </div>
+    </div>
+  </div>
+);
 
-  const oficiaisFiltrados = useMemo(() => {
-    if (!isUnidade) return [];
-    return (no.militares || []).filter((m) => classificarMilitar(m) === 'oficial' && militarPassaFiltroModal(m, buscaMembros, tagsSelecionadasModal));
-  }, [no.militares, buscaMembros, tagsSelecionadasModal, isUnidade]);
-
-  const pracasFiltradas = useMemo(() => {
-    if (!isUnidade) return [];
-    return (no.militares || []).filter((m) => classificarMilitar(m) !== 'oficial' && militarPassaFiltroModal(m, buscaMembros, tagsSelecionadasModal));
-  }, [no.militares, buscaMembros, tagsSelecionadasModal, isUnidade]);
-
-  const totalFiltrado = oficiaisFiltrados.length + pracasFiltradas.length;
-  const totalOriginal = no.militares?.length || 0;
+const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
+  const unidades = no.filhos || [];
+  const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(320px, 1fr))` };
 
   return (
-    <div className="flex flex-col items-center">
-      <div className={`w-[300px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${corTipo}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs text-slate-500">{no.tipo}</p>
-            <p className="text-sm font-semibold text-slate-900">{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+    <div className="relative flex min-w-0 flex-col items-center pt-6">
+      <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+      <div className="w-[360px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="rounded-lg bg-purple-50 p-2 text-purple-600"><GitBranch className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-purple-700">Subsetor</p>
+              <p className={`mt-0.5 truncate text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`} title={`${no.nome}${no.sigla ? ` (${no.sigla})` : ''}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            </div>
           </div>
-          <Badge variant="outline">{countTotal(no)}</Badge>
+          <TotalBadge total={countTotal(no)} />
         </div>
         {isUnidade ? (
           <>
@@ -193,76 +229,52 @@ const TreeNode = ({ no, expandedUnits, onToggleUnit }) => {
             <button type="button" onClick={() => onToggleUnit(no.id)} className="mt-3 text-xs font-medium text-emerald-700">
               {expandedUnits[no.id] ? 'Ocultar membros' : 'Ver membros'}
             </button>
-            {expandedUnits[no.id] ? (
-              <div className="mt-2 w-full text-left">
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                    <div className="relative flex-1">
-                      <input
-                        value={buscaMembros}
-                        onChange={(e) => setBuscaMembros(e.target.value)}
-                        placeholder="Pesquisar por nome, matrícula, posto, quadro..."
-                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                      />
-                    </div>
-                    <div className="text-xs font-semibold text-slate-500">
-                      {totalFiltrado} de {totalOriginal} militares
-                    </div>
-                    {(buscaMembros || tagsSelecionadasModal.length > 0) ? (
-                      <button type="button" onClick={() => { setBuscaMembros(""); setTagsSelecionadasModal([]); }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">
-                        Limpar filtros
-                      </button>
-                    ) : null}
-                  </div>
-                  {tagsDisponiveisModal.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {tagsDisponiveisModal.slice(0, 16).map((tag) => {
-                        const ativo = tagsSelecionadasModal.includes(tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => setTagsSelecionadasModal((atuais) => ativo ? atuais.filter((id) => id !== tag.id) : [...atuais, tag.id])}
-                            className={["rounded-full border px-3 py-1 text-xs font-semibold transition", ativo ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"].join(" ")}
-                          >
-                            {tag.nome}
-                            <span className="ml-1 text-[10px] opacity-70">{tag.total}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <SecaoEfetivo
-                    titulo="Oficiais"
-                    militares={oficiaisFiltrados}
-                    totalOriginal={resumo.oficiais}
-                  />
-                  <SecaoEfetivo
-                    titulo="Praças"
-                    observacao="Inclui Subtenentes e Temporários."
-                    militares={pracasFiltradas}
-                    totalOriginal={resumo.pracas + resumo.temporarios}
-                  />
-                </div>
-              </div>
-            ) : null}
+            {expandedUnits[no.id] ? <div className="mt-2 space-y-2">{no.militares.map((m) => <MembroChip key={`${m.id || m.matricula}-${no.id}`} militar={m} />)}</div> : null}
           </>
         ) : null}
       </div>
-      {no.filhos?.length ? <div className="h-8 w-px bg-slate-300" /> : null}
-      {no.filhos?.length && expandedNode ? (
-        <>
-          <div className="h-px w-full bg-slate-300" />
-          <div className="mt-4 flex flex-wrap justify-center gap-6">
-            {no.filhos.map((filho) => <TreeNode key={filho.id} no={filho} expandedUnits={expandedUnits} onToggleUnit={onToggleUnit} />)}
+      {unidades.length > 0 ? (
+        <div className="relative w-full pt-8">
+          <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
+          {unidades.length > 1 ? <div className="absolute left-[calc(160px)] right-[calc(160px)] top-8 h-px bg-slate-300" /> : null}
+          <div className="grid gap-5" style={unitGridStyle}>
+            {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
-        </>
+        </div>
       ) : null}
-      {no.filhos?.length ? <button type="button" className="mt-2 text-xs text-slate-600" onClick={() => setExpandedNode((p) => !p)}>{expandedNode ? 'Recolher nível' : 'Expandir nível'}</button> : null}
     </div>
+  );
+};
+
+const SetorTree = ({ no, onVerMembros, onVerResumo }) => {
+  const subsetores = no.filhos || [];
+  const subsetorGridStyle = { gridTemplateColumns: `repeat(${Math.max(subsetores.length, 1)}, minmax(360px, 1fr))` };
+
+  return (
+    <section className="flex min-w-max flex-col items-center rounded-2xl border border-slate-200 bg-white/60 px-5 py-6 shadow-sm">
+      <div className="w-[360px] rounded-xl border border-slate-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="rounded-lg bg-blue-50 p-2 text-blue-600"><Building2 className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700">Setor</p>
+              <p className={`mt-0.5 truncate text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`} title={`${no.nome}${no.sigla ? ` (${no.sigla})` : ''}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            </div>
+          </div>
+          <TotalBadge total={countTotal(no)} />
+        </div>
+        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} />
+      </div>
+      {subsetores.length > 0 ? (
+        <div className="relative w-full pt-8">
+          <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
+          {subsetores.length > 1 ? <div className="absolute left-[calc(180px)] right-[calc(180px)] top-8 h-px bg-slate-300" /> : null}
+          <div className="grid gap-8" style={subsetorGridStyle}>
+            {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 };
 
@@ -296,21 +308,24 @@ const renderListaNode = (no, level, expanded, onToggle) => {
 
 export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidadeMap }) {
   const [activeView, setActiveView] = useState('arvore');
-  const [expandedUnitsTree, setExpandedUnitsTree] = useState({});
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState(null);
+  const [unidadeResumoSelecionada, setUnidadeResumoSelecionada] = useState(null);
   const [expandedListNodes, setExpandedListNodes] = useState({});
   const [buscaCartoes, setBuscaCartoes] = useState('');
 
   const q = String(filtro || '').trim().toLowerCase();
-  const filtrada = useMemo(() => (estrutura || []).map((setor) => ({
-    ...setor,
-    subsetores: (setor.subsetores || []).map((subsetor) => ({
-      ...subsetor,
-      unidades: (subsetor.unidades || []).map((unidade) => ({
-        ...unidade,
-        militares: ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap),
-      })).filter((u) => !q || u.militares.length > 0),
-    })).filter((ss) => !q || ss.unidades.length > 0),
-  })).filter((s) => !q || s.subsetores.length > 0), [estrutura, q, ordemAntiguidadeMap]);
+  const filtrada = useMemo(() => (estrutura || []).map((setor) => {
+    const subsetores = (setor.subsetores || []).map((subsetor) => {
+      const unidades = (subsetor.unidades || []).map((unidade) => {
+        const militares = ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap);
+        return { ...unidade, total: militares.length, militares, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'), pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial') };
+      }).filter((unidade) => !q || unidade.militares.length > 0);
+      const militares = unidades.flatMap((unidade) => unidade.militares);
+      return { ...subsetor, total: militares.length, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), unidades };
+    }).filter((subsetor) => !q || subsetor.unidades.length > 0);
+    const militares = subsetores.flatMap((subsetor) => subsetor.unidades.flatMap((unidade) => unidade.militares));
+    return { ...setor, total: militares.length, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), subsetores };
+  }).filter((setor) => !q || setor.subsetores.length > 0), [estrutura, q, ordemAntiguidadeMap]);
 
   const nos = useMemo(() => montarNos(filtrada), [filtrada]);
   const unidades = useMemo(() => filtrada.flatMap((setor) => (setor.subsetores || []).flatMap((subsetor) => (subsetor.unidades || []).map((u) => ({ ...u, setorNome: setor.setorNome, subsetorNome: subsetor.subsetorNome })))), [filtrada]);
@@ -324,7 +339,6 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
     });
   }, [nos]);
 
-  const toggleUnit = (id) => setExpandedUnitsTree((prev) => ({ ...prev, [id]: !prev[id] }));
   const toggleListNode = (id) => setExpandedListNodes((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
@@ -340,7 +354,7 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
         </div>
       </div>
 
-      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-6"><div className="flex min-w-max justify-center gap-8">{nos.map((no) => <TreeNode key={no.id} no={no} expandedUnits={expandedUnitsTree} onToggleUnit={toggleUnit} />)}</div></div> : null}
+      {activeView === 'arvore' ? <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-[#f8fafc] p-4 md:p-6"><div className="flex min-w-max items-start justify-center gap-10">{nos.map((no) => <SetorTree key={no.id} no={no} onVerMembros={setUnidadeSelecionada} onVerResumo={setUnidadeResumoSelecionada} />)}</div></div> : null}
 
       {activeView === 'lista' ? <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">{nos.map((no) => renderListaNode(no, 0, expandedListNodes, toggleListNode))}</div> : null}
 
@@ -374,6 +388,9 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
           </div>
         </div>
       ) : null}
+
+      <ModalEfetivoUnidade unidade={unidadeSelecionada} onClose={() => setUnidadeSelecionada(null)} />
+      <ModalResumoUnidade unidade={unidadeResumoSelecionada} onClose={() => setUnidadeResumoSelecionada(null)} />
     </div>
   );
 }

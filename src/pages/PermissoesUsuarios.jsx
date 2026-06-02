@@ -36,6 +36,8 @@ const assertCudEntityAllowed = (entityName) => {
 const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
 const fullAccessPermissions = buildFullAccessPermissions();
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
+const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
 const normalizeAccessMode = (value) => {
   const normalized = (value || '').toString().trim().toLowerCase();
@@ -101,6 +103,7 @@ export default function PermissoesUsuarios() {
     || canAccessAction('excluir_usuarios_acesso')
   );
   const canHardDeleteAccess = hasAccess && canAccessAction('excluir_usuarios_acesso');
+  const isAdministrator = normalizeAccessMode(acessoLogado?.tipo_acesso) === 'admin' || isSuperAdmin(null, acessoLogado);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);
@@ -185,6 +188,18 @@ export default function PermissoesUsuarios() {
       ? acessos
       : acessos.filter((u) => u.ativo !== false)
   ), [acessos, showInactiveArchived]);
+
+  // PARTE C — Contagem de duplicidades por user_email (normalizado).
+  // Considera TODOS os acessos (ativos + inativos) para refletir o estado real do banco.
+  const duplicidadesPorEmail = useMemo(() => {
+    const contagem = new Map();
+    (acessos || []).forEach((u) => {
+      const emailNormalizado = normalizeEmail(u?.user_email);
+      if (!emailNormalizado) return;
+      contagem.set(emailNormalizado, (contagem.get(emailNormalizado) || 0) + 1);
+    });
+    return contagem;
+  }, [acessos]);
 
   const filteredAcessos = useMemo(() => {
     const query = userSearch.trim().toLowerCase();
@@ -376,6 +391,23 @@ export default function PermissoesUsuarios() {
       return;
     }
 
+    // PARTE B — Bloqueio de criação duplicada por e-mail.
+    // Normaliza o e-mail e verifica se já existe UsuarioAcesso (ativo ou inativo) com o mesmo e-mail.
+    // Consulta direta ao backend para não depender do cache do React Query.
+    if (isNewAcesso) {
+      const emailNormalizado = normalizeEmail(userUserEmail);
+      try {
+        const existentes = await base44.entities.UsuarioAcesso.list();
+        if ((existentes || []).some((acesso) => normalizeEmail(acesso?.user_email) === emailNormalizado)) {
+          alert(DUPLICATE_ACCESS_MESSAGE);
+          return;
+        }
+      } catch (err) {
+        alert(err?.message || 'Não foi possível validar duplicidade de e-mail. Tente novamente.');
+        return;
+      }
+    }
+
     setSavingUser(true);
     try {
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
@@ -410,7 +442,7 @@ export default function PermissoesUsuarios() {
 
       const baseData = {
         nome_usuario: userNomeUsuario,
-        user_email: userUserEmail.trim(),
+        user_email: normalizeEmail(userUserEmail),
         ativo: targetIsSuperAdmin ? true : userAtivo,
         perfil_id: perfilOrigemId || '',
         perfil_nome: perfilBaseSelecionado?.nome_perfil || appliedProfileState.nome || '',
@@ -468,7 +500,6 @@ export default function PermissoesUsuarios() {
         && String(perfilAtualDoUsuario?.usuario_vinculado_id || '') === String(usuarioVinculadoId);
 
       let perfilFinal = perfilAtualDoUsuario;
-      let reloadedRecord = reloadedAccess;
 
       if (possuiAjusteManual) {
         const perfisPersonalizadosRemotos = await base44.entities.PerfilPermissao.filter({
@@ -512,7 +543,7 @@ export default function PermissoesUsuarios() {
           await markProfileAsLegacy(perfilDuplicado);
         }
 
-        reloadedRecord = await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
+        await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilPersonalizadoSelecionado.id,
           perfil_nome: perfilPersonalizadoSelecionado.nome_perfil || payloadPerfilPersonalizado.nome_perfil,
         });
@@ -521,7 +552,7 @@ export default function PermissoesUsuarios() {
         if (perfilAtualEhCustomDoUsuario && perfilAtualDoUsuario?.id) {
           await markProfileAsLegacy(perfilAtualDoUsuario);
         }
-        reloadedRecord = await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
+        await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilOrigemId || '',
           perfil_nome: perfilBaseSelecionado?.nome_perfil || '',
         });
@@ -542,14 +573,18 @@ export default function PermissoesUsuarios() {
       });
       setSelectedProfileSource(reloadedProfile || null);
       setLoadedProfilePermissions(reloadedProfile ? resolveProfilePermissions({ profileSource: reloadedProfile }).permissions : null);
+      // O retorno do update pode não refletir integralmente o estado persistido.
+      // Recarregamos o UsuarioAcesso após todas as alterações de escopo/perfil para
+      // impedir que selectedUser mantenha campos antigos em memória.
+      const refreshedAccess = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
       const resolvedReloaded = await resolveUserPermissions({
-        userSource: reloadedRecord,
+        userSource: refreshedAccess,
         profileSource: reloadedProfile || {},
         preferProfilePermissions: true,
       });
       const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(targetIsSuperAdmin ? fullAccessPermissions : reloadedPermissions);
-      setSelectedUser(reloadedRecord);
+      setSelectedUser(refreshedAccess);
       if (targetIsSuperAdmin) {
         setTechnicalWarning('Superadmin protegido: alterações críticas foram preservadas com acesso total.');
       }
@@ -630,17 +665,22 @@ export default function PermissoesUsuarios() {
       alert('Por segurança, desative/arquive o usuário antes da exclusão definitiva.');
       return;
     }
-    if (targetAcesso.militar_id) {
-      alert('Exclusão definitiva bloqueada: há vínculo com militar. Mantenha o registro arquivado para preservar histórico.');
-      return;
-    }
-    const confirmado = window.confirm(
-      `Excluir DEFINITIVAMENTE "${targetAcesso.nome_usuario || targetAcesso.user_email}"?\n\nEsta ação não pode ser desfeita.`
-    );
-    if (!confirmado) return;
-
     try {
-      await deleteEscopadoEntity('UsuarioAcesso', targetAcesso.id);
+      // A decisão deve usar o banco, não o selectedUser potencialmente obsoleto.
+      const acessoAtual = await base44.entities.UsuarioAcesso.get(targetAcesso.id);
+      if (acessoAtual.militar_id) {
+        const mensagemBloqueio = isAdministrator
+          ? `Exclusão definitiva bloqueada. O registro ainda possui militar_id vinculado: ${acessoAtual.militar_id}`
+          : 'Exclusão definitiva bloqueada: há vínculo com militar. Mantenha o registro arquivado para preservar histórico.';
+        alert(mensagemBloqueio);
+        return;
+      }
+      const confirmado = window.confirm(
+        `Excluir DEFINITIVAMENTE "${acessoAtual.nome_usuario || acessoAtual.user_email}"?\n\nEsta ação não pode ser desfeita.`
+      );
+      if (!confirmado) return;
+
+      await deleteEscopadoEntity('UsuarioAcesso', acessoAtual.id);
       if (selectedUser?.id === targetAcesso.id) {
         setSelectedUser(null);
       }
@@ -719,30 +759,47 @@ export default function PermissoesUsuarios() {
                 {filteredAcessos.length === 0 ? (
                   <p className="text-center text-slate-400 py-10 text-sm">Nenhum acesso cadastrado</p>
                 ) : (
-                  filteredAcessos.map((u) => (
-                    <div 
-                      key={u.id} 
-                      onClick={() => handleSelectAcesso(u)} 
-                      className={`p-2.5 rounded-xl border cursor-pointer transition-all ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
+                  filteredAcessos.map((u) => {
+                    const emailKey = normalizeEmail(u?.user_email);
+                    const totalDuplicados = emailKey ? (duplicidadesPorEmail.get(emailKey) || 0) : 0;
+                    const isDuplicado = totalDuplicados > 1;
+                    const isSelecionado = selectedUser?.id === u.id;
+                    return (
+                    <div
+                      key={u.id}
+                      onClick={() => handleSelectAcesso(u)}
+                      className={`p-2.5 rounded-xl border cursor-pointer transition-all ${isSelecionado ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
                     >
                       <div className="flex justify-between items-start mb-1.5 gap-2">
-                        <div className={`font-semibold text-sm truncate ${selectedUser?.id === u.id ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
+                        <div className={`font-semibold text-sm truncate ${isSelecionado ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
                           {u.nome_usuario || u.user_email}
-                          {!u.ativo && <span className={`ml-1.5 text-xs font-semibold ${selectedUser?.id === u.id ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>}
+                          {!u.ativo && <span className={`ml-1.5 text-xs font-semibold ${isSelecionado ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>}
                         </div>
                         <div className="shrink-0 [&_.bg-emerald-100]:bg-white/20 [&_.text-emerald-800]:text-white [&_.bg-emerald-50]:bg-white/20 [&_.text-emerald-700]:text-white [&_.border-emerald-200]:border-white/30 [&_.bg-blue-100]:bg-white/20 [&_.text-blue-800]:text-white [&_.bg-amber-100]:bg-white/20 [&_.text-amber-800]:text-white [&_.text-slate-500]:text-white">
                           {getTipoBadge(u)}
                         </div>
                       </div>
-                      <div className={`text-xs mb-2 truncate ${selectedUser?.id === u.id ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
-                      
-                      {u.perfil_nome && (
-                        <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block truncate max-w-full ${selectedUser?.id === u.id ? 'bg-white/20 text-white border border-white/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'}`}>
-                          Perfil: {u.perfil_nome}
-                        </div>
-                      )}
+                      <div className={`text-xs mb-2 truncate ${isSelecionado ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {u.perfil_nome && (
+                          <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block truncate max-w-full ${isSelecionado ? 'bg-white/20 text-white border border-white/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'}`}>
+                            Perfil: {u.perfil_nome}
+                          </div>
+                        )}
+                        {isDuplicado && (
+                          <div
+                            title={`Existem ${totalDuplicados} registros com este e-mail no banco. Edite o registro correto e considere arquivar/excluir os demais.`}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 border ${isSelecionado ? 'bg-white/20 text-white border-white/40' : 'bg-red-50 text-red-700 border-red-200'}`}
+                          >
+                            <BadgeAlert className="w-3 h-3" />
+                            Duplicado ({totalDuplicados} registros)
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
             </div>
