@@ -19,6 +19,7 @@ import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import ContratosDesignacaoSection from '@/components/militar/ContratosDesignacaoSection';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
+import GerarDocumentoMilitarModal from '@/components/documentosMilitares/GerarDocumentoMilitarModal';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import PromocaoHistoricaModal from '@/components/antiguidade/PromocaoHistoricaModal';
 import PromocaoFuturaModal from '@/components/antiguidade/PromocaoFuturaModal';
@@ -139,6 +140,7 @@ export default function VerMilitar() {
   const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeExcluirContratoDesignacao = isAdmin || canAccessAction('excluir_contrato_designacao');
   const [showSolicitacao, setShowSolicitacao] = useState(false);
+  const [showGerarDocumento, setShowGerarDocumento] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
   const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
   const [showPromocaoFuturaModal, setShowPromocaoFuturaModal] = useState(false);
@@ -525,6 +527,9 @@ export default function VerMilitar() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowGerarDocumento(true)}>
+              <FileText className="w-4 h-4 mr-2" />Gerar Documento
+            </Button>
             <Button variant="outline" onClick={() => setShowSolicitacao(true)}>
               <Send className="w-4 h-4 mr-2" />Solicitar Correção
             </Button>
@@ -1087,6 +1092,13 @@ export default function VerMilitar() {
           await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
         }}
       />
+
+      {showGerarDocumento &&
+      <GerarDocumentoMilitarModal
+        militar={militarEnriquecido || militar}
+        onClose={() => setShowGerarDocumento(false)} />
+
+      }
 
       {showSolicitacao &&
       <SolicitarAtualizacaoModal
