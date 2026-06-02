@@ -82,7 +82,7 @@ function textoValido(valor) {
   if (valor === null || valor === undefined || typeof valor === 'object') return '';
   const texto = String(valor).trim();
   if (!texto) return '';
-  if (['nao informado', 'setor nao informado', 'subsetor nao informado', 'unidade nao informada'].includes(normalizarChave(texto))) return '';
+  if (['nao informado', 'setor nao informado', 'subsetor nao informado', 'unidade nao informada'].includes(normalizarChaveBusca(texto))) return '';
   return texto;
 }
 
@@ -94,7 +94,7 @@ function primeiroTextoValido(...valores) {
   return '';
 }
 
-function normalizarChave(valor) {
+export function normalizarChaveBusca(valor) {
   return String(valor ?? '')
     .trim()
     .normalize('NFD')
@@ -178,7 +178,7 @@ function coletarChavesLotacao(lotacao) {
     lotacao?.unidade_nome,
     lotacao?.sigla,
     lotacao?.codigo,
-  ].map(normalizarChave).filter(Boolean);
+  ].map(normalizarChaveBusca).filter(Boolean);
 }
 
 function criarIndiceLotacoes(lotacoes = []) {
@@ -222,7 +222,7 @@ function encontrarLotacaoDoMilitar(militar, indiceLotacoes) {
   ];
 
   for (const candidato of candidatos) {
-    const chave = normalizarChave(candidato);
+    const chave = normalizarChaveBusca(candidato);
     if (chave && indiceLotacoes.has(chave)) return indiceLotacoes.get(chave);
   }
 
@@ -230,30 +230,66 @@ function encontrarLotacaoDoMilitar(militar, indiceLotacoes) {
 }
 
 export function normalizarTagsMilitar(militar) {
-  const fontes = [militar?.tags_resolvidas, militar?.tags, militar?.marcadores, militar?.tags_operacionais, militar?.tagsOperacionais];
+  const fontes = [
+    militar?.tags_resolvidas,
+    militar?.tags,
+    militar?.marcadores,
+    militar?.tags_operacionais,
+    militar?.tagsOperacionais,
+    militar?.tags_militar,
+    militar?.tagsMilitar,
+    militar?.tag_ids,
+    militar?.tagIds,
+    militar?.funcoes,
+    militar?.funcoes_institucionais,
+    militar?.funcoesInstitucionais,
+    militar?.marcadores_operacionais,
+    militar?.marcadoresOperacionais,
+    militar?.metadata?.tags,
+    militar?.extras?.tags,
+  ];
   const tags = [];
 
   for (const fonte of fontes) {
     if (!fonte) continue;
+
     if (Array.isArray(fonte)) {
       for (const item of fonte) {
         if (!item) continue;
+
         if (typeof item === 'string') {
           const nome = item.trim();
-          if (nome) tags.push({ id: normalizarChave(nome), nome });
-        } else if (typeof item === 'object') {
-          const nome = primeiroTextoValido(item.nome, item.label, item.titulo, item.name, item.tag);
-          if (nome) tags.push({ id: item.id || normalizarChave(nome), nome, cor: item.cor || item.color });
+          if (nome) tags.push({ id: normalizarChaveBusca(nome), nome });
+          continue;
+        }
+
+        if (typeof item === 'object') {
+          const nome = primeiroTextoValido(item.nome, item.label, item.titulo, item.name, item.tag, item.codigo, item.sigla, item.descricao);
+          if (nome) {
+            tags.push({
+              id: item.id || item.tag_id || item.codigo || normalizarChaveBusca(nome),
+              nome,
+              cor: item.cor || item.color || item.backgroundColor,
+            });
+          }
         }
       }
-    } else if (typeof fonte === 'string') {
-      fonte.split(/[;,|]/).map((item) => item.trim()).filter(Boolean).forEach((nome) => tags.push({ id: normalizarChave(nome), nome }));
+    }
+
+    if (typeof fonte === 'string') {
+      fonte.split(/[;,|]/).map((item) => item.trim()).filter(Boolean).forEach((nome) => tags.push({ id: normalizarChaveBusca(nome), nome }));
+    }
+
+    if (typeof fonte === 'object' && !Array.isArray(fonte)) {
+      for (const [chave, valor] of Object.entries(fonte)) {
+        if (valor === true || valor === 'true' || valor === 1) tags.push({ id: normalizarChaveBusca(chave), nome: chave });
+      }
     }
   }
 
   const deduplicadas = new Map();
   for (const tag of tags) {
-    const chave = normalizarChave(tag.id || tag.nome);
+    const chave = normalizarChaveBusca(tag.id || tag.nome);
     if (chave && !deduplicadas.has(chave)) deduplicadas.set(chave, tag);
   }
   return Array.from(deduplicadas.values());
@@ -278,7 +314,7 @@ export function calcularResumoTags(militares = []) {
   const mapa = new Map();
   for (const militar of militares || []) {
     for (const tag of normalizarTagsMilitar(militar)) {
-      const chave = normalizarChave(tag.nome || tag);
+      const chave = normalizarChaveBusca(tag.nome || tag);
       if (!chave) continue;
       const existente = mapa.get(chave) || { id: chave, nome: tag.nome || String(tag), total: 0 };
       existente.total += 1;
@@ -292,7 +328,7 @@ function unicoNomeInformado(registros, campo) {
   const nomes = new Map();
   for (const registro of registros) {
     const nome = registro[campo];
-    const chave = normalizarChave(nome);
+    const chave = normalizarChaveBusca(nome);
     if (chave) nomes.set(chave, nome);
   }
   return nomes.size === 1 ? nomes.values().next().value : '';
@@ -342,7 +378,7 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
 
   const registrosPorSetor = new Map();
   for (const registro of registros) {
-    const setorKey = normalizarChave(registro.setorNome);
+    const setorKey = normalizarChaveBusca(registro.setorNome);
     if (!registrosPorSetor.has(setorKey)) registrosPorSetor.set(setorKey, []);
     registrosPorSetor.get(setorKey).push(registro);
   }
@@ -353,9 +389,9 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
 
   const setoresMap = new Map();
   for (const registro of registros) {
-    const setorKey = normalizarChave(registro.setorNome);
-    const subsetorKey = `${setorKey}::${normalizarChave(registro.subsetorNome)}`;
-    const unidadeKey = `${subsetorKey}::${normalizarChave(registro.unidadeNome)}`;
+    const setorKey = normalizarChaveBusca(registro.setorNome);
+    const subsetorKey = `${setorKey}::${normalizarChaveBusca(registro.subsetorNome)}`;
+    const unidadeKey = `${subsetorKey}::${normalizarChaveBusca(registro.unidadeNome)}`;
     if (!setoresMap.has(setorKey)) setoresMap.set(setorKey, { setorNome: registro.setorNome, setorSigla: registro.setorSigla, subsetoresMap: new Map() });
     const setor = setoresMap.get(setorKey);
     if (!setor.subsetoresMap.has(subsetorKey)) setor.subsetoresMap.set(subsetorKey, { subsetorNome: registro.subsetorNome, subsetorSigla: registro.subsetorSigla, unidadesMap: new Map() });
