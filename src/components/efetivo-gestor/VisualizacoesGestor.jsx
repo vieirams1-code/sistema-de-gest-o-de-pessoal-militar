@@ -225,9 +225,9 @@ const ModalResumoUnidade = ({ unidade, onClose }) => {
 };
 
 const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
-  <div className="relative flex min-w-0 flex-col pt-6">
-    <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
-    <div className="flex w-[320px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
+  <div className="relative z-10 flex min-w-0 flex-col pt-6">
+    <div className="pointer-events-none absolute left-1/2 top-0 z-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+    <div className="relative z-10 flex w-[320px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><MapPin className="h-4 w-4" /></div>
@@ -240,9 +240,29 @@ const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
         <TotalBadge total={no.militares.length} />
       </div>
       <ResumoMetricasEfetivo resumo={no.resumoEfetivo} />
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => onVerMembros(no)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Ver membros</button>
-        <button type="button" onClick={() => onVerResumo(no)} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100">Resumo</button>
+      <div className="relative z-20 mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onVerMembros?.(no);
+          }}
+          className="relative z-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+        >
+          Ver membros
+        </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onVerResumo?.(no);
+          }}
+          className="relative z-20 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
+        >
+          Resumo
+        </button>
       </div>
     </div>
   </div>
@@ -254,7 +274,7 @@ const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
 
   return (
     <div className="relative flex min-w-0 flex-col items-center pt-6">
-      <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
+      <div className="pointer-events-none absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
       <div className="w-[360px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2.5">
@@ -270,8 +290,8 @@ const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
       </div>
       {unidades.length > 0 ? (
         <div className="relative w-full pt-8">
-          <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
-          {unidades.length > 1 ? <div className="absolute left-[calc(160px)] right-[calc(160px)] top-8 h-px bg-slate-300" /> : null}
+          <div className="pointer-events-none absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
+          {unidades.length > 1 ? <div className="pointer-events-none absolute left-[calc(160px)] right-[calc(160px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-5" style={unitGridStyle}>
             {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
@@ -302,8 +322,8 @@ const SetorTree = ({ no, onVerMembros, onVerResumo }) => {
       </div>
       {subsetores.length > 0 ? (
         <div className="relative w-full pt-8">
-          <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
-          {subsetores.length > 1 ? <div className="absolute left-[calc(180px)] right-[calc(180px)] top-8 h-px bg-slate-300" /> : null}
+          <div className="pointer-events-none absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
+          {subsetores.length > 1 ? <div className="pointer-events-none absolute left-[calc(180px)] right-[calc(180px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-8" style={subsetorGridStyle}>
             {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
