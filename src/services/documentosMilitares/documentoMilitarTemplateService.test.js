@@ -93,3 +93,21 @@ test('lint de outros módulos preserva o comportamento anterior', () => {
     true
   );
 });
+
+test('lint de DocumentosMilitares aceita campo dinâmico válido e alerta formatos inválidos', () => {
+  const valido = lintTemplateDocumentoMilitar('{{nome_completo}} / {{campo:nome_curso}}');
+  const invalido = lintTemplateDocumentoMilitar('{{campo:}} / {{campo}}');
+
+  assert.equal(valido.findings.some((finding) => finding.code === 'VAR_DESCONHECIDA_DOCUMENTO_MILITAR'), false);
+  assert.deepEqual(
+    invalido.findings.map((finding) => finding.variavel),
+    ['campo:', 'campo']
+  );
+});
+
+test('preview administrativo substitui campos dinâmicos simulados e preserva os sem simulação', () => {
+  assert.equal(
+    previewTemplateDocumentoMilitar('{{nome_completo}} / {{campo:nome_curso}} / {{campo:observacoes}}'),
+    'Maria da Silva / Curso de Formação / {{campo:observacoes}}'
+  );
+});
