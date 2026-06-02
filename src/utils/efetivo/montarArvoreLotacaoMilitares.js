@@ -432,6 +432,6 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
   }).sort((a, b) => a.setorNome.localeCompare(b.setorNome, 'pt-BR'));
 
   const totalArvore = resultado.reduce((totalSetores, setor) => totalSetores + setor.subsetores.reduce((totalSubsetores, subsetor) => totalSubsetores + subsetor.unidades.reduce((totalUnidades, unidade) => totalUnidades + (unidade.militares?.length || 0), 0), 0), 0);
-  if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production' && totalArvore !== militares.length) console.warn(`Total da árvore (${totalArvore}) difere do total de militares carregados (${militares.length}).`);
+  if (import.meta.env?.MODE !== 'production' && totalArvore !== militares.length) console.warn(`Total da árvore (${totalArvore}) difere do total de militares carregados (${militares.length}).`);
   return resultado;
 }

@@ -107,6 +107,28 @@ const MembroChip = ({ militar }) => (
   </div>
 );
 
+const TotalBadge = ({ total }) => (
+  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{total}</span>
+);
+
+const ResumoMetricasEfetivo = ({ resumo }) => {
+  if (!resumo) return null;
+  const itens = [
+    ['Oficiais', resumo.oficiais],
+    ['Praças', resumo.pracas],
+  ];
+  if (resumo.temporarios) itens.push(['Temporários', resumo.temporarios]);
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+      {itens.map(([label, valor]) => (
+        <span key={label} className="rounded-md bg-slate-50 px-2 py-0.5 text-slate-600">
+          {label}: <strong className="text-slate-800">{valor || 0}</strong>
+        </span>
+      ))}
+    </div>
+  );
+};
+
 function SecaoEfetivo({ titulo, militares, observacao, totalOriginal }) {
   const totalAtual = militares?.length || 0;
 
@@ -342,8 +364,6 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
         </div>
       ) : null}
 
-      <ModalEfetivoUnidade unidade={unidadeSelecionada} onClose={() => setUnidadeSelecionada(null)} />
-      <ModalResumoUnidade unidade={unidadeResumoSelecionada} onClose={() => setUnidadeResumoSelecionada(null)} />
     </div>
   );
 }
