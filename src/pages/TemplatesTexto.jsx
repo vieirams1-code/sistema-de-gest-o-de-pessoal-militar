@@ -22,6 +22,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle, Copy } from 'lucide-react';
 import { aplicarTemplate, buildPreviewTemplateVars, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO } from '@/components/atestado/atestadoTemplateVars';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 import {
@@ -45,6 +46,14 @@ const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
   [MODULO_EX_OFFICIO]: 'Ex Offício',
 };
+
+const TIPOS_TEMPLATE_ADICIONAIS = [
+  {
+    value: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
+    label: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
+    modulo: MODULO_EX_OFFICIO,
+  },
+];
 
 const ESCOPO_OPTIONS = [
   { value: ESCOPO_TEMPLATE.GLOBAL, label: 'Global' },
@@ -70,7 +79,7 @@ const TIPO_REGISTRO_CATEGORIAS = [
   {
     key: 'atestados_saude',
     label: 'Atestados / Saúde',
-    tipos: ['Homologação de Atestado', 'Homologação de Atestado de Acompanhamento', 'Ata JISO'],
+    tipos: ['Homologação de Atestado', TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO, 'Ata JISO'],
   },
   {
     key: 'comportamento',
@@ -599,7 +608,7 @@ const VARS_POR_TIPO = {
       { v: '{{medico_crm}}', desc: 'CRM do médico responsável' },
     ]
   },
-  'Homologação de Atestado de Acompanhamento': {
+  [TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO]: {
     grupo: 'Homologação de Atestado de Acompanhamento',
     cor: 'blue',
     variaveis: [
@@ -799,7 +808,7 @@ export default function TemplatesTexto() {
   };
 
   const tiposRegistroOptions = useMemo(() => (
-    RP_TIPOS_BASE
+    [...RP_TIPOS_BASE, ...TIPOS_TEMPLATE_ADICIONAIS]
       .map((tipo) => ({ ...tipo, modulo: normalizeTemplateModulo(tipo.modulo) }))
       .sort((a, b) => getTipoDisplay(a.value).localeCompare(getTipoDisplay(b.value), 'pt-BR'))
   ), []);
