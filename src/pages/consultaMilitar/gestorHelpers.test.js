@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolvePostoGraduacao, classificarMilitar, ordenarMilitaresAntiguidade } from '../../utils/efetivo/gestorClassificacao.js';
-import { filtrarUnidadesCartoes } from '../../utils/efetivo/visualizacaoGestor.js';
-import montarArvoreLotacaoMilitares from '../../utils/efetivo/montarArvoreLotacaoMilitares.js';
+import { filtrarMilitaresGestor, filtrarUnidadesCartoes, listarTagsDisponiveisGestor } from '../../utils/efetivo/visualizacaoGestor.js';
+import montarArvoreLotacaoMilitares, { normalizarTagsMilitar } from '../../utils/efetivo/montarArvoreLotacaoMilitares.js';
+import { getTagsCompactasMilitar } from '../../utils/funcoesTags/tagsCompactasEfetivo.js';
 
 test('resolve posto_graduacao com precedência', () => {
   assert.equal(resolvePostoGraduacao({ posto_graduacao: 'Capitão', posto_grad: 'Soldado' }), 'CAPITÃO');
@@ -183,4 +184,38 @@ test('vincula militar por campos alternativos e aceita lotação embutida como o
   });
 
   assert.deepEqual(arvore[0].subsetores[0].unidades.map((unidade) => unidade.unidadeNome), ['Campo Grande', 'Sidrolândia']);
+});
+
+
+test('normaliza tags em múltiplos formatos compatíveis com o efetivo', () => {
+  assert.ok(normalizarTagsMilitar({ tags: ['COV'] }).map((tag) => tag.nome).includes('COV'));
+  assert.ok(normalizarTagsMilitar({ marcadores: [{ nome: 'MOB' }] }).map((tag) => tag.nome).includes('MOB'));
+  assert.deepEqual(normalizarTagsMilitar({ tags_operacionais: 'APH;Motorista' }).map((tag) => tag.nome), ['APH', 'Motorista']);
+  assert.ok(normalizarTagsMilitar({ tags_militar: [{ tag_id: 'cov-id', label: 'COV' }] }).map((tag) => tag.nome).includes('COV'));
+});
+
+test('lista tags disponíveis e filtra militares por todas as tags selecionadas', () => {
+  const militares = [
+    { id: '1', nome_guerra: 'A', tags_resolvidas: [{ id: 'cov-id', nome: 'COV' }, { id: 'mob-id', nome: 'MOB' }] },
+    { id: '2', nome_guerra: 'B', tags_resolvidas: [{ id: 'cov-id', nome: 'COV' }] },
+    { id: '3', nome_guerra: 'C', tags_resolvidas: [{ id: 'mob-id', nome: 'MOB' }] },
+  ];
+
+  assert.deepEqual(listarTagsDisponiveisGestor(militares), [
+    { id: 'cov', nome: 'COV', total: 2 },
+    { id: 'mob', nome: 'MOB', total: 2 },
+  ]);
+  assert.deepEqual(filtrarMilitaresGestor(militares, '', ['cov']).map((militar) => militar.id), ['1', '2']);
+  assert.deepEqual(filtrarMilitaresGestor(militares, '', ['cov', 'mob']).map((militar) => militar.id), ['1']);
+});
+
+
+test('resolve a tag real da lista do Efetivo pelo catálogo Tag e vínculo MilitarTag', () => {
+  const tags = getTagsCompactasMilitar({
+    militarId: 'militar-1',
+    tagsAtivas: [{ id: 'tag-cov', nome: 'COV', aplicabilidade: 'militar' }],
+    vinculosTagsAtivos: [{ id: 'vinculo-1', militar_id: 'militar-1', tag_id: 'tag-cov', status: 'ativa' }],
+  });
+
+  assert.deepEqual(tags.map((tag) => tag.nome), ['COV']);
 });

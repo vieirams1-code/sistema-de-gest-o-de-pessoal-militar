@@ -1,5 +1,5 @@
-import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isRegistroAtivo } from './contratoCampos';
-import { resolveTagVisual } from '@/utils/tags/tagPresenter';
+import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isRegistroAtivo } from './contratoCampos.js';
+import { resolveTagVisual } from '../tags/tagPresenter.js';
 
 const EMOJI_PADRAO_FUNCAO = '⭐';
 const EMOJI_PADRAO_TAG = '🏷️';

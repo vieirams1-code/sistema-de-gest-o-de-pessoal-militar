@@ -91,34 +91,50 @@ const obterPostoExibicaoMilitar = (militar) => (
 
 const obterMatriculaExibicaoMilitar = (militar) => militar?.matricula || militar?.matricula_funcional || militar?.numero_matricula || '';
 
-const MetricaUnidade = ({ tipo, label, valor }) => {
+function MetricaEfetivoCompacta({ tipo, label, valor }) {
   const config = {
-    oficiais: 'border-blue-100 bg-blue-50 text-blue-700',
-    pracas: 'border-emerald-100 bg-emerald-50 text-emerald-700',
-    homens: 'border-slate-200 bg-slate-50 text-slate-700',
-    mulheres: 'border-pink-100 bg-pink-50 text-pink-700',
-  };
-  const icones = { oficiais: '★', pracas: '◆', homens: '👨', mulheres: '👩' };
+    oficiais: { wrap: 'border-blue-100 bg-blue-50 text-blue-700', icon: '★' },
+    pracas: { wrap: 'border-emerald-100 bg-emerald-50 text-emerald-700', icon: '◆' },
+    homens: { wrap: 'border-slate-200 bg-slate-50 text-slate-700', icon: '👨' },
+    mulheres: { wrap: 'border-pink-100 bg-pink-50 text-pink-700', icon: '👩' },
+  }[tipo];
 
   return (
-    <div className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${config[tipo]}`}>
-      <span className="text-sm leading-none">{icones[tipo]}</span>
-      <div className="min-w-0">
-        <div className="text-[9px] font-bold uppercase tracking-wide opacity-80">{label}</div>
-        <div className="text-sm font-black leading-none">{valor || 0}</div>
+    <div className={['min-w-0 rounded-lg border px-2 py-1.5', 'flex flex-col items-center justify-center text-center', config.wrap].join(' ')} title={`${label}: ${valor || 0}`}>
+      <div className="flex min-w-0 items-center justify-center gap-1 text-[10px] font-black uppercase leading-none">
+        <span className="text-xs">{config.icon}</span>
+        <span className="truncate">{label}</span>
       </div>
+      <div className="mt-1 text-base font-black leading-none">{valor || 0}</div>
     </div>
   );
-};
+}
 
-const ResumoMetricasEfetivo = ({ resumo, compacto = false }) => (
-  <div className={compacto ? 'mt-3 grid grid-cols-4 gap-1.5' : 'mt-3 grid grid-cols-2 gap-2 md:grid-cols-4'}>
-    <MetricaUnidade tipo="oficiais" label="Oficiais" valor={resumo?.oficiais || 0} />
-    <MetricaUnidade tipo="pracas" label="Praças" valor={resumo?.pracas || 0} />
-    <MetricaUnidade tipo="homens" label="Homens" valor={resumo?.homens || 0} />
-    <MetricaUnidade tipo="mulheres" label="Mulheres" valor={resumo?.mulheres || 0} />
-  </div>
-);
+function ResumoMetricasEfetivo({ resumo }) {
+  return (
+    <div className="mt-3 grid grid-cols-4 gap-2">
+      <MetricaEfetivoCompacta tipo="oficiais" label="Oficiais" valor={resumo?.oficiais || 0} />
+      <MetricaEfetivoCompacta tipo="pracas" label="Praças" valor={resumo?.pracas || 0} />
+      <MetricaEfetivoCompacta tipo="homens" label="Homens" valor={resumo?.homens || 0} />
+      <MetricaEfetivoCompacta tipo="mulheres" label="Mulheres" valor={resumo?.mulheres || 0} />
+    </div>
+  );
+}
+
+function TagsMilitarLinha({ tags = [] }) {
+  if (!tags.length) return null;
+
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {tags.slice(0, 5).map((tag) => (
+        <span key={tag.id || tag.nome} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600" title={tag.nome}>
+          {tag.nome}
+        </span>
+      ))}
+      {tags.length > 5 ? <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-400">+{tags.length - 5}</span> : null}
+    </div>
+  );
+}
 
 const LinhaMilitarEfetivo = ({ militar, indice }) => {
   const nome = obterNomeExibicaoMilitar(militar);
@@ -133,12 +149,7 @@ const LinhaMilitarEfetivo = ({ militar, indice }) => {
       <div className="min-w-0">
         <div className="truncate text-sm font-bold text-slate-900" title={nome}>{nome}</div>
         <div className="mt-0.5 truncate text-xs text-slate-500">{[posto, matricula ? `Matrícula ${matricula}` : ''].filter(Boolean).join(' • ')}</div>
-        {militar?.tags_resolvidas?.length ? (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {militar.tags_resolvidas.slice(0, 4).map((tag) => <span key={tag.id || tag.nome} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{tag.nome}</span>)}
-            {militar.tags_resolvidas.length > 4 ? <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-400">+{militar.tags_resolvidas.length - 4}</span> : null}
-          </div>
-        ) : null}
+        <TagsMilitarLinha tags={militar?.tags_resolvidas || []} />
       </div>
       <div className="text-center text-lg" title={tituloSexo}>{sexo === 'F' ? '👩' : sexo === 'M' ? '👨' : '•'}</div>
     </div>
@@ -231,13 +242,13 @@ const ModalResumoUnidade = ({ unidade, onClose }) => {
 const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
   <div className="relative flex min-w-0 flex-col pt-6">
     <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
-    <div className="flex w-[280px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
+    <div className="flex w-[320px] flex-col rounded-xl border border-slate-200 border-l-4 border-l-emerald-400 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><MapPin className="h-4 w-4" /></div>
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">Unidade</p>
-            <p className="mt-0.5 text-sm font-semibold text-slate-900">{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-900" title={`${no.nome}${no.sigla ? ` (${no.sigla})` : ''}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
             {no.descricao ? <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{no.descricao}</p> : null}
           </div>
         </div>
@@ -254,28 +265,28 @@ const UnidadeTreeCard = ({ no, onVerMembros, onVerResumo }) => (
 
 const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
   const unidades = no.filhos || [];
-  const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(280px, 1fr))` };
+  const unitGridStyle = { gridTemplateColumns: `repeat(${Math.max(unidades.length, 1)}, minmax(320px, 1fr))` };
 
   return (
     <div className="relative flex min-w-0 flex-col items-center pt-6">
       <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-slate-300" />
-      <div className="w-[320px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
+      <div className="w-[360px] rounded-xl border border-slate-200 border-l-4 border-l-purple-400 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2.5">
             <div className="rounded-lg bg-purple-50 p-2 text-purple-600"><GitBranch className="h-4 w-4" /></div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium uppercase tracking-wide text-purple-700">Subsetor</p>
-              <p className={`mt-0.5 text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+              <p className={`mt-0.5 truncate text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`} title={`${no.nome}${no.sigla ? ` (${no.sigla})` : ''}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
             </div>
           </div>
           <TotalBadge total={countTotal(no)} />
         </div>
-        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} compacto />
+        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} />
       </div>
       {unidades.length > 0 ? (
         <div className="relative w-full pt-8">
           <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
-          {unidades.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
+          {unidades.length > 1 ? <div className="absolute left-[calc(160px)] right-[calc(160px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-5" style={unitGridStyle}>
             {unidades.map((unidade) => <UnidadeTreeCard key={unidade.id} no={unidade} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
@@ -287,27 +298,27 @@ const SubsetorTree = ({ no, onVerMembros, onVerResumo }) => {
 
 const SetorTree = ({ no, onVerMembros, onVerResumo }) => {
   const subsetores = no.filhos || [];
-  const subsetorGridStyle = { gridTemplateColumns: `repeat(${Math.max(subsetores.length, 1)}, minmax(280px, 1fr))` };
+  const subsetorGridStyle = { gridTemplateColumns: `repeat(${Math.max(subsetores.length, 1)}, minmax(360px, 1fr))` };
 
   return (
     <section className="flex min-w-max flex-col items-center rounded-2xl border border-slate-200 bg-white/60 px-5 py-6 shadow-sm">
-      <div className="w-[320px] rounded-xl border border-slate-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm">
+      <div className="w-[360px] rounded-xl border border-slate-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2.5">
             <div className="rounded-lg bg-blue-50 p-2 text-blue-600"><Building2 className="h-4 w-4" /></div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700">Setor</p>
-              <p className={`mt-0.5 text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
+              <p className={`mt-0.5 truncate text-sm font-semibold ${no.discreto ? 'text-slate-500' : 'text-slate-900'}`} title={`${no.nome}${no.sigla ? ` (${no.sigla})` : ''}`}>{no.nome} {no.sigla ? `(${no.sigla})` : ''}</p>
             </div>
           </div>
           <TotalBadge total={countTotal(no)} />
         </div>
-        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} compacto />
+        <ResumoMetricasEfetivo resumo={no.resumoEfetivo} />
       </div>
       {subsetores.length > 0 ? (
         <div className="relative w-full pt-8">
           <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-slate-300" />
-          {subsetores.length > 1 ? <div className="absolute left-[calc(140px)] right-[calc(140px)] top-8 h-px bg-slate-300" /> : null}
+          {subsetores.length > 1 ? <div className="absolute left-[calc(180px)] right-[calc(180px)] top-8 h-px bg-slate-300" /> : null}
           <div className="grid gap-8" style={subsetorGridStyle}>
             {subsetores.map((subsetor) => <SubsetorTree key={subsetor.id} no={subsetor} onVerMembros={onVerMembros} onVerResumo={onVerResumo} />)}
           </div>
