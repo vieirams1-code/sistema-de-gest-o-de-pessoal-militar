@@ -1,0 +1,52 @@
+.documento-militar-a4 {
+  box-sizing: border-box;
+  width: min(100%, 210mm);
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 22mm 20mm 18mm;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 5px rgb(15 23 42 / 14%);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.55;
+}
+
+.documento-militar-cabecalho {
+  display: flex;
+  min-height: 24mm;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16mm;
+  border-bottom: 1px solid #1f2937;
+  padding-bottom: 5mm;
+  text-align: center;
+}
+
+.documento-militar-brasao { width: 20mm; height: 20mm; object-fit: contain; }
+.documento-militar-orgao, .documento-militar-titulo, .documento-militar-assinatura p { margin: 0; }
+.documento-militar-orgao { font-size: 11pt; font-weight: 700; letter-spacing: .08em; }
+.documento-militar-titulo { margin-top: 2mm; font-size: 10pt; letter-spacing: .06em; }
+.documento-militar-corpo { min-height: 125mm; white-space: pre-wrap; overflow-wrap: anywhere; text-align: justify; }
+.documento-militar-assinatura { margin-top: 22mm; text-align: center; font-size: 11pt; }
+.documento-militar-local { margin-bottom: 16mm !important; text-align: right; }
+.documento-militar-linha-assinatura { width: 78mm; margin: 0 auto 2mm; border-top: 1px solid #111827; }
+.documento-militar-signatario { font-weight: 700; }
+
+@page { size: A4; margin: 0; }
+
+@media print {
+  body, body * { overflow: visible !important; }
+  body * { visibility: hidden !important; }
+  .documento-militar-print-area, .documento-militar-print-area * { visibility: visible !important; }
+  .documento-militar-print-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0;
+    box-shadow: none;
+  }
+}

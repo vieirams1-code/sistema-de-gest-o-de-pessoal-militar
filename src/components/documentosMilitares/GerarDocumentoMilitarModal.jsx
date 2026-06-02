@@ -1,18 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, X } from 'lucide-react';
+import { FileText, Printer, Settings, X } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import DocumentoMilitarPreview from '@/components/documentosMilitares/DocumentoMilitarPreview';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
 import {
   filtrarTemplatesDocumentosMilitares,
   identificarCamposTemplateDocumentoMilitar,
   renderizarDocumentoMilitarIndividual,
 } from '@/services/documentosMilitares/gerarDocumentoMilitarService';
+import {
+  carregarDocumentoMilitarPrintConfig,
+  salvarDocumentoMilitarPrintConfig,
+} from '@/services/documentosMilitares/documentoMilitarPrintConfig';
 
 function formatarRotuloCampo(chave) {
   return String(chave || '')
@@ -25,6 +30,8 @@ function formatarRotuloCampo(chave) {
 export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   const [templateId, setTemplateId] = useState('');
   const [camposManuais, setCamposManuais] = useState({});
+  const [configImpressao, setConfigImpressao] = useState(() => carregarDocumentoMilitarPrintConfig());
+  const [configurandoImpressao, setConfigurandoImpressao] = useState(false);
   const { data: templatesRecebidos = [], isLoading, isError } = useQuery({
     queryKey: ['templates-documentos-militares'],
     queryFn: () => base44.entities.TemplateTexto.filter({ modulo: MODULO_DOCUMENTOS_MILITARES }, '-created_date'),
@@ -48,9 +55,23 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
     setCamposManuais({});
   }, [templateId]);
 
+  function atualizarConfigImpressao(campo, valor) {
+    setConfigImpressao((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function salvarConfigImpressao() {
+    setConfigImpressao(salvarDocumentoMilitarPrintConfig(configImpressao));
+    setConfigurandoImpressao(false);
+  }
+
+  function cancelarConfigImpressao() {
+    setConfigImpressao(carregarDocumentoMilitarPrintConfig());
+    setConfigurandoImpressao(false);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b p-6">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold text-[#1e3a5f]">
@@ -122,11 +143,61 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
             )}
           </div>
 
-          <div className="min-h-[320px] rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-sm font-semibold text-slate-700">Prévia renderizada</h3>
+          <div className="min-h-[320px] rounded-xl border border-slate-200 bg-slate-100 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-700">Prévia institucional para impressão</h3>
+              <Button variant="ghost" size="sm" onClick={() => setConfigurandoImpressao((atual) => !atual)}>
+                <Settings className="mr-1.5 h-4 w-4" />
+                Configurar impressão
+              </Button>
+            </div>
+
+            {configurandoImpressao && (
+              <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm">
+                <h4 className="font-semibold text-slate-700">Configuração local da impressão</h4>
+                <p className="mt-1 text-xs text-slate-500">Estas preferências ficam salvas somente neste navegador.</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {[
+                    ['mostrarCabecalho', 'Mostrar cabeçalho'],
+                    ['mostrarBrasao', 'Mostrar brasão quando disponível'],
+                    ['mostrarAssinatura', 'Mostrar assinatura'],
+                  ].map(([campo, rotulo]) => (
+                    <label key={campo} className="flex items-center gap-2 text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={configImpressao[campo]}
+                        onChange={(event) => atualizarConfigImpressao(campo, event.target.checked)}
+                      />
+                      {rotulo}
+                    </label>
+                  ))}
+                  {[
+                    ['cidadePadrao', 'Cidade padrão'],
+                    ['nomeSignatario', 'Nome do signatário'],
+                    ['cargoSignatario', 'Cargo do signatário'],
+                    ['matriculaSignatario', 'Matrícula do signatário'],
+                  ].map(([campo, rotulo]) => (
+                    <div key={campo}>
+                      <Label htmlFor={`config-impressao-${campo}`}>{rotulo}</Label>
+                      <Input
+                        id={`config-impressao-${campo}`}
+                        className="mt-1"
+                        value={configImpressao[campo]}
+                        onChange={(event) => atualizarConfigImpressao(campo, event.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={cancelarConfigImpressao}>Cancelar</Button>
+                  <Button size="sm" onClick={salvarConfigImpressao}>Salvar preferências</Button>
+                </div>
+              </div>
+            )}
+
             {templateSelecionado ? (
-              <div className="mt-3 min-h-[260px] whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
-                {previa}
+              <div className="overflow-x-auto">
+                <DocumentoMilitarPreview texto={previa} config={configImpressao} />
               </div>
             ) : (
               <p className="mt-3 text-sm text-slate-500">Selecione um template para visualizar a prévia.</p>
@@ -134,8 +205,12 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
           </div>
         </div>
 
-        <div className="flex justify-end border-t px-6 py-4">
+        <div className="flex justify-end gap-2 border-t px-6 py-4">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button onClick={() => window.print()} disabled={!previa.trim()}>
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir
+          </Button>
         </div>
       </div>
     </div>
