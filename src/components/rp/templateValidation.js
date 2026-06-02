@@ -418,6 +418,28 @@ const TEMPLATE_VAR_CONTRACT = {
       nome: 'nome_completo',
     },
   },
+  [resolveTipoRegistroTemplate('Homologação de Atestado de Acompanhamento')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula'],
+    opcionais: [
+      'data_registro',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      'dias',
+      'dias_extenso',
+      'tipo_afastamento',
+      'data_inicio',
+      'data_termino',
+      'medico_nome',
+      'medico_crm',
+      'acompanhado_parentesco',
+      'tipo_atestado_texto',
+    ],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+    },
+  },
   [resolveTipoRegistroTemplate('Ata JISO')]: {
     obrigatorias: ['nome_completo', 'posto_nome', 'matricula'],
     opcionais: ['data_registro', 'quadro', 'quadro_nome', 'militar_quadro'],

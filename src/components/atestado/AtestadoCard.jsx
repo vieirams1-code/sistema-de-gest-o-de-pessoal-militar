@@ -40,7 +40,7 @@ import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContex
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
-import { buildAtestadoTemplateVarsContrato } from './atestadoTemplateVars';
+import { buildAtestadoTemplateVarsContrato, getTipoTemplateHomologacaoAtestado } from './atestadoTemplateVars';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -122,6 +122,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const matriculaOperacional = montarLabelMilitarAtestado(atestado, { contexto: 'operacional' });
   const matriculaDocumental = montarLabelMilitarAtestado(atestado, { contexto: 'documental' });
 
+  const tipoTemplateHomologacao = getTipoTemplateHomologacaoAtestado(atestado);
   const varsContratoTemplate = buildAtestadoTemplateVarsContrato({
     atestado,
     medicoCadastrado,
@@ -131,7 +132,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   });
 
   const gerarTextoHomologacao = (form) => {
-    const tmpl = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
+    const tmpl = getTemplateAtivoPorTipo(tipoTemplateHomologacao, 'ExOfficio', templates, {
       grupamento_id: militarAtestado?.grupamento_id,
       subgrupamento_id: militarAtestado?.subgrupamento_id,
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
@@ -171,7 +172,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     }
     const texto = gerarTextoHomologacao({});
     if (texto === null) {
-      alert("Template obrigatório não encontrado para 'Homologação de Atestado'. Entre em contato com o administrador.");
+      alert(`Template obrigatório não encontrado para '${tipoTemplateHomologacao}'. Entre em contato com o administrador.`);
       return;
     }
     setHomologacaoForm(prev => ({ ...prev, texto_publicacao: texto }));
@@ -225,7 +226,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       queryKey: ['templates-texto'],
       queryFn: () => base44.entities.TemplateTexto.list(),
     });
-    const templateHomologacao = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templatesAtualizados, {
+    const templateHomologacao = getTemplateAtivoPorTipo(tipoTemplateHomologacao, 'ExOfficio', templatesAtualizados, {
       grupamento_id: militarAtestado?.grupamento_id,
       subgrupamento_id: militarAtestado?.subgrupamento_id,
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,

@@ -208,6 +208,17 @@ test('homologação de atestado aceita variáveis usadas no fluxo real', () => {
   assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
 });
 
+test('homologação de atestado de acompanhamento aceita variáveis específicas seguras', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'ExOfficio',
+    tipoRegistro: 'Homologação de Atestado de Acompanhamento',
+    template:
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{dias}} {{tipo_afastamento}} {{acompanhado_parentesco}} {{tipo_atestado_texto}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
 test('homologação de atestado continua bloqueando variável desconhecida', () => {
   const result = lintTemplateOnSave({
     modulo: 'ExOfficio',
