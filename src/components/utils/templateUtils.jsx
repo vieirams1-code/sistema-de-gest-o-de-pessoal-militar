@@ -270,6 +270,8 @@ export const VARS_PREVIEW = buildPreviewTemplateVars({
   publicacao_transferencia: 'DOEMS nº 12.345',
   documento: 'Ofício 001/2026',
   tipo_afastamento: 'própria saúde',
+  acompanhado_parentesco: 'Filho(a)',
+  tipo_atestado_texto: 'atestado de acompanhamento',
   medico_nome: 'Dra. Maria Souza',
   medico_crm: 'CRM 12345',
   numero_bg_ref: '045',

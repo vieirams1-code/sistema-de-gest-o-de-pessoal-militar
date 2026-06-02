@@ -70,7 +70,7 @@ const TIPO_REGISTRO_CATEGORIAS = [
   {
     key: 'atestados_saude',
     label: 'Atestados / Saúde',
-    tipos: ['Homologação de Atestado', 'Ata JISO'],
+    tipos: ['Homologação de Atestado', 'Homologação de Atestado de Acompanhamento', 'Ata JISO'],
   },
   {
     key: 'comportamento',
@@ -597,6 +597,24 @@ const VARS_POR_TIPO = {
       { v: '{{data_termino}}', desc: 'Data de término' },
       { v: '{{medico_nome}}', desc: 'Nome do médico responsável' },
       { v: '{{medico_crm}}', desc: 'CRM do médico responsável' },
+    ]
+  },
+  'Homologação de Atestado de Acompanhamento': {
+    grupo: 'Homologação de Atestado de Acompanhamento',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{dias}}', desc: 'Quantidade de dias' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
+      { v: '{{tipo_afastamento}}', desc: 'Tipo de afastamento' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_termino}}', desc: 'Data de término' },
+      { v: '{{medico_nome}}', desc: 'Nome do médico responsável' },
+      { v: '{{medico_crm}}', desc: 'CRM do médico responsável' },
+      { v: '{{acompanhado_parentesco}}', desc: 'Grau de parentesco da pessoa acompanhada' },
+      { v: '{{tipo_atestado_texto}}', desc: 'Descrição do tipo de atestado' },
     ]
   },
   'Apostila': {

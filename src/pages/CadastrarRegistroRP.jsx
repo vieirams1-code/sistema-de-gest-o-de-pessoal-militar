@@ -51,6 +51,7 @@ import {
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata, parseTemplateRenderMetadata, warnIfMissingRenderMetadata } from '@/services/templateRenderMetadata';
+import { getTipoTemplatePublicacaoAtestado } from '@/components/atestado/atestadoTemplateVars';
 
 
 function mapearEntityPublicacaoPorModulo(modulo) {
@@ -216,6 +217,8 @@ export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = 
     quadro: quadroBase,
     quadro_nome: quadroBase,
     militar_quadro: quadroBase,
+    acompanhado_parentesco: atestadoSelecionado?.grau_parentesco || '',
+    tipo_atestado_texto: atestadoSelecionado?.acompanhado === true ? 'atestado de acompanhamento' : 'atestado médico',
     data_registro: formatDateBR(dataRegistro),
     data_publicacao: formatDateBR(dataRegistro),
     data_bg: formatDateBR(formData.data_bg),
@@ -651,10 +654,15 @@ export default function CadastrarRegistroRP() {
     user?.email,
   ]);
 
+  const tipoTemplateSelecionado = useMemo(
+    () => getTipoTemplatePublicacaoAtestado(formData.tipo_registro, atestadoHomologadoSelecionado),
+    [formData.tipo_registro, atestadoHomologadoSelecionado]
+  );
+
   const templateAtivoSelecionado = useMemo(() => {
-    if (!formData.tipo_registro || !moduloAtual) return null;
-    return getTemplateAtivoPorTipo(formData.tipo_registro, moduloAtual, templatesAtivos, contextoTemplate);
-  }, [formData.tipo_registro, moduloAtual, templatesAtivos, contextoTemplate]);
+    if (!tipoTemplateSelecionado || !moduloAtual) return null;
+    return getTemplateAtivoPorTipo(tipoTemplateSelecionado, moduloAtual, templatesAtivos, contextoTemplate);
+  }, [tipoTemplateSelecionado, moduloAtual, templatesAtivos, contextoTemplate]);
 
   const templateObrigatorioAusente = useMemo(() => {
     if (!formData.tipo_registro) return false;
@@ -666,8 +674,8 @@ export default function CadastrarRegistroRP() {
       return { temConflito: false, modulos: [] };
     }
 
-    return getConflitoTemplatePorTipo(formData.tipo_registro, templatesAtivos);
-  }, [formData.tipo_registro, templatesAtivos]);
+    return getConflitoTemplatePorTipo(tipoTemplateSelecionado, templatesAtivos);
+  }, [formData.tipo_registro, tipoTemplateSelecionado, templatesAtivos]);
 
   const hasTemplateConflict = conflitoTemplateSelecionado.temConflito;
   const statusCalculadoFormulario = useMemo(
@@ -1007,7 +1015,7 @@ export default function CadastrarRegistroRP() {
 
     const moduloValidacao = getModuloByTipo(formData.tipo_registro, tiposCustom);
     const templateAtivoNoSubmit = getTemplateAtivoPorTipo(
-      formData.tipo_registro,
+      getTipoTemplatePublicacaoAtestado(formData.tipo_registro, atestadoHomologadoSelecionado),
       moduloValidacao,
       templatesAtivos,
       contextoTemplate,
@@ -1015,7 +1023,10 @@ export default function CadastrarRegistroRP() {
     const templateObrigatorioAusenteNoSubmit =
       tipoExigeTemplate(formData.tipo_registro) && !templateAtivoNoSubmit;
 
-    const conflitoTemplateNoSubmit = getConflitoTemplatePorTipo(formData.tipo_registro, templatesAtivos);
+    const conflitoTemplateNoSubmit = getConflitoTemplatePorTipo(
+      getTipoTemplatePublicacaoAtestado(formData.tipo_registro, atestadoHomologadoSelecionado),
+      templatesAtivos,
+    );
 
     if (templateObrigatorioAusenteNoSubmit) return;
     if (conflitoTemplateNoSubmit.temConflito) return;
