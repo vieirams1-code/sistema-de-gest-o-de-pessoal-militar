@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { normalizarPostoGraduacaoMilitar } from '@/utils/militarPostoGraduacao';
+import { fetchAllScopedMilitaresPages } from '@/services/getScopedMilitaresPagination';
 
 // =====================================================================
 // getScopedMilitaresClient — Lote 1B
@@ -42,7 +43,7 @@ export function getEffectiveEmail() {
  * sessionStorage (a menos que o caller já tenha passado um valor).
  *
  * Payload suportado (campos opcionais):
- *  - limit, offset, includeFoto, debugFields
+ *  - limit, offset, fetchAll, includeFoto, debugFields
  *  - statusCadastro, situacaoMilitar, search, militarIds
  *  - postoGraduacaoFiltro (string) | postoGraduacaoFiltros (array)
  *  - lotacaoFiltro (string)
@@ -70,10 +71,21 @@ export async function fetchScopedMilitares(payload = {}) {
     delete finalPayload.effectiveEmail;
   }
 
-  const response = await base44.functions.invoke('getScopedMilitares', finalPayload);
-  const data = response?.data ?? response ?? {};
+  const invokePage = async (pagePayload) => {
+    const response = await base44.functions.invoke('getScopedMilitares', pagePayload);
+    const data = response?.data ?? response ?? {};
+    return {
+      militares: Array.isArray(data.militares) ? data.militares : [],
+      meta: data.meta || {},
+    };
+  };
+
+  const data = finalPayload.fetchAll
+    ? await fetchAllScopedMilitaresPages(finalPayload, invokePage)
+    : await invokePage(finalPayload);
+
   return {
-    militares: Array.isArray(data.militares) ? data.militares.map((militar) => normalizarPostoGraduacaoMilitar(militar)) : [],
-    meta: data.meta || {},
+    militares: data.militares.map((militar) => normalizarPostoGraduacaoMilitar(militar)),
+    meta: data.meta,
   };
 }
