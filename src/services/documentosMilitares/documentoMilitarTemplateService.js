@@ -2,6 +2,10 @@ import {
   MODULO_DOCUMENTOS_MILITARES,
   montarVariaveisDocumentoMilitar,
 } from './documentoMilitarVarsService.js';
+import {
+  obterChaveCampoDinamicoDocumentoMilitar,
+  substituirCamposDinamicosDocumentoMilitar,
+} from './camposDinamicosDocumentoMilitar.js';
 import { substituirVariaveisDocumentoMilitar } from './substituirVariaveisDocumentoMilitar.js';
 
 export const TIPO_TEMPLATE_DOCUMENTO_MILITAR = 'Documento Militar';
@@ -35,7 +39,7 @@ export const VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR = [
 const CHAVES_VARIAVEIS_DOCUMENTO_MILITAR = new Set(
   VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR.map(({ chave }) => chave)
 );
-const PLACEHOLDER_REGEX = /{{\s*([\w.]+)\s*}}/g;
+const PLACEHOLDER_REGEX = /{{\s*([^{}]+?)\s*}}/g;
 
 function montarResumo(findings) {
   return {
@@ -60,8 +64,12 @@ export function lintTemplateDocumentoMilitar(template = '') {
   }
 
   for (const match of texto.matchAll(PLACEHOLDER_REGEX)) {
-    const variavel = match[1];
+    const variavel = match[1].trim();
     normalizedVars.push(variavel);
+
+    if (obterChaveCampoDinamicoDocumentoMilitar(variavel)) {
+      continue;
+    }
 
     if (!CHAVES_VARIAVEIS_DOCUMENTO_MILITAR.has(variavel)) {
       findings.push({
@@ -103,8 +111,21 @@ export function buildPreviewDocumentoMilitarVars() {
   });
 }
 
+export function buildPreviewDocumentoMilitarCamposDinamicos() {
+  return {
+    nome_curso: 'Curso de Formação',
+    periodo_curso: '1º a 30 de junho de 2026',
+    destino_documento: 'Comando-Geral',
+  };
+}
+
 export function previewTemplateDocumentoMilitar(template = '') {
-  return substituirVariaveisDocumentoMilitar(template, buildPreviewDocumentoMilitarVars(), {
+  const templateComCamposDinamicos = substituirCamposDinamicosDocumentoMilitar(
+    template,
+    buildPreviewDocumentoMilitarCamposDinamicos()
+  );
+
+  return substituirVariaveisDocumentoMilitar(templateComCamposDinamicos, buildPreviewDocumentoMilitarVars(), {
     manterDesconhecidas: true,
   });
 }

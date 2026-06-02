@@ -40,6 +40,7 @@ import {
   resolverTipoFeriasCanonico,
 } from '@/components/ferias/feriasTipoResolver';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
+import { obterChaveCampoDinamicoDocumentoMilitar } from '@/services/documentosMilitares/camposDinamicosDocumentoMilitar';
 import {
   DOCUMENTOS_MILITARES_TEMPLATE_OPTION,
   previewTemplateDocumentoMilitar,
@@ -928,7 +929,13 @@ export default function TemplatesTexto() {
   const variaveisInvalidas = useMemo(() => {
     if (!editingTemplate?.modulo || !editingTemplate?.tipo_registro) return [];
     const validas = getVariaveisValidas(editingTemplate.modulo, editingTemplate.tipo_registro);
-    return variaveisUsadas.filter((nome) => !validas.has(nome));
+    return variaveisUsadas.filter((nome) => {
+      if (normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES && obterChaveCampoDinamicoDocumentoMilitar(nome)) {
+        return false;
+      }
+
+      return !validas.has(nome);
+    });
   }, [editingTemplate?.modulo, editingTemplate?.tipo_registro, variaveisUsadas]);
 
   const safeLintResult = useMemo(() => getSafeLintResult(lintResult), [lintResult]);
@@ -1287,6 +1294,15 @@ export default function TemplatesTexto() {
                   placeholder="Digite o texto do template. Use {{variavel}} para dados dinâmicos."
                 />
               </div>
+
+              {normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  <p className="font-semibold">Campos manuais para Documentos Militares</p>
+                  <p className="mt-1">
+                    Use o formato <code className="rounded bg-emerald-100 px-1 font-mono">{'{{campo:nome_do_campo}}'}</code> para dados que serão preenchidos manualmente. Exemplo: <code className="rounded bg-emerald-100 px-1 font-mono">{'{{campo:nome_curso}}'}</code>.
+                  </p>
+                </div>
+              )}
 
               {safeLintResult.findings.length > 0 && (
                 <div className={`rounded-md p-3 text-sm flex gap-2 ${
