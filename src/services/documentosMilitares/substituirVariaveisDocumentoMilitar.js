@@ -1,11 +1,11 @@
 const PLACEHOLDER_REGEX = /{{\s*([\w.]+)\s*}}/g;
 
-export function substituirVariaveisDocumentoMilitar(template = '', variaveis = {}) {
+export function substituirVariaveisDocumentoMilitar(template = '', variaveis = {}, { manterDesconhecidas = false } = {}) {
   const texto = typeof template === 'string' ? template : '';
   const fonte = variaveis && typeof variaveis === 'object' ? variaveis : {};
 
   return texto.replace(PLACEHOLDER_REGEX, (_, chave) => {
-    if (!Object.hasOwn(fonte, chave)) return '';
+    if (!Object.hasOwn(fonte, chave)) return manterDesconhecidas ? `{{${chave}}}` : '';
 
     const valor = fonte[chave];
     if (typeof valor !== 'string' && typeof valor !== 'number') return '';

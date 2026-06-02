@@ -39,15 +39,23 @@ import {
   getLabelTipoFerias,
   resolverTipoFeriasCanonico,
 } from '@/components/ferias/feriasTipoResolver';
+import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
+import {
+  DOCUMENTOS_MILITARES_TEMPLATE_OPTION,
+  previewTemplateDocumentoMilitar,
+  VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR,
+} from '@/services/documentosMilitares/documentoMilitarTemplateService';
 
 const FERIAS_CANONICAL_TYPES = Object.values(FERIAS_TIPO_CANONICO);
 
 const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
   [MODULO_EX_OFFICIO]: 'Ex Offício',
+  [MODULO_DOCUMENTOS_MILITARES]: 'Documentos Militares',
 };
 
 const TIPOS_TEMPLATE_ADICIONAIS = [
+  DOCUMENTOS_MILITARES_TEMPLATE_OPTION,
   {
     value: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
     label: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
@@ -71,6 +79,11 @@ const TIPO_LABEL_OVERRIDES = {
 };
 
 const TIPO_REGISTRO_CATEGORIAS = [
+  {
+    key: 'documentos_militares',
+    label: 'Documentos Militares',
+    tipos: [DOCUMENTOS_MILITARES_TEMPLATE_OPTION.value],
+  },
   {
     key: 'ferias',
     label: 'Férias',
@@ -669,6 +682,9 @@ const GRUPOS_GENERICOS_LIVRO = [
     { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
   ]},
 ];
+const GRUPOS_DOCUMENTOS_MILITARES = [
+  { grupo: 'Dados do Militar', cor: 'blue', variaveis: VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR.map(({ chave, descricao }) => ({ v: `{{${chave}}}`, desc: descricao })) },
+];
 const GRUPOS_GENERICOS_EXOFFICIO = [
   { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
     { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
@@ -806,6 +822,7 @@ export default function TemplatesTexto() {
   const moduloColor = {
     [MODULO_LIVRO]: 'bg-blue-100 text-blue-700',
     [MODULO_EX_OFFICIO]: 'bg-purple-100 text-purple-700',
+    [MODULO_DOCUMENTOS_MILITARES]: 'bg-emerald-100 text-emerald-700',
   };
 
   const tiposRegistroOptions = useMemo(() => (
@@ -894,7 +911,7 @@ export default function TemplatesTexto() {
 
     const validas = new Set();
     const moduloNormalizado = normalizeTemplateModulo(modulo);
-    const genericos = moduloNormalizado === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : moduloNormalizado === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : [];
+    const genericos = moduloNormalizado === MODULO_DOCUMENTOS_MILITARES ? GRUPOS_DOCUMENTOS_MILITARES : moduloNormalizado === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : moduloNormalizado === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : [];
     genericos.forEach(g => g.variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, ''))));
 
     if (VARS_POR_TIPO[tipo]) {
@@ -1114,7 +1131,9 @@ export default function TemplatesTexto() {
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                     {(() => {
-                      const textoPreview = aplicarTemplate(editingTemplate.template, buildPreviewTemplateVars());
+                      const textoPreview = normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES
+                        ? previewTemplateDocumentoMilitar(editingTemplate.template)
+                        : aplicarTemplate(editingTemplate.template, buildPreviewTemplateVars());
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
                       let lastIndex = 0;
@@ -1297,7 +1316,7 @@ export default function TemplatesTexto() {
               {(() => {
                 const gruposParaMostrar = selectedTipoVars
                   ? [selectedTipoVars]
-                  : (normalizeTemplateModulo(editingTemplate.modulo) === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : normalizeTemplateModulo(editingTemplate.modulo) === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : []);
+                  : (normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES ? GRUPOS_DOCUMENTOS_MILITARES : normalizeTemplateModulo(editingTemplate.modulo) === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : normalizeTemplateModulo(editingTemplate.modulo) === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : []);
 
                 if (gruposParaMostrar.length === 0) return null;
 
