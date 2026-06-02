@@ -1,4 +1,6 @@
 import { resolverTipoFeriasCanonico } from '../ferias/feriasTipoResolver.js';
+import { MODULO_DOCUMENTOS_MILITARES } from '../../services/documentosMilitares/documentoMilitarVarsService.js';
+import { lintTemplateDocumentoMilitar } from '../../services/documentosMilitares/documentoMilitarTemplateService.js';
 
 export const TEMPLATE_BLOQUEIO_MENSAGEM =
   'Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.';
@@ -465,7 +467,9 @@ function extractTemplateVars(template = '') {
 }
 
 export function lintTemplateOnSave({ modulo = '', tipoRegistro = '', template = '' } = {}) {
-  void modulo;
+  if (normalizarModulo(modulo) === normalizarModulo(MODULO_DOCUMENTOS_MILITARES)) {
+    return lintTemplateDocumentoMilitar(template);
+  }
   const findings = [];
   const normalizedTemplate = String(template || '');
   const tipoResolvido = resolveTipoRegistroTemplate(tipoRegistro);

@@ -24,3 +24,10 @@ test('substitui variáveis ausentes ou não textuais por string vazia', () => {
 test('retorna texto vazio quando o template não é uma string', () => {
   assert.equal(substituirVariaveisDocumentoMilitar(null, { nome_completo: 'Maria' }), '');
 });
+
+test('pode manter placeholders desconhecidos evidentes para preview administrativo', () => {
+  assert.equal(
+    substituirVariaveisDocumentoMilitar('Nome: {{nome_completo}} / {{revisar}}', { nome_completo: 'Maria' }, { manterDesconhecidas: true }),
+    'Nome: Maria / {{revisar}}'
+  );
+});

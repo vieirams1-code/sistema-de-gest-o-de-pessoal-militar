@@ -1,0 +1,110 @@
+import {
+  MODULO_DOCUMENTOS_MILITARES,
+  montarVariaveisDocumentoMilitar,
+} from './documentoMilitarVarsService.js';
+import { substituirVariaveisDocumentoMilitar } from './substituirVariaveisDocumentoMilitar.js';
+
+export const TIPO_TEMPLATE_DOCUMENTO_MILITAR = 'Documento Militar';
+
+export const DOCUMENTOS_MILITARES_TEMPLATE_OPTION = {
+  value: TIPO_TEMPLATE_DOCUMENTO_MILITAR,
+  label: 'Documento Militar',
+  modulo: MODULO_DOCUMENTOS_MILITARES,
+};
+
+export const VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR = [
+  { chave: 'nome_completo', descricao: 'Nome completo do militar' },
+  { chave: 'nome_guerra', descricao: 'Nome de guerra do militar' },
+  { chave: 'posto_graduacao', descricao: 'Posto ou graduação do militar' },
+  { chave: 'quadro', descricao: 'Quadro do militar' },
+  { chave: 'matricula', descricao: 'Matrícula funcional' },
+  { chave: 'cpf', descricao: 'CPF do militar' },
+  { chave: 'rg', descricao: 'RG do militar' },
+  { chave: 'data_nascimento', descricao: 'Data de nascimento' },
+  { chave: 'data_inclusao', descricao: 'Data de inclusão' },
+  { chave: 'lotacao', descricao: 'Lotação atual' },
+  { chave: 'unidade', descricao: 'Unidade atual' },
+  { chave: 'situacao', descricao: 'Situação funcional' },
+  { chave: 'comportamento_atual', descricao: 'Comportamento atual' },
+  { chave: 'data_promocao_atual', descricao: 'Data da promoção atual' },
+  { chave: 'tempo_servico', descricao: 'Tempo de serviço' },
+  { chave: 'data_atual', descricao: 'Data atual' },
+  { chave: 'cidade', descricao: 'Cidade de referência do documento' },
+];
+
+const CHAVES_VARIAVEIS_DOCUMENTO_MILITAR = new Set(
+  VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR.map(({ chave }) => chave)
+);
+const PLACEHOLDER_REGEX = /{{\s*([\w.]+)\s*}}/g;
+
+function montarResumo(findings) {
+  return {
+    erros: findings.filter((finding) => finding.severity === 'ERRO').length,
+    alertas: findings.filter((finding) => finding.severity === 'ALERTA').length,
+    infos: findings.filter((finding) => finding.severity === 'INFO').length,
+  };
+}
+
+export function lintTemplateDocumentoMilitar(template = '') {
+  const texto = typeof template === 'string' ? template : '';
+  const findings = [];
+  const normalizedVars = [];
+
+  if (!texto.trim()) {
+    findings.push({
+      severity: 'ERRO',
+      code: 'TEMPLATE_VAZIO',
+      variavel: null,
+      message: 'Template vazio: informe o texto antes de salvar.',
+    });
+  }
+
+  for (const match of texto.matchAll(PLACEHOLDER_REGEX)) {
+    const variavel = match[1];
+    normalizedVars.push(variavel);
+
+    if (!CHAVES_VARIAVEIS_DOCUMENTO_MILITAR.has(variavel)) {
+      findings.push({
+        severity: 'ALERTA',
+        code: 'VAR_DESCONHECIDA_DOCUMENTO_MILITAR',
+        variavel,
+        message: `Variável '{{${variavel}}}' não é reconhecida para Documentos Militares. O salvamento será permitido, mas revise o placeholder.`,
+      });
+    }
+  }
+
+  return {
+    ok: findings.every((finding) => finding.severity !== 'ERRO'),
+    summary: montarResumo(findings),
+    findings,
+    normalizedVars,
+  };
+}
+
+export function buildPreviewDocumentoMilitarVars() {
+  return montarVariaveisDocumentoMilitar({
+    nome_completo: 'Maria da Silva',
+    nome_guerra: 'SILVA',
+    posto_graduacao: 'Capitão',
+    quadro: 'QOBM',
+    matricula: '123456',
+    cpf: '111.222.333-44',
+    rg: '987654',
+    data_nascimento: '1990-05-20',
+    data_inclusao: '2010-06-01',
+    lotacao: { nome: '1º GBM' },
+    unidade_nome: 'CBMDF',
+    situacao: 'Ativo',
+    comportamento_atual: 'Ótimo',
+    data_promocao_atual: '2024-01-15',
+    endereco: { cidade: 'Brasília' },
+  }, {
+    dataReferencia: '2026-06-02',
+  });
+}
+
+export function previewTemplateDocumentoMilitar(template = '') {
+  return substituirVariaveisDocumentoMilitar(template, buildPreviewDocumentoMilitarVars(), {
+    manterDesconhecidas: true,
+  });
+}
