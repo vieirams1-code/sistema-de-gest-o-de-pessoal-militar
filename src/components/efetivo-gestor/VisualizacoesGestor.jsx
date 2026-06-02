@@ -12,6 +12,46 @@ const summarizeMilitares = (militares = []) => {
   return { total, oficiais, pracas: total - oficiais - temporarios, temporarios };
 };
 
+function normalizarBuscaLocal(valor) {
+  return String(valor || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getTagIdLocal(tag) {
+  return normalizarBuscaLocal(tag?.id || tag?.nome || tag?.label || tag);
+}
+
+function getTagNomeLocal(tag) {
+  if (!tag) return "";
+  if (typeof tag === "string") return tag;
+  return tag.nome || tag.label || tag.tag || tag.name || "";
+}
+
+function getTagsDoMilitarModal(militar) {
+  return militar?.tags_resolvidas || militar?.tagsCompactas || militar?.tags || [];
+}
+
+function militarPassaFiltroModal(militar, busca, tagsSelecionadas) {
+  const termo = normalizarBuscaLocal(busca);
+
+  const textoMilitar = normalizarBuscaLocal([
+    militar?.nome_guerra_resolvido, militar?.nome_guerra, militar?.nomeGuerra,
+    militar?.nome, militar?.nome_completo, militar?.posto_graduacao_resolvido,
+    militar?.posto_graduacao, militar?.postoGraduacao, militar?.matricula,
+    militar?.cpf, militar?.quadro
+  ].filter(Boolean).join(" "));
+
+  const passaBusca = !termo || textoMilitar.includes(termo);
+  const tagsMilitar = getTagsDoMilitarModal(militar).map(getTagIdLocal).filter(Boolean);
+
+  const passaTags = !tagsSelecionadas.length || tagsSelecionadas.every((tagId) => tagsMilitar.includes(tagId));
+
+  return passaBusca && passaTags;
+}
+
 const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
   id: `setor-${sIdx}-${setor.setorNome}`,
   tipo: 'Setor',
@@ -54,11 +94,88 @@ const MembroChip = ({ militar }) => (
   </div>
 );
 
+function SecaoEfetivo({ titulo, militares, observacao, totalOriginal }) {
+  const totalAtual = militares?.length || 0;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div>
+          <div className="text-sm font-black text-slate-900">{titulo}</div>
+          {observacao ? (
+            <div className="mt-0.5 text-xs text-slate-500">{observacao}</div>
+          ) : null}
+        </div>
+
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          {totalAtual}
+          {typeof totalOriginal === "number" && totalOriginal !== totalAtual
+            ? ` de ${totalOriginal}`
+            : ""}
+        </span>
+      </div>
+
+      {militares?.length ? (
+        <div className="space-y-2 p-3">
+          {militares.map((militar, indice) => (
+            <MembroChip key={militar.id || militar.matricula || `${titulo}-${indice}`} militar={militar} />
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-8 text-center text-sm text-slate-500">
+          Nenhum militar encontrado com os filtros aplicados.
+        </div>
+      )}
+    </section>
+  );
+}
+
 const TreeNode = ({ no, expandedUnits, onToggleUnit }) => {
   const [expandedNode, setExpandedNode] = useState(true);
+  const [buscaMembros, setBuscaMembros] = useState('');
+  const [tagsSelecionadasModal, setTagsSelecionadasModal] = useState([]);
+
   const isUnidade = no.tipo === 'Unidade';
   const corTipo = isUnidade ? 'border-l-4 border-l-emerald-400' : no.tipo === 'Subsetor' ? 'border-l-4 border-l-purple-400' : 'border-l-4 border-l-blue-400';
   const resumo = isUnidade ? summarizeMilitares(no.militares) : null;
+
+  useEffect(() => {
+    if (!expandedUnits[no.id]) {
+      setBuscaMembros('');
+      setTagsSelecionadasModal([]);
+    }
+  }, [expandedUnits, no.id]);
+
+  const tagsDisponiveisModal = useMemo(() => {
+    if (!isUnidade) return [];
+    const mapa = new Map();
+    for (const militar of no.militares || []) {
+      for (const tag of getTagsDoMilitarModal(militar)) {
+        const id = getTagIdLocal(tag);
+        const nome = getTagNomeLocal(tag);
+        if (!id || !nome) continue;
+        if (!mapa.has(id)) mapa.set(id, { id, nome, total: 0 });
+        mapa.get(id).total += 1;
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [no.militares, isUnidade]);
+
+  const oficiaisFiltrados = useMemo(() => {
+    if (!isUnidade) return [];
+    return (no.militares || []).filter((m) => classificarMilitar(m) === 'oficial' && militarPassaFiltroModal(m, buscaMembros, tagsSelecionadasModal));
+  }, [no.militares, buscaMembros, tagsSelecionadasModal, isUnidade]);
+
+  const pracasFiltradas = useMemo(() => {
+    if (!isUnidade) return [];
+    return (no.militares || []).filter((m) => classificarMilitar(m) !== 'oficial' && militarPassaFiltroModal(m, buscaMembros, tagsSelecionadasModal));
+  }, [no.militares, buscaMembros, tagsSelecionadasModal, isUnidade]);
+
+  const totalFiltrado = oficiaisFiltrados.length + pracasFiltradas.length;
+  const totalOriginal = no.militares?.length || 0;
 
   return (
     <div className="flex flex-col items-center">
@@ -76,7 +193,62 @@ const TreeNode = ({ no, expandedUnits, onToggleUnit }) => {
             <button type="button" onClick={() => onToggleUnit(no.id)} className="mt-3 text-xs font-medium text-emerald-700">
               {expandedUnits[no.id] ? 'Ocultar membros' : 'Ver membros'}
             </button>
-            {expandedUnits[no.id] ? <div className="mt-2 space-y-2">{no.militares.map((m) => <MembroChip key={`${m.id || m.matricula}-${no.id}`} militar={m} />)}</div> : null}
+            {expandedUnits[no.id] ? (
+              <div className="mt-2 w-full text-left">
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <div className="relative flex-1">
+                      <input
+                        value={buscaMembros}
+                        onChange={(e) => setBuscaMembros(e.target.value)}
+                        placeholder="Pesquisar por nome, matrícula, posto, quadro..."
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                    <div className="text-xs font-semibold text-slate-500">
+                      {totalFiltrado} de {totalOriginal} militares
+                    </div>
+                    {(buscaMembros || tagsSelecionadasModal.length > 0) ? (
+                      <button type="button" onClick={() => { setBuscaMembros(""); setTagsSelecionadasModal([]); }} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                        Limpar filtros
+                      </button>
+                    ) : null}
+                  </div>
+                  {tagsDisponiveisModal.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {tagsDisponiveisModal.slice(0, 16).map((tag) => {
+                        const ativo = tagsSelecionadasModal.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => setTagsSelecionadasModal((atuais) => ativo ? atuais.filter((id) => id !== tag.id) : [...atuais, tag.id])}
+                            className={["rounded-full border px-3 py-1 text-xs font-semibold transition", ativo ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"].join(" ")}
+                          >
+                            {tag.nome}
+                            <span className="ml-1 text-[10px] opacity-70">{tag.total}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  <SecaoEfetivo
+                    titulo="Oficiais"
+                    militares={oficiaisFiltrados}
+                    totalOriginal={resumo.oficiais}
+                  />
+                  <SecaoEfetivo
+                    titulo="Praças"
+                    observacao="Inclui Subtenentes e Temporários."
+                    militares={pracasFiltradas}
+                    totalOriginal={resumo.pracas + resumo.temporarios}
+                  />
+                </div>
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>
