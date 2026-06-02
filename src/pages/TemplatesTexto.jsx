@@ -623,6 +623,7 @@ const VARS_POR_TIPO = {
       { v: '{{medico_nome}}', desc: 'Nome do médico responsável' },
       { v: '{{medico_crm}}', desc: 'CRM do médico responsável' },
       { v: '{{acompanhado_parentesco}}', desc: 'Grau de parentesco da pessoa acompanhada' },
+      { v: '{{acompanhado_nome}}', desc: 'Nome da pessoa acompanhada/dependente' },
       { v: '{{tipo_atestado_texto}}', desc: 'Descrição do tipo de atestado' },
     ]
   },

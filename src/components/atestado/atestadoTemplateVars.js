@@ -32,6 +32,7 @@ export function buildAtestadoTemplateVarsContrato({
       medico_crm: atestado.medico_crm_snapshot || atestado.crm_medico || medicoCadastrado?.crm || atestado.medico_crm,
     }),
     acompanhado_parentesco: atestado.grau_parentesco || '',
+    acompanhado_nome: atestado.acompanhado_nome || '',
     tipo_atestado_texto: atestado.acompanhado === true ? 'atestado de acompanhamento' : 'atestado médico',
   };
 }

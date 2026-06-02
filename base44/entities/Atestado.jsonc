@@ -67,6 +67,10 @@
       "type": "boolean",
       "default": false
     },
+    "acompanhado_nome": {
+      "type": "string",
+      "title": "Nome do dependente/acompanhado"
+    },
     "grau_parentesco": {
       "type": "string",
       "enum": [

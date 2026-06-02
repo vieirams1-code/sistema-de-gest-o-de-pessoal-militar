@@ -43,12 +43,13 @@ test('atestado de acompanhamento usa chave específica e renderiza variáveis se
   const atestado = {
     acompanhado: true,
     grau_parentesco: 'Filho(a)',
+    acompanhado_nome: 'Maria da Silva',
     militar_nome: 'Militar Exemplo',
     militar_posto: 'Cabo',
     militar_matricula: '123456',
   };
   const vars = buildAtestadoTemplateVarsContrato({ atestado });
-  const texto = '{{tipo_atestado_texto}} para {{nome_completo}} — parentesco: {{acompanhado_parentesco}}.'.replace(
+  const texto = '{{tipo_atestado_texto}} para {{nome_completo}} — acompanhante: {{acompanhado_nome}} — parentesco: {{acompanhado_parentesco}}.'.replace(
     /\{\{(\w+)\}\}/g,
     (_, key) => vars[key] ?? `{{${key}}}`
   );
@@ -61,6 +62,6 @@ test('atestado de acompanhamento usa chave específica e renderiza variáveis se
     getTipoTemplatePublicacaoAtestado(TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO, atestado),
     TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO
   );
-  assert.equal(texto, 'atestado de acompanhamento para Militar Exemplo — parentesco: Filho(a).');
+  assert.equal(texto, 'atestado de acompanhamento para Militar Exemplo — acompanhante: Maria da Silva — parentesco: Filho(a).');
   assert.doesNotMatch(texto, /\{\{[^}]+\}\}/);
 });

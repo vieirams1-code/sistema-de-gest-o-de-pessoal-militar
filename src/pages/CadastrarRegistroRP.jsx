@@ -218,6 +218,7 @@ export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = 
     quadro_nome: quadroBase,
     militar_quadro: quadroBase,
     acompanhado_parentesco: atestadoSelecionado?.grau_parentesco || '',
+    acompanhado_nome: atestadoSelecionado?.acompanhado_nome || '',
     tipo_atestado_texto: atestadoSelecionado?.acompanhado === true ? 'atestado de acompanhamento' : 'atestado médico',
     data_registro: formatDateBR(dataRegistro),
     data_publicacao: formatDateBR(dataRegistro),
