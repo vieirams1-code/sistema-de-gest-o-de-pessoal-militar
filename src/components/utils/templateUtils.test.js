@@ -45,6 +45,14 @@ test('buildPreviewTemplateVars resolve variáveis canônicas de médico e CRM no
   assert.equal(saida, 'Dra. Maria Souza|CRM 12345');
 });
 
+test('preview administrativo substitui nome simulado do dependente acompanhado', () => {
+  const vars = buildPreviewTemplateVars({ acompanhado_nome: 'Maria da Silva' });
+  const saida = aplicarTemplate('Acompanhado: {{acompanhado_nome}}', vars);
+
+  assert.equal(saida, 'Acompanhado: Maria da Silva');
+  assert.doesNotMatch(saida, /\{\{[^}]+\}\}/);
+});
+
 test('buildPreviewTemplateVars usa mesmo contrato para posto_nome', () => {
   const vars = buildPreviewTemplateVars({ posto_abreviatura: 'Maj', quadro: 'QOSAU' });
   const esperado = montarPostoNomeTemplate({ abreviatura: 'Maj', quadro: 'QOSAU', source: vars });

@@ -15,6 +15,7 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 import CidSelector from '@/components/atestado/CidSelector';
 import MedicoSelector from '@/components/atestado/MedicoSelector';
 import { normalizeCrm } from '@/components/atestado/medicoUtils';
+import { isAtestadoAcompanhamento, normalizeDadosAcompanhamentoAtestado } from '@/components/atestado/atestadoAcompanhamentoForm';
 import DateCalculator from '@/components/atestado/DateCalculator';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -43,6 +44,7 @@ const initialFormData = {
   cid_10: '',
   cid_descricao: '',
   acompanhado: false,
+  acompanhado_nome: '',
   grau_parentesco: '',
   data_inicio: '',
   dias: '',
@@ -149,6 +151,13 @@ export default function CadastrarAtestado() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleAcompanhadoChange = (checked) => {
+    setFormData(prev => normalizeDadosAcompanhamentoAtestado({
+      ...prev,
+      acompanhado: checked === true,
+    }));
+  };
+
   // Ao escolher fluxo manualmente, sincronizar campos derivados
   const handleFluxoChange = (fluxo) => {
     setFormData(prev => ({
@@ -244,7 +253,7 @@ export default function CadastrarAtestado() {
     const medicoNomeSnapshot = String(formData.medico_nome_snapshot || formData.medico || '').trim();
     const medicoCrmSnapshot = normalizeCrm(formData.medico_crm_snapshot || formData.crm_medico || '');
 
-    const dataToSave = {
+    const dataToSave = normalizeDadosAcompanhamentoAtestado({
       ...formData,
       medico_nome_snapshot: medicoNomeSnapshot,
       medico_crm_snapshot: medicoCrmSnapshot,
@@ -252,7 +261,7 @@ export default function CadastrarAtestado() {
       medico: medicoNomeSnapshot,
       crm_medico: medicoCrmSnapshot,
       dias: formData.dias ? parseInt(formData.dias) : 0,
-    };
+    });
 
     // Remover campos que não existem mais no schema
     delete dataToSave.texto_publicacao;
@@ -367,22 +376,30 @@ export default function CadastrarAtestado() {
                 <Checkbox
                   id="acompanhado"
                   checked={formData.acompanhado}
-                  onCheckedChange={(checked) => handleChange('acompanhado', checked)}
+                  onCheckedChange={handleAcompanhadoChange}
                 />
                 <Label htmlFor="acompanhado" className="text-sm cursor-pointer">
                   Este é um atestado de acompanhamento
                 </Label>
               </div>
 
-              {formData.acompanhado && (
-                <FormField
-                  label="Grau de Parentesco"
-                  name="grau_parentesco"
-                  value={formData.grau_parentesco}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Pai', 'Mãe', 'Filho(a)', 'Cônjuge', 'Irmão(ã)', 'Avô(ó)', 'Outro']}
-                />
+              {isAtestadoAcompanhamento(formData.acompanhado) && (
+                <>
+                  <FormField
+                    label="Nome do dependente/acompanhado"
+                    name="acompanhado_nome"
+                    value={formData.acompanhado_nome}
+                    onChange={handleChange}
+                  />
+                  <FormField
+                    label="Grau de Parentesco"
+                    name="grau_parentesco"
+                    value={formData.grau_parentesco}
+                    onChange={handleChange}
+                    type="select"
+                    options={['Pai', 'Mãe', 'Filho(a)', 'Cônjuge', 'Irmão(ã)', 'Avô(ó)', 'Outro']}
+                  />
+                </>
               )}
 
               <div className="space-y-2">

@@ -213,10 +213,20 @@ test('homologação de atestado de acompanhamento aceita variáveis específicas
     modulo: 'ExOfficio',
     tipoRegistro: 'Homologação de Atestado de Acompanhamento',
     template:
-      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{dias}} {{tipo_afastamento}} {{acompanhado_parentesco}} {{tipo_atestado_texto}}',
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{dias}} {{tipo_afastamento}} {{acompanhado_nome}} {{acompanhado_parentesco}} {{tipo_atestado_texto}}',
   });
   assert.equal(result.ok, true);
   assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
+test('homologação de atestado comum bloqueia variável exclusiva de acompanhamento', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'ExOfficio',
+    tipoRegistro: 'Homologação de Atestado',
+    template: 'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{acompanhado_nome}}',
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA' && f.variavel === 'acompanhado_nome'), true);
 });
 
 test('homologação de atestado continua bloqueando variável desconhecida', () => {

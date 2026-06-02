@@ -271,6 +271,7 @@ export const VARS_PREVIEW = buildPreviewTemplateVars({
   documento: 'Ofício 001/2026',
   tipo_afastamento: 'própria saúde',
   acompanhado_parentesco: 'Filho(a)',
+  acompanhado_nome: 'Maria da Silva',
   tipo_atestado_texto: 'atestado de acompanhamento',
   medico_nome: 'Dra. Maria Souza',
   medico_crm: 'CRM 12345',

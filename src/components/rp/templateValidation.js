@@ -433,6 +433,7 @@ const TEMPLATE_VAR_CONTRACT = {
       'medico_nome',
       'medico_crm',
       'acompanhado_parentesco',
+      'acompanhado_nome',
       'tipo_atestado_texto',
     ],
     aliases: {
