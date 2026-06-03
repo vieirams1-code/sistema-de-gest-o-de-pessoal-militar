@@ -50,8 +50,6 @@ import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContr
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
-import FuncoesMilitarSection from '@/components/militar/FuncoesMilitarSection';
-import TagsMilitarSection from '@/components/militar/TagsMilitarSection';
 import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
 import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMilitar } from '@/utils/funcoesTags/decoracaoInstitucionalMilitar';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
@@ -652,12 +650,6 @@ export default function VerMilitar() {
                     )}
                     </div>
                   }
-                </Section>
-                <Section title="Funções e Tags" icon={Briefcase}>
-                  <div className="space-y-4">
-                    <FuncoesMilitarSection militar={militar} />
-                    <TagsMilitarSection militar={militar} />
-                  </div>
                 </Section>
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">

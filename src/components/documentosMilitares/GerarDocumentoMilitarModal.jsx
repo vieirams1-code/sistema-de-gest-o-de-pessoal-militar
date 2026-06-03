@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import DocumentoMilitarPreview from '@/components/documentosMilitares/DocumentoMilitarPreview';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
 import {
@@ -19,6 +20,7 @@ import {
   carregarDocumentoMilitarPrintConfig,
   salvarDocumentoMilitarPrintConfig,
 } from '@/services/documentosMilitares/documentoMilitarPrintConfig';
+import { normalizarSignatarioMilitar } from '@/services/documentosMilitares/documentoMilitarSignatarioService';
 
 function formatarRotuloCampo(chave) {
   return String(chave || '')
@@ -33,9 +35,25 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   const [camposManuais, setCamposManuais] = useState({});
   const [configImpressao, setConfigImpressao] = useState(() => carregarDocumentoMilitarPrintConfig());
   const [configurandoImpressao, setConfigurandoImpressao] = useState(false);
+  const [buscaSignatario, setBuscaSignatario] = useState('');
   const { data: templatesRecebidos = [], isLoading, isError } = useQuery({
     queryKey: ['templates-documentos-militares'],
     queryFn: () => base44.entities.TemplateTexto.filter({ modulo: MODULO_DOCUMENTOS_MILITARES }, '-created_date'),
+  });
+  const { data: militaresSignatarios = [], isFetching: isFetchingSignatarios } = useQuery({
+    queryKey: ['documentos-militares-signatarios', buscaSignatario.trim()],
+    queryFn: async () => {
+      const { militares } = await fetchScopedMilitares({
+        search: buscaSignatario.trim(),
+        statusCadastro: 'Ativo',
+        limit: 50,
+        offset: 0,
+        includeFoto: false,
+      });
+      return militares;
+    },
+    enabled: configurandoImpressao,
+    staleTime: 2 * 60 * 1000,
   });
   const templates = useMemo(
     () => filtrarTemplatesDocumentosMilitares(templatesRecebidos),
@@ -58,6 +76,15 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
 
   function atualizarConfigImpressao(campo, valor) {
     setConfigImpressao((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function selecionarMilitarSignatario(militarSelecionado) {
+    const signatario = normalizarSignatarioMilitar(militarSelecionado);
+    setConfigImpressao((atual) => ({
+      ...atual,
+      ...signatario,
+    }));
+    setBuscaSignatario('');
   }
 
   function salvarConfigImpressao() {
@@ -174,7 +201,54 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                     </label>
                   ))}
                   {[
+                    ['orgaoLinha1', 'Órgão - linha 1'],
+                    ['orgaoLinha2', 'Órgão - linha 2'],
+                    ['orgaoLinha3', 'Órgão - linha 3'],
+                    ['tituloDocumentoPadrao', 'Título padrão'],
                     ['cidadePadrao', 'Cidade padrão'],
+                  ].map(([campo, rotulo]) => (
+                    <div key={campo}>
+                      <Label htmlFor={`config-impressao-${campo}`}>{rotulo}</Label>
+                      <Input
+                        id={`config-impressao-${campo}`}
+                        className="mt-1"
+                        value={configImpressao[campo]}
+                        onChange={(event) => atualizarConfigImpressao(campo, event.target.value)}
+                      />
+                    </div>
+                  ))}
+                  <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <Label htmlFor="busca-signatario-documento">Selecionar militar signatário</Label>
+                    <Input
+                      id="busca-signatario-documento"
+                      className="mt-1"
+                      value={buscaSignatario}
+                      onChange={(event) => setBuscaSignatario(event.target.value)}
+                      placeholder="Buscar por nome, matrícula, CPF ou RG..."
+                    />
+                    <div className="mt-2 max-h-40 space-y-1 overflow-auto">
+                      {isFetchingSignatarios ? (
+                        <p className="text-xs text-slate-500">Buscando militares...</p>
+                      ) : militaresSignatarios.length === 0 ? (
+                        <p className="text-xs text-slate-500">Nenhum militar encontrado no escopo atual.</p>
+                      ) : militaresSignatarios.map((item) => {
+                        const signatario = normalizarSignatarioMilitar(item);
+                        const rotulo = [item.posto_graduacao, item.nome_guerra || item.nome_completo].filter(Boolean).join(' ');
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-white"
+                            onClick={() => selecionarMilitarSignatario(item)}
+                          >
+                            <span className="font-medium">{rotulo || signatario.nomeSignatario || 'Militar sem nome'}</span>
+                            {signatario.matriculaSignatario && <span className="text-slate-500"> • Mat {signatario.matriculaSignatario}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {[
                     ['nomeSignatario', 'Nome do signatário'],
                     ['cargoSignatario', 'Cargo do signatário'],
                     ['matriculaSignatario', 'Matrícula do signatário'],

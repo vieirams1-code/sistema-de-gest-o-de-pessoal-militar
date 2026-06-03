@@ -41,13 +41,16 @@
   body, body * { overflow: visible !important; }
   body * { visibility: hidden !important; }
   .documento-militar-print-area, .documento-militar-print-area * { visibility: visible !important; }
+  html, body {
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
   .documento-militar-print-area {
-    position: absolute;
-    top: 0;
-    left: 0;
+    display: block !important;
     width: 210mm;
     min-height: 297mm;
-    margin: 0;
+    margin: 0 auto;
     box-shadow: none;
   }
 }

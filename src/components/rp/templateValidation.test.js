@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getTemplateAtivoPorTipo, lintTemplateOnSave, tipoExigeTemplate } from './templateValidation.js';
+import { getConflitoUnicidadeTemplate, getTemplateAtivoPorTipo, lintTemplateOnSave, tipoExigeTemplate } from './templateValidation.js';
 
 const BASE_TEMPLATE = {
   ativo: true,
@@ -9,6 +9,41 @@ const BASE_TEMPLATE = {
   modulo: 'ExOfficio',
   template: 'Texto {{nome_completo}} - {{posto}}',
 };
+
+
+test('permite múltiplos templates ativos para DocumentosMilitares no mesmo escopo', () => {
+  const existente = {
+    id: 'doc-1',
+    ativo: true,
+    modulo: 'DocumentosMilitares',
+    tipo_registro: 'Documento Militar',
+    escopo: 'GLOBAL',
+  };
+
+  const conflito = getConflitoUnicidadeTemplate({ ...existente, id: 'doc-2' }, [existente], {
+    ignoreId: 'doc-2',
+    considerarApenasAtivos: true,
+  });
+
+  assert.equal(conflito, null);
+});
+
+test('preserva unicidade para outros módulos no mesmo escopo', () => {
+  const existente = {
+    id: 'livro-1',
+    ativo: true,
+    modulo: 'Livro',
+    tipo_registro: 'Saída Férias',
+    escopo: 'GLOBAL',
+  };
+
+  const conflito = getConflitoUnicidadeTemplate({ ...existente, id: 'livro-2' }, [existente], {
+    ignoreId: 'livro-2',
+    considerarApenasAtivos: true,
+  });
+
+  assert.equal(conflito?.id, 'livro-1');
+});
 
 test('prioriza template de UNIDADE sobre SUBSETOR/SETOR/GLOBAL', () => {
   const templates = [
