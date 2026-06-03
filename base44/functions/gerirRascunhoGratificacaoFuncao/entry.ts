@@ -1,0 +1,230 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+const RETRY_MAX_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 400;
+const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const LIMIT_USUARIO_ACESSO = 1000;
+const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'perfil_id'];
+const REQUIRED_ACTION = 'gerir_gratificacoes_funcao';
+const OPERACOES = new Set(['criar_rascunho', 'atualizar_rascunho']);
+const STATUS_RASCUNHO = 'rascunho';
+const STATUS_COTA_ATIVA = 'ativa';
+const STATUS_GRATIFICACAO_ATIVA = 'nomeado_ativo';
+const GRATIFICACAO_FIELDS = [
+  'militar_id', 'tipo_gratificacao_funcao_id', 'cota_gratificacao_funcao_id', 'funcao_gratificada',
+  'numero_processo', 'observacoes',
+];
+const CAMPOS_MILITAR_SNAPSHOT = [
+  'id', 'nome_completo', 'nome_guerra', 'posto_graduacao', 'quadro', 'matricula', 'lotacao',
+  'lotacao_atual', 'lotacao_nome', 'unidade_nome', 'setor_nome',
+];
+
+const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
+const normalizeTipo = (value: unknown) => String(value || '').trim().toLowerCase();
+const trimString = (value: unknown) => String(value ?? '').trim();
+const toNumber = (value: unknown) => { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; };
+
+function withStatus(message: string, status: number) {
+  const error = new Error(message);
+  error['status'] = status;
+  return error;
+}
+
+async function fetchWithRetry(queryFn: () => Promise<any>, label = 'query') {
+  let lastError;
+  for (let attempt = 1; attempt <= RETRY_MAX_ATTEMPTS; attempt += 1) {
+    try { return await queryFn(); } catch (error) {
+      lastError = error;
+      const status = error?.response?.status || error?.status || 0;
+      if (!RETRY_STATUS.has(status) || attempt === RETRY_MAX_ATTEMPTS) break;
+      const waitMs = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 200);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      console.warn(`[gerirRascunhoGratificacaoFuncao] retry step=${label} attempt=${attempt} status=${status}`);
+    }
+  }
+  throw lastError;
+}
+
+function extrairMatrizPermissoes(descricao: unknown) {
+  if (typeof descricao !== 'string' || !descricao) return {};
+  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
+  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
+  if (start === -1 || end === -1 || end <= start) return {};
+  try {
+    const parsed = JSON.parse(descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim());
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) { return {}; }
+}
+
+function consolidarActions(perfis: any[], acessos: any[]) {
+  const actions: Record<string, boolean> = {};
+  const aplicarFonte = (fonte: any) => {
+    if (!fonte) return;
+    Object.entries(fonte).forEach(([key, val]) => {
+      if (typeof val !== 'boolean' || !key.startsWith('perm_')) return;
+      const actionKey = key.replace(/^perm_/, '');
+      if (val === true) actions[actionKey] = true;
+      else if (!(actionKey in actions)) actions[actionKey] = false;
+    });
+  };
+  (perfis || []).forEach((perfil) => { aplicarFonte(perfil); aplicarFonte(extrairMatrizPermissoes(perfil?.descricao)); });
+  (acessos || []).forEach(aplicarFonte);
+  return actions;
+}
+
+async function resolverPermissoes(base44: ReturnType<typeof createClientFromRequest>, email: string) {
+  const emailNorm = normalizeEmail(email);
+  const acessos = await fetchWithRetry(
+    () => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: emailNorm, ativo: true }, undefined, LIMIT_USUARIO_ACESSO, 0, CAMPOS_USUARIO_ACESSO),
+    `UsuarioAcesso:${emailNorm}`,
+  );
+  const perfilIds = Array.from(new Set((acessos || []).map((acesso: any) => acesso?.perfil_id).filter(Boolean)));
+  let perfis: any[] = [];
+  if (perfilIds.length > 0) {
+    perfis = await fetchWithRetry(() => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }), `PerfilPermissao:${emailNorm}`);
+  }
+  return {
+    actions: consolidarActions(perfis || [], acessos || []),
+    isAdminByAccess: (acessos || []).some((a: any) => normalizeTipo(a?.tipo_acesso) === 'admin'),
+  };
+}
+
+function textoReferencia(value: any): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') return trimString(value.nome || value.nome_curto || value.sigla || value.label || value.descricao);
+  return trimString(value);
+}
+
+function sanitizePayload(input: any = {}) {
+  const out: Record<string, any> = {};
+  for (const field of GRATIFICACAO_FIELDS) out[field] = trimString(input[field]);
+  if (input.status !== undefined && trimString(input.status) && normalizeTipo(input.status) !== STATUS_RASCUNHO) {
+    throw withStatus('Status não pode ser alterado neste lote; somente rascunho é permitido.', 400);
+  }
+  if (!out.militar_id) throw withStatus('militar_id é obrigatório.', 400);
+  if (!out.tipo_gratificacao_funcao_id) throw withStatus('tipo_gratificacao_funcao_id é obrigatório.', 400);
+  if (!out.cota_gratificacao_funcao_id) throw withStatus('cota_gratificacao_funcao_id é obrigatório.', 400);
+  if (!out.funcao_gratificada) throw withStatus('funcao_gratificada é obrigatória.', 400);
+  return out;
+}
+
+async function buscarUm(base44: ReturnType<typeof createClientFromRequest>, entityName: string, id: string, campos?: string[]) {
+  const registros = await fetchWithRetry(() => base44.asServiceRole.entities[entityName].filter({ id }, undefined, 1, 0, campos), `${entityName}.get:${id}`);
+  const registro = (registros || [])[0];
+  if (!registro) throw withStatus(`${entityName} não encontrado.`, 404);
+  return registro;
+}
+
+async function validarReferencias(base44: ReturnType<typeof createClientFromRequest>, data: Record<string, any>) {
+  const [militar, tipo, cota] = await Promise.all([
+    buscarUm(base44, 'Militar', data.militar_id, CAMPOS_MILITAR_SNAPSHOT),
+    buscarUm(base44, 'TipoGratificacaoFuncao', data.tipo_gratificacao_funcao_id),
+    buscarUm(base44, 'CotaGratificacaoFuncao', data.cota_gratificacao_funcao_id),
+  ]);
+
+  if (tipo.ativo === false) throw withStatus('tipo_gratificacao_funcao_id deve referenciar tipo ativo.', 400);
+  if (normalizeTipo(cota.status) !== STATUS_COTA_ATIVA) throw withStatus('cota_gratificacao_funcao_id deve referenciar cota ativa.', 400);
+  if (String(cota.tipo_gratificacao_funcao_id || '') !== data.tipo_gratificacao_funcao_id) throw withStatus('cota_gratificacao_funcao_id deve pertencer ao tipo_gratificacao_funcao_id informado.', 400);
+
+  const gratificacoesDaCota = await fetchWithRetry(
+    () => base44.asServiceRole.entities.GratificacaoFuncao.filter({ cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id }, undefined, 1000, 0, ['id', 'status']),
+    `GratificacaoFuncao.cota:${data.cota_gratificacao_funcao_id}`,
+  );
+  const ocupadas = (gratificacoesDaCota || []).filter((item: any) => normalizeTipo(item?.status) === STATUS_GRATIFICACAO_ATIVA).length;
+  const disponiveis = Math.max(toNumber(cota.quantidade_autorizada) - ocupadas, 0);
+  if (!(disponiveis > 0)) throw withStatus('quantidade disponível da cota deve ser maior que zero.', 400);
+
+  return { militar, tipo, cota, ocupadas, disponiveis };
+}
+
+function montarRegistroRascunho(data: Record<string, any>, refs: any, authUser: any) {
+  const { militar, tipo, cota } = refs;
+  const unidadeMilitar = textoReferencia(militar.lotacao_atual) || textoReferencia(militar.lotacao) || textoReferencia(militar.lotacao_nome) || textoReferencia(militar.unidade_nome);
+  const setorMilitar = textoReferencia(militar.setor_nome);
+  return {
+    militar_id: data.militar_id,
+    militar_snapshot: {
+      nome: militar.nome_completo || militar.nome_guerra || '',
+      posto: militar.posto_graduacao || '',
+      quadro: militar.quadro || '',
+      matricula: militar.matricula || '',
+      unidade: unidadeMilitar,
+      setor: setorMilitar,
+    },
+    nome_completo_snapshot: militar.nome_completo || '',
+    nome_guerra_snapshot: militar.nome_guerra || '',
+    posto_graduacao_snapshot: militar.posto_graduacao || '',
+    quadro_snapshot: militar.quadro || '',
+    matricula_snapshot: militar.matricula || '',
+    unidade_id: cota.unidade_id || '',
+    unidade_nome_snapshot: cota.unidade_nome_snapshot || unidadeMilitar,
+    setor_id: cota.setor_id || '',
+    setor_nome_snapshot: cota.setor_nome_snapshot || setorMilitar,
+    tipo_gratificacao_funcao_id: data.tipo_gratificacao_funcao_id,
+    cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id,
+    funcao_gratificada: data.funcao_gratificada,
+    codigo_funcao: cota.codigo_funcao || '',
+    nivel_gratificacao: cota.nivel_gratificacao || tipo.nivel || '',
+    tipo_gratificacao: cota.tipo_gratificacao || tipo.nome || tipo.sigla || tipo.codigo || '',
+    status: STATUS_RASCUNHO,
+    numero_processo: data.numero_processo,
+    observacoes: data.observacoes,
+    solicitado_por: authUser?.email || '',
+    origem_registro: 'cadastro_rascunho_gratificacao_funcao',
+    metadados: {
+      fluxo_lote: '2B',
+      somente_rascunho: true,
+      sem_ativacao: true,
+      sem_nomeacao: true,
+      sem_publicacao_doems: true,
+      sem_efeitos_financeiros: true,
+    },
+  };
+}
+
+function sanitizeResponse(item: any = {}) {
+  return {
+    id: item.id || '', militar_id: item.militar_id || '', tipo_gratificacao_funcao_id: item.tipo_gratificacao_funcao_id || '', cota_gratificacao_funcao_id: item.cota_gratificacao_funcao_id || '',
+    funcao_gratificada: item.funcao_gratificada || '', numero_processo: item.numero_processo || '', observacoes: item.observacoes || '', status: item.status || '',
+    nome_completo_snapshot: item.nome_completo_snapshot || '', nome_guerra_snapshot: item.nome_guerra_snapshot || '', posto_graduacao_snapshot: item.posto_graduacao_snapshot || '', quadro_snapshot: item.quadro_snapshot || '', matricula_snapshot: item.matricula_snapshot || '',
+    unidade_nome_snapshot: item.unidade_nome_snapshot || '', setor_nome_snapshot: item.setor_nome_snapshot || '', created_date: item.created_date || '', updated_date: item.updated_date || '',
+  };
+}
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const authUser = await base44.auth.me();
+    if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
+
+    let payload: any = {};
+    try { payload = await req.json(); } catch (_error) { payload = {}; }
+    const operacao = trimString(payload?.operacao);
+    if (!OPERACOES.has(operacao)) return Response.json({ error: 'Operação não permitida neste lote. Use criar_rascunho ou atualizar_rascunho.' }, { status: 400 });
+
+    const authPerms = await resolverPermissoes(base44, authUser.email);
+    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
+    const canManage = authIsAdmin || authPerms.actions?.[REQUIRED_ACTION] === true;
+    if (!canManage) return Response.json({ error: 'Acesso negado: requer gerir_gratificacoes_funcao ou admin/ALL.' }, { status: 403 });
+
+    const data = sanitizePayload(payload?.data && typeof payload.data === 'object' ? payload.data : {});
+    const refs = await validarReferencias(base44, data);
+    const registro = montarRegistroRascunho(data, refs, authUser);
+
+    if (operacao === 'criar_rascunho') {
+      const resultado = await fetchWithRetry(() => base44.asServiceRole.entities.GratificacaoFuncao.create(registro), 'GratificacaoFuncao.create:rascunho');
+      return Response.json({ ok: true, operacao, entityName: 'GratificacaoFuncao', data: sanitizeResponse(resultado), meta: { statusRestrito: STATUS_RASCUNHO, semAtivacao: true, semNomeacao: true } });
+    }
+
+    const id = trimString(payload?.id || payload?.data?.id);
+    if (!id) throw withStatus('id é obrigatório para atualizar_rascunho.', 400);
+    const existente = await buscarUm(base44, 'GratificacaoFuncao', id);
+    if (normalizeTipo(existente.status) !== STATUS_RASCUNHO) throw withStatus('Somente GratificacaoFuncao em rascunho pode ser atualizada neste lote.', 400);
+    const resultado = await fetchWithRetry(() => base44.asServiceRole.entities.GratificacaoFuncao.update(id, { ...registro, status: STATUS_RASCUNHO }), `GratificacaoFuncao.update:rascunho:${id}`);
+    return Response.json({ ok: true, operacao, entityName: 'GratificacaoFuncao', data: sanitizeResponse(resultado), meta: { statusRestrito: STATUS_RASCUNHO, semAtivacao: true, semNomeacao: true } });
+  } catch (error) {
+    const status = error?.response?.status || error?.status || 500;
+    return Response.json({ error: error?.message || 'Erro ao gerir rascunho de Gratificação de Função.', meta: { status } }, { status });
+  }
+});

@@ -30,6 +30,7 @@ export const GRATIFICACAO_STATUS_LABELS = {
 };
 
 export const GRATIFICACAO_TABS = {
+  RASCUNHOS: 'rascunhos',
   ATIVOS: 'ativos',
   AGUARDANDO_PUBLICACAO: 'aguardando_publicacao',
   DISPENSA_EM_ANDAMENTO: 'dispensa_em_andamento',
@@ -39,6 +40,7 @@ export const GRATIFICACAO_TABS = {
 };
 
 export const GRATIFICACAO_TAB_LABELS = {
+  [GRATIFICACAO_TABS.RASCUNHOS]: 'Rascunhos',
   [GRATIFICACAO_TABS.ATIVOS]: 'Ativos',
   [GRATIFICACAO_TABS.AGUARDANDO_PUBLICACAO]: 'Aguardando publicação',
   [GRATIFICACAO_TABS.DISPENSA_EM_ANDAMENTO]: 'Dispensa em andamento',
@@ -117,6 +119,7 @@ export function filtrarGratificacoesPorAba(gratificacoes = [], aba = GRATIFICACA
   const statusHistorico = new Set([GRATIFICACAO_STATUS.DISPENSADO, GRATIFICACAO_STATUS.CANCELADO]);
   return (gratificacoes || []).filter((item) => {
     const status = normalizeStatus(item?.status);
+    if (aba === GRATIFICACAO_TABS.RASCUNHOS) return status === GRATIFICACAO_STATUS.RASCUNHO;
     if (aba === GRATIFICACAO_TABS.ATIVOS) return status === GRATIFICACAO_STATUS.NOMEADO_ATIVO;
     if (aba === GRATIFICACAO_TABS.AGUARDANDO_PUBLICACAO) return [GRATIFICACAO_STATUS.SOLICITADO_DP, GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_NOMEACAO].includes(status);
     if (aba === GRATIFICACAO_TABS.DISPENSA_EM_ANDAMENTO) return [GRATIFICACAO_STATUS.DISPENSA_SOLICITADA, GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_DISPENSA].includes(status);
@@ -262,5 +265,12 @@ export async function gerirCadastrosGratificacaoFuncao({ operacao, id, data } = 
   const response = await base44.functions.invoke('gerirCadastrosGratificacaoFuncao', { operacao, id, data });
   const body = response?.data ?? response ?? {};
   assertFunctionResponse(body, 'Erro ao salvar cadastro de Gratificação de Função.');
+  return body?.data || null;
+}
+
+export async function gerirRascunhoGratificacaoFuncao({ operacao, id, data } = {}) {
+  const response = await base44.functions.invoke('gerirRascunhoGratificacaoFuncao', { operacao, id, data });
+  const body = response?.data ?? response ?? {};
+  assertFunctionResponse(body, 'Erro ao salvar rascunho de Gratificação de Função.');
   return body?.data || null;
 }

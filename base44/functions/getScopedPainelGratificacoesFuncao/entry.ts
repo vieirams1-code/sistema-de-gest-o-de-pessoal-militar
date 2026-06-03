@@ -16,6 +16,7 @@ const COTA_ATIVA = 'ativa';
 const STATUS_SOLICITACOES = new Set(['solicitado_dp', 'aguardando_publicacao_nomeacao']);
 const STATUS_DISPENSAS = new Set(['dispensa_solicitada', 'aguardando_publicacao_dispensa']);
 const TAB_STATUS = {
+  rascunhos: new Set(['rascunho']),
   ativos: new Set(['nomeado_ativo']),
   aguardando_publicacao: new Set(['solicitado_dp', 'aguardando_publicacao_nomeacao']),
   dispensa_em_andamento: new Set(['dispensa_solicitada', 'aguardando_publicacao_dispensa']),
