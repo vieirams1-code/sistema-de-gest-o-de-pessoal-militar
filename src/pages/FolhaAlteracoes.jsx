@@ -12,9 +12,10 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
-import { agruparHistoricoPorAnoMes, deduplicarEventosFolhaAlteracoes, ordenarEventosFolhaAlteracoes } from '@/components/folha-alteracoes/folhaAlteracoesHistorico';
+import { agruparHistoricoPorAnoMes, montarHistoricoFolhaAlteracoes } from '@/components/folha-alteracoes/folhaAlteracoesHistorico';
 import { abreviarPostoGraduacao, montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, getLotacaoAtualMilitar, militarCorrespondeBusca, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
+import { listarRegistrosMilitar } from '@/services/registrosMilitarService';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -71,97 +72,6 @@ function obterLocalFechamento(militar) {
   if (cidade) return cidade;
   if (uf) return uf;
   return '';
-}
-
-function getTextoOficialRegistro(item) {
-  const camposPreferenciais = [
-    'texto_publicacao',
-    'texto_renderizado',
-    'texto_oficial',
-    'texto_base',
-    'texto_complemento',
-    'nota_para_bg',
-    'observacoes',
-    'descricao',
-    'historico',
-    'resumo',
-  ];
-
-  for (const campo of camposPreferenciais) {
-    const valor = item?.[campo];
-    if (typeof valor === 'string' && valor.trim()) {
-      return valor.trim();
-    }
-  }
-
-  return '';
-}
-
-function normalizarDataISO(value) {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    const brMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-
-    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
-    return null;
-  }
-
-  const dateObj = new Date(value);
-  if (Number.isNaN(dateObj.getTime())) return null;
-  const ano = dateObj.getFullYear();
-  const mes = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const dia = String(dateObj.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
-}
-
-function toText(value) {
-  return String(value || '').trim();
-}
-
-function extrairDadosBg(item = {}) {
-  const numero = toText(item?.numero_bg || item?.boletim_numero);
-  const data = normalizarDataISO(item?.data_bg || item?.boletim_data);
-  return {
-    numero,
-    data,
-    completo: Boolean(numero && data),
-  };
-}
-
-function statusPublicado(item = {}) {
-  return toText(item?.status) === 'Publicado' || toText(item?.status_publicacao) === 'Publicado';
-}
-
-function registroPublicadoEmBg(item = {}) {
-  const bg = extrairDadosBg(item);
-  return statusPublicado(item) && bg.completo;
-}
-
-function montarEventoAtestado(item, filtrarPorPeriodo) {
-  if (!registroPublicadoEmBg(item)) return null;
-  const dataEvento = normalizarDataISO(item.data_bg);
-  if (!filtrarPorPeriodo(dataEvento)) return null;
-
-  const texto = toText(item?.texto_publicacao) || toText(item?.nota_para_bg);
-  if (!texto) return null;
-
-  return {
-    id: item.id,
-    data: dataEvento,
-    tipo: 'Atestado',
-    texto,
-    referenciaBoletim: montarReferenciaBoletim(item),
-    descricao: `Atestado - BG ${item.numero_bg}`,
-    origem: 'Atestado',
-  };
-}
-
-function montarReferenciaBoletim(item = {}) {
-  const bg = extrairDadosBg(item);
-  if (!bg.completo) return '';
-  return `Boletim ${bg.numero}, de ${formatarData(bg.data)}`;
 }
 
 function toAnoMesTexto(ano, mes) {
@@ -444,58 +354,45 @@ export default function FolhaAlteracoes() {
 
   const periodoValido = periodoEfetivo.valido;
 
-  const { data: historicoAlteracoes = [], isLoading: loadingHistorico } = useQuery({
+  const { data: fluxoHistorico = { eventos: [], metricas: null }, isLoading: loadingHistorico } = useQuery({
     queryKey: ['folha-alteracoes-historico', previa?.militar?.id, previa?.periodo?.dataInicial, previa?.periodo?.dataFinal],
     queryFn: async () => {
-      if (!previa?.militar?.id || !previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return [];
+      if (!previa?.militar?.id || !previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return { eventos: [], metricas: null };
 
       const militarId = previa.militar.id;
       const inicioPeriodo = previa.periodo.dataInicial;
       const fimPeriodo = previa.periodo.dataFinal;
 
-      const [publicacoes, atestados] = await Promise.all([
-        listarPorMilitar('PublicacaoExOfficio', militarId, '-data_bg'),
+      const [registrosMilitar, atestados] = await Promise.all([
+        listarRegistrosMilitar(),
         listarPorMilitar('Atestado', militarId, '-data_bg'),
       ]);
 
-      const filtrarPorPeriodo = (data) => Boolean(data && data >= inicioPeriodo && data <= fimPeriodo);
+      const { eventos, metricas } = montarHistoricoFolhaAlteracoes({
+        registros: registrosMilitar,
+        atestados,
+        militar: previa.militar,
+        dataInicial: inicioPeriodo,
+        dataFinal: fimPeriodo,
+      });
 
-      const eventosPublicacoes = publicacoes
-        .map((item) => {
-          if (!registroPublicadoEmBg(item)) return null;
-          const dataEvento = normalizarDataISO(item.data_bg);
-          if (!filtrarPorPeriodo(dataEvento)) return null;
+      if (import.meta.env?.DEV) {
+        console.info('[FolhaAlteracoes] fluxo histórico', {
+          militarId,
+          periodo: { dataInicial: inicioPeriodo, dataFinal: fimPeriodo },
+          metricas,
+        });
+      }
 
-          const tipoPublicacao = item.tipo_registro || item.tipo || item.categoria || 'Publicação';
-          const textoOficial = getTextoOficialRegistro(item);
-
-          return {
-            id: item.id,
-            data: dataEvento,
-            tipo: 'Publicação',
-            texto: textoOficial,
-            referenciaBoletim: montarReferenciaBoletim(item),
-            descricao: `${tipoPublicacao} - BG ${item.numero_bg}`,
-            origem: 'PublicacaoExOfficio',
-          };
-        })
-        .filter(Boolean);
-
-      const eventosAtestados = atestados
-        .map((item) => montarEventoAtestado(item, filtrarPorPeriodo))
-        .filter(Boolean);
-
-      return ordenarEventosFolhaAlteracoes(
-        deduplicarEventosFolhaAlteracoes([...eventosPublicacoes, ...eventosAtestados])
-      );
+      return { eventos, metricas };
     },
     enabled: !!previa,
   });
 
   const historicoPorAnoMes = useMemo(() => {
     if (!previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return [];
-    return agruparHistoricoPorAnoMes(historicoAlteracoes, previa.periodo.dataInicial, previa.periodo.dataFinal);
-  }, [historicoAlteracoes, previa]);
+    return agruparHistoricoPorAnoMes(fluxoHistorico.eventos, previa.periodo.dataInicial, previa.periodo.dataFinal);
+  }, [fluxoHistorico.eventos, previa]);
 
   const handleGerarPrevia = () => {
     if (!militarSelecionado || !periodoValido) return;

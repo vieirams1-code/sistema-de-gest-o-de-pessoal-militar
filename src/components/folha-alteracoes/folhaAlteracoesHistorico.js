@@ -1,3 +1,6 @@
+import { obterStatusCanonicoPublicacao, STATUS_PUBLICACAO } from '../publicacao/publicacaoStateMachine.js';
+import { vinculaRegistroAoMilitar } from '../../services/registrosMilitarMatcher.js';
+
 const MESES_FOLHA_ALTERACOES = [
   'JANEIRO',
   'FEVEREIRO',
@@ -97,4 +100,146 @@ export function agruparHistoricoPorAnoMes(eventos, dataInicial, dataFinal) {
   return Array.from(agrupadoPorAno.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([ano, mesesDoAno]) => ({ ano, meses: mesesDoAno }));
+}
+
+
+export function normalizarDataISOFolhaAlteracoes(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const brMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+    return null;
+  }
+
+  const dateObj = new Date(value);
+  if (Number.isNaN(dateObj.getTime())) return null;
+  const ano = dateObj.getUTCFullYear();
+  const mes = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const dia = String(dateObj.getUTCDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function toText(value) {
+  return String(value || '').trim();
+}
+
+function getTextoOficialRegistroFolhaAlteracoes(item) {
+  const camposPreferenciais = [
+    'texto_publicacao',
+    'texto_renderizado',
+    'texto_oficial',
+    'texto_base',
+    'texto_complemento',
+    'nota_para_bg',
+    'observacoes',
+    'descricao',
+    'historico',
+    'resumo',
+    'titulo_evento',
+    'tipo_registro',
+    'tipo',
+    'categoria',
+  ];
+
+  for (const campo of camposPreferenciais) {
+    const valor = item?.[campo];
+    if (typeof valor === 'string' && valor.trim()) {
+      return valor.trim();
+    }
+  }
+
+  return '';
+}
+
+function extrairDadosBgFolhaAlteracoes(item = {}) {
+  const numero = toText(item?.numero_bg || item?.publicacao?.numero_bg || item?.boletim_numero);
+  const data = normalizarDataISOFolhaAlteracoes(item?.data_bg || item?.publicacao?.data_bg || item?.boletim_data);
+  return {
+    numero,
+    data,
+    completo: Boolean(numero && data),
+  };
+}
+
+function montarReferenciaBoletimFolhaAlteracoes(item = {}) {
+  const bg = extrairDadosBgFolhaAlteracoes(item);
+  if (!bg.completo) return '';
+  const [ano, mes, dia] = bg.data.split('-');
+  return `Boletim ${bg.numero}, de ${dia}/${mes}/${ano}`;
+}
+
+function registroPublicadoEmBgFolhaAlteracoes(item = {}) {
+  const bg = extrairDadosBgFolhaAlteracoes(item);
+  return bg.completo && obterStatusCanonicoPublicacao(item) === STATUS_PUBLICACAO.PUBLICADO;
+}
+
+function getDataEventoFolhaAlteracoes(item = {}) {
+  return normalizarDataISOFolhaAlteracoes(
+    item?.data_bg || item?.publicacao?.data_bg || item?.data_publicacao || item?.data_evento || item?.created_date
+  );
+}
+
+export function montarEventoRegistroMilitarFolhaAlteracoes(item, dataEvento = getDataEventoFolhaAlteracoes(item)) {
+  const textoOficial = getTextoOficialRegistroFolhaAlteracoes(item);
+  if (!textoOficial) return null;
+
+  const tipoPublicacao = item?.tipo_registro || item?.tipo || item?.categoria || 'Publicação';
+  const origem = item?.origem_fonte || item?.origem || (item?.tipo_registro ? 'RegistroLivro' : 'PublicacaoExOfficio');
+
+  return {
+    id: item.id,
+    data: dataEvento,
+    tipo: 'Publicação',
+    texto: textoOficial,
+    referenciaBoletim: montarReferenciaBoletimFolhaAlteracoes(item),
+    descricao: `${tipoPublicacao} - BG ${extrairDadosBgFolhaAlteracoes(item).numero}`,
+    origem,
+  };
+}
+
+export function montarHistoricoFolhaAlteracoes({ registros = [], atestados = [], militar, dataInicial, dataFinal }) {
+  const metricas = {
+    brutos: registros.length + atestados.length,
+    registrosBrutos: registros.length,
+    atestadosBrutos: atestados.length,
+    aposFiltroMilitar: 0,
+    aposFiltroPeriodo: 0,
+    aposFiltroStatusPublicacao: 0,
+    chegaramAgrupamento: 0,
+    renderizados: 0,
+  };
+
+  const noPeriodo = (data) => Boolean(data && data >= dataInicial && data <= dataFinal);
+  const registrosDoMilitar = registros.filter((item) => vinculaRegistroAoMilitar(item, militar));
+  const atestadosDoMilitar = atestados
+    .filter((item) => vinculaRegistroAoMilitar(item, militar))
+    .map((item) => ({ ...item, origem_fonte: item?.origem_fonte || 'Atestado' }));
+  metricas.aposFiltroMilitar = registrosDoMilitar.length + atestadosDoMilitar.length;
+
+  const candidatosComData = [...registrosDoMilitar, ...atestadosDoMilitar]
+    .map((item) => ({ item, dataEvento: getDataEventoFolhaAlteracoes(item) }))
+    .filter(({ dataEvento }) => noPeriodo(dataEvento));
+  metricas.aposFiltroPeriodo = candidatosComData.length;
+
+  const publicados = candidatosComData.filter(({ item }) => registroPublicadoEmBgFolhaAlteracoes(item));
+  metricas.aposFiltroStatusPublicacao = publicados.length;
+
+  const eventos = publicados
+    .map(({ item, dataEvento }) => montarEventoRegistroMilitarFolhaAlteracoes(item, dataEvento))
+    .filter(Boolean);
+
+  const eventosDeduplicados = deduplicarEventosFolhaAlteracoes(eventos);
+  metricas.chegaramAgrupamento = eventosDeduplicados.length;
+
+  const historicoOrdenado = ordenarEventosFolhaAlteracoes(eventosDeduplicados);
+  const agrupado = agruparHistoricoPorAnoMes(historicoOrdenado, dataInicial, dataFinal);
+  metricas.renderizados = agrupado.reduce(
+    (totalAno, ano) => totalAno + ano.meses.reduce((totalMes, mes) => totalMes + mes.eventos.length, 0),
+    0
+  );
+
+  return { eventos: historicoOrdenado, agrupado, metricas };
 }
