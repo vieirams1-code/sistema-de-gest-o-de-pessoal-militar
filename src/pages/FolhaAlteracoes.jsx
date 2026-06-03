@@ -355,7 +355,7 @@ export default function FolhaAlteracoes() {
   const periodoValido = periodoEfetivo.valido;
 
   const { data: fluxoHistorico = { eventos: [], metricas: null }, isLoading: loadingHistorico } = useQuery({
-    queryKey: ['folha-alteracoes-historico', previa?.militar?.id, previa?.periodo?.dataInicial, previa?.periodo?.dataFinal],
+    queryKey: ['folha-alteracoes-historico', previa?.militar?.id, previa?.periodo?.dataInicial, previa?.periodo?.dataFinal, previa?.geradoEm],
     queryFn: async () => {
       if (!previa?.militar?.id || !previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return { eventos: [], metricas: null };
 
@@ -376,6 +376,16 @@ export default function FolhaAlteracoes() {
         dataFinal: fimPeriodo,
       });
 
+      console.info('[FA DEBUG EVENTOS]', { total: eventos.length });
+      console.table(
+        eventos.map(e => ({
+          id: e.id,
+          data: e.data,
+          origem: e.origem,
+          texto: e.texto?.slice(0, 80)
+        }))
+      );
+
       if (import.meta.env?.DEV) {
         console.info('[FolhaAlteracoes] fluxo histórico', {
           militarId,
@@ -391,7 +401,23 @@ export default function FolhaAlteracoes() {
 
   const historicoPorAnoMes = useMemo(() => {
     if (!previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return [];
-    return agruparHistoricoPorAnoMes(fluxoHistorico.eventos, previa.periodo.dataInicial, previa.periodo.dataFinal);
+    const historicoAgrupado = agruparHistoricoPorAnoMes(fluxoHistorico.eventos, previa.periodo.dataInicial, previa.periodo.dataFinal);
+
+    const eventosAgrupados = historicoAgrupado.flatMap(ano =>
+      ano.meses.flatMap(mes =>
+        mes.eventos.map(e => ({
+          id: e.id,
+          data: e.data,
+          origem: e.origem,
+          texto: e.texto?.slice(0, 80)
+        }))
+      )
+    );
+
+    console.info('[FA DEBUG AGRUPADO]', { total: eventosAgrupados.length });
+    console.table(eventosAgrupados);
+
+    return historicoAgrupado;
   }, [fluxoHistorico.eventos, previa]);
 
   const handleGerarPrevia = () => {
