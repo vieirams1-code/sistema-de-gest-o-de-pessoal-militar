@@ -257,3 +257,10 @@ export async function fetchPainelGratificacoesFuncao(payload = {}) {
     },
   };
 }
+
+export async function gerirCadastrosGratificacaoFuncao({ operacao, id, data } = {}) {
+  const response = await base44.functions.invoke('gerirCadastrosGratificacaoFuncao', { operacao, id, data });
+  const body = response?.data ?? response ?? {};
+  assertFunctionResponse(body, 'Erro ao salvar cadastro de Gratificação de Função.');
+  return body?.data || null;
+}

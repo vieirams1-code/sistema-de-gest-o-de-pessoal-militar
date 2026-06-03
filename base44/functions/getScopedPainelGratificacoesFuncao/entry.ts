@@ -10,7 +10,7 @@ const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 200;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 const CAMPOS_MILITAR_ID = ['id'];
-const CAMPOS_TIPO = ['id', 'nome', 'sigla', 'codigo', 'descricao', 'nivel', 'ativo'];
+const CAMPOS_TIPO = ['id', 'nome', 'sigla', 'codigo', 'descricao', 'nivel', 'ativo', 'observacoes'];
 const STATUS_ATIVO = 'nomeado_ativo';
 const COTA_ATIVA = 'ativa';
 const STATUS_SOLICITACOES = new Set(['solicitado_dp', 'aguardando_publicacao_nomeacao']);
@@ -157,13 +157,13 @@ function sanitizerCota(cota: any = {}, ocupadas = 0) {
     funcao_gratificada: cota.funcao_gratificada || '', codigo_funcao: cota.codigo_funcao || '', nivel_gratificacao: cota.nivel_gratificacao || '', tipo_gratificacao: cota.tipo_gratificacao || '', tipo_gratificacao_funcao_id: cota.tipo_gratificacao_funcao_id || '',
     unidade_id: cota.unidade_id || '', unidade_nome_snapshot: cota.unidade_nome_snapshot || '', setor_id: cota.setor_id || '', setor_nome_snapshot: cota.setor_nome_snapshot || '',
     quantidade_autorizada: autorizadas, ocupadas, disponiveis: Math.max(autorizadas - ocupadas, 0), excedentes: Math.max(ocupadas - autorizadas, 0),
-    data_inicio_vigencia: cota.data_inicio_vigencia || '', data_fim_vigencia: cota.data_fim_vigencia || '', ato_autorizativo: cota.ato_autorizativo || '', doems_autorizacao_numero: cota.doems_autorizacao_numero || '', doems_autorizacao_edicao: cota.doems_autorizacao_edicao || '', status: cota.status || '',
+    data_inicio_vigencia: cota.data_inicio_vigencia || '', data_fim_vigencia: cota.data_fim_vigencia || '', ato_autorizativo: cota.ato_autorizativo || '', doems_autorizacao_numero: cota.doems_autorizacao_numero || '', doems_autorizacao_edicao: cota.doems_autorizacao_edicao || '', doems_autorizacao_link: cota.doems_autorizacao_link || '', status: cota.status || '', observacoes: cota.observacoes || '',
     created_date: cota.created_date || '', updated_date: cota.updated_date || '',
   };
 }
 
 function sanitizerTipo(tipo: any = {}) {
-  return { id: tipo.id, nome: tipo.nome || '', sigla: tipo.sigla || '', codigo: tipo.codigo || '', descricao: tipo.descricao || '', nivel: tipo.nivel || '', ativo: tipo.ativo !== false };
+  return { id: tipo.id, nome: tipo.nome || '', sigla: tipo.sigla || '', codigo: tipo.codigo || '', descricao: tipo.descricao || '', nivel: tipo.nivel || '', ativo: tipo.ativo !== false, observacoes: tipo.observacoes || '' };
 }
 
 async function resolverEscopo(base44: ReturnType<typeof createClientFromRequest>, acessos: any[], warnings: string[]) {
