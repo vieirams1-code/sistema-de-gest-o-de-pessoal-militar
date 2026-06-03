@@ -22,6 +22,15 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_gratificacoes_funcao',
+        label: 'Gratificação de Função',
+        actions: [
+          { key: 'perm_visualizar_gratificacoes_funcao', label: 'Visualizar Gratificação de Função' },
+          { key: 'perm_gerir_gratificacoes_funcao', label: 'Gerir Gratificações de Função', sensitive: true },
+          { key: 'perm_gerir_cotas_gratificacao_funcao', label: 'Gerir Cotas de Gratificação de Função', sensitive: true }
+        ]
+      },
+      {
         key: 'acesso_extracao_efetivo',
         label: 'Extração do Efetivo',
         actions: [
