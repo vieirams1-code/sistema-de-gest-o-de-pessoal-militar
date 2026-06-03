@@ -115,3 +115,19 @@ test('renderização final mantém placeholders quando os dados não existem', (
 
   assert.equal(texto, '{{data_nascimento}} {{unidade}} {{data_promocao_atual}}');
 });
+
+test('renderização final normaliza template com linha gigante sem criar nova linha artificial', () => {
+  const linhaGigante = 'SEMESPACOS'.repeat(30);
+  const texto = renderizarDocumentoMilitarIndividual({
+    template: `{{nome_completo}}
+
+
+${linhaGigante}`,
+    militar,
+  });
+
+  assert.equal(texto.startsWith('Maria da Silva\n\n'), true);
+  assert.equal(texto.includes('\n\n\n'), false);
+  assert.equal(texto.replaceAll('\u200B', '').endsWith(linhaGigante), true);
+  assert.equal(texto.split('\n').length, 3);
+});

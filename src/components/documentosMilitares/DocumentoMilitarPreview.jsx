@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 
 import { montarDadosDocumentoMilitarPreview } from '@/services/documentosMilitares/documentoMilitarPrintConfig';
+import { normalizarTextoDocumentoMilitar } from '@/services/documentosMilitares/normalizarTextoDocumentoMilitar';
 import './documento-militar-preview.css';
 
 export default function DocumentoMilitarPreview({ texto = '', config, brasaoSrc = '', tituloDocumento = '' }) {
@@ -8,6 +9,7 @@ export default function DocumentoMilitarPreview({ texto = '', config, brasaoSrc 
     () => montarDadosDocumentoMilitarPreview(config, { brasaoSrc, tituloDocumento }),
     [config, brasaoSrc, tituloDocumento]
   );
+  const textoNormalizado = useMemo(() => normalizarTextoDocumentoMilitar(texto), [texto]);
 
   return (
     <article className="documento-militar-print-area documento-militar-a4" aria-label="Prévia do documento militar">
@@ -32,7 +34,7 @@ export default function DocumentoMilitarPreview({ texto = '', config, brasaoSrc 
         <h1 className="documento-militar-titulo">{dados.tituloDocumento}</h1>
       )}
 
-      <section className="documento-militar-corpo">{texto}</section>
+      <section className="documento-militar-corpo">{textoNormalizado}</section>
 
       {dados.mostrarAssinatura && (
         <section className="documento-militar-assinatura" aria-label="Assinatura do documento militar">

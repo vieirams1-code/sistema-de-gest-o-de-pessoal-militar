@@ -8,7 +8,7 @@ import DocumentoMilitarPreview from './DocumentoMilitarPreview';
  * - Renderizado FORA do modal (no final do <body> via React tree raiz do modal).
  * - Invisível na tela (display:none via CSS).
  * - Visível somente em @media print.
- * - Contém exatamente uma <DocumentoMilitarPreview /> (uma única área imprimível).
+ * - Contém exatamente uma prévia do documento (uma única área imprimível).
  * - Não depende de wrappers do modal (sem grid/flex/max-height/overflow).
  */
 export default function DocumentoMilitarPrintRoot({ texto = '', config, tituloDocumento = '' }) {

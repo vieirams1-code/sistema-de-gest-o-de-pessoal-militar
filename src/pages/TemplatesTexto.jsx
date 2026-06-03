@@ -46,6 +46,7 @@ import {
   previewTemplateDocumentoMilitar,
   VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR,
 } from '@/services/documentosMilitares/documentoMilitarTemplateService';
+import { normalizarTextoDocumentoMilitar } from '@/services/documentosMilitares/normalizarTextoDocumentoMilitar';
 
 const FERIAS_CANONICAL_TYPES = Object.values(FERIAS_TIPO_CANONICO);
 
@@ -1136,11 +1137,12 @@ export default function TemplatesTexto() {
                     <Eye className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-semibold text-emerald-700">Prévia com dados simulados</span>
                   </div>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words [word-break:break-word]">
                     {(() => {
-                      const textoPreview = normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES
+                      const textoPreviewBruto = normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES
                         ? previewTemplateDocumentoMilitar(editingTemplate.template)
                         : aplicarTemplate(editingTemplate.template, buildPreviewTemplateVars());
+                      const textoPreview = normalizarTextoDocumentoMilitar(textoPreviewBruto);
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
                       let lastIndex = 0;
@@ -1286,11 +1288,12 @@ export default function TemplatesTexto() {
                   <Label className="text-sm font-medium text-slate-700">Texto do Template <span className="text-red-500">*</span></Label>
                 </div>
                 <Textarea
-                ref={textareaRef}
+                  ref={textareaRef}
                   value={editingTemplate.template}
                   onChange={e => setEditingTemplate(p => ({ ...p, template: e.target.value }))}
                   rows={8}
-                  className={`font-mono text-sm ${variaveisInvalidas.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
+                  wrap="soft"
+                  className={`font-mono text-sm whitespace-pre-wrap break-words overflow-x-hidden [word-break:break-word] ${variaveisInvalidas.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                   placeholder="Digite o texto do template. Use {{variavel}} para dados dinâmicos."
                 />
               </div>
