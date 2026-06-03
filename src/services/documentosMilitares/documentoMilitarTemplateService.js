@@ -7,6 +7,7 @@ import {
   substituirCamposDinamicosDocumentoMilitar,
 } from './camposDinamicosDocumentoMilitar.js';
 import { substituirVariaveisDocumentoMilitar } from './substituirVariaveisDocumentoMilitar.js';
+import { montarVariaveisSignatarioDocumentoMilitar } from './documentoMilitarSignatarioService.js';
 
 export const TIPO_TEMPLATE_DOCUMENTO_MILITAR = 'Documento Militar';
 
@@ -34,6 +35,13 @@ export const VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR = [
   { chave: 'tempo_servico', descricao: 'Tempo de serviço' },
   { chave: 'data_atual', descricao: 'Data atual' },
   { chave: 'cidade', descricao: 'Cidade de referência do documento' },
+  { chave: 'titulo_documento', descricao: 'Título configurável do documento' },
+  { chave: 'signatario_nome', descricao: 'Nome do signatário' },
+  { chave: 'signatario_posto_graduacao', descricao: 'Posto ou graduação do signatário' },
+  { chave: 'signatario_quadro', descricao: 'Quadro do signatário' },
+  { chave: 'signatario_matricula', descricao: 'Matrícula do signatário' },
+  { chave: 'signatario_funcao', descricao: 'Função do signatário' },
+  { chave: 'assinatura_signatario', descricao: 'Assinatura institucional do signatário em 3 linhas' },
 ];
 
 const CHAVES_VARIAVEIS_DOCUMENTO_MILITAR = new Set(
@@ -90,25 +98,35 @@ export function lintTemplateDocumentoMilitar(template = '') {
 }
 
 export function buildPreviewDocumentoMilitarVars() {
-  return montarVariaveisDocumentoMilitar({
-    nome_completo: 'Maria da Silva',
-    nome_guerra: 'SILVA',
-    posto_graduacao: 'Capitão',
-    quadro: 'QOBM',
-    matricula: '123456',
-    cpf: '111.222.333-44',
-    rg: '987654',
-    data_nascimento: '1990-05-20',
-    data_inclusao: '2010-06-01',
-    lotacao: { nome: '1º GBM' },
-    unidade_nome: 'CBMDF',
-    situacao: 'Ativo',
-    comportamento_atual: 'Ótimo',
-    data_promocao_atual: '2024-01-15',
-    endereco: { cidade: 'Brasília' },
-  }, {
-    dataReferencia: '2026-06-02',
-  });
+  return {
+    ...montarVariaveisDocumentoMilitar({
+      nome_completo: 'Maria da Silva',
+      nome_guerra: 'SILVA',
+      posto_graduacao: 'Capitão',
+      quadro: 'QOBM',
+      matricula: '123456',
+      cpf: '111.222.333-44',
+      rg: '987654',
+      data_nascimento: '1990-05-20',
+      data_inclusao: '2010-06-01',
+      lotacao: { nome: '1º GBM' },
+      unidade_nome: 'CBMDF',
+      situacao: 'Ativo',
+      comportamento_atual: 'Ótimo',
+      data_promocao_atual: '2024-01-15',
+      endereco: { cidade: 'Brasília' },
+    }, {
+      dataReferencia: '2026-06-02',
+    }),
+    titulo_documento: 'DOCUMENTO MILITAR',
+    ...montarVariaveisSignatarioDocumentoMilitar({
+      nomeSignatario: 'Edson Vieira de Souza',
+      postoGraduacaoSignatario: '2º TEN',
+      quadroSignatario: 'QOBM',
+      matriculaSignatario: '108.747-021',
+      funcaoSignatario: 'Chefe da B1/1ºGBM/CBMMS',
+    }),
+  };
 }
 
 export function buildPreviewDocumentoMilitarCamposDinamicos() {

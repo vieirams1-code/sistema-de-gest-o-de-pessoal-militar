@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { MODULO_DOCUMENTOS_MILITARES } from './documentoMilitarVarsService.js';
 import {
+  ASSINATURA_SIGNATARIO_MARKER_END,
+  ASSINATURA_SIGNATARIO_MARKER_START,
   filtrarTemplatesDocumentosMilitares,
   identificarCamposTemplateDocumentoMilitar,
   renderizarDocumentoMilitarIndividual,
@@ -130,4 +132,30 @@ ${linhaGigante}`,
   assert.equal(texto.includes('\n\n\n'), false);
   assert.equal(texto.replaceAll('\u200B', '').endsWith(linhaGigante), true);
   assert.equal(texto.split('\n').length, 3);
+});
+
+test('renderização final injeta título e assinatura canônica do signatário', () => {
+  const texto = renderizarDocumentoMilitarIndividual({
+    template: '{{titulo_documento}}\n{{assinatura_signatario}}',
+    militar,
+    opcoesVariaveis: {
+      tituloDocumento: 'PORTARIA',
+      signatario: {
+        nomeSignatario: 'Edson Vieira de Souza',
+        postoGraduacaoSignatario: '2º TEN',
+        quadroSignatario: 'QOBM',
+        matriculaSignatario: '108.747-021',
+        funcaoSignatario: 'Chefe da B1/1ºGBM/CBMMS',
+      },
+    },
+  });
+
+  assert.equal(texto, [
+    'PORTARIA',
+    ASSINATURA_SIGNATARIO_MARKER_START,
+    'Edson Vieira de Souza - 2º TEN QOBM',
+    'Matrícula 108.747-021',
+    'Chefe da B1/1ºGBM/CBMMS',
+    ASSINATURA_SIGNATARIO_MARKER_END,
+  ].join('\n'));
 });
