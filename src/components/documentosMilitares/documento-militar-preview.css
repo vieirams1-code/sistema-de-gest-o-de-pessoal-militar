@@ -14,6 +14,7 @@
 
 .documento-militar-cabecalho {
   display: flex;
+  break-inside: avoid;
   min-height: 24mm;
   align-items: center;
   justify-content: center;
@@ -29,7 +30,7 @@
 .documento-militar-orgao { font-size: 11pt; font-weight: 700; letter-spacing: .08em; }
 .documento-militar-titulo { margin-top: 2mm; font-size: 10pt; letter-spacing: .06em; }
 .documento-militar-corpo { min-height: 125mm; white-space: pre-wrap; overflow-wrap: anywhere; text-align: justify; }
-.documento-militar-assinatura { margin-top: 22mm; text-align: center; font-size: 11pt; }
+.documento-militar-assinatura { margin-top: 22mm; break-inside: avoid; text-align: center; font-size: 11pt; }
 .documento-militar-local { margin-bottom: 16mm !important; text-align: right; }
 .documento-militar-linha-assinatura { width: 78mm; margin: 0 auto 2mm; border-top: 1px solid #111827; }
 .documento-militar-signatario { font-weight: 700; }
@@ -41,7 +42,7 @@
   body * { visibility: hidden !important; }
   .documento-militar-print-area, .documento-militar-print-area * { visibility: visible !important; }
   .documento-militar-print-area {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 210mm;
