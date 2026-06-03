@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Printer, Settings, X } from 'lucide-react';
 
@@ -11,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import DocumentoMilitarPreview from '@/components/documentosMilitares/DocumentoMilitarPreview';
-import DocumentoMilitarPrintRoot from '@/components/documentosMilitares/DocumentoMilitarPrintRoot';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
 import {
   filtrarTemplatesDocumentosMilitares,
@@ -113,35 +112,8 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
     setConfigurandoImpressao(false);
   }
 
-  const ativarModoImpressao = useCallback(() => {
-    if (typeof document !== 'undefined') {
-      document.body.classList.add('documento-militar-printing');
-    }
-  }, []);
-
-  const desativarModoImpressao = useCallback(() => {
-    if (typeof document !== 'undefined') {
-      document.body.classList.remove('documento-militar-printing');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    window.addEventListener('beforeprint', ativarModoImpressao);
-    window.addEventListener('afterprint', desativarModoImpressao);
-
-    return () => {
-      window.removeEventListener('beforeprint', ativarModoImpressao);
-      window.removeEventListener('afterprint', desativarModoImpressao);
-      desativarModoImpressao();
-    };
-  }, [ativarModoImpressao, desativarModoImpressao]);
-
   function imprimirDocumentoMilitar() {
-    ativarModoImpressao();
     window.print();
-    window.setTimeout(desativarModoImpressao, 500);
   }
 
   return (
@@ -346,8 +318,13 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
             )}
 
             {templateSelecionado ? (
-              <div className="documento-militar-screen-preview documento-militar-no-print overflow-x-auto">
-                <DocumentoMilitarPreview texto={previa} config={configImpressao} tituloDocumento={tituloDocumento} />
+              <div className="documento-militar-screen-only documento-militar-no-print overflow-x-auto">
+                <DocumentoMilitarPreview
+                  texto={previa}
+                  config={configImpressao}
+                  tituloDocumento={tituloDocumento}
+                  variant="screen"
+                />
               </div>
             ) : (
               <p className="mt-3 text-sm text-slate-500">Selecione um template para visualizar a prévia.</p>
@@ -365,11 +342,14 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
       </div>
     </div>
     {templateSelecionado && (
-      <DocumentoMilitarPrintRoot
-        texto={previa}
-        config={configImpressao}
-        tituloDocumento={tituloDocumento}
-      />
+      <section className="documento-militar-print-only-document" aria-hidden="true">
+        <DocumentoMilitarPreview
+          texto={previa}
+          config={configImpressao}
+          tituloDocumento={tituloDocumento}
+          variant="print"
+        />
+      </section>
     )}
     </>
   );

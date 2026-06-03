@@ -4,15 +4,28 @@ import { montarDadosDocumentoMilitarPreview } from '@/services/documentosMilitar
 import { normalizarTextoDocumentoMilitar } from '@/services/documentosMilitares/normalizarTextoDocumentoMilitar';
 import './documento-militar-preview.css';
 
-export default function DocumentoMilitarPreview({ texto = '', config, brasaoSrc = '', tituloDocumento = '' }) {
+export default function DocumentoMilitarPreview({
+  texto = '',
+  config,
+  brasaoSrc = '',
+  tituloDocumento = '',
+  variant = 'screen',
+}) {
   const dados = useMemo(
     () => montarDadosDocumentoMilitarPreview(config, { brasaoSrc, tituloDocumento }),
     [config, brasaoSrc, tituloDocumento]
   );
   const textoNormalizado = useMemo(() => normalizarTextoDocumentoMilitar(texto), [texto]);
+  const isPrint = variant === 'print';
 
   return (
-    <article className="documento-militar-print-area documento-militar-a4" aria-label="Prévia do documento militar">
+    <article
+      className={[
+        'documento-militar-documento documento-militar-a4',
+        isPrint ? 'documento-militar-print-document' : 'documento-militar-screen-document',
+      ].join(' ')}
+      aria-label={isPrint ? 'Documento militar para impressão' : 'Prévia do documento militar'}
+    >
       {dados.mostrarCabecalho && (
         <header className="documento-militar-cabecalho">
           {dados.imagemCabecalhoSrc && (
