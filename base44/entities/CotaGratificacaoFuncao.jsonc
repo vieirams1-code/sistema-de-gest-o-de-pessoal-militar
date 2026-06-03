@@ -1,0 +1,113 @@
+{
+  "name": "CotaGratificacaoFuncao",
+  "type": "object",
+  "title": "Cota de Gratificação de Função",
+  "description": "Cotas autorizadas para gratificação de função. A ocupação oficial deve ser calculada futuramente a partir de gratificações ativas, não por campo de saldo manual.",
+  "properties": {
+    "funcao_gratificada": {
+      "type": "string",
+      "default": "",
+      "description": "Descrição da função gratificada autorizada."
+    },
+    "codigo_funcao": {
+      "type": "string",
+      "default": "",
+      "description": "Código administrativo da função autorizada."
+    },
+    "nivel_gratificacao": {
+      "type": "string",
+      "default": "",
+      "description": "Nível/faixa da gratificação autorizada."
+    },
+    "tipo_gratificacao": {
+      "type": "string",
+      "default": "",
+      "description": "Tipo textual da gratificação para snapshot e leitura rápida."
+    },
+    "tipo_gratificacao_funcao_id": {
+      "type": "string",
+      "default": "",
+      "description": "Referência ao catálogo TipoGratificacaoFuncao."
+    },
+    "unidade_id": {
+      "type": "string",
+      "default": "",
+      "description": "ID da unidade à qual a cota está vinculada."
+    },
+    "unidade_nome_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Nome da unidade no momento do cadastro/autorização da cota."
+    },
+    "setor_id": {
+      "type": "string",
+      "default": "",
+      "description": "ID do setor ao qual a cota está vinculada, quando aplicável."
+    },
+    "setor_nome_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Nome do setor no momento do cadastro/autorização da cota."
+    },
+    "quantidade_autorizada": {
+      "type": "integer",
+      "default": 0,
+      "description": "Quantidade de posições autorizadas para a cota."
+    },
+    "data_inicio_vigencia": {
+      "type": "date",
+      "default": "",
+      "description": "Data de início da vigência da cota."
+    },
+    "data_fim_vigencia": {
+      "type": "date",
+      "default": "",
+      "description": "Data de fim da vigência da cota, se houver."
+    },
+    "ato_autorizativo": {
+      "type": "string",
+      "default": "",
+      "description": "Ato administrativo que autorizou a cota."
+    },
+    "doems_autorizacao_numero": {
+      "type": "string",
+      "default": "",
+      "description": "Número do DOEMS da autorização."
+    },
+    "doems_autorizacao_edicao": {
+      "type": "string",
+      "default": "",
+      "description": "Edição do DOEMS da autorização."
+    },
+    "doems_autorizacao_link": {
+      "type": "string",
+      "default": "",
+      "description": "Link do DOEMS ou publicação de autorização."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativa",
+        "suspensa",
+        "encerrada"
+      ],
+      "default": "ativa",
+      "description": "Status administrativo da cota."
+    },
+    "observacoes": {
+      "type": "string",
+      "default": "",
+      "description": "Observações internas da cota."
+    },
+    "metadados": {
+      "type": "object",
+      "default": {},
+      "description": "Dados técnicos auxiliares para integrações e functions escopadas futuras."
+    }
+  },
+  "required": [
+    "funcao_gratificada",
+    "quantidade_autorizada",
+    "status"
+  ]
+}

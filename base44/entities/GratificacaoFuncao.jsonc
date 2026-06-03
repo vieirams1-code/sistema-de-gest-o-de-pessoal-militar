@@ -1,0 +1,242 @@
+{
+  "name": "GratificacaoFuncao",
+  "type": "object",
+  "title": "Gratificação de Função",
+  "description": "Controle administrativo próprio de gratificações de função, independente de contratos de designação, férias e períodos aquisitivos.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "default": "",
+      "description": "ID do militar vinculado, sem armazenar CPF no snapshot."
+    },
+    "militar_snapshot": {
+      "type": "object",
+      "default": {},
+      "description": "Snapshot mínimo e não sensível dos dados do militar no momento do registro."
+    },
+    "nome_completo_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Nome completo do militar no momento do registro."
+    },
+    "nome_guerra_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Nome de guerra do militar no momento do registro."
+    },
+    "posto_graduacao_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Posto ou graduação do militar no momento do registro."
+    },
+    "quadro_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Quadro do militar no momento do registro."
+    },
+    "matricula_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Matrícula institucional do militar no momento do registro."
+    },
+    "unidade_id": {
+      "type": "string",
+      "default": "",
+      "description": "ID da unidade de lotação/exercício relacionada à gratificação."
+    },
+    "unidade_nome_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Nome da unidade no momento do registro."
+    },
+    "setor_id": {
+      "type": "string",
+      "default": "",
+      "description": "ID do setor relacionado à gratificação, quando aplicável."
+    },
+    "setor_nome_snapshot": {
+      "type": "string",
+      "default": "",
+      "description": "Nome do setor no momento do registro."
+    },
+    "tipo_gratificacao_funcao_id": {
+      "type": "string",
+      "default": "",
+      "description": "Referência ao catálogo TipoGratificacaoFuncao."
+    },
+    "cota_gratificacao_funcao_id": {
+      "type": "string",
+      "default": "",
+      "description": "Referência à cota autorizada utilizada como base administrativa."
+    },
+    "funcao_gratificada": {
+      "type": "string",
+      "default": "",
+      "description": "Descrição da função gratificada exercida."
+    },
+    "codigo_funcao": {
+      "type": "string",
+      "default": "",
+      "description": "Código administrativo da função gratificada."
+    },
+    "nivel_gratificacao": {
+      "type": "string",
+      "default": "",
+      "description": "Nível/faixa da gratificação de função."
+    },
+    "tipo_gratificacao": {
+      "type": "string",
+      "default": "",
+      "description": "Tipo textual da gratificação para snapshot e leitura rápida."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "rascunho",
+        "solicitado_dp",
+        "aguardando_publicacao_nomeacao",
+        "nomeado_ativo",
+        "dispensa_solicitada",
+        "aguardando_publicacao_dispensa",
+        "dispensado",
+        "cancelado"
+      ],
+      "default": "rascunho",
+      "description": "Status próprio do fluxo de gratificação, sem reaproveitar status de contrato."
+    },
+    "data_solicitacao": {
+      "type": "date",
+      "default": "",
+      "description": "Data da solicitação inicial ao DP."
+    },
+    "documento_solicitacao": {
+      "type": "string",
+      "default": "",
+      "description": "Documento ou referência da solicitação inicial."
+    },
+    "numero_processo": {
+      "type": "string",
+      "default": "",
+      "description": "Número do processo administrativo, se houver."
+    },
+    "solicitado_por": {
+      "type": "string",
+      "default": "",
+      "description": "Usuário, setor ou autoridade que solicitou o registro."
+    },
+    "data_publicacao_nomeacao": {
+      "type": "date",
+      "default": "",
+      "description": "Data de publicação da nomeação."
+    },
+    "doems_nomeacao_numero": {
+      "type": "string",
+      "default": "",
+      "description": "Número do DOEMS da nomeação."
+    },
+    "doems_nomeacao_edicao": {
+      "type": "string",
+      "default": "",
+      "description": "Edição do DOEMS da nomeação."
+    },
+    "doems_nomeacao_link": {
+      "type": "string",
+      "default": "",
+      "description": "Link do DOEMS ou publicação de nomeação."
+    },
+    "ato_nomeacao_numero": {
+      "type": "string",
+      "default": "",
+      "description": "Número do ato de nomeação."
+    },
+    "data_inicio_efeitos": {
+      "type": "date",
+      "default": "",
+      "description": "Data inicial dos efeitos administrativos/financeiros futuros."
+    },
+    "data_solicitacao_dispensa": {
+      "type": "date",
+      "default": "",
+      "description": "Data da solicitação de dispensa."
+    },
+    "documento_solicitacao_dispensa": {
+      "type": "string",
+      "default": "",
+      "description": "Documento ou referência da solicitação de dispensa."
+    },
+    "motivo_dispensa": {
+      "type": "string",
+      "default": "",
+      "description": "Motivo administrativo da dispensa."
+    },
+    "data_publicacao_dispensa": {
+      "type": "date",
+      "default": "",
+      "description": "Data de publicação da dispensa."
+    },
+    "doems_dispensa_numero": {
+      "type": "string",
+      "default": "",
+      "description": "Número do DOEMS da dispensa."
+    },
+    "doems_dispensa_edicao": {
+      "type": "string",
+      "default": "",
+      "description": "Edição do DOEMS da dispensa."
+    },
+    "doems_dispensa_link": {
+      "type": "string",
+      "default": "",
+      "description": "Link do DOEMS ou publicação de dispensa."
+    },
+    "ato_dispensa_numero": {
+      "type": "string",
+      "default": "",
+      "description": "Número do ato de dispensa."
+    },
+    "data_fim_efeitos": {
+      "type": "date",
+      "default": "",
+      "description": "Data final dos efeitos administrativos/financeiros futuros."
+    },
+    "observacoes": {
+      "type": "string",
+      "default": "",
+      "description": "Observações internas do controle."
+    },
+    "anexos": {
+      "type": "array",
+      "default": [],
+      "description": "Referências a anexos/documentos de suporte, sem geração de documento oficial."
+    },
+    "metadados": {
+      "type": "object",
+      "default": {},
+      "description": "Dados técnicos auxiliares para integrações e functions escopadas futuras."
+    },
+    "origem_registro": {
+      "type": "string",
+      "default": "",
+      "description": "Origem técnica ou administrativa do registro."
+    },
+    "status_alterado_em": {
+      "type": "date",
+      "default": "",
+      "description": "Data da última alteração de status."
+    },
+    "status_alterado_por": {
+      "type": "string",
+      "default": "",
+      "description": "Responsável pela última alteração de status."
+    },
+    "motivo_cancelamento": {
+      "type": "string",
+      "default": "",
+      "description": "Motivo de cancelamento, quando status = cancelado."
+    }
+  },
+  "required": [
+    "militar_id",
+    "status"
+  ]
+}

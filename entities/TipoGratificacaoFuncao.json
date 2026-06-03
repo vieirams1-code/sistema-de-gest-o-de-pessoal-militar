@@ -1,0 +1,51 @@
+{
+  "name": "TipoGratificacaoFuncao",
+  "type": "object",
+  "title": "Tipo de Gratificação de Função",
+  "description": "Catálogo de tipos/classes de gratificação de função para padronização de cotas e registros.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "default": "",
+      "description": "Nome do tipo de gratificação de função."
+    },
+    "sigla": {
+      "type": "string",
+      "default": "",
+      "description": "Sigla institucional do tipo, quando houver."
+    },
+    "descricao": {
+      "type": "string",
+      "default": "",
+      "description": "Descrição administrativa do tipo de gratificação."
+    },
+    "nivel": {
+      "type": "string",
+      "default": "",
+      "description": "Nível/faixa padrão associada ao tipo, quando aplicável."
+    },
+    "codigo": {
+      "type": "string",
+      "default": "",
+      "description": "Código técnico ou administrativo do tipo."
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica se o tipo está disponível para novos registros."
+    },
+    "observacoes": {
+      "type": "string",
+      "default": "",
+      "description": "Observações internas do catálogo."
+    },
+    "metadados": {
+      "type": "object",
+      "default": {},
+      "description": "Dados técnicos auxiliares para integrações e functions escopadas futuras."
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}
