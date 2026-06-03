@@ -8,12 +8,17 @@
 
 .documento-militar-print-shell {
   width: 100%;
+  min-width: 0;
+}
+
+.documento-militar-print-root {
+  display: none;
 }
 
 .documento-militar-a4 {
   box-sizing: border-box;
+  max-width: 100%;
   width: min(100%, var(--documento-militar-page-width));
-  min-height: var(--documento-militar-page-height);
   margin: 0 auto;
   padding: var(--documento-militar-page-padding-top) var(--documento-militar-page-padding-x) var(--documento-militar-page-padding-bottom);
   background: #fff;
@@ -74,8 +79,10 @@
 }
 
 .documento-militar-corpo {
+  max-width: 100%;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: break-word;
   text-align: justify;
 }
 
@@ -137,6 +144,44 @@
   body.documento-militar-printing .documento-militar-no-print {
     display: none !important;
     visibility: hidden !important;
+  }
+
+  body.documento-militar-printing .documento-militar-screen-preview {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.documento-militar-printing .documento-militar-print-root {
+    display: block !important;
+    visibility: visible !important;
+    width: var(--documento-militar-page-width) !important;
+    min-width: var(--documento-militar-page-width) !important;
+    max-width: var(--documento-militar-page-width) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body.documento-militar-printing .documento-militar-print-root .documento-militar-print-area {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: var(--documento-militar-page-width) !important;
+    min-width: var(--documento-militar-page-width) !important;
+    max-width: var(--documento-militar-page-width) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: var(--documento-militar-page-padding-top) var(--documento-militar-page-padding-x) var(--documento-militar-page-padding-bottom) !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+    break-before: auto !important;
+    break-after: auto !important;
   }
 
   body.documento-militar-printing .documento-militar-modal-print-root,

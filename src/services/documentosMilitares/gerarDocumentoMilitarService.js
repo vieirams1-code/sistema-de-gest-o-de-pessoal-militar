@@ -1,5 +1,6 @@
 import { identificarCamposDinamicosDocumentoMilitar, substituirCamposDinamicosDocumentoMilitar } from './camposDinamicosDocumentoMilitar.js';
 import { MODULO_DOCUMENTOS_MILITARES, montarVariaveisDocumentoMilitar } from './documentoMilitarVarsService.js';
+import { normalizarTextoDocumentoMilitar } from './normalizarTextoDocumentoMilitar.js';
 import { substituirVariaveisDocumentoMilitar } from './substituirVariaveisDocumentoMilitar.js';
 
 function somenteValoresPreenchidos(valores = {}) {
@@ -34,9 +35,11 @@ export function renderizarDocumentoMilitarIndividual({
   );
   const variaveisMilitar = montarVariaveisDocumentoMilitar(militar, opcoesVariaveis);
 
-  return substituirVariaveisDocumentoMilitar(
+  const textoRenderizado = substituirVariaveisDocumentoMilitar(
     templateComCamposManuais,
     somenteValoresPreenchidos(variaveisMilitar),
     { manterDesconhecidas: true }
   );
+
+  return normalizarTextoDocumentoMilitar(textoRenderizado);
 }
