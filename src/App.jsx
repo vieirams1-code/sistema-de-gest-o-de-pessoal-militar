@@ -26,6 +26,7 @@ const adminOnlyPages = new Set([
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
   'Medicos',
+  'GratificacoesFuncao',
 ]);
 
 

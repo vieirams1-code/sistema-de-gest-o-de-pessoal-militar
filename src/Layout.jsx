@@ -85,6 +85,7 @@ const menuGroups = [
               { type: 'action', key: 'gerir_contratos_designacao' },
             ],
           },
+          { name: 'Gratificação de Função', page: 'GratificacoesFuncao', icon: Medal, adminOnly: true },
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
           { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },

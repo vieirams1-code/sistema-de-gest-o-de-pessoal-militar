@@ -77,6 +77,7 @@ import ExtratoAtestadosMedicos from './pages/ExtratoAtestadosMedicos';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
 import FolhaAlteracoes from './pages/FolhaAlteracoes';
+import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
 import IndicacoesDomPedroII from './pages/IndicacoesDomPedroII';
@@ -144,6 +145,7 @@ export const PAGES = {
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
     "FolhaAlteracoes": FolhaAlteracoes,
+    "GratificacoesFuncao": GratificacoesFuncao,
     "Home": Home,
     "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
     "IndicacoesDomPedroII": IndicacoesDomPedroII,
