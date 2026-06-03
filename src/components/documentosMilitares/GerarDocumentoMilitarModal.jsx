@@ -34,6 +34,7 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   const [templateId, setTemplateId] = useState('');
   const [camposManuais, setCamposManuais] = useState({});
   const [configImpressao, setConfigImpressao] = useState(() => carregarDocumentoMilitarPrintConfig());
+  const [tituloDocumento, setTituloDocumento] = useState('');
   const [configurandoImpressao, setConfigurandoImpressao] = useState(false);
   const [buscaSignatario, setBuscaSignatario] = useState('');
   const { data: templatesRecebidos = [], isLoading, isError } = useQuery({
@@ -188,8 +189,9 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {[
                     ['mostrarCabecalho', 'Mostrar cabeçalho'],
-                    ['mostrarBrasao', 'Mostrar brasão quando disponível'],
+                    ['mostrarBrasao', 'Mostrar brasão legado quando disponível'],
                     ['mostrarAssinatura', 'Mostrar assinatura'],
+                    ['mostrarRodape', 'Mostrar rodapé institucional'],
                   ].map(([campo, rotulo]) => (
                     <label key={campo} className="flex items-center gap-2 text-slate-700">
                       <input
@@ -204,8 +206,13 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                     ['orgaoLinha1', 'Órgão - linha 1'],
                     ['orgaoLinha2', 'Órgão - linha 2'],
                     ['orgaoLinha3', 'Órgão - linha 3'],
+                    ['orgaoLinha4', 'Órgão - linha 4'],
+                    ['orgaoLinha5', 'Órgão - linha 5'],
                     ['tituloDocumentoPadrao', 'Título padrão'],
+                    ['imagemCabecalhoSrc', 'Imagem institucional (URL ou data URL)'],
                     ['cidadePadrao', 'Cidade padrão'],
+                    ['rodapeLinha1', 'Rodapé - linha 1'],
+                    ['rodapeLinha2', 'Rodapé - linha 2'],
                   ].map(([campo, rotulo]) => (
                     <div key={campo}>
                       <Label htmlFor={`config-impressao-${campo}`}>{rotulo}</Label>
@@ -217,6 +224,10 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                       />
                     </div>
                   ))}
+
+                  <div className="sm:col-span-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                    Para usar imagem institucional, informe uma URL ou data URL. Imagens externas podem não carregar se o navegador bloquear o acesso.
+                  </div>
                   <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <Label htmlFor="busca-signatario-documento">Selecionar militar signatário</Label>
                     <Input
@@ -271,9 +282,25 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
               </div>
             )}
 
+            {templateSelecionado && (
+              <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm">
+                <Label htmlFor="titulo-documento-militar">Título do documento</Label>
+                <Input
+                  id="titulo-documento-militar"
+                  className="mt-1"
+                  value={tituloDocumento}
+                  onChange={(event) => setTituloDocumento(event.target.value)}
+                  placeholder={configImpressao.tituloDocumentoPadrao || 'DOCUMENTO MILITAR'}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Se ficar vazio, a prévia usa o título padrão da configuração local.
+                </p>
+              </div>
+            )}
+
             {templateSelecionado ? (
               <div className="overflow-x-auto">
-                <DocumentoMilitarPreview texto={previa} config={configImpressao} />
+                <DocumentoMilitarPreview texto={previa} config={configImpressao} tituloDocumento={tituloDocumento} />
               </div>
             ) : (
               <p className="mt-3 text-sm text-slate-500">Selecione um template para visualizar a prévia.</p>
