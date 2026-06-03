@@ -87,3 +87,31 @@ test('renderiza template grande sem truncar conteúdo equivalente a cinco págin
   assert.match(resultado, /Página 1: Maria da Silva/);
   assert.match(resultado, /Página 5: Maria da Silva/);
 });
+
+test('renderização final substitui nascimento, unidade e promoção quando presentes', () => {
+  const texto = renderizarDocumentoMilitarIndividual({
+    template: [
+      'Nascimento: {{data_nascimento}}',
+      'Unidade: {{unidade}}',
+      'Promoção: {{data_promocao_atual}}',
+    ].join('\n'),
+    militar: {
+      dataNascimento: '1987-02-13',
+      lotacao_atual: { nome: '1º GBM' },
+      dataPromocaoAtual: '2021-04-05',
+    },
+    opcoesVariaveis: { dataReferencia: '2026-06-02' },
+  });
+
+  assert.equal(texto, 'Nascimento: 13/02/1987\nUnidade: 1º GBM\nPromoção: 05/04/2021');
+});
+
+test('renderização final mantém placeholders quando os dados não existem', () => {
+  const texto = renderizarDocumentoMilitarIndividual({
+    template: '{{data_nascimento}} {{unidade}} {{data_promocao_atual}}',
+    militar: {},
+    opcoesVariaveis: { dataReferencia: '2026-06-02' },
+  });
+
+  assert.equal(texto, '{{data_nascimento}} {{unidade}} {{data_promocao_atual}}');
+});

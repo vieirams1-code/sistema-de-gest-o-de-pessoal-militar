@@ -27,7 +27,10 @@ function textoDeReferencia(value) {
     value.nome_completo,
     value.descricao,
     value.sigla,
-    value.titulo
+    value.titulo,
+    value.estrutura_nome,
+    value.grupamento_nome,
+    value.subgrupamento_nome
   );
 }
 
@@ -60,16 +63,43 @@ export function montarVariaveisDocumentoMilitar(militar = {}, { dataReferencia =
     matricula: primeiroTexto(fonte.matricula_documental, fonte.matricula_operacional, fonte.matricula),
     cpf: textoSeguro(fonte.cpf),
     rg: textoSeguro(fonte.rg),
-    data_nascimento: formatarDataDocumentoMilitar(primeiroTexto(fonte.data_nascimento, fonte.nascimento)),
+    data_nascimento: formatarDataDocumentoMilitar(primeiroTexto(
+      fonte.data_nascimento,
+      fonte.dataNascimento,
+      fonte.nascimento,
+      fonte.data_nasc
+    )),
     data_inclusao: formatarDataDocumentoMilitar(fonte.data_inclusao),
-    lotacao: primeiroTexto(textoDeReferencia(fonte.lotacao), fonte.lotacao_nome),
-    unidade: primeiroTexto(textoDeReferencia(fonte.unidade), fonte.unidade_nome, fonte.lotacao_unidade, fonte.unidade_atual),
+    lotacao: primeiroTexto(
+      textoDeReferencia(fonte.lotacao_atual),
+      textoDeReferencia(fonte.lotacaoAtual),
+      textoDeReferencia(fonte.lotacao),
+      fonte.lotacao_nome,
+      fonte.estrutura_nome,
+      fonte.subgrupamento_nome,
+      fonte.grupamento_nome
+    ),
+    unidade: primeiroTexto(
+      textoDeReferencia(fonte.unidade),
+      textoDeReferencia(fonte.unidadeAtual),
+      textoDeReferencia(fonte.lotacao_unidade),
+      textoDeReferencia(fonte.lotacao_atual),
+      textoDeReferencia(fonte.lotacaoAtual),
+      fonte.unidade_nome,
+      fonte.unidade_atual,
+      fonte.estrutura_nome,
+      fonte.subgrupamento_nome,
+      fonte.grupamento_nome
+    ),
     situacao: primeiroTexto(fonte.situacao, fonte.situacao_funcional, fonte.status_cadastro, fonte.status, fonte.situacao_militar),
     comportamento_atual: primeiroTexto(fonte.comportamento_atual, fonte.comportamento),
     data_promocao_atual: formatarDataDocumentoMilitar(primeiroTexto(
       fonte.data_promocao_atual,
+      fonte.dataPromocaoAtual,
       fonte.data_ultima_promocao,
+      fonte.dataUltimaPromocao,
       fonte.promocao_atual_data,
+      fonte.promocaoAtualData,
       fonte.data_promocao
     )),
     tempo_servico: formatarTempoServico(fonte, dataReferencia),
