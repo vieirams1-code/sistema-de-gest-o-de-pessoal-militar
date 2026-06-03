@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
+import { agruparHistoricoPorAnoMes, deduplicarEventosFolhaAlteracoes, ordenarEventosFolhaAlteracoes } from '@/components/folha-alteracoes/folhaAlteracoesHistorico';
 import { abreviarPostoGraduacao, montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, getLotacaoAtualMilitar, militarCorrespondeBusca, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
@@ -163,34 +164,6 @@ function montarReferenciaBoletim(item = {}) {
   return `Boletim ${bg.numero}, de ${formatarData(bg.data)}`;
 }
 
-function listarMesesNoPeriodo(dataInicial, dataFinal) {
-  if (!dataInicial || !dataFinal || dataInicial > dataFinal) return [];
-
-  const [anoInicio, mesInicio] = dataInicial.split('-').map(Number);
-  const [anoFim, mesFim] = dataFinal.split('-').map(Number);
-
-  const itens = [];
-  let anoAtual = anoInicio;
-  let mesAtual = mesInicio;
-
-  while (anoAtual < anoFim || (anoAtual === anoFim && mesAtual <= mesFim)) {
-    itens.push({
-      ano: anoAtual,
-      mes: mesAtual,
-      chave: `${anoAtual}-${String(mesAtual).padStart(2, '0')}`,
-      titulo: `MÊS DE ${MESES[mesAtual - 1]}/${anoAtual}`,
-    });
-
-    mesAtual += 1;
-    if (mesAtual > 12) {
-      mesAtual = 1;
-      anoAtual += 1;
-    }
-  }
-
-  return itens;
-}
-
 function toAnoMesTexto(ano, mes) {
   if (!ano || !mes) return '';
   return `${String(mes).padStart(2, '0')}/${ano}`;
@@ -212,33 +185,6 @@ function converterMesAnoParaPeriodo({ mesInicial, anoInicial, mesFinal, anoFinal
     valido,
     descricaoSelecao: `${toAnoMesTexto(anoInicial, mesInicial)} a ${toAnoMesTexto(anoFinal, mesFinal)}`,
   };
-}
-
-function agruparHistoricoPorAnoMes(eventos, dataInicial, dataFinal) {
-  const meses = listarMesesNoPeriodo(dataInicial, dataFinal);
-  const agrupadoPorAno = new Map();
-
-  meses.forEach((mesInfo) => {
-    if (!agrupadoPorAno.has(mesInfo.ano)) {
-      agrupadoPorAno.set(mesInfo.ano, []);
-    }
-
-    const eventosDoMes = eventos
-      .filter((evento) => {
-        if (!evento?.data) return false;
-        return evento.data.startsWith(mesInfo.chave);
-      })
-      .sort((a, b) => a.data.localeCompare(b.data));
-
-    agrupadoPorAno.get(mesInfo.ano).push({
-      ...mesInfo,
-      eventos: eventosDoMes,
-    });
-  });
-
-  return Array.from(agrupadoPorAno.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([ano, mesesDoAno]) => ({ ano, meses: mesesDoAno }));
 }
 
 function getEntitySafe(entityName) {
@@ -524,6 +470,7 @@ export default function FolhaAlteracoes() {
           const textoOficial = getTextoOficialRegistro(item);
 
           return {
+            id: item.id,
             data: dataEvento,
             tipo: 'Publicação',
             texto: textoOficial,
@@ -538,13 +485,9 @@ export default function FolhaAlteracoes() {
         .map((item) => montarEventoAtestado(item, filtrarPorPeriodo))
         .filter(Boolean);
 
-      const deduplicado = new Map();
-      [...eventosPublicacoes, ...eventosAtestados].forEach((evento) => {
-        const key = `${evento.origem}-${evento.id || `${evento.data}-${evento.referenciaBoletim}`}`;
-        if (!deduplicado.has(key)) deduplicado.set(key, evento);
-      });
-
-      return Array.from(deduplicado.values()).sort((a, b) => a.data.localeCompare(b.data));
+      return ordenarEventosFolhaAlteracoes(
+        deduplicarEventosFolhaAlteracoes([...eventosPublicacoes, ...eventosAtestados])
+      );
     },
     enabled: !!previa,
   });
