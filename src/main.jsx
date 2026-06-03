@@ -11,6 +11,9 @@ import {
   HistoricoPromocaoMilitarV2,
   Promocao,
   PromocaoMilitar,
+  GratificacaoFuncao,
+  CotaGratificacaoFuncao,
+  TipoGratificacaoFuncao,
   ResetOperacionalLog,
   BaseConhecimentoProcedimento,
   AssistenteLog,
@@ -37,6 +40,9 @@ void CreditoExtraFerias;
 void HistoricoPromocaoMilitarV2;
 void Promocao;
 void PromocaoMilitar;
+void GratificacaoFuncao;
+void CotaGratificacaoFuncao;
+void TipoGratificacaoFuncao;
 void ResetOperacionalLog;
 void BaseConhecimentoProcedimento;
 void AssistenteLog;
