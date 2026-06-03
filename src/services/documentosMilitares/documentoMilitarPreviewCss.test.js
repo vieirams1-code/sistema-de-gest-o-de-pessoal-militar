@@ -63,7 +63,19 @@ test('documento de uma página não gera duplicação estrutural por wrappers de
 
   assert.match(modal, /documento-militar-print-shell/);
   assert.match(modal, /documento-militar-printing/);
+  assert.match(css, /body\.documento-militar-printing > \*:not\(\.documento-militar-modal-print-root\)\s*{[^}]*display:\s*none !important;/);
   assert.match(css, /body\.documento-militar-printing \.documento-militar-no-print\s*{[^}]*display:\s*none !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-modal-print-root,[\s\S]*display:\s*contents !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*break-before:\s*auto !important;[^}]*break-after:\s*auto !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-modal-print-root,[\s\S]*position:\s*static !important;[\s\S]*display:\s*block !important;[\s\S]*overflow:\s*visible !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*min-height:\s*0 !important;[^}]*break-before:\s*auto !important;[^}]*break-after:\s*auto !important;/);
+});
+
+test('impressão usa A4 real sem depender da prévia de tela', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  assert.match(css, /--documento-militar-page-width:\s*210mm;/);
+  assert.match(css, /--documento-militar-page-height:\s*297mm;/);
+  assert.match(css, /@page\s*{[^}]*size:\s*A4 portrait;[^}]*margin:\s*0;/);
+  assert.match(css, /html,[\s\S]*body\s*{[^}]*width:\s*var\(--documento-militar-page-width\) !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*width:\s*var\(--documento-militar-page-width\) !important;/);
+  assert.doesNotMatch(css, /@media print[\s\S]*position:\s*fixed/);
 });
