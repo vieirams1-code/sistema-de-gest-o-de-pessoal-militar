@@ -71,6 +71,23 @@ test('documento de uma página não gera duplicação estrutural por wrappers de
   assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*min-height:\s*0 !important;[^}]*break-before:\s*auto !important;[^}]*break-after:\s*auto !important;/);
 });
 
+test('CSS de tela não força altura mínima A4 que cause quebra excessiva na impressão', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  // .documento-militar-a4 não deve ter min-height fixa (que forçaria altura mínima do A4 mesmo em documentos curtos)
+  assert.doesNotMatch(css, /\.documento-militar-a4\s*{[^}]*min-height:/);
+});
+
+test('CSS de impressão usa espaçamentos compactos para evitar quebra desnecessária', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  // Espaçamentos compactos no modo print
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-cabecalho\s*{[^}]*margin-bottom:\s*5mm !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-titulo\s*{[^}]*margin:\s*6mm 0 5mm !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-corpo\s*{[^}]*min-height:\s*0 !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-assinatura\s*{[^}]*margin-top:\s*12mm !important;/);
+});
+
 test('impressão usa A4 real sem depender da prévia de tela', async () => {
   const css = await readFile(cssUrl, 'utf8');
 

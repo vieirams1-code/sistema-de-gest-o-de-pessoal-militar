@@ -129,3 +129,35 @@ test('substitui variáveis residuais quando aliases enriquecidos existem', () =>
   assert.equal(variaveis.unidade, '4º GBM');
   assert.equal(variaveis.data_promocao_atual, '29/02/2020');
 });
+
+test('substitui data_nascimento pelos aliases aninhados em dados_pessoais', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    dados_pessoais: { data_nascimento: '1980-04-22' },
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_nascimento, '22/04/1980');
+});
+
+test('substitui data_nascimento pelo alias aninhado em dadosPessoais camelCase', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    dadosPessoais: { dataNascimento: '1981-09-15' },
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_nascimento, '15/09/1981');
+});
+
+test('substitui data_promocao_atual pelo alias historico_promocao_atual', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    historico_promocao_atual: { data: '2021-06-01' },
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_promocao_atual, '01/06/2021');
+});
+
+test('substitui data_promocao_atual pelo alias historicoPromocaoAtual camelCase com dataPromocao', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    historicoPromocaoAtual: { dataPromocao: '2019-10-25' },
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_promocao_atual, '25/10/2019');
+});

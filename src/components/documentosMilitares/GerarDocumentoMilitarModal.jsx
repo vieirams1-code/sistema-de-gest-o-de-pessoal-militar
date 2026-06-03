@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
+import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import DocumentoMilitarPreview from '@/components/documentosMilitares/DocumentoMilitarPreview';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
 import {
@@ -41,6 +42,19 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
     queryKey: ['templates-documentos-militares'],
     queryFn: () => base44.entities.TemplateTexto.filter({ modulo: MODULO_DOCUMENTOS_MILITARES }, '-created_date'),
   });
+  const { data: historicoPromocoes = [] } = useQuery({
+    queryKey: ['documentos-militares-historico-promocao', militar?.id || ''],
+    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: militar.id }, '-data_promocao'),
+    enabled: Boolean(militar?.id),
+    staleTime: 60 * 1000,
+  });
+  const militarComPromocao = useMemo(() => {
+    if (!militar) return militar;
+    const selecao = selecionarPromocaoAtualEAnteriores({ historicoPromocoes, militar });
+    const promocaoAtual = selecao?.promocaoAtual || null;
+    if (!promocaoAtual?.data_promocao) return militar;
+    return { ...militar, historico_promocao_atual: { data: promocaoAtual.data_promocao } };
+  }, [militar, historicoPromocoes]);
   const { data: militaresSignatarios = [], isFetching: isFetchingSignatarios } = useQuery({
     queryKey: ['documentos-militares-signatarios', buscaSignatario.trim()],
     queryFn: async () => {
@@ -67,9 +81,9 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   );
   const previa = useMemo(() => renderizarDocumentoMilitarIndividual({
     template: templateSelecionado?.template,
-    militar,
+    militar: militarComPromocao,
     camposManuais,
-  }), [templateSelecionado?.template, militar, camposManuais]);
+  }), [templateSelecionado?.template, militarComPromocao, camposManuais]);
 
   useEffect(() => {
     setCamposManuais({});

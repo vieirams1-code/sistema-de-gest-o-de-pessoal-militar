@@ -31,6 +31,7 @@ function dataDeReferencia(value) {
     value.data_nascimento,
     value.dataNascimento,
     value.nascimento,
+    value.nascimento_data,
     value.data_promocao_atual,
     value.dataPromocaoAtual,
     value.data_promocao,
@@ -93,7 +94,11 @@ export function montarVariaveisDocumentoMilitar(militar = {}, { dataReferencia =
       dataDeReferencia(fonte.dataDeNascimento),
       dataDeReferencia(fonte.dt_nascimento),
       dataDeReferencia(fonte.nascimento_data),
-      dataDeReferencia(fonte.nascimentoData)
+      dataDeReferencia(fonte.nascimentoData),
+      dataDeReferencia(fonte.dados_pessoais?.data_nascimento),
+      dataDeReferencia(fonte.dados_pessoais?.dataNascimento),
+      dataDeReferencia(fonte.dadosPessoais?.data_nascimento),
+      dataDeReferencia(fonte.dadosPessoais?.dataNascimento)
     )),
     data_inclusao: formatarDataDocumentoMilitar(fonte.data_inclusao),
     lotacao: primeiroTexto(
@@ -137,7 +142,9 @@ export function montarVariaveisDocumentoMilitar(militar = {}, { dataReferencia =
       dataDeReferencia(fonte.promocaoAtual),
       dataDeReferencia(fonte.data_promocao),
       dataDeReferencia(fonte.dataPromocao),
-      dataDeReferencia(fonte.dt_promocao_atual)
+      dataDeReferencia(fonte.dt_promocao_atual),
+      dataDeReferencia(fonte.historico_promocao_atual),
+      dataDeReferencia(fonte.historicoPromocaoAtual)
     )),
     tempo_servico: formatarTempoServico(fonte, dataReferencia),
     data_atual: formatarDataDocumentoMilitar(dataReferencia),
