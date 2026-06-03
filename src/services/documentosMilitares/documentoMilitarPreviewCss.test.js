@@ -63,9 +63,11 @@ test('documento de uma página não gera duplicação estrutural por wrappers de
 
   assert.match(modal, /documento-militar-print-shell/);
   assert.match(modal, /documento-militar-printing/);
-  assert.match(css, /body\.documento-militar-printing > \*:not\(\.documento-militar-modal-print-root\)\s*{[^}]*display:\s*none !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-no-print\s*{[^}]*display:\s*none !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-modal-print-root,[\s\S]*position:\s*static !important;[\s\S]*display:\s*block !important;[\s\S]*overflow:\s*visible !important;/);
+  assert.doesNotMatch(css, /body\.documento-militar-printing > \*:not\([^)]*\)\s*{[^}]*display:\s*none !important;/);
+  assert.match(css, /body\.documento-militar-printing \*\s*{[^}]*visibility:\s*hidden !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-no-print\s*{[^}]*display:\s*none !important;[^}]*visibility:\s*hidden !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-modal-print-root,[\s\S]*visibility:\s*visible !important;[\s\S]*position:\s*static !important;[\s\S]*display:\s*block !important;[\s\S]*overflow:\s*visible !important;/);
+  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area,[\s\S]*body\.documento-militar-printing \.documento-militar-print-area \*\s*{[^}]*visibility:\s*visible !important;[^}]*overflow:\s*visible !important;/);
   assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*min-height:\s*0 !important;[^}]*break-before:\s*auto !important;[^}]*break-after:\s*auto !important;/);
 });
 
