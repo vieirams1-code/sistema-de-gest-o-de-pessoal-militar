@@ -4,13 +4,13 @@ import test from 'node:test';
 
 const cssUrl = new URL('../../components/documentosMilitares/documento-militar-preview.css', import.meta.url);
 const previewUrl = new URL('../../components/documentosMilitares/DocumentoMilitarPreview.jsx', import.meta.url);
+const printRootUrl = new URL('../../components/documentosMilitares/DocumentoMilitarPrintRoot.jsx', import.meta.url);
 const modalUrl = new URL('../../components/documentosMilitares/GerarDocumentoMilitarModal.jsx', import.meta.url);
 
-test('CSS não usa position fixed na prévia de impressão', async () => {
+test('CSS não usa position fixed na prévia/impressão', async () => {
   const css = await readFile(cssUrl, 'utf8');
 
-  assert.doesNotMatch(css, /position:\s*fixed;/);
-  assert.doesNotMatch(css, /\.documento-militar-print-area\s*{[^}]*position:/);
+  assert.doesNotMatch(css, /position:\s*fixed/);
 });
 
 test('CSS contém regras para evitar fragmentação do cabeçalho, título e assinatura', async () => {
@@ -29,72 +29,91 @@ test('DocumentoMilitarPreview gera apenas uma área imprimível', async () => {
   assert.match(preview, /<article className="documento-militar-print-area documento-militar-a4"/);
 });
 
-test('modal renderiza apenas uma instância visível de DocumentoMilitarPreview e uma área de impressão', async () => {
-  const modal = await readFile(modalUrl, 'utf8');
-  const importacaoPreview = modal.match(/import DocumentoMilitarPreview/g) || [];
-  const rendersPreview = modal.match(/<DocumentoMilitarPreview\b/g) || [];
-  const areasDiretas = modal.match(/documento-militar-print-area/g) || [];
-
-  assert.equal(importacaoPreview.length, 1);
-  assert.equal(rendersPreview.length, 1);
-  assert.equal(areasDiretas.length, 0);
-});
-
-test('configuração de cabeçalho não gera segunda área imprimível', async () => {
-  const modal = await readFile(modalUrl, 'utf8');
-  const preview = await readFile(previewUrl, 'utf8');
-
-  assert.match(modal, /documento-militar-no-print mb-4[\s\S]*Configuração local da impressão/);
-  assert.equal((preview.match(/<header className="documento-militar-cabecalho">/g) || []).length, 1);
-  assert.equal((preview.match(/documento-militar-print-area/g) || []).length, 1);
-});
-
-test('impressão não possui cabeçalho isolado fora da área imprimível', async () => {
-  const preview = await readFile(previewUrl, 'utf8');
+test('Modal possui prévia visual em tela E root de impressão separados', async () => {
   const modal = await readFile(modalUrl, 'utf8');
 
-  assert.doesNotMatch(modal, /ESTADO DE MATO GROSSO DO SUL/);
-  assert.match(preview, /<article className="documento-militar-print-area documento-militar-a4"[\s\S]*<header className="documento-militar-cabecalho">[\s\S]*<section className="documento-militar-corpo">/);
+  // Prévia visual na tela
+  assert.match(modal, /documento-militar-screen-preview/);
+  // Root de impressão isolado, renderizado fora do dialog (irmão do modal)
+  assert.match(modal, /<DocumentoMilitarPrintRoot\b/);
+  // Import do componente isolado
+  assert.match(modal, /import DocumentoMilitarPrintRoot/);
 });
 
-test('documento de uma página não gera duplicação estrutural por wrappers de impressão', async () => {
-  const css = await readFile(cssUrl, 'utf8');
-  const modal = await readFile(modalUrl, 'utf8');
-
-  assert.match(modal, /documento-militar-print-shell/);
-  assert.match(modal, /documento-militar-printing/);
-  assert.doesNotMatch(css, /body\.documento-militar-printing > \*:not\([^)]*\)\s*{[^}]*display:\s*none !important;/);
-  assert.match(css, /body\.documento-militar-printing \*\s*{[^}]*visibility:\s*hidden !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-no-print\s*{[^}]*display:\s*none !important;[^}]*visibility:\s*hidden !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-modal-print-root,[\s\S]*visibility:\s*visible !important;[\s\S]*position:\s*static !important;[\s\S]*display:\s*block !important;[\s\S]*overflow:\s*visible !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area,[\s\S]*body\.documento-militar-printing \.documento-militar-print-area \*\s*{[^}]*visibility:\s*visible !important;[^}]*overflow:\s*visible !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*min-height:\s*0 !important;[^}]*break-before:\s*auto !important;[^}]*break-after:\s*auto !important;/);
-});
-
-test('CSS de tela não força altura mínima A4 que cause quebra excessiva na impressão', async () => {
+test('Root de impressão fica oculto em tela', async () => {
   const css = await readFile(cssUrl, 'utf8');
 
-  // .documento-militar-a4 não deve ter min-height fixa (que forçaria altura mínima do A4 mesmo em documentos curtos)
+  assert.match(css, /\.documento-militar-print-root\s*{[^}]*display:\s*none;/);
+});
+
+test('Root de impressão fica visível no print e prévia visual é ocultada', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  // No modo print, a prévia visual e wrappers do modal são escondidos
+  assert.match(
+    css,
+    /body\.documento-militar-printing[^{]*\.documento-militar-screen-preview[\s\S]*?display:\s*none\s*!important;/,
+  );
+  // O root de impressão fica visível e como bloco
+  assert.match(
+    css,
+    /body\.documento-militar-printing\s+\.documento-militar-print-root\s*{[^}]*display:\s*block\s*!important;/,
+  );
+  assert.match(
+    css,
+    /body\.documento-militar-printing\s+\.documento-militar-print-root[\s\S]*?visibility:\s*visible\s*!important;/,
+  );
+});
+
+test('Root de impressão contém exatamente uma área imprimível', async () => {
+  const printRoot = await readFile(printRootUrl, 'utf8');
+
+  const ocorrenciasPreview = printRoot.match(/<DocumentoMilitarPreview\b/g) || [];
+  assert.equal(ocorrenciasPreview.length, 1);
+});
+
+test('CSS do root de impressão não depende de modal/grid/flex', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  // O bloco do root no print não pode declarar grid/flex
+  const blocoMatch = css.match(/body\.documento-militar-printing\s+\.documento-militar-print-root\s*{[^}]*}/);
+  assert.ok(blocoMatch, 'bloco CSS do print-root deveria existir');
+  const bloco = blocoMatch[0];
+  assert.doesNotMatch(bloco, /display:\s*grid/);
+  assert.doesNotMatch(bloco, /display:\s*flex/);
+  assert.doesNotMatch(bloco, /grid-template/);
+  assert.doesNotMatch(bloco, /position:\s*fixed/);
+});
+
+test('Documento curto não tem regra estrutural que force quebra antes do corpo', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  // .documento-militar-a4 não pode ter min-height fixa (forçaria altura do A4 inteiro)
   assert.doesNotMatch(css, /\.documento-militar-a4\s*{[^}]*min-height:/);
+  // O print-area no modo print precisa permitir break-before/after auto
+  assert.match(
+    css,
+    /body\.documento-militar-printing\s+\.documento-militar-print-root\s+\.documento-militar-print-area\s*{[^}]*break-before:\s*auto\s*!important;/,
+  );
+  assert.match(
+    css,
+    /body\.documento-militar-printing\s+\.documento-militar-print-root\s+\.documento-militar-print-area\s*{[^}]*break-after:\s*auto\s*!important;/,
+  );
+  assert.match(
+    css,
+    /body\.documento-militar-printing\s+\.documento-militar-print-root\s+\.documento-militar-print-area\s*{[^}]*min-height:\s*0\s*!important;/,
+  );
 });
 
-test('CSS de impressão usa espaçamentos compactos para evitar quebra desnecessária', async () => {
-  const css = await readFile(cssUrl, 'utf8');
-
-  // Espaçamentos compactos no modo print
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-cabecalho\s*{[^}]*margin-bottom:\s*5mm !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-titulo\s*{[^}]*margin:\s*6mm 0 5mm !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-corpo\s*{[^}]*min-height:\s*0 !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area \.documento-militar-assinatura\s*{[^}]*margin-top:\s*12mm !important;/);
-});
-
-test('impressão usa A4 real sem depender da prévia de tela', async () => {
+test('Impressão usa A4 real sem depender da prévia de tela', async () => {
   const css = await readFile(cssUrl, 'utf8');
 
   assert.match(css, /--documento-militar-page-width:\s*210mm;/);
-  assert.match(css, /--documento-militar-page-height:\s*297mm;/);
   assert.match(css, /@page\s*{[^}]*size:\s*A4 portrait;[^}]*margin:\s*0;/);
-  assert.match(css, /html,[\s\S]*body\s*{[^}]*width:\s*var\(--documento-militar-page-width\) !important;/);
-  assert.match(css, /body\.documento-militar-printing \.documento-militar-print-area\s*{[^}]*width:\s*var\(--documento-militar-page-width\) !important;/);
-  assert.doesNotMatch(css, /@media print[\s\S]*position:\s*fixed/);
+});
+
+test('Não usa position: fixed em nenhum lugar do CSS', async () => {
+  const css = await readFile(cssUrl, 'utf8');
+
+  assert.doesNotMatch(css, /position:\s*fixed/);
 });

@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import DocumentoMilitarPreview from '@/components/documentosMilitares/DocumentoMilitarPreview';
+import DocumentoMilitarPrintRoot from '@/components/documentosMilitares/DocumentoMilitarPrintRoot';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
 import {
   filtrarTemplatesDocumentosMilitares,
@@ -144,6 +145,7 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   }
 
   return (
+    <>
     <div className="documento-militar-modal-print-root fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
       <div className="documento-militar-modal-dialog flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[90vh]">
         <div className="documento-militar-no-print flex items-center justify-between border-b p-4 sm:p-6">
@@ -344,7 +346,7 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
             )}
 
             {templateSelecionado ? (
-              <div className="documento-militar-print-shell overflow-x-auto">
+              <div className="documento-militar-screen-preview documento-militar-no-print overflow-x-auto">
                 <DocumentoMilitarPreview texto={previa} config={configImpressao} tituloDocumento={tituloDocumento} />
               </div>
             ) : (
@@ -362,5 +364,13 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
         </div>
       </div>
     </div>
+    {templateSelecionado && (
+      <DocumentoMilitarPrintRoot
+        texto={previa}
+        config={configImpressao}
+        tituloDocumento={tituloDocumento}
+      />
+    )}
+    </>
   );
 }

@@ -161,3 +161,42 @@ test('substitui data_promocao_atual pelo alias historicoPromocaoAtual camelCase 
 
   assert.equal(variaveis.data_promocao_atual, '25/10/2019');
 });
+
+test('aliases reais de data_nascimento são resolvidos quando shape do Efetivo é diverso', () => {
+  const casos = [
+    { entrada: { dataNascimento: '1990-01-02' }, esperado: '02/01/1990' },
+    { entrada: { dados_pessoais: { data_nascimento: '1990-01-03' } }, esperado: '03/01/1990' },
+    { entrada: { dadosPessoais: { dataNascimento: '1990-01-04' } }, esperado: '04/01/1990' },
+    { entrada: { data_nascimento: '1990-01-05' }, esperado: '05/01/1990' },
+    { entrada: { nascimento: '1990-01-06' }, esperado: '06/01/1990' },
+  ];
+
+  for (const caso of casos) {
+    const variaveis = montarVariaveisDocumentoMilitar(caso.entrada, { dataReferencia: '2026-06-02' });
+    assert.equal(variaveis.data_nascimento, caso.esperado);
+  }
+});
+
+test('aliases reais de data_promocao_atual são resolvidos quando shape do Efetivo é diverso', () => {
+  const casos = [
+    { entrada: { promocaoAtual: { dataPromocao: '2020-01-02' } }, esperado: '02/01/2020' },
+    { entrada: { promocao_atual: { data_promocao: '2020-01-03' } }, esperado: '03/01/2020' },
+    { entrada: { dataPromocaoAtual: '2020-01-04' }, esperado: '04/01/2020' },
+    { entrada: { data_promocao_atual: '2020-01-05' }, esperado: '05/01/2020' },
+    { entrada: { historico_promocao_atual: { data: '2020-01-06' } }, esperado: '06/01/2020' },
+  ];
+
+  for (const caso of casos) {
+    const variaveis = montarVariaveisDocumentoMilitar(caso.entrada, { dataReferencia: '2026-06-02' });
+    assert.equal(variaveis.data_promocao_atual, caso.esperado);
+  }
+});
+
+test('mantém data_nascimento e data_promocao_atual vazios quando dado realmente não existe', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    nome_completo: 'Sem datas',
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_nascimento, '');
+  assert.equal(variaveis.data_promocao_atual, '');
+});
