@@ -1,17 +1,11 @@
 :root {
   --documento-militar-page-width: 210mm;
-  --documento-militar-page-height: 297mm;
   --documento-militar-page-padding-top: 20mm;
   --documento-militar-page-padding-x: 20mm;
   --documento-militar-page-padding-bottom: 16mm;
 }
 
-.documento-militar-print-shell {
-  width: 100%;
-  min-width: 0;
-}
-
-.documento-militar-print-root {
+.documento-militar-print-only-document {
   display: none;
 }
 
@@ -23,10 +17,13 @@
   padding: var(--documento-militar-page-padding-top) var(--documento-militar-page-padding-x) var(--documento-militar-page-padding-bottom);
   background: #fff;
   color: #111827;
-  box-shadow: 0 1px 5px rgb(15 23 42 / 14%);
   font-family: "Times New Roman", Times, serif;
   font-size: 12pt;
   line-height: 1.55;
+}
+
+.documento-militar-screen-document {
+  box-shadow: 0 1px 5px rgb(15 23 42 / 14%);
 }
 
 .documento-militar-cabecalho {
@@ -118,128 +115,87 @@
   text-align: center;
 }
 
+@media screen {
+  .documento-militar-print-only-document {
+    display: none !important;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 12mm 16mm;
   }
 
-  html,
+  body * {
+    visibility: hidden !important;
+  }
+
+  .documento-militar-print-only-document,
+  .documento-militar-print-only-document * {
+    visibility: visible !important;
+  }
+
   body {
-    width: var(--documento-militar-page-width) !important;
-    min-width: var(--documento-militar-page-width) !important;
-    max-width: var(--documento-militar-page-width) !important;
-    height: auto !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
     background: #fff !important;
   }
 
-  body.documento-militar-printing * {
-    visibility: hidden !important;
-  }
-
-  body.documento-militar-printing .documento-militar-no-print {
+  .documento-militar-no-print,
+  .documento-militar-screen-only,
+  .documento-militar-screen-preview,
+  .documento-militar-screen-document,
+  .documento-militar-modal-print-root,
+  .documento-militar-modal-dialog,
+  .documento-militar-modal-body,
+  .documento-militar-preview-panel {
     display: none !important;
     visibility: hidden !important;
   }
 
-  body.documento-militar-printing .documento-militar-screen-preview {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  body.documento-militar-printing .documento-militar-print-root {
+  .documento-militar-print-only-document {
     display: block !important;
-    visibility: visible !important;
-    width: var(--documento-militar-page-width) !important;
-    min-width: var(--documento-militar-page-width) !important;
-    max-width: var(--documento-militar-page-width) !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    color: #111827 !important;
+    font-family: "Times New Roman", Times, serif !important;
+    font-size: 12pt !important;
+    line-height: 1.55 !important;
     background: #fff !important;
   }
 
-  body.documento-militar-printing .documento-militar-print-root .documento-militar-print-area {
+  .documento-militar-print-only-document .documento-militar-documento {
     display: block !important;
     box-sizing: border-box !important;
-    width: var(--documento-militar-page-width) !important;
-    min-width: var(--documento-militar-page-width) !important;
-    max-width: var(--documento-militar-page-width) !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: var(--documento-militar-page-padding-top) var(--documento-militar-page-padding-x) var(--documento-militar-page-padding-bottom) !important;
-    background: #fff !important;
-    box-shadow: none !important;
-    page-break-before: auto !important;
-    page-break-after: auto !important;
-    break-before: auto !important;
-    break-after: auto !important;
-  }
-
-  body.documento-militar-printing .documento-militar-modal-print-root,
-  body.documento-militar-printing .documento-militar-modal-dialog,
-  body.documento-militar-printing .documento-militar-modal-body,
-  body.documento-militar-printing .documento-militar-preview-panel,
-  body.documento-militar-printing .documento-militar-print-shell {
-    visibility: visible !important;
-    position: static !important;
-    inset: auto !important;
-    display: block !important;
-    overflow: visible !important;
-    box-sizing: border-box !important;
-    width: var(--documento-militar-page-width) !important;
-    min-width: var(--documento-militar-page-width) !important;
-    max-width: var(--documento-militar-page-width) !important;
-    height: auto !important;
-    min-height: 0 !important;
     max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
-    background: transparent !important;
+    background: #fff !important;
     box-shadow: none !important;
-    transform: none !important;
-    contain: none !important;
-    grid-template-columns: none !important;
-    grid-template-rows: none !important;
-    flex: none !important;
-    flex-direction: initial !important;
-    align-items: initial !important;
-    justify-content: initial !important;
-    gap: 0 !important;
-  }
-
-  body.documento-militar-printing .documento-militar-print-area,
-  body.documento-militar-printing .documento-militar-print-area * {
-    visibility: visible !important;
     overflow: visible !important;
   }
 
-  body.documento-militar-printing .documento-militar-print-area {
-    display: block !important;
-    box-sizing: border-box !important;
-    width: var(--documento-militar-page-width) !important;
-    min-width: var(--documento-militar-page-width) !important;
-    max-width: var(--documento-militar-page-width) !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: var(--documento-militar-page-padding-top) var(--documento-militar-page-padding-x) var(--documento-militar-page-padding-bottom) !important;
-    background: #fff !important;
-    box-shadow: none !important;
-    page-break-before: auto !important;
-    page-break-after: auto !important;
-    break-before: auto !important;
-    break-after: auto !important;
+  .documento-militar-print-only-document .documento-militar-cabecalho {
+    margin-bottom: 10mm !important;
+  }
+
+  .documento-militar-print-only-document .documento-militar-titulo {
+    margin: 12mm 0 10mm !important;
+  }
+
+  .documento-militar-print-only-document .documento-militar-assinatura {
+    margin-top: 22mm !important;
+  }
+
+  .documento-militar-print-only-document .documento-militar-rodape {
+    margin-top: 14mm !important;
+    padding-top: 4mm !important;
   }
 }
