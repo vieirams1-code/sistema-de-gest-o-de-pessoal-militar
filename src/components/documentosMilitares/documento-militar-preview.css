@@ -130,12 +130,13 @@
     background: #fff !important;
   }
 
-  body.documento-militar-printing > *:not(.documento-militar-modal-print-root) {
-    display: none !important;
+  body.documento-militar-printing * {
+    visibility: hidden !important;
   }
 
   body.documento-militar-printing .documento-militar-no-print {
     display: none !important;
+    visibility: hidden !important;
   }
 
   body.documento-militar-printing .documento-militar-modal-print-root,
@@ -143,6 +144,7 @@
   body.documento-militar-printing .documento-militar-modal-body,
   body.documento-militar-printing .documento-militar-preview-panel,
   body.documento-militar-printing .documento-militar-print-shell {
+    visibility: visible !important;
     position: static !important;
     inset: auto !important;
     display: block !important;
@@ -173,6 +175,7 @@
 
   body.documento-militar-printing .documento-militar-print-area,
   body.documento-militar-printing .documento-militar-print-area * {
+    visibility: visible !important;
     overflow: visible !important;
   }
 
