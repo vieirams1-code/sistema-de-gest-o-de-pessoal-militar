@@ -62,7 +62,6 @@
 }
 
 .documento-militar-corpo {
-  min-height: 125mm;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   text-align: justify;
@@ -103,19 +102,64 @@
 @page { size: A4; margin: 0; }
 
 @media print {
-  body, body * { overflow: visible !important; }
-  body * { visibility: hidden !important; }
-  .documento-militar-print-area, .documento-militar-print-area * { visibility: visible !important; }
-  html, body {
+  html,
+  body {
+    width: 210mm !important;
+    min-height: 0 !important;
     margin: 0 !important;
     background: #fff !important;
   }
 
-  .documento-militar-print-area {
+  body.documento-militar-printing,
+  body.documento-militar-printing * {
+    overflow: visible !important;
+  }
+
+  body.documento-militar-printing * {
+    visibility: hidden !important;
+  }
+
+  body.documento-militar-printing .documento-militar-modal-print-root,
+  body.documento-militar-printing .documento-militar-modal-dialog,
+  body.documento-militar-printing .documento-militar-modal-body,
+  body.documento-militar-printing .documento-militar-preview-panel,
+  body.documento-militar-printing .documento-militar-print-shell {
+    display: contents !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+    visibility: visible !important;
+  }
+
+  body.documento-militar-printing .documento-militar-no-print {
+    display: none !important;
+  }
+
+  body.documento-militar-printing .documento-militar-print-area,
+  body.documento-militar-printing .documento-militar-print-area * {
+    visibility: visible !important;
+  }
+
+  body.documento-militar-printing .documento-militar-print-area {
     display: block !important;
-    width: 210mm;
-    min-height: 297mm;
-    margin: 0 auto;
-    box-shadow: none;
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 20mm 20mm 16mm !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+    break-before: auto !important;
+    break-after: auto !important;
   }
 }

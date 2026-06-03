@@ -93,3 +93,27 @@ test('retorna strings vazias quando o militar ou seus dados não estão disponí
 test('formatação de data é defensiva para valores inválidos', () => {
   assert.equal(formatarDataDocumentoMilitar('data inválida'), '');
 });
+
+test('substitui data_nascimento quando o dado chega no alias camelCase', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    dataNascimento: '1991-08-09',
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_nascimento, '09/08/1991');
+});
+
+test('substitui unidade quando o dado chega por lotação atual enriquecida', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    lotacao_atual: '3º GBM',
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.unidade, '3º GBM');
+});
+
+test('substitui data_promocao_atual quando o dado chega no alias camelCase', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    dataPromocaoAtual: '2022-11-30',
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_promocao_atual, '30/11/2022');
+});
