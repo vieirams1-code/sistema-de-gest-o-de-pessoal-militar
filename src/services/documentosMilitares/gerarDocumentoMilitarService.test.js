@@ -64,3 +64,26 @@ test('considera somente templates do módulo DocumentosMilitares', () => {
   assert.deepEqual(filtrarTemplatesDocumentosMilitares(templates), [templates[0]]);
   assert.deepEqual(filtrarTemplatesDocumentosMilitares(null), []);
 });
+
+test('preserva acentos, símbolos institucionais e quebras de linha do template e dos campos manuais', () => {
+  assert.equal(
+    renderizarDocumentoMilitarIndividual({
+      template: 'Referência: § 1º\nMilitar: {{nome_completo}}\n{{campo:observacoes}}',
+      militar,
+      camposManuais: { observacoes: 'Promoção à 2ª classe\nTemperatura: 30°' },
+    }),
+    'Referência: § 1º\nMilitar: Maria da Silva\nPromoção à 2ª classe\nTemperatura: 30°'
+  );
+});
+
+test('renderiza template grande sem truncar conteúdo equivalente a cinco páginas', () => {
+  const blocos = Array.from({ length: 5 }, (_, pagina) => (
+    `Página ${pagina + 1}: {{nome_completo}}\n${'Linha institucional preservada.\n'.repeat(55)}`
+  ));
+  const template = blocos.join('\n');
+  const resultado = renderizarDocumentoMilitarIndividual({ template, militar });
+
+  assert.equal(resultado, template.replaceAll('{{nome_completo}}', 'Maria da Silva'));
+  assert.match(resultado, /Página 1: Maria da Silva/);
+  assert.match(resultado, /Página 5: Maria da Silva/);
+});

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import DocumentoMilitarPreview from '@/components/documentosMilitares/DocumentoMilitarPreview';
 import { MODULO_DOCUMENTOS_MILITARES } from '@/services/documentosMilitares/documentoMilitarVarsService';
 import {
@@ -70,9 +71,9 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+      <div className="flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[90vh]">
+        <div className="flex items-center justify-between border-b p-4 sm:p-6">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold text-[#1e3a5f]">
               <FileText className="h-5 w-5" />
@@ -85,7 +86,7 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
           </Button>
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto p-6 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 sm:p-6 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] md:gap-6">
           <div className="space-y-5">
             <div>
               <Label className="text-sm font-medium">Template</Label>
@@ -130,9 +131,10 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                     <Label htmlFor={`campo-documento-${campo}`} className="text-sm font-medium">
                       {formatarRotuloCampo(campo)}
                     </Label>
-                    <Input
+                    <Textarea
                       id={`campo-documento-${campo}`}
-                      className="mt-1.5"
+                      className="mt-1.5 min-h-16 resize-y"
+                      rows={2}
                       value={camposManuais[campo] || ''}
                       onChange={(event) => setCamposManuais((atuais) => ({ ...atuais, [campo]: event.target.value }))}
                       placeholder={`Informe ${formatarRotuloCampo(campo).toLowerCase()}`}
@@ -144,7 +146,7 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
           </div>
 
           <div className="min-h-[320px] rounded-xl border border-slate-200 bg-slate-100 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-700">Prévia institucional para impressão</h3>
               <Button variant="ghost" size="sm" onClick={() => setConfigurandoImpressao((atual) => !atual)}>
                 <Settings className="mr-1.5 h-4 w-4" />
@@ -205,7 +207,7 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t px-6 py-4">
+        <div className="flex justify-end gap-2 border-t px-4 py-3 sm:px-6 sm:py-4">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
           <Button onClick={() => window.print()} disabled={!previa.trim()}>
             <Printer className="mr-2 h-4 w-4" />
