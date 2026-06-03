@@ -31,6 +31,31 @@ function formatarRotuloCampo(chave) {
     .join(' ');
 }
 
+function templateResolveTituloNoCorpo(template = '', titulo = '') {
+  const texto = typeof template === 'string' ? template : '';
+  const tituloSeguro = typeof titulo === 'string' ? titulo.trim() : '';
+
+  if (/{{\s*titulo_documento\s*}}/.test(texto)) return true;
+
+  const primeiraLinha = texto
+    .split(/\r?\n/)
+    .map((linha) => linha.trim())
+    .find(Boolean) || '';
+  const primeiraLinhaPareceTitulo = primeiraLinha.length > 0
+    && primeiraLinha.length <= 100
+    && primeiraLinha === primeiraLinha.toLocaleUpperCase('pt-BR')
+    && /[A-ZÀ-Ý]/.test(primeiraLinha);
+
+  if (primeiraLinhaPareceTitulo) return true;
+  if (!tituloSeguro) return false;
+
+  return texto
+    .split(/\r?\n/)
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .some((linha) => linha === tituloSeguro);
+}
+
 export default function GerarDocumentoMilitarModal({ militar, onClose }) {
   const [templateId, setTemplateId] = useState('');
   const [camposManuais, setCamposManuais] = useState({});
@@ -79,11 +104,22 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
     () => identificarCamposTemplateDocumentoMilitar(templateSelecionado?.template),
     [templateSelecionado?.template]
   );
+  const tituloDocumentoEfetivo = useMemo(() => (
+    tituloDocumento.trim() || templateSelecionado?.nome || configImpressao.tituloDocumentoPadrao || ''
+  ), [tituloDocumento, templateSelecionado?.nome, configImpressao.tituloDocumentoPadrao]);
+  const exibirTituloAutomatico = useMemo(() => !templateResolveTituloNoCorpo(
+    templateSelecionado?.template,
+    tituloDocumentoEfetivo
+  ), [templateSelecionado?.template, tituloDocumentoEfetivo]);
   const previa = useMemo(() => renderizarDocumentoMilitarIndividual({
     template: templateSelecionado?.template,
     militar: militarComPromocao,
     camposManuais,
-  }), [templateSelecionado?.template, militarComPromocao, camposManuais]);
+    opcoesVariaveis: {
+      signatario: configImpressao,
+      tituloDocumento: tituloDocumentoEfetivo,
+    },
+  }), [templateSelecionado?.template, militarComPromocao, camposManuais, configImpressao, tituloDocumentoEfetivo]);
 
   useEffect(() => {
     setCamposManuais({});
@@ -227,7 +263,6 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                     ['orgaoLinha3', 'Órgão - linha 3'],
                     ['orgaoLinha4', 'Órgão - linha 4'],
                     ['orgaoLinha5', 'Órgão - linha 5'],
-                    ['tituloDocumentoPadrao', 'Título padrão'],
                     ['imagemCabecalhoSrc', 'Imagem institucional (URL ou data URL)'],
                     ['cidadePadrao', 'Cidade padrão'],
                     ['rodapeLinha1', 'Rodapé - linha 1'],
@@ -280,8 +315,11 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                   </div>
                   {[
                     ['nomeSignatario', 'Nome do signatário'],
+                    ['postoGraduacaoSignatario', 'Posto/graduação do signatário'],
+                    ['quadroSignatario', 'Quadro do signatário'],
                     ['cargoSignatario', 'Cargo do signatário'],
                     ['matriculaSignatario', 'Matrícula do signatário'],
+                    ['funcaoSignatario', 'Função do signatário'],
                   ].map(([campo, rotulo]) => (
                     <div key={campo}>
                       <Label htmlFor={`config-impressao-${campo}`}>{rotulo}</Label>
@@ -309,10 +347,10 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                   className="mt-1"
                   value={tituloDocumento}
                   onChange={(event) => setTituloDocumento(event.target.value)}
-                  placeholder={configImpressao.tituloDocumentoPadrao || 'DOCUMENTO MILITAR'}
+                  placeholder={templateSelecionado?.nome || configImpressao.tituloDocumentoPadrao || 'Título opcional'}
                 />
                 <p className="mt-1 text-xs text-slate-500">
-                  Se ficar vazio, a prévia usa o título padrão da configuração local.
+                  Use <code>{'{{titulo_documento}}'}</code> no corpo do template para renderizar este título sem criar cabeçalho duplicado.
                 </p>
               </div>
             )}
@@ -322,7 +360,8 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
                 <DocumentoMilitarPreview
                   texto={previa}
                   config={configImpressao}
-                  tituloDocumento={tituloDocumento}
+                  tituloDocumento={tituloDocumentoEfetivo}
+                  exibirTituloAutomatico={exibirTituloAutomatico}
                   variant="screen"
                 />
               </div>
@@ -346,7 +385,8 @@ export default function GerarDocumentoMilitarModal({ militar, onClose }) {
         <DocumentoMilitarPreview
           texto={previa}
           config={configImpressao}
-          tituloDocumento={tituloDocumento}
+          tituloDocumento={tituloDocumentoEfetivo}
+          exibirTituloAutomatico={exibirTituloAutomatico}
           variant="print"
         />
       </section>

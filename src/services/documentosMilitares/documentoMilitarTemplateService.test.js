@@ -28,6 +28,13 @@ const VARIAVEIS_ESPERADAS = [
   'tempo_servico',
   'data_atual',
   'cidade',
+  'titulo_documento',
+  'signatario_nome',
+  'signatario_posto_graduacao',
+  'signatario_quadro',
+  'signatario_matricula',
+  'signatario_funcao',
+  'assinatura_signatario',
 ];
 
 test('expõe DocumentosMilitares como módulo disponível para templates', () => {
@@ -109,5 +116,12 @@ test('preview administrativo substitui campos dinâmicos simulados e preserva os
   assert.equal(
     previewTemplateDocumentoMilitar('{{nome_completo}} / {{campo:nome_curso}} / {{campo:observacoes}}'),
     'Maria da Silva / Curso de Formação / {{campo:observacoes}}'
+  );
+});
+
+test('preview administrativo resolve variáveis canônicas do signatário e título', () => {
+  assert.equal(
+    previewTemplateDocumentoMilitar('{{titulo_documento}}\n{{assinatura_signatario}}'),
+    'DOCUMENTO MILITAR\nEdson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe da B1/1ºGBM/CBMMS'
   );
 });

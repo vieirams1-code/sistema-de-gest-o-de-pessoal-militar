@@ -45,6 +45,14 @@ function obterLotacaoSignatario(militar = {}) {
   );
 }
 
+function obterQuadroSignatario(militar = {}) {
+  return primeiroTexto(
+    militar.quadro,
+    militar.quadro_nome,
+    militar.militar_quadro,
+  );
+}
+
 function obterMatriculaSignatario(militar = {}) {
   return primeiroTexto(
     militar.matricula_atual,
@@ -60,14 +68,63 @@ export function normalizarSignatarioMilitar(militar = {}) {
   const fonte = militar && typeof militar === 'object' ? militar : {};
   const nome = primeiroTexto(fonte.nome_completo, fonte.militar_nome, fonte.nome, fonte.nome_guerra);
   const postoGraduacao = primeiroTexto(fonte.posto_graduacao, fonte.militar_posto, fonte.posto, fonte.graduacao);
+  const quadro = obterQuadroSignatario(fonte);
   const funcao = obterFuncaoSignatario(fonte);
   const lotacao = obterLotacaoSignatario(fonte);
+  const funcaoComLotacao = [funcao, lotacao].filter(Boolean).join('/');
   const detalhesCargo = [funcao, lotacao].filter(Boolean).join(' / ');
   const cargoSignatario = [postoGraduacao, detalhesCargo].filter(Boolean).join(' - ');
+  const matricula = obterMatriculaSignatario(fonte);
 
   return {
     nomeSignatario: nome,
+    postoGraduacaoSignatario: postoGraduacao,
+    quadroSignatario: quadro,
+    funcaoSignatario: funcaoComLotacao,
     cargoSignatario,
-    matriculaSignatario: obterMatriculaSignatario(fonte),
+    matriculaSignatario: matricula,
+  };
+}
+
+export function montarLinhaIdentificacaoSignatario({ nome = '', postoGraduacao = '', quadro = '' } = {}) {
+  const nomeSeguro = textoSeguro(nome);
+  const postoQuadro = [textoSeguro(postoGraduacao), textoSeguro(quadro)].filter(Boolean).join(' ');
+
+  if (nomeSeguro && postoQuadro) return `${nomeSeguro} - ${postoQuadro}`;
+  return nomeSeguro || postoQuadro;
+}
+
+export function montarAssinaturaSignatario({ nome = '', postoGraduacao = '', quadro = '', matricula = '', funcao = '' } = {}) {
+  const linhaIdentificacao = montarLinhaIdentificacaoSignatario({ nome, postoGraduacao, quadro });
+  const matriculaSegura = textoSeguro(matricula);
+
+  return [
+    linhaIdentificacao,
+    matriculaSegura ? `Matrícula ${matriculaSegura}` : '',
+    textoSeguro(funcao),
+  ].filter(Boolean).join('\n');
+}
+
+export function montarVariaveisSignatarioDocumentoMilitar(signatario = {}) {
+  const fonte = signatario && typeof signatario === 'object' ? signatario : {};
+  const nome = primeiroTexto(fonte.signatario_nome, fonte.nomeSignatario, fonte.nome, fonte.nome_completo);
+  const postoGraduacao = primeiroTexto(
+    fonte.signatario_posto_graduacao,
+    fonte.postoGraduacaoSignatario,
+    fonte.posto_graduacao,
+    fonte.posto,
+    fonte.graduacao,
+  );
+  const quadro = primeiroTexto(fonte.signatario_quadro, fonte.quadroSignatario, fonte.quadro, fonte.quadro_nome, fonte.militar_quadro);
+  const matricula = primeiroTexto(fonte.signatario_matricula, fonte.matriculaSignatario, fonte.matricula_atual, fonte.matricula);
+  const funcao = primeiroTexto(fonte.signatario_funcao, fonte.funcaoSignatario, fonte.funcao, fonte.cargoSignatario);
+
+  return {
+    signatario_nome: nome,
+    signatario_posto_graduacao: postoGraduacao,
+    signatario_quadro: quadro,
+    signatario_matricula: matricula,
+    signatario_funcao: funcao,
+    assinatura_signatario: montarAssinaturaSignatario({ nome, postoGraduacao, quadro, matricula, funcao }),
   };
 }

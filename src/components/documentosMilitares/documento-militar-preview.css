@@ -83,6 +83,17 @@
   text-align: justify;
 }
 
+.documento-militar-assinatura-inline,
+.documento-militar-assinatura-texto {
+  white-space: pre-wrap;
+  text-align: center;
+}
+
+.documento-militar-assinatura-inline {
+  break-inside: avoid;
+  margin: 18mm auto 0;
+}
+
 .documento-militar-assinatura {
   break-inside: avoid;
   margin-top: 22mm;
