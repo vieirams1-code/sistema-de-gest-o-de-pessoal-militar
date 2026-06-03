@@ -26,7 +26,6 @@ const adminOnlyPages = new Set([
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
   'Medicos',
-  'GratificacoesFuncao',
 ]);
 
 
@@ -47,6 +46,7 @@ const moduleGuardByPage = {
   ContratosDesignacao: { moduleKey: 'militares', actionKeys: ['visualizar_contratos_designacao', 'gerir_contratos_designacao'], moduleName: 'Contratos de Designação' },
   Armamentos: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   Medalhas: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
+  GratificacoesFuncao: { actionKey: 'visualizar_gratificacoes_funcao', moduleName: 'Gratificação de Função' },
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   AntiguidadeConfigQuadros: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
