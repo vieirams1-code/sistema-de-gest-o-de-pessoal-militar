@@ -14,7 +14,6 @@ import {
   GRATIFICACAO_TABS,
   GRATIFICACAO_TAB_LABELS,
   aplicarFiltrosGratificacoesFuncao,
-  calcularResumoGratificacoesFuncao,
   fetchPainelGratificacoesFuncao,
   filtrarGratificacoesPorAba,
   getMatriculaGratificacao,
@@ -225,9 +224,20 @@ export default function GratificacoesFuncao() {
   const [funcao, setFuncao] = useState(TODOS);
   const [unidade, setUnidade] = useState(TODOS);
 
+  const filtrosBackend = useMemo(() => ({
+    tab: aba,
+    busca,
+    status: status === TODOS ? undefined : status,
+    tipo_gratificacao_funcao_id: tipo === TODOS ? undefined : tipo,
+    funcao_gratificada: funcao === TODOS ? undefined : funcao,
+    unidade_id: unidade === TODOS ? undefined : unidade,
+    limit: 200,
+    offset: 0,
+  }), [aba, busca, status, tipo, funcao, unidade]);
+
   const query = useQuery({
-    queryKey: ['gratificacoes-funcao-painel'],
-    queryFn: () => fetchPainelGratificacoesFuncao(),
+    queryKey: ['gratificacoes-funcao-painel', filtrosBackend],
+    queryFn: () => fetchPainelGratificacoesFuncao(filtrosBackend),
     enabled: canView,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
@@ -236,7 +246,7 @@ export default function GratificacoesFuncao() {
   const gratificacoes = query.data?.gratificacoes || [];
   const cotas = query.data?.cotas || [];
   const tipos = query.data?.tipos || [];
-  const resumo = useMemo(() => calcularResumoGratificacoesFuncao(gratificacoes, cotas), [gratificacoes, cotas]);
+  const resumo = query.data?.counters || {};
   const opcoes = useMemo(() => listarOpcoesGratificacao(gratificacoes, cotas, tipos), [gratificacoes, cotas, tipos]);
 
   const filtros = useMemo(() => ({ busca, status, tipo, funcao, unidade }), [busca, status, tipo, funcao, unidade]);
@@ -284,7 +294,7 @@ export default function GratificacoesFuncao() {
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 lg:max-w-md">
               <div className="flex gap-2">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <p><span className="font-semibold">Risco registrado:</span> ainda não há function escopada para este módulo. A leitura direta está limitada ao perfil administrativo e a 1000 registros por entidade.</p>
+                <p><span className="font-semibold">Leitura escopada:</span> os dados são carregados por functions backend com autorização, escopo estrutural e paginação. A tela permanece somente leitura e admin-only neste lote.</p>
               </div>
             </div>
           </div>
