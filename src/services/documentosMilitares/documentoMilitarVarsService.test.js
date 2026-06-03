@@ -117,3 +117,15 @@ test('substitui data_promocao_atual quando o dado chega no alias camelCase', () 
 
   assert.equal(variaveis.data_promocao_atual, '30/11/2022');
 });
+
+test('substitui variáveis residuais quando aliases enriquecidos existem', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    data_de_nascimento: { data: '1992-07-14' },
+    unidadeAtual: { sigla: '4º GBM' },
+    promocao_atual: { data: '2020-02-29' },
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_nascimento, '14/07/1992');
+  assert.equal(variaveis.unidade, '4º GBM');
+  assert.equal(variaveis.data_promocao_atual, '29/02/2020');
+});
