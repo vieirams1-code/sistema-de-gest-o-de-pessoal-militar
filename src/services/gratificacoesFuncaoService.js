@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 export const GRATIFICACAO_STATUS = {
   RASCUNHO: 'rascunho',
@@ -46,7 +47,8 @@ export const GRATIFICACAO_TAB_LABELS = {
   [GRATIFICACAO_TABS.TIPOS]: 'Tipos de gratificação',
 };
 
-const DEFAULT_LIMIT = 1000;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
 
 const normalizeText = (value) => String(value ?? '').trim().toLowerCase();
 const normalizeStatus = (value) => normalizeText(value);
@@ -103,7 +105,8 @@ export function calcularResumoGratificacoesFuncao(gratificacoes = [], cotas = []
   return {
     cotasAutorizadas,
     cotasOcupadas,
-    cotasDisponiveis: cotasAutorizadas - cotasOcupadas,
+    cotasDisponiveis: Math.max(cotasAutorizadas - cotasOcupadas, 0),
+    cotasExcedentes: Math.max(cotasOcupadas - cotasAutorizadas, 0),
     solicitacoesPendentes,
     nomeacoesAtivas: cotasOcupadas,
     dispensasPendentes,
@@ -190,21 +193,67 @@ export function listarOpcoesGratificacao(gratificacoes = [], cotas = [], tipos =
   };
 }
 
-export async function fetchPainelGratificacoesFuncao({ limit = DEFAULT_LIMIT } = {}) {
-  const [gratificacoes, cotas, tipos] = await Promise.all([
-    base44.entities.GratificacaoFuncao.list('-updated_date', limit),
-    base44.entities.CotaGratificacaoFuncao.list('-updated_date', limit),
-    base44.entities.TipoGratificacaoFuncao.list('nome', limit),
+function normalizarLimit(limit) {
+  const parsed = Number(limit);
+  if (!Number.isFinite(parsed)) return DEFAULT_LIMIT;
+  return Math.min(Math.max(Math.floor(parsed), 1), MAX_LIMIT);
+}
+
+function montarPayloadEscopado(payload = {}) {
+  const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : getEffectiveEmail();
+  const finalPayload = { ...(payload || {}), limit: normalizarLimit(payload.limit), offset: Math.max(Number(payload.offset) || 0, 0) };
+  if (effectiveEmail) finalPayload['effectiveEmail'] = effectiveEmail;
+  else delete finalPayload['effectiveEmail'];
+  return finalPayload;
+}
+
+function assertFunctionResponse(body, fallbackMessage) {
+  if (body?.error) {
+    const error = new Error(body.error || fallbackMessage);
+    if (body?.meta?.status) error['status'] = body.meta.status;
+    throw error;
+  }
+}
+
+export async function fetchScopedCotasGratificacaoFuncao(payload = {}) {
+  const response = await base44.functions.invoke('getScopedCotasGratificacaoFuncao', montarPayloadEscopado(payload));
+  const body = response?.data ?? response ?? {};
+  assertFunctionResponse(body, 'Erro ao carregar cotas escopadas de Gratificação de Função.');
+  return {
+    cotas: Array.isArray(body?.cotas) ? body.cotas : [],
+    totais: body?.totais && typeof body.totais === 'object' ? body.totais : {},
+    tipos: Array.isArray(body?.tipos) ? body.tipos : [],
+    meta: body?.meta && typeof body.meta === 'object' ? body.meta : { scopedFunction: true, hasNext: false },
+  };
+}
+
+export async function fetchPainelGratificacoesFuncao(payload = {}) {
+  const finalPayload = montarPayloadEscopado(payload);
+  const [painelResponse, cotasResponse] = await Promise.all([
+    base44.functions.invoke('getScopedPainelGratificacoesFuncao', finalPayload),
+    base44.functions.invoke('getScopedCotasGratificacaoFuncao', finalPayload),
   ]);
 
+  const painelBody = painelResponse?.data ?? painelResponse ?? {};
+  const cotasBody = cotasResponse?.data ?? cotasResponse ?? {};
+  assertFunctionResponse(painelBody, 'Erro ao carregar painel escopado de Gratificação de Função.');
+  assertFunctionResponse(cotasBody, 'Erro ao carregar cotas escopadas de Gratificação de Função.');
+
+  const tiposPainel = Array.isArray(painelBody?.tipos) ? painelBody.tipos : [];
+  const tiposCotas = Array.isArray(cotasBody?.tipos) ? cotasBody.tipos : [];
+
   return {
-    gratificacoes: Array.isArray(gratificacoes) ? gratificacoes : [],
-    cotas: Array.isArray(cotas) ? cotas : [],
-    tipos: Array.isArray(tipos) ? tipos : [],
+    gratificacoes: Array.isArray(painelBody?.gratificacoes) ? painelBody.gratificacoes : [],
+    cotas: Array.isArray(cotasBody?.cotas) ? cotasBody.cotas : [],
+    tipos: tiposPainel.length ? tiposPainel : tiposCotas,
+    counters: painelBody?.counters && typeof painelBody.counters === 'object' ? painelBody.counters : {},
+    cotasTotais: cotasBody?.totais && typeof cotasBody.totais === 'object' ? cotasBody.totais : {},
+    facets: painelBody?.facets && typeof painelBody.facets === 'object' ? painelBody.facets : {},
     meta: {
-      limit,
-      scopedFunction: false,
-      risk: 'Ainda não há function escopada específica para Gratificação de Função; leitura inicial limitada ao perfil administrativo e a 1000 registros por entidade.',
+      ...(painelBody?.meta && typeof painelBody.meta === 'object' ? painelBody.meta : {}),
+      cotas: cotasBody?.meta && typeof cotasBody.meta === 'object' ? cotasBody.meta : {},
+      scopedFunction: true,
+      readOnly: true,
     },
   };
 }
