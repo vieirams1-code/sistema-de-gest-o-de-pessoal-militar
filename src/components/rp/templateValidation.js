@@ -242,6 +242,7 @@ function getDescricaoEscopoTemplate(template = {}) {
 
 export function getConflitoUnicidadeTemplate(template = {}, templates = [], { ignoreId = null, considerarApenasAtivos = true } = {}) {
   if (!template?.modulo || !template?.tipo_registro) return null;
+  if (normalizarModulo(template.modulo) === normalizarModulo(MODULO_DOCUMENTOS_MILITARES)) return null;
 
   const templateNormalizado = normalizarEscopoTemplate(template);
   const chaveComparacao = getChaveUnicidadeTemplate({

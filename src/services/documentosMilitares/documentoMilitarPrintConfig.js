@@ -4,6 +4,10 @@ export const DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS = Object.freeze({
   mostrarCabecalho: true,
   mostrarBrasao: true,
   mostrarAssinatura: true,
+  orgaoLinha1: 'CORPO DE BOMBEIROS MILITAR DO ESTADO DE MATO GROSSO DO SUL',
+  orgaoLinha2: '1º GRUPAMENTO DE BOMBEIROS MILITAR',
+  orgaoLinha3: 'SEÇÃO DE GESTÃO DE PESSOAS',
+  tituloDocumentoPadrao: 'DOCUMENTO MILITAR',
   cidadePadrao: '',
   nomeSignatario: '',
   cargoSignatario: '',
@@ -11,7 +15,16 @@ export const DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS = Object.freeze({
 });
 
 const CAMPOS_BOOLEANOS = new Set(['mostrarCabecalho', 'mostrarBrasao', 'mostrarAssinatura']);
-const CAMPOS_TEXTO = new Set(['cidadePadrao', 'nomeSignatario', 'cargoSignatario', 'matriculaSignatario']);
+const CAMPOS_TEXTO = new Set([
+  'orgaoLinha1',
+  'orgaoLinha2',
+  'orgaoLinha3',
+  'tituloDocumentoPadrao',
+  'cidadePadrao',
+  'nomeSignatario',
+  'cargoSignatario',
+  'matriculaSignatario',
+]);
 
 function normalizarConfig(config = {}) {
   const configNormalizada = { ...DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS };

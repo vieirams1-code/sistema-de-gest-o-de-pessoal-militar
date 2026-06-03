@@ -44,6 +44,7 @@ import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/q
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
+import GerarDocumentoMilitarModal from '@/components/documentosMilitares/GerarDocumentoMilitarModal';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
 import { bulkMilitarFuncoesEscopado, bulkMilitarTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
@@ -194,6 +195,8 @@ export default function Militares() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
   const [militarPromocaoAtual, setMilitarPromocaoAtual] = useState(null);
+  const [militarDocumento, setMilitarDocumento] = useState(null);
+  const [abrindoDocumentoMilitar, setAbrindoDocumentoMilitar] = useState(false);
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [pageOffset, setPageOffset] = useState(0);
   const [militaresAcumulados, setMilitaresAcumulados] = useState([]);
@@ -915,6 +918,46 @@ export default function Militares() {
     setMilitarPromocaoAtual(militar);
   }, []);
 
+  const handleGerarDocumentoSelecionado = useCallback(async () => {
+    const totalSelecionados = selectedMilitarIds.size;
+    if (totalSelecionados === 0) {
+      toast({ title: 'Selecione 1 militar', description: 'Marque um militar no Efetivo para gerar o documento.' });
+      return;
+    }
+
+    if (totalSelecionados > 1) {
+      toast({
+        title: 'Seleção múltipla não disponível',
+        description: 'Neste momento, selecione apenas 1 militar. A geração em lote será implementada posteriormente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const [militarId] = Array.from(selectedMilitarIds);
+    const militarSelecionado = selectedMilitaresById.get(String(militarId));
+    setAbrindoDocumentoMilitar(true);
+    try {
+      const { militares: detalhes } = await fetchScopedMilitares({
+        militarIds: [militarId],
+        includeFoto: false,
+        limit: 1,
+        offset: 0,
+      });
+      const [detalhado] = await carregarMilitaresComMatriculas(detalhes || []);
+      setMilitarDocumento({ ...(militarSelecionado || {}), ...(detalhado || {}) });
+    } catch {
+      if (militarSelecionado) {
+        setMilitarDocumento(militarSelecionado);
+        toast({ title: 'Usando dados já carregados', description: 'Não foi possível atualizar os detalhes, então a prévia usará os dados da lista.' });
+      } else {
+        toast({ title: 'Não foi possível abrir o gerador', description: 'O militar selecionado não foi encontrado no escopo atual.', variant: 'destructive' });
+      }
+    } finally {
+      setAbrindoDocumentoMilitar(false);
+    }
+  }, [selectedMilitarIds, selectedMilitaresById, toast]);
+
   const handleExportExcel = ({ mode }) => {
     const isSelectedMode = mode === 'selected';
     const militaresParaExportar = isSelectedMode ? filteredSelectedMilitares : filteredMilitares;
@@ -1008,6 +1051,14 @@ export default function Militares() {
             </Button>
             <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
               Colunas ({sanitizedVisibleColumnKeys.length}/{allowedColumns.length})
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleGerarDocumentoSelecionado}
+              disabled={abrindoDocumentoMilitar || selectedMilitarIds.size === 0}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Gerar Documento
             </Button>
             <TooltipProvider delayDuration={120}>
               <Tooltip>
@@ -1473,6 +1524,12 @@ export default function Militares() {
         onOpenChange={(open) => { if (!open) setMilitarPromocaoAtual(null); }}
         militar={militarPromocaoAtual}
       />
+      {militarDocumento && (
+        <GerarDocumentoMilitarModal
+          militar={militarDocumento}
+          onClose={() => setMilitarDocumento(null)}
+        />
+      )}
       <MilitarTagsBulkPanel
         open={bulkPanelOpen}
         onClose={() => setBulkPanelOpen(false)}

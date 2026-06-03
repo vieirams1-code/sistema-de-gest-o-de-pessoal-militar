@@ -8,8 +8,8 @@ test('área de impressão permite paginação sem fixar conteúdo nas páginas s
   const css = await readFile(cssUrl, 'utf8');
   const blocoImpressao = css.match(/@media print\s*{([\s\S]*)}\s*$/)?.[1] || '';
 
-  assert.match(blocoImpressao, /\.documento-militar-print-area\s*{[^}]*position:\s*absolute;/);
-  assert.doesNotMatch(blocoImpressao, /\.documento-militar-print-area\s*{[^}]*position:\s*fixed;/);
+  assert.doesNotMatch(blocoImpressao, /position:\s*fixed;/);
+  assert.doesNotMatch(blocoImpressao, /\.documento-militar-print-area\s*{[^}]*position:/);
 });
 
 test('cabeçalho e assinatura não são fragmentados entre páginas', async () => {

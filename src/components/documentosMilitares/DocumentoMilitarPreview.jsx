@@ -15,8 +15,10 @@ export default function DocumentoMilitarPreview({ texto = '', config, brasaoSrc 
         <header className="documento-militar-cabecalho">
           {dados.brasaoSrc && <img className="documento-militar-brasao" src={dados.brasaoSrc} alt="Brasão institucional" />}
           <div>
-            <p className="documento-militar-orgao">INSTITUIÇÃO MILITAR</p>
-            <p className="documento-militar-titulo">DOCUMENTO MILITAR</p>
+            {[dados.orgaoLinha1, dados.orgaoLinha2, dados.orgaoLinha3].filter(Boolean).map((linha, index) => (
+              <p key={index} className="documento-militar-orgao">{linha}</p>
+            ))}
+            <p className="documento-militar-titulo">{dados.tituloDocumentoPadrao}</p>
           </div>
         </header>
       )}

@@ -53,6 +53,21 @@ test('monta variáveis amplas formatando datas e calculando o tempo de serviço'
   });
 });
 
+
+test('resolve aliases defensivos para nascimento, unidade, situação e promoção atual', () => {
+  const variaveis = montarVariaveisDocumentoMilitar({
+    nascimento: '1985-03-04',
+    lotacao_unidade: '2º GBM',
+    situacao_funcional: 'Agregado',
+    data_ultima_promocao: '2023-12-10',
+  }, { dataReferencia: '2026-06-02' });
+
+  assert.equal(variaveis.data_nascimento, '04/03/1985');
+  assert.equal(variaveis.unidade, '2º GBM');
+  assert.equal(variaveis.situacao, 'Agregado');
+  assert.equal(variaveis.data_promocao_atual, '10/12/2023');
+});
+
 test('retorna strings vazias quando o militar ou seus dados não estão disponíveis', () => {
   assert.deepEqual(montarVariaveisDocumentoMilitar(null, { dataReferencia: null }), {
     nome_completo: '',
