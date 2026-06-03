@@ -214,9 +214,10 @@ function TiposTable({ tipos }) {
 }
 
 export default function GratificacoesFuncao() {
-  const { isAdmin, canAccessAll, permissions, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, canAccessAction, canAccessAll, permissions, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
-  const canView = hasAbsoluteAccess || isAdmin;
+  const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_gratificacoes_funcao');
+  const canViewAdministrativeQuotas = hasAbsoluteAccess || isAdmin || modoAcesso !== 'proprio';
   const [aba, setAba] = useState(GRATIFICACAO_TABS.ATIVOS);
   const [busca, setBusca] = useState('');
   const [status, setStatus] = useState(TODOS);
@@ -244,7 +245,8 @@ export default function GratificacoesFuncao() {
   });
 
   const gratificacoes = query.data?.gratificacoes || [];
-  const cotas = query.data?.cotas || [];
+  const cotasBackend = query.data?.cotas || [];
+  const cotas = canViewAdministrativeQuotas ? cotasBackend : [];
   const tipos = query.data?.tipos || [];
   const resumo = query.data?.counters || {};
   const opcoes = useMemo(() => listarOpcoesGratificacao(gratificacoes, cotas, tipos), [gratificacoes, cotas, tipos]);
@@ -294,7 +296,7 @@ export default function GratificacoesFuncao() {
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 lg:max-w-md">
               <div className="flex gap-2">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <p><span className="font-semibold">Leitura escopada:</span> os dados são carregados por functions backend com autorização, escopo estrutural e paginação. A tela permanece somente leitura e admin-only neste lote.</p>
+                <p><span className="font-semibold">Leitura escopada:</span> os dados são carregados por functions backend com autorização, escopo estrutural e paginação. A tela permanece somente leitura e não oferece criação, edição, exclusão ou alteração de status.</p>
               </div>
             </div>
           </div>
@@ -343,7 +345,7 @@ export default function GratificacoesFuncao() {
 
         <Tabs value={aba} onValueChange={setAba} className="w-full">
           <TabsList className="flex h-auto flex-wrap justify-start gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-            {TAB_KEYS.map((tab) => <TabsTrigger key={tab} value={tab} className="rounded-xl px-3 py-2 text-xs md:text-sm">{GRATIFICACAO_TAB_LABELS[tab]}</TabsTrigger>)}
+            {TAB_KEYS.filter((tab) => canViewAdministrativeQuotas || tab !== GRATIFICACAO_TABS.COTAS).map((tab) => <TabsTrigger key={tab} value={tab} className="rounded-xl px-3 py-2 text-xs md:text-sm">{GRATIFICACAO_TAB_LABELS[tab]}</TabsTrigger>)}
           </TabsList>
         </Tabs>
 
