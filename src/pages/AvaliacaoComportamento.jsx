@@ -205,10 +205,12 @@ export default function AvaliacaoComportamento() {
         }
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] });
-      await queryClient.invalidateQueries({ queryKey: ['militares'] });
-      await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
-      await queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] }),
+        queryClient.invalidateQueries({ queryKey: ['militares'] }),
+        queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+      ]);
 
       const descricaoPublicacao = !gerarPublicacao
         ? 'Comportamento aplicado com sucesso.'
@@ -254,9 +256,11 @@ export default function AvaliacaoComportamento() {
   const gerarPendencias = async () => {
     if (!canGerarPendencias) return;
     const alvos = avaliacao.filter((a) => a.divergente && !a.pendenciaExistente && !a.inconsistenteCalculo);
-    if (alvos.length > 0) {
-      await Promise.all(alvos.map((linha) => gerarPendencia(linha)));
-    }
+
+    // ⚡ [Performance]: Execute generation tasks concurrently.
+    // Sequential await in a loop was replaced by Promise.all mapping for faster batch execution.
+    await Promise.all(alvos.map((linha) => gerarPendencia(linha)));
+
     await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
   };
 
