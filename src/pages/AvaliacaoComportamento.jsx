@@ -205,10 +205,12 @@ export default function AvaliacaoComportamento() {
         }
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] });
-      await queryClient.invalidateQueries({ queryKey: ['militares'] });
-      await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
-      await queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] }),
+        queryClient.invalidateQueries({ queryKey: ['militares'] }),
+        queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+      ]);
 
       const descricaoPublicacao = !gerarPublicacao
         ? 'Comportamento aplicado com sucesso.'
