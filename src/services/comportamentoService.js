@@ -59,33 +59,24 @@ async function buscarPendenciaPorId(pendenciaEntity, id) {
 async function resolverPendenciasEntrada(pendenciasEntrada = [], pendenciaEntity) {
   if (!Array.isArray(pendenciasEntrada) || pendenciasEntrada.length === 0) return [];
 
-  const resolvidas = [];
-  for (const item of pendenciasEntrada) {
+  return Promise.all(pendenciasEntrada.map(async (item) => {
     if (typeof item === 'string' || typeof item === 'number') {
       const pendencia = await buscarPendenciaPorId(pendenciaEntity, normalizarId(item));
-      resolvidas.push(pendencia || { id: normalizarId(item), __nao_encontrada: true });
-      // eslint-disable-next-line no-continue
-      continue;
+      return pendencia || { id: normalizarId(item), __nao_encontrada: true };
     }
 
     if (item && typeof item === 'object') {
       const id = normalizarId(item.id);
       if (!id) {
-        resolvidas.push(item);
-        // eslint-disable-next-line no-continue
-        continue;
+        return item;
       }
 
       const pendenciaAtualizada = await buscarPendenciaPorId(pendenciaEntity, id);
-      resolvidas.push(pendenciaAtualizada || item);
-      // eslint-disable-next-line no-continue
-      continue;
+      return pendenciaAtualizada || item;
     }
 
-    resolvidas.push({ id: '', __entrada_invalida: true });
-  }
-
-  return resolvidas;
+    return { id: '', __entrada_invalida: true };
+  }));
 }
 
 function montarItemRelatorio({ pendencia, motivo, erro, militar }) {
@@ -134,46 +125,52 @@ export async function aplicarPendenciasComportamentoEmLote({
 
   const pendenciasResolvidas = await resolverPendenciasEntrada(pendencias, pendenciaEntity);
 
-  for (const pendencia of pendenciasResolvidas) {
+  // Agrupar pendências por militarId para evitar condições de corrida em atualizações do mesmo militar.
+  const pendenciasPorMilitar = new Map();
+  for (const p of pendenciasResolvidas) {
+    const mId = normalizarId(p?.militar_id);
+    if (!mId) continue;
+    if (!pendenciasPorMilitar.has(mId)) pendenciasPorMilitar.set(mId, []);
+    pendenciasPorMilitar.get(mId).push(p);
+  }
+
+  // Pendências sem militar_id (serão tratadas como falhas)
+  const pendenciasSemMilitar = pendenciasResolvidas.filter((p) => !normalizarId(p?.militar_id));
+
+  const processarPendencia = async (pendencia) => {
     try {
       const pendenciaId = normalizarId(pendencia?.id);
       if (!pendenciaId) {
         resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'pendencia_sem_id' }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       if (pendencia?.__nao_encontrada) {
         resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'pendencia_nao_encontrada' }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       if (obterStatusPendencia(pendencia) !== 'Pendente') {
         resultado.ignoradas.push(montarItemRelatorio({ pendencia, motivo: 'pendencia_nao_pendente' }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       const militarId = normalizarId(pendencia?.militar_id);
       if (!militarId) {
         resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'militar_id_ausente' }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       const comportamentoSugerido = String(pendencia?.comportamento_sugerido || '').trim();
       if (!comportamentoSugerido) {
         resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'comportamento_sugerido_ausente' }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       const militar = await buscarMilitarPorId(militarEntity, militarId);
       if (!militar) {
         resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'militar_nao_encontrado' }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       const comportamentoAtual = String(militar?.comportamento || 'Bom').trim();
@@ -183,8 +180,7 @@ export async function aplicarPendenciasComportamentoEmLote({
           militar,
           motivo: 'comportamento_ja_igual_ao_sugerido',
         }));
-        // eslint-disable-next-line no-continue
-        continue;
+        return;
       }
 
       await militarEntity.update(militarId, {
@@ -225,7 +221,19 @@ export async function aplicarPendenciasComportamentoEmLote({
         erro: erro,
       }));
     }
-  }
+  };
+
+  await Promise.all([
+    // Processar grupos de militares em paralelo
+    ...Array.from(pendenciasPorMilitar.values()).map(async (grupo) => {
+      // Processar pendências do mesmo militar sequencialmente
+      for (const pendencia of grupo) {
+        await processarPendencia(pendencia);
+      }
+    }),
+    // Processar pendências inválidas em paralelo (apenas para registro de falha)
+    ...pendenciasSemMilitar.map((p) => processarPendencia(p)),
+  ]);
 
   resultado.totalAplicadas = resultado.aplicadas.length;
   resultado.totalIgnoradas = resultado.ignoradas.length;

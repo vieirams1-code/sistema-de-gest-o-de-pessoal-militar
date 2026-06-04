@@ -129,7 +129,7 @@ export default function AuditoriaComportamento() {
     let falhas = 0;
     const dataCalculo = new Date().toISOString().slice(0, 10);
 
-    for (const linha of resumoSelecionado) {
+    await Promise.all(resumoSelecionado.map(async (linha) => {
       // Marca origem AUDITORIA_MANUAL e mantém detalhes do cálculo.
       const detalhesPayload = {
         origem: ORIGEM_AUDITORIA,
@@ -171,13 +171,15 @@ export default function AuditoriaComportamento() {
           erro: error?.message || error,
         });
       }
-    }
+    }));
 
     setCriando(false);
     setModalAberto(false);
     setSelecionados(new Set());
-    await queryClient.invalidateQueries({ queryKey: ['auditoria-comportamento-pendencias'] });
-    await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['auditoria-comportamento-pendencias'] }),
+      queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] }),
+    ]);
 
     toast({
       title: 'Operação concluída',
