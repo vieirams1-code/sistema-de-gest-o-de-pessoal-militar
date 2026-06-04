@@ -798,12 +798,7 @@ async function reavaliarCamposPreImportacao({ linhaAtual = {}, transformado = {}
   };
 }
 
-export async function corrigirLinhaPreImportacao({
-  analise,
-  linhaNumero,
-  campos = {},
-  usuario,
-}) {
+function findLinhaNaAnalise(analise, linhaNumero) {
   if (!analise?.linhas?.length) {
     throw new Error('Análise indisponível para correção.');
   }
@@ -813,8 +808,10 @@ export async function corrigirLinhaPreImportacao({
     throw new Error(`Linha ${linhaNumero} não encontrada na análise.`);
   }
 
-  const linhaAtual = analise.linhas[idxLinha];
-  const transformadoBase = { ...(linhaAtual.transformado || {}) };
+  return { linhaAtual: analise.linhas[idxLinha], idxLinha };
+}
+
+function aplicarAlteracoesCampos(transformadoBase, campos) {
   const transformado = { ...transformadoBase };
   const alteracoes = [];
   const alteracoesDetalhadas = [];
@@ -829,55 +826,51 @@ export async function corrigirLinhaPreImportacao({
     });
   };
 
-  if (Object.prototype.hasOwnProperty.call(campos, 'nome_completo')) {
-    const valorAnterior = transformado.nome_completo || '';
-    const nomeCompleto = normalizarNomeEssencial(campos.nome_completo);
-    transformado.nome_completo = nomeCompleto;
-    registrarAlteracaoCampo('nome_completo', valorAnterior, nomeCompleto);
-  }
+  const regras = {
+    nome_completo: (v) => normalizarNomeEssencial(v),
+    nome_guerra: (v) => normalizarNomeEssencial(v),
+    matricula: (v) => limparTexto(v),
+    cpf: (v) => limparTexto(v),
+    data_inclusao: (v) => limparTexto(v),
+  };
 
-  if (Object.prototype.hasOwnProperty.call(campos, 'nome_guerra')) {
-    const valorAnterior = transformado.nome_guerra || '';
-    const nomeGuerra = normalizarNomeEssencial(campos.nome_guerra);
-    transformado.nome_guerra = nomeGuerra;
-    registrarAlteracaoCampo('nome_guerra', valorAnterior, nomeGuerra);
-  }
-
-  if (Object.prototype.hasOwnProperty.call(campos, 'matricula')) {
-    const valorAnterior = transformado.matricula || '';
-    transformado.matricula = limparTexto(campos.matricula);
-    registrarAlteracaoCampo('matricula', valorAnterior, transformado.matricula || '');
-  }
-
-  if (Object.prototype.hasOwnProperty.call(campos, 'cpf')) {
-    const valorAnterior = transformado.cpf || '';
-    transformado.cpf = limparTexto(campos.cpf);
-    registrarAlteracaoCampo('cpf', valorAnterior, transformado.cpf || '');
-  }
-
-  if (Object.prototype.hasOwnProperty.call(campos, 'data_inclusao')) {
-    const valorAnterior = transformado.data_inclusao || '';
-    transformado.data_inclusao = limparTexto(campos.data_inclusao);
-    registrarAlteracaoCampo('data_inclusao', valorAnterior, transformado.data_inclusao || '');
-  }
-
-  const { linhaAtualizada: linhaReavaliada } = await reavaliarCamposPreImportacao({
-    linhaAtual,
-    transformado,
+  Object.entries(regras).forEach(([campo, normalizador]) => {
+    if (Object.prototype.hasOwnProperty.call(campos, campo)) {
+      const valorAnterior = transformado[campo] || '';
+      const valorNovo = normalizador(campos[campo]);
+      transformado[campo] = valorNovo;
+      registrarAlteracaoCampo(campo, valorAnterior, valorNovo);
+    }
   });
 
+  return { transformado, alteracoes, alteracoesDetalhadas };
+}
+
+function consolidarMensagensReavaliadas(linhaAtual, linhaReavaliada) {
   const errosPreservados = removerMensagensReavaliaveis(linhaAtual.erros, ['nome completo', 'nome de guerra', 'matricula', 'cpf', 'data de inclusao']);
   const alertasPreservados = removerMensagensReavaliaveis(linhaAtual.alertas, ['nome de guerra', 'matricula', 'cpf', 'data de inclusao', 'duplicidade']);
+
   const errosNormalizados = dedupeMensagens([...(errosPreservados || []), ...(linhaReavaliada.erros || [])]);
   const alertasNormalizados = dedupeMensagens([...(alertasPreservados || []), ...(linhaReavaliada.alertas || [])]);
 
-  const linhaAtualizada = {
+  return { errosNormalizados, alertasNormalizados };
+}
+
+function buildLinhaCorrigida({
+  linhaReavaliada,
+  erros,
+  alertas,
+  alteracoes,
+  alteracoesDetalhadas,
+  usuario,
+}) {
+  return {
     ...linhaReavaliada,
-    erros: errosNormalizados,
-    alertas: alertasNormalizados,
+    erros,
+    alertas,
     status: definirStatusLinha(
-      errosNormalizados,
-      alertasNormalizados,
+      erros,
+      alertas,
       linhaReavaliada.status === STATUS_LINHA.DUPLICADO,
     ),
     correcao_pre_importacao: {
@@ -888,6 +881,40 @@ export async function corrigirLinhaPreImportacao({
       alteracoes_detalhadas: alteracoesDetalhadas,
     },
   };
+}
+
+export async function corrigirLinhaPreImportacao({
+  analise,
+  linhaNumero,
+  campos = {},
+  usuario,
+}) {
+  const { linhaAtual, idxLinha } = findLinhaNaAnalise(analise, linhaNumero);
+
+  const {
+    transformado,
+    alteracoes,
+    alteracoesDetalhadas,
+  } = aplicarAlteracoesCampos(linhaAtual.transformado || {}, campos);
+
+  const { linhaAtualizada: linhaReavaliada } = await reavaliarCamposPreImportacao({
+    linhaAtual,
+    transformado,
+  });
+
+  const {
+    errosNormalizados,
+    alertasNormalizados,
+  } = consolidarMensagensReavaliadas(linhaAtual, linhaReavaliada);
+
+  const linhaAtualizada = buildLinhaCorrigida({
+    linhaReavaliada,
+    erros: errosNormalizados,
+    alertas: alertasNormalizados,
+    alteracoes,
+    alteracoesDetalhadas,
+    usuario,
+  });
 
   const linhas = analise.linhas.map((linha, indice) => (indice === idxLinha ? linhaAtualizada : linha));
   return {
