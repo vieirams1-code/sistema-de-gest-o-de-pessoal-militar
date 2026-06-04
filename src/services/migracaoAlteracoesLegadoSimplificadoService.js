@@ -295,6 +295,98 @@ function detectarColunas(headers = []) {
   return indexPorCampo;
 }
 
+function validarEstruturaTabela(header) {
+  const colunas = detectarColunas(header);
+
+  const camposAusentes = CAMPOS_OBRIGATORIOS.filter((c) => colunas[c] === undefined);
+  if (camposAusentes.length) {
+    throw new Error(
+      `Cabeçalhos obrigatórios ausentes na planilha: ${camposAusentes.join(', ')}.`,
+    );
+  }
+  return colunas;
+}
+
+function contarDuplicidadesInternas(rows, colunas) {
+  const contagemNotaPlanilha = new Map();
+  rows.forEach((row) => {
+    const n = normalizarNumeroNota(row[colunas.numero_nota]);
+    if (!n) return;
+    contagemNotaPlanilha.set(n, (contagemNotaPlanilha.get(n) || 0) + 1);
+  });
+  return contagemNotaPlanilha;
+}
+
+function mapearEValidarLinha(row, index, colunas, numerosNotaJaExistentes, contagemNotaPlanilha) {
+  const get = (campo) => limparTexto(row[colunas[campo]]);
+  const numeroNotaBruto = get('numero_nota');
+  const numeroNotaNorm = normalizarNumeroNota(numeroNotaBruto);
+  const textoPublicado = get('texto_publicado');
+  const numeroBgBr = get('numero_bg_br');
+  const dataBgBrBruta = row[colunas.data_bg_br];
+  const dataBgIso = parseDataBrParaIso(dataBgBrBruta);
+  const dataBgBrNormalizada = dataBgIso ? formatarIsoParaBr(dataBgIso) : limparTexto(dataBgBrBruta);
+  const tipoLegado = get('tipo_legado');
+  const tipoClassificado = get('tipo_classificado');
+  const tipoBgLegado = get('tipo_bg_legado');
+
+  const erros = [];
+  const avisos = [];
+
+  if (!numeroNotaNorm) erros.push('Número da nota é obrigatório.');
+  if (!textoPublicado) erros.push('Texto publicado é obrigatório.');
+
+  if (!numeroBgBr) avisos.push('Número do BG/BR ausente.');
+  if (dataBgBrBruta && !dataBgIso) {
+    avisos.push('Data do BG/BR inválida; valor preservado, mas precisa ser revisado.');
+  } else if (!dataBgBrBruta) {
+    avisos.push('Data do BG/BR ausente.');
+  }
+  if (!tipoLegado) avisos.push('Tipo legado ausente.');
+  if (!tipoClassificado) avisos.push('Tipo classificado ausente.');
+
+  let status = STATUS_LINHA_SIMPLIFICADO.PRONTA;
+  if (erros.length) {
+    status = STATUS_LINHA_SIMPLIFICADO.ERRO;
+  } else if (numeroNotaNorm && numerosNotaJaExistentes.has(numeroNotaNorm)) {
+    status = STATUS_LINHA_SIMPLIFICADO.DUPLICADA;
+    erros.push('Nota já importada anteriormente para este militar.');
+  } else if (numeroNotaNorm && (contagemNotaPlanilha.get(numeroNotaNorm) || 0) > 1) {
+    status = STATUS_LINHA_SIMPLIFICADO.DUPLICADA;
+    erros.push('Número da nota duplicado na própria planilha.');
+  }
+
+  return {
+    rowIndex: index + 2, // +2 = cabeçalho + base 1
+    status,
+    numero_nota: numeroNotaBruto,
+    numero_bg_br: numeroBgBr,
+    data_bg_br: dataBgBrNormalizada,
+    tipo_legado: tipoLegado,
+    tipo_classificado: tipoClassificado,
+    tipo_bg_legado: tipoBgLegado,
+    texto_publicado: textoPublicado,
+    status_publicacao: calcularStatusPublicacaoLegado({
+      numero_nota: numeroNotaBruto,
+      numero_bg_br: numeroBgBr,
+      data_bg_br: dataBgBrNormalizada,
+    }),
+    erros,
+    avisos,
+    recusada: false,
+  };
+}
+
+function processarLinhasAnalise(rows, colunas, numerosNotaJaExistentes, contagemNotaPlanilha) {
+  return rows.map((row, index) => mapearEValidarLinha(
+    row,
+    index,
+    colunas,
+    numerosNotaJaExistentes,
+    contagemNotaPlanilha,
+  ));
+}
+
 /**
  * Busca todas as PublicacaoExOfficio do militar destino para verificar
  * duplicidade por militar_id + numero_nota.
@@ -383,83 +475,17 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
   if (!tabela.length) throw new Error('Arquivo sem conteúdo válido para análise.');
 
   const [header, ...rows] = tabela;
-  const colunas = detectarColunas(header);
-
-  const camposAusentes = CAMPOS_OBRIGATORIOS.filter((c) => colunas[c] === undefined);
-  if (camposAusentes.length) {
-    throw new Error(
-      `Cabeçalhos obrigatórios ausentes na planilha: ${camposAusentes.join(', ')}.`,
-    );
-  }
+  const colunas = validarEstruturaTabela(header);
 
   const numerosNotaJaExistentes = await listarNumerosNotaExistentesPorMilitar(militarDestinoId);
+  const contagemNotaPlanilha = contarDuplicidadesInternas(rows, colunas);
 
-  const contagemNotaPlanilha = new Map();
-  rows.forEach((row) => {
-    const n = normalizarNumeroNota(row[colunas.numero_nota]);
-    if (!n) return;
-    contagemNotaPlanilha.set(n, (contagemNotaPlanilha.get(n) || 0) + 1);
-  });
-
-  const linhas = rows.map((row, index) => {
-    const get = (campo) => limparTexto(row[colunas[campo]]);
-    const numeroNotaBruto = get('numero_nota');
-    const numeroNotaNorm = normalizarNumeroNota(numeroNotaBruto);
-    const textoPublicado = get('texto_publicado');
-    const numeroBgBr = get('numero_bg_br');
-    const dataBgBrBruta = row[colunas.data_bg_br];
-    const dataBgIso = parseDataBrParaIso(dataBgBrBruta);
-    const dataBgBrNormalizada = dataBgIso ? formatarIsoParaBr(dataBgIso) : limparTexto(dataBgBrBruta);
-    const tipoLegado = get('tipo_legado');
-    const tipoClassificado = get('tipo_classificado');
-    const tipoBgLegado = get('tipo_bg_legado');
-
-    const erros = [];
-    const avisos = [];
-
-    if (!numeroNotaNorm) erros.push('Número da nota é obrigatório.');
-    if (!textoPublicado) erros.push('Texto publicado é obrigatório.');
-
-    if (!numeroBgBr) avisos.push('Número do BG/BR ausente.');
-    if (dataBgBrBruta && !dataBgIso) {
-      avisos.push('Data do BG/BR inválida; valor preservado, mas precisa ser revisado.');
-    } else if (!dataBgBrBruta) {
-      avisos.push('Data do BG/BR ausente.');
-    }
-    if (!tipoLegado) avisos.push('Tipo legado ausente.');
-    if (!tipoClassificado) avisos.push('Tipo classificado ausente.');
-
-    let status = STATUS_LINHA_SIMPLIFICADO.PRONTA;
-    if (erros.length) {
-      status = STATUS_LINHA_SIMPLIFICADO.ERRO;
-    } else if (numeroNotaNorm && numerosNotaJaExistentes.has(numeroNotaNorm)) {
-      status = STATUS_LINHA_SIMPLIFICADO.DUPLICADA;
-      erros.push('Nota já importada anteriormente para este militar.');
-    } else if (numeroNotaNorm && (contagemNotaPlanilha.get(numeroNotaNorm) || 0) > 1) {
-      status = STATUS_LINHA_SIMPLIFICADO.DUPLICADA;
-      erros.push('Número da nota duplicado na própria planilha.');
-    }
-
-    return {
-      rowIndex: index + 2, // +2 = cabeçalho + base 1
-      status,
-      numero_nota: numeroNotaBruto,
-      numero_bg_br: numeroBgBr,
-      data_bg_br: dataBgBrNormalizada,
-      tipo_legado: tipoLegado,
-      tipo_classificado: tipoClassificado,
-      tipo_bg_legado: tipoBgLegado,
-      texto_publicado: textoPublicado,
-      status_publicacao: calcularStatusPublicacaoLegado({
-        numero_nota: numeroNotaBruto,
-        numero_bg_br: numeroBgBr,
-        data_bg_br: dataBgBrNormalizada,
-      }),
-      erros,
-      avisos,
-      recusada: false,
-    };
-  });
+  const linhas = processarLinhasAnalise(
+    rows,
+    colunas,
+    numerosNotaJaExistentes,
+    contagemNotaPlanilha,
+  );
 
   return {
     arquivo: {
