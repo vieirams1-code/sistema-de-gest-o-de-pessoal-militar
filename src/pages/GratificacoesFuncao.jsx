@@ -89,11 +89,24 @@ function Field({ label, children, className = '' }) {
   return <div className={className}><Label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</Label>{children}</div>;
 }
 
-function GratificacoesTable({ gratificacoes, tipos, canManageRascunhos = false, onEditRascunho }) {
+function GratificacoesTable({ gratificacoes, tipos, canManageRascunhos = false, onEditRascunho, onEnviarDP, onAguardandoPublicacao }) {
   const tiposById = useMemo(() => new Map((tipos || []).map((tipo) => [String(tipo?.id || ''), tipo?.nome || tipo?.sigla || tipo?.codigo || ''])), [tipos]);
   if (!gratificacoes.length) return <EmptyState />;
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Militar</th><th className="px-4 py-3">Função</th><th className="px-4 py-3">Tipo / nível</th><th className="px-4 py-3">Unidade / setor</th><th className="px-4 py-3">Publicação / processo</th><th className="px-4 py-3">Efeitos</th><th className="px-4 py-3">Status</th>{canManageRascunhos && <th className="px-4 py-3 text-right">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-100">{gratificacoes.map((item) => <tr key={item.id} className="align-top hover:bg-slate-50/80"><td className="min-w-[14rem] px-4 py-4"><p className="font-semibold text-slate-900">{getNomeMilitarGratificacao(item)}</p><p className="text-xs text-slate-500">{item.posto_graduacao_snapshot || 'Posto/graduação não informado'} · Mat. {getMatriculaGratificacao(item)}</p></td><td className="min-w-[13rem] px-4 py-4"><p className="font-medium text-slate-900">{item.funcao_gratificada || '—'}</p><p className="text-xs text-slate-500">{item.codigo_funcao || 'Código não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{getTipoGratificacaoLabel(item, tiposById)}</p><p className="text-xs text-slate-500">{item.nivel_gratificacao || 'Nível não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{item.unidade_nome_snapshot || '—'}</p><p className="text-xs text-slate-500">{item.setor_nome_snapshot || 'Setor não informado'}</p></td><td className="min-w-[14rem] px-4 py-4"><p className="font-medium text-slate-900">{item.doems_nomeacao_numero || item.doems_dispensa_numero || item.ato_nomeacao_numero || item.ato_dispensa_numero || '—'}</p><p className="text-xs text-slate-500">{item.numero_processo || item.documento_solicitacao || 'Processo/documento não informado'}</p></td><td className="min-w-[10rem] px-4 py-4 text-xs text-slate-600"><p>Início: <span className="font-medium text-slate-800">{formatDate(item.data_inicio_efeitos || item.data_publicacao_nomeacao || item.data_solicitacao)}</span></p><p>Fim: <span className="font-medium text-slate-800">{formatDate(item.data_fim_efeitos || item.data_publicacao_dispensa)}</span></p></td><td className="px-4 py-4"><StatusBadge status={item.status} /></td>{canManageRascunhos && <td className="px-4 py-4 text-right">{item.status === GRATIFICACAO_STATUS.RASCUNHO ? <Button type="button" variant="outline" size="sm" onClick={() => onEditRascunho(item)}><Edit className="h-3.5 w-3.5" /> Editar</Button> : <span className="text-xs text-slate-400">Somente rascunho</span>}</td>}</tr>)}</tbody></table></div></div>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Militar</th><th className="px-4 py-3">Função</th><th className="px-4 py-3">Tipo / nível</th><th className="px-4 py-3">Unidade / setor</th><th className="px-4 py-3">Publicação / processo</th><th className="px-4 py-3">Efeitos</th><th className="px-4 py-3">Status</th>{canManageRascunhos && <th className="px-4 py-3 text-right">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-100">{gratificacoes.map((item) => <tr key={item.id} className="align-top hover:bg-slate-50/80"><td className="min-w-[14rem] px-4 py-4"><p className="font-semibold text-slate-900">{getNomeMilitarGratificacao(item)}</p><p className="text-xs text-slate-500">{item.posto_graduacao_snapshot || 'Posto/graduação não informado'} · Mat. {getMatriculaGratificacao(item)}</p></td><td className="min-w-[13rem] px-4 py-4"><p className="font-medium text-slate-900">{item.funcao_gratificada || '—'}</p><p className="text-xs text-slate-500">{item.codigo_funcao || 'Código não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{getTipoGratificacaoLabel(item, tiposById)}</p><p className="text-xs text-slate-500">{item.nivel_gratificacao || 'Nível não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{item.unidade_nome_snapshot || '—'}</p><p className="text-xs text-slate-500">{item.setor_nome_snapshot || 'Setor não informado'}</p></td><td className="min-w-[14rem] px-4 py-4"><p className="font-medium text-slate-900">{item.doems_nomeacao_numero || item.doems_dispensa_numero || item.ato_nomeacao_numero || item.ato_dispensa_numero || '—'}</p><p className="text-xs text-slate-500">{item.numero_processo || item.documento_solicitacao || 'Processo/documento não informado'}</p></td><td className="min-w-[10rem] px-4 py-4 text-xs text-slate-600"><p>Início: <span className="font-medium text-slate-800">{formatDate(item.data_inicio_efeitos || item.data_publicacao_nomeacao || item.data_solicitacao)}</span></p><p>Fim: <span className="font-medium text-slate-800">{formatDate(item.data_fim_efeitos || item.data_publicacao_dispensa)}</span></p></td><td className="px-4 py-4"><StatusBadge status={item.status} /></td>{canManageRascunhos && <td className="px-4 py-4 text-right">
+  {item.status === GRATIFICACAO_STATUS.RASCUNHO ? (
+    <div className="flex justify-end gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => onEditRascunho(item)}><Edit className="h-3.5 w-3.5" /> Editar</Button>
+      <Button type="button" variant="outline" size="sm" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700" onClick={() => onEnviarDP(item)}>Enviar à DP</Button>
+    </div>
+  ) : item.status === GRATIFICACAO_STATUS.SOLICITADO_DP ? (
+    <div className="flex justify-end gap-2">
+      <Button type="button" variant="outline" size="sm" className="text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700" onClick={() => onAguardandoPublicacao(item)}>Aguardando Publicação</Button>
+    </div>
+  ) : (
+    <span className="text-xs text-slate-400">Somente rascunho/DP</span>
+  )}
+</td>}</tr>)}</tbody></table></div></div>
   );
 }
 
@@ -152,6 +165,84 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>{isEditing ? 'Editar rascunho de gratificação' : 'Nova Gratificação'}</DialogTitle><DialogDescription>Cadastro inicial limitado ao status rascunho. Não há ativação, nomeação, dispensa, publicação DOEMS ou efeito financeiro nesta operação.</DialogDescription></DialogHeader><div className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2"><div className="md:col-span-2"><MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} /></div><Field label="Tipo ativo *"><Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent></Select></Field><Field label="Cota ativa disponível *"><Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota} disabled={!form.tipo_gratificacao_funcao_id}><SelectTrigger><SelectValue placeholder={form.tipo_gratificacao_funcao_id ? 'Selecione a cota' : 'Selecione o tipo primeiro'} /></SelectTrigger><SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent></Select></Field><Field label="Função gratificada *" className="md:col-span-2"><Input value={form.funcao_gratificada} onChange={(e) => update('funcao_gratificada', e.target.value)} /></Field><Field label="Número do processo"><Input value={form.numero_processo || ''} onChange={(e) => update('numero_processo', e.target.value)} /></Field><Field label="Status"><Input value="Rascunho" disabled /></Field><Field label="Observações" className="md:col-span-2"><Textarea value={form.observacoes || ''} onChange={(e) => update('observacoes', e.target.value)} /></Field><div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">Operações bloqueadas neste lote: nomear, ativar, dispensar, cancelar, publicar e integrar folha.</div></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="button" disabled={saving} onClick={() => onSubmit(form)}>{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar rascunho</Button></DialogFooter></DialogContent></Dialog>;
 }
 
+
+function EnviarDPModal({ open, onOpenChange, item, saving, onSubmit }) {
+  const [form, setForm] = React.useState({ data_solicitacao: '', documento_solicitacao: '', numero_processo: '' });
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        data_solicitacao: item?.data_solicitacao || new Date().toISOString().split('T')[0],
+        documento_solicitacao: item?.documento_solicitacao || '',
+        numero_processo: item?.numero_processo || '',
+      });
+    }
+  }, [open, item]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({ id: item.id, ...form });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Enviar à DP</DialogTitle>
+            <DialogDescription>
+              Confirme os dados da solicitação para avançar o status deste rascunho.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Data da Solicitação</Label>
+              <Input type="date" value={form.data_solicitacao} onChange={(e) => setForm({ ...form, data_solicitacao: e.target.value })} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Documento da Solicitação</Label>
+              <Input value={form.documento_solicitacao} onChange={(e) => setForm({ ...form, documento_solicitacao: e.target.value })} placeholder="Ex: Ofício nº 123/2023" />
+            </div>
+            <div className="space-y-2">
+              <Label>Número do Processo (opcional)</Label>
+              <Input value={form.numero_processo} onChange={(e) => setForm({ ...form, numero_processo: e.target.value })} placeholder="Ex: E-09/123/1000/2023" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirmar Envio
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConfirmarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Aguardando Publicação</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja marcar esta gratificação como aguardando publicação da nomeação?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button type="button" onClick={() => onSubmit({ id: item.id })} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Confirmar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function GratificacoesFuncao() {
   const { isAdmin, canAccessAction, canAccessAll, permissions, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = Boolean(isAdmin || canAccessAll || hasAllPermissions(permissions));
@@ -171,6 +262,8 @@ export default function GratificacoesFuncao() {
   const [tipoModal, setTipoModal] = useState({ open: false, data: null });
   const [cotaModal, setCotaModal] = useState({ open: false, data: null });
   const [gratificacaoModal, setGratificacaoModal] = useState({ open: false, data: null });
+  const [enviarDPModal, setEnviarDPModal] = useState({ open: false, data: null });
+  const [aguardandoPublicacaoModal, setAguardandoPublicacaoModal] = useState({ open: false, data: null });
 
   const filtrosBackend = useMemo(() => ({ tab: aba, busca, status: status === TODOS ? undefined : status, tipo_gratificacao_funcao_id: tipo === TODOS ? undefined : tipo, funcao_gratificada: funcao === TODOS ? undefined : funcao, unidade_id: unidade === TODOS ? undefined : unidade, limit: 200, offset: 0 }), [aba, busca, status, tipo, funcao, unidade]);
   const query = useQuery({ queryKey: ['gratificacoes-funcao-painel', filtrosBackend], queryFn: () => fetchPainelGratificacoesFuncao(filtrosBackend), enabled: canView, staleTime: 60 * 1000, refetchOnWindowFocus: false });
@@ -188,13 +281,25 @@ export default function GratificacoesFuncao() {
 
   const rascunhoMutation = useMutation({
     mutationFn: gerirRascunhoGratificacaoFuncao,
-    onSuccess: async () => {
+    onSuccess: async (_, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['gratificacoes-funcao-painel'] });
       setGratificacaoModal({ open: false, data: null });
-      toast({ title: 'Rascunho salvo', description: 'Gratificação de Função salva como rascunho, sem ativação ou nomeação.' });
+
+      const operacao = variables?.operacao || '';
+      if (operacao === 'enviar_dp') {
+        toast({ title: 'Enviado à DP', description: 'Solicitação registrada com sucesso.' });
+      } else if (operacao === 'marcar_aguardando_publicacao') {
+        toast({ title: 'Status Atualizado', description: 'Gratificação marcada como aguardando publicação.' });
+      } else {
+        toast({ title: 'Rascunho salvo', description: 'Gratificação de Função salva como rascunho, sem ativação ou nomeação.' });
+      }
     },
-    onError: (error) => toast({ title: 'Falha ao salvar rascunho', description: error?.message || 'Erro ao salvar rascunho.', variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Falha na operação', description: error?.message || 'Erro ao processar a operação.', variant: 'destructive' }),
   });
+
+  const salvarGratificacao = (form) => rascunhoMutation.mutate({ operacao: form.id ? 'atualizar_rascunho' : 'criar_rascunho', id: form.id, data: { ...form, status: GRATIFICACAO_STATUS.RASCUNHO } });
+  const enviarDP = (form) => { rascunhoMutation.mutate({ operacao: 'enviar_dp', id: form.id, data: form }); };
+  const marcarAguardandoPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'marcar_aguardando_publicacao', id: form.id }); };
 
   const gratificacoes = query.data?.gratificacoes || [];
   const cotasBackend = query.data?.cotas || [];
@@ -221,7 +326,6 @@ export default function GratificacoesFuncao() {
 
   const salvarTipo = (form) => saveMutation.mutate({ operacao: form.id ? 'atualizar_tipo' : 'criar_tipo', id: form.id, data: form });
   const salvarCota = (form) => saveMutation.mutate({ operacao: form.id ? 'atualizar_cota' : 'criar_cota', id: form.id, data: form });
-  const salvarGratificacao = (form) => rascunhoMutation.mutate({ operacao: form.id ? 'atualizar_rascunho' : 'criar_rascunho', id: form.id, data: { ...form, status: GRATIFICACAO_STATUS.RASCUNHO } });
 
   if (loadingUser || !isAccessResolved) return <div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-500" /></div>;
   if (!canView) return <AccessDenied modulo="Gratificação de Função" />;
@@ -234,10 +338,12 @@ export default function GratificacoesFuncao() {
       {canShowAccessDebug && <section className="rounded-2xl border border-dashed border-blue-200 bg-blue-50 p-3 text-xs text-blue-900"><p className="font-semibold">Debug de acesso — Gratificação de Função</p><div className="mt-2 grid gap-1 md:grid-cols-2 xl:grid-cols-5"><span>canAccessAll: {String(canAccessAll)}</span><span>isAdmin: {String(isAdmin)}</span><span>canManageCadastros: {String(canManageCadastros)}</span><span>canManageGratificacoes: {String(canManageGratificacoes)}</span><span>permissions ALL: {String(hasAllPermissions(permissions))}</span></div><p className="mt-2 break-words">Permissões detectadas: {permissions === 'ALL' ? 'ALL' : Object.entries(permissions || {}).filter(([, value]) => value === true).map(([key]) => key).sort().join(', ') || 'nenhuma'}</p></section>}
       {query.isLoading && <div className="flex min-h-[18rem] items-center justify-center rounded-2xl border border-slate-200 bg-white"><Loader2 className="h-8 w-8 animate-spin text-slate-500" /></div>}
       {query.error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>{query.error.message || 'Erro controlado ao carregar o painel de Gratificação de Função.'}</p></div></div>}
-      {!query.isLoading && !query.error && aba !== GRATIFICACAO_TABS.COTAS && aba !== GRATIFICACAO_TABS.TIPOS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageRascunhos={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} />}
+      {!query.isLoading && !query.error && aba !== GRATIFICACAO_TABS.COTAS && aba !== GRATIFICACAO_TABS.TIPOS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageRascunhos={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} />}
       {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.COTAS && <CotasTable cotas={cotasFiltradas} canManage={canManageCadastros} onEdit={(cotaItem) => setCotaModal({ open: true, data: cotaItem })} />}
       {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.TIPOS && <TiposTable tipos={tipos} canManage={canManageCadastros} onEdit={(tipoItem) => setTipoModal({ open: true, data: tipoItem })} />}
       <GratificacaoModal open={gratificacaoModal.open} initialData={gratificacaoModal.data} tipos={tipos} cotas={cotas} saving={rascunhoMutation.isPending} onOpenChange={(open) => setGratificacaoModal({ open, data: open ? gratificacaoModal.data : null })} onSubmit={salvarGratificacao} />
+      <EnviarDPModal open={enviarDPModal.open} item={enviarDPModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setEnviarDPModal({ open, data: open ? enviarDPModal.data : null })} onSubmit={enviarDP} />
+      <ConfirmarPublicacaoModal open={aguardandoPublicacaoModal.open} item={aguardandoPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setAguardandoPublicacaoModal({ open, data: open ? aguardandoPublicacaoModal.data : null })} onSubmit={marcarAguardandoPublicacao} />
       <TipoModal open={tipoModal.open} initialData={tipoModal.data} saving={saveMutation.isPending} onOpenChange={(open) => setTipoModal({ open, data: open ? tipoModal.data : null })} onSubmit={salvarTipo} />
       <CotaModal open={cotaModal.open} initialData={cotaModal.data} tipos={tipos} saving={saveMutation.isPending} onOpenChange={(open) => setCotaModal({ open, data: open ? cotaModal.data : null })} onSubmit={salvarCota} />
     </div></div>
