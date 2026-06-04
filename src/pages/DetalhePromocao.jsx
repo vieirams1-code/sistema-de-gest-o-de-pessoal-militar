@@ -913,10 +913,14 @@ export default function DetalhePromocao() {
       await invalidarDados();
       await queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
       const idsAfetados = Array.isArray(resultado?.militar_ids_afetados) ? resultado.militar_ids_afetados : [];
-      await Promise.all(idsAfetados.map(async (militarId) => {
-        await queryClient.invalidateQueries({ queryKey: ['militar', militarId] });
-        await queryClient.invalidateQueries({ queryKey: ['ver-historico-promocoes', militarId] });
-      }));
+      if (idsAfetados.length > 0) {
+        const idsSet = new Set(idsAfetados.map(String));
+        await queryClient.invalidateQueries({
+          predicate: (query) =>
+            (query.queryKey[0] === 'militar' || query.queryKey[0] === 'ver-historico-promocoes') &&
+            idsSet.has(String(query.queryKey[1])),
+        });
+      }
     },
     onError: (error) => toast({ title: 'Falha ao publicar promoção', description: error.message, variant: 'destructive' }),
   });
