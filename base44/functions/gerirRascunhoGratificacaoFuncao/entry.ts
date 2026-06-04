@@ -125,8 +125,8 @@ async function validarReferencias(base44: ReturnType<typeof createClientFromRequ
     buscarUm(base44, 'CotaGratificacaoFuncao', data.cota_gratificacao_funcao_id),
   ]);
 
-  if (tipo.ativo === false) throw withStatus('tipo_gratificacao_funcao_id deve referenciar tipo ativo.', 400);
-  if (normalizeTipo(cota.status) !== STATUS_COTA_ATIVA) throw withStatus('cota_gratificacao_funcao_id deve referenciar cota ativa.', 400);
+  if (tipo.ativo === false) throw withStatus('Tipo inativo.', 400);
+  if (normalizeTipo(cota.status) !== STATUS_COTA_ATIVA) throw withStatus('Cota inativa.', 400);
   if (String(cota.tipo_gratificacao_funcao_id || '') !== data.tipo_gratificacao_funcao_id) throw withStatus('cota_gratificacao_funcao_id deve pertencer ao tipo_gratificacao_funcao_id informado.', 400);
 
 
@@ -135,7 +135,7 @@ async function validarReferencias(base44: ReturnType<typeof createClientFromRequ
     `GratificacaoFuncao.militar:${data.militar_id}`,
   );
   const ativasDoMilitar = (gratificacoesDoMilitar || []).filter((item: any) => normalizeTipo(item?.status) === STATUS_GRATIFICACAO_ATIVA && item.id !== data.id);
-  if (ativasDoMilitar.length > 0) throw withStatus('Militar já possui uma gratificação ativa para este tipo/cota/função.', 400);
+  if (ativasDoMilitar.length > 0) throw withStatus('Já existe nomeação ativa para este militar.', 400);
 
   const gratificacoesDaCota = await fetchWithRetry(
 
@@ -144,7 +144,7 @@ async function validarReferencias(base44: ReturnType<typeof createClientFromRequ
   );
   const ocupadas = (gratificacoesDaCota || []).filter((item: any) => normalizeTipo(item?.status) === STATUS_GRATIFICACAO_ATIVA).length;
   const disponiveis = Math.max(toNumber(cota.quantidade_autorizada) - ocupadas, 0);
-  if (!(disponiveis > 0)) throw withStatus('quantidade disponível da cota deve ser maior que zero.', 400);
+  if (!(disponiveis > 0)) throw withStatus('Sem disponibilidade de cota.', 400);
 
   return { militar, tipo, cota, ocupadas, disponiveis };
 }
@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
 
 
     if (operacao === 'registrar_publicacao_nomeacao') {
-      if (statusAtual !== STATUS_AGUARDANDO_PUBLICACAO) throw withStatus('Apenas registros aguardando publicação podem ser ativados.', 400);
+      if (statusAtual !== STATUS_AGUARDANDO_PUBLICACAO) throw withStatus('Registro não está em aguardando_publicacao_nomeacao.', 400);
 
       const dataPub = trimString(data.data_publicacao_nomeacao);
       const dataEfeitos = trimString(data.data_inicio_efeitos);

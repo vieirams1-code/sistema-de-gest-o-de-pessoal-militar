@@ -210,6 +210,13 @@ function montarPayloadEscopado(payload = {}) {
   return finalPayload;
 }
 
+function extrairMensagemErro(err, fallback) {
+  const data = err?.response?.data || err?.data || err;
+  if (data?.error) return data.error;
+  if (typeof data === 'string' && data) return data;
+  return err?.message || fallback;
+}
+
 function assertFunctionResponse(body, fallbackMessage) {
   if (body?.error) {
     const error = new Error(body.error || fallbackMessage);
@@ -262,15 +269,23 @@ export async function fetchPainelGratificacoesFuncao(payload = {}) {
 }
 
 export async function gerirCadastrosGratificacaoFuncao({ operacao, id, data } = {}) {
-  const response = await base44.functions.invoke('gerirCadastrosGratificacaoFuncao', { operacao, id, data });
-  const body = response?.data ?? response ?? {};
-  assertFunctionResponse(body, 'Erro ao salvar cadastro de Gratificação de Função.');
-  return body?.data || null;
+  try {
+    const response = await base44.functions.invoke('gerirCadastrosGratificacaoFuncao', { operacao, id, data });
+    const body = response?.data ?? response ?? {};
+    assertFunctionResponse(body, 'Erro ao salvar cadastro de Gratificação de Função.');
+    return body?.data || null;
+  } catch (err) {
+    throw new Error(extrairMensagemErro(err, 'Erro ao salvar cadastro de Gratificação de Função.'));
+  }
 }
 
 export async function gerirRascunhoGratificacaoFuncao({ operacao, id, data } = {}) {
-  const response = await base44.functions.invoke('gerirRascunhoGratificacaoFuncao', { operacao, id, data });
-  const body = response?.data ?? response ?? {};
-  assertFunctionResponse(body, 'Erro ao salvar rascunho de Gratificação de Função.');
-  return body?.data || null;
+  try {
+    const response = await base44.functions.invoke('gerirRascunhoGratificacaoFuncao', { operacao, id, data });
+    const body = response?.data ?? response ?? {};
+    assertFunctionResponse(body, 'Erro ao salvar rascunho de Gratificação de Função.');
+    return body?.data || null;
+  } catch (err) {
+    throw new Error(extrairMensagemErro(err, 'Erro ao salvar rascunho de Gratificação de Função.'));
+  }
 }
