@@ -32,25 +32,47 @@ async function resolverPermissoes(base44, email) {
 
 async function listarMilitarIdsDoEscopo(base44, acessos, criteriosAplicados) {
   const ids = new Set();
-  for (const acesso of acessos || []) {
+  if (!acessos || acessos.length === 0) return Array.from(ids);
+  if (acessos.some((a) => normalizeTipo(a?.tipo_acesso) === 'admin')) return null;
+
+  const promiseFiltros = acessos.map(async (acesso) => {
     const tipo = normalizeTipo(acesso?.tipo_acesso);
-    if (tipo === 'admin') return null;
-    if (tipo === 'proprio') {
-      if (acesso?.militar_id) { ids.add(String(acesso.militar_id)); criteriosAplicados.add('proprio'); }
-      continue;
-    }
     const grupamentoId = acesso?.grupamento_id || null;
     const subgrupamentoId = acesso?.subgrupamento_id || null;
-    const filtros = [];
-    if (tipo === 'setor' && grupamentoId) { filtros.push({ grupamento_raiz_id: grupamentoId }, { grupamento_id: grupamentoId }, { estrutura_id: grupamentoId }); criteriosAplicados.add('setor'); }
-    else if (tipo === 'subsetor' && subgrupamentoId) {
-      filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }); criteriosAplicados.add('subsetor');
-      try { const filhos = await fetchWithRetry(() => base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }), `subgrupamento.parent:${subgrupamentoId}`); for (const f of (filhos || [])) if (f?.id) filtros.push({ estrutura_id: f.id }, { subgrupamento_id: f.id }); } catch (_e) {}
-    } else if (tipo === 'unidade' && subgrupamentoId) { filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }); criteriosAplicados.add('unidade'); }
-    for (const filtro of filtros) {
-      try { const militares = await fetchWithRetry(() => base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']), `militar.escopo:${JSON.stringify(filtro)}`); for (const m of (militares || [])) if (m?.id) ids.add(String(m.id)); } catch (_e) {}
+    const localFiltros = [];
+
+    if (tipo === 'proprio') {
+      if (acesso?.militar_id) { ids.add(String(acesso.militar_id)); criteriosAplicados.add('proprio'); }
+      return [];
     }
-  }
+
+    if (tipo === 'setor' && grupamentoId) {
+      localFiltros.push({ grupamento_raiz_id: grupamentoId }, { grupamento_id: grupamentoId }, { estrutura_id: grupamentoId });
+      criteriosAplicados.add('setor');
+    } else if (tipo === 'subsetor' && subgrupamentoId) {
+      localFiltros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId });
+      criteriosAplicados.add('subsetor');
+      try {
+        const filhos = await fetchWithRetry(() => base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }), `subgrupamento.parent:${subgrupamentoId}`);
+        for (const f of (filhos || [])) if (f?.id) localFiltros.push({ estrutura_id: f.id }, { subgrupamento_id: f.id });
+      } catch (_e) {}
+    } else if (tipo === 'unidade' && subgrupamentoId) {
+      localFiltros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId });
+      criteriosAplicados.add('unidade');
+    }
+    return localFiltros;
+  });
+
+  const filtrosArrays = await Promise.all(promiseFiltros);
+  const todosFiltros = filtrosArrays.flat();
+
+  await Promise.all(todosFiltros.map(async (filtro) => {
+    try {
+      const militares = await fetchWithRetry(() => base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']), `militar.escopo:${JSON.stringify(filtro)}`);
+      for (const m of (militares || [])) if (m?.id) ids.add(String(m.id));
+    } catch (_e) {}
+  }));
+
   return Array.from(ids);
 }
 
