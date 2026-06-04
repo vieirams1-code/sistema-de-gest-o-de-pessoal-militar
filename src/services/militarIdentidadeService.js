@@ -442,12 +442,22 @@ export async function executarMergeManualMilitares({
   const snapshotOrigem = { ...origem };
   const snapshotDestinoAntes = { ...destino };
 
-  const todasMatriculas = await matriculaEntity.list();
-  const matriculasOrigem = (todasMatriculas || []).filter((m) => String(m.militar_id) === String(militarOrigemId));
-  const matriculasDestino = (todasMatriculas || []).filter((m) => String(m.militar_id) === String(militarDestinoId));
+  let matriculasOrigem = [];
+  let matriculasDestino = [];
+
+  if (matriculaEntity.filter) {
+    [matriculasOrigem, matriculasDestino] = await Promise.all([
+      matriculaEntity.filter({ militar_id: militarOrigemId }).then((res) => res ?? []),
+      matriculaEntity.filter({ militar_id: militarDestinoId }).then((res) => res ?? []),
+    ]);
+  } else {
+    const list = (await matriculaEntity.list?.()) ?? [];
+    matriculasOrigem = list.filter((m) => String(m.militar_id) === String(militarOrigemId));
+    matriculasDestino = list.filter((m) => String(m.militar_id) === String(militarDestinoId));
+  }
 
   const destinoPorNorm = new Map(
-    matriculasDestino
+    (matriculasDestino || [])
       .map((m) => [normalizarMatricula(m.matricula_normalizada || m.matricula), m])
       .filter(([k]) => !!k),
   );
@@ -473,14 +483,21 @@ export async function executarMergeManualMilitares({
 
   await Promise.all(ENTIDADES_VINCULOS_MILITAR_ID.map(async (entityName) => {
     const entity = await getEntity(entityName);
-    if (!entity?.list || !entity?.update) return;
-    const rows = await entity.list();
-    const vinculados = (rows || []).filter((row) => String(row?.militar_id || '') === String(militarOrigemId));
-    await Promise.all(vinculados.map((row) => entity.update(row.id, { militar_id: militarDestinoId })));
+    if (!entity?.update) return;
+    const vinculados = entity.filter
+      ? await entity.filter({ militar_id: militarOrigemId })
+      : (await (entity.list?.() || Promise.resolve([]))) ?? [];
+
+    const finalVinculados = (Array.isArray(vinculados) ? vinculados : []).filter((row) => String(row?.militar_id || '') === String(militarOrigemId));
+
+    await Promise.all(finalVinculados.map((row) => entity.update(row.id, { militar_id: militarDestinoId })));
   }));
 
-  const aposMergeMatriculas = await matriculaEntity.list();
-  const matriculasDestinoPos = (aposMergeMatriculas || []).filter((m) => String(m.militar_id) === String(militarDestinoId));
+  const matriculasDestinoPosRaw = matriculaEntity.filter
+    ? await matriculaEntity.filter({ militar_id: militarDestinoId })
+    : await (matriculaEntity.list?.() || Promise.resolve([]));
+  const matriculasDestinoPos = (Array.isArray(matriculasDestinoPosRaw) ? matriculasDestinoPosRaw : [])
+    .filter((m) => String(m.militar_id) === String(militarDestinoId));
 
   const atualDestino = matriculasDestinoPos.find((m) => m.is_atual === true)
     || matriculasDestinoPos.find((m) => normalizarMatricula(m.matricula_normalizada || m.matricula) === normalizarMatricula(destino.matricula))
@@ -490,25 +507,27 @@ export async function executarMergeManualMilitares({
     throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
   }
 
-  for (const mat of matriculasDestinoPos) {
+  await Promise.all(matriculasDestinoPos.map((mat) => {
     const deveSerAtual = String(mat.id) === String(atualDestino.id);
     if (Boolean(mat.is_atual) !== deveSerAtual) {
-      await matriculaEntity.update(mat.id, {
+      return matriculaEntity.update(mat.id, {
         is_atual: deveSerAtual,
         data_fim: deveSerAtual ? '' : (mat.data_fim || hoje),
       });
     }
-  }
+    return Promise.resolve();
+  }));
 
-  await militarEntity.update(militarDestinoId, {
-    matricula: atualDestino.matricula || formatarMatriculaPadrao(atualDestino.matricula_normalizada || ''),
-  });
-
-  await militarEntity.update(militarOrigemId, {
-    status_cadastro: 'Mesclado',
-    situacao_militar: 'Mesclado',
-    merged_into_id: militarDestinoId,
-  });
+  await Promise.all([
+    militarEntity.update(militarDestinoId, {
+      matricula: atualDestino.matricula || formatarMatriculaPadrao(atualDestino.matricula_normalizada || ''),
+    }),
+    militarEntity.update(militarOrigemId, {
+      status_cadastro: 'Mesclado',
+      situacao_militar: 'Mesclado',
+      merged_into_id: militarDestinoId,
+    }),
+  ]);
 
   const destinoDepois = await obterMilitarPorId(militarDestinoId);
 

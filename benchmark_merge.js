@@ -25,6 +25,13 @@ const mockEntityCalls = (delay) => {
                     if (args.id === 'origem_1') return [{id: 'origem_1', matricula: '111'}];
                     if (args.id === 'destino_1') return [{id: 'destino_1', matricula: '222'}];
                 }
+                if (entityName === 'MatriculaMilitar') {
+                    if (args.militar_id === 'origem_1') return [{ id: 'mat1', militar_id: 'origem_1', matricula: '111', is_atual: true }];
+                    if (args.militar_id === 'destino_1') return [{ id: 'mat2', militar_id: 'destino_1', matricula: '222', is_atual: true }];
+                }
+                if (['HistoricoComportamento', 'PendenciaComportamento', 'PunicaoDisciplinar'].includes(entityName)) {
+                    if (args.militar_id === 'origem_1') return Array(5).fill({}).map((_, i) => ({ id: `${entityName}_${i}`, militar_id: 'origem_1' }));
+                }
                 return [];
             },
             create: async () => {
