@@ -371,13 +371,11 @@ export async function adicionarNovaMatriculaMilitar({ militarId, matricula, tipo
   const matriculaNorm = await validarMatriculaDisponivel(matricula, militarId);
 
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
-  for (const atual of atuais || []) {
-    await matriculaEntity.update(atual.id, {
-      is_atual: false,
-      data_fim: dataInicio || new Date().toISOString().slice(0, 10),
-      motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-    });
-  }
+  await Promise.all((atuais || []).map((atual) => matriculaEntity.update(atual.id, {
+    is_atual: false,
+    data_fim: dataInicio || new Date().toISOString().slice(0, 10),
+    motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
+  })));
 
   const nova = await matriculaEntity.create({
     militar_id: militarId,
@@ -490,15 +488,16 @@ export async function executarMergeManualMilitares({
     throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
   }
 
-  for (const mat of matriculasDestinoPos) {
+  await Promise.all(matriculasDestinoPos.map((mat) => {
     const deveSerAtual = String(mat.id) === String(atualDestino.id);
     if (Boolean(mat.is_atual) !== deveSerAtual) {
-      await matriculaEntity.update(mat.id, {
+      return matriculaEntity.update(mat.id, {
         is_atual: deveSerAtual,
         data_fim: deveSerAtual ? '' : (mat.data_fim || hoje),
       });
     }
-  }
+    return Promise.resolve();
+  }));
 
   await militarEntity.update(militarDestinoId, {
     matricula: atualDestino.matricula || formatarMatriculaPadrao(atualDestino.matricula_normalizada || ''),

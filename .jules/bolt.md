@@ -5,3 +5,6 @@
 
 **Learning:** When executing multiple independent operations sequentially in a loop (like fetching or updating different unrelated entities), execution time can grow linearly with the number of entities due to repeated network/DB latencies.
 **Action:** Replace `for...of` loops containing independent async operations with `await Promise.all(array.map(async item => { ... }))` to parallelize requests and significantly reduce overall latency.
+## 2026-06-04 - Parallelizing record merges in militarIdentidadeService
+**Learning:** Parallelizing database updates for record merges using Promise.all() reduces latency from O(N) to O(1) relative to number of updates, while ensuring error propagation for critical data integrity.
+**Action:** Use Promise.all() for concurrent updates in critical service flows like record merges.
