@@ -453,33 +453,30 @@ export async function executarMergeManualMilitares({
   );
 
   const hoje = new Date().toISOString().slice(0, 10);
-  for (const matOrigem of matriculasOrigem) {
+  await Promise.all(matriculasOrigem.map((matOrigem) => {
     const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
     if (norm && destinoPorNorm.has(norm)) {
-      await matriculaEntity.update(matOrigem.id, {
+      return matriculaEntity.update(matOrigem.id, {
         is_atual: false,
         situacao: 'Mesclada',
         data_fim: hoje,
         motivo: `${matOrigem.motivo || ''} Encerrada por merge manual com militar ${militarDestinoId}.`.trim(),
       });
-      continue;
     }
 
-    await matriculaEntity.update(matOrigem.id, {
+    return matriculaEntity.update(matOrigem.id, {
       militar_id: militarDestinoId,
       is_atual: false,
       motivo: `${matOrigem.motivo || ''} Reatribuída por merge manual a partir do militar ${militarOrigemId}.`.trim(),
     });
-  }
+  }));
 
   for (const entityName of ENTIDADES_VINCULOS_MILITAR_ID) {
     const entity = await getEntity(entityName);
     if (!entity?.list || !entity?.update) continue;
     const rows = await entity.list();
     const vinculados = (rows || []).filter((row) => String(row?.militar_id || '') === String(militarOrigemId));
-    for (const row of vinculados) {
-      await entity.update(row.id, { militar_id: militarDestinoId });
-    }
+    await Promise.all(vinculados.map((row) => entity.update(row.id, { militar_id: militarDestinoId })));
   }
 
   const aposMergeMatriculas = await matriculaEntity.list();
