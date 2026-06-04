@@ -240,7 +240,14 @@ export async function executarLimpezaPrePublicacao({ confirmacao, executadoPor }
     }
   }
 
-  const orfaosRestantes = await diagnosticarOrfaos();
+  const todasEntidadesOrfaos = [
+    ...new Set([
+      ...ORFAOS_RULES.map((r) => r.entidade),
+      ...ORFAOS_RULES.map((r) => r.referencia),
+    ]),
+  ];
+  const cacheOrfaos = await listAllSafe(todasEntidadesOrfaos);
+  const orfaosRestantes = await diagnosticarOrfaos(cacheOrfaos);
   const orfaosPromises = orfaosRestantes.detalhes.map(async (item) => {
     const results = await Promise.allSettled(item.ids.map((id) => deleteSafe(item.entidade, id)));
     const count = results.filter((r) => r.status === 'fulfilled' && !!r.value).length;

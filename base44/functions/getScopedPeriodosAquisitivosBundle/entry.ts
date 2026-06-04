@@ -32,25 +32,54 @@ async function resolverPermissoes(base44, email) {
 
 async function listarMilitarIdsDoEscopo(base44, acessos, criteriosAplicados) {
   const ids = new Set();
-  for (const acesso of acessos || []) {
-    const tipo = normalizeTipo(acesso?.tipo_acesso);
-    if (tipo === 'admin') return null;
-    if (tipo === 'proprio') {
-      if (acesso?.militar_id) { ids.add(String(acesso.militar_id)); criteriosAplicados.add('proprio'); }
-      continue;
-    }
-    const grupamentoId = acesso?.grupamento_id || null;
-    const subgrupamentoId = acesso?.subgrupamento_id || null;
-    const filtros = [];
-    if (tipo === 'setor' && grupamentoId) { filtros.push({ grupamento_raiz_id: grupamentoId }, { grupamento_id: grupamentoId }, { estrutura_id: grupamentoId }); criteriosAplicados.add('setor'); }
-    else if (tipo === 'subsetor' && subgrupamentoId) {
-      filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }); criteriosAplicados.add('subsetor');
-      try { const filhos = await fetchWithRetry(() => base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }), `subgrupamento.parent:${subgrupamentoId}`); for (const f of (filhos || [])) if (f?.id) filtros.push({ estrutura_id: f.id }, { subgrupamento_id: f.id }); } catch (_e) {}
-    } else if (tipo === 'unidade' && subgrupamentoId) { filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }); criteriosAplicados.add('unidade'); }
-    for (const filtro of filtros) {
-      try { const militares = await fetchWithRetry(() => base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']), `militar.escopo:${JSON.stringify(filtro)}`); for (const m of (militares || [])) if (m?.id) ids.add(String(m.id)); } catch (_e) {}
+  const normalizedAcessos = (acessos || []).map((a) => ({ ...a, tipo: normalizeTipo(a?.tipo_acesso) }));
+  if (normalizedAcessos.some((a) => a.tipo === 'admin')) return null;
+
+  const subsetorPromises = [];
+  for (const acesso of normalizedAcessos) {
+    if (acesso.tipo === 'proprio') {
+      if (acesso.militar_id) { ids.add(String(acesso.militar_id)); criteriosAplicados.add('proprio'); }
+    } else if (acesso.tipo === 'subsetor' && acesso.subgrupamento_id) {
+      subsetorPromises.push(
+        fetchWithRetry(() => base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: acesso.subgrupamento_id }), `subgrupamento.parent:${acesso.subgrupamento_id}`)
+          .then((filhos) => ({ acesso, filhos: filhos || [] }))
+          .catch(() => ({ acesso, filhos: [] }))
+      );
     }
   }
+
+  const subsetorFilhosResult = await Promise.all(subsetorPromises);
+  const subsetorMap = new Map(subsetorFilhosResult.map((r) => [r.acesso, r.filhos]));
+  const militarFiltros = [];
+
+  for (const acesso of normalizedAcessos) {
+    const gId = acesso.grupamento_id || null;
+    const sId = acesso.subgrupamento_id || null;
+
+    if (acesso.tipo === 'setor' && gId) {
+      militarFiltros.push({ grupamento_raiz_id: gId }, { grupamento_id: gId }, { estrutura_id: gId });
+      criteriosAplicados.add('setor');
+    } else if (acesso.tipo === 'subsetor' && sId) {
+      militarFiltros.push({ estrutura_id: sId }, { subgrupamento_id: sId });
+      criteriosAplicados.add('subsetor');
+      const filhos = subsetorMap.get(acesso) || [];
+      for (const f of filhos) if (f?.id) militarFiltros.push({ estrutura_id: f.id }, { subgrupamento_id: f.id });
+    } else if (acesso.tipo === 'unidade' && sId) {
+      militarFiltros.push({ estrutura_id: sId }, { subgrupamento_id: sId });
+      criteriosAplicados.add('unidade');
+    }
+  }
+
+  const militarPromises = militarFiltros.map((filtro) =>
+    fetchWithRetry(() => base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']), `militar.escopo:${JSON.stringify(filtro)}`)
+      .catch(() => [])
+  );
+
+  const militarResults = await Promise.all(militarPromises);
+  for (const militares of militarResults) {
+    for (const m of (militares || [])) if (m?.id) ids.add(String(m.id));
+  }
+
   return Array.from(ids);
 }
 

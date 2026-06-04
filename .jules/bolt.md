@@ -9,3 +9,7 @@
 ## 2026-06-04 - Parallelized Principal Status Updates in MilitarFuncao
 **Learning:** Sequential updates in a loop for database writes (e.g., clearing the "principal" flag for multiple records) introduce unnecessary N+1 latency. Parallelizing with `Promise.all` achieved ~90% latency reduction in benchmarks for 10 items.
 **Action:** Always favor `Promise.all` or `Promise.allSettled` for batch updates of independent records in backend functions to minimize total I/O wait time.
+
+## 2024-05-20 - Parallelized Multi-Identifier Search in React Hooks
+**Learning:** Sequential `await` in loops for filtering entities by multiple identifiers (e.g., several emails) in frontend hooks creates I/O bottlenecks. Using `flatMap` with `Promise.all` reduced latency by ~49% in benchmarks.
+**Action:** Deduplicate identifier lists and use `flatMap` to generate all filter promises for concurrent resolution via `Promise.all`.
