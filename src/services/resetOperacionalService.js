@@ -178,26 +178,55 @@ export async function executarLimpezaPrePublicacao({ confirmacao, executadoPor }
   let removidos = 0;
   const removidosPorEntidade = {};
 
-  for (const modulo of MODULOS_LIMPEZA) {
-    for (const nome of modulo.entidades) {
-      const rows = await listSafe(nome);
-      for (const row of rows) {
-        if (!row?.id) continue;
-        if (await deleteSafe(nome, row.id)) {
-          removidos += 1;
-          removidosPorEntidade[nome] = (removidosPorEntidade[nome] || 0) + 1;
-        }
-      }
+  const entitiesToDelete = MODULOS_LIMPEZA.flatMap(modulo => modulo.entidades);
+  const allRowsNested = await Promise.all(entitiesToDelete.map(async (nome) => {
+    const rows = await listSafe(nome);
+    return { nome, rows };
+  }));
+
+  const deletePromises = [];
+  for (const { nome, rows } of allRowsNested) {
+    for (const row of rows) {
+      if (!row?.id) continue;
+      deletePromises.push(
+        deleteSafe(nome, row.id).then((success) => {
+          if (success) {
+            return nome;
+          }
+          return null;
+        })
+      );
+    }
+  }
+
+  const results = await Promise.all(deletePromises);
+  for (const nome of results) {
+    if (nome) {
+      removidos += 1;
+      removidosPorEntidade[nome] = (removidosPorEntidade[nome] || 0) + 1;
     }
   }
 
   const orfaosRestantes = await diagnosticarOrfaos();
+  const orfaosDeletePromises = [];
   for (const item of orfaosRestantes.detalhes) {
     for (const id of item.ids) {
-      if (await deleteSafe(item.entidade, id)) {
-        removidos += 1;
-        removidosPorEntidade[item.entidade] = (removidosPorEntidade[item.entidade] || 0) + 1;
-      }
+      orfaosDeletePromises.push(
+        deleteSafe(item.entidade, id).then((success) => {
+          if (success) {
+            return item.entidade;
+          }
+          return null;
+        })
+      );
+    }
+  }
+
+  const orfaosResults = await Promise.all(orfaosDeletePromises);
+  for (const entidade of orfaosResults) {
+    if (entidade) {
+      removidos += 1;
+      removidosPorEntidade[entidade] = (removidosPorEntidade[entidade] || 0) + 1;
     }
   }
 
