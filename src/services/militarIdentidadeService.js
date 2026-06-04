@@ -495,7 +495,6 @@ export async function executarMergeManualMilitares({
       .filter(([k]) => !!k),
   );
 
-  const hoje = new Date().toISOString().slice(0, 10);
   await Promise.all([
     ...matriculasOrigem.map((matOrigem) => {
       const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
@@ -541,7 +540,8 @@ export async function executarMergeManualMilitares({
     throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
   }
 
-  for (const mat of matriculasDestinoFinal) {
+  const updatesMatricula = [];
+  for (const mat of matriculasDestinoPos) {
     const deveSerAtual = String(mat.id) === String(atualDestino.id);
     const isOrigemReatribuida = String(mat.militar_id) === String(militarDestinoId)
        && (matriculasOrigem || []).some((mo) => String(mo.id) === String(mat.id));
