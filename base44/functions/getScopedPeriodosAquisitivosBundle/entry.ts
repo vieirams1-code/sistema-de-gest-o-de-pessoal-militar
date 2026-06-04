@@ -32,12 +32,13 @@ async function resolverPermissoes(base44, email) {
 
 async function listarMilitarIdsDoEscopo(base44, acessos, criteriosAplicados) {
   const ids = new Set();
-  for (const acesso of acessos || []) {
+  if (!acessos || acessos.length === 0) return Array.from(ids);
+  for (const acesso of acessos) if (normalizeTipo(acesso?.tipo_acesso) === 'admin') return null;
+  await Promise.all(acessos.map(async (acesso) => {
     const tipo = normalizeTipo(acesso?.tipo_acesso);
-    if (tipo === 'admin') return null;
     if (tipo === 'proprio') {
       if (acesso?.militar_id) { ids.add(String(acesso.militar_id)); criteriosAplicados.add('proprio'); }
-      continue;
+      return;
     }
     const grupamentoId = acesso?.grupamento_id || null;
     const subgrupamentoId = acesso?.subgrupamento_id || null;
@@ -47,10 +48,10 @@ async function listarMilitarIdsDoEscopo(base44, acessos, criteriosAplicados) {
       filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }); criteriosAplicados.add('subsetor');
       try { const filhos = await fetchWithRetry(() => base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }), `subgrupamento.parent:${subgrupamentoId}`); for (const f of (filhos || [])) if (f?.id) filtros.push({ estrutura_id: f.id }, { subgrupamento_id: f.id }); } catch (_e) {}
     } else if (tipo === 'unidade' && subgrupamentoId) { filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }); criteriosAplicados.add('unidade'); }
-    for (const filtro of filtros) {
+    await Promise.all(filtros.map(async (filtro) => {
       try { const militares = await fetchWithRetry(() => base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']), `militar.escopo:${JSON.stringify(filtro)}`); for (const m of (militares || [])) if (m?.id) ids.add(String(m.id)); } catch (_e) {}
-    }
-  }
+    }));
+  }));
   return Array.from(ids);
 }
 

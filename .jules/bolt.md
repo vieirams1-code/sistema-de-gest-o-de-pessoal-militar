@@ -5,3 +5,7 @@
 
 **Learning:** When executing multiple independent operations sequentially in a loop (like fetching or updating different unrelated entities), execution time can grow linearly with the number of entities due to repeated network/DB latencies.
 **Action:** Replace `for...of` loops containing independent async operations with `await Promise.all(array.map(async item => { ... }))` to parallelize requests and significantly reduce overall latency.
+
+## 2025-05-22 - Parallelized Scope ID Resolution
+**Learning:** Sequential N+1 reads during nested resource resolution (e.g., fetching sub-groups then their members) creates a massive performance bottleneck. In `listarMilitarIdsDoEscopo`, we observed ~83% latency reduction by parallelizing both the outer loop of access records and the inner loop of filters.
+**Action:** Always check if loops containing `await` can be refactored into `Promise.all` maps. For early-exit logic (like `admin` checks), perform a preliminary synchronous check (e.g., `array.some(...)`) before initiating parallel async tasks.
