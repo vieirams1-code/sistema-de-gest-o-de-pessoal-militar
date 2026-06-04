@@ -55,7 +55,11 @@ import { canEditarOrdem, canExcluirDefinitivo, canRemoverDaTurma, canReverterIte
 import { getPostoOrigemEsperado, isPromocaoSubtenenteParaSegundoTenenteQAOBM } from '@/utils/promocao/elegibilidadePromocao';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
-const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
+const diagLog = (evento, dados = {}) => {
+  if (import.meta.env?.DEV) {
+    console.info(`${DIAG_PREFIX} ${evento}`, dados);
+  }
+};
 
 const CAMPOS_PROMOCAO = [
   'posto_graduacao',
@@ -76,7 +80,9 @@ async function carregarPromocaoPorId(promocaoId) {
       const promocao = await base44.entities.Promocao.get(promocaoId);
       if (promocao) return promocao;
     } catch (error) {
-      console.warn('[DetalhePromocao] Promocao.get indisponível; usando busca alternativa.', error);
+      if (import.meta.env?.DEV) {
+        console.warn('[DetalhePromocao] Promocao.get indisponível; usando busca alternativa.', error);
+      }
     }
   }
 
@@ -377,7 +383,9 @@ export default function DetalhePromocao() {
       try {
         return await entity.list();
       } catch (error) {
-        console.warn('[DetalhePromocao] PromocaoMilitar indisponível; lista principal usará registros já vinculados.', error);
+        if (import.meta.env?.DEV) {
+          console.warn('[DetalhePromocao] PromocaoMilitar indisponível; lista principal usará registros já vinculados.', error);
+        }
         return [];
       }
     },
