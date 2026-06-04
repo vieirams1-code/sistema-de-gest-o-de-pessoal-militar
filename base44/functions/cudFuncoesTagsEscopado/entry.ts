@@ -602,7 +602,7 @@ Deno.serve(async (req) => {
         }
         if (data?.principal === true) {
           const outrosPrincipais = (ativas || []).filter((v: any) => v.principal === true && String(v.id) !== String(id || ''));
-          for (const v of outrosPrincipais) await svc.update(String(v.id), { principal: false });
+          await Promise.all(outrosPrincipais.map((v: any) => svc.update(String(v.id), { principal: false })));
         }
         if (operacao === 'create') return Response.json({ data: await svc.create({ ...data, militar_id: militarId, status: 'ativa' }) });
         return Response.json({ data: await svc.update(String(id), { ...data, militar_id: militarId }) });
