@@ -30,24 +30,24 @@ export const GRATIFICACAO_STATUS_LABELS = {
 };
 
 export const GRATIFICACAO_TABS = {
-  RASCUNHOS: 'rascunhos',
-  ATIVOS: 'ativos',
-  AGUARDANDO_PUBLICACAO: 'aguardando_publicacao',
-  DISPENSA_EM_ANDAMENTO: 'dispensa_em_andamento',
+  ATIVAS: 'ativas',
   HISTORICO: 'historico',
-  COTAS: 'cotas',
-  TIPOS: 'tipos',
+  CONFIGURACOES: 'configuracoes',
 };
 
 export const GRATIFICACAO_TAB_LABELS = {
-  [GRATIFICACAO_TABS.RASCUNHOS]: 'Rascunhos',
-  [GRATIFICACAO_TABS.ATIVOS]: 'Ativos',
-  [GRATIFICACAO_TABS.AGUARDANDO_PUBLICACAO]: 'Aguardando publicação',
-  [GRATIFICACAO_TABS.DISPENSA_EM_ANDAMENTO]: 'Dispensa em andamento',
+  [GRATIFICACAO_TABS.ATIVAS]: 'Ativas',
   [GRATIFICACAO_TABS.HISTORICO]: 'Histórico',
-  [GRATIFICACAO_TABS.COTAS]: 'Cotas',
-  [GRATIFICACAO_TABS.TIPOS]: 'Tipos de gratificação',
+  [GRATIFICACAO_TABS.CONFIGURACOES]: 'Configurações',
 };
+
+export const STATUS_PENDENTES = [
+  GRATIFICACAO_STATUS.RASCUNHO,
+  GRATIFICACAO_STATUS.SOLICITADO_DP,
+  GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_NOMEACAO,
+  GRATIFICACAO_STATUS.DISPENSA_SOLICITADA,
+  GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_DISPENSA,
+];
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -115,16 +115,13 @@ export function calcularResumoGratificacoesFuncao(gratificacoes = [], cotas = []
   };
 }
 
-export function filtrarGratificacoesPorAba(gratificacoes = [], aba = GRATIFICACAO_TABS.ATIVOS) {
+export function filtrarGratificacoesPorAba(gratificacoes = [], aba = GRATIFICACAO_TABS.ATIVAS) {
   const statusHistorico = new Set([GRATIFICACAO_STATUS.DISPENSADO, GRATIFICACAO_STATUS.CANCELADO]);
   return (gratificacoes || []).filter((item) => {
     const status = normalizeStatus(item?.status);
-    if (aba === GRATIFICACAO_TABS.RASCUNHOS) return status === GRATIFICACAO_STATUS.RASCUNHO;
-    if (aba === GRATIFICACAO_TABS.ATIVOS) return status === GRATIFICACAO_STATUS.NOMEADO_ATIVO;
-    if (aba === GRATIFICACAO_TABS.AGUARDANDO_PUBLICACAO) return [GRATIFICACAO_STATUS.SOLICITADO_DP, GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_NOMEACAO].includes(status);
-    if (aba === GRATIFICACAO_TABS.DISPENSA_EM_ANDAMENTO) return [GRATIFICACAO_STATUS.DISPENSA_SOLICITADA, GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_DISPENSA].includes(status);
+    if (aba === GRATIFICACAO_TABS.ATIVAS) return status === GRATIFICACAO_STATUS.NOMEADO_ATIVO;
     if (aba === GRATIFICACAO_TABS.HISTORICO) return statusHistorico.has(status);
-    return true;
+    return false;
   });
 }
 

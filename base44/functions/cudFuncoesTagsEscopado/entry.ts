@@ -64,24 +64,36 @@ async function resolverPermissoes(base44: any, email: string) {
 }
 async function listarMilitarIdsDoEscopo(base44: any, acessos: any[]) {
   const ids = new Set<string>();
+  const queries: any[] = [];
+
   for (const acesso of acessos || []) {
     const tipo = normalizeTipo(acesso?.tipo_acesso);
     if (tipo === 'admin') return null;
-    if (tipo === 'proprio') { if (acesso?.militar_id) ids.add(String(acesso.militar_id)); continue; }
-    const filtros: any[] = [];
+    if (tipo === 'proprio') {
+      if (acesso?.militar_id) ids.add(String(acesso.militar_id));
+      continue;
+    }
     const grupamentoId = acesso?.grupamento_id || null;
     const subgrupamentoId = acesso?.subgrupamento_id || null;
-    if (tipo === 'setor' && grupamentoId) filtros.push({ grupamento_raiz_id: grupamentoId }, { grupamento_id: grupamentoId }, { estrutura_id: grupamentoId });
-    else if (tipo === 'subsetor' && subgrupamentoId) {
-      filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId });
+
+    if (tipo === 'setor' && grupamentoId) {
+      queries.push({ grupamento_raiz_id: grupamentoId }, { grupamento_id: grupamentoId }, { estrutura_id: grupamentoId });
+    } else if (tipo === 'subsetor' && subgrupamentoId) {
+      queries.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId });
       const filhos = await base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }, undefined, 1000, 0, ['id']);
-      for (const filho of (filhos || [])) if (filho?.id) filtros.push({ estrutura_id: filho.id }, { subgrupamento_id: filho.id });
-    } else if (tipo === 'unidade' && subgrupamentoId) filtros.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId });
-    for (const filtro of filtros) {
-      const militares = await base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']);
-      for (const m of (militares || [])) if (m?.id) ids.add(String(m.id));
+      for (const filho of (filhos || [])) if (filho?.id) queries.push({ estrutura_id: filho.id }, { subgrupamento_id: filho.id });
+    } else if (tipo === 'unidade' && subgrupamentoId) {
+      queries.push({ estrutura_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId });
     }
   }
+
+  if (queries.length > 0) {
+    const results = await Promise.all(queries.map((q) => base44.asServiceRole.entities.Militar.filter(q, undefined, 1000, 0, ['id'])));
+    for (const lista of results) {
+      for (const m of (lista || [])) if (m?.id) ids.add(String(m.id));
+    }
+  }
+
   return Array.from(ids);
 }
 
@@ -119,9 +131,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 async function carregarVinculosAtivosPorCampo(svc: any, campoChave: 'militar_id' | 'ferias_id', valores: string[], extra: Record<string, unknown> = {}) {
+  const chunks = chunk(valores, 100);
+  const results = await Promise.all(chunks.map((grupo) => svc.filter({ [campoChave]: { $in: grupo }, status: 'ativa', ...extra }, undefined, 2000, 0)));
   const out: any[] = [];
-  for (const grupo of chunk(valores, 100)) {
-    const lista = await svc.filter({ [campoChave]: { $in: grupo }, status: 'ativa', ...extra }, undefined, 2000, 0);
+  for (const lista of results) {
     if (Array.isArray(lista)) out.push(...lista);
   }
   return out;
@@ -594,11 +607,13 @@ Deno.serve(async (req) => {
         const ativas = await base44.asServiceRole.entities.MilitarFuncao.filter({ militar_id: militarId, status: 'ativa' }, undefined, 1000, 0);
         const chave = String(funcao?.institucional_chave || '').toLowerCase();
         if (chave === 'comandante' || chave === 'subcomandante') {
-          const ativosMesmoTipo = await Promise.all((ativas || []).filter((v: any) => String(v.id) !== String(id || '')).map(async (v: any) => {
-            const [f] = await base44.asServiceRole.entities.FuncaoMilitar.filter({ id: v.funcao_militar_id }, undefined, 1, 0);
-            return String(f?.institucional_chave || '').toLowerCase() === chave;
-          }));
-          if (ativosMesmoTipo.some(Boolean)) return erro(400, `Já existe vínculo ativo de ${chave} para este militar.`);
+          const idsParaConsultar = Array.from(new Set((ativas || []).filter((v: any) => String(v.id) !== String(id || '')).map((v: any) => v.funcao_militar_id).filter(Boolean)));
+          if (idsParaConsultar.length > 0) {
+            const funcoes = await base44.asServiceRole.entities.FuncaoMilitar.filter({ id: { $in: idsParaConsultar } }, undefined, 1000, 0);
+            if ((funcoes || []).some((f: any) => String(f?.institucional_chave || '').toLowerCase() === chave)) {
+              return erro(400, `Já existe vínculo ativo de ${chave} para este militar.`);
+            }
+          }
         }
         if (data?.principal === true) {
           const outrosPrincipais = (ativas || []).filter((v: any) => v.principal === true && String(v.id) !== String(id || ''));
