@@ -60,6 +60,107 @@ function isContratoDeOutroMilitar(contrato, militarId) {
   return String(contrato.militar_id) !== String(militarId);
 }
 
+function filtrarContratosAtivosDoMilitar(contratosDesignacao, militarId, warnings) {
+  const contratos = Array.isArray(contratosDesignacao) ? contratosDesignacao : [];
+  return contratos.filter((contrato) => {
+    if (isContratoDeOutroMilitar(contrato, militarId)) {
+      warnings.push(`CONTRATO_DE_OUTRO_MILITAR_IGNORADO:${getRegistroId(contrato) || 'sem_id'}`);
+      return false;
+    }
+
+    return normalizarStatusContratoDesignacao(contrato?.status_contrato) === STATUS_CONTRATO_DESIGNACAO.ATIVO;
+  });
+}
+
+function resolverPeloContrato(contratoAtivo, { validarDatas, bloquearDataContratoAnteriorAoInicio, warnings }) {
+  const contratoId = getRegistroId(contratoAtivo);
+
+  if (contratoAtivo?.gera_direito_ferias === false) {
+    return criarRetorno({
+      bloqueado: true,
+      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_NAO_GERA_FERIAS,
+      mensagem: 'Contrato de designação ativo configurado para não gerar direito a férias.',
+      warnings,
+    });
+  }
+
+  if (String(contratoAtivo?.regra_geracao_periodos || '').trim().toLowerCase() === 'bloqueada') {
+    return criarRetorno({
+      bloqueado: true,
+      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_GERACAO_BLOQUEADA,
+      mensagem: 'Contrato de designação ativo está com regra de geração de períodos bloqueada.',
+      warnings,
+    });
+  }
+
+  if (!contratoAtivo?.data_inclusao_para_ferias) {
+    return criarRetorno({
+      bloqueado: true,
+      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_SEM_DATA_BASE,
+      mensagem: 'Contrato de designação ativo sem data de inclusão para férias.',
+      warnings,
+    });
+  }
+
+  const resultadoContrato = normalizarDataBaseOuBloquear({
+    dataBase: contratoAtivo.data_inclusao_para_ferias,
+    origem: ORIGENS_DATA_BASE_FERIAS.CONTRATO_DESIGNACAO,
+    contratoId,
+    campoLabel: 'Data de inclusão para férias do contrato de designação',
+    warnings,
+    validarDatas,
+  });
+
+  if (resultadoContrato.bloqueado) return resultadoContrato;
+
+  if (validarDatas && contratoAtivo?.data_inicio_contrato) {
+    const dataInicioContrato = normalizeDateOnly(contratoAtivo.data_inicio_contrato);
+    if (!dataInicioContrato) {
+      return criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_FERIAS_INVALIDA,
+        mensagem: 'Data de início do contrato de designação inválida para validar a data-base de férias.',
+        warnings,
+      });
+    }
+
+    if (compareDateOnly(resultadoContrato.dataBase, dataInicioContrato) === -1) {
+      if (bloquearDataContratoAnteriorAoInicio) {
+        return criarRetorno({
+          bloqueado: true,
+          codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO,
+          mensagem: 'Data-base de férias do contrato é anterior à data de início do contrato.',
+          warnings,
+        });
+      }
+
+      warnings.push('DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO');
+    }
+  }
+
+  return resultadoContrato;
+}
+
+function resolverPeloMilitar(militar, { validarDatas, warnings }) {
+  if (!militar?.data_inclusao) {
+    return criarRetorno({
+      bloqueado: true,
+      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.MILITAR_SEM_DATA_INCLUSAO,
+      mensagem: 'Militar sem data de inclusão para resolver a data-base de férias.',
+      warnings,
+    });
+  }
+
+  return normalizarDataBaseOuBloquear({
+    dataBase: militar.data_inclusao,
+    origem: ORIGENS_DATA_BASE_FERIAS.MILITAR_DATA_INCLUSAO,
+    contratoId: null,
+    campoLabel: 'Data de inclusão do militar',
+    warnings,
+    validarDatas,
+  });
+}
+
 function normalizarDataBaseOuBloquear({ dataBase, origem, contratoId, campoLabel, warnings, validarDatas }) {
   if (!validarDatas) {
     return criarRetorno({
@@ -94,18 +195,8 @@ export function resolverDataBaseFerias({ militar, contratosDesignacao = [], opti
   const resolvedOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
   const warnings = [];
   const militarId = getMilitarId(militar);
-  const contratos = Array.isArray(contratosDesignacao) ? contratosDesignacao : [];
-  const contratosDoMilitar = contratos.filter((contrato) => {
-    if (isContratoDeOutroMilitar(contrato, militarId)) {
-      warnings.push(`CONTRATO_DE_OUTRO_MILITAR_IGNORADO:${getRegistroId(contrato) || 'sem_id'}`);
-      return false;
-    }
 
-    return true;
-  });
-  const contratosAtivos = contratosDoMilitar.filter(
-    (contrato) => normalizarStatusContratoDesignacao(contrato?.status_contrato) === STATUS_CONTRATO_DESIGNACAO.ATIVO,
-  );
+  const contratosAtivos = filtrarContratosAtivosDoMilitar(contratosDesignacao, militarId, warnings);
 
   if (contratosAtivos.length > 1) {
     return criarRetorno({
@@ -117,93 +208,15 @@ export function resolverDataBaseFerias({ militar, contratosDesignacao = [], opti
   }
 
   if (contratosAtivos.length === 1) {
-    const contratoAtivo = contratosAtivos[0];
-    const contratoId = getRegistroId(contratoAtivo);
-
-    if (contratoAtivo?.gera_direito_ferias === false) {
-      return criarRetorno({
-        bloqueado: true,
-        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_NAO_GERA_FERIAS,
-        mensagem: 'Contrato de designação ativo configurado para não gerar direito a férias.',
-        warnings,
-      });
-    }
-
-    if (String(contratoAtivo?.regra_geracao_periodos || '').trim().toLowerCase() === 'bloqueada') {
-      return criarRetorno({
-        bloqueado: true,
-        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_GERACAO_BLOQUEADA,
-        mensagem: 'Contrato de designação ativo está com regra de geração de períodos bloqueada.',
-        warnings,
-      });
-    }
-
-    if (!contratoAtivo?.data_inclusao_para_ferias) {
-      return criarRetorno({
-        bloqueado: true,
-        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_SEM_DATA_BASE,
-        mensagem: 'Contrato de designação ativo sem data de inclusão para férias.',
-        warnings,
-      });
-    }
-
-    const resultadoContrato = normalizarDataBaseOuBloquear({
-      dataBase: contratoAtivo.data_inclusao_para_ferias,
-      origem: ORIGENS_DATA_BASE_FERIAS.CONTRATO_DESIGNACAO,
-      contratoId,
-      campoLabel: 'Data de inclusão para férias do contrato de designação',
-      warnings,
+    return resolverPeloContrato(contratosAtivos[0], {
       validarDatas: resolvedOptions.validarDatas,
-    });
-
-    if (resultadoContrato.bloqueado) return resultadoContrato;
-
-    if (resolvedOptions.validarDatas && contratoAtivo?.data_inicio_contrato) {
-      const dataInicioContrato = normalizeDateOnly(contratoAtivo.data_inicio_contrato);
-      if (!dataInicioContrato) {
-        return criarRetorno({
-          bloqueado: true,
-          codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_FERIAS_INVALIDA,
-          mensagem: 'Data de início do contrato de designação inválida para validar a data-base de férias.',
-          warnings,
-        });
-      }
-
-      if (compareDateOnly(resultadoContrato.dataBase, dataInicioContrato) === -1) {
-        if (resolvedOptions.bloquearDataContratoAnteriorAoInicio) {
-          return criarRetorno({
-            bloqueado: true,
-            codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO,
-            mensagem: 'Data-base de férias do contrato é anterior à data de início do contrato.',
-            warnings,
-          });
-        }
-
-        warnings.push('DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO');
-      }
-    }
-
-    return criarRetorno({
-      ...resultadoContrato,
+      bloquearDataContratoAnteriorAoInicio: resolvedOptions.bloquearDataContratoAnteriorAoInicio,
       warnings,
     });
   }
 
-  if (!militar?.data_inclusao) {
-    return criarRetorno({
-      bloqueado: true,
-      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.MILITAR_SEM_DATA_INCLUSAO,
-      mensagem: 'Militar sem data de inclusão para resolver a data-base de férias.',
-      warnings,
-    });
-  }
-
-  return normalizarDataBaseOuBloquear({
-    dataBase: militar.data_inclusao,
-    origem: ORIGENS_DATA_BASE_FERIAS.MILITAR_DATA_INCLUSAO,
-    contratoId: null,
-    campoLabel: 'Data de inclusão do militar',
-    warnings,
+  return resolverPeloMilitar(militar, {
     validarDatas: resolvedOptions.validarDatas,
+    warnings,
   });
 }
