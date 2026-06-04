@@ -384,11 +384,13 @@ export async function adicionarNovaMatriculaMilitar({
   const matriculaNorm = await validarMatriculaDisponivel(matricula, militarId);
 
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
-  await Promise.all((atuais || []).map((atual) => matriculaEntity.update(atual.id, {
-    is_atual: false,
-    data_fim: dataInicio || new Date().toISOString().slice(0, 10),
-    motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-  })));
+  if (Array.isArray(atuais) && atuais.length > 0) {
+    await Promise.all(atuais.map((atual) => matriculaEntity.update(atual.id, {
+      is_atual: false,
+      data_fim: dataInicio || new Date().toISOString().slice(0, 10),
+      motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
+    })));
+  }
 
   const nova = await matriculaEntity.create({
     militar_id: militarId,

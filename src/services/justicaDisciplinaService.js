@@ -256,12 +256,13 @@ export async function diagnosticarFluxoPunicaoRuntime() {
   const cardEntity = getEntitySafe('CardOperacional');
   const colunaEntity = getEntitySafe('ColunaOperacional');
 
-  diagnostico.campos.push(
-    await validarCamposEmAmostra(militarEntity, ['id', 'nome_completo', 'posto_graduacao', 'comportamento', 'data_inclusao'], 'Militar'),
-    await validarCamposEmAmostra(pendenciaEntity, ['militar_id', 'militar_nome', 'comportamento_atual', 'comportamento_sugerido', 'fundamento_legal', 'status_pendencia'], 'PendenciaComportamento'),
-    await validarCamposEmAmostra(cardEntity, ['coluna_id', 'ordem', 'titulo', 'tipo', 'status', 'arquivado'], 'CardOperacional'),
-    await validarCamposEmAmostra(colunaEntity, ['quadro_id', 'nome', 'ordem', 'ativa'], 'ColunaOperacional'),
-  );
+  const resultadosValidacao = await Promise.all([
+    validarCamposEmAmostra(militarEntity, ['id', 'nome_completo', 'posto_graduacao', 'comportamento', 'data_inclusao'], 'Militar'),
+    validarCamposEmAmostra(pendenciaEntity, ['militar_id', 'militar_nome', 'comportamento_atual', 'comportamento_sugerido', 'fundamento_legal', 'status_pendencia'], 'PendenciaComportamento'),
+    validarCamposEmAmostra(cardEntity, ['coluna_id', 'ordem', 'titulo', 'tipo', 'status', 'arquivado'], 'CardOperacional'),
+    validarCamposEmAmostra(colunaEntity, ['quadro_id', 'nome', 'ordem', 'ativa'], 'ColunaOperacional'),
+  ]);
+  diagnostico.campos.push(...resultadosValidacao);
 
   return diagnostico;
 }
@@ -529,8 +530,13 @@ export async function registrarMarcoHistoricoComportamento({
   }
   const mudancaDisciplinarPorCalculo = origemEhPendencia || Boolean(fundamentoLegalFinal);
   if (!fundamentoLegalFinal && mudancaDisciplinarPorCalculo) {
-    const [militar] = await (getEntitySafe('Militar')?.filter?.({ id: militarIdNormalizado }) || []);
-    const punicoes = await (getEntitySafe('PunicaoDisciplinar')?.filter?.({ militar_id: militarIdNormalizado }) || []);
+    const [militarResult, punicoesResult] = await Promise.all([
+      getEntitySafe('Militar')?.filter?.({ id: militarIdNormalizado }) || [],
+      getEntitySafe('PunicaoDisciplinar')?.filter?.({ militar_id: militarIdNormalizado }) || [],
+    ]);
+    const [militar] = Array.isArray(militarResult) ? militarResult : [];
+    const punicoes = Array.isArray(punicoesResult) ? punicoesResult : [];
+
     fundamentoLegalFinal = inferirFundamentoPorCalculoNoMarco({
       marco: {
         data_alteracao: dataVigencia,
