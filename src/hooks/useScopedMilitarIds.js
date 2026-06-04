@@ -54,14 +54,18 @@ export function useScopedMilitarIds(options = {}) {
         const ids = new Set();
         if (linkedMilitarId) ids.add(linkedMilitarId);
         const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
-        for (const email of knownEmails) {
-          const consultas = await Promise.all([
-            base44.entities.Militar.filter({ email: email }),
-            base44.entities.Militar.filter({ email_particular: email }),
-            base44.entities.Militar.filter({ email_funcional: email }),
-          ]);
+
+        // Optimize: Fetch all email-related records concurrently instead of sequentially in a loop.
+        const emailPromises = knownEmails.map((email) => Promise.all([
+          base44.entities.Militar.filter({ email: email }),
+          base44.entities.Militar.filter({ email_particular: email }),
+          base44.entities.Militar.filter({ email_funcional: email }),
+        ]));
+
+        const resultadosEmails = await Promise.all(emailPromises);
+        resultadosEmails.forEach(consultas => {
           consultas.flat().forEach((m) => { if (m?.id) ids.add(m.id); });
-        }
+        });
         return Array.from(ids);
       }
 
