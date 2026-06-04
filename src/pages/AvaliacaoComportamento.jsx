@@ -253,9 +253,9 @@ export default function AvaliacaoComportamento() {
 
   const gerarPendencias = async () => {
     if (!canGerarPendencias) return;
-    for (const linha of avaliacao.filter((a) => a.divergente && !a.pendenciaExistente && !a.inconsistenteCalculo)) {
-      // eslint-disable-next-line no-await-in-loop
-      await gerarPendencia(linha);
+    const alvos = avaliacao.filter((a) => a.divergente && !a.pendenciaExistente && !a.inconsistenteCalculo);
+    if (alvos.length > 0) {
+      await Promise.all(alvos.map((linha) => gerarPendencia(linha)));
     }
     await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
   };
