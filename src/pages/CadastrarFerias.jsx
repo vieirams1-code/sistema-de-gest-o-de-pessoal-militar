@@ -1,6 +1,6 @@
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -21,23 +21,12 @@ import {
   validarInicioNoPeriodoConcessivo,
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
-import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils';
+import { validarDiasNoSaldoPeriodo, DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
-import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
-
-// Gera opções de período aquisitivo: ano corrente + 1 próximo
-const gerarOpcoesAnos = () => {
-  const anoAtual = new Date().getFullYear();
-  const opcoes = [];
-  for (let ano = anoAtual - 15; ano <= anoAtual + 1; ano++) {
-    opcoes.push(`${ano}/${ano + 1}`);
-  }
-  return opcoes.reverse();
-};
 
 // Fracoes válidas: combinações fixas com soma = 30
 const OPCOES_FRACOES = [
@@ -124,7 +113,7 @@ export default function CadastrarFerias() {
     enabled: !!editId && isAccessResolved && hasFeriasAccess
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (editingFerias) {
       setFormData({ ...initialFormData, ...editingFerias });
       setFracoes([{
@@ -226,10 +215,6 @@ export default function CadastrarFerias() {
       setErroRegras(erroOrdem);
       return;
     }
-
-    const erroConcessivo = fracoes
-      .map((fracao) => validarInicioNoPeriodoConcessivo(fracao.data_inicio, periodoSelecionado?.data_limite_gozo))
-      .find(Boolean);
 
     if (periodoSelecionado) {
       const totalDiasSolicitados = fracoes.reduce((sum, item) => sum + Number(item?.dias || 0), 0);
