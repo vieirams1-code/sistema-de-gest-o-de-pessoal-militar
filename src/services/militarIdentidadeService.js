@@ -471,13 +471,13 @@ export async function executarMergeManualMilitares({
     });
   }));
 
-  for (const entityName of ENTIDADES_VINCULOS_MILITAR_ID) {
+  await Promise.all(ENTIDADES_VINCULOS_MILITAR_ID.map(async (entityName) => {
     const entity = await getEntity(entityName);
-    if (!entity?.list || !entity?.update) continue;
+    if (!entity?.list || !entity?.update) return;
     const rows = await entity.list();
     const vinculados = (rows || []).filter((row) => String(row?.militar_id || '') === String(militarOrigemId));
     await Promise.all(vinculados.map((row) => entity.update(row.id, { militar_id: militarDestinoId })));
-  }
+  }));
 
   const aposMergeMatriculas = await matriculaEntity.list();
   const matriculasDestinoPos = (aposMergeMatriculas || []).filter((m) => String(m.militar_id) === String(militarDestinoId));
