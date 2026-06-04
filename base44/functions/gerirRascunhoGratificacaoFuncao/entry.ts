@@ -15,6 +15,8 @@ const STATUS_GRATIFICACAO_ATIVA = 'nomeado_ativo';
 const GRATIFICACAO_FIELDS = [
   'militar_id', 'tipo_gratificacao_funcao_id', 'cota_gratificacao_funcao_id', 'funcao_gratificada',
   'numero_processo', 'observacoes', 'data_solicitacao', 'documento_solicitacao',
+  'data_publicacao_nomeacao', 'data_inicio_efeitos', 'doems_nomeacao_numero', 'doems_nomeacao_edicao',
+  'doems_nomeacao_link', 'ato_nomeacao_numero',
 ];
 const CAMPOS_MILITAR_SNAPSHOT = [
   'id', 'nome_completo', 'nome_guerra', 'posto_graduacao', 'quadro', 'matricula', 'lotacao',
