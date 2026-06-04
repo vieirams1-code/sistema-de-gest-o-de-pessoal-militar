@@ -651,8 +651,8 @@ export default function DetalhePromocao() {
 
   const salvarTurmaMutation = useMutation({
     mutationFn: async () => {
-      if (!base44.entities.PromocaoMilitar || typeof base44.entities.PromocaoMilitar.update !== 'function') {
-        throw new Error('Não foi possível salvar a lista.');
+      if (!base44.entities.PromocaoMilitar || typeof base44.entities.PromocaoMilitar.bulkUpdate !== 'function') {
+        throw new Error('Não foi possível salvar a lista em lote.');
       }
       const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocaoReferenciaCadastro));
       const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao: promocaoReferenciaCadastro });
@@ -667,7 +667,12 @@ export default function DetalhePromocao() {
         historicosV2: historicosVinculados,
       });
       if (!validacaoImutabilidade.valido) throw new Error(validacaoImutabilidade.mensagens.join(' '));
-      await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }))));
+      if (alterados.length > 0) {
+        await base44.entities.PromocaoMilitar.bulkUpdate(alterados.map((registro) => ({
+          id: registro.id,
+          ...montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }),
+        })));
+      }
       return alterados;
     },
     onSuccess: async (alterados = []) => {
@@ -840,7 +845,9 @@ export default function DetalhePromocao() {
           `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.encontrados}\nTotal sem histórico: ${resultado.semHistorico.length}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}${alertaResumo}`
         );
         if (!confirmou) return { cancelado: true };
-        await Promise.all(resultado.ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+        if (resultado.ordenados.length > 0) {
+          await base44.entities.PromocaoMilitar.bulkUpdate(resultado.ordenados.map((item) => ({ id: item.id, ordem: item.ordem })));
+        }
         return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
       }
 
@@ -875,7 +882,9 @@ export default function DetalhePromocao() {
       const confirmou = window.confirm(`Ordenar pela lista atual?\n\nPrévia (primeiros 10):\n${previaTexto}${ordenados.length > 10 ? '\n...' : ''}`);
       if (!confirmou) return { cancelado: true };
 
-      await Promise.all(ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+      if (ordenados.length > 0) {
+        await base44.entities.PromocaoMilitar.bulkUpdate(ordenados.map((item) => ({ id: item.id, ordem: item.ordem })));
+      }
       return { atualizados: ordenados.length, historica: false };
     },
     onSuccess: async (resultado) => {
