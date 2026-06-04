@@ -67,6 +67,14 @@ async function listSafe(nome) {
   }
 }
 
+async function listAllSafe(nomes) {
+  const uniqueNomes = [...new Set(nomes)];
+  const results = await Promise.all(uniqueNomes.map((nome) => listSafe(nome)));
+  const cache = new Map();
+  uniqueNomes.forEach((nome, i) => cache.set(nome, results[i]));
+  return cache;
+}
+
 async function deleteSafe(nome, id) {
   const entity = await getEntity(nome);
   if (!entity?.delete) return false;
@@ -78,7 +86,7 @@ async function deleteSafe(nome, id) {
   }
 }
 
-async function gerarResumoOperacional() {
+async function gerarResumoOperacional(cache = null) {
   const itens = [];
   let total = 0;
 
@@ -87,7 +95,7 @@ async function gerarResumoOperacional() {
     const entidades = [];
 
     for (const nome of modulo.entidades) {
-      const rows = await listSafe(nome);
+      const rows = cache?.has(nome) ? cache.get(nome) : await listSafe(nome);
       const count = rows.length;
       subtotal += count;
       total += count;
@@ -97,7 +105,7 @@ async function gerarResumoOperacional() {
     itens.push({ chave: modulo.chave, label: modulo.label, subtotal, entidades });
   }
 
-  const orfaos = await diagnosticarOrfaos();
+  const orfaos = await diagnosticarOrfaos(cache);
 
   return {
     confirmadoNecessario: CONFIRMACAO_FORTE,
@@ -111,21 +119,21 @@ async function gerarResumoOperacional() {
   };
 }
 
-async function diagnosticarOrfaos() {
+async function diagnosticarOrfaos(cache = null) {
   const cacheIds = new Map();
   const detalhes = [];
   let total = 0;
 
   const getIds = async (entidade) => {
     if (cacheIds.has(entidade)) return cacheIds.get(entidade);
-    const rows = await listSafe(entidade);
+    const rows = cache?.has(entidade) ? cache.get(entidade) : await listSafe(entidade);
     const ids = new Set(rows.map((r) => r.id).filter(Boolean));
     cacheIds.set(entidade, ids);
     return ids;
   };
 
   for (const rule of ORFAOS_RULES) {
-    const rows = await listSafe(rule.entidade);
+    const rows = cache?.has(rule.entidade) ? cache.get(rule.entidade) : await listSafe(rule.entidade);
     if (!rows.length) continue;
     const validos = await getIds(rule.referencia);
 
@@ -164,7 +172,15 @@ async function registrarLog({ tipo, executadoPor, resumo, removidos }) {
 }
 
 export async function previewLimpezaPrePublicacao({ executadoPor } = {}) {
-  const resumo = await gerarResumoOperacional();
+  const todasEntidades = [
+    ...new Set([
+      ...MODULOS_LIMPEZA.flatMap((m) => m.entidades),
+      ...ORFAOS_RULES.map((r) => r.entidade),
+      ...ORFAOS_RULES.map((r) => r.referencia),
+    ]),
+  ];
+  const cache = await listAllSafe(todasEntidades);
+  const resumo = await gerarResumoOperacional(cache);
   await registrarLog({ tipo: 'preview', executadoPor, resumo, removidos: 0 });
   return resumo;
 }
@@ -174,30 +190,51 @@ export async function executarLimpezaPrePublicacao({ confirmacao, executadoPor }
     throw new Error(`Confirmação inválida. Use exatamente: ${CONFIRMACAO_FORTE}`);
   }
 
-  const resumo = await gerarResumoOperacional();
+  const todasEntidades = [
+    ...new Set([
+      ...MODULOS_LIMPEZA.flatMap((m) => m.entidades),
+      ...ORFAOS_RULES.map((r) => r.entidade),
+      ...ORFAOS_RULES.map((r) => r.referencia),
+    ]),
+  ];
+  const cache = await listAllSafe(todasEntidades);
+  const resumo = await gerarResumoOperacional(cache);
+
   let removidos = 0;
   const removidosPorEntidade = {};
 
   for (const modulo of MODULOS_LIMPEZA) {
-    for (const nome of modulo.entidades) {
-      const rows = await listSafe(nome);
-      for (const row of rows) {
-        if (!row?.id) continue;
-        if (await deleteSafe(nome, row.id)) {
-          removidos += 1;
-          removidosPorEntidade[nome] = (removidosPorEntidade[nome] || 0) + 1;
-        }
+    const moduloPromises = modulo.entidades.map(async (nome) => {
+      const rows = cache.get(nome) || [];
+      const ids = rows.map((r) => r?.id).filter(Boolean);
+      if (!ids.length) return { nome, count: 0 };
+
+      const results = await Promise.allSettled(ids.map((id) => deleteSafe(nome, id)));
+      const count = results.filter((r) => r.status === 'fulfilled' && !!r.value).length;
+      return { nome, count };
+    });
+
+    const moduloResults = await Promise.all(moduloPromises);
+    for (const res of moduloResults) {
+      if (res.count > 0) {
+        removidos += res.count;
+        removidosPorEntidade[res.nome] = (removidosPorEntidade[res.nome] || 0) + res.count;
       }
     }
   }
 
   const orfaosRestantes = await diagnosticarOrfaos();
-  for (const item of orfaosRestantes.detalhes) {
-    for (const id of item.ids) {
-      if (await deleteSafe(item.entidade, id)) {
-        removidos += 1;
-        removidosPorEntidade[item.entidade] = (removidosPorEntidade[item.entidade] || 0) + 1;
-      }
+  const orfaosPromises = orfaosRestantes.detalhes.map(async (item) => {
+    const results = await Promise.allSettled(item.ids.map((id) => deleteSafe(item.entidade, id)));
+    const count = results.filter((r) => r.status === 'fulfilled' && !!r.value).length;
+    return { entidade: item.entidade, count };
+  });
+
+  const orfaosResults = await Promise.all(orfaosPromises);
+  for (const res of orfaosResults) {
+    if (res.count > 0) {
+      removidos += res.count;
+      removidosPorEntidade[res.entidade] = (removidosPorEntidade[res.entidade] || 0) + res.count;
     }
   }
 
