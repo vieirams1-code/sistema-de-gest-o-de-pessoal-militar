@@ -464,20 +464,6 @@ function contarOcorrenciasNotasPendentes(pendentes = []) {
   return mapa;
 }
 
-function encontrarPubComMesmoNotaId(vinculosEfetivos = {}, pubIdAtual, notaId) {
-  return Object.entries(vinculosEfetivos).find(([pubId, idAtual]) => pubId !== pubIdAtual && idAtual === notaId);
-}
-
-function existemNotasBoletimDuplicadas(vinculosEfetivos = {}) {
-  const contagem = new Map();
-
-  Object.values(vinculosEfetivos).forEach((notaId) => {
-    if (!notaId) return;
-    contagem.set(notaId, (contagem.get(notaId) || 0) + 1);
-  });
-
-  return Array.from(contagem.values()).some((total) => total > 1);
-}
 
 export default function ConciliacaoBoletim() {
   const queryClient = useQueryClient();
@@ -602,7 +588,19 @@ export default function ConciliacaoBoletim() {
     return combinados;
   }, [conciliacaoAutomatica, vinculosPersistidos, vinculos, vinculosRemovidos]);
 
-  const notasConciliadasIds = useMemo(() => new Set(Object.values(vinculosEfetivos)), [vinculosEfetivos]);
+  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
+
+  const mapaVinculosInvertido = useMemo(() => {
+    const mapa = new Map();
+    Object.entries(vinculosEfetivos).forEach(([pubId, notaId]) => {
+      if (!notaId) return;
+      if (!mapa.has(notaId)) mapa.set(notaId, []);
+      mapa.get(notaId).push(pubId);
+    });
+    return mapa;
+  }, [vinculosEfetivos]);
+
+  const notasConciliadasIds = useMemo(() => new Set(mapaVinculosInvertido.keys()), [mapaVinculosInvertido]);
 
   useEffect(() => {
     setVinculos((atual) => {
@@ -621,14 +619,19 @@ export default function ConciliacaoBoletim() {
   const pendentesSemCorrespondencia = pendentes.filter((pub) => !vinculosEfetivos[pub.id]);
   const publicacoesConciliadas = pendentes.filter((pub) => !!vinculosEfetivos[pub.id]);
   const notasSemItem = notasEncontradas.filter((nota) => !notasConciliadasIds.has(nota.id));
-  const existeDuplicidadeNosVinculos = useMemo(() => existemNotasBoletimDuplicadas(vinculosEfetivos), [vinculosEfetivos]);
+  const existeDuplicidadeNosVinculos = useMemo(() => {
+    for (const ids of mapaVinculosInvertido.values()) {
+      if (ids.length > 1) return true;
+    }
+    return false;
+  }, [mapaVinculosInvertido]);
 
   const correspondenciaPorPublicacao = useMemo(() => {
     const mapa = {};
 
     publicacoesConciliadas.forEach((pub) => {
       const notaId = vinculosEfetivos[pub.id];
-      const nota = notasEncontradas.find((item) => item.id === notaId);
+      const nota = mapaNotasById.get(notaId);
       const textoSistema = (pub.texto_publicacao || pub.texto || '').trim();
       const textoBoletim = nota?.contexto || '';
 
@@ -636,7 +639,7 @@ export default function ConciliacaoBoletim() {
     });
 
     return mapa;
-  }, [publicacoesConciliadas, vinculosEfetivos, notasEncontradas]);
+  }, [publicacoesConciliadas, vinculosEfetivos, mapaNotasById]);
 
   const confirmarMutation = useMutation({
     mutationFn: async () => {
@@ -648,13 +651,13 @@ export default function ConciliacaoBoletim() {
         throw new Error('Não há publicações conciliadas para confirmar.');
       }
 
-      if (existemNotasBoletimDuplicadas(vinculosEfetivos)) {
+      if (existeDuplicidadeNosVinculos) {
         throw new Error('Há a mesma nota do boletim vinculada a mais de uma publicação. Revise os vínculos antes de confirmar.');
       }
 
       const updates = publicacoesConciliadas.flatMap((pub) => {
         const notaId = vinculosEfetivos[pub.id];
-        const nota = notasEncontradas.find((item) => item.id === notaId);
+        const nota = mapaNotasById.get(notaId);
         const payloadBase = {
           numero_bg: numeroBoletim,
           data_bg: dataBoletim,
@@ -762,6 +765,9 @@ export default function ConciliacaoBoletim() {
     const estadoAnteriorVinculo = vinculos[pubId] || '';
     const estadoAnteriorRemocao = !!vinculosRemovidos[pubId];
 
+    const pubsUsandoNota = mapaVinculosInvertido.get(notaId) || [];
+    const conflitoExistente = pubsUsandoNota.find(id => id !== pubId);
+
     if (!notaId) {
       setVinculos((prev) => ({ ...prev, [pubId]: '' }));
       setVinculosRemovidos((prev) => ({ ...prev, [pubId]: true }));
@@ -775,14 +781,13 @@ export default function ConciliacaoBoletim() {
       return;
     }
 
-    const pubConflitante = encontrarPubComMesmoNotaId(vinculosEfetivos, pubId, notaId);
-    if (pubConflitante) {
-      const pubConflitanteObj = pendentes.find((item) => item.id === pubConflitante[0]);
+    if (conflitoExistente) {
+      const pubConflitanteObj = pendentes.find((item) => item.id === conflitoExistente);
       setErroVinculo(`Esta nota do boletim já está vinculada a "${getReferenciaPrincipal(pubConflitanteObj || {})}".`);
       return;
     }
 
-    const notaSelecionada = notasEncontradas.find((nota) => nota.id === notaId);
+    const notaSelecionada = mapaNotasById.get(notaId);
     if (!notaSelecionada) {
       setErroVinculo('Nota selecionada não encontrada na leitura atual do boletim.');
       return;
@@ -855,7 +860,7 @@ export default function ConciliacaoBoletim() {
         pubId: pub.id,
         referencia: getReferenciaPrincipal(pub),
         notaSistema: pub.nota_para_bg,
-        notaBoletim: notasEncontradas.find((nota) => nota.id === notaId)?.nota || '-',
+        notaBoletim: mapaNotasById.get(notaId)?.nota || '-',
       },
       ...prev.filter((item) => item.pubId !== pub.id),
     ]));
@@ -956,8 +961,9 @@ export default function ConciliacaoBoletim() {
         <CardContent className="space-y-4">
           {publicacoesConciliadas.length === 0 && <p className="text-sm text-slate-500">Nenhum vínculo criado.</p>}
           {publicacoesConciliadas.map((pub) => {
-            const nota = notasEncontradas.find((n) => n.id === vinculosEfetivos[pub.id]);
-            const automatico = conciliacaoAutomatica[pub.id] === vinculosEfetivos[pub.id];
+            const notaId = vinculosEfetivos[pub.id];
+            const nota = mapaNotasById.get(notaId);
+            const automatico = conciliacaoAutomatica[pub.id] === notaId;
             const correspondencia = correspondenciaPorPublicacao[pub.id] || { percentual: 0, trechoComparadoSistema: '', trechoComparadoBoletim: '' };
             const faixa = classificarCorrespondencia(correspondencia.percentual);
             const termosRelevantes = obterTermosRelevantesComparacao(correspondencia);
@@ -1012,11 +1018,6 @@ export default function ConciliacaoBoletim() {
         <CardContent className="space-y-3">
           {!conciliacaoIniciada ? <p className="text-sm text-slate-500">Inicie a Etapa 2 para revisar e vincular manualmente.</p> : null}
           {pendentes.map((pub) => {
-            const notaEmUsoPorOutro = notasEncontradas.find((nota) => {
-              const conflita = encontrarPubComMesmoNotaId(vinculosEfetivos, pub.id, nota.id);
-              return !!conflita;
-            });
-
             return (
               <div key={pub.id} className="rounded-lg border p-3 bg-white space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1039,26 +1040,23 @@ export default function ConciliacaoBoletim() {
                   >
                     <option value="">Sem vínculo</option>
                     {notasEncontradas.map((nota) => {
-                      const conflita = encontrarPubComMesmoNotaId(vinculosEfetivos, pub.id, nota.id);
-                      const pubConflitante = conflita ? pendentes.find((item) => item.id === conflita[0]) : null;
+                      const pubsUsando = mapaVinculosInvertido.get(nota.id) || [];
+                      const conflitaId = pubsUsando.find(id => id !== pub.id);
+                      const pubConflitante = conflitaId ? pendentes.find((item) => item.id === conflitaId) : null;
+
                       return (
                         <option
                           key={nota.id}
                           value={nota.id}
-                          disabled={!!conflita}
+                          disabled={!!conflitaId}
                         >
-                          {conflita
+                          {conflitaId
                             ? `Nota ${nota.nota} — já vinculada a ${getReferenciaPrincipal(pubConflitante || {})}`
                             : `Nota ${nota.nota}`}
                         </option>
                       );
                     })}
                   </select>
-                  {notaEmUsoPorOutro ? (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Notas já usadas por outra publicação aparecem bloqueadas na lista.
-                    </p>
-                  ) : null}
                 </div>
               </div>
             );
