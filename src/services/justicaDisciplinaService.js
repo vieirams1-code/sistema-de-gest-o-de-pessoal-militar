@@ -188,6 +188,7 @@ async function enriquecerHistoricoComportamentoDisciplinar(registros = [], milit
   const militar = Array.isArray(militarLista) ? militarLista[0] : null;
 
   const atualizados = new Map();
+  const updatePromises = [];
 
   for (const marco of candidatos) {
     const pendencia = encontrarPendenciaCorrespondente(marco, pendencias);
@@ -217,15 +218,21 @@ async function enriquecerHistoricoComportamentoDisciplinar(registros = [], milit
         ...patch,
       });
 
-      try {
-        await historicoEntity.update(marco.id, patch);
-      } catch (error) {
-        console.warn('[HIST] falha saneamento de marco disciplinar', {
-          historico_id: marco?.id,
-          erro: error?.message || error,
-        });
-      }
+      // ⚡ [Performance]: Avoid N+1 database queries by accumulating update promises
+      // Expected impact: Significant reduction in total latency during historic enrichment batch operations.
+      updatePromises.push(
+        historicoEntity.update(marco.id, patch).catch((error) => {
+          console.warn('[HIST] falha saneamento de marco disciplinar', {
+            historico_id: marco?.id,
+            erro: error?.message || error,
+          });
+        })
+      );
     }
+  }
+
+  if (updatePromises.length > 0) {
+    await Promise.allSettled(updatePromises);
   }
 
   if (!atualizados.size) return historico;
