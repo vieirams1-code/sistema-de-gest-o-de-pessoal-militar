@@ -82,19 +82,27 @@ async function gerarResumoOperacional() {
   const itens = [];
   let total = 0;
 
-  for (const modulo of MODULOS_LIMPEZA) {
-    let subtotal = 0;
-    const entidades = [];
-
-    for (const nome of modulo.entidades) {
+  const modulosPromises = MODULOS_LIMPEZA.map(async (modulo) => {
+    const entidadesPromises = modulo.entidades.map(async (nome) => {
       const rows = await listSafe(nome);
-      const count = rows.length;
-      subtotal += count;
-      total += count;
-      entidades.push({ entidade: nome, quantidade: count });
+      return { entidade: nome, quantidade: rows.length };
+    });
+
+    const entidades = await Promise.all(entidadesPromises);
+
+    let subtotal = 0;
+    for (const ent of entidades) {
+      subtotal += ent.quantidade;
     }
 
-    itens.push({ chave: modulo.chave, label: modulo.label, subtotal, entidades });
+    return { chave: modulo.chave, label: modulo.label, subtotal, entidades };
+  });
+
+  const resolvidos = await Promise.all(modulosPromises);
+
+  for (const item of resolvidos) {
+    itens.push(item);
+    total += item.subtotal;
   }
 
   const orfaos = await diagnosticarOrfaos();

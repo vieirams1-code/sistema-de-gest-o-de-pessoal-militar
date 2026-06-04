@@ -1,3 +1,3 @@
-## 2024-06-04 - React.memo custom equality comparator caveats
-**Learning:** When using a custom equality function for `React.memo`, like checking only specific properties on a deeply nested object, it's critical to ensure *every single property* used by the component's render tree and its helper functions is explicitly checked. Missing one (like a nested property used in a utility function) causes the component to not re-render when that unseen property changes, resulting in stale UI state.
-**Action:** Always verify every single property access (e.g. using `grep -o`) within the component and its imported utility functions before finalizing a custom equality comparator.
+## 2024-06-04 - Parallelizing list fetches over delete operations
+**Learning:** For database or API cleanup operations, read operations can be safely parallelized using Promise.all to improve throughput. However, applying the same parallelization to delete operations violates order dependency and can break foreign key constraints, cause deadlocks, or trigger API rate limits.
+**Action:** Always maintain sequential execution for deletion logic unless specifically architected to handle concurrent deletions safely. Apply parallelization primarily to read paths.
