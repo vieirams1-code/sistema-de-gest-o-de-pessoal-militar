@@ -1104,6 +1104,90 @@ function linhaTemSomenteRevisaoTipo(linha) {
   return revisoes.every((r) => r.includes('Tipo de publicação pendente'));
 }
 
+function isLinhaImportavel(linha, { incluirAlertas, incluirPendentesClassificacao }) {
+  const destino = linha.transformado?.destino_final || DESTINO_FINAL.IMPORTAR;
+  if (
+    linha.status === STATUS_LINHA.ERRO
+    || linha.status === STATUS_LINHA.EXCLUIDO_DO_LOTE
+    || destino === DESTINO_FINAL.IGNORAR
+    || destino === DESTINO_FINAL.EXCLUIDO_DO_LOTE
+  ) {
+    return false;
+  }
+  if (destino === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
+    return !!incluirPendentesClassificacao && !linha.erros?.length && linhaTemSomenteRevisaoTipo(linha);
+  }
+  if (linha.status === STATUS_LINHA.APTO) return true;
+  if (linha.status === STATUS_LINHA.APTO_COM_ALERTA) return !!incluirAlertas;
+  return false;
+}
+
+async function buscarPublicacoesJaImportadas(chaves) {
+  if (!chaves.length) return new Map();
+  const publicacoesJaImportadas = await base44.entities.PublicacaoExOfficio
+    .filter({ importado_legado: true }, '-created_date')
+    .then((itens) => (itens || []).filter((item) => chaves.includes(item.chave_origem_legado || item.hash_linha_legado)));
+  return new Map(publicacoesJaImportadas.map((item) => [item.chave_origem_legado || item.hash_linha_legado, item]));
+}
+
+async function processarLoteImportacao({ importaveis, publicacoesPorChave, historicoId, usuario, totalNaoImportadas }) {
+  const resultado = {
+    totalImportadas: 0,
+    totalNaoImportadas,
+    erros: [],
+    idsPublicacoes: [],
+    jaImportadas: [],
+    linhasProcessadas: [],
+  };
+
+  for (const linha of importaveis) {
+    try {
+      const chaveOrigem = linha.chave_origem || linha.transformado?.chave_origem;
+      const existente = publicacoesPorChave.get(chaveOrigem);
+      if (existente?.id) {
+        resultado.jaImportadas.push({
+          linhaNumero: linha.linhaNumero,
+          chave_origem: chaveOrigem,
+          publicacaoId: existente.id,
+          mensagem: 'Registro já importado anteriormente.',
+        });
+        resultado.linhasProcessadas.push({
+          linhaNumero: linha.linhaNumero,
+          chave_origem: chaveOrigem,
+          estado_operacional: 'IMPORTADO',
+          reaproveitado: true,
+          publicacaoId: existente.id,
+        });
+        continue;
+      }
+      const payload = buildPayloadPublicacaoLegado(linha, historicoId, usuario);
+      const criado = await criarEscopado('PublicacaoExOfficio', payload);
+      resultado.totalImportadas += 1;
+      resultado.idsPublicacoes.push(criado.id);
+      resultado.linhasProcessadas.push({
+        linhaNumero: linha.linhaNumero,
+        chave_origem: payload.chave_origem_legado,
+        estado_operacional: 'IMPORTADO',
+        reaproveitado: false,
+        publicacaoId: criado.id,
+      });
+    } catch (error) {
+      resultado.erros.push({
+        linhaNumero: linha.linhaNumero,
+        mensagem: error?.message || 'Falha ao criar publicação legado.',
+      });
+      resultado.linhasProcessadas.push({
+        linhaNumero: linha.linhaNumero,
+        chave_origem: linha.chave_origem || linha.transformado?.chave_origem || '',
+        estado_operacional: 'ERRO',
+        reaproveitado: false,
+      });
+    }
+  }
+
+  return resultado;
+}
+
 export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, incluirPendentesClassificacao = false, historicoId, usuario }) {
   if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
   const avisosHistorico = [];
@@ -1118,50 +1202,19 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     });
   }
 
-  const importaveis = analise.linhas.filter((linha) => {
-    const destino = linha.transformado?.destino_final || DESTINO_FINAL.IMPORTAR;
-    if (linha.status === STATUS_LINHA.ERRO || linha.status === STATUS_LINHA.EXCLUIDO_DO_LOTE || destino === DESTINO_FINAL.IGNORAR || destino === DESTINO_FINAL.EXCLUIDO_DO_LOTE) return false;
-    if (destino === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) return !!incluirPendentesClassificacao && !linha.erros?.length && linhaTemSomenteRevisaoTipo(linha);
-    if (linha.status === STATUS_LINHA.APTO) return true;
-    if (linha.status === STATUS_LINHA.APTO_COM_ALERTA) return !!incluirAlertas;
-    return false;
-  });
-  const naoImportadas = analise.linhas.filter((linha) => !importaveis.includes(linha));
-
-  const resultado = {
-    totalImportadas: 0,
-    totalNaoImportadas: naoImportadas.length,
-    erros: [],
-    idsPublicacoes: [],
-    jaImportadas: [],
-    linhasProcessadas: [],
-  };
+  const importaveis = analise.linhas.filter((linha) => isLinhaImportavel(linha, { incluirAlertas, incluirPendentesClassificacao }));
+  const totalNaoImportadas = analise.linhas.length - importaveis.length;
 
   const chavesImportaveis = Array.from(new Set(importaveis.map((linha) => linha.chave_origem || linha.transformado?.chave_origem).filter(Boolean)));
-  const publicacoesJaImportadas = await base44.entities.PublicacaoExOfficio
-    .filter({ importado_legado: true }, '-created_date')
-    .then((itens) => itens.filter((item) => chavesImportaveis.includes(item.chave_origem_legado || item.hash_linha_legado)));
-  const publicacoesPorChave = new Map(publicacoesJaImportadas.map((item) => [item.chave_origem_legado || item.hash_linha_legado, item]));
+  const publicacoesPorChave = await buscarPublicacoesJaImportadas(chavesImportaveis);
 
-  for (const linha of importaveis) {
-    try {
-      const chaveOrigem = linha.chave_origem || linha.transformado?.chave_origem;
-      const existente = publicacoesPorChave.get(chaveOrigem);
-      if (existente?.id) {
-        resultado.jaImportadas.push({ linhaNumero: linha.linhaNumero, chave_origem: chaveOrigem, publicacaoId: existente.id, mensagem: 'Registro já importado anteriormente.' });
-        resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: chaveOrigem, estado_operacional: 'IMPORTADO', reaproveitado: true, publicacaoId: existente.id });
-        continue;
-      }
-      const payload = buildPayloadPublicacaoLegado(linha, historicoId, usuario);
-      const criado = await criarEscopado('PublicacaoExOfficio', payload);
-      resultado.totalImportadas += 1;
-      resultado.idsPublicacoes.push(criado.id);
-      resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: payload.chave_origem_legado, estado_operacional: 'IMPORTADO', reaproveitado: false, publicacaoId: criado.id });
-    } catch (error) {
-      resultado.erros.push({ linhaNumero: linha.linhaNumero, mensagem: error?.message || 'Falha ao criar publicação legado.' });
-      resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: linha.chave_origem || linha.transformado?.chave_origem || '', estado_operacional: 'ERRO', reaproveitado: false });
-    }
-  }
+  const resultado = await processarLoteImportacao({
+    importaveis,
+    publicacoesPorChave,
+    historicoId,
+    usuario,
+    totalNaoImportadas,
+  });
 
   const statusFinal = resultado.erros.length
     ? (resultado.totalImportadas > 0 ? STATUS_IMPORTACAO.IMPORTADO_PARCIAL : STATUS_IMPORTACAO.FALHOU)
