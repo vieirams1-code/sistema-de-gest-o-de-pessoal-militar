@@ -87,6 +87,19 @@ async function deleteSafe(nome, id) {
 }
 
 async function gerarResumoOperacional(cache = null) {
+  let effectiveCache = cache;
+
+  if (!effectiveCache) {
+    const todasEntidades = [
+      ...new Set([
+        ...MODULOS_LIMPEZA.flatMap((m) => m.entidades),
+        ...ORFAOS_RULES.map((r) => r.entidade),
+        ...ORFAOS_RULES.map((r) => r.referencia),
+      ]),
+    ];
+    effectiveCache = await listAllSafe(todasEntidades);
+  }
+
   const itens = [];
   let total = 0;
 
@@ -95,7 +108,7 @@ async function gerarResumoOperacional(cache = null) {
     const entidades = [];
 
     for (const nome of modulo.entidades) {
-      const rows = cache?.has(nome) ? cache.get(nome) : await listSafe(nome);
+      const rows = effectiveCache.get(nome) || [];
       const count = rows.length;
       subtotal += count;
       total += count;
@@ -105,7 +118,7 @@ async function gerarResumoOperacional(cache = null) {
     itens.push({ chave: modulo.chave, label: modulo.label, subtotal, entidades });
   }
 
-  const orfaos = await diagnosticarOrfaos(cache);
+  const orfaos = await diagnosticarOrfaos(effectiveCache);
 
   return {
     confirmadoNecessario: CONFIRMACAO_FORTE,
@@ -120,22 +133,34 @@ async function gerarResumoOperacional(cache = null) {
 }
 
 async function diagnosticarOrfaos(cache = null) {
+  let effectiveCache = cache;
+
+  if (!effectiveCache) {
+    const todasEntidades = [
+      ...new Set([
+        ...ORFAOS_RULES.map((r) => r.entidade),
+        ...ORFAOS_RULES.map((r) => r.referencia),
+      ]),
+    ];
+    effectiveCache = await listAllSafe(todasEntidades);
+  }
+
   const cacheIds = new Map();
   const detalhes = [];
   let total = 0;
 
-  const getIds = async (entidade) => {
+  const getIds = (entidade) => {
     if (cacheIds.has(entidade)) return cacheIds.get(entidade);
-    const rows = cache?.has(entidade) ? cache.get(entidade) : await listSafe(entidade);
+    const rows = effectiveCache.get(entidade) || [];
     const ids = new Set(rows.map((r) => r.id).filter(Boolean));
     cacheIds.set(entidade, ids);
     return ids;
   };
 
   for (const rule of ORFAOS_RULES) {
-    const rows = cache?.has(rule.entidade) ? cache.get(rule.entidade) : await listSafe(rule.entidade);
+    const rows = effectiveCache.get(rule.entidade) || [];
     if (!rows.length) continue;
-    const validos = await getIds(rule.referencia);
+    const validos = getIds(rule.referencia);
 
     const orfaos = rows.filter((row) => {
       const refId = row?.[rule.campo];
@@ -223,7 +248,14 @@ export async function executarLimpezaPrePublicacao({ confirmacao, executadoPor }
     }
   }
 
-  const orfaosRestantes = await diagnosticarOrfaos();
+  const todasEntidadesOrfaos = [
+    ...new Set([
+      ...ORFAOS_RULES.map((r) => r.entidade),
+      ...ORFAOS_RULES.map((r) => r.referencia),
+    ]),
+  ];
+  const cacheOrfaos = await listAllSafe(todasEntidadesOrfaos);
+  const orfaosRestantes = await diagnosticarOrfaos(cacheOrfaos);
   const orfaosPromises = orfaosRestantes.detalhes.map(async (item) => {
     const results = await Promise.allSettled(item.ids.map((id) => deleteSafe(item.entidade, id)));
     const count = results.filter((r) => r.status === 'fulfilled' && !!r.value).length;
