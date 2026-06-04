@@ -27,7 +27,7 @@ function formatDateBR(dateStr) {
  *
  * Componente puramente visual. Não altera dados.
  */
-export default function CondicaoBadge({ militar = {} }) {
+function CondicaoBadge({ militar = {} }) {
   const condicao = String(militar?.condicao || '').trim();
 
   const movimento = resolveMovimentoCondicao(militar);
@@ -115,3 +115,24 @@ export default function CondicaoBadge({ militar = {} }) {
     </div>
   );
 }
+
+// Otimização de performance: O CondicaoBadge é usado intensivamente
+// dentro da lista virtualizada de militares (MilitarConsultaVirtualList -> MilitarConsultaRow).
+// A memoização profunda, comparando apenas os campos específicos que
+// afetam a renderização (condicao, movimento e detalhes como ltip e destino),
+// previne re-renderizações desnecessárias de centenas de componentes
+// quando outros dados do militar não-relacionados são atualizados ou
+// quando as referências do objeto militar mudam durante o scroll.
+function condicaoBadgePropsAreEqual(prevProps, nextProps) {
+  const prevMilitar = prevProps.militar || {};
+  const nextMilitar = nextProps.militar || {};
+  return (
+    prevMilitar.condicao === nextMilitar.condicao &&
+    prevMilitar.condicao_movimento === nextMilitar.condicao_movimento &&
+    prevMilitar.condicao_origem_destino === nextMilitar.condicao_origem_destino &&
+    prevMilitar.destino === nextMilitar.destino &&
+    prevMilitar.ltip_data_fim === nextMilitar.ltip_data_fim
+  );
+}
+
+export default React.memo(CondicaoBadge, condicaoBadgePropsAreEqual);
