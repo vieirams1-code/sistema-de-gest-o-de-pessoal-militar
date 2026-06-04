@@ -1,5 +1,8 @@
 import { base44 } from '@/api/base44Client';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { buildChecklistResumo } from './quadroFormatters';
+
+export { buildChecklistResumo };
 
 export const CHECKLIST_PRESETS = {
   JISO: [
@@ -37,12 +40,6 @@ export const CHECKLIST_PRESETS = {
     'Arquivar',
   ],
 };
-
-export function buildChecklistResumo(items = []) {
-  const total = items.length;
-  const concluidos = items.filter((item) => item.concluido).length;
-  return `${concluidos}/${total}`;
-}
 
 export function obterVinculoAtestado(vinculos = []) {
   return vinculos.find((vinculo) => {
