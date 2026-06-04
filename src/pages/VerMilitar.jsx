@@ -287,40 +287,12 @@ export default function VerMilitar() {
   });
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
-    queryFn: async () => {
+    queryFn: () => {
       const militarIdHistorico = militar?.id || id;
-      const historico = await obterHistoricoComportamentoMilitar(militarIdHistorico);
-      console.log('[HIST] resultado query:', {
-        militar_id: militarIdHistorico,
-        quantidade: Array.isArray(historico) ? historico.length : 0,
-        registros: historico
-      });
-      return historico;
+      return obterHistoricoComportamentoMilitar(militarIdHistorico);
     },
     enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
-
-  React.useEffect(() => {
-    if (!militar?.id) return;
-    console.log('[VER_MILITAR] query_payload_militar', {
-      militar_id: militar.id,
-      posto_graduacao: militar.posto_graduacao,
-      quadro: militar.quadro,
-      payload: militar,
-    });
-  }, [militar]);
-
-  React.useEffect(() => {
-    if (!militar?.id) return;
-    console.log('[VER_MILITAR] ui_payload_cabecalho', {
-      militar_id: militar.id,
-      posto_graduacao_query_militar: postoGraduacaoMilitar,
-      posto_promocao_atual_historico: postoPromocaoAtual,
-      posto_renderizado_cabecalho: postoGraduacaoMilitar,
-      existe_divergencia_posto_ativo: existeDivergenciaPostoAtivo,
-      quadro_renderizado: militar.quadro,
-    });
-  }, [militar, postoGraduacaoMilitar, postoPromocaoAtual, existeDivergenciaPostoAtivo]);
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['ver-punicoes-comportamento', id],
