@@ -6,7 +6,7 @@ const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'perfil_id'];
 const REQUIRED_ACTION = 'gerir_gratificacoes_funcao';
-const OPERACOES = new Set(['criar_rascunho', 'atualizar_rascunho', 'enviar_dp', 'marcar_aguardando_publicacao', 'registrar_publicacao_nomeacao']);
+const OPERACOES = new Set(['criar_rascunho', 'atualizar_rascunho', 'enviar_dp', 'marcar_aguardando_publicacao', 'registrar_publicacao_nomeacao', 'criar_nomeacao_ativa']);
 const STATUS_RASCUNHO = 'rascunho';
 const STATUS_SOLICITADO_DP = 'solicitado_dp';
 const STATUS_AGUARDANDO_PUBLICACAO = 'aguardando_publicacao_nomeacao';
@@ -104,11 +104,17 @@ function sanitizePayload(input: any = {}, operacao: string) {
   const out: Record<string, any> = {};
   for (const field of GRATIFICACAO_FIELDS) out[field] = trimString(input[field]);
 
-  if (operacao === 'criar_rascunho' || operacao === 'atualizar_rascunho') {
+  if (operacao === 'criar_rascunho' || operacao === 'atualizar_rascunho' || operacao === 'criar_nomeacao_ativa') {
     if (!out.militar_id) throw withStatus('militar_id é obrigatório.', 400);
     if (!out.tipo_gratificacao_funcao_id) throw withStatus('tipo_gratificacao_funcao_id é obrigatório.', 400);
     if (!out.cota_gratificacao_funcao_id) throw withStatus('cota_gratificacao_funcao_id é obrigatório.', 400);
     if (!out.funcao_gratificada) throw withStatus('funcao_gratificada é obrigatória.', 400);
+
+    if (operacao === 'criar_nomeacao_ativa') {
+      if (!out.data_publicacao_nomeacao) throw withStatus('data_publicacao_nomeacao é obrigatória.', 400);
+      if (!out.data_inicio_efeitos) throw withStatus('data_inicio_efeitos é obrigatória.', 400);
+      if (!out.doems_nomeacao_numero && !out.doems_nomeacao_edicao) throw withStatus('doems_nomeacao_numero ou doems_nomeacao_edicao é obrigatório.', 400);
+    }
   }
   return out;
 }
@@ -151,11 +157,11 @@ async function validarReferencias(base44: ReturnType<typeof createClientFromRequ
   return { militar, tipo, cota, ocupadas, disponiveis };
 }
 
-function montarRegistroRascunho(data: Record<string, any>, refs: any, authUser: any) {
+function montarRegistroGratificacao(data: Record<string, any>, refs: any, authUser: any, status: string = STATUS_RASCUNHO) {
   const { militar, tipo, cota } = refs;
   const unidadeMilitar = textoReferencia(militar.lotacao_atual) || textoReferencia(militar.lotacao) || textoReferencia(militar.lotacao_nome) || textoReferencia(militar.unidade_nome);
   const setorMilitar = textoReferencia(militar.setor_nome);
-  return {
+  const registro: Record<string, any> = {
     militar_id: data.militar_id,
     militar_snapshot: {
       nome: militar.nome_completo || militar.nome_guerra || '',
@@ -180,20 +186,33 @@ function montarRegistroRascunho(data: Record<string, any>, refs: any, authUser: 
     codigo_funcao: cota.codigo_funcao || '',
     nivel_gratificacao: cota.nivel_gratificacao || tipo.nivel || '',
     tipo_gratificacao: cota.tipo_gratificacao || tipo.nome || tipo.sigla || tipo.codigo || '',
-    status: STATUS_RASCUNHO,
+    status: status,
     numero_processo: data.numero_processo,
     observacoes: data.observacoes,
     solicitado_por: authUser?.email || '',
-    origem_registro: 'cadastro_rascunho_gratificacao_funcao',
+    origem_registro: status === STATUS_GRATIFICACAO_ATIVA ? 'cadastro_direto_ativa_gratificacao_funcao' : 'cadastro_rascunho_gratificacao_funcao',
     metadados: {
       fluxo_lote: '2B',
-      somente_rascunho: true,
-      sem_ativacao: true,
-      sem_nomeacao: true,
-      sem_publicacao_doems: true,
-      sem_efeitos_financeiros: true,
+      somente_rascunho: status === STATUS_RASCUNHO,
+      sem_ativacao: status === STATUS_RASCUNHO,
+      sem_nomeacao: status === STATUS_RASCUNHO,
+      sem_publicacao_doems: status === STATUS_RASCUNHO,
+      sem_efeitos_financeiros: status === STATUS_RASCUNHO,
     },
   };
+
+  if (status === STATUS_GRATIFICACAO_ATIVA) {
+    registro.data_publicacao_nomeacao = data.data_publicacao_nomeacao;
+    registro.data_inicio_efeitos = data.data_inicio_efeitos;
+    registro.doems_nomeacao_numero = data.doems_nomeacao_numero;
+    registro.doems_nomeacao_edicao = data.doems_nomeacao_edicao;
+    registro.doems_nomeacao_link = data.doems_nomeacao_link;
+    registro.ato_nomeacao_numero = data.ato_nomeacao_numero;
+    registro.status_alterado_em = new Date().toISOString();
+    registro.status_alterado_por = authUser.email || '';
+  }
+
+  return registro;
 }
 
 function sanitizeResponse(item: any = {}) {
@@ -223,13 +242,14 @@ Deno.serve(async (req) => {
 
     const data = sanitizePayload(payload?.data && typeof payload.data === 'object' ? payload.data : {}, operacao);
 
-    if (operacao === 'criar_rascunho' || operacao === 'atualizar_rascunho') {
+    if (operacao === 'criar_rascunho' || operacao === 'atualizar_rascunho' || operacao === 'criar_nomeacao_ativa') {
       const refs = await validarReferencias(base44, data);
-      const registro = montarRegistroRascunho(data, refs, authUser);
+      const targetStatus = operacao === 'criar_nomeacao_ativa' ? STATUS_GRATIFICACAO_ATIVA : STATUS_RASCUNHO;
+      const registro = montarRegistroGratificacao(data, refs, authUser, targetStatus);
 
-      if (operacao === 'criar_rascunho') {
-        const resultado = await fetchWithRetry(() => base44.asServiceRole.entities.GratificacaoFuncao.create(registro), 'GratificacaoFuncao.create:rascunho');
-        return Response.json({ ok: true, operacao, entityName: 'GratificacaoFuncao', data: sanitizeResponse(resultado), meta: { statusRestrito: STATUS_RASCUNHO, semAtivacao: true, semNomeacao: true } });
+      if (operacao === 'criar_rascunho' || operacao === 'criar_nomeacao_ativa') {
+        const resultado = await fetchWithRetry(() => base44.asServiceRole.entities.GratificacaoFuncao.create(registro), `GratificacaoFuncao.create:${targetStatus}`);
+        return Response.json({ ok: true, operacao, entityName: 'GratificacaoFuncao', data: sanitizeResponse(resultado), meta: { statusRestrito: targetStatus, semAtivacao: targetStatus === STATUS_RASCUNHO } });
       }
 
       const id = trimString(payload?.id || payload?.data?.id);
