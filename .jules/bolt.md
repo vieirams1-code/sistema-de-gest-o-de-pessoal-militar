@@ -1,3 +1,6 @@
 ## 2024-06-04 - React.memo custom equality comparator caveats
 **Learning:** When using a custom equality function for `React.memo`, like checking only specific properties on a deeply nested object, it's critical to ensure *every single property* used by the component's render tree and its helper functions is explicitly checked. Missing one (like a nested property used in a utility function) causes the component to not re-render when that unseen property changes, resulting in stale UI state.
 **Action:** Always verify every single property access (e.g. using `grep -o`) within the component and its imported utility functions before finalizing a custom equality comparator.
+## 2024-06-05 - N+1 Array Filtering in useMemo
+**Learning:** In React components like `Ferias.jsx`, nested array filtering (e.g. calling `.filter()` on a large `registrosLivro` array for every item in `ferias`) inside a `useMemo` dependency causes severe O(N*M) performance bottlenecks during filtering operations.
+**Action:** When cross-referencing collections in the frontend (especially inside render loops or frequently evaluated `useMemo` hooks), always pre-compute a grouped `Map` (e.g., `registrosLivroMap`) to achieve O(1) lookups per item.

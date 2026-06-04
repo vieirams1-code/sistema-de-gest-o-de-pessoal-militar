@@ -467,6 +467,18 @@ export default function Ferias() {
   const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
   const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
 
+
+  const registrosLivroMap = useMemo(() => {
+    const mapa = new Map();
+    registrosLivro.forEach((r) => {
+      const fId = r.ferias_id;
+      if (!fId) return;
+      if (!mapa.has(fId)) mapa.set(fId, []);
+      mapa.get(fId).push(r);
+    });
+    return mapa;
+  }, [registrosLivro]);
+
   const getFeriasEstagioProvavel = () => {
     const feriasErrorMessage = String(feriasError?.message || '').toLowerCase();
     if (isAdmin && isFeriasError) return 'Ferias.list';
@@ -606,7 +618,7 @@ export default function Ferias() {
     return ferias.filter((f) => {
       const matchesSearch = feriasCorrespondeBusca(f, searchTerm);
       const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
-      const cadeia = getCadeiaOperacional(f, registrosLivro);
+      const cadeia = getCadeiaOperacional(f, registrosLivroMap.get(f.id) || []);
       const gozo = deriveStatusGozo(f, cadeia);
       const situacao = deriveSituacaoPeriodo(f, cadeia, gozo);
       const ano = deriveAnoAquisitivo(f);
@@ -622,7 +634,7 @@ export default function Ferias() {
       const filtroFim = parseISO(`${periodEnd}T00:00:00`);
       return matchesSearch && matchesStatus && matchesSituacao && matchesAno && matchesGozo && matchesTags && inicio <= filtroFim && fim >= filtroInicio;
     }).sort((a, b) => (getDataInicioFerias(a)?.getTime() || Infinity) - (getDataInicioFerias(b)?.getTime() || Infinity));
-  }, [ferias, searchTerm, statusFilter, periodStart, periodEnd, registrosLivro, feriasTagsAtivasMap, situacaoPeriodoFilter, anoAquisitivoFilter, statusGozoFilter, tagsFilter]);
+  }, [ferias, searchTerm, statusFilter, periodStart, periodEnd, registrosLivroMap, feriasTagsAtivasMap, situacaoPeriodoFilter, anoAquisitivoFilter, statusGozoFilter, tagsFilter]);
 
   const selectedFerias = useMemo(() => filteredFerias.filter((item) => selectedFeriasIds.includes(String(item.id))), [filteredFerias, selectedFeriasIds]);
 
@@ -1365,9 +1377,8 @@ export default function Ferias() {
 
                     <tbody>
                       {grupo.items.map((f) => {
-                        const temEventos = registrosLivro.some(
+                        const temEventos = (registrosLivroMap.get(f.id) || []).some(
                           (r) =>
-                            r.ferias_id === f.id &&
                             TIPOS_OPERACIONAIS.includes(r.tipo_registro)
                         );
                         const creditosDoGozo = creditosPorGozo.get(f.id) || [];
@@ -1375,7 +1386,7 @@ export default function Ferias() {
 
                         const interrupcaoInfo =
                           f.status === 'Interrompida'
-                            ? deriveInterrupcaoData(f, registrosLivro)
+                            ? deriveInterrupcaoData(f, registrosLivroMap.get(f.id) || [])
                             : null;
 
                         const inicioBlockedReason =
