@@ -200,7 +200,7 @@ test('migração preserva militares e reporta conflito sem merge automático', a
 
   const dryRun = await migrarMatriculasLegadas({ dryRun: true });
   assert.equal(dryRun.totalMilitares, 3);
-  assert.equal(dryRun.criadas, 3);
+  assert.equal(dryRun.criadas, 2);
 
   const real = await migrarMatriculasLegadas({ dryRun: false });
   assert.equal(real.criadas, 2);
