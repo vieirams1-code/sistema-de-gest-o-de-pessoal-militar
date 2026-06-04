@@ -16,11 +16,14 @@ const COTA_ATIVA = 'ativa';
 const STATUS_SOLICITACOES = new Set(['solicitado_dp', 'aguardando_publicacao_nomeacao']);
 const STATUS_DISPENSAS = new Set(['dispensa_solicitada', 'aguardando_publicacao_dispensa']);
 const TAB_STATUS = {
+  ativas: new Set(['nomeado_ativo']),
+  historico: new Set(['dispensado', 'cancelado', 'rascunho', 'solicitado_dp', 'aguardando_publicacao_nomeacao', 'dispensa_solicitada', 'aguardando_publicacao_dispensa']),
+  configuracoes: new Set([]), // Sem filtro de status para aba de configurações
+  // Compatibilidade com chaves antigas se necessário
   rascunhos: new Set(['rascunho']),
   ativos: new Set(['nomeado_ativo']),
   aguardando_publicacao: new Set(['solicitado_dp', 'aguardando_publicacao_nomeacao']),
   dispensa_em_andamento: new Set(['dispensa_solicitada', 'aguardando_publicacao_dispensa']),
-  historico: new Set(['dispensado', 'cancelado']),
 };
 const FILTROS_PERMITIDOS = new Set([
   'tab', 'status', 'tipo_gratificacao_funcao_id', 'tipo_gratificacao', 'funcao_gratificada', 'codigo_funcao', 'unidade_id', 'setor_id', 'cota_gratificacao_funcao_id', 'busca',
@@ -228,7 +231,7 @@ function dentroEscopoCota(item: any, escopo: any) {
 function passaFiltrosGratificacao(item: any, filtros: Record<string, string>) {
   const status = normalizeStatus(item?.status);
   const tab = filtros.tab;
-  if (tab && TAB_STATUS[tab] && !TAB_STATUS[tab].has(status)) return false;
+  if (tab && TAB_STATUS[tab] && TAB_STATUS[tab].size > 0 && !TAB_STATUS[tab].has(status)) return false;
   if (filtros.status && status !== filtros.status) return false;
   for (const campo of ['tipo_gratificacao_funcao_id', 'tipo_gratificacao', 'funcao_gratificada', 'codigo_funcao', 'unidade_id', 'setor_id', 'cota_gratificacao_funcao_id']) {
     if (filtros[campo] && removerAcentosLower(item?.[campo]) !== removerAcentosLower(filtros[campo])) return false;
