@@ -156,28 +156,34 @@ export default function RegistrosMilitar() {
   const canExcluirRegistros = canUseAdminMode && canAccessAction('excluir_registros_militar');
   const canManageAdminActions = canEditarRegistros || canExcluirRegistros;
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
     queryKey: ['registros-militar-militares'],
     queryFn: () => base44.entities.Militar.list('-created_date', 10000),
     enabled: isAccessResolved && canAccessRegistrosMilitar,
+    staleTime: STALE_TIME_MS,
   });
 
   const { data: matriculas = [] } = useQuery({
     queryKey: ['registros-militar-matriculas'],
     queryFn: () => base44.entities.MatriculaMilitar.list('-created_date', 10000),
     enabled: isAccessResolved && canAccessRegistrosMilitar,
+    staleTime: STALE_TIME_MS,
   });
 
   const { data: registros = [], isLoading: loadingRegistros } = useQuery({
     queryKey: ['registros-militar-registros'],
     queryFn: listarRegistrosMilitar,
     enabled: isAccessResolved && canAccessRegistrosMilitar,
+    staleTime: STALE_TIME_MS,
   });
 
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom'],
     queryFn: () => base44.entities.TipoPublicacaoCustom.list(),
     enabled: isAccessResolved && canAccessRegistrosMilitar,
+    staleTime: STALE_TIME_MS,
   });
 
   const tiposValidos = useMemo(() => getTiposRPFiltrados({ tiposCustom }), [tiposCustom]);

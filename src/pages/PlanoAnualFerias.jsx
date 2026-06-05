@@ -36,8 +36,11 @@ export default function PlanoAnualFerias() {
     queryFn: () => base44.entities.PlanoFerias.filter({ ano_plano: anoSelecionado })
   });
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const { data: ferias = [], isLoading: loadingFerias } = useQuery({
     queryKey: ['ferias-ano', anoSelecionado],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const todasFerias = await base44.entities.Ferias.list();
       const filtradas = todasFerias.filter(f => {

@@ -249,11 +249,8 @@ export default function Militares() {
 
   useEffect(() => {
     localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumnKeys));
-  }, [visibleColumnKeys]);
-
-  useEffect(() => {
     localStorage.setItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY, JSON.stringify(columnFilters));
-  }, [columnFilters]);
+  }, [visibleColumnKeys, columnFilters]);
 
   const columnMetaByKey = useMemo(() => new Map(allowedColumns.map((col) => [col.key, col])), [allowedColumns]);
   const getColumnClassName = useCallback((column, { isHeader = false } = {}) => {
@@ -289,14 +286,12 @@ export default function Militares() {
   }, [sanitizedVisibleColumnKeys]);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
+    const t = setTimeout(() => {
+      setDebouncedPostos(postosSelecionados);
+      setDebouncedSearchTerm(searchTerm.trim());
+    }, 300);
     return () => clearTimeout(t);
-  }, [postosSelecionados]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
-    return () => clearTimeout(t);
-  }, [searchTerm]);
+  }, [postosSelecionados, searchTerm]);
 
   const selectedPostos = debouncedPostos;
 
@@ -346,19 +341,10 @@ export default function Militares() {
     [lotacoesDisponiveis],
   );
 
-  useEffect(() => {
-    if (lotacaoFilter === TODAS_LOTACOES_VALUE) return;
-    if (lotacoesDisponiveisIds.has(String(lotacaoFilter))) return;
-    setLotacaoFilter(TODAS_LOTACOES_VALUE);
-  }, [lotacaoFilter, lotacoesDisponiveisIds]);
-
-  // ===================================================================
-  // Militares — via getScopedMilitares (sem fallback em loop)
-  // ===================================================================
   const incluirInativos = isAdmin && mostrarInativos;
 
   // Filtros que são empurrados para o backend — quando mudam, reseta a paginação
-  const backendFiltersKey = [
+  const backendFiltersKey = useMemo(() => [
     isAdmin,
     debugFieldsEnabled ? 'debugFields' : 'noDebugFields',
     lotacaoFilter,
@@ -372,13 +358,22 @@ export default function Militares() {
     debouncedSearchTerm,
     effectiveEmail || 'self',
     incluirInativos ? 'todos' : 'ativos',
-  ].join('::');
+  ].join('::'), [
+    isAdmin, debugFieldsEnabled, lotacaoFilter, selectedPostos, quadrosSelecionados,
+    condicaoFilter, movimentoFilter, tagsSelecionadas, gruposSelecionados,
+    situacoesSelecionadas, debouncedSearchTerm, effectiveEmail, incluirInativos
+  ]);
 
-  // Reset de paginação quando filtros de backend mudam
   useEffect(() => {
+    // 1. Reset de lotação se inválida
+    if (lotacaoFilter !== TODAS_LOTACOES_VALUE && !lotacoesDisponiveisIds.has(String(lotacaoFilter))) {
+      setLotacaoFilter(TODAS_LOTACOES_VALUE);
+    }
+
+    // 2. Reset de paginação quando filtros de backend mudam
     setPageOffset(0);
     setMilitaresAcumulados([]);
-  }, [backendFiltersKey]);
+  }, [backendFiltersKey, lotacoesDisponiveisIds]); // backendFiltersKey já depende de lotacaoFilter
 
   const militaresQueryKey = [
     'militares-consulta-rapida-scoped',
@@ -722,12 +717,17 @@ export default function Militares() {
   const totalPages = Math.max(1, Math.ceil(filteredMilitares.length / frontendPageSize));
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [frontendPageSize, backendFiltersKey, debouncedSearchTerm, activeColumnFilterKeys.join('|')]);
+    setCurrentPage((prev) => {
+      // Se totalPages diminuiu e a página atual ficou "orfã", ajusta.
+      // Caso contrário, se foi uma mudança de filtro, volta para a 1.
+      // Usamos uma heurística simples: se totalPages mudou mas o backendFiltersKey também, é reset.
+      return Math.min(prev, totalPages);
+    });
+  }, [totalPages]);
 
   useEffect(() => {
-    setCurrentPage((prev) => Math.min(prev, totalPages));
-  }, [totalPages]);
+    setCurrentPage(1);
+  }, [frontendPageSize, backendFiltersKey, debouncedSearchTerm, activeColumnFilterKeys.join('|')]);
 
   const paginatedMilitares = useMemo(() => {
     const start = (currentPage - 1) * frontendPageSize;

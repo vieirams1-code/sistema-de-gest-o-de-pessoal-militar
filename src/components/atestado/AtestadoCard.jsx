@@ -93,10 +93,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
   };
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const { data: templates = [] } = useQuery({
     queryKey: ['templates-texto'],
     queryFn: () => base44.entities.TemplateTexto.list(),
-    staleTime: 30000,
+    staleTime: STALE_TIME_MS,
   });
   const { data: militarAtestado = null } = useQuery({
     queryKey: ['militar-atestado-template', atestado?.militar_id],
@@ -106,7 +108,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return rows?.[0] || null;
     },
     enabled: !!atestado?.militar_id,
-    staleTime: 30000,
+    staleTime: STALE_TIME_MS,
   });
   const { data: medicoCadastrado = null, isLoading: isLoadingMedicoCadastrado } = useQuery({
     queryKey: ['medico-atestado-template', atestado?.medico_id],
@@ -115,7 +117,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return rows?.[0] || null;
     },
     enabled: !!atestado?.medico_id,
-    staleTime: 30000,
+    staleTime: STALE_TIME_MS,
   });
 
   const diasExtensoMap = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };

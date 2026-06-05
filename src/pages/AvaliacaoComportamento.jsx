@@ -50,8 +50,11 @@ export default function AvaliacaoComportamento() {
   const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
   const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['avaliacao-comportamento-militares', isAdmin, modoAcesso, userEmail],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       let lista = [];
       if (isAdmin) {
@@ -77,6 +80,7 @@ export default function AvaliacaoComportamento() {
   });
   const { data: punicoes = [], isLoading: loadingPunicoes } = useQuery({
     queryKey: ['avaliacao-comportamento-punicoes', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = await punicaoEntity.list();
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
@@ -85,6 +89,7 @@ export default function AvaliacaoComportamento() {
   });
   const { data: pendencias = [] } = useQuery({
     queryKey: ['pendencias-comportamento', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = base44.entities.PendenciaComportamento?.list
         ? await base44.entities.PendenciaComportamento.list('-created_date')
