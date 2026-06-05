@@ -1200,19 +1200,150 @@ export async function persistirCorrecaoPreImportacaoHistorico({
   });
 }
 
-export async function importarAnalise({ analise, incluirAlertas, historicoId, usuario }) {
-  const historicoEntity = getHistoricoImportacaoEntity();
-  const avisosHistorico = [];
+async function assegurarHistoricoEfetivoParaImportacao(analise, historicoId, usuario) {
   let historicoIdEfetivo = historicoId;
-
   if (!historicoIdEfetivo) {
     const historicoCriado = await salvarAnaliseHistorico(analise, usuario);
     historicoIdEfetivo = historicoCriado?.id;
   }
-
   if (!historicoIdEfetivo) {
     throw new Error('Não foi possível determinar o registro de histórico da importação.');
   }
+  return historicoIdEfetivo;
+}
+
+async function processarLinhaMilitarImportacao(linha, usuario) {
+  const { matricula, posto_graduacao, data_inclusao } = linha.transformado;
+
+  try {
+    await validarMatriculaDisponivel(matricula);
+  } catch (error) {
+    return { exito: false, motivo: 'Matrícula já cadastrada.' };
+  }
+
+  const duplicidadeForte = await localizarDuplicidadeForte({
+    cpf: linha.transformado.cpf,
+    nomeCanonico: linha.transformado.nome_completo,
+    dataNascimento: linha.transformado.data_nascimento,
+  });
+  if (duplicidadeForte) {
+    return { exito: false, motivo: 'Possível duplicidade identificada.' };
+  }
+  if (!data_inclusao) {
+    return { exito: false, motivo: 'Data de inclusão inválida na revalidação.' };
+  }
+  if (!posto_graduacao || !POSTOS_VALIDOS.has(toUpperTrim(posto_graduacao))) {
+    return { exito: false, motivo: 'Posto/graduação inválido na revalidação.' };
+  }
+
+  const payloadMilitar = sanitizarCamposNumericosMilitar(linha.transformado);
+  try {
+    const criado = await criarMilitarComMatricula(payloadMilitar, {
+      origemRegistro: 'importacao_legado',
+      criadoPor: usuario?.email || '',
+    });
+    return { exito: true, id: criado?.id };
+  } catch (error) {
+    const mensagem = String(error?.message || '').toLowerCase();
+    if (mensagem.includes('matrícula já cadastrada')) {
+      return { exito: false, motivo: 'Matrícula já cadastrada.' };
+    }
+    if (mensagem.includes('possível duplicidade')) {
+      return { exito: false, motivo: 'Possível duplicidade identificada.' };
+    }
+    throw error;
+  }
+}
+
+async function finalizarHistoricoImportacaoMilitares({
+  historicoIdEfetivo,
+  analise,
+  incluirAlertas,
+  idsCriados,
+  naoImportadas,
+  usuario,
+  avisosHistorico,
+}) {
+  const historicoEntity = getHistoricoImportacaoEntity();
+  const totalImportadas = idsCriados.length;
+  const totalNaoImportadas = analise.resumo.total_linhas - totalImportadas;
+  const statusImportacao = totalImportadas === 0
+    ? 'Falhou'
+    : totalNaoImportadas > 0 ? 'Importado Parcial' : 'Importado';
+
+  const relatorio = relatorioFromAnalise(analise, {
+    importacao: {
+      incluirAlertas,
+      total_importadas: totalImportadas,
+      total_nao_importadas: totalNaoImportadas,
+      nao_importadas: naoImportadas,
+      ids_criados: idsCriados,
+    },
+  });
+
+  await atualizarHistoricoComDiagnostico(
+    historicoEntity,
+    historicoIdEfetivo,
+    {
+      importado_por: usuario?.email || '',
+      importado_por_nome: usuario?.full_name || usuario?.name || '',
+      total_importadas: totalImportadas,
+      total_nao_importadas: totalNaoImportadas,
+      status_importacao: statusImportacao,
+      importar_linhas_com_alerta: incluirAlertas,
+      relatorio_json: JSON.stringify(relatorio, null, 2),
+      observacoes: `Tipo: Migração de Militares | Processadas: ${analise.resumo.total_linhas} | Importadas: ${totalImportadas} | Erros/Não importadas: ${totalNaoImportadas}`,
+    },
+    'finalizar histórico',
+    avisosHistorico,
+  );
+
+  return {
+    statusImportacao,
+    totalImportadas,
+    totalNaoImportadas,
+    historicoId: historicoIdEfetivo,
+    avisosHistorico,
+    idsCriados,
+    naoImportadas,
+    relatorio,
+  };
+}
+
+async function registrarFalhaImportacaoMilitares({
+  error,
+  historicoIdEfetivo,
+  avisosHistorico,
+}) {
+  const historicoEntity = getHistoricoImportacaoEntity();
+  try {
+    await atualizarHistoricoComDiagnostico(
+      historicoEntity,
+      historicoIdEfetivo,
+      {
+        status_importacao: 'Falhou',
+        observacoes: error?.message || 'Falha ao importar lote.',
+      },
+      'registrar falha da importação',
+      avisosHistorico,
+    );
+  } catch (updateError) {
+    console.error('[ImportacaoMilitares] Não foi possível registrar falha no histórico.', updateError);
+  }
+  if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+    throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+  }
+  throw error;
+}
+
+async function marcarInicioImportacaoMilitares({
+  historicoIdEfetivo,
+  incluirAlertas,
+  avisosHistorico,
+  analise,
+  usuario,
+}) {
+  const historicoEntity = getHistoricoImportacaoEntity();
   try {
     await atualizarHistoricoComDiagnostico(
       historicoEntity,
@@ -1224,15 +1355,16 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       'marcar status IMPORTANDO',
       avisosHistorico,
     );
+    return historicoIdEfetivo;
   } catch (error) {
     const mensagem = `[ImportacaoMilitares] Registro de histórico ${historicoIdEfetivo} indisponível para atualização. Será criado novo lote para preservar auditoria.`;
     console.warn(mensagem, { erro: error?.message || error });
     avisosHistorico.push(mensagem);
     const historicoCriado = await salvarAnaliseHistorico(analise, usuario);
-    historicoIdEfetivo = historicoCriado?.id;
+    const novoId = historicoCriado?.id;
     await atualizarHistoricoComDiagnostico(
       historicoEntity,
-      historicoIdEfetivo,
+      novoId,
       {
         status_importacao: 'Importando',
         importar_linhas_com_alerta: incluirAlertas,
@@ -1240,122 +1372,54 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       'marcar status IMPORTANDO em lote recriado',
       avisosHistorico,
     );
+    return novoId;
   }
+}
 
-  const podeImportar = (linha) => linha.status === STATUS_LINHA.APTO || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA);
-  const elegiveis = analise.linhas.filter(podeImportar);
+export async function importarAnalise({ analise, incluirAlertas, historicoId, usuario }) {
+  const avisosHistorico = [];
+  let historicoIdEfetivo = await assegurarHistoricoEfetivoParaImportacao(analise, historicoId, usuario);
+
+  historicoIdEfetivo = await marcarInicioImportacaoMilitares({
+    historicoIdEfetivo,
+    incluirAlertas,
+    avisosHistorico,
+    analise,
+    usuario,
+  });
+
   const idsCriados = [];
   const naoImportadas = [];
 
   try {
+    const podeImportar = (linha) => linha.status === STATUS_LINHA.APTO
+      || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA);
+    const elegiveis = analise.linhas.filter(podeImportar);
+
     for (const linha of elegiveis) {
-      const { matricula, posto_graduacao, data_inclusao } = linha.transformado;
-
-      try {
-        await validarMatriculaDisponivel(matricula);
-      } catch (error) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
-        continue;
-      }
-
-      const duplicidadeForte = await localizarDuplicidadeForte({
-        cpf: linha.transformado.cpf,
-        nomeCanonico: linha.transformado.nome_completo,
-        dataNascimento: linha.transformado.data_nascimento,
-      });
-      if (duplicidadeForte) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada.' });
-        continue;
-      }
-      if (!data_inclusao) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Data de inclusão inválida na revalidação.' });
-        continue;
-      }
-      if (!posto_graduacao || !POSTOS_VALIDOS.has(toUpperTrim(posto_graduacao))) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Posto/graduação inválido na revalidação.' });
-        continue;
-      }
-
-      const payloadMilitar = sanitizarCamposNumericosMilitar(linha.transformado);
-      try {
-        const criado = await criarMilitarComMatricula(payloadMilitar, { origemRegistro: 'importacao_legado', criadoPor: usuario?.email || '' });
-        idsCriados.push(criado?.id);
-      } catch (error) {
-        const mensagem = String(error?.message || '').toLowerCase();
-        if (mensagem.includes('matrícula já cadastrada')) {
-          naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
-          continue;
-        }
-        if (mensagem.includes('possível duplicidade')) {
-          naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada.' });
-          continue;
-        }
-        throw error;
+      const resultado = await processarLinhaMilitarImportacao(linha, usuario);
+      if (resultado.exito) {
+        idsCriados.push(resultado.id);
+      } else {
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: resultado.motivo });
       }
     }
 
-    const totalImportadas = idsCriados.length;
-    const totalNaoImportadas = analise.resumo.total_linhas - totalImportadas;
-    const statusImportacao = totalImportadas === 0
-      ? 'Falhou'
-      : totalNaoImportadas > 0 ? 'Importado Parcial' : 'Importado';
-
-    const relatorio = relatorioFromAnalise(analise, {
-      importacao: {
-        incluirAlertas,
-        total_importadas: totalImportadas,
-        total_nao_importadas: totalNaoImportadas,
-        nao_importadas: naoImportadas,
-        ids_criados: idsCriados,
-      },
-    });
-
-    await atualizarHistoricoComDiagnostico(
-      historicoEntity,
+    return await finalizarHistoricoImportacaoMilitares({
       historicoIdEfetivo,
-      {
-        importado_por: usuario?.email || '',
-        importado_por_nome: usuario?.full_name || usuario?.name || '',
-        total_importadas: totalImportadas,
-        total_nao_importadas: totalNaoImportadas,
-        status_importacao: statusImportacao,
-        importar_linhas_com_alerta: incluirAlertas,
-        relatorio_json: JSON.stringify(relatorio, null, 2),
-        observacoes: `Tipo: Migração de Militares | Processadas: ${analise.resumo.total_linhas} | Importadas: ${totalImportadas} | Erros/Não importadas: ${totalNaoImportadas}`,
-      },
-      'finalizar histórico',
-      avisosHistorico,
-    );
-
-    return {
-      statusImportacao,
-      totalImportadas,
-      totalNaoImportadas,
-      historicoId: historicoIdEfetivo,
-      avisosHistorico,
+      analise,
+      incluirAlertas,
       idsCriados,
       naoImportadas,
-      relatorio,
-    };
+      usuario,
+      avisosHistorico,
+    });
   } catch (error) {
-    try {
-      await atualizarHistoricoComDiagnostico(
-        historicoEntity,
-        historicoIdEfetivo,
-        {
-          status_importacao: 'Falhou',
-          observacoes: error?.message || 'Falha ao importar lote.',
-        },
-        'registrar falha da importação',
-        avisosHistorico,
-      );
-    } catch (updateError) {
-      console.error('[ImportacaoMilitares] Não foi possível registrar falha no histórico.', updateError);
-    }
-    if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
-      throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
-    }
-    throw error;
+    return await registrarFalhaImportacaoMilitares({
+      error,
+      historicoIdEfetivo,
+      avisosHistorico,
+    });
   }
 }
 
