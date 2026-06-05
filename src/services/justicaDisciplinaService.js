@@ -448,47 +448,23 @@ function sanitizarHistoricoComportamento(registros = [], { ordem = 'asc' } = {})
   return ordem === 'desc' ? [...marcosReais].reverse() : marcosReais;
 }
 
-export async function registrarMarcoHistoricoComportamento({
-  militarId,
-  dataVigencia,
-  comportamentoAnterior,
-  comportamento,
-  motivoMudanca,
-  fundamentoLegal,
-  origemTipo,
-  origemId,
-  motivo_mudanca,
-  fundamento_legal,
-  origem_tipo,
-  origem_id,
-  observacoes,
-  createdBy,
-  created_by,
-}) {
+function validarEntradaMarco({ militarId, dataVigencia, comportamento, origemTipo }) {
   const militarIdNormalizado = normalizarMilitarId(militarId);
-  if (!militarIdNormalizado) return null;
-  if (!ehDataVigenciaValida(dataVigencia)) return null;
-  if (!ehComportamentoValido(comportamento)) return null;
+  if (!militarIdNormalizado) return { exito: false };
+  if (!ehDataVigenciaValida(dataVigencia)) return { exito: false };
+  if (!ehComportamentoValido(comportamento)) return { exito: false };
   if (ehOrigemAutomatica(origemTipo)) {
     console.info('[HIST] registro bloqueado por origem automática', {
       militar_id: militarIdNormalizado,
       origem_tipo: origemTipo,
     });
-    return null;
+    return { exito: false };
   }
+  return { exito: true, militarIdNormalizado };
+}
 
-  if (comportamentoAnterior && comportamentoAnterior === comportamento) {
-    console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
-    return null;
-  }
-
-  const historicoEntity = getEntitySafe('HistoricoComportamento');
-  if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
-
-  const registrosExistentes = await listarHistoricoPorMilitar(historicoEntity, militarIdNormalizado, 'data_alteracao');
-  const historicoSanitizado = sanitizarHistoricoComportamento(registrosExistentes, { ordem: 'desc' });
+function verificarDuplicidadeMarco({ militarIdNormalizado, dataVigencia, comportamento, historicoSanitizado, comportamentoAnterior }) {
   const ultimoMarco = historicoSanitizado[0];
-
   const dataVigenciaNormalizada = normalizarDataVigencia(dataVigencia);
   const ultimaDataNormalizada = normalizarDataVigencia(ultimoMarco?.data_alteracao);
   const ultimoComportamento = ultimoMarco?.comportamento_novo;
@@ -500,7 +476,7 @@ export async function registrarMarcoHistoricoComportamento({
       data_alteracao: dataVigenciaNormalizada,
       comportamento,
     });
-    return null;
+    return { exito: false };
   }
 
   if (ultimoComportamento === comportamento) {
@@ -509,20 +485,30 @@ export async function registrarMarcoHistoricoComportamento({
       motivo: 'mesmo_comportamento_do_ultimo_marco',
       comportamento,
     });
-    return null;
+    return { exito: false };
   }
 
   const comportamentoAnteriorFinal = comportamentoAnterior || ultimoComportamento || '';
 
   if (comportamentoAnteriorFinal === comportamento) {
     console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
-    return null;
+    return { exito: false };
   }
 
-  const origemTipoFinal = origemTipo || origem_tipo || '';
-  const origemIdFinal = origemId || origem_id || '';
-  let fundamentoLegalFinal = fundamentoLegal || fundamento_legal || '';
-  const origemEhPendencia = String(origemTipoFinal || '').toUpperCase().includes('PENDENCIACOMPORTAMENTO');
+  return { exito: true, ultimoMarco, comportamentoAnteriorFinal };
+}
+
+async function resolverFundamentoLegal({
+  militarIdNormalizado,
+  dataVigencia,
+  comportamento,
+  origemTipoFinal,
+  origemIdFinal,
+  fundamentoLegalInput,
+  origemEhPendencia,
+}) {
+  let fundamentoLegalFinal = fundamentoLegalInput || '';
+
   if (!fundamentoLegalFinal && origemEhPendencia && origemIdFinal) {
     const pendenciaEntity = getEntitySafe('PendenciaComportamento');
     if (hasEntityMethod(pendenciaEntity, 'filter')) {
@@ -530,6 +516,7 @@ export async function registrarMarcoHistoricoComportamento({
       fundamentoLegalFinal = String(pendenciaOrigem?.fundamento_legal || '').trim();
     }
   }
+
   const mudancaDisciplinarPorCalculo = origemEhPendencia || Boolean(fundamentoLegalFinal);
   if (!fundamentoLegalFinal && mudancaDisciplinarPorCalculo) {
     const [militarResult, punicoesResult] = await Promise.all([
@@ -548,17 +535,83 @@ export async function registrarMarcoHistoricoComportamento({
       punicoes,
     });
   }
-  const motivoMudancaFinal = (motivoMudanca || motivo_mudanca || '').trim()
-    || (mudancaDisciplinarPorCalculo ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
-  const createdByFinal = createdBy || created_by || '';
 
-  // Mapear para o campo 'motivo' que a entidade requer (enum: "Manual", "Melhoria de Comportamento", "Punição")
+  return { fundamentoLegalFinal, mudancaDisciplinarPorCalculo };
+}
+
+function determinarMotivoEnum({ mudancaDisciplinarPorCalculo, origemEhPendencia, origemTipoFinal }) {
   let motivoEnum = 'Manual';
   if (mudancaDisciplinarPorCalculo || origemEhPendencia) {
     motivoEnum = 'Melhoria de Comportamento';
   } else if (String(origemTipoFinal || '').toUpperCase().includes('PUNICAO') || String(origemTipoFinal || '').toUpperCase().includes('PUNIÇÃO')) {
     motivoEnum = 'Punição';
   }
+  return motivoEnum;
+}
+
+export async function registrarMarcoHistoricoComportamento({
+  militarId,
+  dataVigencia,
+  comportamentoAnterior,
+  comportamento,
+  motivoMudanca,
+  fundamentoLegal,
+  origemTipo,
+  origemId,
+  motivo_mudanca,
+  fundamento_legal,
+  origem_tipo,
+  origem_id,
+  observacoes,
+  createdBy,
+  created_by,
+}) {
+  const resultValidacao = validarEntradaMarco({ militarId, dataVigencia, comportamento, origemTipo });
+  if (!resultValidacao.exito) return null;
+  const { militarIdNormalizado } = resultValidacao;
+
+  const historicoEntity = getEntitySafe('HistoricoComportamento');
+  if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
+
+  const registrosExistentes = await listarHistoricoPorMilitar(historicoEntity, militarIdNormalizado, 'data_alteracao');
+  const historicoSanitizado = sanitizarHistoricoComportamento(registrosExistentes, { ordem: 'desc' });
+
+  const resultDuplicidade = verificarDuplicidadeMarco({
+    militarIdNormalizado,
+    dataVigencia,
+    comportamento,
+    historicoSanitizado,
+    comportamentoAnterior,
+  });
+  if (!resultDuplicidade.exito) return null;
+  const { comportamentoAnteriorFinal } = resultDuplicidade;
+
+  const origemTipoFinal = origemTipo || origem_tipo || '';
+  const origemIdFinal = origemId || origem_id || '';
+  const fundamentoLegalInput = fundamentoLegal || fundamento_legal || '';
+  const origemEhPendencia = String(origemTipoFinal || '').toUpperCase().includes('PENDENCIACOMPORTAMENTO');
+
+  const { fundamentoLegalFinal, mudancaDisciplinarPorCalculo } = await resolverFundamentoLegal({
+    militarIdNormalizado,
+    dataVigencia,
+    comportamento,
+    origemTipoFinal,
+    origemIdFinal,
+    fundamentoLegalInput,
+    origemEhPendencia,
+  });
+
+  const motivoMudancaFinal = (motivoMudanca || motivo_mudanca || '').trim()
+    || (mudancaDisciplinarPorCalculo ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
+  const createdByFinal = createdBy || created_by || '';
+
+  const motivoEnum = determinarMotivoEnum({
+    mudancaDisciplinarPorCalculo,
+    origemEhPendencia,
+    origemTipoFinal,
+  });
+
+  const dataVigenciaNormalizada = normalizarDataVigencia(dataVigencia);
 
   try {
     const marco = await historicoEntity.create({
