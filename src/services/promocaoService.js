@@ -790,12 +790,20 @@ export function calcularInsercaoPorAntiguidadeAnterior({
     };
   }
 
+  const ativosNoPostoPorMilitar = new Map();
+  (historicos || []).forEach((h) => {
+    if (statusNormalizado(h?.status_registro) !== 'ativo') return;
+    if (normalizarPostoGraduacao(h?.posto_graduacao_novo) !== postoBaseAnterior) return;
+    const mid = texto(h?.militar_id);
+    if (!mid) return;
+    const existente = ativosNoPostoPorMilitar.get(mid);
+    if (!existente || texto(h?.data_promocao) > texto(existente?.data_promocao)) {
+      ativosNoPostoPorMilitar.set(mid, h);
+    }
+  });
+
   const militarId = texto(militar?.id);
-  const historicoBase = (historicos || [])
-    .filter((h) => statusNormalizado(h?.status_registro) === 'ativo')
-    .filter((h) => texto(h?.militar_id) === militarId)
-    .filter((h) => normalizarPostoGraduacao(h?.posto_graduacao_novo) === postoBaseAnterior)
-    .sort((a, b) => texto(b?.data_promocao).localeCompare(texto(a?.data_promocao)))[0];
+  const historicoBase = ativosNoPostoPorMilitar.get(militarId);
 
   if (!historicoBase) {
     return { ordemSugerida: null, baseAnterior: null, deslocamentos: [], alertas: ['Sem histórico ativo no posto anterior esperado.'], podeAdicionar: false };
@@ -814,11 +822,7 @@ export function calcularInsercaoPorAntiguidadeAnterior({
   let posicao = ordenados.length;
   for (let i = 0; i < ordenados.length; i += 1) {
     const item = ordenados[i];
-    const hist = (historicos || [])
-      .filter((h) => statusNormalizado(h?.status_registro) === 'ativo')
-      .filter((h) => texto(h?.militar_id) === texto(item?.militar_id))
-      .filter((h) => normalizarPostoGraduacao(h?.posto_graduacao_novo) === postoBaseAnterior)
-      .sort((a, b) => texto(b?.data_promocao).localeCompare(texto(a?.data_promocao)))[0];
+    const hist = ativosNoPostoPorMilitar.get(texto(item?.militar_id));
     if (!hist) continue;
     const cmpData = texto(hist?.data_promocao).localeCompare(referencia.data_promocao);
     const cmpClassificacao = Number(hist?.antiguidade_referencia_ordem || 0) - referencia.classificacao;
@@ -880,8 +884,12 @@ export function ordemHistoricoOuProxima(historico = {}, registrosExistentes = []
 
 export function montarPayloadsPromocaoMilitarAgrupamento({ promocao = {}, historicos = [], registrosExistentes = [], militarPorId = new Map() } = {}) {
   const existentes = new Set((registrosExistentes || []).map((registro) => `${texto(registro?.promocao_id)}|${texto(registro?.militar_id)}`));
-  const registrosParaOrdem = [...(registrosExistentes || [])];
   const payloads = [];
+
+  let maiorOrdem = (registrosExistentes || []).reduce((atual, registro) => {
+    const numero = Number(registro?.ordem ?? registro?.antiguidade_referencia_ordem);
+    return Number.isFinite(numero) && numero > atual ? numero : atual;
+  }, 0);
 
   (historicos || []).forEach((historico) => {
     const promocaoId = texto(promocao?.id);
@@ -889,7 +897,14 @@ export function montarPayloadsPromocaoMilitarAgrupamento({ promocao = {}, histor
     const chave = `${promocaoId}|${militarId}`;
     if (!promocaoId || !militarId || existentes.has(chave)) return;
 
-    const ordem = ordemHistoricoOuProxima(historico, registrosParaOrdem);
+    let ordem;
+    if (isOrdemPreenchida(historico?.antiguidade_referencia_ordem)) {
+      ordem = Number(historico.antiguidade_referencia_ordem);
+    } else {
+      maiorOrdem += 1;
+      ordem = maiorOrdem;
+    }
+
     const militar = historico?.militar || militarPorId.get(militarId) || null;
     const sugestao = getSugestaoAtualizacaoCadastro({ militar, promocao });
     const atualizarCadastro = Boolean(sugestao.atualizar);
@@ -908,7 +923,7 @@ export function montarPayloadsPromocaoMilitarAgrupamento({ promocao = {}, histor
     };
 
     existentes.add(chave);
-    registrosParaOrdem.push(payload);
+    if (ordem > maiorOrdem) maiorOrdem = ordem;
     payloads.push(payload);
   });
 
@@ -1256,7 +1271,15 @@ export function simularImpactoCadeiaPromocoes({
   if (!militarIdNormalizado) throw new Error('militarId é obrigatório');
   if (!Number.isFinite(ordemSugerida) || ordemSugerida <= 0) throw new Error('ordemSugeridaBase deve ser numérica e positiva');
 
-  const itensBase = promocaoMilitar.filter((item) => String(item?.promocao_id || '') === String(promocaoBase.id));
+  const itensPorPromocao = new Map();
+  (promocaoMilitar || []).forEach((item) => {
+    const pid = String(item?.promocao_id || '');
+    if (!pid) return;
+    if (!itensPorPromocao.has(pid)) itensPorPromocao.set(pid, []);
+    itensPorPromocao.get(pid).push(item);
+  });
+
+  const itensBase = itensPorPromocao.get(String(promocaoBase.id)) || [];
   const itemMilitarBase = itensBase.find((item) => String(item?.militar_id || '') === militarIdNormalizado);
   const ordemAtualBase = Number(itemMilitarBase?.ordem || 0);
   if (!Number.isFinite(ordemAtualBase) || ordemAtualBase <= 0) alertas.push('Militar não possui ordem válida na promoção-base.');
@@ -1274,8 +1297,7 @@ export function simularImpactoCadeiaPromocoes({
 
   const resultado = [];
   futuras.forEach((promocao) => {
-    const itens = promocaoMilitar
-      .filter((item) => String(item?.promocao_id || '') === String(promocao.id))
+    const itens = (itensPorPromocao.get(String(promocao.id)) || [])
       .filter((item) => Number(item?.ordem) > 0)
       .sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0));
     if (itens.length === 0) return;
