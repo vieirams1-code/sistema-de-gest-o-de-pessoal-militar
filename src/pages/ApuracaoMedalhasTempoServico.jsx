@@ -376,7 +376,12 @@ export default function ApuracaoMedalhasTempoServico() {
             observacoes: `${m.observacoes ? `${m.observacoes}\n` : ''}[RESET] Indicação resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
           }, { userEmail, acao: 'reset' }),
         }));
-        await base44.entities.Medalha.bulkUpdate(payloads);
+
+        if (typeof base44.entities.Medalha.bulkUpdate === 'function') {
+          await base44.entities.Medalha.bulkUpdate(payloads);
+        } else {
+          await Promise.all(payloads.map(({ id, ...data }) => base44.entities.Medalha.update(id, data)));
+        }
       }
 
       return pendentesEscopo.length;
