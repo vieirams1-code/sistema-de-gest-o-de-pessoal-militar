@@ -11,6 +11,42 @@ import { formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { criarEscopado } from '@/services/cudEscopadoClient';
 
+let base44Override = null;
+let criarEscopadoOverride = null;
+let formatarMatriculaPadraoOverride = null;
+let isMilitarMescladoOverride = null;
+let resolverMatriculaAtualOverride = null;
+let obterTemplatePadraoComportamentoOverride = null;
+
+function getClient() {
+  return base44Override || base44;
+}
+
+async function callCriarEscopado(...args) {
+  if (criarEscopadoOverride) return criarEscopadoOverride(...args);
+  return criarEscopado(...args);
+}
+
+function callFormatarMatriculaPadrao(...args) {
+  if (formatarMatriculaPadraoOverride) return formatarMatriculaPadraoOverride(...args);
+  return formatarMatriculaPadrao(...args);
+}
+
+function callIsMilitarMesclado(...args) {
+  if (isMilitarMescladoOverride) return isMilitarMescladoOverride(...args);
+  return isMilitarMesclado(...args);
+}
+
+function callResolverMatriculaAtual(...args) {
+  if (resolverMatriculaAtualOverride) return resolverMatriculaAtualOverride(...args);
+  return resolverMatriculaAtual(...args);
+}
+
+function callObterTemplatePadraoComportamento(...args) {
+  if (obterTemplatePadraoComportamentoOverride) return obterTemplatePadraoComportamentoOverride(...args);
+  return obterTemplatePadraoComportamento(...args);
+}
+
 function normalizarTexto(value) {
   return String(value || '').trim();
 }
@@ -33,13 +69,14 @@ function coletarCamposObrigatoriosAusentes({ militar = {}, marco = {} }) {
 }
 
 async function obterOuSemearTemplateAtivo(tipoTemplate) {
-  const templatesAtivos = await base44.entities.TemplateTexto.filter({ ativo: true });
+  const client = getClient();
+  const templatesAtivos = await client.entities.TemplateTexto.filter({ ativo: true });
   let templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
 
   if (!templateAtivo?.template) {
-    const templatePadrao = obterTemplatePadraoComportamento(tipoTemplate);
+    const templatePadrao = callObterTemplatePadraoComportamento(tipoTemplate);
     if (templatePadrao) {
-      templateAtivo = await base44.entities.TemplateTexto.create({
+      templateAtivo = await client.entities.TemplateTexto.create({
         modulo: MODULO_EX_OFFICIO,
         tipo_registro: tipoTemplate,
         nome: `Template padrão — ${tipoTemplate}`,
@@ -58,10 +95,11 @@ async function obterOuSemearTemplateAtivo(tipoTemplate) {
 }
 
 async function buscarPublicacaoExistentePorHistorico(historicoId) {
+  const client = getClient();
   const historicoComportamentoId = normalizarTexto(historicoId);
   if (!historicoComportamentoId) return null;
 
-  const porHistorico = await base44.entities.PublicacaoExOfficio.filter({
+  const porHistorico = await client.entities.PublicacaoExOfficio.filter({
     historico_comportamento_id: historicoComportamentoId,
   });
 
@@ -69,7 +107,7 @@ async function buscarPublicacaoExistentePorHistorico(historicoId) {
     return porHistorico[0];
   }
 
-  const porOrigem = await base44.entities.PublicacaoExOfficio.filter({
+  const porOrigem = await client.entities.PublicacaoExOfficio.filter({
     origem_tipo: 'historico_comportamento',
     origem_id: historicoComportamentoId,
   });
@@ -78,12 +116,13 @@ async function buscarPublicacaoExistentePorHistorico(historicoId) {
 }
 
 async function obterMatriculaAtualMilitar(militar = {}) {
+  const client = getClient();
   const matriculaPayload = normalizarTexto(militar?.matricula_atual || militar?.matricula);
-  if (matriculaPayload) return formatarMatriculaPadrao(matriculaPayload);
+  if (matriculaPayload) return callFormatarMatriculaPadrao(matriculaPayload);
 
   if (!militar?.id) return '';
-  const historicoMatriculas = await base44.entities.MatriculaMilitar.filter({ militar_id: militar.id }, '-created_date');
-  return resolverMatriculaAtual(militar, Array.isArray(historicoMatriculas) ? historicoMatriculas : []);
+  const historicoMatriculas = await client.entities.MatriculaMilitar.filter({ militar_id: militar.id }, '-created_date');
+  return callResolverMatriculaAtual(militar, Array.isArray(historicoMatriculas) ? historicoMatriculas : []);
 }
 
 async function validarElegibilidadeParaGeracao({ militar, marco }) {
@@ -106,7 +145,7 @@ async function validarElegibilidadeParaGeracao({ militar, marco }) {
     };
   }
 
-  if (isMilitarMesclado(militar)) {
+  if (callIsMilitarMesclado(militar)) {
     return {
       exito: false,
       payload: { ok: false, publicado: false, etapa: 'validacao', motivo: 'militar_mesclado_fluxo_operacional' },
@@ -221,7 +260,7 @@ async function executarCriacaoPublicacao({
     militar_id: militar.id,
     militar_nome: militar.nome_completo || militar.nome_guerra || '',
     militar_posto: militar.posto_graduacao || '',
-    militar_matricula: matriculaAtual || formatarMatriculaPadrao(militar.matricula || ''),
+    militar_matricula: matriculaAtual || callFormatarMatriculaPadrao(militar.matricula || ''),
     tipo: tipoTemplate,
     data_publicacao: dataPublicacao,
     status: 'Aguardando Nota',
@@ -239,7 +278,7 @@ async function executarCriacaoPublicacao({
   console.info('[RP_AUTO][create] payload de criação da publicação', payloadPublicacao);
 
   try {
-    const registroCriado = await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
+    const registroCriado = await callCriarEscopado('PublicacaoExOfficio', payloadPublicacao);
     console.info('[RP_AUTO][create] publicação criada com sucesso', {
       publicacaoId: registroCriado?.id || '',
     });
@@ -319,4 +358,36 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
   }
 
   return resultadoCriacao;
+}
+
+export function __setComportamentoRPClientForTests(client) {
+  base44Override = client;
+}
+
+export function __setCriarEscopadoForTests(fn) {
+  criarEscopadoOverride = fn;
+}
+
+export function __setMilitarIdentidadeOverridesForTests(overrides = {}) {
+  if (overrides.formatarMatriculaPadrao) formatarMatriculaPadraoOverride = overrides.formatarMatriculaPadrao;
+}
+
+export function __setMatriculaMilitarViewOverridesForTests(overrides = {}) {
+  if (overrides.isMilitarMesclado) isMilitarMescladoOverride = overrides.isMilitarMesclado;
+  if (overrides.resolverMatriculaAtual) resolverMatriculaAtualOverride = overrides.resolverMatriculaAtual;
+}
+
+export function __setComportamentoTemplateUtilsOverridesForTests(overrides = {}) {
+  if (overrides.obterTemplatePadraoComportamento) {
+    obterTemplatePadraoComportamentoOverride = overrides.obterTemplatePadraoComportamento;
+  }
+}
+
+export function __resetComportamentoRPForTests() {
+  base44Override = null;
+  criarEscopadoOverride = null;
+  formatarMatriculaPadraoOverride = null;
+  isMilitarMescladoOverride = null;
+  resolverMatriculaAtualOverride = null;
+  obterTemplatePadraoComportamentoOverride = null;
 }
