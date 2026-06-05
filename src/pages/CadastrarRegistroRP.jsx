@@ -38,7 +38,7 @@ import {
   formatDateBR,
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
-} from '@/components/utils/templateUtils';
+} from '@/components/utils/templateUtils.js';
 import {
   anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,

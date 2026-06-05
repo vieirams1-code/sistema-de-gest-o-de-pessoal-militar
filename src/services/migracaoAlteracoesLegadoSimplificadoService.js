@@ -317,59 +317,90 @@ function contarDuplicidadesInternas(rows, colunas) {
   return contagemNotaPlanilha;
 }
 
-function mapearEValidarLinha(row, index, colunas, numerosNotaJaExistentes, contagemNotaPlanilha) {
+function extrairDadosLinhaSimplificado(row, colunas) {
   const get = (campo) => limparTexto(row[colunas[campo]]);
   const numeroNotaBruto = get('numero_nota');
-  const numeroNotaNorm = normalizarNumeroNota(numeroNotaBruto);
-  const textoPublicado = get('texto_publicado');
-  const numeroBgBr = get('numero_bg_br');
   const dataBgBrBruta = row[colunas.data_bg_br];
   const dataBgIso = parseDataBrParaIso(dataBgBrBruta);
-  const dataBgBrNormalizada = dataBgIso ? formatarIsoParaBr(dataBgIso) : limparTexto(dataBgBrBruta);
-  const tipoLegado = get('tipo_legado');
-  const tipoClassificado = get('tipo_classificado');
-  const tipoBgLegado = get('tipo_bg_legado');
 
+  return {
+    numero_nota: numeroNotaBruto,
+    numero_nota_norm: normalizarNumeroNota(numeroNotaBruto),
+    texto_publicado: get('texto_publicado'),
+    numero_bg_br: get('numero_bg_br'),
+    data_bg_br_bruta: dataBgBrBruta,
+    data_bg_iso: dataBgIso,
+    data_bg_br_normalizada: dataBgIso ? formatarIsoParaBr(dataBgIso) : limparTexto(dataBgBrBruta),
+    tipo_legado: get('tipo_legado'),
+    tipo_classificado: get('tipo_classificado'),
+    tipo_bg_legado: get('tipo_bg_legado'),
+  };
+}
+
+function validarDadosLinhaSimplificado(dados) {
   const erros = [];
   const avisos = [];
 
-  if (!numeroNotaNorm) erros.push('Número da nota é obrigatório.');
-  if (!textoPublicado) erros.push('Texto publicado é obrigatório.');
+  if (!dados.numero_nota_norm) erros.push('Número da nota é obrigatório.');
+  if (!dados.texto_publicado) erros.push('Texto publicado é obrigatório.');
 
-  if (!numeroBgBr) avisos.push('Número do BG/BR ausente.');
-  if (dataBgBrBruta && !dataBgIso) {
+  if (!dados.numero_bg_br) avisos.push('Número do BG/BR ausente.');
+  if (dados.data_bg_br_bruta && !dados.data_bg_iso) {
     avisos.push('Data do BG/BR inválida; valor preservado, mas precisa ser revisado.');
-  } else if (!dataBgBrBruta) {
+  } else if (!dados.data_bg_br_bruta) {
     avisos.push('Data do BG/BR ausente.');
   }
-  if (!tipoLegado) avisos.push('Tipo legado ausente.');
-  if (!tipoClassificado) avisos.push('Tipo classificado ausente.');
+  if (!dados.tipo_legado) avisos.push('Tipo legado ausente.');
+  if (!dados.tipo_classificado) avisos.push('Tipo classificado ausente.');
 
-  let status = STATUS_LINHA_SIMPLIFICADO.PRONTA;
-  if (erros.length) {
-    status = STATUS_LINHA_SIMPLIFICADO.ERRO;
-  } else if (numeroNotaNorm && numerosNotaJaExistentes.has(numeroNotaNorm)) {
-    status = STATUS_LINHA_SIMPLIFICADO.DUPLICADA;
-    erros.push('Nota já importada anteriormente para este militar.');
-  } else if (numeroNotaNorm && (contagemNotaPlanilha.get(numeroNotaNorm) || 0) > 1) {
-    status = STATUS_LINHA_SIMPLIFICADO.DUPLICADA;
-    erros.push('Número da nota duplicado na própria planilha.');
+  return { erros, avisos };
+}
+
+function determinarStatusLinhaSimplificado(dados, errosIniciais, numerosNotaJaExistentes, contagemNotaPlanilha) {
+  if (errosIniciais.length) {
+    return { status: STATUS_LINHA_SIMPLIFICADO.ERRO, erros: errosIniciais };
   }
+
+  const erros = [];
+  const { numero_nota_norm: n } = dados;
+
+  if (n && numerosNotaJaExistentes.has(n)) {
+    erros.push('Nota já importada anteriormente para este militar.');
+    return { status: STATUS_LINHA_SIMPLIFICADO.DUPLICADA, erros };
+  }
+
+  if (n && (contagemNotaPlanilha.get(n) || 0) > 1) {
+    erros.push('Número da nota duplicado na própria planilha.');
+    return { status: STATUS_LINHA_SIMPLIFICADO.DUPLICADA, erros };
+  }
+
+  return { status: STATUS_LINHA_SIMPLIFICADO.PRONTA, erros };
+}
+
+function mapearEValidarLinha(row, index, colunas, numerosNotaJaExistentes, contagemNotaPlanilha) {
+  const dados = extrairDadosLinhaSimplificado(row, colunas);
+  const { erros: errosIniciais, avisos } = validarDadosLinhaSimplificado(dados);
+  const { status, erros } = determinarStatusLinhaSimplificado(
+    dados,
+    errosIniciais,
+    numerosNotaJaExistentes,
+    contagemNotaPlanilha,
+  );
 
   return {
     rowIndex: index + 2, // +2 = cabeçalho + base 1
     status,
-    numero_nota: numeroNotaBruto,
-    numero_bg_br: numeroBgBr,
-    data_bg_br: dataBgBrNormalizada,
-    tipo_legado: tipoLegado,
-    tipo_classificado: tipoClassificado,
-    tipo_bg_legado: tipoBgLegado,
-    texto_publicado: textoPublicado,
+    numero_nota: dados.numero_nota,
+    numero_bg_br: dados.numero_bg_br,
+    data_bg_br: dados.data_bg_br_normalizada,
+    tipo_legado: dados.tipo_legado,
+    tipo_classificado: dados.tipo_classificado,
+    tipo_bg_legado: dados.tipo_bg_legado,
+    texto_publicado: dados.texto_publicado,
     status_publicacao: calcularStatusPublicacaoLegado({
-      numero_nota: numeroNotaBruto,
-      numero_bg_br: numeroBgBr,
-      data_bg_br: dataBgBrNormalizada,
+      numero_nota: dados.numero_nota,
+      numero_bg_br: dados.numero_bg_br,
+      data_bg_br: dados.data_bg_br_normalizada,
     }),
     erros,
     avisos,
@@ -434,6 +465,44 @@ function gerarResumo(linhas) {
   }, { total_linhas: 0, total_prontas: 0, total_erros: 0, total_duplicadas: 0, total_com_avisos: 0, total_recusadas: 0 });
 }
 
+function validarInputsAnaliseSimplificada(file, opts) {
+  const { militarDestinoId } = opts;
+  if (!militarDestinoId) {
+    throw new Error('Militar destino não informado para a análise simplificada.');
+  }
+  if (!file) throw new Error('Arquivo obrigatório para análise.');
+}
+
+async function extrairTabelaERows(file) {
+  const tabela = await lerArquivoComoTabela(file);
+  if (!tabela.length) throw new Error('Arquivo sem conteúdo válido para análise.');
+
+  const [header, ...rows] = tabela;
+  const colunas = validarEstruturaTabela(header);
+  return { rows, colunas };
+}
+
+async function buscarDependenciasAnalise(militarDestinoId, rows, colunas) {
+  const numerosNotaJaExistentes = await listarNumerosNotaExistentesPorMilitar(militarDestinoId);
+  const contagemNotaPlanilha = contarDuplicidadesInternas(rows, colunas);
+  return { numerosNotaJaExistentes, contagemNotaPlanilha };
+}
+
+function montarObjetoRespostaAnalise(file, militarDestinoId, militarDestinoSnapshot, numerosNotaJaExistentes, linhas) {
+  return {
+    arquivo: {
+      nome: file?.name || 'arquivo',
+      tamanho: file?.size || 0,
+      tipo: file?.type || 'application/octet-stream',
+    },
+    militarDestino: buildSnapshotMilitar(militarDestinoSnapshot, militarDestinoId),
+    numerosNotaJaExistentes: Array.from(numerosNotaJaExistentes),
+    linhas,
+    resumo: gerarResumo(linhas),
+    versao_regra: 'lote3.1.v1.0.0',
+  };
+}
+
 /**
  * Função principal — Lote 2.
  *
@@ -466,19 +535,14 @@ function gerarResumo(linhas) {
  */
 export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, opts = {}) {
   const { militarDestinoId, militarDestinoSnapshot } = opts;
-  if (!militarDestinoId) {
-    throw new Error('Militar destino não informado para a análise simplificada.');
-  }
-  if (!file) throw new Error('Arquivo obrigatório para análise.');
+  validarInputsAnaliseSimplificada(file, opts);
 
-  const tabela = await lerArquivoComoTabela(file);
-  if (!tabela.length) throw new Error('Arquivo sem conteúdo válido para análise.');
+  const { rows, colunas } = await extrairTabelaERows(file);
 
-  const [header, ...rows] = tabela;
-  const colunas = validarEstruturaTabela(header);
-
-  const numerosNotaJaExistentes = await listarNumerosNotaExistentesPorMilitar(militarDestinoId);
-  const contagemNotaPlanilha = contarDuplicidadesInternas(rows, colunas);
+  const {
+    numerosNotaJaExistentes,
+    contagemNotaPlanilha,
+  } = await buscarDependenciasAnalise(militarDestinoId, rows, colunas);
 
   const linhas = processarLinhasAnalise(
     rows,
@@ -487,16 +551,11 @@ export async function analisarArquivoMigracaoAlteracoesLegadoSimplificado(file, 
     contagemNotaPlanilha,
   );
 
-  return {
-    arquivo: {
-      nome: file?.name || 'arquivo',
-      tamanho: file?.size || 0,
-      tipo: file?.type || 'application/octet-stream',
-    },
-    militarDestino: buildSnapshotMilitar(militarDestinoSnapshot, militarDestinoId),
-    numerosNotaJaExistentes: Array.from(numerosNotaJaExistentes),
+  return montarObjetoRespostaAnalise(
+    file,
+    militarDestinoId,
+    militarDestinoSnapshot,
+    numerosNotaJaExistentes,
     linhas,
-    resumo: gerarResumo(linhas),
-    versao_regra: 'lote3.1.v1.0.0',
-  };
+  );
 }
