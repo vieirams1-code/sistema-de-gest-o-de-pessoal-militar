@@ -42,22 +42,19 @@ function computeTotaisPorOrigem(afastamentos) {
   }, {});
 }
 
-function useAfastamentosVigentesData({ atestados, registrosLivro, enabled }) {
-  // Lote 1D-E: escopo transversal — filtra todas as entidades por militar_id
-  // dentro do escopo do usuário. Para admin (scopedIds === null), mantém global.
-  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
-  const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
-
-  const { data: ferias = [] } = useQuery({
+function useFeriasVigentesQuery({ scopedIds, scopeKey, enabled }) {
+  return useQuery({
     queryKey: ['painel-afastamentos-ferias', scopeKey],
     queryFn: async () => {
       const lista = await base44.entities.Ferias.list('-data_inicio');
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
     },
-    enabled: enabled && scopedReady,
+    enabled,
   });
+}
 
-  const { data: militaresLtip = [] } = useQuery({
+function useMilitaresLtipQuery({ scopedIds, scopeKey, enabled }) {
+  return useQuery({
     queryKey: ['painel-afastamentos-ltip', scopeKey],
     queryFn: async () => {
       const lista = await base44.entities.Militar.filter({ condicao: 'LTIP' }, '-ltip_data_inicio', 500);
@@ -66,6 +63,25 @@ function useAfastamentosVigentesData({ atestados, registrosLivro, enabled }) {
         scopedIds,
       );
     },
+    enabled,
+  });
+}
+
+function useAfastamentosVigentesData({ atestados, registrosLivro, enabled }) {
+  // Lote 1D-E: escopo transversal — filtra todas as entidades por militar_id
+  // dentro do escopo do usuário. Para admin (scopedIds === null), mantém global.
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+  const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
+
+  const { data: ferias = [] } = useFeriasVigentesQuery({
+    scopedIds,
+    scopeKey,
+    enabled: enabled && scopedReady,
+  });
+
+  const { data: militaresLtip = [] } = useMilitaresLtipQuery({
+    scopedIds,
+    scopeKey,
     enabled: enabled && scopedReady,
   });
 
@@ -167,6 +183,27 @@ function AfastamentosFilterBar({
   );
 }
 
+function AfastamentoRow({ item }) {
+  return (
+    <tr className="border-b border-slate-100">
+      <td className="py-2 pr-2">
+        <div className="font-medium text-slate-800">{item.militarNome}</div>
+        {item.possuiConflitoSimultaneo && (
+          <Badge className="mt-1 bg-orange-100 text-orange-700 border border-orange-200">
+            Múltiplos vigentes
+          </Badge>
+        )}
+      </td>
+      <td className="py-2 pr-2">{item.postoGraduacao || '—'}</td>
+      <td className="py-2 pr-2">{item.tipoAfastamento}</td>
+      <td className="py-2 pr-2">{item.origem}</td>
+      <td className="py-2 pr-2">{formatDateBR(item.dataInicio)}</td>
+      <td className="py-2 pr-2">{formatDateBR(item.dataTermino)}</td>
+      <td className="py-2 pr-2">{item.status || 'Ativo'}</td>
+    </tr>
+  );
+}
+
 function AfastamentosTable({ items }) {
   return (
     <div className="overflow-x-auto">
@@ -191,22 +228,7 @@ function AfastamentosTable({ items }) {
             </tr>
           )}
           {items.map((item) => (
-            <tr key={item.id} className="border-b border-slate-100">
-              <td className="py-2 pr-2">
-                <div className="font-medium text-slate-800">{item.militarNome}</div>
-                {item.possuiConflitoSimultaneo && (
-                  <Badge className="mt-1 bg-orange-100 text-orange-700 border border-orange-200">
-                    Múltiplos vigentes
-                  </Badge>
-                )}
-              </td>
-              <td className="py-2 pr-2">{item.postoGraduacao || '—'}</td>
-              <td className="py-2 pr-2">{item.tipoAfastamento}</td>
-              <td className="py-2 pr-2">{item.origem}</td>
-              <td className="py-2 pr-2">{formatDateBR(item.dataInicio)}</td>
-              <td className="py-2 pr-2">{formatDateBR(item.dataTermino)}</td>
-              <td className="py-2 pr-2">{item.status || 'Ativo'}</td>
-            </tr>
+            <AfastamentoRow key={item.id} item={item} />
           ))}
         </tbody>
       </table>
