@@ -15,6 +15,10 @@ export function __resetMigracaoAlteracoesLegadoClientForTests() {
   client = defaultBase44;
 }
 
+export function __isLinhaImportavelForTests(...args) {
+  return isLinhaImportavel(...args);
+}
+
 export const STATUS_LINHA = {
   APTO: 'APTO',
   APTO_COM_ALERTA: 'APTO_COM_ALERTA',
@@ -1242,34 +1246,31 @@ async function processarLinhasAnalise(importaveis, { publicacoesPorChave, histor
   return resultado;
 }
 
-export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, incluirPendentesClassificacao = false, historicoId, usuario }) {
-  if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
-  const avisosHistorico = [];
-  let historicoImportando = null;
+async function inicializarStatusImportacaoNoHistorico(historicoId, { incluirAlertas, incluirPendentesClassificacao }) {
+  if (!historicoId) return null;
+  return atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+    status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
+    status_lote: STATUS_IMPORTACAO.IMPORTANDO,
+    importar_linhas_com_alerta: !!incluirAlertas,
+    importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
+  });
+}
 
-  if (historicoId) {
-    historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-      status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
-      status_lote: STATUS_IMPORTACAO.IMPORTANDO,
-      importar_linhas_com_alerta: !!incluirAlertas,
-      importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
-    });
+function filtrarLinhasParaProcessamento(linhas, { incluirAlertas, incluirPendentesClassificacao }) {
+  const importaveis = linhas.filter((l) => isLinhaImportavel(l, { incluirAlertas, incluirPendentesClassificacao }));
+  const naoImportadas = linhas.filter((l) => !importaveis.includes(l));
+  return { importaveis, naoImportadas };
+}
+
+function determinarStatusFinalImportacao(resultado) {
+  if (resultado.erros.length) {
+    return resultado.totalImportadas > 0 ? STATUS_IMPORTACAO.IMPORTADO_PARCIAL : STATUS_IMPORTACAO.FALHOU;
   }
+  return STATUS_IMPORTACAO.IMPORTADO;
+}
 
-  const importaveis = analise.linhas.filter((l) => isLinhaImportavel(l, { incluirAlertas, incluirPendentesClassificacao }));
-  const naoImportadas = analise.linhas.filter((l) => !importaveis.includes(l));
-
-  const chavesImportaveis = Array.from(new Set(importaveis.map((l) => l.chave_origem || l.transformado?.chave_origem).filter(Boolean)));
-  const publicacoesPorChave = await buscarPublicacoesJaImportadas(chavesImportaveis);
-
-  const resultado = await processarLinhasAnalise(importaveis, { publicacoesPorChave, historicoId, usuario });
-  resultado.totalNaoImportadas = naoImportadas.length;
-
-  const statusFinal = resultado.erros.length
-    ? (resultado.totalImportadas > 0 ? STATUS_IMPORTACAO.IMPORTADO_PARCIAL : STATUS_IMPORTACAO.FALHOU)
-    : STATUS_IMPORTACAO.IMPORTADO;
-
-  const relatorio = {
+function construirRelatorioFinalImportacao(analise, resultado, { incluirAlertas, incluirPendentesClassificacao, historicoId }) {
+  return {
     arquivo: analise.arquivo,
     resumoAnalise: analise.resumo,
     totalImportadas: resultado.totalImportadas,
@@ -1290,22 +1291,50 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     linhasProcessadas: resultado.linhasProcessadas,
     finalizadoEm: new Date().toISOString(),
   };
+}
 
-  let historicoFinal = null;
-  if (historicoId) {
-    historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-      ...analise.resumo,
-      total_importadas: resultado.totalImportadas,
-      total_nao_importadas: resultado.totalNaoImportadas,
-      ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
-      status_importacao: statusFinal,
-      status_lote: statusFinal,
-      importar_linhas_com_alerta: !!incluirAlertas,
-      importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
-      relatorio_json: JSON.stringify(relatorio),
-      observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
-    });
-  }
+async function finalizarHistoricoComRelatorio(historicoId, { analise, resultado, relatorio, statusFinal, incluirAlertas, incluirPendentesClassificacao }) {
+  if (!historicoId) return null;
+  return atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+    ...analise.resumo,
+    total_importadas: resultado.totalImportadas,
+    total_nao_importadas: resultado.totalNaoImportadas,
+    ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
+    status_importacao: statusFinal,
+    status_lote: statusFinal,
+    importar_linhas_com_alerta: !!incluirAlertas,
+    importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
+    relatorio_json: JSON.stringify(relatorio),
+    observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
+  });
+}
+
+export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, incluirPendentesClassificacao = false, historicoId, usuario }) {
+  if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
+  const avisosHistorico = [];
+
+  const historicoImportando = await inicializarStatusImportacaoNoHistorico(historicoId, { incluirAlertas, incluirPendentesClassificacao });
+
+  const { importaveis, naoImportadas } = filtrarLinhasParaProcessamento(analise.linhas, { incluirAlertas, incluirPendentesClassificacao });
+
+  const chavesImportaveis = Array.from(new Set(importaveis.map((l) => l.chave_origem || l.transformado?.chave_origem).filter(Boolean)));
+  const publicacoesPorChave = await buscarPublicacoesJaImportadas(chavesImportaveis);
+
+  const resultado = await processarLinhasAnalise(importaveis, { publicacoesPorChave, historicoId, usuario });
+  resultado.totalNaoImportadas = naoImportadas.length;
+
+  const statusFinal = determinarStatusFinalImportacao(resultado);
+
+  const relatorio = construirRelatorioFinalImportacao(analise, resultado, { incluirAlertas, incluirPendentesClassificacao, historicoId });
+
+  const historicoFinal = await finalizarHistoricoComRelatorio(historicoId, {
+    analise,
+    resultado,
+    relatorio,
+    statusFinal,
+    incluirAlertas,
+    incluirPendentesClassificacao,
+  });
 
   return {
     historicoInicial: historicoImportando,

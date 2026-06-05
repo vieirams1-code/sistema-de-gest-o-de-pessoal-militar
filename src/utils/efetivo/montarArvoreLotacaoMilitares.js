@@ -1,6 +1,6 @@
-const TEXTO_SETOR_FALLBACK = 'CMB';
-const TEXTO_SUBSETOR_FALLBACK = '1º GBM';
-const TEXTO_UNIDADE_FALLBACK = 'Unidade não informada';
+export const TEXTO_SETOR_FALLBACK = 'CMB';
+export const TEXTO_SUBSETOR_FALLBACK = '1º GBM';
+export const TEXTO_UNIDADE_FALLBACK = 'Unidade não informada';
 
 const POSTOS_OFICIAIS = new Set([
   'ASP OFICIAL',

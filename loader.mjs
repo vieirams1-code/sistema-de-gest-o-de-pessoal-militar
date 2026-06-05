@@ -22,8 +22,6 @@ export async function resolve(specifier, context, nextResolve) {
             finalPath += '.js';
         }
     }
-
-    return nextResolve(pathToFileURL(finalPath).href, context);
   }
 
   if (specifier.includes('/src/') && specifier.endsWith('.js')) {
@@ -49,10 +47,16 @@ export async function load(url, context, nextLoad) {
   }
 
   const result = await nextLoad(url, context);
-  if (result.source && (url.includes('app-params.js') || url.includes('base44Client.js'))) {
+  if (result.source) {
     let source = result.source.toString();
+    // Polyfill common browser/Vite globals
     source = source.replace(/import\.meta\.env/g, 'process.env');
-    source = source.replace(/window\.location\.href/g, '""');
+
+    // Check if it is an assignment
+    source = source.replace(/window\.location\.href\s*=/g, 'globalThis.windowLocationHref =');
+    // Then replace usages
+    source = source.replace(/window\.location\.href/g, '(globalThis.windowLocationHref || "")');
+
     return { ...result, source };
   }
   return result;
