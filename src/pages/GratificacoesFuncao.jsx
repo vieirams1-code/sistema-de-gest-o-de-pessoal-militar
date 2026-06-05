@@ -402,6 +402,92 @@ function ConfirmarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
   );
 }
 
+function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit }) {
+  const [form, setForm] = useState({
+    data_fim_efeitos: '',
+    motivo_dispensa: '',
+    data_publicacao_dispensa: '',
+    doems_dispensa_numero: '',
+    doems_dispensa_edicao: '',
+    doems_dispensa_link: '',
+    ato_dispensa_numero: '',
+    documento_solicitacao_dispensa: '',
+    observacoes: '',
+  });
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        data_fim_efeitos: item?.data_fim_efeitos || '',
+        motivo_dispensa: item?.motivo_dispensa || '',
+        data_publicacao_dispensa: item?.data_publicacao_dispensa || '',
+        doems_dispensa_numero: item?.doems_dispensa_numero || '',
+        doems_dispensa_edicao: item?.doems_dispensa_edicao || '',
+        doems_dispensa_link: item?.doems_dispensa_link || '',
+        ato_dispensa_numero: item?.ato_dispensa_numero || '',
+        documento_solicitacao_dispensa: item?.documento_solicitacao_dispensa || '',
+        observacoes: item?.observacoes || '',
+      });
+    }
+  }, [open, item]);
+
+  const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Finalizar Gratificação (Dispensa)</DialogTitle>
+          <DialogDescription>
+            Esta ação encerrará a gratificação e moverá o registro para o histórico.
+            <div className="mt-2 rounded bg-amber-50 p-2 text-amber-800 border border-amber-200 text-xs">
+              <span className="font-semibold">Aviso:</span> Certifique-se de que a data de fim dos efeitos e o motivo da dispensa estejam corretos.
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-4 max-h-[60vh] overflow-y-auto pr-2">
+          <Field label="Fim dos efeitos *">
+            <Input type="date" value={form.data_fim_efeitos} onChange={(e) => update('data_fim_efeitos', e.target.value)} required />
+          </Field>
+          <Field label="Motivo da dispensa *">
+            <Input value={form.motivo_dispensa} onChange={(e) => update('motivo_dispensa', e.target.value)} placeholder="Ex: A pedido do militar" required />
+          </Field>
+          <Field label="Data da publicação dispensa">
+            <Input type="date" value={form.data_publicacao_dispensa} onChange={(e) => update('data_publicacao_dispensa', e.target.value)} />
+          </Field>
+          <Field label="DOEMS número">
+            <Input value={form.doems_dispensa_numero} onChange={(e) => update('doems_dispensa_numero', e.target.value)} placeholder="Ex: 11000" />
+          </Field>
+          <Field label="DOEMS edição">
+            <Input value={form.doems_dispensa_edicao} onChange={(e) => update('doems_dispensa_edicao', e.target.value)} placeholder="Ex: Suplemento I" />
+          </Field>
+          <Field label="Ato de dispensa">
+            <Input value={form.ato_dispensa_numero} onChange={(e) => update('ato_dispensa_numero', e.target.value)} placeholder="Número do ato, se houver" />
+          </Field>
+          <Field label="DOEMS link" className="md:col-span-2">
+            <Input value={form.doems_dispensa_link} onChange={(e) => update('doems_dispensa_link', e.target.value)} placeholder="https://..." />
+          </Field>
+          <Field label="Documento de solicitação" className="md:col-span-2">
+            <Input value={form.documento_solicitacao_dispensa} onChange={(e) => update('documento_solicitacao_dispensa', e.target.value)} placeholder="Ex: Ofício nº 456/2023" />
+          </Field>
+          <Field label="Observações" className="md:col-span-2">
+            <Textarea value={form.observacoes} onChange={(e) => update('observacoes', e.target.value)} />
+          </Field>
+        </div>
+
+        <DialogFooter className="mt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button type="button" onClick={() => onSubmit({ id: item.id, ...form })} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Finalizar Gratificação
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function GratificacoesFuncao() {
   const { isAdmin, canAccessAction, canAccessAll, permissions, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = Boolean(isAdmin || canAccessAll || hasAllPermissions(permissions));
@@ -424,6 +510,7 @@ export default function GratificacoesFuncao() {
   const [enviarDPModal, setEnviarDPModal] = useState({ open: false, data: null });
   const [aguardandoPublicacaoModal, setAguardandoPublicacaoModal] = useState({ open: false, data: null });
   const [registrarPublicacaoModal, setRegistrarPublicacaoModal] = useState({ open: false, data: null });
+  const [finalizarModal, setFinalizarModal] = useState({ open: false, data: null });
 
   const filtrosBackend = useMemo(() => ({ tab: aba === GRATIFICACAO_TABS.CONFIGURACOES ? 'cotas' : aba, busca, status: status === TODOS ? undefined : status, tipo_gratificacao_funcao_id: tipo === TODOS ? undefined : tipo, funcao_gratificada: funcao === TODOS ? undefined : funcao, unidade_id: unidade === TODOS ? undefined : unidade, limit: 200, offset: 0 }), [aba, busca, status, tipo, funcao, unidade]);
   const query = useQuery({ queryKey: ['gratificacoes-funcao-painel', filtrosBackend], queryFn: () => fetchPainelGratificacoesFuncao(filtrosBackend), enabled: canView, staleTime: 60 * 1000, refetchOnWindowFocus: false });
@@ -453,6 +540,10 @@ export default function GratificacoesFuncao() {
       } else if (operacao === 'criar_nomeacao_ativa') {
         setAba(GRATIFICACAO_TABS.ATIVAS);
         toast({ title: 'Gratificação Ativada', description: 'O registro foi criado diretamente como ativo e ocupou uma cota.' });
+      } else if (operacao === 'finalizar_gratificacao') {
+        setFinalizarModal({ open: false, data: null });
+        setAba(GRATIFICACAO_TABS.HISTORICO);
+        toast({ title: 'Gratificação Finalizada', description: 'O registro foi finalizado com sucesso e movido para o histórico.' });
       } else {
         toast({ title: 'Rascunho salvo', description: 'Gratificação de Função salva como rascunho, sem ativação ou nomeação.' });
       }
@@ -464,6 +555,7 @@ export default function GratificacoesFuncao() {
   const enviarDP = (form) => { rascunhoMutation.mutate({ operacao: 'enviar_dp', id: form.id, data: form }); };
   const marcarAguardandoPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'marcar_aguardando_publicacao', id: form.id }); };
   const registrarPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'registrar_publicacao_nomeacao', id: form.id, data: form }); };
+  const finalizarGratificacao = (form) => { rascunhoMutation.mutate({ operacao: 'finalizar_gratificacao', id: form.id, data: form }); };
 
   const gratificacoes = query.data?.gratificacoes || [];
   const cotasBackend = query.data?.cotas || [];
@@ -503,10 +595,10 @@ export default function GratificacoesFuncao() {
       {canShowAccessDebug && <section className="rounded-2xl border border-dashed border-blue-200 bg-blue-50 p-3 text-xs text-blue-900"><p className="font-semibold">Debug de acesso — Gratificação de Função</p><div className="mt-2 grid gap-1 md:grid-cols-2 xl:grid-cols-5"><span>canAccessAll: {String(canAccessAll)}</span><span>isAdmin: {String(isAdmin)}</span><span>canManageCadastros: {String(canManageCadastros)}</span><span>canManageGratificacoes: {String(canManageGratificacoes)}</span><span>permissions ALL: {String(hasAllPermissions(permissions))}</span></div><p className="mt-2 break-words">Permissões detectadas: {permissions === 'ALL' ? 'ALL' : Object.entries(permissions || {}).filter(([, value]) => value === true).map(([key]) => key).sort().join(', ') || 'nenhuma'}</p></section>}
       {query.isLoading && <div className="flex min-h-[18rem] items-center justify-center rounded-2xl border border-slate-200 bg-white"><Loader2 className="h-8 w-8 animate-spin text-slate-500" /></div>}
       {query.error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>{query.error.message || 'Erro controlado ao carregar o painel de Gratificação de Função.'}</p></div></div>}
-      {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.ATIVAS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={() => toast({ title: 'Em breve', description: 'O fluxo de finalização simplificada estará disponível no próximo lote.' })} />}
+      {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.ATIVAS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />}
       {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.HISTORICO && (
         <div className="flex flex-col gap-6">
-          <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={() => toast({ title: 'Em breve', description: 'O fluxo de finalização simplificada estará disponível no próximo lote.' })} />
+          <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />
           {pendenciasAntigasFiltradas.length > 0 && (
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="pendencias" className="border-none">
@@ -514,7 +606,7 @@ export default function GratificacoesFuncao() {
                   <div className="flex items-center gap-2"><History className="h-4 w-4" /> Pendências antigas ({pendenciasAntigasFiltradas.length})</div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                  <GratificacoesTable gratificacoes={pendenciasAntigasFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={() => toast({ title: 'Em breve', description: 'O fluxo de finalização simplificada estará disponível no próximo lote.' })} />
+                  <GratificacoesTable gratificacoes={pendenciasAntigasFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -541,6 +633,7 @@ export default function GratificacoesFuncao() {
       <EnviarDPModal open={enviarDPModal.open} item={enviarDPModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setEnviarDPModal({ open, data: open ? enviarDPModal.data : null })} onSubmit={enviarDP} />
       <ConfirmarPublicacaoModal open={aguardandoPublicacaoModal.open} item={aguardandoPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setAguardandoPublicacaoModal({ open, data: open ? aguardandoPublicacaoModal.data : null })} onSubmit={marcarAguardandoPublicacao} />
       <RegistrarPublicacaoModal open={registrarPublicacaoModal.open} item={registrarPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setRegistrarPublicacaoModal({ open, data: open ? registrarPublicacaoModal.data : null })} onSubmit={registrarPublicacao} />
+      <FinalizarGratificacaoModal open={finalizarModal.open} item={finalizarModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setFinalizarModal({ open, data: open ? finalizarModal.data : null })} onSubmit={finalizarGratificacao} />
       <TipoModal open={tipoModal.open} initialData={tipoModal.data} saving={saveMutation.isPending} onOpenChange={(open) => setTipoModal({ open, data: open ? tipoModal.data : null })} onSubmit={salvarTipo} />
       <CotaModal open={cotaModal.open} initialData={cotaModal.data} tipos={tipos} saving={saveMutation.isPending} onOpenChange={(open) => setCotaModal({ open, data: open ? cotaModal.data : null })} onSubmit={salvarCota} />
     </div></div>

@@ -486,8 +486,7 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .map((m) => [normalizarMatricula(m.matricula_normalizada || m.matricula), m])
       .filter(([k]) => !!k),
   );
-
-  const updates = matriculasOrigem.map((matOrigem) => {
+  const updates = (matriculasOrigem || []).map((matOrigem) => {
     const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
     if (norm && destinoPorNorm.has(norm)) {
       return matriculaEntity.update(matOrigem.id, {
