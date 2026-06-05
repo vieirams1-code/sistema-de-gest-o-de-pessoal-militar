@@ -409,17 +409,16 @@ export async function adicionarNovaMatriculaMilitar({
 
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
   if (Array.isArray(atuais) && atuais.length > 0) {
-    const deactivatePayloads = atuais.map((atual) => ({
+    const payloads = atuais.map((atual) => ({
       id: atual.id,
       is_atual: false,
       data_fim: dataInicio || new Date().toISOString().slice(0, 10),
       motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
     }));
-
     if (typeof matriculaEntity.bulkUpdate === 'function') {
-      await matriculaEntity.bulkUpdate(deactivatePayloads);
+      await matriculaEntity.bulkUpdate(payloads);
     } else {
-      await Promise.all(deactivatePayloads.map((p) => matriculaEntity.update(p.id, p)));
+      await Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
     }
   }
 
