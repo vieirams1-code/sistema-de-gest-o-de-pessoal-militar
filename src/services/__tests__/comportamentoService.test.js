@@ -172,3 +172,99 @@ test('não aplica sem comportamento_sugerido', async () => {
   assert.equal(resultado.totalFalhas, 1);
   assert.equal(resultado.falhas[0].motivo, 'comportamento_sugerido_ausente');
 });
+
+test('lança erro se usuário não tem permissão', async () => {
+  __resetComportamentoServiceForTests();
+
+  await assert.rejects(
+    aplicarPendenciasComportamentoEmLote({
+      pendencias: ['p1'],
+      usuarioAtual: { canAccessAction: () => false },
+    }),
+    /Usuário sem permissão/
+  );
+});
+
+test('processa múltiplos militares no mesmo lote', async () => {
+  const entities = {
+    Militar: createEntity([
+      { id: 'm1', nome_completo: 'Militar 1', comportamento: 'Bom' },
+      { id: 'm2', nome_completo: 'Militar 2', comportamento: 'Bom' },
+    ]),
+    PendenciaComportamento: createEntity([
+      { id: 'p1', militar_id: 'm1', comportamento_sugerido: 'Ótimo', status_pendencia: 'Pendente' },
+      { id: 'p2', militar_id: 'm2', comportamento_sugerido: 'Ótimo', status_pendencia: 'Pendente' },
+    ]),
+  };
+
+  __resetComportamentoServiceForTests();
+  __setComportamentoServiceClientForTests({ entities });
+  __setComportamentoServiceDepsForTests(stubDeps());
+
+  const resultado = await aplicarPendenciasComportamentoEmLote({
+    pendencias: ['p1', 'p2'],
+    usuarioAtual: { canAccessAction: () => true },
+  });
+
+  assert.equal(resultado.totalAplicadas, 2);
+  assert.equal(resultado.aplicadas.length, 2);
+});
+
+test('trata pendências duplicadas (mesmo ID) no mesmo lote', async () => {
+  const entities = {
+    Militar: createEntity([{ id: 'm1', nome_completo: 'Militar 1', comportamento: 'Bom' }]),
+    PendenciaComportamento: createEntity([
+      { id: 'p1', militar_id: 'm1', comportamento_sugerido: 'Ótimo', status_pendencia: 'Pendente' },
+    ]),
+  };
+
+  __resetComportamentoServiceForTests();
+  __setComportamentoServiceClientForTests({ entities });
+  __setComportamentoServiceDepsForTests(stubDeps());
+
+  // Passando a mesma pendência duas vezes
+  const resultado = await aplicarPendenciasComportamentoEmLote({
+    pendencias: ['p1', 'p1'],
+    usuarioAtual: { canAccessAction: () => true },
+  });
+
+  // A primeira deve ser aplicada, a segunda deve ser ignorada
+  // Como as pendências são resolvidas no início, a segunda ainda terá status 'Pendente' no objeto em memória
+  // MAS o militar já terá o comportamento atualizado.
+  assert.equal(resultado.totalAplicadas, 1);
+  assert.equal(resultado.totalIgnoradas, 1);
+  assert.equal(resultado.ignoradas[0].motivo, 'comportamento_ja_igual_ao_sugerido');
+});
+
+test('erro em uma pendência não aborta o lote', async () => {
+  const entities = {
+    Militar: createEntity([
+      { id: 'm1', nome_completo: 'Militar 1', comportamento: 'Bom' },
+      { id: 'm2', nome_completo: 'Militar 2', comportamento: 'Bom' },
+    ]),
+    PendenciaComportamento: createEntity([
+      { id: 'p1', militar_id: 'm1', comportamento_sugerido: 'Ótimo', status_pendencia: 'Pendente' },
+      { id: 'p2', militar_id: 'm2', comportamento_sugerido: 'Ótimo', status_pendencia: 'Pendente' },
+    ]),
+  };
+
+  const deps = stubDeps();
+  deps.registrarMarcoHistoricoComportamento = async ({ militarId }) => {
+    if (militarId === 'm1') throw new Error('erro_m1');
+    return { ok: true };
+  };
+
+  __resetComportamentoServiceForTests();
+  __setComportamentoServiceClientForTests({ entities });
+  __setComportamentoServiceDepsForTests(deps);
+
+  const resultado = await aplicarPendenciasComportamentoEmLote({
+    pendencias: ['p1', 'p2'],
+    usuarioAtual: { canAccessAction: () => true },
+  });
+
+  assert.equal(resultado.totalAplicadas, 1);
+  assert.equal(resultado.totalFalhas, 1);
+  assert.equal(resultado.falhas[0].militarId, 'm1');
+  assert.equal(resultado.aplicadas[0].militarId, 'm2');
+});

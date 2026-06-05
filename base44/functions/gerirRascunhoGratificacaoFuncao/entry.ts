@@ -6,17 +6,21 @@ const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'perfil_id'];
 const REQUIRED_ACTION = 'gerir_gratificacoes_funcao';
-const OPERACOES = new Set(['criar_rascunho', 'atualizar_rascunho', 'enviar_dp', 'marcar_aguardando_publicacao', 'registrar_publicacao_nomeacao', 'criar_nomeacao_ativa']);
+const OPERACOES = new Set(['criar_rascunho', 'atualizar_rascunho', 'enviar_dp', 'marcar_aguardando_publicacao', 'registrar_publicacao_nomeacao', 'criar_nomeacao_ativa', 'finalizar_gratificacao']);
 const STATUS_RASCUNHO = 'rascunho';
 const STATUS_SOLICITADO_DP = 'solicitado_dp';
 const STATUS_AGUARDANDO_PUBLICACAO = 'aguardando_publicacao_nomeacao';
 const STATUS_COTA_ATIVA = 'ativa';
 const STATUS_GRATIFICACAO_ATIVA = 'nomeado_ativo';
+const STATUS_DISPENSADO = 'dispensado';
+const STATUS_CANCELADO = 'cancelado';
 const GRATIFICACAO_FIELDS = [
   'militar_id', 'tipo_gratificacao_funcao_id', 'cota_gratificacao_funcao_id', 'funcao_gratificada',
   'numero_processo', 'observacoes', 'data_solicitacao', 'documento_solicitacao',
   'data_publicacao_nomeacao', 'data_inicio_efeitos', 'doems_nomeacao_numero', 'doems_nomeacao_edicao',
   'doems_nomeacao_link', 'ato_nomeacao_numero',
+  'data_fim_efeitos', 'motivo_dispensa', 'data_publicacao_dispensa', 'doems_dispensa_numero',
+  'doems_dispensa_edicao', 'doems_dispensa_link', 'ato_dispensa_numero', 'documento_solicitacao_dispensa',
 ];
 const CAMPOS_MILITAR_SNAPSHOT = [
   'id', 'nome_completo', 'nome_guerra', 'posto_graduacao', 'quadro', 'matricula', 'lotacao',
@@ -330,6 +334,32 @@ Deno.serve(async (req) => {
       };
       const resultado = await fetchWithRetry(() => base44.asServiceRole.entities.GratificacaoFuncao.update(id, payloadUpdate), `GratificacaoFuncao.marcar_aguardando_publicacao:${id}`);
       return Response.json({ ok: true, operacao, entityName: 'GratificacaoFuncao', data: sanitizeResponse(resultado), meta: { statusRestrito: STATUS_AGUARDANDO_PUBLICACAO, semAtivacao: true, semNomeacao: true } });
+    }
+
+    if (operacao === 'finalizar_gratificacao') {
+      if (statusAtual === STATUS_DISPENSADO || statusAtual === STATUS_CANCELADO) throw withStatus('Registro já está dispensado ou cancelado.', 400);
+      if (statusAtual !== STATUS_GRATIFICACAO_ATIVA) throw withStatus('Apenas registros em nomeado_ativo podem ser finalizados.', 400);
+
+      if (!data.data_fim_efeitos) throw withStatus('data_fim_efeitos é obrigatória para finalizar a gratificação.', 400);
+      if (!data.motivo_dispensa) throw withStatus('motivo_dispensa é obrigatório para finalizar a gratificação.', 400);
+
+      const payloadUpdate = {
+        status: STATUS_DISPENSADO,
+        data_fim_efeitos: data.data_fim_efeitos,
+        motivo_dispensa: data.motivo_dispensa,
+        data_publicacao_dispensa: data.data_publicacao_dispensa || null,
+        doems_dispensa_numero: data.doems_dispensa_numero || '',
+        doems_dispensa_edicao: data.doems_dispensa_edicao || '',
+        doems_dispensa_link: data.doems_dispensa_link || '',
+        ato_dispensa_numero: data.ato_dispensa_numero || '',
+        documento_solicitacao_dispensa: data.documento_solicitacao_dispensa || '',
+        observacoes: data.observacoes || existente.observacoes || '',
+        status_alterado_em: new Date().toISOString(),
+        status_alterado_por: authUser.email || ''
+      };
+
+      const resultado = await fetchWithRetry(() => base44.asServiceRole.entities.GratificacaoFuncao.update(id, payloadUpdate), `GratificacaoFuncao.finalizar_gratificacao:${id}`);
+      return Response.json({ ok: true, operacao, entityName: 'GratificacaoFuncao', data: sanitizeResponse(resultado), meta: { statusRestrito: STATUS_DISPENSADO } });
     }
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
