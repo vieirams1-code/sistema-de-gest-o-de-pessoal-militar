@@ -184,6 +184,16 @@ test('persiste correção no histórico e restaura após recarregar', async () =
   assert.equal(restaurado.linhas[0].status, 'APTO_COM_ALERTA');
   assert.match(ImportacaoMilitares._rows[0].observacoes, /Correção pré-importação linha 2/);
 
+  await assert.rejects(
+    corrigirLinhaPreImportacao({
+      analise: restaurado,
+      linhaNumero: 99,
+      campos: { nome_completo: 'Erro' },
+      usuario,
+    }),
+    { message: /Linha 99 não encontrada/ },
+  );
+
   await persistirCorrecaoPreImportacaoHistorico({
     historicoId: historico.id,
     analise: analiseAtualizada,
