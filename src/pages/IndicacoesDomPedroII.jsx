@@ -284,7 +284,7 @@ export default function IndicacoesDomPedroII() {
         if (typeof base44.entities.Medalha.bulkUpdate === 'function') {
           await base44.entities.Medalha.bulkUpdate(payloads);
         } else {
-          await Promise.all(payloads.map((p) => base44.entities.Medalha.update(p.id, p)));
+          await Promise.all(payloads.map(({ id, ...data }) => base44.entities.Medalha.update(id, data)));
         }
       }
 

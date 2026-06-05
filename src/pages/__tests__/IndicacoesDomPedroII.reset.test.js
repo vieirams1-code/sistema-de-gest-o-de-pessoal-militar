@@ -18,7 +18,8 @@ async function resetMutationFn({
     isAdmin,
     militarIdsEscopo,
     userEmail,
-    bulkUpdateMock
+    bulkUpdateMock,
+    updateMock
 }) {
     const pendentes = mockFiltrarIndicacoesDomPedroResetaveis(domPedroRegistros);
     const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
@@ -31,7 +32,12 @@ async function resetMutationFn({
                 observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada.`,
             }, { userEmail, acao: 'reset' }),
         }));
-        await bulkUpdateMock(updates);
+
+        if (typeof bulkUpdateMock === 'function') {
+            await bulkUpdateMock(updates);
+        } else {
+            await Promise.all(updates.map(({ id, ...data }) => updateMock(id, data)));
+        }
     }
     return pendentesEscopo.length;
 }
@@ -100,5 +106,28 @@ describe('IndicacoesDomPedroII Reset Logic', () => {
 
         assert.strictEqual(count, 2);
         assert.strictEqual(capturedUpdates.length, 2);
+    });
+
+    it('should fallback to sequential updates if bulkUpdate is missing', async () => {
+        const updatedIds = [];
+        const updateMock = async (id) => { updatedIds.push(id); };
+
+        const domPedroRegistros = [
+            { id: '1', militar_id: 'm1', tipo: 'DOM_PEDRO_II', status: 'INDICADA' },
+            { id: '2', militar_id: 'm2', tipo: 'DOM_PEDRO_II', status: 'INDICADA' }
+        ];
+
+        await resetMutationFn({
+            domPedroRegistros,
+            isAdmin: true,
+            militarIdsEscopo: new Set(),
+            userEmail: 'test@user.com',
+            updateMock
+            // bulkUpdateMock is undefined
+        });
+
+        assert.strictEqual(updatedIds.length, 2);
+        assert.ok(updatedIds.includes('1'));
+        assert.ok(updatedIds.includes('2'));
     });
 });
