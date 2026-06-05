@@ -385,11 +385,17 @@ export async function adicionarNovaMatriculaMilitar({
 
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
   if (Array.isArray(atuais) && atuais.length > 0) {
-    await Promise.all(atuais.map((atual) => matriculaEntity.update(atual.id, {
+    const payloads = atuais.map((atual) => ({
+      id: atual.id,
       is_atual: false,
       data_fim: dataInicio || new Date().toISOString().slice(0, 10),
       motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-    })));
+    }));
+    if (typeof matriculaEntity.bulkUpdate === 'function') {
+      await matriculaEntity.bulkUpdate(payloads);
+    } else {
+      await Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
+    }
   }
 
   const nova = await matriculaEntity.create({
@@ -707,7 +713,11 @@ export async function migrarMatriculasLegadas({ dryRun = true } = {}) {
   }
 
   if (!dryRun && aCriar.length > 0) {
-    await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
+    if (typeof matriculaEntity.bulkCreate === 'function') {
+      await matriculaEntity.bulkCreate(aCriar);
+    } else {
+      await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
+    }
   }
 
   return diagnostico;

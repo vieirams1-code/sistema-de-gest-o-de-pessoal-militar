@@ -37,6 +37,12 @@ function createEntity(initial = []) {
       rows[idx] = { ...rows[idx], ...payload };
       return rows[idx];
     },
+    async bulkUpdate(payloads) {
+      return Promise.all(payloads.map((p) => this.update(p.id, p)));
+    },
+    async bulkCreate(payloads) {
+      return Promise.all(payloads.map((p) => this.create(p)));
+    },
     _rows: rows,
   };
 }
