@@ -486,7 +486,6 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .map((m) => [normalizarMatricula(m.matricula_normalizada || m.matricula), m])
       .filter(([k]) => !!k),
   );
-
   await Promise.all([
     ...matriculasOrigem.map((matOrigem) => {
       const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);

@@ -273,14 +273,14 @@ export default function IndicacoesDomPedroII() {
       const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
 
       if (pendentesEscopo.length > 0) {
-        const updates = pendentesEscopo.map((registro) => ({
+        const payloads = pendentesEscopo.map((registro) => ({
           id: registro.id,
           ...adicionarAuditoriaMedalha({
             status: 'CANCELADA',
             observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
           }, { userEmail, acao: 'reset' }),
         }));
-        await base44.entities.Medalha.bulkUpdate(updates);
+        await base44.entities.Medalha.bulkUpdate(payloads);
       }
 
       return pendentesEscopo.length;
