@@ -385,18 +385,11 @@ export async function adicionarNovaMatriculaMilitar({
 
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
   if (Array.isArray(atuais) && atuais.length > 0) {
-    const payloads = atuais.map((atual) => ({
-      id: atual.id,
+    await Promise.all(atuais.map((atual) => matriculaEntity.update(atual.id, {
       is_atual: false,
       data_fim: dataInicio || new Date().toISOString().slice(0, 10),
       motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-    }));
-
-    if (typeof matriculaEntity.bulkUpdate === 'function') {
-      await matriculaEntity.bulkUpdate(payloads);
-    } else {
-      await Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
-    }
+    })));
   }
 
   const nova = await matriculaEntity.create({
@@ -494,48 +487,30 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .filter(([k]) => !!k),
   );
 
-  const payloads = (matriculasOrigem || []).map((matOrigem) => {
+  const updates = (matriculasOrigem || []).map((matOrigem) => {
     const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
     if (norm && destinoPorNorm.has(norm)) {
-      return {
-        id: matOrigem.id,
+      return matriculaEntity.update(matOrigem.id, {
         is_atual: false,
         situacao: 'Mesclada',
         data_fim: hoje,
         motivo: `${matOrigem.motivo || ''} Encerrada por merge manual com militar ${militarDestinoId}.`.trim(),
-      };
+      });
     }
 
-    return {
-      id: matOrigem.id,
+    return matriculaEntity.update(matOrigem.id, {
       militar_id: militarDestinoId,
       is_atual: false,
       motivo: `${matOrigem.motivo || ''} Reatribuída por merge manual a partir do militar ${matOrigem.militar_id}.`.trim(),
-    };
+    });
   });
 
-  if (payloads.length === 0) return [];
-  if (typeof matriculaEntity.bulkUpdate === 'function') {
-    return matriculaEntity.bulkUpdate(payloads);
-  }
-  return Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
+  return Promise.all(updates);
 }
 
 async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
-  const results = [];
-  for (const v of vinculosOrigem) {
-    const items = v.items || [];
-    if (items.length === 0) continue;
-
-    const payloads = items.map((row) => ({ id: row.id, militar_id: militarDestinoId }));
-
-    if (typeof v.entity.bulkUpdate === 'function') {
-      results.push(v.entity.bulkUpdate(payloads));
-    } else {
-      results.push(Promise.all(payloads.map((p) => v.entity.update(p.id, p))));
-    }
-  }
-  return Promise.all(results);
+  const updates = vinculosOrigem.flatMap((v) => (v.items || []).map((row) => v.entity.update(row.id, { militar_id: militarDestinoId })));
+  return Promise.all(updates);
 }
 
 async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOriginal, matriculaEntity, militarEntity) {
@@ -572,26 +547,7 @@ async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOrig
     }
   }
 
-  if (updates.length > 0) {
-    if (typeof matriculaEntity.bulkUpdate === 'function') {
-      const payloads = [];
-      for (const mat of matriculasDestinoPos) {
-        const deveSerAtual = String(mat.id) === String(atualDestino.id);
-        if (Boolean(mat.is_atual) !== deveSerAtual) {
-          const payload = { id: mat.id, is_atual: deveSerAtual };
-          if (deveSerAtual) {
-            payload.data_fim = '';
-          } else {
-            payload.data_fim = mat.data_fim || hoje;
-          }
-          payloads.push(payload);
-        }
-      }
-      await matriculaEntity.bulkUpdate(payloads);
-    } else {
-      await Promise.all(updates);
-    }
-  }
+  await Promise.all(updates);
 
   const destinoMatriculaFinal = atualDestino.matricula || formatarMatriculaPadrao(atualDestino.matricula_normalizada || '');
   await militarEntity.update(militarDestinoId, { matricula: destinoMatriculaFinal });
@@ -751,11 +707,7 @@ export async function migrarMatriculasLegadas({ dryRun = true } = {}) {
   }
 
   if (!dryRun && aCriar.length > 0) {
-    if (typeof matriculaEntity.bulkCreate === 'function') {
-      await matriculaEntity.bulkCreate(aCriar);
-    } else {
-      await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
-    }
+    await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
   }
 
   return diagnostico;

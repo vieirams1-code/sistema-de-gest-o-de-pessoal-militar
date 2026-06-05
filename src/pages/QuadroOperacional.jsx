@@ -416,14 +416,12 @@ export default function QuadroOperacionalPage() {
     queryClient.setQueryData(['colunas', quadro?.id], colunasComNovaOrdem);
 
     try {
-      const alterados = colunasComNovaOrdem.filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem);
+      const updates = colunasComNovaOrdem
+        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem)
+        .map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem }));
 
-      if (alterados.length > 0) {
-        if (typeof base44.entities.ColunaOperacional.bulkUpdate === 'function') {
-          await base44.entities.ColunaOperacional.bulkUpdate(alterados.map((coluna) => ({ id: coluna.id, ordem: coluna.ordem })));
-        } else {
-          await Promise.all(alterados.map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem })));
-        }
+      if (updates.length) {
+        await Promise.all(updates);
       }
 
       queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
