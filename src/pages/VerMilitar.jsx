@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList } from
+  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList,
+  FileWarning, AlertCircle } from
 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
@@ -28,6 +29,7 @@ import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
+import { listarInconsistenciasCadastraisMilitar } from '@/utils/inconsistenciasCadastrais';
 import {
   criarChavePendenciaComportamento,
   obterHistoricoComportamentoMilitar } from
@@ -103,6 +105,58 @@ function Section({ title, icon: Icon, children }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">{children}</CardContent>
+    </Card>);
+
+}
+
+function AuditAlert({ inconsistencias }) {
+  if (!inconsistencias || inconsistencias.length === 0) return null;
+
+  const criticos = inconsistencias.filter((i) => i.nivel === 'critico');
+  const atencao = inconsistencias.filter((i) => i.nivel === 'atencao');
+
+  return (
+    <Card className="border-red-200 bg-red-50/30 mb-4 overflow-hidden shadow-sm">
+      <CardHeader className="py-3 bg-red-50 border-b border-red-100">
+        <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-800 uppercase tracking-tight">
+          <AlertTriangle className="w-4 h-4" />
+          Pendências de Auditoria de RH
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="py-4">
+        <div className="space-y-4">
+          {criticos.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-red-700 uppercase mb-2 flex items-center gap-1">
+                <FileWarning className="w-3 h-3" /> Críticas ({criticos.length})
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {criticos.map((inc, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-red-800 bg-white/50 p-2 rounded border border-red-100">
+                    <span className="font-bold whitespace-nowrap">{inc.labelCampo}:</span>
+                    <span>{inc.impacto}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {atencao.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-amber-700 uppercase mb-2 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> Atenção ({atencao.length})
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {atencao.map((inc, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-amber-800 bg-white/50 p-2 rounded border border-amber-100">
+                    <span className="font-bold whitespace-nowrap">{inc.labelCampo}:</span>
+                    <span>{inc.impacto}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
     </Card>);
 
 }
@@ -415,6 +469,11 @@ export default function VerMilitar() {
   );
   const mensagemRegistrosSistema = React.useMemo(() => getMensagemRegistrosSistemaPerfilMilitar(), []);
 
+  const inconsistenciasAuditRH = React.useMemo(() => {
+    if (!militar) return [];
+    return listarInconsistenciasCadastraisMilitar(militar);
+  }, [militar]);
+
   const avaliacaoComportamento = React.useMemo(() => {
     if (!militar) return null;
     return calcularComportamento(punicoesSistema, militar.posto_graduacao, new Date(), {
@@ -516,6 +575,7 @@ export default function VerMilitar() {
 
         {/* Alertas e tempo de serviço */}
         <div className="space-y-2 mb-4">
+          <AuditAlert inconsistencias={inconsistenciasAuditRH} />
           <AlertasContrato militarId={id} />
           <TempoServico militar={{ ...militar, posto_graduacao: postoGraduacaoMilitar }} />
           {militarMesclado &&

@@ -50,6 +50,7 @@
 import AgendaAcoesOperacionais from './pages/AgendaAcoesOperacionais';
 import AgendarJISO from './pages/AgendarJISO';
 import AuditoriaComportamento from './pages/AuditoriaComportamento';
+import AuditoriaRH from './pages/AuditoriaRH';
 import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
 import ApuracaoMedalhasTempoServico from './pages/ApuracaoMedalhasTempoServico';
@@ -118,6 +119,7 @@ export const PAGES = {
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
     "AuditoriaComportamento": AuditoriaComportamento,
+    "AuditoriaRH": AuditoriaRH,
     "AvaliacaoComportamento": AvaliacaoComportamento,
     "Armamentos": Armamentos,
     "ApuracaoMedalhasTempoServico": ApuracaoMedalhasTempoServico,
