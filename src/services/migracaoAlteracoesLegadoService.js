@@ -15,6 +15,10 @@ export function __resetMigracaoAlteracoesLegadoClientForTests() {
   client = defaultBase44;
 }
 
+export function __isLinhaImportavelForTests(...args) {
+  return isLinhaImportavel(...args);
+}
+
 export const STATUS_LINHA = {
   APTO: 'APTO',
   APTO_COM_ALERTA: 'APTO_COM_ALERTA',
@@ -690,32 +694,7 @@ async function analisarLinhaIndividualLegado({
     erros.push('Matéria legado ausente sem identificador mínimo alternativo (Nota ID).');
   }
 
-  const classificacaoMinima = resolverTipoClassificacaoMinima(transformado, tiposValidosMap);
-  if (classificacaoMinima) {
-    transformado.tipo_publicacao_sugerido = classificacaoMinima.tipoPublicacao;
-    transformado.tipo_publicacao_confirmado = classificacaoMinima.tipoPublicacao;
-    transformado.tipo_publicacao = classificacaoMinima.tipoPublicacao;
-    transformado.confianca_classificacao = 'ALTA';
-    transformado.regra_usada = classificacaoMinima.regraUsada;
-    transformado.motivo_classificacao = 'Correspondência exata e inequívoca da matéria legado para tipo atual.';
-    transformado.destino_sugerido = DESTINO_FINAL.IMPORTAR;
-    transformado.destino_final = DESTINO_FINAL.IMPORTAR;
-  } else {
-    transformado.tipo_publicacao_confirmado = '';
-    transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
-    transformado.destino_sugerido = DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
-    transformado.destino_final = DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
-    transformado.motivo_destino = limparTexto(transformado.motivo_destino) || 'Sem equivalência segura para classificação automática mínima.';
-    if (transformado.destino_final !== DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
-      revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
-    }
-  }
-
-  if (transformado.destino_final === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
-    transformado.classificacao_pendente = true;
-    transformado.tipo_publicacao_confirmado = '';
-    transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
-  }
+  aplicarClassificacaoAutomaticaLegado(transformado, tiposValidosMap, revisoes);
 
   if (!transformado.numero_bg) erros.push('Número do BG obrigatório ausente.');
   if (!transformado.data_bg) erros.push('Data de publicação/BG inválida ou ausente.');
@@ -724,26 +703,7 @@ async function analisarLinhaIndividualLegado({
     erros.push('Status legado não publicado. Apenas registros já publicados podem ser importados.');
   }
 
-  const resolucao = resolverMilitar(transformado, militarIndices);
-  if (resolucao.militar) {
-    const matriculaAtualMilitar = resolucao.militar.matricula_atual || resolucao.militar.matricula || '';
-    transformado.militar_id = resolucao.militar.id;
-    transformado.militar_nome = resolucao.militar.nome_completo || resolucao.militar.nome_guerra || '';
-    transformado.militar_matricula = matriculaAtualMilitar;
-    transformado.militar_matricula_atual = matriculaAtualMilitar;
-    transformado.militar_matricula_vinculo = transformado.matricula_legado || '';
-    transformado.vinculo_automatico_metodo = resolucao.metodo;
-
-    const matriculaLegadoNorm = somenteNumeros(transformado.matricula_legado);
-    const matriculaAtualNorm = somenteNumeros(matriculaAtualMilitar);
-    if (matriculaLegadoNorm && matriculaAtualNorm && matriculaLegadoNorm !== matriculaAtualNorm) {
-      alertas.push('Matrícula legado difere da matrícula atual do militar vinculado; registro legado foi preservado.');
-    }
-  } else if (resolucao.metodo === 'AMBIGUO_MATRICULA' || resolucao.metodo === 'AMBIGUO_NOME') {
-    revisoes.push('Múltiplos militares possíveis para vínculo automático; revisar manualmente.');
-  } else {
-    revisoes.push('Militar não localizado para vínculo automático.');
-  }
+  vincularMilitarALinhaLegado(transformado, militarIndices, alertas, revisoes);
 
   const chave = construirChaveDuplicidade(transformado);
   const chaveOrigem = await gerarChaveOrigemLinha(transformado);
@@ -751,29 +711,7 @@ async function analisarLinhaIndividualLegado({
   transformado.hash_linha = chaveOrigem;
   transformado.hash_lote = hashLote;
 
-  const publicacaoExistente = publicacoesPorChaveOrigem.get(chaveOrigem);
-  if (publicacaoExistente?.id) {
-    revisoes.push('Registro legado já importado anteriormente; importação final será idempotente.');
-    transformado.ja_importado = true;
-    transformado.publicacao_legado_existente_id = publicacaoExistente.id;
-    transformado.destino_final = DESTINO_FINAL.IMPORTAR;
-  }
-
-  const estadoAnterior = indiceHistorico.get(chaveOrigem);
-  if (estadoAnterior?.transformado) {
-    const anterior = estadoAnterior.transformado;
-    if (anterior.tipo_publicacao_confirmado) transformado.tipo_publicacao_confirmado = anterior.tipo_publicacao_confirmado;
-    if (anterior.destino_final) transformado.destino_final = resolverDestinoFinal(anterior.destino_final, transformado.destino_final || DESTINO_FINAL.IMPORTAR);
-    if (anterior.motivo_destino && !transformado.motivo_destino) transformado.motivo_destino = anterior.motivo_destino;
-    if (anterior.militar_id && !transformado.militar_id) {
-      transformado.militar_id = anterior.militar_id;
-      transformado.militar_nome = anterior.militar_nome || transformado.militar_nome;
-      transformado.militar_matricula = anterior.militar_matricula || transformado.militar_matricula;
-    }
-    revisoes.push('Estado anterior reaproveitado automaticamente com base na chave de origem.');
-    transformado.reaproveitado_historico = true;
-    transformado.historico_origem_linha = estadoAnterior?.linhaNumero || null;
-  }
+  verificarIdempotenciaEHistoricoLegado({ transformado, publicacoesPorChaveOrigem, indiceHistorico, revisoes, chaveOrigem });
   if (duplicidadeExistente.has(chave)) revisoes.push('Suspeita de duplicidade contra registros legado já importados.');
   const prev = duplicidadeArquivo.get(chave) || 0;
   duplicidadeArquivo.set(chave, prev + 1);
@@ -805,6 +743,107 @@ async function analisarLinhaIndividualLegado({
   };
 }
 
+function validarEstruturaPlanilhaLegado(colunas) {
+  const camposObrigatorios = ['nome_completo_legado', 'matricula_legado', 'materia_legado', 'numero_bg', 'data_publicacao'];
+  const ausentes = camposObrigatorios.filter((campo) => colunas[campo] === undefined);
+  if (ausentes.length) {
+    throw new Error(`Cabeçalhos obrigatórios ausentes na planilha: ${ausentes.join(', ')}.`);
+  }
+}
+
+function buscarLoteJaImportado(historicosExistentes, hashLote) {
+  return (historicosExistentes || []).find((item) => (item.hash_lote || item.hash_arquivo) === hashLote);
+}
+
+function enriquecerLinhasAnalise(linhas, duplicidadeArquivo) {
+  linhas.forEach((linha) => {
+    if ((duplicidadeArquivo.get(linha.chave_duplicidade) || 0) > 1) {
+      linha.revisoes.push('Suspeita de duplicidade dentro do arquivo atual.');
+    }
+    const linhaAtualizada = atualizarLinhaComStatus(linha);
+    linha.status = linhaAtualizada.status;
+    linha.transformado = linhaAtualizada.transformado;
+  });
+}
+
+function aplicarClassificacaoAutomaticaLegado(transformado, tiposValidosMap, revisoes) {
+  const classificacaoMinima = resolverTipoClassificacaoMinima(transformado, tiposValidosMap);
+  if (classificacaoMinima) {
+    transformado.tipo_publicacao_sugerido = classificacaoMinima.tipoPublicacao;
+    transformado.tipo_publicacao_confirmado = classificacaoMinima.tipoPublicacao;
+    transformado.tipo_publicacao = classificacaoMinima.tipoPublicacao;
+    transformado.confianca_classificacao = 'ALTA';
+    transformado.regra_usada = classificacaoMinima.regraUsada;
+    transformado.motivo_classificacao = 'Correspondência exata e inequívoca da matéria legado para tipo atual.';
+    transformado.destino_sugerido = DESTINO_FINAL.IMPORTAR;
+    transformado.destino_final = DESTINO_FINAL.IMPORTAR;
+  } else {
+    transformado.tipo_publicacao_confirmado = '';
+    transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
+    transformado.destino_sugerido = DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
+    transformado.destino_final = DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
+    transformado.motivo_destino = limparTexto(transformado.motivo_destino) || 'Sem equivalência segura para classificação automática mínima.';
+    if (transformado.destino_final !== DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
+      revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
+    }
+  }
+
+  if (transformado.destino_final === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
+    transformado.classificacao_pendente = true;
+    transformado.tipo_publicacao_confirmado = '';
+    transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
+  }
+}
+
+function vincularMilitarALinhaLegado(transformado, militarIndices, alertas, revisoes) {
+  const resolucao = resolverMilitar(transformado, militarIndices);
+  if (resolucao.militar) {
+    const matriculaAtualMilitar = resolucao.militar.matricula_atual || resolucao.militar.matricula || '';
+    transformado.militar_id = resolucao.militar.id;
+    transformado.militar_nome = resolucao.militar.nome_completo || resolucao.militar.nome_guerra || '';
+    transformado.militar_matricula = matriculaAtualMilitar;
+    transformado.militar_matricula_atual = matriculaAtualMilitar;
+    transformado.militar_matricula_vinculo = transformado.matricula_legado || '';
+    transformado.vinculo_automatico_metodo = resolucao.metodo;
+
+    const matriculaLegadoNorm = somenteNumeros(transformado.matricula_legado);
+    const matriculaAtualNorm = somenteNumeros(matriculaAtualMilitar);
+    if (matriculaLegadoNorm && matriculaAtualNorm && matriculaLegadoNorm !== matriculaAtualNorm) {
+      alertas.push('Matrícula legado difere da matrícula atual do militar vinculado; registro legado foi preservado.');
+    }
+  } else if (resolucao.metodo === 'AMBIGUO_MATRICULA' || resolucao.metodo === 'AMBIGUO_NOME') {
+    revisoes.push('Múltiplos militares possíveis para vínculo automático; revisar manualmente.');
+  } else {
+    revisoes.push('Militar não localizado para vínculo automático.');
+  }
+}
+
+function verificarIdempotenciaEHistoricoLegado({ transformado, publicacoesPorChaveOrigem, indiceHistorico, revisoes, chaveOrigem }) {
+  const publicacaoExistente = publicacoesPorChaveOrigem.get(chaveOrigem);
+  if (publicacaoExistente?.id) {
+    revisoes.push('Registro legado já importado anteriormente; importação final será idempotente.');
+    transformado.ja_importado = true;
+    transformado.publicacao_legado_existente_id = publicacaoExistente.id;
+    transformado.destino_final = DESTINO_FINAL.IMPORTAR;
+  }
+
+  const estadoAnterior = indiceHistorico.get(chaveOrigem);
+  if (estadoAnterior?.transformado) {
+    const anterior = estadoAnterior.transformado;
+    if (anterior.tipo_publicacao_confirmado) transformado.tipo_publicacao_confirmado = anterior.tipo_publicacao_confirmado;
+    if (anterior.destino_final) transformado.destino_final = resolverDestinoFinal(anterior.destino_final, transformado.destino_final || DESTINO_FINAL.IMPORTAR);
+    if (anterior.motivo_destino && !transformado.motivo_destino) transformado.motivo_destino = anterior.motivo_destino;
+    if (anterior.militar_id && !transformado.militar_id) {
+      transformado.militar_id = anterior.militar_id;
+      transformado.militar_nome = anterior.militar_nome || transformado.militar_nome;
+      transformado.militar_matricula = anterior.militar_matricula || transformado.militar_matricula;
+    }
+    revisoes.push('Estado anterior reaproveitado automaticamente com base na chave de origem.');
+    transformado.reaproveitado_historico = true;
+    transformado.historico_origem_linha = estadoAnterior?.linhaNumero || null;
+  }
+}
+
 export async function analisarArquivoMigracaoAlteracoesLegado(file) {
   const tabela = await lerArquivoComoTabela(file);
   if (!tabela.length) throw new Error('Arquivo sem conteúdo válido para análise.');
@@ -813,16 +852,12 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
   const [header, ...rows] = tabela;
   const colunas = detectarColunas(header);
 
-  const camposObrigatorios = ['nome_completo_legado', 'matricula_legado', 'materia_legado', 'numero_bg', 'data_publicacao'];
-  const ausentes = camposObrigatorios.filter((campo) => colunas[campo] === undefined);
-  if (ausentes.length) {
-    throw new Error(`Cabeçalhos obrigatórios ausentes na planilha: ${ausentes.join(', ')}.`);
-  }
+  validarEstruturaPlanilhaLegado(colunas);
 
   const dependencias = await buscarDadosDependenciasAnalise();
   const indices = construirIndicesParaAnalise(dependencias);
   const { tiposPublicacaoValidos } = indices;
-  const loteJaImportado = (dependencias.historicosExistentes || []).find((item) => (item.hash_lote || item.hash_arquivo) === hashLote);
+  const loteJaImportado = buscarLoteJaImportado(dependencias.historicosExistentes, hashLote);
 
   const duplicidadeArquivo = new Map();
   const linhas = await Promise.all(rows.map(async (row, index) => analisarLinhaIndividualLegado({
@@ -835,14 +870,7 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     ...indices,
   })));
 
-  linhas.forEach((linha) => {
-    if ((duplicidadeArquivo.get(linha.chave_duplicidade) || 0) > 1) {
-      linha.revisoes.push('Suspeita de duplicidade dentro do arquivo atual.');
-    }
-    const linhaAtualizada = atualizarLinhaComStatus(linha);
-    linha.status = linhaAtualizada.status;
-    linha.transformado = linhaAtualizada.transformado;
-  });
+  enriquecerLinhasAnalise(linhas, duplicidadeArquivo);
 
   const resumo = gerarResumo(linhas);
 
@@ -1242,34 +1270,31 @@ async function processarLinhasAnalise(importaveis, { publicacoesPorChave, histor
   return resultado;
 }
 
-export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, incluirPendentesClassificacao = false, historicoId, usuario }) {
-  if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
-  const avisosHistorico = [];
-  let historicoImportando = null;
+async function inicializarStatusImportacaoNoHistorico(historicoId, { incluirAlertas, incluirPendentesClassificacao }) {
+  if (!historicoId) return null;
+  return atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+    status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
+    status_lote: STATUS_IMPORTACAO.IMPORTANDO,
+    importar_linhas_com_alerta: !!incluirAlertas,
+    importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
+  });
+}
 
-  if (historicoId) {
-    historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-      status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
-      status_lote: STATUS_IMPORTACAO.IMPORTANDO,
-      importar_linhas_com_alerta: !!incluirAlertas,
-      importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
-    });
+function filtrarLinhasParaProcessamento(linhas, { incluirAlertas, incluirPendentesClassificacao }) {
+  const importaveis = linhas.filter((l) => isLinhaImportavel(l, { incluirAlertas, incluirPendentesClassificacao }));
+  const naoImportadas = linhas.filter((l) => !importaveis.includes(l));
+  return { importaveis, naoImportadas };
+}
+
+function determinarStatusFinalImportacao(resultado) {
+  if (resultado.erros.length) {
+    return resultado.totalImportadas > 0 ? STATUS_IMPORTACAO.IMPORTADO_PARCIAL : STATUS_IMPORTACAO.FALHOU;
   }
+  return STATUS_IMPORTACAO.IMPORTADO;
+}
 
-  const importaveis = analise.linhas.filter((l) => isLinhaImportavel(l, { incluirAlertas, incluirPendentesClassificacao }));
-  const naoImportadas = analise.linhas.filter((l) => !importaveis.includes(l));
-
-  const chavesImportaveis = Array.from(new Set(importaveis.map((l) => l.chave_origem || l.transformado?.chave_origem).filter(Boolean)));
-  const publicacoesPorChave = await buscarPublicacoesJaImportadas(chavesImportaveis);
-
-  const resultado = await processarLinhasAnalise(importaveis, { publicacoesPorChave, historicoId, usuario });
-  resultado.totalNaoImportadas = naoImportadas.length;
-
-  const statusFinal = resultado.erros.length
-    ? (resultado.totalImportadas > 0 ? STATUS_IMPORTACAO.IMPORTADO_PARCIAL : STATUS_IMPORTACAO.FALHOU)
-    : STATUS_IMPORTACAO.IMPORTADO;
-
-  const relatorio = {
+function construirRelatorioFinalImportacao(analise, resultado, { incluirAlertas, incluirPendentesClassificacao, historicoId }) {
+  return {
     arquivo: analise.arquivo,
     resumoAnalise: analise.resumo,
     totalImportadas: resultado.totalImportadas,
@@ -1290,22 +1315,50 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     linhasProcessadas: resultado.linhasProcessadas,
     finalizadoEm: new Date().toISOString(),
   };
+}
 
-  let historicoFinal = null;
-  if (historicoId) {
-    historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-      ...analise.resumo,
-      total_importadas: resultado.totalImportadas,
-      total_nao_importadas: resultado.totalNaoImportadas,
-      ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
-      status_importacao: statusFinal,
-      status_lote: statusFinal,
-      importar_linhas_com_alerta: !!incluirAlertas,
-      importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
-      relatorio_json: JSON.stringify(relatorio),
-      observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
-    });
-  }
+async function finalizarHistoricoComRelatorio(historicoId, { analise, resultado, relatorio, statusFinal, incluirAlertas, incluirPendentesClassificacao }) {
+  if (!historicoId) return null;
+  return atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+    ...analise.resumo,
+    total_importadas: resultado.totalImportadas,
+    total_nao_importadas: resultado.totalNaoImportadas,
+    ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
+    status_importacao: statusFinal,
+    status_lote: statusFinal,
+    importar_linhas_com_alerta: !!incluirAlertas,
+    importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
+    relatorio_json: JSON.stringify(relatorio),
+    observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
+  });
+}
+
+export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, incluirPendentesClassificacao = false, historicoId, usuario }) {
+  if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
+  const avisosHistorico = [];
+
+  const historicoImportando = await inicializarStatusImportacaoNoHistorico(historicoId, { incluirAlertas, incluirPendentesClassificacao });
+
+  const { importaveis, naoImportadas } = filtrarLinhasParaProcessamento(analise.linhas, { incluirAlertas, incluirPendentesClassificacao });
+
+  const chavesImportaveis = Array.from(new Set(importaveis.map((l) => l.chave_origem || l.transformado?.chave_origem).filter(Boolean)));
+  const publicacoesPorChave = await buscarPublicacoesJaImportadas(chavesImportaveis);
+
+  const resultado = await processarLinhasAnalise(importaveis, { publicacoesPorChave, historicoId, usuario });
+  resultado.totalNaoImportadas = naoImportadas.length;
+
+  const statusFinal = determinarStatusFinalImportacao(resultado);
+
+  const relatorio = construirRelatorioFinalImportacao(analise, resultado, { incluirAlertas, incluirPendentesClassificacao, historicoId });
+
+  const historicoFinal = await finalizarHistoricoComRelatorio(historicoId, {
+    analise,
+    resultado,
+    relatorio,
+    statusFinal,
+    incluirAlertas,
+    incluirPendentesClassificacao,
+  });
 
   return {
     historicoInicial: historicoImportando,
