@@ -1,4 +1,4 @@
-import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
+import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils.jsx';
 
 export const TIPO_TEMPLATE_COMPORTAMENTO = {
   ELEVACAO: 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR',
