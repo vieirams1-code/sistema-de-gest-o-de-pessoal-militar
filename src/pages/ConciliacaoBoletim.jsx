@@ -265,11 +265,28 @@ function calcularCorrespondenciaTextual(pub, nota) {
     tokensSistema.forEach((t) => freqSistemaFinal.set(t, (freqSistemaFinal.get(t) || 0) + 1));
   }
 
-  let melhorPercentual = 0;
-  let melhorTrecho = tokensBoletim.join(' ');
-
   const n = tokensSistema.length;
   const m = tokensBoletim.length;
+
+  const calcPercentual = (inter, janelaSize) => {
+    const cobertura = inter / n;
+    const dice = (2 * inter) / (n + janelaSize);
+    return Math.round(((cobertura * 0.75) + (dice * 0.25)) * 100);
+  };
+
+  let intersecaoTotal = 0;
+  const freqTotalBoletim = new Map();
+  tokensBoletim.forEach((t) => {
+    const count = (freqTotalBoletim.get(t) || 0) + 1;
+    freqTotalBoletim.set(t, count);
+    if (count <= (freqSistemaFinal.get(t) || 0)) {
+      intersecaoTotal += 1;
+    }
+  });
+
+  let melhorPercentual = calcPercentual(intersecaoTotal, m);
+  let melhorTrecho = tokensBoletim.join(' ');
+
   const minJanela = Math.max(5, Math.floor(n * 0.6));
   const maxJanela = Math.min(m, Math.max(minJanela, Math.ceil(n * 1.4)));
 
@@ -288,13 +305,7 @@ function calcularCorrespondenciaTextual(pub, nota) {
       }
     }
 
-    const calcPercentual = (inter) => {
-      const cobertura = inter / n;
-      const dice = (2 * inter) / (n + janela);
-      return Math.round(((cobertura * 0.75) + (dice * 0.25)) * 100);
-    };
-
-    let p = calcPercentual(intersecaoAtual);
+    let p = calcPercentual(intersecaoAtual, janela);
     if (p > melhorPercentual) {
       melhorPercentual = p;
       melhorTrecho = tokensBoletim.slice(0, janela).join(' ');
@@ -315,7 +326,7 @@ function calcularCorrespondenciaTextual(pub, nota) {
         intersecaoAtual += 1;
       }
 
-      p = calcPercentual(intersecaoAtual);
+      p = calcPercentual(intersecaoAtual, janela);
       if (p > melhorPercentual) {
         melhorPercentual = p;
         melhorTrecho = tokensBoletim.slice(inicio, inicio + janela).join(' ');
