@@ -2,6 +2,13 @@ import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
 export async function resolve(specifier, context, nextResolve) {
+  // Inject import.meta.env for Node.js tests
+  if (typeof globalThis !== 'undefined' && !globalThis.importMetaEnvInjected) {
+    globalThis.importMetaEnvInjected = true;
+    // We can't easily modify import.meta from here for all modules,
+    // but some code might look at process.env as a fallback or we can polyfill if we control the entry
+  }
+
   if (specifier.startsWith('@/')) {
     const rootPath = process.cwd();
     const subPath = specifier.slice(2);
@@ -17,4 +24,15 @@ export async function resolve(specifier, context, nextResolve) {
     return nextResolve(pathToFileURL(finalPath).href, context);
   }
   return nextResolve(specifier, context);
+}
+
+export async function load(url, context, nextLoad) {
+  const result = await nextLoad(url, context);
+  if (result.source && (url.includes('app-params.js') || url.includes('base44Client.js'))) {
+    let source = result.source.toString();
+    source = source.replace(/import\.meta\.env/g, 'process.env');
+    source = source.replace(/window\.location\.href/g, '""');
+    return { ...result, source };
+  }
+  return result;
 }

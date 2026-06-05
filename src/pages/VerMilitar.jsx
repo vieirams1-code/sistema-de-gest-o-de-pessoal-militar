@@ -287,7 +287,7 @@ export default function VerMilitar() {
   });
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
-    queryFn: async () => {
+    queryFn: () => {
       const militarIdHistorico = militar?.id || id;
       const historico = await obterHistoricoComportamentoMilitar(militarIdHistorico);
       if (import.meta.env?.DEV) {
