@@ -407,7 +407,21 @@ export async function adicionarNovaMatriculaMilitar({
 
   const matriculaNorm = await validarMatriculaDisponivel(matricula, militarId);
 
-  await encerrarMatriculasAtuais(matriculaEntity, militarId, dataInicio);
+  const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
+  if (Array.isArray(atuais) && atuais.length > 0) {
+    const deactivatePayloads = atuais.map((atual) => ({
+      id: atual.id,
+      is_atual: false,
+      data_fim: dataInicio || new Date().toISOString().slice(0, 10),
+      motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
+    }));
+
+    if (typeof matriculaEntity.bulkUpdate === 'function') {
+      await matriculaEntity.bulkUpdate(deactivatePayloads);
+    } else {
+      await Promise.all(deactivatePayloads.map((p) => matriculaEntity.update(p.id, p)));
+    }
+  }
 
   const nova = await matriculaEntity.create({
     militar_id: militarId,
@@ -504,30 +518,45 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .filter(([k]) => !!k),
   );
 
-  const updates = (matriculasOrigem || []).map((matOrigem) => {
+  const payloads = matriculasOrigem.map((matOrigem) => {
     const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
     if (norm && destinoPorNorm.has(norm)) {
-      return matriculaEntity.update(matOrigem.id, {
+      return {
+        id: matOrigem.id,
         is_atual: false,
         situacao: 'Mesclada',
         data_fim: hoje,
         motivo: `${matOrigem.motivo || ''} Encerrada por merge manual com militar ${militarDestinoId}.`.trim(),
-      });
+      };
     }
 
-    return matriculaEntity.update(matOrigem.id, {
+    return {
+      id: matOrigem.id,
       militar_id: militarDestinoId,
       is_atual: false,
       motivo: `${matOrigem.motivo || ''} Reatribuída por merge manual a partir do militar ${matOrigem.militar_id}.`.trim(),
-    });
+    };
   });
 
-  return Promise.all(updates);
+  if (typeof matriculaEntity.bulkUpdate === 'function') {
+    return matriculaEntity.bulkUpdate(payloads);
+  }
+
+  return Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
 }
 
 async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
-  const updates = vinculosOrigem.flatMap((v) => (v.items || []).map((row) => v.entity.update(row.id, { militar_id: militarDestinoId })));
-  return Promise.all(updates);
+  const promises = vinculosOrigem.map(async (v) => {
+    const payloads = (v.items || []).map((row) => ({ id: row.id, militar_id: militarDestinoId }));
+    if (payloads.length === 0) return;
+
+    if (typeof v.entity.bulkUpdate === 'function') {
+      return v.entity.bulkUpdate(payloads);
+    }
+    return Promise.all(payloads.map((p) => v.entity.update(p.id, p)));
+  });
+
+  return Promise.all(promises);
 }
 
 function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOriginal) {
@@ -536,43 +565,33 @@ function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOrigin
     || matriculasDestinoPos[0];
 }
 
-async function sincronizarStatusMatriculasDestino(matriculaEntity, matriculasDestinoPos, atualDestinoId) {
-  const hoje = new Date().toISOString().slice(0, 10);
-  const updates = [];
+  if (!atualDestino) {
+    throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
+  }
 
+  const payloads = [];
   for (const mat of matriculasDestinoPos) {
     const deveSerAtual = String(mat.id) === String(atualDestinoId);
     const needsUpdate = (Boolean(mat.is_atual) !== deveSerAtual);
 
     if (needsUpdate) {
-      const payload = { is_atual: deveSerAtual };
+      const payload = { id: mat.id, is_atual: deveSerAtual };
       if (deveSerAtual) {
         payload.data_fim = '';
       } else {
         payload.data_fim = mat.data_fim || hoje;
       }
-      updates.push(matriculaEntity.update(mat.id, payload));
+      payloads.push(payload);
     }
   }
 
-  return Promise.all(updates);
-}
-
-async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOriginal, matriculaEntity, militarEntity) {
-  const matriculasDestinoPosRaw = matriculaEntity.filter
-    ? await matriculaEntity.filter({ militar_id: militarDestinoId })
-    : await (matriculaEntity.list?.() || Promise.resolve([]));
-
-  const matriculasDestinoPos = (Array.isArray(matriculasDestinoPosRaw) ? matriculasDestinoPosRaw : [])
-    .filter((m) => String(m.militar_id) === String(militarDestinoId));
-
-  const atualDestino = determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOriginal);
-
-  if (!atualDestino) {
-    throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
+  if (payloads.length > 0) {
+    if (typeof matriculaEntity.bulkUpdate === 'function') {
+      await matriculaEntity.bulkUpdate(payloads);
+    } else {
+      await Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
+    }
   }
-
-  await sincronizarStatusMatriculasDestino(matriculaEntity, matriculasDestinoPos, atualDestino.id);
 
   const destinoMatriculaFinal = atualDestino.matricula || formatarMatriculaPadrao(atualDestino.matricula_normalizada || '');
   await militarEntity.update(militarDestinoId, { matricula: destinoMatriculaFinal });
@@ -767,20 +786,12 @@ function processarAnaliseMigracao(militares, matriculas, dryRun) {
     }
   }
 
-  return { aCriar, diagnostico };
-}
-
-async function persistirResultadosMigracao(matriculaEntity, aCriar) {
-  if (!aCriar.length) return;
-  return Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
-}
-
-export async function migrarMatriculasLegadas({ dryRun = true } = {}) {
-  const { matriculaEntity, militares, matriculas } = await carregarDadosParaMigracao();
-  const { aCriar, diagnostico } = processarAnaliseMigracao(militares, matriculas, dryRun);
-
-  if (!dryRun) {
-    await persistirResultadosMigracao(matriculaEntity, aCriar);
+  if (!dryRun && aCriar.length > 0) {
+    if (typeof matriculaEntity.bulkCreate === 'function') {
+      await matriculaEntity.bulkCreate(aCriar);
+    } else {
+      await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
+    }
   }
 
   return diagnostico;
