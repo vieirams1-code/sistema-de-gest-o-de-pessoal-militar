@@ -1,73 +1,74 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import {
-  getPostoGraduacaoOficial,
-  normalizarPostoGraduacaoMilitar,
-} from '../militarPostoGraduacao.js';
+import { getPostoGraduacaoOficial, normalizarPostoGraduacaoMilitar } from '../militarPostoGraduacao.js';
 
-test('getPostoGraduacaoOficial handles empty or null input', () => {
-  assert.strictEqual(getPostoGraduacaoOficial(), '');
-  assert.strictEqual(getPostoGraduacaoOficial({}), '');
-  assert.strictEqual(getPostoGraduacaoOficial(null), '');
+test('getPostoGraduacaoOficial - returns empty string for empty input', () => {
+  assert.equal(getPostoGraduacaoOficial(), '');
+  assert.equal(getPostoGraduacaoOficial({}), '');
+  assert.equal(getPostoGraduacaoOficial(null), '');
 });
 
-test('getPostoGraduacaoOficial priority order', () => {
-  assert.strictEqual(getPostoGraduacaoOficial({ posto_graduacao: '1SGT' }), '1SGT');
-
-  assert.strictEqual(getPostoGraduacaoOficial({
-    posto_graduacao: '1SGT',
-    'posto_graduação': '2SGT'
-  }), '1SGT');
-
-  assert.strictEqual(getPostoGraduacaoOficial({
-    'posto_graduação': '2SGT',
-    posto_grad: '3SGT'
-  }), '2SGT');
-
-  assert.strictEqual(getPostoGraduacaoOficial({
-    posto_grad: '3SGT',
-    posto: 'Capitão'
-  }), '3SGT');
-
-  assert.strictEqual(getPostoGraduacaoOficial({
-    posto: 'Capitão',
-    graduacao: 'Soldado'
-  }), 'Capitão');
-
-  assert.strictEqual(getPostoGraduacaoOficial({
-    graduacao: 'Soldado'
-  }), 'Soldado');
+test('getPostoGraduacaoOficial - picks up values from various keys', () => {
+  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: 'Coronel' }), 'Coronel');
+  assert.equal(getPostoGraduacaoOficial({ 'posto_graduação': 'Tenente' }), 'Tenente');
+  assert.equal(getPostoGraduacaoOficial({ posto_grad: 'Major' }), 'Major');
+  assert.equal(getPostoGraduacaoOficial({ posto: 'Capitão' }), 'Capitão');
+  assert.equal(getPostoGraduacaoOficial({ graduacao: 'Soldado' }), 'Soldado');
 });
 
-test('getPostoGraduacaoOficial trims the result', () => {
-  assert.strictEqual(getPostoGraduacaoOficial({ posto_graduacao: '  1SGT  ' }), '1SGT');
+test('getPostoGraduacaoOficial - respects precedence', () => {
+  const militar = {
+    posto_graduacao: 'Precedence 1',
+    'posto_graduação': 'Precedence 2',
+    posto_grad: 'Precedence 3',
+    posto: 'Precedence 4',
+    graduacao: 'Precedence 5'
+  };
+  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 1');
+
+  delete militar.posto_graduacao;
+  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 2');
+
+  delete militar['posto_graduação'];
+  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 3');
+
+  delete militar.posto_grad;
+  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 4');
+
+  delete militar.posto;
+  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 5');
 });
 
-test('normalizarPostoGraduacaoMilitar returns original object if no rank found', () => {
+test('getPostoGraduacaoOficial - trims whitespace', () => {
+  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: '  Coronel  ' }), 'Coronel');
+});
+
+test('getPostoGraduacaoOficial - handles non-string values', () => {
+  assert.equal(getPostoGraduacaoOficial({ posto: 123 }), '123');
+});
+
+test('normalizarPostoGraduacaoMilitar - returns same object if no rank found', () => {
   const militar = { nome: 'João' };
-  const result = normalizarPostoGraduacaoMilitar(militar);
-  assert.strictEqual(result, militar);
+  assert.deepEqual(normalizarPostoGraduacaoMilitar(militar), militar);
 });
 
-test('normalizarPostoGraduacaoMilitar returns original object if already normalized', () => {
-  const militar = { nome: 'João', posto_graduacao: '1SGT' };
-  const result = normalizarPostoGraduacaoMilitar(militar);
-  assert.strictEqual(result, militar);
+test('normalizarPostoGraduacaoMilitar - returns same object if posto_graduacao is already set and matches', () => {
+  const militar = { nome: 'João', posto_graduacao: 'Coronel' };
+  const resultado = normalizarPostoGraduacaoMilitar(militar);
+  assert.strictEqual(resultado, militar);
 });
 
-test('normalizarPostoGraduacaoMilitar normalizes from other fields', () => {
-  const militar = { nome: 'João', posto: 'Capitão' };
-  const result = normalizarPostoGraduacaoMilitar(militar);
-  assert.notStrictEqual(result, militar);
-  assert.strictEqual(result.posto_graduacao, 'Capitão');
-  assert.strictEqual(result.posto, 'Capitão');
+test('normalizarPostoGraduacaoMilitar - updates object with normalized posto_graduacao', () => {
+  const militar = { nome: 'João', posto: 'Tenente' };
+  const resultado = normalizarPostoGraduacaoMilitar(militar);
+  assert.equal(resultado.posto_graduacao, 'Tenente');
+  assert.equal(resultado.nome, 'João');
+  assert.equal(resultado.posto, 'Tenente');
 });
 
-test('normalizarPostoGraduacaoMilitar does not trim if already present and matching trimmed', () => {
-  // Testing the current behavior observed in the code
-  const militar = { nome: 'João', posto_graduacao: ' 1SGT ' };
-  const result = normalizarPostoGraduacaoMilitar(militar);
-  assert.strictEqual(result, militar, 'Should return same object if trimmed value matches');
-  assert.strictEqual(result.posto_graduacao, ' 1SGT ');
+test('normalizarPostoGraduacaoMilitar - handles case where posto_graduacao is present but needs trimming', () => {
+  const militar = { nome: 'João', posto_graduacao: '  Coronel  ' };
+  const resultado = normalizarPostoGraduacaoMilitar(militar);
+  assert.equal(resultado.posto_graduacao, 'Coronel');
 });
