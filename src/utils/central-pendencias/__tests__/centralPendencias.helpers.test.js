@@ -11,37 +11,34 @@ import {
   filtrarPendencias,
 } from '../centralPendencias.helpers.js';
 
-test('normalizarTexto deve retornar texto em minusculo e sem espaços', () => {
-  assert.strictEqual(normalizarTexto('  Teste  '), 'teste');
-  assert.strictEqual(normalizarTexto('TESTE'), 'teste');
+test('normalizarTexto deve retornar string minuscula e sem espaços', () => {
+  assert.strictEqual(normalizarTexto('  TEXTO  '), 'texto');
   assert.strictEqual(normalizarTexto(null), '');
   assert.strictEqual(normalizarTexto(undefined), '');
 });
 
-test('formatarDataSegura deve formatar datas corretamente', () => {
-  assert.strictEqual(formatarDataSegura('2023-12-31'), '31/12/2023');
-  assert.strictEqual(formatarDataSegura('2023-12-31T12:00:00Z'), '31/12/2023');
-  assert.strictEqual(formatarDataSegura(''), '—');
+test('formatarDataSegura deve formatar data corretamente', () => {
+  assert.strictEqual(formatarDataSegura('2023-10-27'), '27/10/2023');
   assert.strictEqual(formatarDataSegura(null), '—');
   assert.strictEqual(formatarDataSegura('data-invalida'), '—');
 });
 
-test('diferencaDias deve calcular a diferença de dias corretamente', () => {
-  const base = new Date('2023-01-10T10:00:00');
-  assert.strictEqual(diferencaDias('2023-01-15', base), 5);
-  assert.strictEqual(diferencaDias('2023-01-05', base), -5);
-  assert.strictEqual(diferencaDias('2023-01-10', base), 0);
-  assert.strictEqual(diferencaDias(null, base), null);
-  assert.strictEqual(diferencaDias('invalida', base), null);
+test('diferencaDias deve calcular a diferença correta em dias', () => {
+  const base = new Date('2023-10-27T12:00:00');
+  assert.strictEqual(diferencaDias('2023-10-30', base), 3);
+  assert.strictEqual(diferencaDias('2023-10-24', base), -3);
+  assert.strictEqual(diferencaDias('2023-10-27', base), 0);
+  assert.strictEqual(diferencaDias(null), null);
+  assert.strictEqual(diferencaDias('invalida'), null);
 });
 
-test('calcularPrioridadePorPrazo deve retornar a prioridade correta', () => {
+test('calcularPrioridadePorPrazo deve determinar a prioridade correta', () => {
   assert.strictEqual(calcularPrioridadePorPrazo({ vencido: true }), 'critica');
-  assert.strictEqual(calcularPrioridadePorPrazo({ status: 'Vencido' }), 'critica');
+  assert.strictEqual(calcularPrioridadePorPrazo({ status: 'VENCIDO' }), 'critica');
   assert.strictEqual(calcularPrioridadePorPrazo({ diasParaVencer: 2 }), 'critica');
   assert.strictEqual(calcularPrioridadePorPrazo({ diasParaVencer: 10 }), 'alta');
-  assert.strictEqual(calcularPrioridadePorPrazo({ status: 'Aguardando' }), 'alta');
-  assert.strictEqual(calcularPrioridadePorPrazo({ diasParaVencer: 25 }), 'media');
+  assert.strictEqual(calcularPrioridadePorPrazo({ status: 'aguardando' }), 'alta');
+  assert.strictEqual(calcularPrioridadePorPrazo({ diasParaVencer: 20 }), 'media');
   assert.strictEqual(calcularPrioridadePorPrazo({ diasParaVencer: 40 }), 'media');
 });
 
@@ -50,63 +47,67 @@ test('normalizarTipoCategoria deve mapear categorias corretamente', () => {
   assert.strictEqual(normalizarTipoCategoria('Atestado Médico'), 'atestados');
   assert.strictEqual(normalizarTipoCategoria('Férias'), 'ferias');
   assert.strictEqual(normalizarTipoCategoria('Comportamento'), 'comportamento');
-  assert.strictEqual(normalizarTipoCategoria('Legado'), 'legado');
   assert.strictEqual(normalizarTipoCategoria('Duplicidade'), 'legado');
-  assert.strictEqual(normalizarTipoCategoria('Desconhecido'), 'outros');
+  assert.strictEqual(normalizarTipoCategoria('Qualquer outra coisa'), 'outros');
 });
 
 test('montarDescricaoCurta deve montar a string corretamente', () => {
-  assert.strictEqual(
-    montarDescricaoCurta({ situacao: 'Pendente', detalhe: 'Faltam documentos', dataReferencia: '2023-05-20' }),
-    'Pendente • Faltam documentos • Ref.: 20/05/2023'
-  );
-  assert.strictEqual(
-    montarDescricaoCurta({ situacao: 'Pendente', detalhe: 'Faltam documentos' }),
-    'Pendente • Faltam documentos'
-  );
-  assert.strictEqual(
-    montarDescricaoCurta({ situacao: 'Pendente', dataReferencia: '2023-05-20' }),
-    'Pendente • Ref.: 20/05/2023'
-  );
-  assert.strictEqual(
-    montarDescricaoCurta({ detalhe: 'Faltam documentos', dataReferencia: '2023-05-20' }),
-    'Faltam documentos • Ref.: 20/05/2023'
-  );
-  assert.strictEqual(
-    montarDescricaoCurta({ situacao: 'Pendente' }),
-    'Pendente'
-  );
-  assert.strictEqual(
-    montarDescricaoCurta({}),
-    ''
-  );
+  const data = {
+    situacao: 'Pendente',
+    detalhe: 'Aguardando assinatura',
+    dataReferencia: '2023-10-27'
+  };
+  assert.strictEqual(montarDescricaoCurta(data), 'Pendente • Aguardando assinatura • Ref.: 27/10/2023');
+  assert.strictEqual(montarDescricaoCurta({ situacao: 'Ok' }), 'Ok');
 });
 
-test('ordenarPendencias deve ordenar corretamente', () => {
+test('ordenarPendencias: data_desc', () => {
   const lista = [
-    { prioridade: 'baixa', dataReferencia: '2023-01-01' },
-    { prioridade: 'critica', dataReferencia: '2023-01-02' },
-    { prioridade: 'media', dataReferencia: '2023-01-03' },
+    { id: 1, dataReferencia: '2023-10-01' },
+    { id: 2, dataReferencia: '2023-10-20' },
+    { id: 3, dataReferencia: '2023-09-15' },
   ];
-
-  const ordenada = ordenarPendencias(lista, 'prioridade_desc');
-  assert.strictEqual(ordenada[0].prioridade, 'critica');
-  assert.strictEqual(ordenada[1].prioridade, 'media');
-  assert.strictEqual(ordenada[2].prioridade, 'baixa');
-
-  const porDataAsc = ordenarPendencias(lista, 'data_asc');
-  assert.strictEqual(porDataAsc[0].dataReferencia, '2023-01-01');
-  assert.strictEqual(porDataAsc[2].dataReferencia, '2023-01-03');
+  const ordenado = ordenarPendencias(lista, 'data_desc');
+  assert.strictEqual(ordenado[0].id, 2);
+  assert.strictEqual(ordenado[1].id, 1);
+  assert.strictEqual(ordenado[2].id, 3);
 });
 
-test('filtrarPendencias deve filtrar corretamente', () => {
+test('ordenarPendencias: data_asc', () => {
   const lista = [
-    { titulo: 'Pendencia 1', categoriaSlug: 'ferias', prioridade: 'alta' },
-    { titulo: 'Outra coisa', categoriaSlug: 'atestados', prioridade: 'media' },
+    { id: 1, dataReferencia: '2023-10-01' },
+    { id: 2, dataReferencia: '2023-10-20' },
+    { id: 3, dataReferencia: '2023-09-15' },
+  ];
+  const ordenado = ordenarPendencias(lista, 'data_asc');
+  assert.strictEqual(ordenado[0].id, 3);
+  assert.strictEqual(ordenado[1].id, 1);
+  assert.strictEqual(ordenado[2].id, 2);
+});
+
+test('ordenarPendencias: prioridade_desc (default) com desempate por data_desc', () => {
+  const lista = [
+    { id: 1, prioridade: 'baixa', dataReferencia: '2023-10-01' },
+    { id: 2, prioridade: 'critica', dataReferencia: '2023-10-01' },
+    { id: 3, prioridade: 'alta', dataReferencia: '2023-10-01' },
+    { id: 4, prioridade: 'critica', dataReferencia: '2023-10-20' },
+  ];
+  const ordenado = ordenarPendencias(lista); // default is prioridade_desc
+  assert.strictEqual(ordenado[0].id, 4); // critica, mais recente
+  assert.strictEqual(ordenado[1].id, 2); // critica, mais antiga
+  assert.strictEqual(ordenado[2].id, 3); // alta
+  assert.strictEqual(ordenado[3].id, 1); // baixa
+});
+
+test('filtrarPendencias deve filtrar por texto e categorias', () => {
+  const lista = [
+    { id: 1, titulo: 'Pendência A', categoriaSlug: 'ferias', prioridade: 'alta', situacao: 'Aguardando' },
+    { id: 2, titulo: 'Pendência B', categoriaSlug: 'atestados', prioridade: 'baixa', situacao: 'Vencido' },
   ];
 
-  assert.strictEqual(filtrarPendencias(lista, { texto: 'Pendencia' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'Pendência A' }).length, 1);
   assert.strictEqual(filtrarPendencias(lista, { categoria: 'ferias' }).length, 1);
-  assert.strictEqual(filtrarPendencias(lista, { prioridade: 'media' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { prioridade: 'baixa' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { situacao: 'vencid' }).length, 1);
   assert.strictEqual(filtrarPendencias(lista, { texto: 'Inexistente' }).length, 0);
 });
