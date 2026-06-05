@@ -568,7 +568,13 @@ export default function RastreamentoPromocoes() {
           militarPorId,
         });
 
-        await Promise.all(payloadsTurma.map((payloadTurma) => PromocaoMilitar.create(payloadTurma)));
+        if (payloadsTurma.length > 0) {
+          if (typeof PromocaoMilitar.bulkCreate === 'function') {
+            await PromocaoMilitar.bulkCreate(payloadsTurma);
+          } else {
+            await Promise.all(payloadsTurma.map((payloadTurma) => PromocaoMilitar.create(payloadTurma)));
+          }
+        }
         return { ...promocaoCriada, total_promocao_militar_criados: payloadsTurma.length };
       } catch (createError) {
         if (isErroSchemaPromocaoAusente(createError)) {
