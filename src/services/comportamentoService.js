@@ -95,6 +95,103 @@ async function buscarMilitarPorId(militarEntity, militarId) {
   return militar || null;
 }
 
+function validarElegibilidadePendencia(pendencia) {
+  const pendenciaId = normalizarId(pendencia?.id);
+  if (!pendenciaId) {
+    return { valida: false, motivo: 'pendencia_sem_id', categoria: 'falhas' };
+  }
+
+  if (pendencia?.__nao_encontrada) {
+    return { valida: false, motivo: 'pendencia_nao_encontrada', categoria: 'falhas' };
+  }
+
+  if (obterStatusPendencia(pendencia) !== 'Pendente') {
+    return { valida: false, motivo: 'pendencia_nao_pendente', categoria: 'ignoradas' };
+  }
+
+  const militarId = normalizarId(pendencia?.militar_id);
+  if (!militarId) {
+    return { valida: false, motivo: 'militar_id_ausente', categoria: 'falhas' };
+  }
+
+  const comportamentoSugerido = String(pendencia?.comportamento_sugerido || '').trim();
+  if (!comportamentoSugerido) {
+    return { valida: false, motivo: 'comportamento_sugerido_ausente', categoria: 'falhas' };
+  }
+
+  return { valida: true, pendenciaId, militarId, comportamentoSugerido };
+}
+
+async function validarElegibilidadeMilitar({
+  militarEntity,
+  militarId,
+  comportamentoSugerido,
+  options = {},
+}) {
+  const militar = await buscarMilitarPorId(militarEntity, militarId);
+  if (!militar) {
+    return { valida: false, motivo: 'militar_nao_encontrado', categoria: 'falhas' };
+  }
+
+  const comportamentoAtual = String(militar?.comportamento || 'Bom').trim();
+  if (comportamentoAtual === comportamentoSugerido && !options?.permitirComportamentoIgual) {
+    return {
+      valida: false,
+      militar,
+      motivo: 'comportamento_ja_igual_ao_sugerido',
+      categoria: 'ignoradas',
+    };
+  }
+
+  return { valida: true, militar, comportamentoAtual };
+}
+
+async function executarEfetivacaoMudancaComportamento({
+  militarEntity,
+  pendenciaEntity,
+  deps,
+  pendencia,
+  pendenciaId,
+  militarId,
+  militar,
+  comportamentoAtual,
+  comportamentoSugerido,
+  usuarioAtual,
+  options = {},
+}) {
+  await militarEntity.update(militarId, {
+    comportamento: comportamentoSugerido,
+  });
+
+  await deps.garantirImplantacaoHistoricoComportamento({
+    militarId,
+    comportamentoAtual,
+    origemTipo: 'Militar',
+    origemId: militarId,
+  });
+
+  const dataReferencia = options?.dataReferencia || new Date().toISOString().slice(0, 10);
+  await deps.registrarMarcoHistoricoComportamento({
+    militarId,
+    dataVigencia: dataReferencia,
+    comportamentoAnterior: comportamentoAtual,
+    comportamento: comportamentoSugerido,
+    motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
+    fundamentoLegal: pendencia?.fundamento_legal || '',
+    origemTipo: 'PendenciaComportamento',
+    origemId: pendenciaId,
+    observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
+  });
+
+  await pendenciaEntity.update(pendenciaId, {
+    status_pendencia: 'Aplicada',
+    data_confirmacao: new Date().toISOString().slice(0, 10),
+    confirmado_por: String(usuarioAtual?.email || usuarioAtual?.login || '').trim() || null,
+  });
+
+  return { exito: true };
+}
+
 export async function aplicarPendenciasComportamentoEmLote({
   pendencias = [],
   usuarioAtual = null,
@@ -139,78 +236,47 @@ export async function aplicarPendenciasComportamentoEmLote({
 
   const processarPendencia = async (pendencia) => {
     try {
-      const pendenciaId = normalizarId(pendencia?.id);
-      if (!pendenciaId) {
-        resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'pendencia_sem_id' }));
-        return;
-      }
-
-      if (pendencia?.__nao_encontrada) {
-        resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'pendencia_nao_encontrada' }));
-        return;
-      }
-
-      if (obterStatusPendencia(pendencia) !== 'Pendente') {
-        resultado.ignoradas.push(montarItemRelatorio({ pendencia, motivo: 'pendencia_nao_pendente' }));
-        return;
-      }
-
-      const militarId = normalizarId(pendencia?.militar_id);
-      if (!militarId) {
-        resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'militar_id_ausente' }));
-        return;
-      }
-
-      const comportamentoSugerido = String(pendencia?.comportamento_sugerido || '').trim();
-      if (!comportamentoSugerido) {
-        resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'comportamento_sugerido_ausente' }));
-        return;
-      }
-
-      const militar = await buscarMilitarPorId(militarEntity, militarId);
-      if (!militar) {
-        resultado.falhas.push(montarItemRelatorio({ pendencia, motivo: 'militar_nao_encontrado' }));
-        return;
-      }
-
-      const comportamentoAtual = String(militar?.comportamento || 'Bom').trim();
-      if (comportamentoAtual === comportamentoSugerido && !options?.permitirComportamentoIgual) {
-        resultado.ignoradas.push(montarItemRelatorio({
+      const elegibilidadePendencia = validarElegibilidadePendencia(pendencia);
+      if (!elegibilidadePendencia.valida) {
+        resultado[elegibilidadePendencia.categoria].push(montarItemRelatorio({
           pendencia,
-          militar,
-          motivo: 'comportamento_ja_igual_ao_sugerido',
+          motivo: elegibilidadePendencia.motivo,
         }));
         return;
       }
 
-      await militarEntity.update(militarId, {
-        comportamento: comportamentoSugerido,
+      const { pendenciaId, militarId, comportamentoSugerido } = elegibilidadePendencia;
+
+      const elegibilidadeMilitar = await validarElegibilidadeMilitar({
+        militarEntity,
+        militarId,
+        comportamentoSugerido,
+        options,
       });
 
-      await deps.garantirImplantacaoHistoricoComportamento({
+      if (!elegibilidadeMilitar.valida) {
+        resultado[elegibilidadeMilitar.categoria].push(montarItemRelatorio({
+          pendencia,
+          militar: elegibilidadeMilitar.militar,
+          motivo: elegibilidadeMilitar.motivo,
+        }));
+        return;
+      }
+
+      const { militar, comportamentoAtual } = elegibilidadeMilitar;
+
+      await executarEfetivacaoMudancaComportamento({
+        militarEntity,
+        pendenciaEntity,
+        deps,
+        pendencia,
+        pendenciaId,
         militarId,
+        militar,
         comportamentoAtual,
-        origemTipo: 'Militar',
-        origemId: militarId,
-      });
-
-      const dataReferencia = options?.dataReferencia || new Date().toISOString().slice(0, 10);
-      await deps.registrarMarcoHistoricoComportamento({
-        militarId,
-        dataVigencia: dataReferencia,
-        comportamentoAnterior: comportamentoAtual,
-        comportamento: comportamentoSugerido,
-        motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
-        fundamentoLegal: pendencia?.fundamento_legal || '',
-        origemTipo: 'PendenciaComportamento',
-        origemId: pendenciaId,
-        observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
-      });
-
-      await pendenciaEntity.update(pendenciaId, {
-        status_pendencia: 'Aplicada',
-        data_confirmacao: new Date().toISOString().slice(0, 10),
-        confirmado_por: String(usuarioAtual?.email || usuarioAtual?.login || '').trim() || null,
+        comportamentoSugerido,
+        usuarioAtual,
+        options,
       });
 
       resultado.aplicadas.push(montarItemRelatorio({ pendencia, militar, motivo: 'aplicada' }));
