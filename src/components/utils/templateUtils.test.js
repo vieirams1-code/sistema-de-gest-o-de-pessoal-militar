@@ -8,7 +8,7 @@ import {
   buildVarsLivro,
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
-} from './templateUtils.jsx';
+} from './templateUtils.js';
 
 test('buildVarsLivro expõe quadro_nome sem quebrar posto_nome legado', () => {
   const vars = buildVarsLivro({

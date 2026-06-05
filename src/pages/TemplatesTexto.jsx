@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle, Copy } from 'lucide-react';
-import { aplicarTemplate, buildPreviewTemplateVars, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildPreviewTemplateVars, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils.js';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO } from '@/components/atestado/atestadoTemplateVars';
 import AccessDenied from '@/components/auth/AccessDenied';
