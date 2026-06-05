@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import {
   Users, Award, Shield, AlertTriangle, Calendar, Star,
   FileText, BookOpen, ClipboardList, Gavel, Activity,
-  ChevronRight, Clock, CheckCircle, Stethoscope, CalendarClock
+  ChevronRight, Clock, CheckCircle, Stethoscope, CalendarClock,
+  Cake, Zap, Trophy, TrendingUp
 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
+import { calcularTempoServico, parseDateSafe } from '@/services/tempoServicoService';
 import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
 import AuditoriaComportamentoAlert from '@/components/dashboard/AuditoriaComportamentoAlert';
 import { ptBR } from 'date-fns/locale';
@@ -369,10 +371,39 @@ export default function Home() {
   }, [publicacoesExOfficio, registrosLivro]);
   const pendenciasComportamentoValidas = filtrarPendenciasComportamentoDashboard(pendenciasComportamento, militares);
   const inconsistenciasCadastrais = listarInconsistenciasCadastraisDashboard(militares);
-  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamentoValidas.length + inconsistenciasCadastrais.length;
-  const afastamentosParciais = React.useMemo(() => {
-    return buildAfastamentosVigentes({ atestados, registrosLivro }).length;
-  }, [atestados, registrosLivro]);
+
+  const aniversariantes = React.useMemo(() => {
+    const hojeMesDia = format(hoje, 'MM-dd');
+    return militares.filter((m) => {
+      const dataNasc = parseDateSafe(m.data_nascimento);
+      return dataNasc && format(dataNasc, 'MM-dd') === hojeMesDia;
+    });
+  }, [militares, hoje]);
+
+  const marcosCarreira = React.useMemo(() => {
+    const anosDesejados = [10, 20, 25, 30];
+    return militares.map(militar => {
+      const tempo = calcularTempoServico(militar, hoje);
+      if (tempo.valido && anosDesejados.includes(tempo.anos_completos)) {
+        return { militar, anos: tempo.anos_completos };
+      }
+      return null;
+    }).filter(Boolean);
+  }, [militares, hoje]);
+
+  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamentoValidas.length + inconsistenciasCadastrais.length + marcosCarreira.length;
+
+  const afastamentosVigentesFull = React.useMemo(() => {
+    return buildAfastamentosVigentes({ atestados, ferias, registrosLivro });
+  }, [atestados, ferias, registrosLivro]);
+
+  const prontidao = React.useMemo(() => {
+    const total = militares.length || 0;
+    const afastados = afastamentosVigentesFull.length || 0;
+    const disponiveis = Math.max(0, total - afastados);
+    const percentual = total > 0 ? Math.round((disponiveis / total) * 100) : 100;
+    return { disponiveis, total, percentual, afastados };
+  }, [militares.length, afastamentosVigentesFull.length]);
 
   const registrosRecentes = registrosLivro.slice(0, 5);
   const jisosAgendadas = React.useMemo(() => {
@@ -412,51 +443,143 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={Users} value={militares.length} label="Militares Ativos"
-            color="bg-[#1e3a5f]/10 text-[#1e3a5f]"
-            onClick={() => navigate(createPageUrl('Militares'))}
-          />
-          <StatCard
-            icon={Stethoscope} value={atestadosAtivos.length} label="Atestados Ativos"
-            color="bg-blue-100 text-blue-600"
-            onClick={() => navigate(createPageUrl('Atestados'))}
-          />
-          <StatCard
-            icon={Gavel} value={punicoesAtivas.length} label="Punições Ativas"
-            color="bg-red-100 text-red-600"
-            onClick={() => navigate(createPageUrl('Punicoes'))}
-          />
-          <StatCard
-            icon={Shield} value={armamentos.length} label="Armamentos"
-            color="bg-slate-100 text-slate-600"
-            onClick={() => navigate(createPageUrl('Armamentos'))}
-          />
-        </div>
+        {/* Visão de Comando */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="md:col-span-2 bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 mb-6">
+              <Zap className="w-5 h-5 text-amber-500" />
+              <h2 className="font-bold text-slate-800 text-lg">Visão de Comando</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="relative w-20 h-20 flex items-center justify-center mb-2">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle
+                      cx="40" cy="40" r="36"
+                      stroke="currentColor" strokeWidth="8" fill="transparent"
+                      className="text-slate-200"
+                    />
+                    <circle
+                      cx="40" cy="40" r="36"
+                      stroke="currentColor" strokeWidth="8" fill="transparent"
+                      strokeDasharray={226}
+                      strokeDashoffset={226 - (226 * prontidao.percentual) / 100}
+                      className={prontidao.percentual > 85 ? 'text-green-500' : prontidao.percentual > 70 ? 'text-amber-500' : 'text-red-500'}
+                    />
+                  </svg>
+                  <span className="absolute text-lg font-bold text-slate-800">{prontidao.percentual}%</span>
+                </div>
+                <p className="text-sm font-semibold text-slate-700">Prontidão</p>
+                <p className="text-xs text-slate-500 text-center mt-1">
+                  {prontidao.disponiveis} de {prontidao.total} militares disponíveis
+                </p>
+              </div>
 
-        <div className="mb-8">
-          {afastamentosPanelOpen ? (
-            <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
-          ) : (
-            <AfastamentosVigentesResumoCard
-              totalParcial={afastamentosParciais}
-              onOpen={() => setAfastamentosPanelOpen(true)}
-            />
-          )}
-        </div>
+              <div className="flex flex-col gap-3">
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                  <div className="flex items-center gap-2 text-blue-700 mb-1">
+                    <Users className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Efetivo Total</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-800">{militares.length}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-orange-50 border border-orange-100">
+                  <div className="flex items-center gap-2 text-orange-700 mb-1">
+                    <CalendarClock className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Afastados</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-800">{prontidao.afastados}</p>
+                </div>
+              </div>
 
-        {isAdmin && (
-          <div className="mb-8">
-            <AuditoriaComportamentoAlert isAdmin={isAdmin} />
+              <div className="flex flex-col gap-3">
+                <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-100 flex-1">
+                  <div className="flex items-center gap-2 text-indigo-700 mb-2">
+                    <Cake className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Aniversariantes</span>
+                  </div>
+                  {aniversariantes.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">Nenhum hoje</p>
+                  ) : (
+                    <div className="space-y-2 max-h-24 overflow-y-auto">
+                      {aniversariantes.map(m => (
+                        <div key={m.id} className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                          {m.nome_guerra || m.nome_completo}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+
+          <div className="bg-[#1e3a5f] rounded-xl p-6 shadow-sm text-white">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-amber-400" />
+              <h2 className="font-bold text-lg">Resumo Estratégico</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm font-medium">Marcos de Carreira</span>
+                </div>
+                <Badge className="bg-amber-400/20 text-amber-400 border-none">{marcosCarreira.length}</Badge>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-blue-300" />
+                  <span className="text-sm font-medium">Armamentos</span>
+                </div>
+                <span className="text-sm font-bold">{armamentos.length}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <span className="text-sm font-medium">Urgências</span>
+                </div>
+                <span className="text-sm font-bold">{totalAlertas}</span>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full border-white/20 hover:bg-white/10 text-white mt-2"
+                onClick={() => navigate(createPageUrl('VisualizacaoGestorEfetivo'))}
+              >
+                Relatórios Completos
+              </Button>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
           {/* Alertas Consolidados */}
           <div className="lg:col-span-2 space-y-4">
+
+            {/* Marcos de Carreira */}
+            {marcosCarreira.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-500" />
+                    <h2 className="font-semibold text-slate-800">Marcos de Carreira</h2>
+                    <Badge className="bg-amber-100 text-amber-700">{marcosCarreira.length}</Badge>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {marcosCarreira.map(({ militar, anos }, idx) => (
+                    <AlertItem
+                      key={`${militar.id}-${anos}-${idx}`}
+                      nivel="aviso"
+                      titulo={`${militar.posto_graduacao ? militar.posto_graduacao + ' ' : ''}${militar.nome_completo}`}
+                      subtitulo={`Completando ${anos} anos de serviço efetivo.`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Férias vencendo */}
             {periodosAlerta.length > 0 && (
@@ -666,6 +789,47 @@ export default function Home() {
             </Button>
           </div>
         </div>
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard
+            icon={Users} value={militares.length} label="Militares Ativos"
+            color="bg-[#1e3a5f]/10 text-[#1e3a5f]"
+            onClick={() => navigate(createPageUrl('Militares'))}
+          />
+          <StatCard
+            icon={Stethoscope} value={atestadosAtivos.length} label="Atestados Ativos"
+            color="bg-blue-100 text-blue-600"
+            onClick={() => navigate(createPageUrl('Atestados'))}
+          />
+          <StatCard
+            icon={Gavel} value={punicoesAtivas.length} label="Punições Ativas"
+            color="bg-red-100 text-red-600"
+            onClick={() => navigate(createPageUrl('Punicoes'))}
+          />
+          <StatCard
+            icon={Shield} value={armamentos.length} label="Armamentos"
+            color="bg-slate-100 text-slate-600"
+            onClick={() => navigate(createPageUrl('Armamentos'))}
+          />
+        </div>
+
+        <div className="mb-8">
+          {afastamentosPanelOpen ? (
+            <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
+          ) : (
+            <AfastamentosVigentesResumoCard
+              totalParcial={prontidao.afastados}
+              onOpen={() => setAfastamentosPanelOpen(true)}
+            />
+          )}
+        </div>
+
+        {isAdmin && (
+          <div className="mb-8">
+            <AuditoriaComportamentoAlert isAdmin={isAdmin} />
+          </div>
+        )}
 
         {/* Atalhos Rápidos */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
