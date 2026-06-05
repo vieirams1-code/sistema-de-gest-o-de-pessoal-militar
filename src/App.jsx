@@ -21,6 +21,7 @@ const adminOnlyPages = new Set([
   'SolicitacoesAtualizacao',
   // Lote 1D-D: Auditoria de Comportamento — admin only por requisito do lote.
   'AuditoriaComportamento',
+  'AuditoriaRH',
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
@@ -60,6 +61,7 @@ const moduleGuardByPage = {
   EstruturaOrganizacional: { moduleKey: 'estrutura_organizacional', moduleName: 'Estrutura Organizacional' },
   CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   CadastrarMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  AuditoriaRH: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   VerMilitar: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   FichaMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
