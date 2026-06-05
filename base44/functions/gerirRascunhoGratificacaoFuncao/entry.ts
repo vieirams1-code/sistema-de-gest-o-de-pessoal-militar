@@ -106,8 +106,6 @@ function sanitizePayload(input: any = {}, operacao: string) {
 
   if (operacao === 'criar_rascunho' || operacao === 'atualizar_rascunho' || operacao === 'criar_nomeacao_ativa') {
     if (!out.militar_id) throw withStatus('militar_id é obrigatório.', 400);
-    if (!out.tipo_gratificacao_funcao_id) throw withStatus('tipo_gratificacao_funcao_id é obrigatório.', 400);
-    if (!out.cota_gratificacao_funcao_id) throw withStatus('cota_gratificacao_funcao_id é obrigatório.', 400);
     if (!out.funcao_gratificada) throw withStatus('funcao_gratificada é obrigatória.', 400);
 
     if (operacao === 'criar_nomeacao_ativa') {
@@ -129,30 +127,37 @@ async function buscarUm(base44: ReturnType<typeof createClientFromRequest>, enti
 async function validarReferencias(base44: ReturnType<typeof createClientFromRequest>, data: Record<string, any>) {
   const [militar, tipo, cota] = await Promise.all([
     buscarUm(base44, 'Militar', data.militar_id, CAMPOS_MILITAR_SNAPSHOT),
-    buscarUm(base44, 'TipoGratificacaoFuncao', data.tipo_gratificacao_funcao_id),
-    buscarUm(base44, 'CotaGratificacaoFuncao', data.cota_gratificacao_funcao_id),
+    data.tipo_gratificacao_funcao_id ? buscarUm(base44, 'TipoGratificacaoFuncao', data.tipo_gratificacao_funcao_id) : Promise.resolve(null),
+    data.cota_gratificacao_funcao_id ? buscarUm(base44, 'CotaGratificacaoFuncao', data.cota_gratificacao_funcao_id) : Promise.resolve(null),
   ]);
 
-  if (tipo.ativo === false) throw withStatus('Tipo inativo.', 400);
-  if (normalizeTipo(cota.status) !== STATUS_COTA_ATIVA) throw withStatus('Cota inativa.', 400);
-  if (String(cota.tipo_gratificacao_funcao_id || '') !== data.tipo_gratificacao_funcao_id) throw withStatus('cota_gratificacao_funcao_id deve pertencer ao tipo_gratificacao_funcao_id informado.', 400);
+  if (tipo && tipo.ativo === false) throw withStatus('Tipo inativo.', 400);
+  if (cota) {
+    if (normalizeTipo(cota.status) !== STATUS_COTA_ATIVA) throw withStatus('Cota inativa.', 400);
+    if (data.tipo_gratificacao_funcao_id && String(cota.tipo_gratificacao_funcao_id || '') !== data.tipo_gratificacao_funcao_id) {
+      throw withStatus('cota_gratificacao_funcao_id deve pertencer ao tipo_gratificacao_funcao_id informado.', 400);
+    }
+  }
 
 
   const gratificacoesDoMilitar = await fetchWithRetry(
-    () => base44.asServiceRole.entities.GratificacaoFuncao.filter({ militar_id: data.militar_id, tipo_gratificacao_funcao_id: data.tipo_gratificacao_funcao_id, cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id, funcao_gratificada: data.funcao_gratificada }, undefined, 100, 0, ['id', 'status']),
+    () => base44.asServiceRole.entities.GratificacaoFuncao.filter({ militar_id: data.militar_id, funcao_gratificada: data.funcao_gratificada }, undefined, 100, 0, ['id', 'status']),
     `GratificacaoFuncao.militar:${data.militar_id}`,
   );
   const ativasDoMilitar = (gratificacoesDoMilitar || []).filter((item: any) => normalizeTipo(item?.status) === STATUS_GRATIFICACAO_ATIVA && item.id !== data.id);
   if (ativasDoMilitar.length > 0) throw withStatus('Já existe nomeação ativa para este militar.', 400);
 
-  const gratificacoesDaCota = await fetchWithRetry(
-
-    () => base44.asServiceRole.entities.GratificacaoFuncao.filter({ cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id }, undefined, 1000, 0, ['id', 'status']),
-    `GratificacaoFuncao.cota:${data.cota_gratificacao_funcao_id}`,
-  );
-  const ocupadas = (gratificacoesDaCota || []).filter((item: any) => normalizeTipo(item?.status) === STATUS_GRATIFICACAO_ATIVA).length;
-  const disponiveis = Math.max(toNumber(cota.quantidade_autorizada) - ocupadas, 0);
-  if (!(disponiveis > 0)) throw withStatus('Sem disponibilidade de cota.', 400);
+  let ocupadas = 0;
+  let disponiveis = 0;
+  if (cota) {
+    const gratificacoesDaCota = await fetchWithRetry(
+      () => base44.asServiceRole.entities.GratificacaoFuncao.filter({ cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id }, undefined, 1000, 0, ['id', 'status']),
+      `GratificacaoFuncao.cota:${data.cota_gratificacao_funcao_id}`,
+    );
+    ocupadas = (gratificacoesDaCota || []).filter((item: any) => normalizeTipo(item?.status) === STATUS_GRATIFICACAO_ATIVA).length;
+    disponiveis = Math.max(toNumber(cota.quantidade_autorizada) - ocupadas, 0);
+    if (!(disponiveis > 0)) throw withStatus('Sem disponibilidade de cota.', 400);
+  }
 
   return { militar, tipo, cota, ocupadas, disponiveis };
 }
@@ -176,16 +181,16 @@ function montarRegistroGratificacao(data: Record<string, any>, refs: any, authUs
     posto_graduacao_snapshot: militar.posto_graduacao || '',
     quadro_snapshot: militar.quadro || '',
     matricula_snapshot: militar.matricula || '',
-    unidade_id: cota.unidade_id || '',
-    unidade_nome_snapshot: cota.unidade_nome_snapshot || unidadeMilitar,
-    setor_id: cota.setor_id || '',
-    setor_nome_snapshot: cota.setor_nome_snapshot || setorMilitar,
-    tipo_gratificacao_funcao_id: data.tipo_gratificacao_funcao_id,
-    cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id,
+    unidade_id: cota?.unidade_id || '',
+    unidade_nome_snapshot: cota?.unidade_nome_snapshot || unidadeMilitar,
+    setor_id: cota?.setor_id || '',
+    setor_nome_snapshot: cota?.setor_nome_snapshot || setorMilitar,
+    tipo_gratificacao_funcao_id: data.tipo_gratificacao_funcao_id || null,
+    cota_gratificacao_funcao_id: data.cota_gratificacao_funcao_id || null,
     funcao_gratificada: data.funcao_gratificada,
-    codigo_funcao: cota.codigo_funcao || '',
-    nivel_gratificacao: cota.nivel_gratificacao || tipo.nivel || '',
-    tipo_gratificacao: cota.tipo_gratificacao || tipo.nome || tipo.sigla || tipo.codigo || '',
+    codigo_funcao: cota?.codigo_funcao || '',
+    nivel_gratificacao: cota?.nivel_gratificacao || tipo?.nivel || '',
+    tipo_gratificacao: cota?.tipo_gratificacao || tipo?.nome || tipo?.sigla || tipo?.codigo || '',
     status: status,
     numero_processo: data.numero_processo,
     observacoes: data.observacoes,

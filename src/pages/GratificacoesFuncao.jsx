@@ -182,7 +182,7 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
             {isEditing ? 'Atualize os dados básicos deste rascunho antes de prosseguir com o fluxo de publicação.' : 'Registre uma nova gratificação diretamente como ativa. Os dados de publicação e efeitos são obrigatórios.'}
             {!isEditing && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                <span className="font-bold">Aviso:</span> Ao salvar, a gratificação será registrada como ativa e ocupará uma cota.
+                <span className="font-bold">Aviso:</span> Ao salvar, a gratificação será registrada como ativa.
               </div>
             )}
           </DialogDescription>
@@ -191,15 +191,15 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
           <div className="md:col-span-2">
             <MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} />
           </div>
-          <Field label="Tipo ativo *">
+          <Field label="Tipo ativo">
             <Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}>
               <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
               <SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Cota ativa disponível *">
-            <Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota} disabled={!form.tipo_gratificacao_funcao_id}>
-              <SelectTrigger><SelectValue placeholder={form.tipo_gratificacao_funcao_id ? 'Selecione a cota' : 'Selecione o tipo primeiro'} /></SelectTrigger>
+          <Field label="Cota ativa disponível">
+            <Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota}>
+              <SelectTrigger><SelectValue placeholder="Selecione a cota" /></SelectTrigger>
               <SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
@@ -339,7 +339,7 @@ function RegistrarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
           <DialogDescription>
             Informe os dados da publicação da nomeação em DOEMS.
             <div className="mt-2 rounded bg-amber-50 p-2 text-amber-800 border border-amber-200">
-              <span className="font-semibold">Aviso:</span> Esta ação tornará a gratificação ativa e ocupará uma cota.
+              <span className="font-semibold">Aviso:</span> Esta ação tornará a gratificação ativa.
             </div>
           </DialogDescription>
         </DialogHeader>
