@@ -81,37 +81,24 @@ export function getTipoGratificacaoLabel(item = {}, tiposById = new Map()) {
   return item.tipo_gratificacao || tiposById.get(String(item.tipo_gratificacao_funcao_id || '')) || '—';
 }
 
-export function calcularResumoGratificacoesFuncao(gratificacoes = [], cotas = []) {
-  const cotasAutorizadas = (cotas || [])
-    .filter((cota) => normalizeStatus(cota?.status || COTA_STATUS.ATIVA) === COTA_STATUS.ATIVA)
-    .reduce((total, cota) => total + toNumber(cota?.quantidade_autorizada), 0);
-
-  const cotasOcupadas = (gratificacoes || [])
+export function calcularResumoGratificacoesFuncao(gratificacoes = []) {
+  const ativas = (gratificacoes || [])
     .filter((item) => normalizeStatus(item?.status) === GRATIFICACAO_STATUS.NOMEADO_ATIVO)
     .length;
 
-  const solicitacoesPendentes = (gratificacoes || [])
-    .filter((item) => [
-      GRATIFICACAO_STATUS.SOLICITADO_DP,
-      GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_NOMEACAO,
-    ].includes(normalizeStatus(item?.status)))
+  const finalizadas = (gratificacoes || [])
+    .filter((item) => normalizeStatus(item?.status) === GRATIFICACAO_STATUS.DISPENSADO)
     .length;
 
-  const dispensasPendentes = (gratificacoes || [])
-    .filter((item) => [
-      GRATIFICACAO_STATUS.DISPENSA_SOLICITADA,
-      GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_DISPENSA,
-    ].includes(normalizeStatus(item?.status)))
+  const canceladas = (gratificacoes || [])
+    .filter((item) => normalizeStatus(item?.status) === GRATIFICACAO_STATUS.CANCELADO)
     .length;
 
   return {
-    cotasAutorizadas,
-    cotasOcupadas,
-    cotasDisponiveis: Math.max(cotasAutorizadas - cotasOcupadas, 0),
-    cotasExcedentes: Math.max(cotasOcupadas - cotasAutorizadas, 0),
-    solicitacoesPendentes,
-    nomeacoesAtivas: cotasOcupadas,
-    dispensasPendentes,
+    ativas,
+    finalizadas,
+    canceladas,
+    total: (gratificacoes || []).length,
   };
 }
 

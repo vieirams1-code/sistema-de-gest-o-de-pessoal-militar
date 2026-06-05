@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Award, BadgeCheck, BriefcaseBusiness, Clock3, Edit, FileText, History, Loader2, Plus, Search, Settings, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, Award, Edit, History, Loader2, Plus, Search, Settings, ShieldAlert, Users } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
@@ -52,12 +52,10 @@ const STATUS_BADGE = {
 
 const COTA_STATUS_LABELS = { ativa: 'Ativa', suspensa: 'Suspensa', encerrada: 'Encerrada' };
 const CARD_CONFIG = [
-  { key: 'cotasAutorizadas', title: 'Cotas autorizadas', icon: BriefcaseBusiness, tone: 'bg-blue-500' },
-  { key: 'cotasOcupadas', title: 'Cotas ocupadas', icon: Users, tone: 'bg-emerald-500' },
-  { key: 'cotasDisponiveis', title: 'Cotas disponíveis', icon: BadgeCheck, tone: 'bg-cyan-500' },
-  { key: 'solicitacoesPendentes', title: 'Solicitações pendentes', icon: Clock3, tone: 'bg-amber-500' },
-  { key: 'nomeacoesAtivas', title: 'Nomeações ativas', icon: Award, tone: 'bg-green-600' },
-  { key: 'dispensasPendentes', title: 'Dispensas pendentes', icon: FileText, tone: 'bg-purple-500' },
+  { key: 'ativas', title: 'Gratificações Ativas', icon: Award, tone: 'bg-emerald-600' },
+  { key: 'finalizadas', title: 'Finalizadas', icon: History, tone: 'bg-blue-500' },
+  { key: 'canceladas', title: 'Canceladas', icon: ShieldAlert, tone: 'bg-red-500' },
+  { key: 'total', title: 'Total', icon: Users, tone: 'bg-slate-500' },
 ];
 const TAB_KEYS = [GRATIFICACAO_TABS.ATIVAS, GRATIFICACAO_TABS.HISTORICO, GRATIFICACAO_TABS.CONFIGURACOES];
 const ADMIN_PERMISSION_SENTINELS = new Set(['ALL', 'all', '*']);
@@ -156,23 +154,13 @@ const GRATIFICACAO_FORM_DEFAULT = {
   data_publicacao_nomeacao: '', doems_nomeacao_numero: '', doems_nomeacao_edicao: '', doems_nomeacao_link: '', ato_nomeacao_numero: '', data_inicio_efeitos: '',
 };
 
-function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, saving, onSubmit }) {
+function GratificacaoModal({ open, onOpenChange, initialData, tipos, saving, onSubmit }) {
   const isEditing = Boolean(initialData?.id);
   const [form, setForm] = useState({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}) });
   React.useEffect(() => { if (open) setForm({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}), status: isEditing ? (initialData?.status || GRATIFICACAO_STATUS.RASCUNHO) : GRATIFICACAO_STATUS.NOMEADO_ATIVO }); }, [open, initialData, isEditing]);
   const tiposAtivos = useMemo(() => (tipos || []).filter((tipo) => tipo.ativo !== false), [tipos]);
-  const cotasDisponiveis = useMemo(() => (cotas || []).filter((cota) => cota.status === COTA_STATUS.ATIVA && Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0) > 0 && (!form.tipo_gratificacao_funcao_id || String(cota.tipo_gratificacao_funcao_id || '') === String(form.tipo_gratificacao_funcao_id))), [cotas, form.tipo_gratificacao_funcao_id]);
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
-  const selectTipo = (value) => setForm((current) => ({ ...current, tipo_gratificacao_funcao_id: value, cota_gratificacao_funcao_id: '', funcao_gratificada: '' }));
-  const selectCota = (value) => {
-    const cota = (cotas || []).find((item) => String(item.id) === String(value));
-    setForm((current) => ({
-      ...current,
-      cota_gratificacao_funcao_id: value,
-      tipo_gratificacao_funcao_id: cota?.tipo_gratificacao_funcao_id || current.tipo_gratificacao_funcao_id,
-      funcao_gratificada: cota?.funcao_gratificada || current.funcao_gratificada,
-    }));
-  };
+  const selectTipo = (value) => setForm((current) => ({ ...current, tipo_gratificacao_funcao_id: value }));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -181,7 +169,7 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
           <DialogDescription>
             {isEditing ? 'Atualize os dados básicos deste rascunho antes de prosseguir com o fluxo de publicação.' : 'Registre uma nova gratificação diretamente como ativa. Os dados de publicação e efeitos são obrigatórios.'}
             {!isEditing && (
-              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
                 <span className="font-bold">Aviso:</span> Ao salvar, a gratificação será registrada como ativa.
               </div>
             )}
@@ -191,19 +179,13 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
           <div className="md:col-span-2">
             <MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} />
           </div>
-          <Field label="Tipo ativo">
+          <Field label="Tipo (opcional)">
             <Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}>
               <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
               <SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Cota ativa disponível">
-            <Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota}>
-              <SelectTrigger><SelectValue placeholder="Selecione a cota" /></SelectTrigger>
-              <SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-          <Field label="Função gratificada *" className="md:col-span-2">
+          <Field label="Função gratificada *" className="md:col-span-1">
             <Input value={form.funcao_gratificada} onChange={(e) => update('funcao_gratificada', e.target.value)} />
           </Field>
           {!isEditing && (
@@ -403,6 +385,7 @@ function ConfirmarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
 }
 
 function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit }) {
+  const { toast } = useToast();
   const [form, setForm] = useState({
     data_fim_efeitos: '',
     motivo_dispensa: '',
@@ -432,6 +415,14 @@ function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit
   }, [open, item]);
 
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleFinalizar = () => {
+    if (!form.data_fim_efeitos || !form.motivo_dispensa) {
+      toast({ title: 'Campos obrigatórios', description: 'Por favor, informe a data de fim dos efeitos e o motivo da dispensa.', variant: 'destructive' });
+      return;
+    }
+    onSubmit({ id: item.id, ...form });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -478,7 +469,7 @@ function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit
 
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button type="button" onClick={() => onSubmit({ id: item.id, ...form })} disabled={saving}>
+          <Button type="button" onClick={handleFinalizar} disabled={saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Finalizar Gratificação
           </Button>
@@ -539,7 +530,7 @@ export default function GratificacoesFuncao() {
         toast({ title: 'Status Atualizado', description: 'Gratificação marcada como aguardando publicação.' });
       } else if (operacao === 'criar_nomeacao_ativa') {
         setAba(GRATIFICACAO_TABS.ATIVAS);
-        toast({ title: 'Gratificação Ativada', description: 'O registro foi criado diretamente como ativo e ocupou uma cota.' });
+        toast({ title: 'Gratificação Ativada', description: 'O registro foi criado diretamente como ativo.' });
       } else if (operacao === 'finalizar_gratificacao') {
         setFinalizarModal({ open: false, data: null });
         setAba(GRATIFICACAO_TABS.HISTORICO);
@@ -561,7 +552,7 @@ export default function GratificacoesFuncao() {
   const cotasBackend = query.data?.cotas || [];
   const cotas = canViewAdministrativeQuotas ? cotasBackend : [];
   const tipos = query.data?.tipos || [];
-  const resumo = query.data?.counters || {};
+  const resumo = useMemo(() => calcularResumoGratificacoesFuncao(query.data?.gratificacoes || []), [query.data?.gratificacoes]);
   const opcoes = useMemo(() => listarOpcoesGratificacao(gratificacoes, cotas, tipos), [gratificacoes, cotas, tipos]);
   const filtros = useMemo(() => ({ busca, status, tipo, funcao, unidade }), [busca, status, tipo, funcao, unidade]);
   const gratificacoesFiltradas = useMemo(() => aplicarFiltrosGratificacoesFuncao(filtrarGratificacoesPorAba(gratificacoes, aba), filtros, tipos), [gratificacoes, aba, filtros, tipos]);
@@ -617,19 +608,14 @@ export default function GratificacoesFuncao() {
         <div className="flex flex-col gap-6">
           <section className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             {canManageCadastros && <Button type="button" variant="outline" onClick={() => setTipoModal({ open: true, data: null })}><Plus className="h-4 w-4" /> Novo Tipo</Button>}
-            {canManageCadastros && <Button type="button" variant="outline" onClick={() => setCotaModal({ open: true, data: null })}><Plus className="h-4 w-4" /> Nova Cota</Button>}
           </section>
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-wider text-slate-500"><BriefcaseBusiness className="h-4 w-4" /> Cotas de Gratificação</div>
-            <CotasTable cotas={cotasFiltradas} canManage={canManageCadastros} onEdit={(cotaItem) => setCotaModal({ open: true, data: cotaItem })} />
-          </div>
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-wider text-slate-500"><Settings className="h-4 w-4" /> Tipos de Gratificação</div>
             <TiposTable tipos={tipos} canManage={canManageCadastros} onEdit={(tipoItem) => setTipoModal({ open: true, data: tipoItem })} />
           </div>
         </div>
       )}
-      <GratificacaoModal open={gratificacaoModal.open} initialData={gratificacaoModal.data} tipos={tipos} cotas={cotas} saving={rascunhoMutation.isPending} onOpenChange={(open) => setGratificacaoModal({ open, data: open ? gratificacaoModal.data : null })} onSubmit={salvarGratificacao} />
+      <GratificacaoModal open={gratificacaoModal.open} initialData={gratificacaoModal.data} tipos={tipos} saving={rascunhoMutation.isPending} onOpenChange={(open) => setGratificacaoModal({ open, data: open ? gratificacaoModal.data : null })} onSubmit={salvarGratificacao} />
       <EnviarDPModal open={enviarDPModal.open} item={enviarDPModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setEnviarDPModal({ open, data: open ? enviarDPModal.data : null })} onSubmit={enviarDP} />
       <ConfirmarPublicacaoModal open={aguardandoPublicacaoModal.open} item={aguardandoPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setAguardandoPublicacaoModal({ open, data: open ? aguardandoPublicacaoModal.data : null })} onSubmit={marcarAguardandoPublicacao} />
       <RegistrarPublicacaoModal open={registrarPublicacaoModal.open} item={registrarPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setRegistrarPublicacaoModal({ open, data: open ? registrarPublicacaoModal.data : null })} onSubmit={registrarPublicacao} />
