@@ -1,91 +1,85 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  obterSexoMilitar,
+  obterGrupoHierarquicoMilitar,
+  calcularResumoEfetivo,
+  TEXTO_UNIDADE_FALLBACK,
+} from '../montarArvoreLotacaoMilitares.js';
 
-import { calcularResumoTags } from '../montarArvoreLotacaoMilitares.js';
-
-test('calcularResumoTags lida com entradas nulas ou vazias', () => {
-  assert.deepEqual(calcularResumoTags(null), []);
-  assert.deepEqual(calcularResumoTags(undefined), []);
-  assert.deepEqual(calcularResumoTags([]), []);
+test('constants are exported correctly', () => {
+  assert.equal(TEXTO_UNIDADE_FALLBACK, 'Unidade não informada');
 });
 
-test('calcularResumoTags agrupa e conta tags de múltiplos militares', () => {
-  const militares = [
-    { tags: ['Tag A', 'Tag B'] },
-    { marcadores: ['Tag A', 'Tag C'] },
-    { funcoes: ['Tag B'] },
-  ];
-
-  const resultado = calcularResumoTags(militares);
-
-  // Esperado: Tag A (2), Tag B (2), Tag C (1)
-  // Ordenação: total desc, nome asc
-  assert.equal(resultado.length, 3);
-
-  assert.equal(resultado[0].nome, 'Tag A');
-  assert.equal(resultado[0].total, 2);
-
-  assert.equal(resultado[1].nome, 'Tag B');
-  assert.equal(resultado[1].total, 2);
-
-  assert.equal(resultado[2].nome, 'Tag C');
-  assert.equal(resultado[2].total, 1);
+test('obterSexoMilitar identifies genders correctly', () => {
+  assert.equal(obterSexoMilitar({ sexo: 'M' }), 'M');
+  assert.equal(obterSexoMilitar({ genero: 'FEMININO' }), 'F');
+  assert.equal(obterSexoMilitar({ sexo_biologico: 'MASC' }), 'M');
+  assert.equal(obterSexoMilitar({ dados_pessoais: { sexo: 'MULHER' } }), 'F');
+  assert.equal(obterSexoMilitar({}), 'NI');
+  assert.equal(obterSexoMilitar(null), 'NI');
+  assert.equal(obterSexoMilitar({ sexo: '  feminino  ' }), 'F');
+  assert.equal(obterSexoMilitar({ sexo: 'HOMEM' }), 'M');
 });
 
-test('calcularResumoTags normaliza nomes de tags (acentos e caixa)', () => {
-  const militares = [
-    { tags: ['AÇÃO', 'acao'] },
-    { tags: ['Ação'] },
-  ];
+test('obterGrupoHierarquicoMilitar identifies groups correctly', () => {
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: 'CORONEL' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ graduacao: 'SUBTENENTE' }), 'praca');
+  assert.equal(obterGrupoHierarquicoMilitar({ pg: 'ST' }), 'praca');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: 'SUB TEN' }), 'praca');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: '2º TENENTE' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: 'CAPITAO' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: 'MAJOR' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: 'ASPIRANTE' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto: '3º SGT' }), 'praca');
+  assert.equal(obterGrupoHierarquicoMilitar({}), 'praca');
 
-  const resultado = calcularResumoTags(militares);
-
-  // normalizarChaveBusca deve transformar tudo em 'acao'
-  assert.equal(resultado.length, 1);
-  assert.equal(resultado[0].id, 'acao');
-  assert.equal(resultado[0].total, 2); // 2 militares têm a tag 'acao' (um deles tem duplicado internamente mas normalizarTagsMilitar deduplica)
+  // Test fallback chain
+  assert.equal(obterGrupoHierarquicoMilitar({ posto_graduacao_resolvido: 'CORONEL' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ posto_graduacao: 'CORONEL' }), 'oficial');
+  assert.equal(obterGrupoHierarquicoMilitar({ postoGraduacao: 'CORONEL' }), 'oficial');
 });
 
-test('calcularResumoTags suporta diversos formatos de fontes de tags', () => {
+test('calcularResumoEfetivo summarizes a list of military personnel', () => {
   const militares = [
-    {
-      tags: ['String Tag'],
-      marcadores: [{ nome: 'Object Tag', cor: 'blue' }],
-      funcoes: 'CSV Tag 1, CSV Tag 2',
-      metadata: { tags: { 'Boolean Tag': true } }
-    }
+    { posto: 'CORONEL', sexo: 'M' },        // oficial, homem
+    { posto: 'MAJOR', sexo: 'F' },          // oficial, mulher
+    { posto: 'SUBTENENTE', sexo: 'M' },     // praca, homem
+    { posto: '1º SGT', sexo: 'F' },          // praca, mulher
+    { posto: '3º SGT', sexo: 'OUTRO' },     // praca, NI
   ];
 
-  const resultado = calcularResumoTags(militares);
+  const resumo = calcularResumoEfetivo(militares);
 
-  const nomes = resultado.map(r => r.nome).sort();
-  assert.deepEqual(nomes, ['Boolean Tag', 'CSV Tag 1', 'CSV Tag 2', 'Object Tag', 'String Tag']);
+  assert.deepEqual(resumo, {
+    oficiais: 2,
+    pracas: 3,
+    homens: 2,
+    mulheres: 2,
+    sexoNaoInformado: 1,
+  });
 });
 
-test('calcularResumoTags ordena por total decrescente e depois por nome crescente', () => {
-  const militares = [
-    { tags: ['B', 'A', 'C'] },
-    { tags: ['B', 'A'] },
-    { tags: ['B'] },
-  ];
-
-  const resultado = calcularResumoTags(militares);
-
-  // B (3), A (2), C (1)
-  assert.equal(resultado[0].nome, 'B');
-  assert.equal(resultado[1].nome, 'A');
-  assert.equal(resultado[2].nome, 'C');
+test('calcularResumoEfetivo handles empty or null input', () => {
+  const resumoVazio = { oficiais: 0, pracas: 0, homens: 0, mulheres: 0, sexoNaoInformado: 0 };
+  assert.deepEqual(calcularResumoEfetivo([]), resumoVazio);
+  assert.deepEqual(calcularResumoEfetivo(null), resumoVazio);
+  assert.deepEqual(calcularResumoEfetivo(undefined), resumoVazio);
 });
 
-test('calcularResumoTags lida com empate no total usando ordem alfabética', () => {
+test('calcularResumoEfetivo handles mixed property names in list', () => {
   const militares = [
-    { tags: ['Z', 'B', 'A'] },
+    { pg: 'CORONEL', genero: 'MASCULINO' },
+    { graduacao: 'SD', sexo_biologico: 'FEM' },
   ];
 
-  const resultado = calcularResumoTags(militares);
+  const resumo = calcularResumoEfetivo(militares);
 
-  // Todos com total 1
-  assert.equal(resultado[0].nome, 'A');
-  assert.equal(resultado[1].nome, 'B');
-  assert.equal(resultado[2].nome, 'Z');
+  assert.deepEqual(resumo, {
+    oficiais: 1,
+    pracas: 1,
+    homens: 1,
+    mulheres: 1,
+    sexoNaoInformado: 0,
+  });
 });
