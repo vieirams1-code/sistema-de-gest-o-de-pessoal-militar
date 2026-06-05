@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig';
-import { aplicarTemplate, buildVarsLivro, resolveQuadroTemplate } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildVarsLivro, resolveQuadroTemplate } from '@/components/utils/templateUtils.js';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { getTipoFeriasOperacional, resolverTipoFeriasCanonico } from '@/components/ferias/feriasTipoResolver';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
