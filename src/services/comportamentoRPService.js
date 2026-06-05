@@ -86,51 +86,50 @@ async function obterMatriculaAtualMilitar(militar = {}) {
   return resolverMatriculaAtual(militar, Array.isArray(historicoMatriculas) ? historicoMatriculas : []);
 }
 
-export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
-  militar,
-  marco,
-  geradoPor = '',
-  dataPublicacao = new Date().toISOString().slice(0, 10),
-}) {
-  const contextoLog = {
-    historicoId: marco?.id || '',
-    militarId: militar?.id || '',
-    comportamentoAnterior: normalizarTexto(marco?.comportamento_anterior),
-    comportamentoNovo: normalizarTexto(marco?.comportamento_novo),
-  };
-  console.info('[RP_AUTO][entrada] iniciar geração automática por histórico de comportamento', contextoLog);
-
+async function validarElegibilidadeParaGeracao({ militar, marco }) {
   const camposAusentes = coletarCamposObrigatoriosAusentes({ militar, marco });
   console.info('[RP_AUTO][validacao] resultado validação de obrigatórios', {
     camposAusentes,
     possuiPendencias: camposAusentes.length > 0,
   });
+
   if (camposAusentes.length > 0) {
     return {
-      ok: false,
-      publicado: false,
-      etapa: 'validacao',
-      motivo: `Campos obrigatórios ausentes: ${camposAusentes.join(', ')}`,
-      camposAusentes,
+      exito: false,
+      payload: {
+        ok: false,
+        publicado: false,
+        etapa: 'validacao',
+        motivo: `Campos obrigatórios ausentes: ${camposAusentes.join(', ')}`,
+        camposAusentes,
+      },
     };
   }
 
   if (isMilitarMesclado(militar)) {
-    return { ok: false, publicado: false, etapa: 'validacao', motivo: 'militar_mesclado_fluxo_operacional' };
+    return {
+      exito: false,
+      payload: { ok: false, publicado: false, etapa: 'validacao', motivo: 'militar_mesclado_fluxo_operacional' },
+    };
   }
 
   if (!houveMudancaRealDeComportamento(marco)) {
     console.info('[RP_AUTO][validacao] sem mudança real de comportamento; fluxo encerrado');
-    return { ok: true, publicado: false, etapa: 'validacao', motivo: 'sem_mudanca_real' };
+    return {
+      exito: false,
+      payload: { ok: true, publicado: false, etapa: 'validacao', motivo: 'sem_mudanca_real' },
+    };
   }
 
   const tipoTemplate = escolherTipoTemplateComportamento(marco);
-  console.info('[RP_AUTO][template] tipo/template escolhido para processamento', {
-    tipoTemplate,
-  });
+  console.info('[RP_AUTO][template] tipo/template escolhido para processamento', { tipoTemplate });
+
   if (!marcoEhValidoParaGeracaoRP(marco, tipoTemplate)) {
     console.warn('[RP_AUTO][validacao] marco inválido para geração de RP', { tipoTemplate });
-    return { ok: false, publicado: false, etapa: 'validacao', motivo: 'marco_invalido_para_rp', tipoTemplate };
+    return {
+      exito: false,
+      payload: { ok: false, publicado: false, etapa: 'validacao', motivo: 'marco_invalido_para_rp', tipoTemplate },
+    };
   }
 
   const publicacaoExistente = await buscarPublicacaoExistentePorHistorico(marco.id);
@@ -140,28 +139,39 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
       historicoId: marco.id,
     });
     return {
-      ok: true,
-      publicado: false,
-      etapa: 'duplicidade',
-      motivo: 'publicacao_ja_existente',
-      publicacao: publicacaoExistente,
-      tipoTemplate,
+      exito: false,
+      payload: {
+        ok: true,
+        publicado: false,
+        etapa: 'duplicidade',
+        motivo: 'publicacao_ja_existente',
+        publicacao: publicacaoExistente,
+        tipoTemplate,
+      },
     };
   }
 
+  return { exito: true, tipoTemplate };
+}
+
+async function resolverERenderizarTemplate({ militar, marco, tipoTemplate }) {
   const templateAtivo = await obterOuSemearTemplateAtivo(tipoTemplate);
   console.info('[RP_AUTO][template] resultado da busca/semeadura de template ativo', {
     tipoTemplate,
     templateEncontrado: Boolean(templateAtivo?.template),
     templateId: templateAtivo?.id || '',
   });
+
   if (!templateAtivo?.template) {
     return {
-      ok: false,
-      publicado: false,
-      etapa: 'template',
-      motivo: 'template_ativo_nao_encontrado',
-      tipoTemplate,
+      exito: false,
+      payload: {
+        ok: false,
+        publicado: false,
+        etapa: 'template',
+        motivo: 'template_ativo_nao_encontrado',
+        tipoTemplate,
+      },
     };
   }
 
@@ -171,6 +181,7 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
     marco,
     tipoTemplate,
   });
+
   console.info('[RP_AUTO][texto] resultado da geração de texto', {
     sucesso: Boolean(renderizacao?.ok && renderizacao?.texto),
     tamanhoTexto: (renderizacao?.texto || '').length,
@@ -179,17 +190,33 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
 
   if (!renderizacao?.ok || !renderizacao?.texto) {
     return {
-      ok: false,
-      publicado: false,
-      etapa: 'texto',
-      motivo: 'falha_renderizacao_template',
-      erro: renderizacao?.erro || '',
-      tipoTemplate,
+      exito: false,
+      payload: {
+        ok: false,
+        publicado: false,
+        etapa: 'texto',
+        motivo: 'falha_renderizacao_template',
+        erro: renderizacao?.erro || '',
+        tipoTemplate,
+      },
     };
   }
 
+  return { exito: true, renderizacao, templateAtivo };
+}
+
+async function executarCriacaoPublicacao({
+  militar,
+  marco,
+  tipoTemplate,
+  renderizacao,
+  templateAtivo,
+  dataPublicacao,
+  geradoPor,
+}) {
   const matriculaAtual = await obterMatriculaAtualMilitar(militar);
   const geradoEm = new Date().toISOString();
+
   const payloadPublicacao = {
     militar_id: militar.id,
     militar_nome: militar.nome_completo || militar.nome_guerra || '',
@@ -208,14 +235,24 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
     gerado_por: geradoPor,
     gerado_em: geradoEm,
   };
+
   console.info('[RP_AUTO][create] payload de criação da publicação', payloadPublicacao);
 
-  let registroCriado;
   try {
-    registroCriado = await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
+    const registroCriado = await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
     console.info('[RP_AUTO][create] publicação criada com sucesso', {
       publicacaoId: registroCriado?.id || '',
     });
+
+    return {
+      ok: true,
+      publicado: true,
+      etapa: 'create',
+      motivo: 'publicacao_criada',
+      tipoTemplate,
+      templateId: templateAtivo.id || '',
+      publicacao: registroCriado,
+    };
   } catch (error) {
     console.error('[RP_AUTO][create] erro ao criar publicação', {
       erro: error?.message || String(error),
@@ -229,18 +266,57 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
       tipoTemplate,
     };
   }
+}
 
-  console.info('[RP_AUTO][retorno] fluxo finalizado com publicação criada', {
-    status: 'criado',
-    publicacaoId: registroCriado?.id || '',
-  });
-  return {
-    ok: true,
-    publicado: true,
-    etapa: 'create',
-    motivo: 'publicacao_criada',
-    tipoTemplate,
-    templateId: templateAtivo.id || '',
-    publicacao: registroCriado,
+export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
+  militar,
+  marco,
+  geradoPor = '',
+  dataPublicacao = new Date().toISOString().slice(0, 10),
+}) {
+  const contextoLog = {
+    historicoId: marco?.id || '',
+    militarId: militar?.id || '',
+    comportamentoAnterior: normalizarTexto(marco?.comportamento_anterior),
+    comportamentoNovo: normalizarTexto(marco?.comportamento_novo),
   };
+  console.info('[RP_AUTO][entrada] iniciar geração automática por histórico de comportamento', contextoLog);
+
+  const elegibilidade = await validarElegibilidadeParaGeracao({ militar, marco });
+  if (!elegibilidade.exito) {
+    return elegibilidade.payload;
+  }
+
+  const { tipoTemplate } = elegibilidade;
+
+  const resultadoTemplate = await resolverERenderizarTemplate({
+    militar,
+    marco,
+    tipoTemplate,
+  });
+
+  if (!resultadoTemplate.exito) {
+    return resultadoTemplate.payload;
+  }
+
+  const { renderizacao, templateAtivo } = resultadoTemplate;
+
+  const resultadoCriacao = await executarCriacaoPublicacao({
+    militar,
+    marco,
+    tipoTemplate,
+    renderizacao,
+    templateAtivo,
+    dataPublicacao,
+    geradoPor,
+  });
+
+  if (resultadoCriacao.ok) {
+    console.info('[RP_AUTO][retorno] fluxo finalizado com publicação criada', {
+      status: 'criado',
+      publicacaoId: resultadoCriacao.publicacao?.id || '',
+    });
+  }
+
+  return resultadoCriacao;
 }
