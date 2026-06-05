@@ -12,7 +12,7 @@ export function getPostoGraduacaoOficial(militar = {}) {
 export function normalizarPostoGraduacaoMilitar(militar = {}) {
   const postoGraduacao = getPostoGraduacaoOficial(militar);
   if (!postoGraduacao) return militar;
-  if (String(militar?.posto_graduacao || '').trim() === postoGraduacao) return militar;
+  if (militar?.posto_graduacao === postoGraduacao) return militar;
   return {
     ...militar,
     posto_graduacao: postoGraduacao,
