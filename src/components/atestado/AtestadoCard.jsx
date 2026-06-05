@@ -26,7 +26,7 @@ import JisoHistoricoModal from './JisoHistoricoModal';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
   aplicarTemplate,
-} from '@/components/utils/templateUtils';
+} from '@/components/utils/templateUtils.js';
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
