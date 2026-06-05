@@ -1,6 +1,6 @@
-const TEXTO_SETOR_FALLBACK = 'CMB';
-const TEXTO_SUBSETOR_FALLBACK = '1º GBM';
-const TEXTO_UNIDADE_FALLBACK = 'Unidade não informada';
+export const TEXTO_SETOR_FALLBACK = 'CMB';
+export const TEXTO_SUBSETOR_FALLBACK = '1º GBM';
+export const TEXTO_UNIDADE_FALLBACK = 'Unidade não informada';
 
 const POSTOS_OFICIAIS = new Set([
   'ASP OFICIAL',
@@ -56,7 +56,7 @@ export function obterGrupoHierarquicoMilitar(militar) {
   );
 
   // Subtenente é praça, apesar de conter o texto "tenente".
-  if (posto.includes('SUBTENENTE') || posto === 'ST' || posto === 'SUB TEN') return 'praca';
+  if (posto.includes('SUBTENENTE') || posto.includes('SUB-TENENTE') || posto === 'ST' || posto === 'SUB TEN') return 'praca';
   if (POSTOS_OFICIAIS.has(posto)) return 'oficial';
   if (posto.includes('TENENTE') || posto.includes('CAPITAO') || posto.includes('MAJOR') || posto.includes('CORONEL') || posto.includes('ASP')) return 'oficial';
   return 'praca';
