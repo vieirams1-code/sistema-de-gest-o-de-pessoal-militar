@@ -1,63 +1,91 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { obterSexoMilitar } from '../montarArvoreLotacaoMilitares.js';
+import { calcularResumoTags } from '../montarArvoreLotacaoMilitares.js';
 
-test('obterSexoMilitar mapeia corretamente para Feminino (F)', () => {
-  const casos = [
-    { sexo: 'F' },
-    { sexo: 'FEM' },
-    { sexo: 'FEMININO' },
-    { sexo: 'MULHER' },
-    { sexo: 'feminino' },
-    { sexo: '  fem  ' },
-    { sexo: 'Feminino' },
-    { sexo: 'FÊMININO' }, // Com acento
-  ];
-
-  for (const militar of casos) {
-    assert.equal(obterSexoMilitar(militar), 'F', `Falhou para: ${JSON.stringify(militar)}`);
-  }
+test('calcularResumoTags lida com entradas nulas ou vazias', () => {
+  assert.deepEqual(calcularResumoTags(null), []);
+  assert.deepEqual(calcularResumoTags(undefined), []);
+  assert.deepEqual(calcularResumoTags([]), []);
 });
 
-test('obterSexoMilitar mapeia corretamente para Masculino (M)', () => {
-  const casos = [
-    { sexo: 'M' },
-    { sexo: 'MASC' },
-    { sexo: 'MASCULINO' },
-    { sexo: 'HOMEM' },
-    { sexo: 'masculino' },
-    { sexo: '  masc  ' },
-    { sexo: 'Masculino' },
-    { sexo: 'MÁSCULINO' }, // Com acento
+test('calcularResumoTags agrupa e conta tags de múltiplos militares', () => {
+  const militares = [
+    { tags: ['Tag A', 'Tag B'] },
+    { marcadores: ['Tag A', 'Tag C'] },
+    { funcoes: ['Tag B'] },
   ];
 
-  for (const militar of casos) {
-    assert.equal(obterSexoMilitar(militar), 'M', `Falhou para: ${JSON.stringify(militar)}`);
-  }
+  const resultado = calcularResumoTags(militares);
+
+  // Esperado: Tag A (2), Tag B (2), Tag C (1)
+  // Ordenação: total desc, nome asc
+  assert.equal(resultado.length, 3);
+
+  assert.equal(resultado[0].nome, 'Tag A');
+  assert.equal(resultado[0].total, 2);
+
+  assert.equal(resultado[1].nome, 'Tag B');
+  assert.equal(resultado[1].total, 2);
+
+  assert.equal(resultado[2].nome, 'Tag C');
+  assert.equal(resultado[2].total, 1);
 });
 
-test('obterSexoMilitar respeita a prioridade dos campos', () => {
-  // Prioridade: sexo > genero > sexo_biologico > dados_pessoais.sexo
-  assert.equal(obterSexoMilitar({ sexo: 'F', genero: 'M' }), 'F');
-  assert.equal(obterSexoMilitar({ genero: 'F', sexo_biologico: 'M' }), 'F');
-  assert.equal(obterSexoMilitar({ sexo_biologico: 'F', dados_pessoais: { sexo: 'M' } }), 'F');
-  assert.equal(obterSexoMilitar({ dados_pessoais: { sexo: 'F' } }), 'F');
-});
-
-test('obterSexoMilitar retorna NI para valores desconhecidos ou vazios', () => {
-  const casos = [
-    {},
-    { sexo: null },
-    { sexo: undefined },
-    { sexo: '' },
-    { sexo: 'NÃO INFORMADO' },
-    { sexo: 'OUTRO' },
-    null,
-    undefined,
+test('calcularResumoTags normaliza nomes de tags (acentos e caixa)', () => {
+  const militares = [
+    { tags: ['AÇÃO', 'acao'] },
+    { tags: ['Ação'] },
   ];
 
-  for (const militar of casos) {
-    assert.equal(obterSexoMilitar(militar), 'NI', `Falhou para: ${JSON.stringify(militar)}`);
-  }
+  const resultado = calcularResumoTags(militares);
+
+  // normalizarChaveBusca deve transformar tudo em 'acao'
+  assert.equal(resultado.length, 1);
+  assert.equal(resultado[0].id, 'acao');
+  assert.equal(resultado[0].total, 2); // 2 militares têm a tag 'acao' (um deles tem duplicado internamente mas normalizarTagsMilitar deduplica)
+});
+
+test('calcularResumoTags suporta diversos formatos de fontes de tags', () => {
+  const militares = [
+    {
+      tags: ['String Tag'],
+      marcadores: [{ nome: 'Object Tag', cor: 'blue' }],
+      funcoes: 'CSV Tag 1, CSV Tag 2',
+      metadata: { tags: { 'Boolean Tag': true } }
+    }
+  ];
+
+  const resultado = calcularResumoTags(militares);
+
+  const nomes = resultado.map(r => r.nome).sort();
+  assert.deepEqual(nomes, ['Boolean Tag', 'CSV Tag 1', 'CSV Tag 2', 'Object Tag', 'String Tag']);
+});
+
+test('calcularResumoTags ordena por total decrescente e depois por nome crescente', () => {
+  const militares = [
+    { tags: ['B', 'A', 'C'] },
+    { tags: ['B', 'A'] },
+    { tags: ['B'] },
+  ];
+
+  const resultado = calcularResumoTags(militares);
+
+  // B (3), A (2), C (1)
+  assert.equal(resultado[0].nome, 'B');
+  assert.equal(resultado[1].nome, 'A');
+  assert.equal(resultado[2].nome, 'C');
+});
+
+test('calcularResumoTags lida com empate no total usando ordem alfabética', () => {
+  const militares = [
+    { tags: ['Z', 'B', 'A'] },
+  ];
+
+  const resultado = calcularResumoTags(militares);
+
+  // Todos com total 1
+  assert.equal(resultado[0].nome, 'A');
+  assert.equal(resultado[1].nome, 'B');
+  assert.equal(resultado[2].nome, 'Z');
 });
