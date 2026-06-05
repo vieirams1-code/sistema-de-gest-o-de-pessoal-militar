@@ -514,8 +514,8 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
-  const pendentes = useMemo(() => {
-    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+  const pendentesMap = useMemo(() => {
+    const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
       .map((registro) => ({
         ...registro,
         origem_tipo: detectarOrigemTipo(registro),
@@ -523,9 +523,15 @@ export default function ConciliacaoBoletim() {
         nota_normalizada: normalizarNota(registro.nota_para_bg),
         nota_conciliada_persistida: getNotaConciliadaPersistida(registro),
       }))
-      .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg)
-      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg);
+
+    return new Map(enriched.map((p) => [p.id, p]));
   }, [registrosLivro, publicacoesExOfficio, atestados]);
+
+  const pendentes = useMemo(() => {
+    return Array.from(pendentesMap.values())
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+  }, [pendentesMap]);
 
   const ocorrenciasNotasPendentes = useMemo(() => contarOcorrenciasNotasPendentes(pendentes), [pendentes]);
 
@@ -757,7 +763,7 @@ export default function ConciliacaoBoletim() {
   };
 
   const handleVinculoManual = async (pubId, notaId) => {
-    const pub = pendentes.find((item) => item.id === pubId);
+    const pub = pendentesMap.get(pubId);
     if (!pub) return;
 
     setErroVinculo('');
@@ -766,7 +772,7 @@ export default function ConciliacaoBoletim() {
     const estadoAnteriorRemocao = !!vinculosRemovidos[pubId];
 
     const pubsUsandoNota = mapaVinculosInvertido.get(notaId) || [];
-    const conflitoExistente = pubsUsandoNota.find(id => id !== pubId);
+    const conflitoExistente = pubsUsandoNota.find((id) => id !== pubId);
 
     if (!notaId) {
       setVinculos((prev) => ({ ...prev, [pubId]: '' }));
@@ -782,7 +788,7 @@ export default function ConciliacaoBoletim() {
     }
 
     if (conflitoExistente) {
-      const pubConflitanteObj = pendentes.find((item) => item.id === conflitoExistente);
+      const pubConflitanteObj = pendentesMap.get(conflitoExistente);
       setErroVinculo(`Esta nota do boletim já está vinculada a "${getReferenciaPrincipal(pubConflitanteObj || {})}".`);
       return;
     }
@@ -1041,8 +1047,8 @@ export default function ConciliacaoBoletim() {
                     <option value="">Sem vínculo</option>
                     {notasEncontradas.map((nota) => {
                       const pubsUsando = mapaVinculosInvertido.get(nota.id) || [];
-                      const conflitaId = pubsUsando.find(id => id !== pub.id);
-                      const pubConflitante = conflitaId ? pendentes.find((item) => item.id === conflitaId) : null;
+                      const conflitaId = pubsUsando.find((id) => id !== pub.id);
+                      const pubConflitante = conflitaId ? pendentesMap.get(conflitaId) : null;
 
                       return (
                         <option

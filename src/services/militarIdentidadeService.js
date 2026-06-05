@@ -495,7 +495,6 @@ export async function executarMergeManualMilitares({
       .filter(([k]) => !!k),
   );
 
-  const hoje = new Date().toISOString().slice(0, 10);
   await Promise.all([
     ...matriculasOrigem.map((matOrigem) => {
       const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
