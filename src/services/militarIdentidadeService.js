@@ -415,10 +415,11 @@ export async function adicionarNovaMatriculaMilitar({
       data_fim: dataInicio || new Date().toISOString().slice(0, 10),
       motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
     }));
-    if (typeof matriculaEntity.bulkUpdate === 'function') {
+
+    if (matriculaEntity.bulkUpdate) {
       await matriculaEntity.bulkUpdate(payloads);
     } else {
-      await Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
+      await Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
     }
   }
 
@@ -517,7 +518,7 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .filter(([k]) => !!k),
   );
 
-  const payloads = matriculasOrigem.map((matOrigem) => {
+  const payloads = (matriculasOrigem || []).map((matOrigem) => {
     const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
     if (norm && destinoPorNorm.has(norm)) {
       return {
@@ -537,11 +538,30 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
     };
   });
 
-  if (typeof matriculaEntity.bulkUpdate === 'function') {
+  if (payloads.length === 0) return [];
+
+  if (matriculaEntity.bulkUpdate) {
     return matriculaEntity.bulkUpdate(payloads);
   }
 
-  return Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
+  return Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
+}
+
+async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
+  const promises = vinculosOrigem.map(async (v) => {
+    const items = v.items || [];
+    if (items.length === 0) return;
+
+    const payloads = items.map((row) => ({ id: row.id, militar_id: militarDestinoId }));
+
+    if (v.entity.bulkUpdate) {
+      return v.entity.bulkUpdate(payloads);
+    }
+
+    return Promise.all(payloads.map(({ id, ...rest }) => v.entity.update(id, rest)));
+  });
+
+  return Promise.all(promises);
 }
 
 async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
@@ -568,7 +588,7 @@ function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOrigin
     throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
   }
 
-  const payloads = [];
+  const updatePayloads = [];
   for (const mat of matriculasDestinoPos) {
     const deveSerAtual = String(mat.id) === String(atualDestinoId);
     const needsUpdate = (Boolean(mat.is_atual) !== deveSerAtual);
@@ -580,15 +600,15 @@ function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOrigin
       } else {
         payload.data_fim = mat.data_fim || hoje;
       }
-      payloads.push(payload);
+      updatePayloads.push(payload);
     }
   }
 
-  if (payloads.length > 0) {
-    if (typeof matriculaEntity.bulkUpdate === 'function') {
-      await matriculaEntity.bulkUpdate(payloads);
+  if (updatePayloads.length > 0) {
+    if (matriculaEntity.bulkUpdate) {
+      await matriculaEntity.bulkUpdate(updatePayloads);
     } else {
-      await Promise.all(payloads.map((p) => matriculaEntity.update(p.id, p)));
+      await Promise.all(updatePayloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
     }
   }
 
@@ -786,7 +806,7 @@ function processarAnaliseMigracao(militares, matriculas, dryRun) {
   }
 
   if (!dryRun && aCriar.length > 0) {
-    if (typeof matriculaEntity.bulkCreate === 'function') {
+    if (matriculaEntity.bulkCreate) {
       await matriculaEntity.bulkCreate(aCriar);
     } else {
       await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
