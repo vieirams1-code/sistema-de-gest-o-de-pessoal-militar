@@ -16,7 +16,7 @@ import { createPageUrl } from '@/utils';
 import {
   aplicarTemplate,
   buildTemplateVarsContrato,
-} from '@/components/utils/templateUtils';
+} from '@/components/utils/templateUtils.js';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
