@@ -675,7 +675,15 @@ export default function DetalhePromocao() {
         historicosV2: historicosVinculados,
       });
       if (!validacaoImutabilidade.valido) throw new Error(validacaoImutabilidade.mensagens.join(' '));
-      await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }))));
+      const updates = alterados.map((registro) => ({
+        id: registro.id,
+        ...montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }),
+      }));
+      if (typeof base44.entities.PromocaoMilitar.bulkUpdate === 'function') {
+        await base44.entities.PromocaoMilitar.bulkUpdate(updates);
+      } else {
+        await Promise.all(updates.map((payload) => base44.entities.PromocaoMilitar.update(payload.id, payload)));
+      }
       return alterados;
     },
     onSuccess: async (alterados = []) => {
@@ -848,7 +856,12 @@ export default function DetalhePromocao() {
           `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.encontrados}\nTotal sem histórico: ${resultado.semHistorico.length}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}${alertaResumo}`
         );
         if (!confirmou) return { cancelado: true };
-        await Promise.all(resultado.ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+        const updates = resultado.ordenados.map((item) => ({ id: item.id, ordem: item.ordem }));
+        if (typeof base44.entities.PromocaoMilitar.bulkUpdate === 'function') {
+          await base44.entities.PromocaoMilitar.bulkUpdate(updates);
+        } else {
+          await Promise.all(updates.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+        }
         return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
       }
 
@@ -883,7 +896,12 @@ export default function DetalhePromocao() {
       const confirmou = window.confirm(`Ordenar pela lista atual?\n\nPrévia (primeiros 10):\n${previaTexto}${ordenados.length > 10 ? '\n...' : ''}`);
       if (!confirmou) return { cancelado: true };
 
-      await Promise.all(ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+      const updates = ordenados.map((item) => ({ id: item.id, ordem: item.ordem }));
+      if (typeof base44.entities.PromocaoMilitar.bulkUpdate === 'function') {
+        await base44.entities.PromocaoMilitar.bulkUpdate(updates);
+      } else {
+        await Promise.all(updates.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+      }
       return { atualizados: ordenados.length, historica: false };
     },
     onSuccess: async (resultado) => {
