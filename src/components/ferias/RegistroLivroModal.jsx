@@ -25,7 +25,7 @@ import {
 import { addDays, differenceInDays, format } from 'date-fns';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
-import { aplicarTemplate, buildVarsLivro } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildVarsLivro } from '@/components/utils/templateUtils.js';
 import {
   validarInicioFracaoNoLivro,
   validarInicioNoPeriodoConcessivo,
