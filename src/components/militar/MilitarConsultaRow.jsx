@@ -82,6 +82,7 @@ function MilitarConsultaRow({
           <label>
             <input
               type="checkbox"
+              aria-label="Selecionar militar"
               checked={isSelected}
               onChange={(e) => onToggleSelection(String(militar.id), e.target.checked)}
             />
@@ -197,29 +198,70 @@ function MilitarConsultaRow({
           );
         })}
         <div className="min-w-0 px-2 py-2 flex justify-end gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
-            <Eye className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}
+                aria-label="Visualizar detalhes"
+              >
+                <Eye className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Visualizar detalhes</TooltipContent>
+          </Tooltip>
+
           {canAccessAction('editar_militares') && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)}>
-              <Pencil className="w-4 h-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)}
+                  aria-label="Editar militar"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Editar militar</TooltipContent>
+            </Tooltip>
           )}
+
           {isAdmin && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              title="Registrar promoção atual"
-              onClick={() => onPromocaoAtual(militar)}
-            >
-              <CalendarClock className="w-4 h-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onPromocaoAtual(militar)}
+                  aria-label="Registrar promoção atual"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Registrar promoção atual</TooltipContent>
+            </Tooltip>
           )}
+
           {canAccessAction('excluir_militares') && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => onAskDelete(militar)}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-red-600"
+                  onClick={() => onAskDelete(militar)}
+                  aria-label="Excluir militar"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Excluir militar</TooltipContent>
+            </Tooltip>
           )}
         </div>
       </div>

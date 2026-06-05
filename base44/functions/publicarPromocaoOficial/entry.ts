@@ -10,26 +10,26 @@ const dataSomente = (valor: unknown) => texto(valor).split('T')[0];
 const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ ?? new Set<string>();
 (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ = EXECUCOES_EM_ANDAMENTO;
 
-function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, militar_id = null, payloadRecebido = null, motivo = '' }: any) {
-  console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, militar_id, payloadRecebido, motivo });
+function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, militar_id = null, motivo = '' }: any) {
+  console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, militar_id, motivo });
 }
 
-function montarErro({ etapa, motivo, promocao_id = null, item_id = null, militar_id = null, payloadRecebido = null }: any) {
+function montarErro({ etapa, motivo, promocao_id = null, item_id = null, militar_id = null }: any) {
   const erro = { success: false, etapa, motivo, promocao_id, item_id, militar_id };
-  logDiagnosticoErro({ ...erro, payloadRecebido });
+  logDiagnosticoErro(erro);
   return erro;
 }
 
 function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAlteracoesPendentes: boolean) {
   const promocaoId = texto(promocao_id) || texto(promocao?.id) || null;
-  if (!promocaoId) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', promocao_id: null, payloadRecebido: { promocao, itens } });
-  if (!promocao || Object.keys(promocao).length === 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_nao_encontrada', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
-  if (STATUS_PROMOCAO_PUBLICADA.has(normalizar(promocao?.status))) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_ja_publicada', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
-  if (!dataSomente(promocao?.data_promocao)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_data', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
-  if (!texto(promocao?.posto_graduacao)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_posto', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
-  if (!texto(promocao?.quadro)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_quadro', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
-  if (!Array.isArray(itens) || itens.length === 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'itens_ausentes', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
-  if (temAlteracoesPendentes) return montarErro({ etapa: 'validacao_entrada', motivo: 'alteracoes_pendentes', promocao_id: promocaoId, payloadRecebido: { promocao, itens } });
+  if (!promocaoId) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', promocao_id: null});
+  if (!promocao || Object.keys(promocao).length === 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_nao_encontrada', promocao_id: promocaoId});
+  if (STATUS_PROMOCAO_PUBLICADA.has(normalizar(promocao?.status))) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_ja_publicada', promocao_id: promocaoId});
+  if (!dataSomente(promocao?.data_promocao)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_data', promocao_id: promocaoId});
+  if (!texto(promocao?.posto_graduacao)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_posto', promocao_id: promocaoId});
+  if (!texto(promocao?.quadro)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_quadro', promocao_id: promocaoId});
+  if (!Array.isArray(itens) || itens.length === 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'itens_ausentes', promocao_id: promocaoId});
+  if (temAlteracoesPendentes) return montarErro({ etapa: 'validacao_entrada', motivo: 'alteracoes_pendentes', promocao_id: promocaoId});
 
   const ordens = new Set<string>();
   const militarIds = new Set<string>();
@@ -40,21 +40,21 @@ function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAl
     const ordem = Number(item?.ordem);
     const status = normalizar(item?.status);
 
-    if (!itemId) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_sem_id', promocao_id: promocaoId, item_id: null, militar_id: militarId, payloadRecebido: item });
-    if (!militarId) return montarErro({ etapa: 'validacao_entrada', motivo: 'militar_id_ausente', promocao_id: promocaoId, item_id: itemId, militar_id: null, payloadRecebido: item });
-    if (militarIds.has(militarId)) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_militar_id', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
-    if (!Number.isFinite(ordem) || ordem <= 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_invalida', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
-    if (ordens.has(String(ordem))) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_ordem', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
+    if (!itemId) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_sem_id', promocao_id: promocaoId, item_id: null, militar_id: militarId});
+    if (!militarId) return montarErro({ etapa: 'validacao_entrada', motivo: 'militar_id_ausente', promocao_id: promocaoId, item_id: itemId, militar_id: null});
+    if (militarIds.has(militarId)) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_militar_id', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+    if (!Number.isFinite(ordem) || ordem <= 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_invalida', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+    if (ordens.has(String(ordem))) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_ordem', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
     ordens.add(String(ordem));
     militarIds.add(militarId);
     itensComOrdem.push({ itemId, militarId, ordem });
-    if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_status_bloqueado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
+    if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_status_bloqueado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
   }
 
   const ordensOrdenadas = itensComOrdem.map((i: any) => i.ordem).sort((a: number, b: number) => a - b);
   for (let i = 1; i < ordensOrdenadas.length; i += 1) {
     if (ordensOrdenadas[i] <= ordensOrdenadas[i - 1]) {
-      return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_antiguidade_inconsistente', promocao_id: promocaoId, payloadRecebido: { ordens: ordensOrdenadas } });
+      return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_antiguidade_inconsistente', promocao_id: promocaoId});
     }
   }
 
@@ -95,10 +95,6 @@ Deno.serve(async (req) => {
     const parsedPayload = await parseBase44Payload(req);
     const payload = parsedPayload ?? input ?? {};
 
-    console.error(
-      'PAYLOAD_RECEBIDO_BACKEND',
-      JSON.stringify(req.body ?? input ?? payload, null, 2)
-    );
     console.error('PAYLOAD_TIPO_BACKEND', typeof payload);
     console.error('PAYLOAD_KEYS_BACKEND', Object.keys(payload || {}));
 
@@ -135,7 +131,7 @@ Deno.serve(async (req) => {
     const filtrosElegibilidade = { sem_id: 0, sem_militar_id: 0, ordem_invalida: 0, status_bloqueado: 0 };
 
     const erroConcorrencia = promocaoId && EXECUCOES_EM_ANDAMENTO.has(texto(promocaoId))
-      ? montarErro({ etapa: 'controle_concorrencia', motivo: 'publicacao_em_andamento', promocao_id: texto(promocaoId), payloadRecebido: { promocao_id: promocaoId } })
+      ? montarErro({ etapa: 'controle_concorrencia', motivo: 'publicacao_em_andamento', promocao_id: texto(promocaoId)})
       : null;
     if (erroConcorrencia) {
       return Response.json({ ...erroConcorrencia, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [erroConcorrencia] }, { status: 409 });
@@ -168,7 +164,7 @@ Deno.serve(async (req) => {
       console.error('PROCESSANDO_ITEM', { item_id: itemId, militar_id: militarId });
       try {
         const militarEncontrado = await Militar.get(item.militar_id).catch(() => null);
-        if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
+        if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
 
         const payloadHistorico = {
           militar_id: militarId,
@@ -192,13 +188,13 @@ Deno.serve(async (req) => {
         let historico = historicoExistente;
         if (!historico) {
           historico = await Historico.create(payloadHistorico).catch(() => null);
-          if (!historico?.id) throw montarErro({ etapa: 'criar_historico', motivo: 'historico_criacao_falhou', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: payloadHistorico });
+          if (!historico?.id) throw montarErro({ etapa: 'criar_historico', motivo: 'historico_criacao_falhou', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
         } else if (!texto(historico?.promocao_id)) {
           historico = await Historico.update(historico.id, { promocao_id: promocaoId });
         }
 
         const atualizacaoMilitar = await Militar.update(item.militar_id, { posto_graduacao: texto(promocao.posto_graduacao), quadro: texto(promocao.quadro) }).catch(() => null);
-        if (!atualizacaoMilitar) throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
+        if (!atualizacaoMilitar) throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
 
         await PromocaoMilitar.update(item.id, { status: 'publicado', publicado: true, historico_promocao_v2_id: texto(historico?.id), atualizar_cadastro_militar: true, motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role.', resultado_aplicacao_cadastro: 'imediatamente_superior' });
 
@@ -206,12 +202,12 @@ Deno.serve(async (req) => {
         militarIdsAfetados.add(militarId);
         publicados += 1;
       } catch (error: any) {
-        const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
+        const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
         errors.push({ ...erroItem, message: erroItem?.motivo || error?.message || 'Falha ao publicar item.' });
       }
     }
 
-    if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', payloadRecebido: payload });
+    if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente'});
     const statusFinal = publicados === 0 ? 'rascunho' : (publicados < itens.length ? 'publicada_parcial' : 'publicada');
     await Promocao.update(promocaoId, { status: statusFinal });
 
@@ -224,7 +220,7 @@ Deno.serve(async (req) => {
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
   } catch (error: any) {
-    const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao', payloadRecebido: null });
+    const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao'});
     return Response.json({ ...erroInterno, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [{ ...erroInterno, message: erroInterno.motivo }] }, { status: 500 });
   } finally {
     if (lockId) EXECUCOES_EM_ANDAMENTO.delete(lockId);

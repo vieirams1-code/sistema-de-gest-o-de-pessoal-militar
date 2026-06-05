@@ -37,6 +37,12 @@ function createEntity(initial = []) {
       rows[idx] = { ...rows[idx], ...payload };
       return rows[idx];
     },
+    async bulkUpdate(payloads) {
+      return Promise.all(payloads.map((p) => this.update(p.id, p)));
+    },
+    async bulkCreate(payloads) {
+      return Promise.all(payloads.map((p) => this.create(p)));
+    },
     _rows: rows,
   };
 }
@@ -224,4 +230,49 @@ test('concorrência simples: apenas uma criação prevalece para mesma matrícul
 
   assert.equal(sucessos.length, 1);
   assert.equal(falhas.length, 1);
+});
+
+test('reatribui vínculos em lote durante merge', async () => {
+  const entities = setupDefaultClient({
+    Militar: createEntity([
+      { id: 'm1', nome_completo: 'Origem' },
+      { id: 'm2', nome_completo: 'Destino' },
+    ]),
+    MatriculaMilitar: createEntity([
+      { id: 'x1', militar_id: 'm1', matricula: '111', is_atual: true },
+      { id: 'x2', militar_id: 'm2', matricula: '222', is_atual: true },
+    ]),
+    HistoricoComportamento: createEntity([
+      { id: 'h1', militar_id: 'm1' },
+      { id: 'h2', militar_id: 'm1' },
+    ]),
+  });
+
+  await executarMergeManualMilitares({
+    militarOrigemId: 'm1',
+    militarDestinoId: 'm2',
+    motivo: 'Teste vínculos',
+  });
+
+  const historicos = await entities.HistoricoComportamento.list();
+  assert.equal(historicos.every(h => h.militar_id === 'm2'), true);
+});
+
+test('fallback seguro quando bulkUpdate não existe', async () => {
+  const entities = setupDefaultClient();
+  // Remove bulkUpdate manually to force fallback
+  delete entities.MatriculaMilitar.bulkUpdate;
+
+  await entities.Militar.create({ id: 'm1', nome_completo: 'A' });
+  await entities.MatriculaMilitar.create({ id: 'x1', militar_id: 'm1', is_atual: true });
+
+  // Deve funcionar usando update individual via fallback
+  await adicionarNovaMatriculaMilitar({
+    militarId: 'm1',
+    matricula: '999',
+    dataInicio: '2025-01-01',
+  });
+
+  const todas = await entities.MatriculaMilitar.list();
+  assert.equal(todas.find(m => m.id === 'x1').is_atual, false);
 });
