@@ -1,117 +1,135 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  resolverNomesEstrutura,
+  TEXTO_SETOR_FALLBACK,
+  TEXTO_SUBSETOR_FALLBACK,
+} from '../montarArvoreLotacaoMilitares.js';
 
-import { normalizarTagsMilitar, normalizarChaveBusca } from '../montarArvoreLotacaoMilitares.js';
+test('resolverNomesEstrutura - deve resolver nomes usando lotação do índice', () => {
+  const lotacoesById = new Map([
+    ['1', {
+      id: '1',
+      setor_nome: 'SETOR TESTE',
+      setor_sigla: 'ST',
+      subsetor_nome: 'SUBSETOR TESTE',
+      subsetor_sigla: 'SST',
+      lotacao: 'UNIDADE TESTE',
+      sigla: 'UT',
+      descricao: 'DESC TESTE'
+    }]
+  ]);
 
-test('normalizarChaveBusca deve normalizar strings corretamente', () => {
-  assert.equal(normalizarChaveBusca('  AçãO   Teste  '), 'acao teste');
-  assert.equal(normalizarChaveBusca(null), '');
-  assert.equal(normalizarChaveBusca(undefined), '');
-  assert.equal(normalizarChaveBusca(123), '123');
+  const militar = { lotacao_id: '1' };
+  const resultado = resolverNomesEstrutura(militar, lotacoesById);
+
+  assert.strictEqual(resultado.setorNome, 'SETOR TESTE');
+  assert.strictEqual(resultado.setorSigla, 'ST');
+  assert.strictEqual(resultado.subsetorNome, 'SUBSETOR TESTE');
+  assert.strictEqual(resultado.subsetorSigla, 'SST');
+  assert.strictEqual(resultado.unidadeNome, 'UNIDADE TESTE');
+  assert.strictEqual(resultado.unidadeSigla, 'UT');
+  assert.strictEqual(resultado.unidadeDescricao, 'DESC TESTE');
 });
 
-test('normalizarTagsMilitar deve lidar com militar nulo ou indefinido', () => {
-  assert.deepEqual(normalizarTagsMilitar(null), []);
-  assert.deepEqual(normalizarTagsMilitar(undefined), []);
-  assert.deepEqual(normalizarTagsMilitar({}), []);
-});
-
-test('normalizarTagsMilitar deve extrair tags de diferentes campos', () => {
+test('resolverNomesEstrutura - deve resolver nomes usando lotação direta no militar', () => {
   const militar = {
-    tags: ['tag1'],
-    marcadores: ['tag2'],
-    tags_operacionais: 'tag3;tag4',
-    metadata: {
-      tags: ['tag5']
+    lotacao_obj: {
+      setor_nome: 'SETOR DIRETO',
+      setor_sigla: 'SD',
+      subsetor_nome: 'SUBSETOR DIRETO',
+      subsetor_sigla: 'SSD',
+      lotacao: 'UNIDADE DIRETA',
+      sigla: 'UD',
+      descricao: 'DESC DIRETA'
     }
   };
-  const resultado = normalizarTagsMilitar(militar);
-  const nomes = resultado.map(t => t.nome);
 
-  assert.ok(nomes.includes('tag1'));
-  assert.ok(nomes.includes('tag2'));
-  assert.ok(nomes.includes('tag3'));
-  assert.ok(nomes.includes('tag4'));
-  assert.ok(nomes.includes('tag5'));
+  const resultado = resolverNomesEstrutura(militar, new Map());
+
+  assert.strictEqual(resultado.setorNome, 'SETOR DIRETO');
+  assert.strictEqual(resultado.setorSigla, 'SD');
+  assert.strictEqual(resultado.subsetorNome, 'SUBSETOR DIRETO');
+  assert.strictEqual(resultado.subsetorSigla, 'SSD');
+  assert.strictEqual(resultado.unidadeNome, 'UNIDADE DIRETA');
+  assert.strictEqual(resultado.unidadeSigla, 'UD');
+  assert.strictEqual(resultado.unidadeDescricao, 'DESC DIRETA');
 });
 
-test('normalizarTagsMilitar deve lidar com strings delimitadas', () => {
+test('resolverNomesEstrutura - deve usar fallbacks do militar quando não há lotação', () => {
   const militar = {
-    tags_militar: 'Férias; Licença, Especial | Urgente'
+    setor_nome: 'SETOR MILITAR',
+    subsetor_nome: 'SUBSETOR MILITAR',
+    unidade_nome: 'UNIDADE MILITAR',
+    lotacao_sigla: 'UM',
+    lotacao_descricao: 'DESC MILITAR'
   };
-  const resultado = normalizarTagsMilitar(militar);
 
-  assert.equal(resultado.length, 4);
-  assert.equal(resultado[0].nome, 'Férias');
-  assert.equal(resultado[1].nome, 'Licença');
-  assert.equal(resultado[2].nome, 'Especial');
-  assert.equal(resultado[3].nome, 'Urgente');
+  const resultado = resolverNomesEstrutura(militar, new Map());
+
+  assert.strictEqual(resultado.setorNome, 'SETOR MILITAR');
+  assert.strictEqual(resultado.subsetorNome, 'SUBSETOR MILITAR');
+  assert.strictEqual(resultado.unidadeNome, 'UNIDADE MILITAR');
+  assert.strictEqual(resultado.unidadeSigla, 'UM');
+  assert.strictEqual(resultado.unidadeDescricao, 'DESC MILITAR');
 });
 
-test('normalizarTagsMilitar deve lidar com arrays de objetos', () => {
-  const militar = {
-    tags: [
-      { nome: 'Tag Objeto', cor: 'blue' },
-      { label: 'Tag Label', color: 'red' },
-      { titulo: 'Tag Titulo', backgroundColor: 'green' },
-      { tag: 'Tag CampoTag', id: 'id-custom' }
-    ]
-  };
-  const resultado = normalizarTagsMilitar(militar);
+test('resolverNomesEstrutura - deve usar fallbacks globais quando tudo está vazio', () => {
+  const resultado = resolverNomesEstrutura({}, new Map());
 
-  assert.equal(resultado.length, 4);
-
-  assert.deepEqual(resultado[0], { id: 'tag objeto', nome: 'Tag Objeto', cor: 'blue' });
-  assert.deepEqual(resultado[1], { id: 'tag label', nome: 'Tag Label', cor: 'red' });
-  assert.deepEqual(resultado[2], { id: 'tag titulo', nome: 'Tag Titulo', cor: 'green' });
-  assert.deepEqual(resultado[3], { id: 'id-custom', nome: 'Tag CampoTag', cor: undefined });
+  assert.strictEqual(resultado.setorNome, TEXTO_SETOR_FALLBACK);
+  assert.strictEqual(resultado.subsetorNome, TEXTO_SUBSETOR_FALLBACK);
+  assert.strictEqual(resultado.unidadeNome, ''); // TEXTO_UNIDADE_FALLBACK é 'Unidade não informada', que é filtrado por textoValido()
+  assert.strictEqual(resultado.setorSigla, '');
+  assert.strictEqual(resultado.subsetorSigla, '');
+  assert.strictEqual(resultado.unidadeSigla, '');
+  assert.strictEqual(resultado.unidadeDescricao, '');
 });
 
-test('normalizarTagsMilitar deve lidar com objetos de flags (legacy markers)', () => {
-  const militar = {
-    tags: {
-      'Motorista': true,
-      'Socorrista': 'true',
-      'Ativo': 1,
-      'Inativo': false,
-      'Outro': 0
-    }
-  };
-  const resultado = normalizarTagsMilitar(militar);
-  const nomes = resultado.map(t => t.nome);
+test('resolverNomesEstrutura - deve lidar com militar nulo ou indefinido', () => {
+  const resultado = resolverNomesEstrutura(null, new Map());
 
-  assert.equal(resultado.length, 3);
-  assert.ok(nomes.includes('Motorista'));
-  assert.ok(nomes.includes('Socorrista'));
-  assert.ok(nomes.includes('Ativo'));
-  assert.ok(!nomes.includes('Inativo'));
-  assert.ok(!nomes.includes('Outro'));
+  assert.strictEqual(resultado.setorNome, TEXTO_SETOR_FALLBACK);
+  assert.strictEqual(resultado.subsetorNome, TEXTO_SUBSETOR_FALLBACK);
+  assert.strictEqual(resultado.unidadeNome, ''); // TEXTO_UNIDADE_FALLBACK é filtrado
 });
 
-test('normalizarTagsMilitar deve realizar deduplicação baseada na chave normalizada', () => {
-  const militar = {
-    tags: ['TAG1', 'tag1', '  Tag1  '],
-    marcadores: [{ nome: 'tág1' }]
-  };
-  const resultado = normalizarTagsMilitar(militar);
+test('resolverNomesEstrutura - deve priorizar campos de grupamento/subgrupamento', () => {
+  const lotacoesById = new Map([
+    ['1', {
+      id: '1',
+      grupamento_nome: 'GRUPAMENTO',
+      grupamento_sigla: 'GP',
+      subgrupamento_nome: 'SUBGRUPAMENTO',
+      subgrupamento_sigla: 'SGP'
+    }]
+  ]);
 
-  // Todas normalizam para 'tag1'
-  assert.equal(resultado.length, 1);
-  // Mantém o primeiro encontrado (TAG1)
-  assert.equal(resultado[0].nome, 'TAG1');
+  const militar = { lotacao_id: '1' };
+  const resultado = resolverNomesEstrutura(militar, lotacoesById);
+
+  assert.strictEqual(resultado.setorNome, 'GRUPAMENTO');
+  assert.strictEqual(resultado.setorSigla, 'GP');
+  assert.strictEqual(resultado.subsetorNome, 'SUBGRUPAMENTO');
+  assert.strictEqual(resultado.subsetorSigla, 'SGP');
 });
 
-test('normalizarTagsMilitar deve priorizar campos de identificação em objetos', () => {
-  const militar = {
-    tags: [
-      { nome: 'Minha Tag', id: 'id-1' },
-      { nome: 'Outra Tag', tag_id: 'id-2' },
-      { nome: 'Mais uma', codigo: 'cod-3' }
-    ]
-  };
-  const resultado = normalizarTagsMilitar(militar);
+test('resolverNomesEstrutura - deve resolver siglas a partir de parentes (parent.parent)', () => {
+  const lotacoesById = new Map([
+    ['1', {
+      id: '1',
+      parent: {
+        sigla: 'PAI_SIGLA',
+        parent: {
+          sigla: 'AVO_SIGLA'
+        }
+      }
+    }]
+  ]);
 
-  assert.equal(resultado[0].id, 'id-1');
-  assert.equal(resultado[1].id, 'id-2');
-  assert.equal(resultado[2].id, 'cod-3');
+  const militar = { lotacao_id: '1' };
+  const resultado = resolverNomesEstrutura(militar, lotacoesById);
+
+  assert.strictEqual(resultado.setorSigla, 'AVO_SIGLA');
+  assert.strictEqual(resultado.subsetorSigla, 'PAI_SIGLA');
 });
