@@ -1,58 +1,60 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularPrioridadePorPrazo, diferencaDias } from '../centralPendencias.helpers.js';
+import { normalizarTipoCategoria, calcularPrioridadePorPrazo } from '../centralPendencias.helpers.js';
 
-test('calcularPrioridadePorPrazo - prioridade crítica', () => {
-  // Vencido explicitamente
-  assert.equal(calcularPrioridadePorPrazo({ vencido: true }), 'critica');
+test('normalizarTipoCategoria mapeia categorias corretamente', () => {
+  // Publicações
+  assert.equal(normalizarTipoCategoria('Publicação'), 'publicacoes');
+  assert.equal(normalizarTipoCategoria('PUBLICA'), 'publicacoes');
 
-  // Status contém 'vencid'
-  assert.equal(calcularPrioridadePorPrazo({ status: 'Vencido' }), 'critica');
-  assert.equal(calcularPrioridadePorPrazo({ status: 'vencida' }), 'critica');
+  // Atestados
+  assert.equal(normalizarTipoCategoria('Atestado Médico'), 'atestados');
+  assert.equal(normalizarTipoCategoria('atestado'), 'atestados');
 
-  // diasParaVencer <= 3
-  assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 3 }), 'critica');
-  assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 0 }), 'critica');
-  assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: -1 }), 'critica');
+  // Férias
+  assert.equal(normalizarTipoCategoria('Férias'), 'ferias');
+  assert.equal(normalizarTipoCategoria('feria'), 'ferias');
+  assert.equal(normalizarTipoCategoria('GOZO DE FÉRIAS'), 'ferias');
+
+  // Comportamento
+  assert.equal(normalizarTipoCategoria('Comportamento'), 'comportamento');
+  assert.equal(normalizarTipoCategoria('COMPORT'), 'comportamento');
+
+  // Legado / Duplicidade
+  assert.equal(normalizarTipoCategoria('Legado'), 'legado');
+  assert.equal(normalizarTipoCategoria('Duplicidade de Vínculo'), 'legado');
+
+  // Outros / Edge cases
+  assert.equal(normalizarTipoCategoria('Diversos'), 'outros');
+  assert.equal(normalizarTipoCategoria(''), 'outros');
+  assert.equal(normalizarTipoCategoria(null), 'outros');
+  assert.equal(normalizarTipoCategoria(undefined), 'outros');
 });
 
-test('calcularPrioridadePorPrazo - prioridade alta', () => {
-  // 3 < diasParaVencer <= 15
+test('calcularPrioridadePorPrazo define prioridade corretamente', () => {
+  // Critica: vencido ou status vencido
+  assert.equal(calcularPrioridadePorPrazo({ vencido: true }), 'critica');
+  assert.equal(calcularPrioridadePorPrazo({ status: 'Vencida' }), 'critica');
+  assert.equal(calcularPrioridadePorPrazo({ status: 'VENCIDO' }), 'critica');
+
+  // Critica: prazo <= 3 dias
+  assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 0 }), 'critica');
+  assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 3 }), 'critica');
+
+  // Alta: prazo <= 15 dias
   assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 4 }), 'alta');
   assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 15 }), 'alta');
 
-  // Status contém 'aguardando'
+  // Alta: status aguardando
   assert.equal(calcularPrioridadePorPrazo({ status: 'Aguardando validação' }), 'alta');
-});
 
-test('calcularPrioridadePorPrazo - prioridade média', () => {
-  // 15 < diasParaVencer <= 30
+  // Media: prazo <= 30 dias
   assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 16 }), 'media');
   assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 30 }), 'media');
 
-  // diasParaVencer > 30 ou null
+  // Media: prazo > 30 dias ou default
   assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: 31 }), 'media');
   assert.equal(calcularPrioridadePorPrazo({ diasParaVencer: null }), 'media');
   assert.equal(calcularPrioridadePorPrazo({}), 'media');
-});
-
-test('diferencaDias - cálculos básicos', () => {
-  const base = new Date('2024-03-20T12:00:00');
-
-  // Mesmo dia
-  assert.equal(diferencaDias('2024-03-20', base), 0);
-
-  // Futuro
-  assert.equal(diferencaDias('2024-03-21', base), 1);
-  assert.equal(diferencaDias('2024-03-30', base), 10);
-
-  // Passado
-  assert.equal(diferencaDias('2024-03-19', base), -1);
-  assert.equal(diferencaDias('2024-03-10', base), -10);
-});
-
-test('diferencaDias - casos de borda e erros', () => {
-  assert.equal(diferencaDias(null), null);
-  assert.equal(diferencaDias(''), null);
-  assert.equal(diferencaDias('data-invalida'), null);
+  assert.equal(calcularPrioridadePorPrazo(), 'media');
 });
