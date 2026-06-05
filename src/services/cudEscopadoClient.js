@@ -1,5 +1,15 @@
-import { base44 } from '@/api/base44Client';
+import { base44 as defaultBase44 } from '@/api/base44Client';
 import { isDataIsoDateOnly } from '@/services/contratosDesignacaoMilitarService';
+
+let client = defaultBase44;
+
+export function __setCudEscopadoClientDepsForTests(newClient) {
+  client = newClient;
+}
+
+export function __resetCudEscopadoClientDepsForTests() {
+  client = defaultBase44;
+}
 
 // =====================================================================
 // cudEscopadoClient — Backend Hardening Lote 1
@@ -68,7 +78,7 @@ function extrairMensagemErro(err, fallback) {
 async function invocar(payload) {
   let response;
   try {
-    response = await base44.functions.invoke('cudEscopado', payload);
+    response = await client.functions.invoke('cudEscopado', payload);
   } catch (err) {
     const msg = extrairMensagemErro(err, 'Falha ao executar cudEscopado.');
     const e = new Error(msg);

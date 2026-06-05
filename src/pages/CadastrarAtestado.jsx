@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -103,7 +103,7 @@ const extractUploadMetadata = (uploadResponse, file) => {
           if (!inferredObjectPath) inferredObjectPath = parts.slice(1).join('/');
         }
       }
-    } catch (_e) {
+    } catch {
       // noop
     }
   }
@@ -141,7 +141,7 @@ export default function CadastrarAtestado() {
     enabled: !!editId
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (editingAtestado) {
       setFormData({ ...initialFormData, ...editingAtestado });
     }
@@ -230,7 +230,7 @@ export default function CadastrarAtestado() {
   };
 
   // Quando dias muda: forçar JISO se >15, sem sobrescrever decisão manual para <=15
-  React.useEffect(() => {
+  useEffect(() => {
     const dias = parseInt(formData.dias) || 0;
     if (dias > 15) {
 
