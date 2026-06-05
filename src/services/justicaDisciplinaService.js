@@ -329,7 +329,9 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
     });
 
     if (registroCriado) {
-      console.log('[HIST] criado:', registroCriado);
+      if (import.meta.env?.DEV) {
+        console.log('[HIST] criado:', registroCriado);
+      }
     } else {
       console.error('[HIST] falha ao criar histórico');
       return null;

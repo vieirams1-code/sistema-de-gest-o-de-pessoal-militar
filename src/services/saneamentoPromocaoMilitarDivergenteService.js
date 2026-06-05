@@ -38,7 +38,9 @@ export async function sincronizarCadastroMilitarComHistorico({ militarId, histor
   };
 
   // eslint-disable-next-line no-console
-  console.info('[SANEAMENTO_PROMOCAO_SYNC] Atualizando militar', { militarId, antes, depois: payload });
+  if (import.meta.env?.DEV) {
+    console.info('[SANEAMENTO_PROMOCAO_SYNC] Atualizando militar', { militarId, antes, depois: payload });
+  }
 
   await entities.Militar.update(militarId, payload);
   return payload;
