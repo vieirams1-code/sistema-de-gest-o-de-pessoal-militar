@@ -1,4 +1,4 @@
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url'; import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export async function resolve(specifier, context, nextResolve) {
@@ -18,7 +18,7 @@ export async function resolve(specifier, context, nextResolve) {
     // Simplistic approach for this loader
     let finalPath = baseResolvedPath;
     if (!finalPath.endsWith('.js') && !finalPath.endsWith('.jsx')) {
-        finalPath += '.js';
+        finalPath += '.jsx';
     }
 
     return nextResolve(pathToFileURL(finalPath).href, context);
@@ -27,6 +27,7 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
+  if (url.endsWith(".jsx")) { return { format: "module", shortCircuit: true, source: readFileSync(new URL(url), "utf8").replace(/import React from .react.;/g, "").replace(/import React, \{.*\} from .react.;/g, (m) => m.replace("React, ", "")) }; }
   const result = await nextLoad(url, context);
   if (result.source && (url.includes('app-params.js') || url.includes('base44Client.js'))) {
     let source = result.source.toString();
