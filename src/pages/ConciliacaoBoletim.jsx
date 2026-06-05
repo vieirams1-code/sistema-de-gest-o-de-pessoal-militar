@@ -236,20 +236,21 @@ function classificarCorrespondencia(percentual) {
   return { label: 'Baixa correspondência', className: 'bg-rose-100 text-rose-700' };
 }
 
-function calcularCorrespondenciaTextual(textoSistema = '', trechoBoletim = '') {
-  const sistemaNormalizado = normalizarTextoComparacao(textoSistema);
-  const boletimNormalizado = normalizarTextoComparacao(trechoBoletim);
+function calcularCorrespondenciaTextual(pub, nota) {
+  const tokensSistema = pub?.tokens_sistema || normalizarTextoComparacao(pub?.texto_publicacao || pub?.texto || '').split(' ').filter(Boolean);
+  const freqSistema = pub?.frequencia_sistema;
+  const tokensBoletim = nota?.tokens_boletim || normalizarTextoComparacao(nota?.contexto || '').split(' ').filter(Boolean);
 
-  if (!sistemaNormalizado || !boletimNormalizado) {
+  const sistemaNormalizado = pub?.texto_normalizado_sistema || tokensSistema.join(' ');
+  const boletimNormalizado = normalizarTextoComparacao(nota?.contexto || '');
+
+  if (!tokensSistema.length || !tokensBoletim.length) {
     return {
       percentual: 0,
       trechoComparadoBoletim: boletimNormalizado,
       trechoComparadoSistema: sistemaNormalizado,
     };
   }
-
-  const tokensSistema = sistemaNormalizado.split(' ').filter(Boolean);
-  const tokensBoletim = boletimNormalizado.split(' ').filter(Boolean);
 
   if (boletimNormalizado.includes(sistemaNormalizado)) {
     return {
@@ -259,21 +260,76 @@ function calcularCorrespondenciaTextual(textoSistema = '', trechoBoletim = '') {
     };
   }
 
-  let melhorPercentual = calcularPercentualTrechos(tokensSistema, tokensBoletim);
-  let melhorTrecho = boletimNormalizado;
+  const freqSistemaFinal = freqSistema || new Map();
+  if (!freqSistema) {
+    tokensSistema.forEach((t) => freqSistemaFinal.set(t, (freqSistemaFinal.get(t) || 0) + 1));
+  }
 
-  const tamanhoSistema = tokensSistema.length;
-  const minJanela = Math.max(5, Math.floor(tamanhoSistema * 0.6));
-  const maxJanela = Math.min(tokensBoletim.length, Math.max(minJanela, Math.ceil(tamanhoSistema * 1.4)));
+  const n = tokensSistema.length;
+  const m = tokensBoletim.length;
+
+  const calcPercentual = (inter, janelaSize) => {
+    const cobertura = inter / n;
+    const dice = (2 * inter) / (n + janelaSize);
+    return Math.round(((cobertura * 0.75) + (dice * 0.25)) * 100);
+  };
+
+  let intersecaoTotal = 0;
+  const freqTotalBoletim = new Map();
+  tokensBoletim.forEach((t) => {
+    const count = (freqTotalBoletim.get(t) || 0) + 1;
+    freqTotalBoletim.set(t, count);
+    if (count <= (freqSistemaFinal.get(t) || 0)) {
+      intersecaoTotal += 1;
+    }
+  });
+
+  let melhorPercentual = calcPercentual(intersecaoTotal, m);
+  let melhorTrecho = tokensBoletim.join(' ');
+
+  const minJanela = Math.max(5, Math.floor(n * 0.6));
+  const maxJanela = Math.min(m, Math.max(minJanela, Math.ceil(n * 1.4)));
 
   for (let janela = minJanela; janela <= maxJanela; janela += 1) {
-    for (let inicio = 0; inicio <= tokensBoletim.length - janela; inicio += 1) {
-      const trechoTokens = tokensBoletim.slice(inicio, inicio + janela);
-      const percentualAtual = calcularPercentualTrechos(tokensSistema, trechoTokens);
+    let intersecaoAtual = 0;
+    const freqJanela = new Map();
 
-      if (percentualAtual > melhorPercentual) {
-        melhorPercentual = percentualAtual;
-        melhorTrecho = trechoTokens.join(' ');
+    for (let i = 0; i < janela; i += 1) {
+      const token = tokensBoletim[i];
+      const countJanela = (freqJanela.get(token) || 0) + 1;
+      freqJanela.set(token, countJanela);
+
+      const countSistema = freqSistemaFinal.get(token) || 0;
+      if (countJanela <= countSistema) {
+        intersecaoAtual += 1;
+      }
+    }
+
+    let p = calcPercentual(intersecaoAtual, janela);
+    if (p > melhorPercentual) {
+      melhorPercentual = p;
+      melhorTrecho = tokensBoletim.slice(0, janela).join(' ');
+    }
+
+    for (let inicio = 1; inicio <= m - janela; inicio += 1) {
+      const removido = tokensBoletim[inicio - 1];
+      const countRemovido = freqJanela.get(removido);
+      if (countRemovido <= (freqSistemaFinal.get(removido) || 0)) {
+        intersecaoAtual -= 1;
+      }
+      freqJanela.set(removido, countRemovido - 1);
+
+      const adicionado = tokensBoletim[inicio + janela - 1];
+      const countAdicionado = (freqJanela.get(adicionado) || 0) + 1;
+      freqJanela.set(adicionado, countAdicionado);
+      if (countAdicionado <= (freqSistemaFinal.get(adicionado) || 0)) {
+        intersecaoAtual += 1;
+      }
+
+      p = calcPercentual(intersecaoAtual, janela);
+      if (p > melhorPercentual) {
+        melhorPercentual = p;
+        melhorTrecho = tokensBoletim.slice(inicio, inicio + janela).join(' ');
       }
     }
   }
@@ -386,6 +442,7 @@ function extrairNotasDoTexto(textoPagina, pagina) {
       nota: notaNorm,
       nota_normalizada: notaNorm,
       contexto,
+      tokens_boletim: normalizarTextoComparacao(contexto).split(' ').filter(Boolean),
       pagina,
     });
   }
@@ -516,13 +573,24 @@ export default function ConciliacaoBoletim() {
 
   const pendentesMap = useMemo(() => {
     const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
-      .map((registro) => ({
-        ...registro,
-        origem_tipo: detectarOrigemTipo(registro),
-        status_calculado: calcStatus(registro),
-        nota_normalizada: normalizarNota(registro.nota_para_bg),
-        nota_conciliada_persistida: getNotaConciliadaPersistida(registro),
-      }))
+      .map((registro) => {
+        const textoSistema = (registro.texto_publicacao || registro.texto || '').trim();
+        const textoNorm = normalizarTextoComparacao(textoSistema);
+        const tokens = textoNorm.split(' ').filter(Boolean);
+        const freq = new Map();
+        tokens.forEach((t) => freq.set(t, (freq.get(t) || 0) + 1));
+
+        return {
+          ...registro,
+          origem_tipo: detectarOrigemTipo(registro),
+          status_calculado: calcStatus(registro),
+          nota_normalizada: normalizarNota(registro.nota_para_bg),
+          nota_conciliada_persistida: getNotaConciliadaPersistida(registro),
+          texto_normalizado_sistema: textoNorm,
+          tokens_sistema: tokens,
+          frequencia_sistema: freq,
+        };
+      })
       .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg);
 
     return new Map(enriched.map((p) => [p.id, p]));
@@ -638,10 +706,9 @@ export default function ConciliacaoBoletim() {
     publicacoesConciliadas.forEach((pub) => {
       const notaId = vinculosEfetivos[pub.id];
       const nota = mapaNotasById.get(notaId);
-      const textoSistema = (pub.texto_publicacao || pub.texto || '').trim();
-      const textoBoletim = nota?.contexto || '';
+      if (!nota) return;
 
-      mapa[pub.id] = calcularCorrespondenciaTextual(textoSistema, textoBoletim);
+      mapa[pub.id] = calcularCorrespondenciaTextual(pub, nota);
     });
 
     return mapa;
