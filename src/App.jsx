@@ -12,8 +12,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 
-const { Pages: ConfiguredPages, Layout } = pagesConfig;
-const Pages = { ...ConfiguredPages };
+const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
 
 const adminOnlyPages = new Set([
