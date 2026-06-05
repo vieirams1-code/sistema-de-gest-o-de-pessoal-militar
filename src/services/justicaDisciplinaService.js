@@ -570,6 +570,11 @@ export async function registrarMarcoHistoricoComportamento({
   if (!resultValidacao.exito) return null;
   const { militarIdNormalizado } = resultValidacao;
 
+  if (comportamentoAnterior && comportamentoAnterior === comportamento) {
+    console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
+    return null;
+  }
+
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
 
