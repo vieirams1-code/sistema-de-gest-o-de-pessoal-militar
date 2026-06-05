@@ -60,6 +60,75 @@ function isContratoDeOutroMilitar(contrato, militarId) {
   return String(contrato.militar_id) !== String(militarId);
 }
 
+function validarElegibilidadeContrato(contratoAtivo, warnings) {
+  if (contratoAtivo?.gera_direito_ferias === false) {
+    return {
+      bloqueado: true,
+      payload: criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_NAO_GERA_FERIAS,
+        mensagem: 'Contrato de designação ativo configurado para não gerar direito a férias.',
+        warnings,
+      }),
+    };
+  }
+
+  if (String(contratoAtivo?.regra_geracao_periodos || '').trim().toLowerCase() === 'bloqueada') {
+    return {
+      bloqueado: true,
+      payload: criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_GERACAO_BLOQUEADA,
+        mensagem: 'Contrato de designação ativo está com regra de geração de períodos bloqueada.',
+        warnings,
+      }),
+    };
+  }
+
+  return { bloqueado: false };
+}
+
+function validarConsistenciaDataBaseContrato(
+  dataBase,
+  contratoAtivo,
+  { validarDatas, bloquearDataContratoAnteriorAoInicio, warnings },
+) {
+  if (!validarDatas || !contratoAtivo?.data_inicio_contrato) {
+    return { bloqueado: false };
+  }
+
+  const dataInicioContrato = normalizeDateOnly(contratoAtivo.data_inicio_contrato);
+  if (!dataInicioContrato) {
+    return {
+      bloqueado: true,
+      payload: criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_FERIAS_INVALIDA,
+        mensagem: 'Data de início do contrato de designação inválida para validar a data-base de férias.',
+        warnings,
+      }),
+    };
+  }
+
+  if (compareDateOnly(dataBase, dataInicioContrato) === -1) {
+    if (bloquearDataContratoAnteriorAoInicio) {
+      return {
+        bloqueado: true,
+        payload: criarRetorno({
+          bloqueado: true,
+          codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO,
+          mensagem: 'Data-base de férias do contrato é anterior à data de início do contrato.',
+          warnings,
+        }),
+      };
+    }
+
+    warnings.push('DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO');
+  }
+
+  return { bloqueado: false };
+}
+
 function filtrarContratosAtivosDoMilitar(contratosDesignacao, militarId, warnings) {
   const contratos = Array.isArray(contratosDesignacao) ? contratosDesignacao : [];
   return contratos.filter((contrato) => {
@@ -72,26 +141,27 @@ function filtrarContratosAtivosDoMilitar(contratosDesignacao, militarId, warning
   });
 }
 
+function verificarDuplicidadeContratosAtivos(contratosAtivos, warnings) {
+  if (contratosAtivos.length > 1) {
+    return {
+      bloqueado: true,
+      payload: criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_DUPLICADO,
+        mensagem: 'Há mais de um contrato de designação ativo para o militar.',
+        warnings,
+      }),
+    };
+  }
+
+  return { bloqueado: false };
+}
+
 function resolverPeloContrato(contratoAtivo, { validarDatas, bloquearDataContratoAnteriorAoInicio, warnings }) {
   const contratoId = getRegistroId(contratoAtivo);
 
-  if (contratoAtivo?.gera_direito_ferias === false) {
-    return criarRetorno({
-      bloqueado: true,
-      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_NAO_GERA_FERIAS,
-      mensagem: 'Contrato de designação ativo configurado para não gerar direito a férias.',
-      warnings,
-    });
-  }
-
-  if (String(contratoAtivo?.regra_geracao_periodos || '').trim().toLowerCase() === 'bloqueada') {
-    return criarRetorno({
-      bloqueado: true,
-      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_GERACAO_BLOQUEADA,
-      mensagem: 'Contrato de designação ativo está com regra de geração de períodos bloqueada.',
-      warnings,
-    });
-  }
+  const elegibilidade = validarElegibilidadeContrato(contratoAtivo, warnings);
+  if (elegibilidade.bloqueado) return elegibilidade.payload;
 
   if (!contratoAtivo?.data_inclusao_para_ferias) {
     return criarRetorno({
@@ -113,30 +183,13 @@ function resolverPeloContrato(contratoAtivo, { validarDatas, bloquearDataContrat
 
   if (resultadoContrato.bloqueado) return resultadoContrato;
 
-  if (validarDatas && contratoAtivo?.data_inicio_contrato) {
-    const dataInicioContrato = normalizeDateOnly(contratoAtivo.data_inicio_contrato);
-    if (!dataInicioContrato) {
-      return criarRetorno({
-        bloqueado: true,
-        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_FERIAS_INVALIDA,
-        mensagem: 'Data de início do contrato de designação inválida para validar a data-base de férias.',
-        warnings,
-      });
-    }
+  const consistencia = validarConsistenciaDataBaseContrato(resultadoContrato.dataBase, contratoAtivo, {
+    validarDatas,
+    bloquearDataContratoAnteriorAoInicio,
+    warnings,
+  });
 
-    if (compareDateOnly(resultadoContrato.dataBase, dataInicioContrato) === -1) {
-      if (bloquearDataContratoAnteriorAoInicio) {
-        return criarRetorno({
-          bloqueado: true,
-          codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO,
-          mensagem: 'Data-base de férias do contrato é anterior à data de início do contrato.',
-          warnings,
-        });
-      }
-
-      warnings.push('DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO');
-    }
-  }
+  if (consistencia.bloqueado) return consistencia.payload;
 
   return resultadoContrato;
 }
@@ -198,14 +251,8 @@ export function resolverDataBaseFerias({ militar, contratosDesignacao = [], opti
 
   const contratosAtivos = filtrarContratosAtivosDoMilitar(contratosDesignacao, militarId, warnings);
 
-  if (contratosAtivos.length > 1) {
-    return criarRetorno({
-      bloqueado: true,
-      codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_DUPLICADO,
-      mensagem: 'Há mais de um contrato de designação ativo para o militar.',
-      warnings,
-    });
-  }
+  const duplicidade = verificarDuplicidadeContratosAtivos(contratosAtivos, warnings);
+  if (duplicidade.bloqueado) return duplicidade.payload;
 
   if (contratosAtivos.length === 1) {
     return resolverPeloContrato(contratosAtivos[0], {
