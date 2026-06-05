@@ -1,10 +1,20 @@
-import { base44 } from '@/api/base44Client';
+import { base44 as defaultBase44 } from '@/api/base44Client';
+
+let client = defaultBase44;
+
+export function __setImportacaoAlteracoesLegadoClientForTests(newClient) {
+  client = newClient;
+}
+
+export function __resetImportacaoAlteracoesLegadoClientForTests() {
+  client = defaultBase44;
+}
 
 const ENTITY_NAME = 'ImportacaoAlteracoesLegado';
 const ENTITY_ERROR_MESSAGE = 'Falha ao acessar o histórico da migração de alterações legado. Verifique se a entidade ImportacaoAlteracoesLegado está publicada no app.';
 
 function getEntity() {
-  const entity = base44?.entities?.[ENTITY_NAME];
+  const entity = client?.entities?.[ENTITY_NAME];
   if (!entity) throw new Error(ENTITY_ERROR_MESSAGE);
   return entity;
 }

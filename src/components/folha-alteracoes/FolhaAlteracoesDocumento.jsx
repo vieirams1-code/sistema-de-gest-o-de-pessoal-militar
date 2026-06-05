@@ -21,6 +21,17 @@ function obterObm(militar) {
   return valorComFallback(militar?.unidade || militar?.unidade_lotacao || militar?.lotacao);
 }
 
+function montarCabecalhoAssinatura(impressaoConfig, localFechamento, dataFechamento) {
+  const localAssinatura = String(impressaoConfig?.localAssinatura || '').trim() || localFechamento;
+  const dataAssinatura = String(dataFechamento || '').trim();
+  return localAssinatura ? `${localAssinatura}, ${dataAssinatura}.` : `${dataAssinatura}.`;
+}
+
+function deveExibirComportamento(militar) {
+  const classificacaoMilitar = classificarPostoGraduacao(militar?.posto_graduacao);
+  return classificacaoMilitar === 'praca';
+}
+
 function DocHeader({ impressaoConfig, militar }) {
   return (
     <header className="text-center">
@@ -58,8 +69,55 @@ function DocMilitarInfo({ militar, matriculaAtualMilitar, periodo, formatarData,
   );
 }
 
+function DocEventoItem({ evento, numero }) {
+  return (
+    <li className="grid grid-cols-[auto,1fr] gap-x-2 leading-[1.5]">
+      <span className="font-semibold">({numero})</span>
+      <div>
+        <p className="m-0 whitespace-pre-line text-justify [text-justify:inter-word]">{evento.texto}</p>
+        {evento.referenciaBoletim && <p className="mt-0.5 text-[10pt] text-slate-700">{evento.referenciaBoletim}</p>}
+      </div>
+    </li>
+  );
+}
+
+function DocMesSection({ mes, renderEvento }) {
+  return (
+    <div className="mt-2 pl-3">
+      <h3 className="font-semibold uppercase">{mes.titulo}</h3>
+
+      {mes.eventos.length === 0 ? (
+        <p className="italic">Sem alteração</p>
+      ) : (
+        <ol className="mt-1 space-y-1">
+          {mes.eventos.map((evento, index) => renderEvento(evento, index, mes.chave))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function DocAnoSection({ ano, renderMes }) {
+  return (
+    <div className="mt-3">
+      <h2 className="font-bold uppercase">ANO {ano.ano}</h2>
+      {ano.meses.map(renderMes)}
+    </div>
+  );
+}
+
 function DocHistorico({ loadingHistorico, historicoPorAnoMes }) {
   let contadorEventos = 0;
+
+  const renderEvento = (evento, index, mesChave) => {
+    contadorEventos += 1;
+    return <DocEventoItem key={`${evento.origem}-${evento.data}-${mesChave}-${index}`} evento={evento} numero={contadorEventos} />;
+  };
+
+  const renderMes = (mes) => <DocMesSection key={mes.chave} mes={mes} renderEvento={renderEvento} />;
+
+  const renderAno = (ano) => <DocAnoSection key={ano.ano} ano={ano} renderMes={renderMes} />;
+
   return (
     <section className="mt-4 text-[11pt]">
       {loadingHistorico && <p>Carregando histórico do período...</p>}
@@ -68,41 +126,7 @@ function DocHistorico({ loadingHistorico, historicoPorAnoMes }) {
         <p>Não foi possível montar o histórico para o período selecionado.</p>
       )}
 
-      {!loadingHistorico && historicoPorAnoMes.length > 0 && historicoPorAnoMes.map((ano) => (
-        <div key={ano.ano} className="mt-3">
-          <h2 className="font-bold uppercase">ANO {ano.ano}</h2>
-
-          {ano.meses.map((mes) => (
-            <div key={mes.chave} className="mt-2 pl-3">
-              <h3 className="font-semibold uppercase">{mes.titulo}</h3>
-
-              {mes.eventos.length === 0 ? (
-                <p className="italic">Sem alteração</p>
-              ) : (
-                <ol className="mt-1 space-y-1">
-                  {mes.eventos.map((evento, index) => {
-                    contadorEventos += 1;
-                    return (
-                      <li
-                        key={`${evento.origem}-${evento.data}-${index}`}
-                        className="grid grid-cols-[auto,1fr] gap-x-2 leading-[1.5]"
-                      >
-                        <span className="font-semibold">({contadorEventos})</span>
-                        <div>
-                          <p className="m-0 text-justify [text-justify:inter-word] whitespace-pre-line">{evento.texto}</p>
-                          {evento.referenciaBoletim && (
-                            <p className="mt-0.5 text-[10pt] text-slate-700">{evento.referenciaBoletim}</p>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
-            </div>
-          ))}
-        </div>
-      ))}
+      {!loadingHistorico && historicoPorAnoMes.length > 0 && historicoPorAnoMes.map(renderAno)}
     </section>
   );
 }
@@ -142,13 +166,8 @@ export default function FolhaAlteracoesDocumento({
   if (!previa) return null;
 
   const isPrint = variant === 'print';
-  const localAssinatura = String(impressaoConfig?.localAssinatura || '').trim() || localFechamento;
-  const dataAssinatura = String(dataFechamento || '').trim();
-  const cabecalhoAssinatura = localAssinatura
-    ? `${localAssinatura}, ${dataAssinatura}.`
-    : `${dataAssinatura}.`;
-  const classificacaoMilitar = classificarPostoGraduacao(previa?.militar?.posto_graduacao);
-  const exibirComportamento = classificacaoMilitar === 'praca';
+  const cabecalhoAssinatura = montarCabecalhoAssinatura(impressaoConfig, localFechamento, dataFechamento);
+  const exibirComportamento = deveExibirComportamento(previa?.militar);
   const matriculaAtualMilitar = resolverMatriculaAtual(previa?.militar, previa?.militar?.matriculas_historico || []);
 
   return (
