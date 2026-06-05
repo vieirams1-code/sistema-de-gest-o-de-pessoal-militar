@@ -721,15 +721,19 @@ export default function TemplatesTexto() {
   const [lintResult, setLintResult] = useState(null);
   const textareaRef = useRef(null);
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates-texto'],
     queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
     enabled: isAccessResolved && canGerirTemplates,
+    staleTime: STALE_TIME_MS,
   });
   const { data: estrutura = [] } = useQuery({
     queryKey: ['estrutura-organizacional-template'],
     queryFn: () => base44.entities.Subgrupamento.list(),
     enabled: isAccessResolved && canGerirTemplates,
+    staleTime: STALE_TIME_MS,
   });
 
   const saveMutation = useMutation({

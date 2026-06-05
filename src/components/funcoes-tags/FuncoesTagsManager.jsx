@@ -83,9 +83,21 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     setActiveTab(initialTab === 'tags' ? 'tags' : 'grupos');
   }, [initialTab, showFuncoesTab]);
 
-  const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes-tags', 'funcoes'], queryFn: () => base44.entities.FuncaoMilitar.list('prioridade_lista') });
-  const { data: grupos = [] } = useQuery({ queryKey: ['funcoes-tags', 'grupos'], queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao') });
-  const { data: tags = [] } = useQuery({ queryKey: ['funcoes-tags', 'tags'], queryFn: () => base44.entities.Tag.list('ordem_exibicao') });
+  const { data: funcoes = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'funcoes'],
+    queryFn: () => base44.entities.FuncaoMilitar.list('prioridade_lista'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: grupos = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'grupos'],
+    queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: tags = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'tags'],
+    queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const gruposAtivos = useMemo(() => grupos.filter((g) => g.ativo !== false), [grupos]);
   const gruposPorId = useMemo(() => new Map(grupos.map((g) => [String(g.id), g])), [grupos]);

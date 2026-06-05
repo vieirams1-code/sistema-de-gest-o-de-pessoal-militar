@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, MoreHorizontal, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
+import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -88,13 +89,17 @@ export default function Promocoes() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [promocaoAtiva, setPromocaoAtiva] = useState(null);
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const promocoesQuery = useQuery({
     queryKey: ['promocoes-operacionais'],
     queryFn: () => base44.entities.Promocao.list(),
+    staleTime: STALE_TIME_MS,
   });
   const historicosQuery = useQuery({
     queryKey: ['promocoes-operacionais-historicos-v2'],
-    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.list(),
+    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({ status_registro: 'ativo' }),
+    staleTime: STALE_TIME_MS,
   });
   const promocoesMilitaresQuery = useQuery({
     queryKey: ['promocoes-operacionais-promocoes-militares'],
@@ -104,10 +109,15 @@ export default function Promocoes() {
       if (typeof entity.list === 'function') return entity.list();
       return [];
     },
+    staleTime: STALE_TIME_MS,
   });
   const militaresQuery = useQuery({
     queryKey: ['promocoes-operacionais-militares'],
-    queryFn: () => base44.entities.Militar.list(),
+    queryFn: async () => {
+      const { militares } = await fetchScopedMilitares({ fetchAll: true });
+      return militares;
+    },
+    staleTime: STALE_TIME_MS,
   });
 
   const totaisReais = useMemo(() => agruparTotaisReais(historicosQuery.data || []), [historicosQuery.data]);

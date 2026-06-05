@@ -50,6 +50,7 @@ function useFeriasVigentesQuery({ scopedIds, scopeKey, enabled }) {
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
     },
     enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -64,6 +65,7 @@ function useMilitaresLtipQuery({ scopedIds, scopeKey, enabled }) {
       );
     },
     enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

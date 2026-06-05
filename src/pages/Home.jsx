@@ -142,8 +142,11 @@ export default function Home() {
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const dataFormatada = format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const { data: militares = [] } = useQuery({
     queryKey: ['militares-ativos', isAdmin, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       if (isAdmin) {
         const lista = await base44.entities.Militar.list('-created_date');
@@ -206,6 +209,7 @@ export default function Home() {
 
   const { data: periodos = [] } = useQuery({
     queryKey: ['periodos-aquisitivos', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       if (scopedIsAdmin || scopedIds === null) {
         return base44.entities.PeriodoAquisitivo.list();
@@ -228,6 +232,7 @@ export default function Home() {
 
   const { data: atestados = [] } = useQuery({
     queryKey: ['dashboard-atestados', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = await base44.entities.Atestado.list();
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
@@ -237,6 +242,7 @@ export default function Home() {
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['punicoes-ativas', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = await punicaoEntity.list();
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
@@ -246,6 +252,7 @@ export default function Home() {
 
   const { data: armamentos = [] } = useQuery({
     queryKey: ['armamentos', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = await base44.entities.Armamento.list();
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
@@ -255,6 +262,7 @@ export default function Home() {
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['dashboard-registros-livro', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = await base44.entities.RegistroLivro.list('-created_date');
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
@@ -264,6 +272,7 @@ export default function Home() {
 
   const { data: publicacoesExOfficio = [] } = useQuery({
     queryKey: ['dashboard-publicacoes-exofficio', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       if (scopedIsAdmin || scopedIds === null) {
         return base44.entities.PublicacaoExOfficio.list('-created_date');
@@ -285,6 +294,7 @@ export default function Home() {
   });
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['dashboard-pendencias-comportamento', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       const lista = await base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' });
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
@@ -293,6 +303,7 @@ export default function Home() {
   });
   const { data: jisoBundle = { atestados: [], jisos: [], meta: {} } } = useQuery({
     queryKey: ['dashboard-jisos', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       return fetchScopedAtestadosBundle();
     },
@@ -300,6 +311,7 @@ export default function Home() {
   });
   const { data: ferias = [] } = useQuery({
     queryKey: ['dashboard-ferias', scopeKey],
+    staleTime: STALE_TIME_MS,
     queryFn: async () => {
       if (scopedIsAdmin || scopedIds === null) {
         return base44.entities.Ferias.list('-data_inicio');

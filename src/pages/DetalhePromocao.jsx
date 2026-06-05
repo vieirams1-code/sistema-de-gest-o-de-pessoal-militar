@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import { POSTOS_GRADUACOES_HIERARQUIA, QUADROS_PROMOCAO_FIXOS } from '@/constants/postosGraduacoes';
 import { base44 } from '@/api/base44Client';
+import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -365,36 +366,49 @@ export default function DetalhePromocao() {
     enabled: Boolean(promocaoId),
   });
 
+  const STALE_TIME_MS = 5 * 60 * 1000;
+
   const historicosQuery = useQuery({
     queryKey: ['detalhe-promocao-historicos-v2'],
-    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.list(),
+    queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({ status_registro: 'ativo' }),
+    staleTime: STALE_TIME_MS,
   });
 
   const promocoesQuery = useQuery({
     queryKey: ['detalhe-promocao-promocoes'],
     queryFn: () => base44.entities.Promocao.list(),
+    staleTime: STALE_TIME_MS,
   });
 
   const promocaoMilitarQuery = useQuery({
-    queryKey: ['detalhe-promocao-promocao-militar'],
+    queryKey: ['detalhe-promocao-promocao-militar', promocaoId],
     queryFn: async () => {
       const entity = base44.entities.PromocaoMilitar;
-      if (!entity || typeof entity.list !== 'function') return [];
+      if (!entity) return [];
       try {
-        return await entity.list();
+        if (typeof entity.filter === 'function' && promocaoId) {
+          return await entity.filter({ promocao_id: promocaoId });
+        }
+        if (typeof entity.list === 'function') return await entity.list();
       } catch (error) {
         if (import.meta.env?.DEV) {
           console.warn('[DetalhePromocao] PromocaoMilitar indisponível; lista principal usará registros já vinculados.', error);
         }
-        return [];
       }
+      return [];
     },
+    enabled: Boolean(promocaoId),
+    staleTime: STALE_TIME_MS,
   });
 
 
   const militaresQuery = useQuery({
     queryKey: ['detalhe-promocao-militares'],
-    queryFn: () => base44.entities.Militar.list(),
+    queryFn: async () => {
+      const { militares } = await fetchScopedMilitares({ fetchAll: true });
+      return militares;
+    },
+    staleTime: STALE_TIME_MS,
   });
 
   const promocao = promocaoQuery.data;

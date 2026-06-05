@@ -218,6 +218,7 @@ export default function TiposPublicacaoManager() {
   const { data: tipos = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom'],
     queryFn: () => base44.entities.TipoPublicacaoCustom.list('-created_date'),
+    staleTime: 5 * 60 * 1000,
   });
 
   const createMutation = useMutation({
