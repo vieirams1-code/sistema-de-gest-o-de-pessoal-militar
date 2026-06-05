@@ -486,18 +486,9 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .map((m) => [normalizarMatricula(m.matricula_normalizada || m.matricula), m])
       .filter(([k]) => !!k),
   );
-  await Promise.all([
-    ...matriculasOrigem.map((matOrigem) => {
-      const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
-      if (norm && destinoPorNorm.has(norm)) {
-        return matriculaEntity.update(matOrigem.id, {
-          is_atual: false,
-          situacao: 'Mesclada',
-          data_fim: hoje,
-          motivo: `${matOrigem.motivo || ''} Encerrada por merge manual com militar ${militarDestinoId}.`.trim(),
-        });
-      }
-
+  const updates = (matriculasOrigem || []).map((matOrigem) => {
+    const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
+    if (norm && destinoPorNorm.has(norm)) {
       return matriculaEntity.update(matOrigem.id, {
         is_atual: false,
         situacao: 'Mesclada',
