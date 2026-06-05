@@ -1,4 +1,4 @@
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url'; import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 
@@ -14,13 +14,7 @@ export async function resolve(specifier, context, nextResolve) {
     let finalPath = join(rootPath, 'src', subPath);
 
     if (!finalPath.endsWith('.js') && !finalPath.endsWith('.jsx')) {
-        if (existsSync(finalPath + '.js')) {
-            finalPath += '.js';
-        } else if (existsSync(finalPath + '.jsx')) {
-            finalPath += '.jsx';
-        } else {
-            finalPath += '.js';
-        }
+        finalPath += '.jsx';
     }
   }
 
@@ -36,16 +30,7 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
-  if (url.endsWith('.jsx')) {
-    const result = await nextLoad(url, { ...context, format: 'module' });
-    let source = result.source.toString();
-    // Remove typical React imports that might fail in Node
-    source = source.replace(/import React from 'react';/g, '');
-    source = source.replace(/import \{ [^}]* \} from 'react';/g, '');
-    // Replace any JSX-specific syntax if it's simple enough, or just wrap in a try-catch
-    return { ...result, source, format: 'module' };
-  }
-
+  if (url.endsWith(".jsx")) { return { format: "module", shortCircuit: true, source: readFileSync(new URL(url), "utf8").replace(/import React from .react.;/g, "").replace(/import React, \{.*\} from .react.;/g, (m) => m.replace("React, ", "")) }; }
   const result = await nextLoad(url, context);
   if (result.source) {
     let source = result.source.toString();

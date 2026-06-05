@@ -1,5 +1,20 @@
 import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils.js';
 
+let deps = { aplicarTemplate, formatDateBR };
+
+/**
+ * @internal
+ * @testOnly
+ * Injeta dependências para testes unitários.
+ */
+export const __setComportamentoTemplateUtilsDepsForTests = (newDeps) => {
+  if (newDeps === null) {
+    deps = { aplicarTemplate, formatDateBR };
+  } else {
+    deps = { ...deps, ...newDeps };
+  }
+};
+
 export const TIPO_TEMPLATE_COMPORTAMENTO = {
   ELEVACAO: 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR',
 };
@@ -183,7 +198,7 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, {
     comportamento_anterior: marco?.comportamento_anterior || 'Não informado',
     comportamento_novo: marco?.comportamento_novo || militar?.comportamento || 'Não informado',
     comportamento_atual: militar?.comportamento || marco?.comportamento_novo || 'Não informado',
-    data_alteracao: format(marco?.data_alteracao),
+    data_alteracao: deps.formatDateBR(marco?.data_alteracao),
     motivo_mudanca: marco?.motivo_mudanca || 'Não informado',
     fundamento_legal: marco?.fundamento_legal || 'Não informado',
   };
@@ -216,7 +231,7 @@ export function gerarTextoRPComportamento({ template, militar, marco, tipoTempla
   const apply = utils.aplicarTemplate || aplicarTemplate;
   return {
     ok: true,
-    texto: apply(template, vars),
+    texto: deps.aplicarTemplate(template, vars),
     vars,
   };
 }
