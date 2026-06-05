@@ -153,12 +153,13 @@ function CotaModal({ open, onOpenChange, initialData, tipos, onSubmit, saving })
 
 const GRATIFICACAO_FORM_DEFAULT = {
   militar_id: '', tipo_gratificacao_funcao_id: '', cota_gratificacao_funcao_id: '', funcao_gratificada: '', numero_processo: '', observacoes: '', status: GRATIFICACAO_STATUS.RASCUNHO,
+  data_publicacao_nomeacao: '', doems_nomeacao_numero: '', doems_nomeacao_edicao: '', doems_nomeacao_link: '', ato_nomeacao_numero: '', data_inicio_efeitos: '',
 };
 
 function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, saving, onSubmit }) {
   const isEditing = Boolean(initialData?.id);
   const [form, setForm] = useState({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}) });
-  React.useEffect(() => { if (open) setForm({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}), status: GRATIFICACAO_STATUS.RASCUNHO }); }, [open, initialData]);
+  React.useEffect(() => { if (open) setForm({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}), status: isEditing ? (initialData?.status || GRATIFICACAO_STATUS.RASCUNHO) : GRATIFICACAO_STATUS.NOMEADO_ATIVO }); }, [open, initialData, isEditing]);
   const tiposAtivos = useMemo(() => (tipos || []).filter((tipo) => tipo.ativo !== false), [tipos]);
   const cotasDisponiveis = useMemo(() => (cotas || []).filter((cota) => cota.status === COTA_STATUS.ATIVA && Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0) > 0 && (!form.tipo_gratificacao_funcao_id || String(cota.tipo_gratificacao_funcao_id || '') === String(form.tipo_gratificacao_funcao_id))), [cotas, form.tipo_gratificacao_funcao_id]);
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
@@ -172,7 +173,78 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
       funcao_gratificada: cota?.funcao_gratificada || current.funcao_gratificada,
     }));
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>{isEditing ? 'Editar rascunho de gratificação' : 'Nova Gratificação'}</DialogTitle><DialogDescription>Cadastro inicial limitado ao status rascunho. Não há ativação, nomeação, dispensa, publicação DOEMS ou efeito financeiro nesta operação.</DialogDescription></DialogHeader><div className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2"><div className="md:col-span-2"><MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} /></div><Field label="Tipo ativo *"><Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent></Select></Field><Field label="Cota ativa disponível *"><Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota} disabled={!form.tipo_gratificacao_funcao_id}><SelectTrigger><SelectValue placeholder={form.tipo_gratificacao_funcao_id ? 'Selecione a cota' : 'Selecione o tipo primeiro'} /></SelectTrigger><SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent></Select></Field><Field label="Função gratificada *" className="md:col-span-2"><Input value={form.funcao_gratificada} onChange={(e) => update('funcao_gratificada', e.target.value)} /></Field><Field label="Número do processo"><Input value={form.numero_processo || ''} onChange={(e) => update('numero_processo', e.target.value)} /></Field><Field label="Status"><Input value="Rascunho" disabled /></Field><Field label="Observações" className="md:col-span-2"><Textarea value={form.observacoes || ''} onChange={(e) => update('observacoes', e.target.value)} /></Field><div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">Operações bloqueadas neste lote: nomear, ativar, dispensar, cancelar, publicar e integrar folha.</div></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="button" disabled={saving} onClick={() => onSubmit(form)}>{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar rascunho</Button></DialogFooter></DialogContent></Dialog>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? 'Editar rascunho de gratificação' : 'Nova Gratificação'}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Atualize os dados básicos deste rascunho antes de prosseguir com o fluxo de publicação.' : 'Registre uma nova gratificação diretamente como ativa. Os dados de publicação e efeitos são obrigatórios.'}
+            {!isEditing && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <span className="font-bold">Aviso:</span> Ao salvar, a gratificação será registrada como ativa.
+              </div>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} />
+          </div>
+          <Field label="Tipo ativo">
+            <Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}>
+              <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+              <SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Cota ativa disponível">
+            <Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota}>
+              <SelectTrigger><SelectValue placeholder="Selecione a cota" /></SelectTrigger>
+              <SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Função gratificada *" className="md:col-span-2">
+            <Input value={form.funcao_gratificada} onChange={(e) => update('funcao_gratificada', e.target.value)} />
+          </Field>
+          {!isEditing && (
+            <>
+              <Field label="Data da publicação *">
+                <Input type="date" value={form.data_publicacao_nomeacao || ''} onChange={(e) => update('data_publicacao_nomeacao', e.target.value)} />
+              </Field>
+              <Field label="Início dos efeitos *">
+                <Input type="date" value={form.data_inicio_efeitos || ''} onChange={(e) => update('data_inicio_efeitos', e.target.value)} />
+              </Field>
+              <Field label="DOEMS número">
+                <Input value={form.doems_nomeacao_numero || ''} onChange={(e) => update('doems_nomeacao_numero', e.target.value)} placeholder="Ex: 11000" />
+              </Field>
+              <Field label="DOEMS edição">
+                <Input value={form.doems_nomeacao_edicao || ''} onChange={(e) => update('doems_nomeacao_edicao', e.target.value)} placeholder="Ex: Suplemento I" />
+              </Field>
+              <Field label="DOEMS link" className="md:col-span-2">
+                <Input value={form.doems_nomeacao_link || ''} onChange={(e) => update('doems_nomeacao_link', e.target.value)} placeholder="https://..." />
+              </Field>
+              <Field label="Ato de nomeação" className="md:col-span-2">
+                <Input value={form.ato_nomeacao_numero || ''} onChange={(e) => update('ato_nomeacao_numero', e.target.value)} placeholder="Número do ato, se houver" />
+              </Field>
+            </>
+          )}
+          <Field label="Número do processo">
+            <Input value={form.numero_processo || ''} onChange={(e) => update('numero_processo', e.target.value)} />
+          </Field>
+          <Field label="Status">
+            <Input value={isEditing ? (GRATIFICACAO_STATUS_LABELS[form.status] || form.status) : 'Nomeado ativo'} disabled />
+          </Field>
+          <Field label="Observações" className="md:col-span-2">
+            <Textarea value={form.observacoes || ''} onChange={(e) => update('observacoes', e.target.value)} />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="button" disabled={saving} onClick={() => onSubmit(form)}>{saving && <Loader2 className="h-4 w-4 animate-spin" />} {isEditing ? 'Salvar alterações' : 'Salvar e ativar'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 
@@ -267,7 +339,7 @@ function RegistrarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
           <DialogDescription>
             Informe os dados da publicação da nomeação em DOEMS.
             <div className="mt-2 rounded bg-amber-50 p-2 text-amber-800 border border-amber-200">
-              <span className="font-semibold">Aviso:</span> Esta ação tornará a gratificação ativa e ocupará uma cota.
+              <span className="font-semibold">Aviso:</span> Esta ação tornará a gratificação ativa.
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -378,6 +450,9 @@ export default function GratificacoesFuncao() {
         toast({ title: 'Enviado à DP', description: 'Solicitação registrada com sucesso.' });
       } else if (operacao === 'marcar_aguardando_publicacao') {
         toast({ title: 'Status Atualizado', description: 'Gratificação marcada como aguardando publicação.' });
+      } else if (operacao === 'criar_nomeacao_ativa') {
+        setAba(GRATIFICACAO_TABS.ATIVAS);
+        toast({ title: 'Gratificação Ativada', description: 'O registro foi criado diretamente como ativo e ocupou uma cota.' });
       } else {
         toast({ title: 'Rascunho salvo', description: 'Gratificação de Função salva como rascunho, sem ativação ou nomeação.' });
       }
@@ -385,7 +460,7 @@ export default function GratificacoesFuncao() {
     onError: (error) => toast({ title: 'Falha na operação', description: error?.message || 'Erro ao processar a operação.', variant: 'destructive' }),
   });
 
-  const salvarGratificacao = (form) => rascunhoMutation.mutate({ operacao: form.id ? 'atualizar_rascunho' : 'criar_rascunho', id: form.id, data: { ...form, status: GRATIFICACAO_STATUS.RASCUNHO } });
+  const salvarGratificacao = (form) => rascunhoMutation.mutate({ operacao: form.id ? 'atualizar_rascunho' : 'criar_nomeacao_ativa', id: form.id, data: { ...form, status: form.id ? form.status : GRATIFICACAO_STATUS.NOMEADO_ATIVO } });
   const enviarDP = (form) => { rascunhoMutation.mutate({ operacao: 'enviar_dp', id: form.id, data: form }); };
   const marcarAguardandoPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'marcar_aguardando_publicacao', id: form.id }); };
   const registrarPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'registrar_publicacao_nomeacao', id: form.id, data: form }); };

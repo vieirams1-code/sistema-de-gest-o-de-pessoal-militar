@@ -367,10 +367,18 @@ export default function ApuracaoMedalhasTempoServico() {
       });
       const pendentes = filtrarIndicacoesTempoResetaveis(registrosTempo);
       const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
-      await Promise.all(pendentesEscopo.map((m) => base44.entities.Medalha.update(m.id, adicionarAuditoriaMedalha({
-        status: 'CANCELADA',
-        observacoes: `${m.observacoes ? `${m.observacoes}\n` : ''}[RESET] Indicação resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
-      }, { userEmail, acao: 'reset' }))));
+
+      if (pendentesEscopo.length > 0) {
+        const payloads = pendentesEscopo.map((m) => ({
+          id: m.id,
+          ...adicionarAuditoriaMedalha({
+            status: 'CANCELADA',
+            observacoes: `${m.observacoes ? `${m.observacoes}\n` : ''}[RESET] Indicação resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
+          }, { userEmail, acao: 'reset' }),
+        }));
+        await base44.entities.Medalha.bulkUpdate(payloads);
+      }
+
       return pendentesEscopo.length;
     },
     onSuccess: (quantidade) => {
