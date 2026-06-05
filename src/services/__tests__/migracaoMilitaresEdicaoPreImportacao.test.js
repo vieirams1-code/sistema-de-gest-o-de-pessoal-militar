@@ -103,8 +103,8 @@ test('permite edição pré-importação dos 5 campos e reclassifica status', as
   assert.equal(linhaAtualizada.transformado.matricula, '123.456-789');
   assert.equal(linhaAtualizada.transformado.cpf, '529.982.247-25');
   assert.equal(linhaAtualizada.transformado.data_inclusao, '2020-01-10');
-  assert.equal(linhaAtualizada.status, 'APTO');
-  assert.equal(analiseAtualizada.resumo.total_aptas, 1);
+  assert.equal(linhaAtualizada.status, 'APTO_COM_ALERTA');
+  assert.equal(analiseAtualizada.resumo.total_aptas_com_alerta, 1);
   assert.equal(analiseAtualizada.resumo.total_erros, 0);
   assert.deepEqual(linhaAtualizada.correcao_pre_importacao.campos_alterados.sort(), ['cpf', 'data_inclusao', 'matricula', 'nome_completo', 'nome_guerra'].sort());
   assert.equal(linhaAtualizada.correcao_pre_importacao.alteracoes_detalhadas.length, 5);
@@ -181,8 +181,18 @@ test('persiste correção no histórico e restaura após recarregar', async () =
 
   const restaurado = await carregarAnaliseHistorico(historico.id);
   assert.equal(restaurado.linhas[0].transformado.nome_completo, 'Maria Souza');
-  assert.equal(restaurado.linhas[0].status, 'APTO');
+  assert.equal(restaurado.linhas[0].status, 'APTO_COM_ALERTA');
   assert.match(ImportacaoMilitares._rows[0].observacoes, /Correção pré-importação linha 2/);
+
+  await assert.rejects(
+    corrigirLinhaPreImportacao({
+      analise: restaurado,
+      linhaNumero: 99,
+      campos: { nome_completo: 'Erro' },
+      usuario,
+    }),
+    { message: /Linha 99 não encontrada/ },
+  );
 
   await persistirCorrecaoPreImportacaoHistorico({
     historicoId: historico.id,

@@ -225,6 +225,38 @@ test('contrato de outro militar é ignorado com warning', () => {
   assertShape(resultado);
 });
 
+test('data em formato brasileiro dd/MM/yyyy é aceita', () => {
+  const resultado = resolverDataBaseFerias({
+    militar: militar({ data_inclusao: '15/01/2024' }),
+  });
+  assert.equal(resultado.dataBase, '2024-01-15');
+  assert.equal(resultado.bloqueado, false);
+});
+
+test('data nula ou undefined no militar bloqueia', () => {
+  const resNull = resolverDataBaseFerias({ militar: militar({ data_inclusao: null }) });
+  const resUndef = resolverDataBaseFerias({ militar: militar({ data_inclusao: undefined }) });
+
+  assert.equal(resNull.bloqueado, true);
+  assert.equal(resNull.codigoBloqueio, CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.MILITAR_SEM_DATA_INCLUSAO);
+  assert.equal(resUndef.bloqueado, true);
+});
+
+test('data nula ou undefined no contrato bloqueia', () => {
+  const resNull = resolverDataBaseFerias({
+    militar: militar(),
+    contratosDesignacao: [contrato({ data_inclusao_para_ferias: null })],
+  });
+  const resUndef = resolverDataBaseFerias({
+    militar: militar(),
+    contratosDesignacao: [contrato({ data_inclusao_para_ferias: undefined })],
+  });
+
+  assert.equal(resNull.bloqueado, true);
+  assert.equal(resNull.codigoBloqueio, CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_SEM_DATA_BASE);
+  assert.equal(resUndef.bloqueado, true);
+});
+
 test('retorno sempre possui shape completo em bloqueios e sucesso', () => {
   const sucesso = resolverDataBaseFerias({ militar: militar() });
   const bloqueio = resolverDataBaseFerias({ militar: militar({ data_inclusao: null }) });

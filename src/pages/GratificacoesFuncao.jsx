@@ -153,12 +153,13 @@ function CotaModal({ open, onOpenChange, initialData, tipos, onSubmit, saving })
 
 const GRATIFICACAO_FORM_DEFAULT = {
   militar_id: '', tipo_gratificacao_funcao_id: '', cota_gratificacao_funcao_id: '', funcao_gratificada: '', numero_processo: '', observacoes: '', status: GRATIFICACAO_STATUS.RASCUNHO,
+  data_publicacao_nomeacao: '', doems_nomeacao_numero: '', doems_nomeacao_edicao: '', doems_nomeacao_link: '', ato_nomeacao_numero: '', data_inicio_efeitos: '',
 };
 
 function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, saving, onSubmit }) {
   const isEditing = Boolean(initialData?.id);
   const [form, setForm] = useState({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}) });
-  React.useEffect(() => { if (open) setForm({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}), status: GRATIFICACAO_STATUS.RASCUNHO }); }, [open, initialData]);
+  React.useEffect(() => { if (open) setForm({ ...GRATIFICACAO_FORM_DEFAULT, ...(initialData || {}), status: isEditing ? (initialData?.status || GRATIFICACAO_STATUS.RASCUNHO) : GRATIFICACAO_STATUS.NOMEADO_ATIVO }); }, [open, initialData, isEditing]);
   const tiposAtivos = useMemo(() => (tipos || []).filter((tipo) => tipo.ativo !== false), [tipos]);
   const cotasDisponiveis = useMemo(() => (cotas || []).filter((cota) => cota.status === COTA_STATUS.ATIVA && Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0) > 0 && (!form.tipo_gratificacao_funcao_id || String(cota.tipo_gratificacao_funcao_id || '') === String(form.tipo_gratificacao_funcao_id))), [cotas, form.tipo_gratificacao_funcao_id]);
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
@@ -172,7 +173,78 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, cotas, savi
       funcao_gratificada: cota?.funcao_gratificada || current.funcao_gratificada,
     }));
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>{isEditing ? 'Editar rascunho de gratificação' : 'Nova Gratificação'}</DialogTitle><DialogDescription>Cadastro inicial limitado ao status rascunho. Não há ativação, nomeação, dispensa, publicação DOEMS ou efeito financeiro nesta operação.</DialogDescription></DialogHeader><div className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2"><div className="md:col-span-2"><MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} /></div><Field label="Tipo ativo *"><Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent></Select></Field><Field label="Cota ativa disponível *"><Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota} disabled={!form.tipo_gratificacao_funcao_id}><SelectTrigger><SelectValue placeholder={form.tipo_gratificacao_funcao_id ? 'Selecione a cota' : 'Selecione o tipo primeiro'} /></SelectTrigger><SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent></Select></Field><Field label="Função gratificada *" className="md:col-span-2"><Input value={form.funcao_gratificada} onChange={(e) => update('funcao_gratificada', e.target.value)} /></Field><Field label="Número do processo"><Input value={form.numero_processo || ''} onChange={(e) => update('numero_processo', e.target.value)} /></Field><Field label="Status"><Input value="Rascunho" disabled /></Field><Field label="Observações" className="md:col-span-2"><Textarea value={form.observacoes || ''} onChange={(e) => update('observacoes', e.target.value)} /></Field><div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">Operações bloqueadas neste lote: nomear, ativar, dispensar, cancelar, publicar e integrar folha.</div></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="button" disabled={saving} onClick={() => onSubmit(form)}>{saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar rascunho</Button></DialogFooter></DialogContent></Dialog>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? 'Editar rascunho de gratificação' : 'Nova Gratificação'}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Atualize os dados básicos deste rascunho antes de prosseguir com o fluxo de publicação.' : 'Registre uma nova gratificação diretamente como ativa. Os dados de publicação e efeitos são obrigatórios.'}
+            {!isEditing && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <span className="font-bold">Aviso:</span> Ao salvar, a gratificação será registrada como ativa.
+              </div>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <MilitarSelector value={form.militar_id} onChange={(_, value) => update('militar_id', value)} onMilitarSelect={(militar) => update('militar_id', militar?.id || '')} />
+          </div>
+          <Field label="Tipo ativo">
+            <Select value={form.tipo_gratificacao_funcao_id || ''} onValueChange={selectTipo}>
+              <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+              <SelectContent>{tiposAtivos.map((tipo) => <SelectItem key={tipo.id} value={String(tipo.id)}>{tipo.nome || tipo.sigla || tipo.codigo}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Cota ativa disponível">
+            <Select value={form.cota_gratificacao_funcao_id || ''} onValueChange={selectCota}>
+              <SelectTrigger><SelectValue placeholder="Selecione a cota" /></SelectTrigger>
+              <SelectContent>{cotasDisponiveis.map((cota) => <SelectItem key={cota.id} value={String(cota.id)}>{cota.funcao_gratificada || 'Cota sem função'} · Disp. {Number(cota.disponiveis ?? cota.quantidade_autorizada ?? 0)}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="Função gratificada *" className="md:col-span-2">
+            <Input value={form.funcao_gratificada} onChange={(e) => update('funcao_gratificada', e.target.value)} />
+          </Field>
+          {!isEditing && (
+            <>
+              <Field label="Data da publicação *">
+                <Input type="date" value={form.data_publicacao_nomeacao || ''} onChange={(e) => update('data_publicacao_nomeacao', e.target.value)} />
+              </Field>
+              <Field label="Início dos efeitos *">
+                <Input type="date" value={form.data_inicio_efeitos || ''} onChange={(e) => update('data_inicio_efeitos', e.target.value)} />
+              </Field>
+              <Field label="DOEMS número">
+                <Input value={form.doems_nomeacao_numero || ''} onChange={(e) => update('doems_nomeacao_numero', e.target.value)} placeholder="Ex: 11000" />
+              </Field>
+              <Field label="DOEMS edição">
+                <Input value={form.doems_nomeacao_edicao || ''} onChange={(e) => update('doems_nomeacao_edicao', e.target.value)} placeholder="Ex: Suplemento I" />
+              </Field>
+              <Field label="DOEMS link" className="md:col-span-2">
+                <Input value={form.doems_nomeacao_link || ''} onChange={(e) => update('doems_nomeacao_link', e.target.value)} placeholder="https://..." />
+              </Field>
+              <Field label="Ato de nomeação" className="md:col-span-2">
+                <Input value={form.ato_nomeacao_numero || ''} onChange={(e) => update('ato_nomeacao_numero', e.target.value)} placeholder="Número do ato, se houver" />
+              </Field>
+            </>
+          )}
+          <Field label="Número do processo">
+            <Input value={form.numero_processo || ''} onChange={(e) => update('numero_processo', e.target.value)} />
+          </Field>
+          <Field label="Status">
+            <Input value={isEditing ? (GRATIFICACAO_STATUS_LABELS[form.status] || form.status) : 'Nomeado ativo'} disabled />
+          </Field>
+          <Field label="Observações" className="md:col-span-2">
+            <Textarea value={form.observacoes || ''} onChange={(e) => update('observacoes', e.target.value)} />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="button" disabled={saving} onClick={() => onSubmit(form)}>{saving && <Loader2 className="h-4 w-4 animate-spin" />} {isEditing ? 'Salvar alterações' : 'Salvar e ativar'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 
@@ -267,7 +339,7 @@ function RegistrarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
           <DialogDescription>
             Informe os dados da publicação da nomeação em DOEMS.
             <div className="mt-2 rounded bg-amber-50 p-2 text-amber-800 border border-amber-200">
-              <span className="font-semibold">Aviso:</span> Esta ação tornará a gratificação ativa e ocupará uma cota.
+              <span className="font-semibold">Aviso:</span> Esta ação tornará a gratificação ativa.
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -330,6 +402,92 @@ function ConfirmarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
   );
 }
 
+function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit }) {
+  const [form, setForm] = useState({
+    data_fim_efeitos: '',
+    motivo_dispensa: '',
+    data_publicacao_dispensa: '',
+    doems_dispensa_numero: '',
+    doems_dispensa_edicao: '',
+    doems_dispensa_link: '',
+    ato_dispensa_numero: '',
+    documento_solicitacao_dispensa: '',
+    observacoes: '',
+  });
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        data_fim_efeitos: item?.data_fim_efeitos || '',
+        motivo_dispensa: item?.motivo_dispensa || '',
+        data_publicacao_dispensa: item?.data_publicacao_dispensa || '',
+        doems_dispensa_numero: item?.doems_dispensa_numero || '',
+        doems_dispensa_edicao: item?.doems_dispensa_edicao || '',
+        doems_dispensa_link: item?.doems_dispensa_link || '',
+        ato_dispensa_numero: item?.ato_dispensa_numero || '',
+        documento_solicitacao_dispensa: item?.documento_solicitacao_dispensa || '',
+        observacoes: item?.observacoes || '',
+      });
+    }
+  }, [open, item]);
+
+  const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Finalizar Gratificação (Dispensa)</DialogTitle>
+          <DialogDescription>
+            Esta ação encerrará a gratificação e moverá o registro para o histórico.
+            <div className="mt-2 rounded bg-amber-50 p-2 text-amber-800 border border-amber-200 text-xs">
+              <span className="font-semibold">Aviso:</span> Certifique-se de que a data de fim dos efeitos e o motivo da dispensa estejam corretos.
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-4 max-h-[60vh] overflow-y-auto pr-2">
+          <Field label="Fim dos efeitos *">
+            <Input type="date" value={form.data_fim_efeitos} onChange={(e) => update('data_fim_efeitos', e.target.value)} required />
+          </Field>
+          <Field label="Motivo da dispensa *">
+            <Input value={form.motivo_dispensa} onChange={(e) => update('motivo_dispensa', e.target.value)} placeholder="Ex: A pedido do militar" required />
+          </Field>
+          <Field label="Data da publicação dispensa">
+            <Input type="date" value={form.data_publicacao_dispensa} onChange={(e) => update('data_publicacao_dispensa', e.target.value)} />
+          </Field>
+          <Field label="DOEMS número">
+            <Input value={form.doems_dispensa_numero} onChange={(e) => update('doems_dispensa_numero', e.target.value)} placeholder="Ex: 11000" />
+          </Field>
+          <Field label="DOEMS edição">
+            <Input value={form.doems_dispensa_edicao} onChange={(e) => update('doems_dispensa_edicao', e.target.value)} placeholder="Ex: Suplemento I" />
+          </Field>
+          <Field label="Ato de dispensa">
+            <Input value={form.ato_dispensa_numero} onChange={(e) => update('ato_dispensa_numero', e.target.value)} placeholder="Número do ato, se houver" />
+          </Field>
+          <Field label="DOEMS link" className="md:col-span-2">
+            <Input value={form.doems_dispensa_link} onChange={(e) => update('doems_dispensa_link', e.target.value)} placeholder="https://..." />
+          </Field>
+          <Field label="Documento de solicitação" className="md:col-span-2">
+            <Input value={form.documento_solicitacao_dispensa} onChange={(e) => update('documento_solicitacao_dispensa', e.target.value)} placeholder="Ex: Ofício nº 456/2023" />
+          </Field>
+          <Field label="Observações" className="md:col-span-2">
+            <Textarea value={form.observacoes} onChange={(e) => update('observacoes', e.target.value)} />
+          </Field>
+        </div>
+
+        <DialogFooter className="mt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button type="button" onClick={() => onSubmit({ id: item.id, ...form })} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Finalizar Gratificação
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function GratificacoesFuncao() {
   const { isAdmin, canAccessAction, canAccessAll, permissions, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = Boolean(isAdmin || canAccessAll || hasAllPermissions(permissions));
@@ -352,6 +510,7 @@ export default function GratificacoesFuncao() {
   const [enviarDPModal, setEnviarDPModal] = useState({ open: false, data: null });
   const [aguardandoPublicacaoModal, setAguardandoPublicacaoModal] = useState({ open: false, data: null });
   const [registrarPublicacaoModal, setRegistrarPublicacaoModal] = useState({ open: false, data: null });
+  const [finalizarModal, setFinalizarModal] = useState({ open: false, data: null });
 
   const filtrosBackend = useMemo(() => ({ tab: aba === GRATIFICACAO_TABS.CONFIGURACOES ? 'cotas' : aba, busca, status: status === TODOS ? undefined : status, tipo_gratificacao_funcao_id: tipo === TODOS ? undefined : tipo, funcao_gratificada: funcao === TODOS ? undefined : funcao, unidade_id: unidade === TODOS ? undefined : unidade, limit: 200, offset: 0 }), [aba, busca, status, tipo, funcao, unidade]);
   const query = useQuery({ queryKey: ['gratificacoes-funcao-painel', filtrosBackend], queryFn: () => fetchPainelGratificacoesFuncao(filtrosBackend), enabled: canView, staleTime: 60 * 1000, refetchOnWindowFocus: false });
@@ -378,6 +537,13 @@ export default function GratificacoesFuncao() {
         toast({ title: 'Enviado à DP', description: 'Solicitação registrada com sucesso.' });
       } else if (operacao === 'marcar_aguardando_publicacao') {
         toast({ title: 'Status Atualizado', description: 'Gratificação marcada como aguardando publicação.' });
+      } else if (operacao === 'criar_nomeacao_ativa') {
+        setAba(GRATIFICACAO_TABS.ATIVAS);
+        toast({ title: 'Gratificação Ativada', description: 'O registro foi criado diretamente como ativo e ocupou uma cota.' });
+      } else if (operacao === 'finalizar_gratificacao') {
+        setFinalizarModal({ open: false, data: null });
+        setAba(GRATIFICACAO_TABS.HISTORICO);
+        toast({ title: 'Gratificação Finalizada', description: 'O registro foi finalizado com sucesso e movido para o histórico.' });
       } else {
         toast({ title: 'Rascunho salvo', description: 'Gratificação de Função salva como rascunho, sem ativação ou nomeação.' });
       }
@@ -385,10 +551,11 @@ export default function GratificacoesFuncao() {
     onError: (error) => toast({ title: 'Falha na operação', description: error?.message || 'Erro ao processar a operação.', variant: 'destructive' }),
   });
 
-  const salvarGratificacao = (form) => rascunhoMutation.mutate({ operacao: form.id ? 'atualizar_rascunho' : 'criar_rascunho', id: form.id, data: { ...form, status: GRATIFICACAO_STATUS.RASCUNHO } });
+  const salvarGratificacao = (form) => rascunhoMutation.mutate({ operacao: form.id ? 'atualizar_rascunho' : 'criar_nomeacao_ativa', id: form.id, data: { ...form, status: form.id ? form.status : GRATIFICACAO_STATUS.NOMEADO_ATIVO } });
   const enviarDP = (form) => { rascunhoMutation.mutate({ operacao: 'enviar_dp', id: form.id, data: form }); };
   const marcarAguardandoPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'marcar_aguardando_publicacao', id: form.id }); };
   const registrarPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'registrar_publicacao_nomeacao', id: form.id, data: form }); };
+  const finalizarGratificacao = (form) => { rascunhoMutation.mutate({ operacao: 'finalizar_gratificacao', id: form.id, data: form }); };
 
   const gratificacoes = query.data?.gratificacoes || [];
   const cotasBackend = query.data?.cotas || [];
@@ -428,10 +595,10 @@ export default function GratificacoesFuncao() {
       {canShowAccessDebug && <section className="rounded-2xl border border-dashed border-blue-200 bg-blue-50 p-3 text-xs text-blue-900"><p className="font-semibold">Debug de acesso — Gratificação de Função</p><div className="mt-2 grid gap-1 md:grid-cols-2 xl:grid-cols-5"><span>canAccessAll: {String(canAccessAll)}</span><span>isAdmin: {String(isAdmin)}</span><span>canManageCadastros: {String(canManageCadastros)}</span><span>canManageGratificacoes: {String(canManageGratificacoes)}</span><span>permissions ALL: {String(hasAllPermissions(permissions))}</span></div><p className="mt-2 break-words">Permissões detectadas: {permissions === 'ALL' ? 'ALL' : Object.entries(permissions || {}).filter(([, value]) => value === true).map(([key]) => key).sort().join(', ') || 'nenhuma'}</p></section>}
       {query.isLoading && <div className="flex min-h-[18rem] items-center justify-center rounded-2xl border border-slate-200 bg-white"><Loader2 className="h-8 w-8 animate-spin text-slate-500" /></div>}
       {query.error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>{query.error.message || 'Erro controlado ao carregar o painel de Gratificação de Função.'}</p></div></div>}
-      {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.ATIVAS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={() => toast({ title: 'Em breve', description: 'O fluxo de finalização simplificada estará disponível no próximo lote.' })} />}
+      {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.ATIVAS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />}
       {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.HISTORICO && (
         <div className="flex flex-col gap-6">
-          <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={() => toast({ title: 'Em breve', description: 'O fluxo de finalização simplificada estará disponível no próximo lote.' })} />
+          <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />
           {pendenciasAntigasFiltradas.length > 0 && (
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="pendencias" className="border-none">
@@ -439,7 +606,7 @@ export default function GratificacoesFuncao() {
                   <div className="flex items-center gap-2"><History className="h-4 w-4" /> Pendências antigas ({pendenciasAntigasFiltradas.length})</div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                  <GratificacoesTable gratificacoes={pendenciasAntigasFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={() => toast({ title: 'Em breve', description: 'O fluxo de finalização simplificada estará disponível no próximo lote.' })} />
+                  <GratificacoesTable gratificacoes={pendenciasAntigasFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -466,6 +633,7 @@ export default function GratificacoesFuncao() {
       <EnviarDPModal open={enviarDPModal.open} item={enviarDPModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setEnviarDPModal({ open, data: open ? enviarDPModal.data : null })} onSubmit={enviarDP} />
       <ConfirmarPublicacaoModal open={aguardandoPublicacaoModal.open} item={aguardandoPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setAguardandoPublicacaoModal({ open, data: open ? aguardandoPublicacaoModal.data : null })} onSubmit={marcarAguardandoPublicacao} />
       <RegistrarPublicacaoModal open={registrarPublicacaoModal.open} item={registrarPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setRegistrarPublicacaoModal({ open, data: open ? registrarPublicacaoModal.data : null })} onSubmit={registrarPublicacao} />
+      <FinalizarGratificacaoModal open={finalizarModal.open} item={finalizarModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setFinalizarModal({ open, data: open ? finalizarModal.data : null })} onSubmit={finalizarGratificacao} />
       <TipoModal open={tipoModal.open} initialData={tipoModal.data} saving={saveMutation.isPending} onOpenChange={(open) => setTipoModal({ open, data: open ? tipoModal.data : null })} onSubmit={salvarTipo} />
       <CotaModal open={cotaModal.open} initialData={cotaModal.data} tipos={tipos} saving={saveMutation.isPending} onOpenChange={(open) => setCotaModal({ open, data: open ? cotaModal.data : null })} onSubmit={salvarCota} />
     </div></div>

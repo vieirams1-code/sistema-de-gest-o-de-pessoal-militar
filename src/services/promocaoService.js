@@ -203,11 +203,13 @@ Motivo: promocao.id ausente no frontend`);
       body: payload,
     });
   } catch (error) {
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][response]', error?.response);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][response.data]', error?.response?.data);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][data]', error?.data);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][message]', error?.message);
+    if (import.meta.env?.DEV) {
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][response]', error?.response);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][response.data]', error?.response?.data);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][data]', error?.data);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][message]', error?.message);
+    }
 
     const dadosErro = error?.response?.data || error?.data || {};
     const etapaErro = (
@@ -1298,9 +1300,11 @@ export function simularImpactoCadeiaPromocoes({
     const ordemAtualLista = itens.map((item) => ({ militar_id: item.militar_id, nome: nomeMilitar(militarPorId.get(String(item.militar_id || '')) || item?.militar), ordem: Number(item.ordem) }));
     const ordemSugeridaLista = baseReordenada.map((item, index) => ({ militar_id: item.militar_id, nome: nomeMilitar(militarPorId.get(String(item.militar_id || '')) || item?.militar), ordem: index + 1 }));
 
+    const ordemAtualMap = new Map(ordemAtualLista.map((at) => [String(at.militar_id || ''), at]));
+
     const deslocados = ordemSugeridaLista
       .map((novo) => {
-        const anterior = ordemAtualLista.find((at) => String(at.militar_id || '') === String(novo.militar_id || ''));
+        const anterior = ordemAtualMap.get(String(novo.militar_id || ''));
         if (!anterior || anterior.ordem === novo.ordem) return null;
         return { militar_id: novo.militar_id, nome: novo.nome, ordemAtual: anterior.ordem, ordemSugerida: novo.ordem };
       })
