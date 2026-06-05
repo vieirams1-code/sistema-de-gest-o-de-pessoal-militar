@@ -549,23 +549,6 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
 
 async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
   const promises = vinculosOrigem.map(async (v) => {
-    const items = v.items || [];
-    if (items.length === 0) return;
-
-    const payloads = items.map((row) => ({ id: row.id, militar_id: militarDestinoId }));
-
-    if (v.entity.bulkUpdate) {
-      return v.entity.bulkUpdate(payloads);
-    }
-
-    return Promise.all(payloads.map(({ id, ...rest }) => v.entity.update(id, rest)));
-  });
-
-  return Promise.all(promises);
-}
-
-async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
-  const promises = vinculosOrigem.map(async (v) => {
     const payloads = (v.items || []).map((row) => ({ id: row.id, militar_id: militarDestinoId }));
     if (payloads.length === 0) return;
 
@@ -584,10 +567,16 @@ function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOrigin
     || matriculasDestinoPos[0];
 }
 
+async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOriginal, matriculaEntity, militarEntity) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const matriculasDestinoPos = await buscarMatriculasMilitar(militarDestinoId, matriculaEntity);
+  const atualDestino = determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOriginal);
+
   if (!atualDestino) {
     throw new Error('Merge bloqueado: militar de destino sem matrícula após reatribuição.');
   }
 
+  const atualDestinoId = atualDestino.id;
   const updatePayloads = [];
   for (const mat of matriculasDestinoPos) {
     const deveSerAtual = String(mat.id) === String(atualDestinoId);
@@ -747,7 +736,7 @@ async function carregarDadosParaMigracao() {
   return { militarEntity, matriculaEntity, militares, matriculas };
 }
 
-function processarAnaliseMigracao(militares, matriculas, dryRun) {
+async function processarAnaliseMigracao(militares, matriculas, dryRun, matriculaEntity) {
   const porMatricula = new Map((matriculas || []).map((m) => [normalizarMatricula(m.matricula_normalizada || m.matricula), m]));
   const listaMilitares = militares || [];
   const diagnostico = { totalMilitares: listaMilitares.length, criadas: 0, conflitos: [], ignoradas: 0 };
