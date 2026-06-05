@@ -46,6 +46,37 @@ const ChartContainer = React.forwardRef(({ id, className, children, config, ...p
 })
 ChartContainer.displayName = "Chart"
 
+/**
+ * Sanitizes a string for use as a CSS identifier (e.g., class name, variable name).
+ * Only allows alphanumeric characters, underscores, and hyphens.
+ */
+const sanitizeIdentifier = (str) => {
+  return typeof str === "string" ? str.replace(/[^\w-]/g, "") : ""
+}
+
+/**
+ * Sanitizes a CSS value to prevent injection and XSS.
+ * Only allows valid CSS color characters and safe functions.
+ */
+const sanitizeValue = (value) => {
+  if (typeof value !== "string") return value
+
+  // 1. Block known dangerous keywords/functions entirely
+  if (
+    /(?:url|expression|javascript|vbscript|onload|onerror|eval)\s*\(/gi.test(
+      value
+    )
+  ) {
+    return ""
+  }
+
+  // 2. Allow only safe characters:
+  // Alphanumerics, spaces, commas, periods, hashes, parentheses, hyphens, percent signs, and forward slashes.
+  // This allows: hex, rgb(), hsl(), var(), and modern color syntax with alpha (e.g., rgb(0 0 0 / 0.5)).
+  // Specifically excludes: ; { } [ ] < > \ ' " `
+  return value.replace(/[;{}[\]<>\\'"`]/g, "")
+}
+
 const ChartStyle = ({
   id,
   config
@@ -56,7 +87,7 @@ const ChartStyle = ({
     return null
   }
 
-  const safeId = id.replace(/[^\w-]/g, "")
+  const safeId = sanitizeIdentifier(id)
 
   return (
     (<style
@@ -74,8 +105,8 @@ if (!color) {
   return null
 }
 
-const safeKey = key.replace(/[^\w-]/g, "")
-const safeColor = typeof color === "string" ? color.replace(/[;{}]/g, "").replace(/<\/style>/gi, "") : color
+const safeKey = sanitizeIdentifier(key)
+const safeColor = sanitizeValue(color)
 
 return `  --color-${safeKey}: ${safeColor};`
 })

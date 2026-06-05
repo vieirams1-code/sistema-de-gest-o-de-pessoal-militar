@@ -1,4 +1,4 @@
-import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
+import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils.js';
 
 export const TIPO_TEMPLATE_COMPORTAMENTO = {
   ELEVACAO: 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR',
@@ -40,25 +40,29 @@ const LABELS_CAMPOS = {
   fundamento_legal: 'Fundamento legal',
 };
 
-function normalizarDataVigencia(data) {
+/** @internal */
+export function normalizarDataVigencia(data) {
   if (!data) return '';
   const texto = String(data);
   return texto.length >= 10 ? texto.slice(0, 10) : texto;
 }
 
-function ehDataValida(data) {
+/** @internal */
+export function ehDataValida(data) {
   const normalizada = normalizarDataVigencia(data);
   if (!normalizada) return false;
   const parsed = new Date(`${normalizada}T00:00:00`);
   return !Number.isNaN(parsed.getTime());
 }
 
-function ehComportamentoValido(comportamento) {
+/** @internal */
+export function ehComportamentoValido(comportamento) {
   if (!comportamento) return false;
   return String(comportamento).trim().toUpperCase() !== 'N/D';
 }
 
-function getMomentoRegistro(evento = {}) {
+/** @internal */
+export function getMomentoRegistro(evento = {}) {
   const candidatos = [
     evento?.created_date,
     evento?.updated_date,
@@ -74,7 +78,8 @@ function getMomentoRegistro(evento = {}) {
   return 0;
 }
 
-function ehRegistroAutomaticoIntermediario(evento = {}) {
+/** @internal */
+export function ehRegistroAutomaticoIntermediario(evento = {}) {
   const origem = String(evento?.origem_tipo || '').toUpperCase();
   const motivo = String(evento?.motivo_mudanca || '').toUpperCase();
   return (
@@ -126,7 +131,8 @@ export function resolverMarcoComportamento(eventos = [], marcoSelecionadoId = nu
   return marcos[marcos.length - 1];
 }
 
-function campoPreenchido(valor) {
+/** @internal */
+export function campoPreenchido(valor) {
   return !(valor === undefined || valor === null || String(valor).trim() === '' || String(valor).trim().toLowerCase() === 'não informado');
 }
 
@@ -166,7 +172,8 @@ export function escolherTipoTemplateComportamento(marco = {}) {
   return TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO;
 }
 
-export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}) {
+export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, { _formatDateBR } = {}) {
+  const format = _formatDateBR || formatDateBR;
   const vars = {
     militar_nome: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
     posto_graduacao: militar?.posto_graduacao || 'Não informado',
@@ -176,7 +183,7 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}) {
     comportamento_anterior: marco?.comportamento_anterior || 'Não informado',
     comportamento_novo: marco?.comportamento_novo || militar?.comportamento || 'Não informado',
     comportamento_atual: militar?.comportamento || marco?.comportamento_novo || 'Não informado',
-    data_alteracao: formatDateBR(marco?.data_alteracao),
+    data_alteracao: format(marco?.data_alteracao),
     motivo_mudanca: marco?.motivo_mudanca || 'Não informado',
     fundamento_legal: marco?.fundamento_legal || 'Não informado',
   };
@@ -184,6 +191,7 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}) {
   return vars;
 }
 
+/** @internal */
 export function validarCamposEssenciaisComportamento(tipoTemplate, vars) {
   const camposObrigatorios = CAMPOS_ESSENCIAIS_POR_TIPO[tipoTemplate] || CAMPOS_ESSENCIAIS_POR_TIPO[TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO];
   const faltantes = camposObrigatorios.filter((campo) => {
@@ -194,8 +202,8 @@ export function validarCamposEssenciaisComportamento(tipoTemplate, vars) {
   return faltantes.map((campo) => LABELS_CAMPOS[campo] || campo);
 }
 
-export function gerarTextoRPComportamento({ template, militar, marco, tipoTemplate }) {
-  const vars = montarVariaveisComportamentoTemplate(militar, marco);
+export function gerarTextoRPComportamento({ template, militar, marco, tipoTemplate, utils = {} }) {
+  const vars = montarVariaveisComportamentoTemplate(militar, marco, { _formatDateBR: utils.formatDateBR });
   const camposEssenciaisAusentes = validarCamposEssenciaisComportamento(tipoTemplate, vars);
 
   if (camposEssenciaisAusentes.length > 0) {
@@ -205,9 +213,10 @@ export function gerarTextoRPComportamento({ template, militar, marco, tipoTempla
     };
   }
 
+  const apply = utils.aplicarTemplate || aplicarTemplate;
   return {
     ok: true,
-    texto: aplicarTemplate(template, vars),
+    texto: apply(template, vars),
     vars,
   };
 }
