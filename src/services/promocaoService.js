@@ -203,11 +203,13 @@ Motivo: promocao.id ausente no frontend`);
       body: payload,
     });
   } catch (error) {
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][response]', error?.response);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][response.data]', error?.response?.data);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][data]', error?.data);
-    console.error('[publicarPromocaoOficial][frontend][invoke-error][message]', error?.message);
+    if (import.meta.env?.DEV) {
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][response]', error?.response);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][response.data]', error?.response?.data);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][data]', error?.data);
+      console.error('[publicarPromocaoOficial][frontend][invoke-error][message]', error?.message);
+    }
 
     const dadosErro = error?.response?.data || error?.data || {};
     const etapaErro = (

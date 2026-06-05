@@ -208,7 +208,9 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
     gerado_por: geradoPor,
     gerado_em: geradoEm,
   };
-  console.info('[RP_AUTO][create] payload de criação da publicação', payloadPublicacao);
+  if (import.meta.env?.DEV) {
+    console.info('[RP_AUTO][create] payload de criação da publicação', payloadPublicacao);
+  }
 
   let registroCriado;
   try {

@@ -24,7 +24,7 @@ function useChart() {
 
 const ChartContainer = React.forwardRef(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const chartId = `chart-${(id || uniqueId).replace(/[^\w-]/g, "")}`
 
   return (
     (<ChartContext.Provider value={{ config }}>
@@ -56,18 +56,28 @@ const ChartStyle = ({
     return null
   }
 
+  const safeId = id.replace(/[^\w-]/g, "")
+
   return (
     (<style
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+${prefix} [data-chart=${safeId}] {
 ${colorConfig
 .map(([key, itemConfig]) => {
 const color =
   itemConfig.theme?.[theme] ||
   itemConfig.color
-return color ? `  --color-${key}: ${color};` : null
+
+if (!color) {
+  return null
+}
+
+const safeKey = key.replace(/[^\w-]/g, "")
+const safeColor = typeof color === "string" ? color.replace(/[;{}]/g, "").replace(/<\/style>/gi, "") : color
+
+return `  --color-${safeKey}: ${safeColor};`
 })
 .join("\n")}
 }
