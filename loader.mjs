@@ -1,37 +1,36 @@
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 export async function resolve(specifier, context, nextResolve) {
-  // Inject import.meta.env for Node.js tests
-  if (typeof globalThis !== 'undefined' && !globalThis.importMetaEnvInjected) {
-    globalThis.importMetaEnvInjected = true;
-    // We can't easily modify import.meta from here for all modules,
-    // but some code might look at process.env as a fallback or we can polyfill if we control the entry
-  }
-
   if (specifier.startsWith('@/')) {
     const rootPath = process.cwd();
     const subPath = specifier.slice(2);
-    // Try .js, .jsx, or just the path
-    const baseResolvedPath = join(rootPath, 'src', subPath);
+    const basePath = join(rootPath, 'src', subPath);
 
-    // Simplistic approach for this loader
-    let finalPath = baseResolvedPath;
-    if (!finalPath.endsWith('.js') && !finalPath.endsWith('.jsx')) {
-        finalPath += '.js';
+    const extensions = ['', '.js', '.jsx', '.json'];
+    for (const ext of extensions) {
+      const fullPath = basePath + ext;
+      if (existsSync(fullPath)) {
+        return nextResolve(pathToFileURL(fullPath).href, context);
+      }
     }
-
-    return nextResolve(pathToFileURL(finalPath).href, context);
   }
   return nextResolve(specifier, context);
 }
 
 export async function load(url, context, nextLoad) {
   const result = await nextLoad(url, context);
-  if (result.source && (url.includes('app-params.js') || url.includes('base44Client.js'))) {
+  if (result.source) {
     let source = result.source.toString();
+    // Polyfill common browser/Vite globals
     source = source.replace(/import\.meta\.env/g, 'process.env');
-    source = source.replace(/window\.location\.href/g, '""');
+
+    // Check if it is an assignment
+    source = source.replace(/window\.location\.href\s*=/g, 'globalThis.windowLocationHref =');
+    // Then replace usages
+    source = source.replace(/window\.location\.href/g, '(globalThis.windowLocationHref || "")');
+
     return { ...result, source };
   }
   return result;

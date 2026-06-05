@@ -2,11 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   analisarArquivoMigracaoAlteracoesLegado,
+  importarAnaliseAlteracoesLegado,
+  __isLinhaImportavelForTests as isLinhaImportavel,
   __setMigracaoAlteracoesLegadoClientForTests,
   __resetMigracaoAlteracoesLegadoClientForTests,
   DESTINO_FINAL,
   STATUS_LINHA,
 } from '../migracaoAlteracoesLegadoService.js';
+import {
+  __setImportacaoAlteracoesLegadoClientForTests,
+  __resetImportacaoAlteracoesLegadoClientForTests,
+} from '../importacaoAlteracoesLegadoService.js';
+import {
+  __setCudEscopadoClientDepsForTests,
+  __resetCudEscopadoClientDepsForTests,
+} from '../cudEscopadoClient.js';
 
 function createEntity(initial = []) {
   const rows = [...initial];
@@ -39,6 +49,8 @@ function setupMockClient(overrides = {}) {
   };
   const client = { entities };
   __setMigracaoAlteracoesLegadoClientForTests(client);
+  __setImportacaoAlteracoesLegadoClientForTests(client);
+  __setCudEscopadoClientDepsForTests(client);
   return client;
 }
 
@@ -109,4 +121,74 @@ test('marca como PENDENTE_CLASSIFICACAO quando não há regra automática', asyn
   assert.equal(analise.linhas[0].status, STATUS_LINHA.APTO_COM_ALERTA);
 
   __resetMigracaoAlteracoesLegadoClientForTests();
+});
+
+test('importarAnaliseAlteracoesLegado importa linhas com sucesso', async (t) => {
+  const analise = {
+    arquivo: { nome: 'test.csv' },
+    resumo: { total_linhas: 1 },
+    linhas: [
+      {
+        linhaNumero: 1,
+        status: STATUS_LINHA.APTO,
+        chave_origem: 'CHAVE1',
+        transformado: {
+          chave_origem: 'CHAVE1',
+          militar_id: 'm1',
+          militar_nome: 'João Silva',
+          militar_matricula: 'M001',
+          tipo_publicacao: 'Ata JISO',
+          numero_bg: '10',
+          data_bg: '2026-05-10',
+          chave_origem: 'CHAVE1',
+          destino_final: DESTINO_FINAL.IMPORTAR
+        }
+      }
+    ]
+  };
+
+  const client = setupMockClient({
+    ImportacaoAlteracoesLegado: createEntity([{ id: 'h1', status_importacao: 'Analisado' }])
+  });
+
+  // Mock base44.functions.invoke for criarEscopado
+  client.functions = {
+    invoke: async (fn, payload) => {
+      if (fn === 'cudEscopado' && payload.operation === 'create') {
+        return { data: { id: 'pub1', ...payload.data } };
+      }
+      return { data: {} };
+    }
+  };
+
+  const result = await importarAnaliseAlteracoesLegado({
+    analise,
+    incluirAlertas: true,
+    historicoId: 'h1',
+    usuario: { id: 'u1', email: 'user@test.com' }
+  });
+
+  assert.equal(result.totalImportadas, 1);
+  assert.equal(result.statusImportacao, 'Importado');
+  assert.equal(client.entities.ImportacaoAlteracoesLegado._rows.length, 1);
+  assert.equal(client.entities.ImportacaoAlteracoesLegado._rows[0].status_importacao, 'Importado');
+
+  __resetMigracaoAlteracoesLegadoClientForTests();
+  __resetImportacaoAlteracoesLegadoClientForTests();
+  __resetCudEscopadoClientDepsForTests();
+});
+
+test('isLinhaImportavel funciona corretamente', (t) => {
+  const linha = {
+    status: STATUS_LINHA.APTO,
+    transformado: { destino_final: DESTINO_FINAL.IMPORTAR }
+  };
+  assert.equal(isLinhaImportavel(linha, { incluirAlertas: false, incluirPendentesClassificacao: false }), true);
+
+  const linhaAlerta = {
+    status: STATUS_LINHA.APTO_COM_ALERTA,
+    transformado: { destino_final: DESTINO_FINAL.IMPORTAR }
+  };
+  assert.equal(isLinhaImportavel(linhaAlerta, { incluirAlertas: false, incluirPendentesClassificacao: false }), false);
+  assert.equal(isLinhaImportavel(linhaAlerta, { incluirAlertas: true, incluirPendentesClassificacao: false }), true);
 });
