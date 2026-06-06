@@ -39,46 +39,61 @@ export async function getMilitarTimeline(militarId) {
 
   const timeline = [
     ...(registrosLivro || []).map(item => ({
+      id: item.id,
       data: item.data_publicacao || item.created_date,
       tipo: 'Publicação',
       titulo: item.tipo_registro || item.tipo || 'Registro de Livro',
-      descricao: item.conteudo || item.descricao || ''
+      descricao: item.conteudo || item.descricao || '',
+      origem: 'RegistroLivro'
     })),
     ...(publicacoesExOfficio || []).map(item => ({
+      id: item.id,
       data: item.data_publicacao || item.created_date,
       tipo: 'Publicação',
       titulo: item.tipo || 'Publicação Ex Officio',
-      descricao: item.conteudo || ''
+      descricao: item.conteudo || '',
+      origem: 'PublicacaoExOfficio'
     })),
     ...(ferias || []).map(item => ({
+      id: item.id,
       data: item.data_inicio,
       tipo: 'Férias',
       titulo: 'Gozo de Férias',
-      descricao: `${item.dias || 0} dias ref. ao período ${item.periodo_aquisitivo_ref || 'N/D'}`
+      descricao: `${item.dias || 0} dias ref. ao período ${item.periodo_aquisitivo_ref || 'N/D'}`,
+      origem: 'Ferias'
     })),
     ...(atestados || []).map(item => ({
+      id: item.id,
       data: item.data_inicio,
       tipo: 'Atestado',
       titulo: item.tipo_afastamento || 'Atestado Médico',
-      descricao: `${item.dias || 0} dias${item.cid_10 ? ' - CID: ' + item.cid_10 : ''}`
+      descricao: `${item.dias || 0} dias${item.cid_10 ? ' - CID: ' + item.cid_10 : ''}`,
+      origem: 'Atestado'
     })),
     ...(promocoes || []).map(item => ({
+      id: item.id,
       data: item.data_promocao,
       tipo: 'Promoção',
       titulo: `${item.posto_graduacao_novo || ''} ${item.quadro_novo || ''}`.trim() || 'Promoção',
-      descricao: `Boletim: ${item.boletim_referencia || 'N/D'}`
+      descricao: `Boletim: ${item.boletim_referencia || 'N/D'}`,
+      origem: 'HistoricoPromocaoMilitarV2'
     })),
     ...(medalhas || []).map(item => ({
+      id: item.id,
       data: item.data_concessao || item.data_indicacao,
       tipo: 'Medalha',
       titulo: item.tipo_medalha_nome || 'Medalha',
-      descricao: `Status: ${item.status || 'N/D'}`
+      descricao: `Status: ${item.status || 'N/D'}`,
+      origem: 'Medalha'
     }))
   ];
 
-  // Deduplicação
+  // Ignorar registros inválidos (sem data)
+  const validTimeline = timeline.filter(item => !!item.data);
+
+  // Deduplicação por objeto completo
   const seen = new Set();
-  const uniqueTimeline = timeline.filter(item => {
+  const uniqueTimeline = validTimeline.filter(item => {
     const key = JSON.stringify(item);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -87,9 +102,6 @@ export async function getMilitarTimeline(militarId) {
 
   // Ordenação: mais recente primeiro
   return uniqueTimeline.sort((a, b) => {
-    if (!a.data && !b.data) return 0;
-    if (!a.data) return 1;
-    if (!b.data) return -1;
     return new Date(b.data) - new Date(a.data);
   });
 }
