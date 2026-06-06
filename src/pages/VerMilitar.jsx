@@ -53,6 +53,7 @@ import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecion
 import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
 import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMilitar } from '@/utils/funcoesTags/decoracaoInstitucionalMilitar';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
+import { montarMilitar360Bundle } from '@/services/militar360Service';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -93,9 +94,9 @@ function InfoItem({ label, value, icon: Icon }) {
 
 }
 
-function Section({ title, icon: Icon, children }) {
+function Section({ title, icon: Icon, children, className }) {
   return (
-    <Card className="shadow-sm">
+    <Card className={`shadow-sm ${className || ''}`}>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2 text-[#1e3a5f]">
           {Icon && <Icon className="w-5 h-5" />}
@@ -422,6 +423,20 @@ export default function VerMilitar() {
     });
   }, [militar, punicoesSistema]);
 
+  const bundle360 = React.useMemo(() => {
+    if (!militar) return null;
+    return montarMilitar360Bundle({
+      militar,
+      ferias,
+      atestados,
+      registrosLivro,
+      publicacoes: [], // Removido fetch global novo conforme requisito 7
+      medalhas,
+      pendencias: pendenciasComportamento,
+      historicoPromocoes
+    });
+  }, [militar, ferias, atestados, registrosLivro, medalhas, pendenciasComportamento, historicoPromocoes]);
+
   const proximaMelhoria = React.useMemo(() => {
     if (!militar) return null;
     return calcularProximaMelhoria(punicoesSistema, militar.posto_graduacao, new Date(), {
@@ -528,6 +543,64 @@ export default function VerMilitar() {
             </div>
           }
         </div>
+
+        {/* Resumo Executivo 360 */}
+        {bundle360 && (
+          <Section title="Resumo Executivo 360º" icon={Activity} className="mb-6 border-l-4 border-l-[#1e3a5f]">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Status Operacional</p>
+                <div className="flex items-center gap-2">
+                  <Badge className={bundle360.statusOperacional.situacao === 'Disponível' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}>
+                    {bundle360.statusOperacional.situacao}
+                  </Badge>
+                  <span className="text-xs text-slate-400">{bundle360.statusOperacional.detalhe}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Comportamento</p>
+                <p className="text-sm font-semibold text-slate-700">{bundle360.resumoExecutivo.comportamento}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Lotação / Função</p>
+                <p className="text-sm font-semibold text-slate-700 truncate" title={`${bundle360.resumoExecutivo.lotacao} / ${bundle360.resumoExecutivo.funcao}`}>
+                  {bundle360.resumoExecutivo.lotacao} / {bundle360.resumoExecutivo.funcao}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Pendências</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant={bundle360.resumoExecutivo.quantidadePendencias > 0 ? "destructive" : "outline"} className="h-5">
+                    {bundle360.resumoExecutivo.quantidadePendencias}
+                  </Badge>
+                  <span className="text-xs text-slate-400">cadastrais/funcionais</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Férias</p>
+                <p className="text-sm font-medium text-slate-700">{bundle360.resumoExecutivo.situacaoFerias}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Saúde</p>
+                <p className="text-sm font-medium text-slate-700">{bundle360.resumoExecutivo.situacaoSaude}</p>
+              </div>
+              <div className="space-y-1 col-span-2">
+                <p className="text-xs text-slate-500">Últimos registros relevantes</p>
+                <div className="flex gap-2 overflow-hidden">
+                  {bundle360.resumoExecutivo.ultimosRegistros.length > 0 ? (
+                    bundle360.resumoExecutivo.ultimosRegistros.map((reg, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-[10px] whitespace-nowrap">
+                        {reg.tipo_registro || reg.tipo || 'Registro'}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">Sem registros recentes</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Section>
+        )}
 
         {/* Profile Header */}
         <Card className="shadow-sm mb-6 overflow-hidden">
