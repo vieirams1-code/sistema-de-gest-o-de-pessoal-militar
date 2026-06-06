@@ -382,11 +382,18 @@ export async function atualizarMilitarSemTrocarMatricula(militarId, payload = {}
 async function encerrarMatriculasAtuais(matriculaEntity, militarId, dataEncerramento) {
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
   if (Array.isArray(atuais) && atuais.length > 0) {
-    await Promise.all(atuais.map((atual) => matriculaEntity.update(atual.id, {
+    const payloads = atuais.map((atual) => ({
+      id: atual.id,
       is_atual: false,
       data_fim: dataEncerramento || new Date().toISOString().slice(0, 10),
       motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-    })));
+    }));
+
+    if (matriculaEntity.bulkUpdate) {
+      await matriculaEntity.bulkUpdate(payloads);
+    } else {
+      await Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
+    }
   }
 }
 
@@ -407,21 +414,7 @@ export async function adicionarNovaMatriculaMilitar({
 
   const matriculaNorm = await validarMatriculaDisponivel(matricula, militarId);
 
-  const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
-  if (Array.isArray(atuais) && atuais.length > 0) {
-    const payloads = atuais.map((atual) => ({
-      id: atual.id,
-      is_atual: false,
-      data_fim: dataInicio || new Date().toISOString().slice(0, 10),
-      motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-    }));
-
-    if (matriculaEntity.bulkUpdate) {
-      await matriculaEntity.bulkUpdate(payloads);
-    } else {
-      await Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
-    }
-  }
+  await encerrarMatriculasAtuais(matriculaEntity, militarId, dataInicio);
 
   const nova = await matriculaEntity.create({
     militar_id: militarId,
@@ -717,6 +710,11 @@ export async function executarMergeManualMilitares({
     militarDestinoId,
     matriculasReatribuídas: (matriculasOrigem || []).length,
   };
+}
+
+export async function migrarMatriculasLegadas({ dryRun = true } = {}) {
+  const { matriculaEntity, militares, matriculas } = await carregarDadosParaMigracao();
+  return processarAnaliseMigracao(militares, matriculas, dryRun, matriculaEntity);
 }
 
 async function carregarDadosParaMigracao() {
