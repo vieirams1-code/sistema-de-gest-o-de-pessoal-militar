@@ -377,10 +377,10 @@ export default function ApuracaoMedalhasTempoServico() {
           }, { userEmail, acao: 'reset' }),
         }));
 
-        if (typeof base44.entities.Medalha.bulkUpdate === 'function') {
+        if (base44.entities.Medalha.bulkUpdate) {
           await base44.entities.Medalha.bulkUpdate(payloads);
         } else {
-          await Promise.all(payloads.map(({ id, ...data }) => base44.entities.Medalha.update(id, data)));
+          await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.Medalha.update(id, rest)));
         }
       }
 
