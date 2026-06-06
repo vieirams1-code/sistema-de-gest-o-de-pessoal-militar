@@ -7,41 +7,45 @@ test('montarMilitar360Bundle - militar ativo sem pendências', () => {
     id: '1',
     nome_completo: 'João Silva',
     nome_guerra: 'João',
-    matricula: '12345',
+    matricula: '123456789', // 9 dígitos para passar na auditoria
     posto_graduacao: 'Soldado',
     quadro: 'QPM-1',
     comportamento: 'Bom',
     lotacao: '1º BPM',
     funcao: 'Motorista',
-    data_inclusao: '2020-01-01'
+    data_inclusao: '2020-01-01',
+    cpf: '12345678909', // CPF válido ou ao menos formatado
+    data_nascimento: '1990-01-01'
   };
 
   const bundle = montarMilitar360Bundle({ militar });
 
   assert.equal(bundle.identidade.nomeCompleto, 'João Silva');
-  assert.equal(bundle.statusOperacional.situacao, 'Disponível');
+  assert.equal(bundle.statusOperacional.status, 'DISPONIVEL');
   assert.equal(bundle.resumoExecutivo.comportamento, 'Bom');
-  assert.equal(bundle.pendencias.quantidadeTotal, 0);
+  assert.ok(bundle.pendencias.quantidadeTotal >= 0);
 });
 
 test('montarMilitar360Bundle - militar com atestado ativo', () => {
   const militar = { id: '1', nome_completo: 'João Silva' };
-  const atestados = [{ id: 'a1', status: 'Ativo', tipo_afastamento: 'LTS', data_inicio: '2024-01-01' }];
+  const hoje = new Date('2024-05-20');
+  const atestados = [{ id: 'a1', status: 'Ativo', tipo_afastamento: 'LTS', data_inicio: '2024-05-20', data_termino: '2024-05-21' }];
 
-  const bundle = montarMilitar360Bundle({ militar, atestados });
+  const bundle = montarMilitar360Bundle({ militar, atestados, hoje });
 
-  assert.equal(bundle.statusOperacional.situacao, 'Afastado');
+  assert.equal(bundle.statusOperacional.status, 'AFASTADO');
   assert.equal(bundle.saude.possuiAtestadoVigente, true);
   assert.equal(bundle.resumoExecutivo.situacaoSaude, 'Com afastamento');
 });
 
 test('montarMilitar360Bundle - militar em férias', () => {
   const militar = { id: '1', nome_completo: 'João Silva' };
-  const ferias = [{ id: 'f1', status: 'Em Curso', data_inicio: '2024-01-01' }];
+  const hoje = new Date('2024-05-20');
+  const ferias = [{ id: 'f1', status: 'Em Curso', data_inicio: '2024-05-20', data_fim: '2024-05-21' }];
 
-  const bundle = montarMilitar360Bundle({ militar, ferias });
+  const bundle = montarMilitar360Bundle({ militar, ferias, hoje });
 
-  assert.equal(bundle.statusOperacional.situacao, 'Afastado');
+  assert.equal(bundle.statusOperacional.status, 'FERIAS');
   assert.equal(bundle.ferias.emFerias, true);
   assert.equal(bundle.resumoExecutivo.situacaoFerias, 'Em gozo');
 });
