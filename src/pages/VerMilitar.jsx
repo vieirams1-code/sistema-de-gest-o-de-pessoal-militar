@@ -127,6 +127,7 @@ export default function VerMilitar() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  const registrosLivro = [];
   const selectedTab = searchParams.get('tab') || 'comportamento';
   const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
@@ -549,53 +550,44 @@ export default function VerMilitar() {
           <Section title="Resumo Executivo 360º" icon={Activity} className="mb-6 border-l-4 border-l-[#1e3a5f]">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
               <div className="space-y-1">
-                <p className="text-xs text-slate-500">Status Operacional</p>
+                <p className="text-xs text-slate-500">STATUS OPERACIONAL</p>
                 <div className="flex items-center gap-2">
-                  <Badge className={bundle360.statusOperacional.situacao === 'Disponível' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}>
-                    {bundle360.statusOperacional.situacao}
+                  <Badge style={{ backgroundColor: bundle360.statusOperacional.cor, color: 'white' }}>
+                    {bundle360.statusOperacional.status}
                   </Badge>
-                  <span className="text-xs text-slate-400">{bundle360.statusOperacional.detalhe}</span>
+                  <span className="text-xs text-slate-400 truncate max-w-[100px]" title={bundle360.statusOperacional.motivo}>
+                    {bundle360.statusOperacional.motivo}
+                  </span>
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-slate-500">Comportamento</p>
-                <p className="text-sm font-semibold text-slate-700">{bundle360.resumoExecutivo.comportamento}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">Lotação / Função</p>
-                <p className="text-sm font-semibold text-slate-700 truncate" title={`${bundle360.resumoExecutivo.lotacao} / ${bundle360.resumoExecutivo.funcao}`}>
-                  {bundle360.resumoExecutivo.lotacao} / {bundle360.resumoExecutivo.funcao}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">Pendências</p>
+                <p className="text-xs text-slate-500">COMPLETUDE CADASTRAL</p>
                 <div className="flex items-center gap-2">
-                  <Badge variant={bundle360.resumoExecutivo.quantidadePendencias > 0 ? "destructive" : "outline"} className="h-5">
-                    {bundle360.resumoExecutivo.quantidadePendencias}
-                  </Badge>
-                  <span className="text-xs text-slate-400">cadastrais/funcionais</span>
+                  <p className="text-sm font-semibold text-slate-700">{bundle360.resumoExecutivo.scoreCompletude}%</p>
+                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
+                    <div
+                      className="h-full bg-emerald-500 transition-all"
+                      style={{ width: `${bundle360.resumoExecutivo.scoreCompletude}%` }}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-slate-500">Férias</p>
-                <p className="text-sm font-medium text-slate-700">{bundle360.resumoExecutivo.situacaoFerias}</p>
+                <p className="text-xs text-slate-500">PENDÊNCIAS CRÍTICAS</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant={bundle360.resumoExecutivo.pendenciasCriticas > 0 ? "destructive" : "outline"} className="h-5">
+                    {bundle360.resumoExecutivo.pendenciasCriticas}
+                  </Badge>
+                  <span className="text-xs text-slate-400">bloqueantes</span>
+                </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-slate-500">Saúde</p>
-                <p className="text-sm font-medium text-slate-700">{bundle360.resumoExecutivo.situacaoSaude}</p>
-              </div>
-              <div className="space-y-1 col-span-2">
-                <p className="text-xs text-slate-500">Últimos registros relevantes</p>
-                <div className="flex gap-2 overflow-hidden">
-                  {bundle360.resumoExecutivo.ultimosRegistros.length > 0 ? (
-                    bundle360.resumoExecutivo.ultimosRegistros.map((reg, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-[10px] whitespace-nowrap">
-                        {reg.tipo_registro || reg.tipo || 'Registro'}
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-400 italic">Sem registros recentes</span>
-                  )}
+                <p className="text-xs text-slate-500">PENDÊNCIAS DE ATENÇÃO</p>
+                <div className="flex items-center gap-2">
+                  <Badge className={bundle360.resumoExecutivo.pendenciasAtencao > 0 ? "bg-amber-100 text-amber-700 hover:bg-amber-100" : "bg-slate-100 text-slate-500 hover:bg-slate-100"} variant="secondary">
+                    {bundle360.resumoExecutivo.pendenciasAtencao}
+                  </Badge>
+                  <span className="text-xs text-slate-400">cadastrais</span>
                 </div>
               </div>
             </div>

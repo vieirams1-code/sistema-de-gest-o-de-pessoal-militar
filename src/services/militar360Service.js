@@ -1,5 +1,6 @@
 import { listarInconsistenciasCadastraisMilitar } from '../utils/inconsistenciasCadastrais.js';
-import { buildAfastamentosVigentes } from './afastamentosVigentesService.js';
+import { auditarMilitar } from './militarAuditoriaService.js';
+import { determinarStatusOperacional } from './statusOperacionalService.js';
 
 /**
  * Monta o bundle de informações da Ficha 360º do Militar.
@@ -10,6 +11,7 @@ export function montarMilitar360Bundle({
   ferias = [],
   atestados = [],
   registrosLivro = [],
+  jisos = [],
   publicacoes = [],
   promocoes = [],
   medalhas = [],
@@ -30,25 +32,15 @@ export function montarMilitar360Bundle({
     foto: militar?.foto || null,
   };
 
-  // 2. Afastamentos Vigentes (Status Operacional)
-  // Reutiliza a lógica existente de afastamentos
-  const afastamentos = buildAfastamentosVigentes({
+  // 2. Status Operacional
+  // Integração com statusOperacionalService
+  const statusOperacional = determinarStatusOperacional({
+    jisos: jisos || [],
     atestados: atestados || [],
     ferias: ferias || [],
-    registrosLivro: registrosLivro || [],
-    militaresLtip: militar?.condicao === 'LTIP' ? [militar] : [],
+    licencas: registrosLivro || [],
     hoje
   });
-
-  const estaAfastado = afastamentos.length > 0;
-  const principalAfastamento = afastamentos[0] || null;
-
-  const statusOperacional = {
-    situacao: estaAfastado ? 'Afastado' : 'Disponível',
-    detalhe: principalAfastamento ? principalAfastamento.tipoAfastamento : 'Pronto para o serviço',
-    cor: estaAfastado ? 'orange' : 'emerald',
-    afastamentosVigentes: afastamentos,
-  };
 
   // 3. Saúde
   const atestadosAtivos = (atestados || []).filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
@@ -82,14 +74,17 @@ export function montarMilitar360Bundle({
     quantidadeTotal: inconsistencias.length + (pendencias || []).length,
   };
 
-  // 7. Documentos (Armamentos e outros registros se disponíveis)
+  // 7. Documentos
   const documentos = {
     publicacoesRecentes: (publicacoes || []).slice(0, 5),
     quantidadePublicacoes: (publicacoes || []).length,
   };
 
   // 8. Auditoria
+  // Integração com militarAuditoriaService
+  const auditoriaMilitar = auditarMilitar(militar);
   const auditoria = {
+    ...auditoriaMilitar,
     dataCriacao: militar?.created_date || null,
     ultimaAtualizacao: militar?.last_modified_date || null,
     statusCadastro: militar?.status_cadastro || 'Não informado',
@@ -97,7 +92,10 @@ export function montarMilitar360Bundle({
 
   // 9. Resumo Executivo (Agregado para exibição rápida)
   const resumoExecutivo = {
-    statusOperacional: statusOperacional.situacao,
+    statusOperacional: statusOperacional.status,
+    scoreCompletude: auditoriaMilitar.score,
+    pendenciasCriticas: auditoriaMilitar.resumo.totalCriticos,
+    pendenciasAtencao: auditoriaMilitar.resumo.totalAtencao,
     comportamento: militar?.comportamento || 'Não calculado',
     lotacao: militar?.lotacao || 'Não informado',
     funcao: militar?.funcao || 'Não informado',
@@ -110,12 +108,12 @@ export function montarMilitar360Bundle({
   return {
     identidade,
     statusOperacional,
+    auditoria,
     resumoExecutivo,
-    pendencias: pendenciasBundle,
     carreira,
     saude,
     ferias: feriasBundle,
     documentos,
-    auditoria
+    pendencias: pendenciasBundle
   };
 }
