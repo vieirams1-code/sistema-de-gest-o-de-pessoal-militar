@@ -434,9 +434,10 @@ export default function VerMilitar() {
       publicacoes: [], // Removido fetch global novo conforme requisito 7
       medalhas,
       pendencias: pendenciasComportamento,
-      historicoPromocoes
+      historicoPromocoes,
+      periodosAquisitivos: periodos
     });
-  }, [militar, ferias, atestados, registrosLivro, medalhas, pendenciasComportamento, historicoPromocoes]);
+  }, [militar, ferias, atestados, registrosLivro, medalhas, pendenciasComportamento, historicoPromocoes, periodos]);
 
   const proximaMelhoria = React.useMemo(() => {
     if (!militar) return null;
@@ -545,51 +546,116 @@ export default function VerMilitar() {
           }
         </div>
 
-        {/* Resumo Executivo 360 */}
+        {/* Ficha 360º — Visão Geral */}
         {bundle360 && (
-          <Section title="Resumo Executivo 360º" icon={Activity} className="mb-6 border-l-4 border-l-[#1e3a5f]">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">STATUS OPERACIONAL</p>
-                <div className="flex items-center gap-2">
-                  <Badge style={{ backgroundColor: bundle360.statusOperacional.cor, color: 'white' }}>
-                    {bundle360.statusOperacional.status}
-                  </Badge>
-                  <span className="text-xs text-slate-400 truncate max-w-[100px]" title={bundle360.statusOperacional.motivo}>
-                    {bundle360.statusOperacional.motivo}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">COMPLETUDE CADASTRAL</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-700">{bundle360.resumoExecutivo.scoreCompletude}%</p>
-                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
-                    <div
-                      className="h-full bg-emerald-500 transition-all"
-                      style={{ width: `${bundle360.resumoExecutivo.scoreCompletude}%` }}
-                    />
+          <Section title="Ficha 360º — Visão Geral" icon={Activity} className="mb-6 border-l-4 border-l-[#1e3a5f]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 py-2">
+              {/* Situação Operacional */}
+              <Card className="bg-slate-50/50 border-none shadow-none">
+                <CardHeader className="p-3 pb-0">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2">
+                    <Activity className="w-3 h-3" /> Situação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="space-y-2">
+                    <Badge style={{ backgroundColor: bundle360.statusOperacional?.cor || '#64748b', color: 'white' }} className="w-full justify-center">
+                      {bundle360.statusOperacional?.status || 'Não informado'}
+                    </Badge>
+                    <p className="text-xs text-slate-600 font-medium truncate" title={bundle360.statusOperacional?.motivo}>
+                      {bundle360.statusOperacional?.motivo || 'Sem registros'}
+                    </p>
                   </div>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">PENDÊNCIAS CRÍTICAS</p>
-                <div className="flex items-center gap-2">
-                  <Badge variant={bundle360.resumoExecutivo.pendenciasCriticas > 0 ? "destructive" : "outline"} className="h-5">
-                    {bundle360.resumoExecutivo.pendenciasCriticas}
-                  </Badge>
-                  <span className="text-xs text-slate-400">bloqueantes</span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">PENDÊNCIAS DE ATENÇÃO</p>
-                <div className="flex items-center gap-2">
-                  <Badge className={bundle360.resumoExecutivo.pendenciasAtencao > 0 ? "bg-amber-100 text-amber-700 hover:bg-amber-100" : "bg-slate-100 text-slate-500 hover:bg-slate-100"} variant="secondary">
-                    {bundle360.resumoExecutivo.pendenciasAtencao}
-                  </Badge>
-                  <span className="text-xs text-slate-400">cadastrais</span>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
+
+              {/* Carreira */}
+              <Card className="bg-slate-50/50 border-none shadow-none">
+                <CardHeader className="p-3 pb-0">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2">
+                    <Briefcase className="w-3 h-3" /> Carreira
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-700">{bundle360.carreira?.postoAtual || 'Não informado'}</p>
+                    <p className="text-xs text-slate-600">{bundle360.carreira?.tempoServico?.anos_completos ?? '0'} anos de serviço</p>
+                    <p className="text-xs text-slate-600">Comp: {bundle360.carreira?.comportamentoAtual?.comportamento || 'Não informado'}</p>
+                    {bundle360.carreira?.proximaMedalha?.codigo && (
+                      <p className="text-[10px] text-emerald-600 font-medium mt-1 uppercase">Próxima: {bundle360.carreira.proximaMedalha.codigo}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Saúde */}
+              <Card className="bg-slate-50/50 border-none shadow-none">
+                <CardHeader className="p-3 pb-0">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2">
+                    <Heart className="w-3 h-3" /> Saúde
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-700">{bundle360.saude?.statusSaude || 'Sem registros'}</p>
+                    <p className="text-xs text-slate-600">
+                      Último: {formatDate(bundle360.saude?.ultimoAtestado?.data_inicio) || 'Não informado'}
+                    </p>
+                    <p className="text-xs text-slate-600">{bundle360.saude?.diasAfastados12Meses || 0} dias (12m)</p>
+                    {bundle360.saude?.possuiJiso && (
+                      <Badge variant="outline" className="text-[10px] h-4 mt-1 border-purple-200 text-purple-700">JISO ATIVA</Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Férias */}
+              <Card className="bg-slate-50/50 border-none shadow-none">
+                <CardHeader className="p-3 pb-0">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2">
+                    <Calendar className="w-3 h-3" /> Férias
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-slate-700">{bundle360.ferias?.saldoAtual || 0} dias</p>
+                      <Badge variant="outline" className="text-[10px] h-4">
+                        {bundle360.ferias?.periodos?.length || 0} per.
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-600">{bundle360.ferias?.situacaoAtual?.emGozo ? 'Em gozo' : 'Disponível'}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Vencto: {formatDate(bundle360.ferias?.proximoVencimento) || 'Não informado'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Auditoria */}
+              <Card className="bg-slate-50/50 border-none shadow-none">
+                <CardHeader className="p-3 pb-0">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2">
+                    <Shield className="w-3 h-3" /> Auditoria
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-slate-700">{bundle360.auditoria?.score ?? '---'}%</p>
+                      <span className="text-[10px] text-slate-400">Completude</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <Badge variant={bundle360.auditoria?.resumo?.totalCriticos > 0 ? "destructive" : "outline"} className="text-[10px] h-4 px-1">
+                        {bundle360.auditoria?.resumo?.totalCriticos || 0} C
+                      </Badge>
+                      <Badge className={`text-[10px] h-4 px-1 ${bundle360.auditoria?.resumo?.totalAtencao > 0 ? "bg-amber-100 text-amber-700 hover:bg-amber-100" : "bg-slate-100 text-slate-500 hover:bg-slate-100"}`} variant="secondary">
+                        {bundle360.auditoria?.resumo?.totalAtencao || 0} A
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </Section>
         )}
