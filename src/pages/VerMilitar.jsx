@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList } from
+  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList, Clock } from
 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
@@ -26,6 +26,7 @@ import PromocaoFuturaModal from '@/components/antiguidade/PromocaoFuturaModal';
 import CarreiraAntiguidadePanel from '@/components/antiguidade/CarreiraAntiguidadePanel';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
+import MilitarTimelineTab from '@/components/militar/MilitarTimelineTab';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
@@ -739,6 +740,7 @@ export default function VerMilitar() {
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
             {podeVisualizarContratosDesignacao && <TabsTrigger value="contratos-designacao"><ClipboardList className="w-4 h-4 mr-1" />Contratos de Designação</TabsTrigger>}
             <TabsTrigger value="antiguidade"><FileText className="w-4 h-4 mr-1" />Carreira e Antiguidade</TabsTrigger>
+            <TabsTrigger value="timeline"><Clock className="w-4 h-4 mr-1" />Linha do Tempo</TabsTrigger>
           </TabsList>
 
           {/* Dados Pessoais */}
@@ -1156,6 +1158,12 @@ export default function VerMilitar() {
                 await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
               }}
             />
+          </TabsContent>
+
+          <TabsContent value="timeline">
+            <div className="pt-4">
+              <MilitarTimelineTab militarId={id} />
+            </div>
           </TabsContent>
 
         </Tabs>
