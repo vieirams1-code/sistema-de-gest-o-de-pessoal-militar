@@ -562,9 +562,17 @@ export default function VerMilitar() {
                     <Badge style={{ backgroundColor: bundle360.statusOperacional?.cor || '#64748b', color: 'white' }} className="w-full justify-center">
                       {bundle360.statusOperacional?.status || 'Não informado'}
                     </Badge>
-                    <p className="text-xs text-slate-600 font-medium truncate" title={bundle360.statusOperacional?.motivo}>
-                      {bundle360.statusOperacional?.motivo || 'Sem registros'}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-600 font-medium truncate" title={bundle360.statusOperacional?.motivo}>
+                        {bundle360.statusOperacional?.motivo || 'Sem registros'}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate" title={bundle360.resumoExecutivo?.lotacao}>
+                        {bundle360.resumoExecutivo?.lotacao || 'Sem lotação'}
+                      </p>
+                      <Badge variant="outline" className="text-[9px] h-3.5 px-1 font-normal opacity-70">
+                        CAD: {bundle360.auditoria?.statusCadastro || '---'}
+                      </Badge>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -578,11 +586,15 @@ export default function VerMilitar() {
                 </CardHeader>
                 <CardContent className="p-3">
                   <div className="space-y-1">
-                    <p className="text-sm font-bold text-slate-700">{bundle360.carreira?.postoAtual || 'Não informado'}</p>
-                    <p className="text-xs text-slate-600">{bundle360.carreira?.tempoServico?.anos_completos ?? '0'} anos de serviço</p>
+                    <p className="text-sm font-bold text-slate-700 leading-tight">{bundle360.carreira?.postoAtual || 'Não informado'}</p>
+                    <p className="text-[10px] text-slate-500">Prom: {formatDate(bundle360.carreira?.resumoCarreira?.dataUltimaPromocao) || '---'}</p>
+                    <p className="text-xs text-slate-600 font-medium">{bundle360.carreira?.tempoServico?.anos_completos ?? '0'} anos de serviço</p>
+                    <p className="text-xs text-slate-600 truncate" title={bundle360.resumoExecutivo?.funcao}>
+                      {bundle360.resumoExecutivo?.funcao || 'Sem função'}
+                    </p>
                     <p className="text-xs text-slate-600">Comp: {bundle360.carreira?.comportamentoAtual?.comportamento || 'Não informado'}</p>
                     {bundle360.carreira?.proximaMedalha?.codigo && (
-                      <p className="text-[10px] text-emerald-600 font-medium mt-1 uppercase">Próxima: {bundle360.carreira.proximaMedalha.codigo}</p>
+                      <p className="text-[10px] text-emerald-600 font-medium uppercase">Próxima: {bundle360.carreira.proximaMedalha.codigo}</p>
                     )}
                   </div>
                 </CardContent>
@@ -653,6 +665,9 @@ export default function VerMilitar() {
                         {bundle360.auditoria?.resumo?.totalAtencao || 0} A
                       </Badge>
                     </div>
+                    <p className="text-[9px] text-slate-400 mt-1 leading-tight">
+                      Atu: {formatDate(bundle360.auditoria?.ultimaAtualizacao) || '---'}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
