@@ -610,37 +610,36 @@ export default function ConciliacaoBoletim() {
   }, [ocorrenciasNotasPendentes]);
 
   const conciliacaoAutomatica = useMemo(() => {
-    if (!conciliacaoIniciada || !pendentes.length || !notasEncontradas.length) return {};
+    if (!conciliacaoIniciada || !pendentes.length || !mapaNotasByNumero.size) return {};
 
-    const mapaNotasBoletim = new Map(notasEncontradas.map((nota) => [nota.nota_normalizada, nota.id]));
     const auto = {};
 
     for (const pub of pendentes) {
       if (!pub.nota_normalizada) continue;
       if ((ocorrenciasNotasPendentes.get(pub.nota_normalizada) || 0) !== 1) continue;
-      if (mapaNotasBoletim.has(pub.nota_normalizada)) {
-        auto[pub.id] = mapaNotasBoletim.get(pub.nota_normalizada);
+      const notaEncontrada = mapaNotasByNumero.get(pub.nota_normalizada);
+      if (notaEncontrada) {
+        auto[pub.id] = notaEncontrada.id;
       }
     }
 
     return auto;
-  }, [conciliacaoIniciada, pendentes, notasEncontradas, ocorrenciasNotasPendentes]);
+  }, [conciliacaoIniciada, pendentes, mapaNotasByNumero, ocorrenciasNotasPendentes]);
 
   const vinculosPersistidos = useMemo(() => {
-    if (!notasEncontradas.length) return {};
-    const porNumero = new Map(notasEncontradas.map((nota) => [nota.nota_normalizada, nota.id]));
+    if (!mapaNotasByNumero.size) return {};
     const resultado = {};
 
     for (const pub of pendentes) {
       if (!pub.nota_conciliada_persistida) continue;
-      const notaId = porNumero.get(pub.nota_conciliada_persistida);
-      if (notaId) {
-        resultado[pub.id] = notaId;
+      const notaEncontrada = mapaNotasByNumero.get(pub.nota_conciliada_persistida);
+      if (notaEncontrada) {
+        resultado[pub.id] = notaEncontrada.id;
       }
     }
 
     return resultado;
-  }, [pendentes, notasEncontradas]);
+  }, [pendentes, mapaNotasByNumero]);
 
   const vinculosEfetivos = useMemo(() => {
     const combinados = { ...vinculosPersistidos, ...conciliacaoAutomatica };
@@ -663,6 +662,7 @@ export default function ConciliacaoBoletim() {
   }, [conciliacaoAutomatica, vinculosPersistidos, vinculos, vinculosRemovidos]);
 
   const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
+  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
 
   const mapaVinculosInvertido = useMemo(() => {
     const mapa = new Map();
@@ -677,22 +677,36 @@ export default function ConciliacaoBoletim() {
   const notasConciliadasIds = useMemo(() => new Set(mapaVinculosInvertido.keys()), [mapaVinculosInvertido]);
 
   useEffect(() => {
+    const idsAtivos = new Set(pendentes.map((item) => item.id));
+
     setVinculos((atual) => {
-      const permitidos = new Set(pendentes.map((item) => item.id));
-      const filtrados = Object.fromEntries(Object.entries(atual).filter(([pubId]) => permitidos.has(pubId)));
-      return Object.keys(filtrados).length === Object.keys(atual).length ? atual : filtrados;
+      const entries = Object.entries(atual);
+      const filtrados = Object.fromEntries(entries.filter(([id]) => idsAtivos.has(id)));
+      return Object.keys(filtrados).length === entries.length ? atual : filtrados;
     });
 
     setVinculosRemovidos((atual) => {
-      const permitidos = new Set(pendentes.map((item) => item.id));
-      const filtrados = Object.fromEntries(Object.entries(atual).filter(([pubId]) => permitidos.has(pubId)));
-      return Object.keys(filtrados).length === Object.keys(atual).length ? atual : filtrados;
+      const entries = Object.entries(atual);
+      const filtrados = Object.fromEntries(entries.filter(([id]) => idsAtivos.has(id)));
+      return Object.keys(filtrados).length === entries.length ? atual : filtrados;
     });
   }, [pendentes]);
 
-  const pendentesSemCorrespondencia = pendentes.filter((pub) => !vinculosEfetivos[pub.id]);
-  const publicacoesConciliadas = pendentes.filter((pub) => !!vinculosEfetivos[pub.id]);
-  const notasSemItem = notasEncontradas.filter((nota) => !notasConciliadasIds.has(nota.id));
+  const pendentesSemCorrespondencia = useMemo(
+    () => pendentes.filter((pub) => !vinculosEfetivos[pub.id]),
+    [pendentes, vinculosEfetivos]
+  );
+
+  const publicacoesConciliadas = useMemo(
+    () => pendentes.filter((pub) => !!vinculosEfetivos[pub.id]),
+    [pendentes, vinculosEfetivos]
+  );
+
+  const notasSemItem = useMemo(
+    () => notasEncontradas.filter((nota) => !notasConciliadasIds.has(nota.id)),
+    [notasEncontradas, notasConciliadasIds]
+  );
+
   const existeDuplicidadeNosVinculos = useMemo(() => {
     for (const ids of mapaVinculosInvertido.values()) {
       if (ids.length > 1) return true;
@@ -706,7 +720,6 @@ export default function ConciliacaoBoletim() {
     publicacoesConciliadas.forEach((pub) => {
       const notaId = vinculosEfetivos[pub.id];
       const nota = mapaNotasById.get(notaId);
-      if (!nota) return;
 
       mapa[pub.id] = calcularCorrespondenciaTextual(pub, nota);
     });
@@ -890,10 +903,9 @@ export default function ConciliacaoBoletim() {
     setConciliacaoIniciada(true);
 
     try {
-      const porNumero = new Map(notasEncontradas.map((nota) => [nota.nota_normalizada, nota]));
       const pendentesAuto = pendentes.filter((pub) => {
         if (!pub.nota_normalizada) return false;
-        if (!porNumero.has(pub.nota_normalizada)) return false;
+        if (!mapaNotasByNumero.has(pub.nota_normalizada)) return false;
         return (ocorrenciasNotasPendentes.get(pub.nota_normalizada) || 0) === 1;
       });
 
