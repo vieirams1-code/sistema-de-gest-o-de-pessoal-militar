@@ -87,11 +87,17 @@ async function reindexarColunaComEspacos(colunaId, cardsDaColuna = []) {
       ordem: (index + 1) * ORDER_STEP,
     }));
 
-  for (const card of ordenados) {
-    await base44.entities.CardOperacional.update(card.id, {
-      coluna_id: colunaId,
-      ordem: card.ordem,
-    });
+  const entity = base44.entities.CardOperacional;
+  const payloads = ordenados.map((card) => ({
+    id: card.id,
+    coluna_id: colunaId,
+    ordem: card.ordem,
+  }));
+
+  if (entity.bulkUpdate) {
+    await entity.bulkUpdate(payloads);
+  } else {
+    await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
   }
 
   return ordenados;
@@ -416,12 +422,19 @@ export default function QuadroOperacionalPage() {
     queryClient.setQueryData(['colunas', quadro?.id], colunasComNovaOrdem);
 
     try {
-      const updates = colunasComNovaOrdem
-        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem)
-        .map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem }));
+      const alterados = colunasComNovaOrdem.filter((coluna) => (
+        ordemOriginal.get(coluna.id) !== coluna.ordem
+      ));
 
-      if (updates.length) {
-        await Promise.all(updates);
+      if (alterados.length) {
+        const entity = base44.entities.ColunaOperacional;
+        const payloads = alterados.map((coluna) => ({ id: coluna.id, ordem: coluna.ordem }));
+
+        if (entity.bulkUpdate) {
+          await entity.bulkUpdate(payloads);
+        } else {
+          await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
