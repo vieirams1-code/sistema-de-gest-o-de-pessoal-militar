@@ -5,6 +5,7 @@ import { getMilitarTimeline, __setMilitarTimelineClientForTests } from '../milit
 // Helper para criar mock de entidade
 const createMockEntity = (data = []) => ({
   filter: async () => data,
+  list: async () => data,
 });
 
 test('getMilitarTimeline - ordena por data decrescente', async () => {
@@ -16,6 +17,10 @@ test('getMilitarTimeline - ordena por data decrescente', async () => {
       Atestado: createMockEntity([{ id: 'a1', data_inicio: '2023-04-01', dias: 5 }]),
       HistoricoPromocaoMilitarV2: createMockEntity([{ id: 'pr1', data_promocao: '2023-05-01', posto_graduacao_novo: 'Cabo' }]),
       Medalha: createMockEntity([{ id: 'm1', data_concessao: '2023-06-01', tipo_medalha_nome: 'Medalha X' }]),
+      MilitarFuncao: createMockEntity([]),
+      GratificacaoFuncao: createMockEntity([]),
+      FuncaoMilitar: createMockEntity([]),
+      TipoGratificacaoFuncao: createMockEntity([]),
     },
   };
 
@@ -34,6 +39,7 @@ test('getMilitarTimeline - ordena por data decrescente', async () => {
   // Verifica campos novos
   assert.equal(timeline[0].id, 'm1');
   assert.equal(timeline[0].origem, 'Medalha');
+  assert.equal(timeline[0].categoria, 'Carreira');
 });
 
 test('getMilitarTimeline - lida com múltiplos eventos na mesma data', async () => {
@@ -45,6 +51,10 @@ test('getMilitarTimeline - lida com múltiplos eventos na mesma data', async () 
       Atestado: createMockEntity([]),
       HistoricoPromocaoMilitarV2: createMockEntity([]),
       Medalha: createMockEntity([]),
+      MilitarFuncao: createMockEntity([]),
+      GratificacaoFuncao: createMockEntity([]),
+      FuncaoMilitar: createMockEntity([]),
+      TipoGratificacaoFuncao: createMockEntity([]),
     },
   };
 
@@ -66,6 +76,10 @@ test('getMilitarTimeline - ignora eventos sem data', async () => {
       Atestado: createMockEntity([]),
       HistoricoPromocaoMilitarV2: createMockEntity([]),
       Medalha: createMockEntity([]),
+      MilitarFuncao: createMockEntity([]),
+      GratificacaoFuncao: createMockEntity([]),
+      FuncaoMilitar: createMockEntity([]),
+      TipoGratificacaoFuncao: createMockEntity([]),
     },
   };
 
@@ -87,6 +101,10 @@ test('getMilitarTimeline - remove eventos duplicados', async () => {
       Atestado: createMockEntity([]),
       HistoricoPromocaoMilitarV2: createMockEntity([]),
       Medalha: createMockEntity([]),
+      MilitarFuncao: createMockEntity([]),
+      GratificacaoFuncao: createMockEntity([]),
+      FuncaoMilitar: createMockEntity([]),
+      TipoGratificacaoFuncao: createMockEntity([]),
     },
   };
 
@@ -107,6 +125,10 @@ test('getMilitarTimeline - formatação correta dos campos', async () => {
       Atestado: createMockEntity([{ id: 'a1', data_inicio: '2023-02-01', dias: 3, tipo_afastamento: 'LTS', cid_10: 'Z00' }]),
       HistoricoPromocaoMilitarV2: createMockEntity([{ id: 'pr1', data_promocao: '2023-03-01', posto_graduacao_novo: 'Sgt', quadro_novo: 'QPBM', boletim_referencia: 'BG 100' }]),
       Medalha: createMockEntity([]),
+      MilitarFuncao: createMockEntity([]),
+      GratificacaoFuncao: createMockEntity([]),
+      FuncaoMilitar: createMockEntity([]),
+      TipoGratificacaoFuncao: createMockEntity([]),
     },
   };
 
@@ -118,13 +140,49 @@ test('getMilitarTimeline - formatação correta dos campos', async () => {
   assert.equal(promo.titulo, 'Sgt QPBM');
   assert.equal(promo.descricao, 'Boletim: BG 100');
   assert.equal(promo.origem, 'HistoricoPromocaoMilitarV2');
+  assert.equal(promo.categoria, 'Carreira');
 
   const ferias = timeline.find(it => it.tipo === 'Férias');
   assert.equal(ferias.descricao, '15 dias ref. ao período 2022/2023');
   assert.equal(ferias.origem, 'Ferias');
+  assert.equal(ferias.categoria, 'Férias');
 
   const atestado = timeline.find(it => it.tipo === 'Atestado');
   assert.equal(atestado.titulo, 'LTS');
   assert.equal(atestado.descricao, '3 dias - CID: Z00');
   assert.equal(atestado.origem, 'Atestado');
+  assert.equal(atestado.categoria, 'Saúde');
+});
+
+test('getMilitarTimeline - inclui funções e gratificações', async () => {
+  const mockBase44 = {
+    entities: {
+      RegistroLivro: createMockEntity([]),
+      PublicacaoExOfficio: createMockEntity([]),
+      Ferias: createMockEntity([]),
+      Atestado: createMockEntity([]),
+      HistoricoPromocaoMilitarV2: createMockEntity([]),
+      Medalha: createMockEntity([]),
+      MilitarFuncao: createMockEntity([{ id: 'vf1', militar_id: 'm1', funcao_militar_id: 'f1', data_inicio: '2023-07-01', principal: true, status: 'ativa' }]),
+      GratificacaoFuncao: createMockEntity([{ id: 'gf1', militar_id: 'm1', tipo_gratificacao_funcao_id: 'tg1', data_solicitacao: '2023-08-01', funcao_gratificada: 'Comandante', status: 'nomeado_ativo' }]),
+      FuncaoMilitar: createMockEntity([{ id: 'f1', nome: 'Comandante de Pelotão' }]),
+      TipoGratificacaoFuncao: createMockEntity([{ id: 'tg1', nome: 'Gratificação de Comando' }]),
+    },
+  };
+
+  __setMilitarTimelineClientForTests(mockBase44);
+
+  const timeline = await getMilitarTimeline('m1');
+
+  assert.equal(timeline.length, 2);
+
+  const func = timeline.find(it => it.tipo === 'Função');
+  assert.equal(func.titulo, 'Comandante de Pelotão');
+  assert.equal(func.categoria, 'Função');
+  assert.ok(func.descricao.includes('Principal'));
+
+  const grat = timeline.find(it => it.tipo === 'Gratificação');
+  assert.equal(grat.titulo, 'Gratificação de Comando');
+  assert.equal(grat.categoria, 'Gratificação');
+  assert.ok(grat.descricao.includes('Comandante'));
 });
