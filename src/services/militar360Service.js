@@ -1,6 +1,11 @@
 import { listarInconsistenciasCadastraisMilitar } from '../utils/inconsistenciasCadastrais.js';
 import { auditarMilitar } from './militarAuditoriaService.js';
 import { determinarStatusOperacional } from './statusOperacionalService.js';
+import { montarConsolidadoCarreira } from './militarCarreiraService.js';
+import { consolidarSaudeMilitar } from './militarSaudeService.js';
+import { consolidarFerias } from './militarFeriasService.js';
+import { getDocumentosUnificados } from './militarDocumentosService.js';
+import { calcularCompletudeMilitar } from './completudeMilitarService.js';
 
 /**
  * Monta o bundle de informações da Ficha 360º do Militar.
@@ -13,12 +18,16 @@ export function montarMilitar360Bundle({
   registrosLivro = [],
   jisos = [],
   publicacoes = [],
-  promocoes = [],
+  promocoes = [], // Adicionado para suportar chamadas legadas ou específicas se houver
   medalhas = [],
   pendencias = [],
   historicoPromocoes = [],
+  periodosAquisitivos = [],
   hoje = new Date()
 } = {}) {
+  // Garantir que usamos historicoPromocoes se promocoes vier vazio
+  const listaPromocoes = (promocoes && promocoes.length > 0) ? promocoes : historicoPromocoes;
+
   // 1. Identidade
   const identidade = {
     id: militar?.id || null,
@@ -32,8 +41,7 @@ export function montarMilitar360Bundle({
     foto: militar?.foto || null,
   };
 
-  // 2. Status Operacional
-  // Integração com statusOperacionalService
+  // 2. Status Operacional (via statusOperacionalService)
   const statusOperacional = determinarStatusOperacional({
     jisos: jisos || [],
     atestados: atestados || [],
@@ -42,31 +50,44 @@ export function montarMilitar360Bundle({
     hoje
   });
 
-  // 3. Saúde
-  const atestadosAtivos = (atestados || []).filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
+  // 3. Saúde (via militarSaudeService)
+  const saudeConsolidada = consolidarSaudeMilitar(atestados, jisos, hoje);
   const saude = {
-    possuiAtestadoVigente: atestadosAtivos.length > 0,
-    ultimoAtestado: (atestados || [])[0] || null,
-    quantidadeAtestadosHistorico: (atestados || []).length,
+    ...saudeConsolidada,
+    possuiAtestadoVigente: saudeConsolidada.afastamentoAtivo, // Backward compatibility
+    ultimoAtestado: saudeConsolidada.ultimoAtestado,
+    quantidadeAtestadosHistorico: saudeConsolidada.quantidadeAtestados,
   };
 
-  // 4. Férias
-  const feriasEmCurso = (ferias || []).find(f => String(f.status).toLowerCase() === 'em curso');
+  // 4. Férias (via militarFeriasService)
+  const feriasConsolidadas = consolidarFerias({
+    periodosAquisitivos,
+    ferias,
+    hoje
+  });
   const feriasBundle = {
-    emFerias: !!feriasEmCurso,
+    ...feriasConsolidadas,
+    emFerias: feriasConsolidadas.situacaoAtual.emGozo, // Backward compatibility
     proximasFerias: (ferias || []).find(f => new Date(f.data_inicio) > hoje) || null,
-    historicoResumido: (ferias || []).slice(0, 3),
+    historicoResumido: feriasConsolidadas.historico.slice(0, 3),
   };
 
-  // 5. Carreira
+  // 5. Carreira (via militarCarreiraService)
+  const carreiraConsolidada = montarConsolidadoCarreira({
+    militar,
+    historicoPromocoes: listaPromocoes,
+    medalhas,
+    comportamento: militar?.comportamento
+  });
   const carreira = {
+    ...carreiraConsolidada,
     postoAtual: militar?.posto_graduacao || 'Não informado',
-    dataUltimaPromocao: (historicoPromocoes || [])[0]?.data_promocao || null,
-    proximaPromocaoEstimada: 'Não calculado', // Evolução futura
-    historicoResumido: (historicoPromocoes || []).slice(0, 3),
+    dataUltimaPromocao: carreiraConsolidada.promocaoAtual?.data_promocao || null,
+    proximaPromocaoEstimada: 'Não calculado',
+    historicoResumido: carreiraConsolidada.historicoPromocoes.slice(0, 3),
   };
 
-  // 6. Pendências
+  // 6. Pendências (Legado + inconsistências calculadas)
   const inconsistencias = listarInconsistenciasCadastraisMilitar(militar);
   const pendenciasBundle = {
     cadastrais: inconsistencias,
@@ -74,14 +95,24 @@ export function montarMilitar360Bundle({
     quantidadeTotal: inconsistencias.length + (pendencias || []).length,
   };
 
-  // 7. Documentos
+  // 7. Documentos (via militarDocumentosService)
+  const documentosUnificados = getDocumentosUnificados({
+    publicacoes,
+    registrosLivro,
+    atestados,
+    ferias,
+    promocoes: listaPromocoes,
+    medalhas
+  });
+
   const documentos = {
-    publicacoesRecentes: (publicacoes || []).slice(0, 5),
-    quantidadePublicacoes: (publicacoes || []).length,
+    itens: documentosUnificados,
+    quantidadeTotal: documentosUnificados.length,
+    publicacoesRecentes: documentosUnificados.filter(d => d.tipo === 'Publicação').slice(0, 5),
+    quantidadePublicacoes: documentosUnificados.filter(d => d.tipo === 'Publicação').length, // Backward compatibility
   };
 
-  // 8. Auditoria
-  // Integração com militarAuditoriaService
+  // 8. Auditoria (via militarAuditoriaService)
   const auditoriaMilitar = auditarMilitar(militar);
   const auditoria = {
     ...auditoriaMilitar,
@@ -90,10 +121,14 @@ export function montarMilitar360Bundle({
     statusCadastro: militar?.status_cadastro || 'Não informado',
   };
 
-  // 9. Resumo Executivo (Agregado para exibição rápida)
+  // 9. Completude (via completudeMilitarService)
+  const completude = calcularCompletudeMilitar(militar);
+
+  // 10. Resumo Executivo (Agregado para exibição rápida e compatibilidade UI)
   const resumoExecutivo = {
     statusOperacional: statusOperacional.status,
     scoreCompletude: auditoriaMilitar.score,
+    percentualCompletude: completude.percentual,
     pendenciasCriticas: auditoriaMilitar.resumo.totalCriticos,
     pendenciasAtencao: auditoriaMilitar.resumo.totalAtencao,
     comportamento: militar?.comportamento || 'Não calculado',
@@ -103,12 +138,14 @@ export function montarMilitar360Bundle({
     situacaoSaude: saude.possuiAtestadoVigente ? 'Com afastamento' : 'Sem restrições',
     quantidadePendencias: pendenciasBundle.quantidadeTotal,
     ultimosRegistros: (registrosLivro || []).slice(0, 3),
+    tempoServicoTexto: carreiraConsolidada.resumoCarreira.texto,
   };
 
   return {
     identidade,
     statusOperacional,
     auditoria,
+    completude,
     resumoExecutivo,
     carreira,
     saude,

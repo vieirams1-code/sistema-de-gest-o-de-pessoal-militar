@@ -34,7 +34,7 @@ test('montarMilitar360Bundle - militar com atestado ativo', () => {
   const bundle = montarMilitar360Bundle({ militar, atestados, hoje });
 
   assert.equal(bundle.statusOperacional.status, 'AFASTADO');
-  assert.equal(bundle.saude.possuiAtestadoVigente, true);
+  assert.equal(bundle.saude.afastamentoAtivo, true);
   assert.equal(bundle.resumoExecutivo.situacaoSaude, 'Com afastamento');
 });
 
@@ -46,7 +46,7 @@ test('montarMilitar360Bundle - militar em férias', () => {
   const bundle = montarMilitar360Bundle({ militar, ferias, hoje });
 
   assert.equal(bundle.statusOperacional.status, 'FERIAS');
-  assert.equal(bundle.ferias.emFerias, true);
+  assert.equal(bundle.ferias.situacaoAtual.emGozo, true);
   assert.equal(bundle.resumoExecutivo.situacaoFerias, 'Em gozo');
 });
 
@@ -67,8 +67,8 @@ test('montarMilitar360Bundle - ausência de arrays opcionais', () => {
   const bundle = montarMilitar360Bundle({ militar });
 
   assert.equal(bundle.identidade.nomeCompleto, 'João');
-  assert.ok(Array.isArray(bundle.ferias.historicoResumido));
-  assert.ok(Array.isArray(bundle.carreira.historicoResumido));
+  assert.ok(Array.isArray(bundle.ferias.historico));
+  assert.ok(Array.isArray(bundle.carreira.historicoPromocoes));
 });
 
 test('montarMilitar360Bundle - datas inválidas sem quebrar', () => {
@@ -78,5 +78,5 @@ test('montarMilitar360Bundle - datas inválidas sem quebrar', () => {
   const bundle = montarMilitar360Bundle({ militar, ferias });
 
   assert.equal(bundle.auditoria.dataCriacao, 'data-invalida');
-  assert.equal(bundle.ferias.emFerias, false);
+  assert.equal(bundle.ferias.situacaoAtual.emGozo, false);
 });
