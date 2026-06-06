@@ -152,7 +152,7 @@ function CotaModal({ open, onOpenChange, initialData, tipos, onSubmit, saving })
 
 const GRATIFICACAO_FORM_DEFAULT = {
   militar_id: '', tipo_gratificacao_funcao_id: '', cota_gratificacao_funcao_id: '', funcao_gratificada: '', numero_processo: '', observacoes: '', status: GRATIFICACAO_STATUS.RASCUNHO,
-  data_publicacao_nomeacao: '', doems_nomeacao_numero: '', doems_nomeacao_edicao: '', doems_nomeacao_link: '', ato_nomeacao_numero: '', data_inicio_efeitos: '',
+  data_solicitacao: '', data_publicacao_nomeacao: '', doems_nomeacao_numero: '', doems_nomeacao_edicao: '', doems_nomeacao_link: '', ato_nomeacao_numero: '', data_inicio_efeitos: '',
 };
 
 function GratificacaoModal({ open, onOpenChange, initialData, tipos, saving, onSubmit }) {
@@ -168,7 +168,7 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, saving, onS
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar rascunho de gratificação' : 'Nova Gratificação'}</DialogTitle>
           <DialogDescription>
-            {isEditing ? 'Atualize os dados básicos deste rascunho antes de prosseguir com o fluxo de publicação.' : 'Registre uma nova gratificação diretamente como ativa. Os dados de publicação e efeitos são obrigatórios.'}
+            {isEditing ? 'Atualize os dados básicos deste rascunho antes de prosseguir com o fluxo de publicação.' : 'Registre uma nova gratificação. Informe a data da solicitação e, quando houver publicação, registre os dados do DOEMS.'}
             {!isEditing && (
               <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
                 <span className="font-bold">Aviso:</span> Ao salvar, a gratificação será registrada como ativa.
@@ -191,11 +191,11 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, saving, onS
           </Field>
           {!isEditing && (
             <>
-              <Field label="Data da publicação *">
-                <Input type="date" value={form.data_publicacao_nomeacao || ''} onChange={(e) => update('data_publicacao_nomeacao', e.target.value)} />
+              <Field label="Data da Solicitação *">
+                <Input type="date" value={form.data_solicitacao || ''} onChange={(e) => update('data_solicitacao', e.target.value)} />
               </Field>
-              <Field label="Início dos efeitos *">
-                <Input type="date" value={form.data_inicio_efeitos || ''} onChange={(e) => update('data_inicio_efeitos', e.target.value)} />
+              <Field label="Data da Publicação">
+                <Input type="date" value={form.data_publicacao_nomeacao || ''} onChange={(e) => update('data_publicacao_nomeacao', e.target.value)} />
               </Field>
               <Field label="DOEMS número">
                 <Input value={form.doems_nomeacao_numero || ''} onChange={(e) => update('doems_nomeacao_numero', e.target.value)} placeholder="Ex: 11000" />
@@ -206,17 +206,8 @@ function GratificacaoModal({ open, onOpenChange, initialData, tipos, saving, onS
               <Field label="DOEMS link" className="md:col-span-2">
                 <Input value={form.doems_nomeacao_link || ''} onChange={(e) => update('doems_nomeacao_link', e.target.value)} placeholder="https://..." />
               </Field>
-              <Field label="Ato de nomeação" className="md:col-span-2">
-                <Input value={form.ato_nomeacao_numero || ''} onChange={(e) => update('ato_nomeacao_numero', e.target.value)} placeholder="Número do ato, se houver" />
-              </Field>
             </>
           )}
-          <Field label="Número do processo">
-            <Input value={form.numero_processo || ''} onChange={(e) => update('numero_processo', e.target.value)} />
-          </Field>
-          <Field label="Status">
-            <Input value={isEditing ? (GRATIFICACAO_STATUS_LABELS[form.status] || form.status) : 'Nomeado ativo'} disabled />
-          </Field>
           <Field label="Observações" className="md:col-span-2">
             <Textarea value={form.observacoes || ''} onChange={(e) => update('observacoes', e.target.value)} />
           </Field>

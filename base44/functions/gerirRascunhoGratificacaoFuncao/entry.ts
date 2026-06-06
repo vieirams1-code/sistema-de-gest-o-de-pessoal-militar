@@ -113,9 +113,7 @@ function sanitizePayload(input: any = {}, operacao: string) {
     if (!out.funcao_gratificada) throw withStatus('funcao_gratificada é obrigatória.', 400);
 
     if (operacao === 'criar_nomeacao_ativa') {
-      if (!out.data_publicacao_nomeacao) throw withStatus('data_publicacao_nomeacao é obrigatória.', 400);
-      if (!out.data_inicio_efeitos) throw withStatus('data_inicio_efeitos é obrigatória.', 400);
-      if (!out.doems_nomeacao_numero && !out.doems_nomeacao_edicao) throw withStatus('doems_nomeacao_numero ou doems_nomeacao_edicao é obrigatório.', 400);
+      if (!out.data_solicitacao) throw withStatus('data_solicitacao é obrigatória.', 400);
     }
   }
   return out;
@@ -196,6 +194,7 @@ function montarRegistroGratificacao(data: Record<string, any>, refs: any, authUs
     nivel_gratificacao: cota?.nivel_gratificacao || tipo?.nivel || '',
     tipo_gratificacao: cota?.tipo_gratificacao || tipo?.nome || tipo?.sigla || tipo?.codigo || '',
     status: status,
+    data_solicitacao: data.data_solicitacao || null,
     numero_processo: data.numero_processo,
     observacoes: data.observacoes,
     solicitado_por: authUser?.email || '',
@@ -211,12 +210,12 @@ function montarRegistroGratificacao(data: Record<string, any>, refs: any, authUs
   };
 
   if (status === STATUS_GRATIFICACAO_ATIVA) {
-    registro.data_publicacao_nomeacao = data.data_publicacao_nomeacao;
-    registro.data_inicio_efeitos = data.data_inicio_efeitos;
-    registro.doems_nomeacao_numero = data.doems_nomeacao_numero;
-    registro.doems_nomeacao_edicao = data.doems_nomeacao_edicao;
-    registro.doems_nomeacao_link = data.doems_nomeacao_link;
-    registro.ato_nomeacao_numero = data.ato_nomeacao_numero;
+    registro.data_publicacao_nomeacao = data.data_publicacao_nomeacao || null;
+    registro.data_inicio_efeitos = data.data_inicio_efeitos || null;
+    registro.doems_nomeacao_numero = data.doems_nomeacao_numero || '';
+    registro.doems_nomeacao_edicao = data.doems_nomeacao_edicao || '';
+    registro.doems_nomeacao_link = data.doems_nomeacao_link || '';
+    registro.ato_nomeacao_numero = data.ato_nomeacao_numero || '';
     registro.status_alterado_em = new Date().toISOString();
     registro.status_alterado_por = authUser.email || '';
   }
