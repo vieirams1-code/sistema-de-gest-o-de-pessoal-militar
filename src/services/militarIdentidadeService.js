@@ -382,11 +382,18 @@ export async function atualizarMilitarSemTrocarMatricula(militarId, payload = {}
 async function encerrarMatriculasAtuais(matriculaEntity, militarId, dataEncerramento) {
   const atuais = await matriculaEntity.filter({ militar_id: militarId, is_atual: true });
   if (Array.isArray(atuais) && atuais.length > 0) {
-    await Promise.all(atuais.map((atual) => matriculaEntity.update(atual.id, {
+    const payloads = atuais.map((atual) => ({
+      id: atual.id,
       is_atual: false,
       data_fim: dataEncerramento || new Date().toISOString().slice(0, 10),
       motivo: atual.motivo || 'Encerrada por inclusão de nova matrícula.',
-    })));
+    }));
+
+    if (matriculaEntity.bulkUpdate) {
+      await matriculaEntity.bulkUpdate(payloads);
+    } else {
+      await Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
+    }
   }
 }
 
@@ -552,10 +559,10 @@ async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
     const payloads = (v.items || []).map((row) => ({ id: row.id, militar_id: militarDestinoId }));
     if (payloads.length === 0) return;
 
-    if (typeof v.entity.bulkUpdate === 'function') {
+    if (v.entity.bulkUpdate) {
       return v.entity.bulkUpdate(payloads);
     }
-    return Promise.all(payloads.map((p) => v.entity.update(p.id, p)));
+    return Promise.all(payloads.map(({ id, ...rest }) => v.entity.update(id, rest)));
   });
 
   return Promise.all(promises);
@@ -798,7 +805,7 @@ async function processarAnaliseMigracao(militares, matriculas, dryRun, matricula
     if (matriculaEntity.bulkCreate) {
       await matriculaEntity.bulkCreate(aCriar);
     } else {
-      await Promise.all(aCriar.map((p) => matriculaEntity.create(p)));
+      await Promise.all(aCriar.map((payload) => matriculaEntity.create(payload)));
     }
   }
 
