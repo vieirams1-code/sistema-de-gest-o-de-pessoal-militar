@@ -23,6 +23,7 @@ import {
   GRATIFICACAO_TAB_LABELS,
   STATUS_PENDENTES,
   aplicarFiltrosGratificacoesFuncao,
+  calcularResumoGratificacoesFuncao,
   fetchPainelGratificacoesFuncao,
   filtrarGratificacoesPorAba,
   gerirCadastrosGratificacaoFuncao,
