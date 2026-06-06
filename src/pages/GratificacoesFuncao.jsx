@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Award, Edit, History, Loader2, Plus, Search, Settings, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, Award, Edit, History, Loader2, Plus, Search, Settings, ShieldAlert, Trash2, Users } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { Switch } from '@/components/ui/switch';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,8 +31,8 @@ import {
   gerirRascunhoGratificacaoFuncao,
   getMatriculaGratificacao,
   getNomeMilitarGratificacao,
-  getTipoGratificacaoLabel,
   listarOpcoesGratificacao,
+  deletarGratificacao,
 } from '@/services/gratificacoesFuncaoService';
 
 const TODOS = 'todos';
@@ -90,31 +91,32 @@ function Field({ label, children, className = '' }) {
   return <div className={className}><Label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</Label>{children}</div>;
 }
 
-function GratificacoesTable({ gratificacoes, tipos, canManageGratificacoes = false, onEditRascunho, onEnviarDP, onAguardandoPublicacao, onRegistrarPublicacao, onFinalizar }) {
+function GratificacoesTable({ gratificacoes, tipos, canManageGratificacoes = false, modoAdmin = false, onEditRascunho, onEnviarDP, onAguardandoPublicacao, onRegistrarPublicacao, onFinalizar, onExcluir }) {
   const tiposById = useMemo(() => new Map((tipos || []).map((tipo) => [String(tipo?.id || ''), tipo?.nome || tipo?.sigla || tipo?.codigo || ''])), [tipos]);
   if (!gratificacoes.length) return <EmptyState />;
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Militar</th><th className="px-4 py-3">Função</th><th className="px-4 py-3">Tipo / nível</th><th className="px-4 py-3">Unidade / setor</th><th className="px-4 py-3">Publicação / processo</th><th className="px-4 py-3">Efeitos</th><th className="px-4 py-3">Status</th>{canManageGratificacoes && <th className="px-4 py-3 text-right">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-100">{gratificacoes.map((item) => <tr key={item.id} className="align-top hover:bg-slate-50/80"><td className="min-w-[14rem] px-4 py-4"><p className="font-semibold text-slate-900">{getNomeMilitarGratificacao(item)}</p><p className="text-xs text-slate-500">{item.posto_graduacao_snapshot || 'Posto/graduação não informado'} · Mat. {getMatriculaGratificacao(item)}</p></td><td className="min-w-[13rem] px-4 py-4"><p className="font-medium text-slate-900">{item.funcao_gratificada || '—'}</p><p className="text-xs text-slate-500">{item.codigo_funcao || 'Código não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{getTipoGratificacaoLabel(item, tiposById)}</p><p className="text-xs text-slate-500">{item.nivel_gratificacao || 'Nível não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{item.unidade_nome_snapshot || '—'}</p><p className="text-xs text-slate-500">{item.setor_nome_snapshot || 'Setor não informado'}</p></td><td className="min-w-[14rem] px-4 py-4"><p className="font-medium text-slate-900">{item.doems_nomeacao_numero || item.doems_dispensa_numero || item.ato_nomeacao_numero || item.ato_dispensa_numero || '—'}</p><p className="text-xs text-slate-500">{item.numero_processo || item.documento_solicitacao || 'Processo/documento não informado'}</p></td><td className="min-w-[10rem] px-4 py-4 text-xs text-slate-600"><p>Início: <span className="font-medium text-slate-800">{formatDate(item.data_inicio_efeitos || item.data_publicacao_nomeacao || item.data_solicitacao)}</span></p><p>Fim: <span className="font-medium text-slate-800">{formatDate(item.data_fim_efeitos || item.data_publicacao_dispensa)}</span></p></td><td className="px-4 py-4"><StatusBadge status={item.status} /></td>{canManageGratificacoes && <td className="px-4 py-4 text-right">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Militar</th><th className="px-4 py-3">Função</th><th className="px-4 py-3">Unidade</th><th className="px-4 py-3">Publicação / processo</th><th className="px-4 py-3">Efeitos</th><th className="px-4 py-3">Status</th>{canManageGratificacoes && <th className="px-4 py-3 text-right">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-100">{gratificacoes.map((item) => <tr key={item.id} className="align-top hover:bg-slate-50/80"><td className="min-w-[14rem] px-4 py-4"><p className="font-semibold text-slate-900">{getNomeMilitarGratificacao(item)}</p><p className="text-xs text-slate-500">{item.posto_graduacao_snapshot || 'Posto/graduação não informado'} · Mat. {getMatriculaGratificacao(item)}</p></td><td className="min-w-[13rem] px-4 py-4"><p className="font-medium text-slate-900">{item.funcao_gratificada || '—'}</p><p className="text-xs text-slate-500">{item.codigo_funcao || 'Código não informado'}</p></td><td className="min-w-[12rem] px-4 py-4"><p className="font-medium text-slate-900">{item.unidade_nome_snapshot || '—'}</p></td><td className="min-w-[14rem] px-4 py-4"><p className="font-medium text-slate-900">{item.doems_nomeacao_numero || item.doems_dispensa_numero || item.ato_nomeacao_numero || item.ato_dispensa_numero || '—'}</p><p className="text-xs text-slate-500">{item.numero_processo || item.documento_solicitacao || 'Processo/documento não informado'}</p></td><td className="min-w-[10rem] px-4 py-4 text-xs text-slate-600"><p>Início: <span className="font-medium text-slate-800">{formatDate(item.data_inicio_efeitos || item.data_publicacao_nomeacao || item.data_solicitacao)}</span></p><p>Fim: <span className="font-medium text-slate-800">{formatDate(item.data_fim_efeitos || item.data_publicacao_dispensa)}</span></p></td><td className="px-4 py-4"><StatusBadge status={item.status} /></td>{canManageGratificacoes && <td className="px-4 py-4 text-right">
+  <div className="flex justify-end gap-2">
+  {modoAdmin && (
+    <Button type="button" variant="outline" size="sm" className="text-red-600 border-red-200 bg-red-50 hover:bg-red-100" onClick={() => onExcluir(item)}>
+      <Trash2 className="h-3.5 w-3.5" /> Excluir
+    </Button>
+  )}
   {item.status === GRATIFICACAO_STATUS.RASCUNHO ? (
-    <div className="flex justify-end gap-2">
+    <>
       <Button type="button" variant="outline" size="sm" onClick={() => onEditRascunho(item)}><Edit className="h-3.5 w-3.5" /> Editar</Button>
       <Button type="button" variant="outline" size="sm" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700" onClick={() => onEnviarDP(item)}>Enviar à DP</Button>
-    </div>
+    </>
   ) : item.status === GRATIFICACAO_STATUS.SOLICITADO_DP ? (
-    <div className="flex justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" className="text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700" onClick={() => onAguardandoPublicacao(item)}>Aguardando Publicação</Button>
-    </div>
+    <Button type="button" variant="outline" size="sm" className="text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700" onClick={() => onAguardandoPublicacao(item)}>Aguardando Publicação</Button>
   ) : item.status === GRATIFICACAO_STATUS.AGUARDANDO_PUBLICACAO_NOMEACAO ? (
-    <div className="flex justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" className="text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={() => onRegistrarPublicacao(item)}>Registrar Publicação</Button>
-    </div>
+    <Button type="button" variant="outline" size="sm" className="text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={() => onRegistrarPublicacao(item)}>Registrar Publicação</Button>
   ) : item.status === GRATIFICACAO_STATUS.NOMEADO_ATIVO ? (
-    <div className="flex justify-end gap-2">
-      <Button type="button" variant="outline" size="sm" className="text-red-600 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-700" onClick={() => onFinalizar(item)}>Finalizar</Button>
-    </div>
+    <Button type="button" variant="outline" size="sm" className="text-red-600 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-700" onClick={() => onFinalizar(item)}>Finalizar</Button>
   ) : (
-    <span className="text-xs text-slate-400">—</span>
+    !modoAdmin && <span className="text-xs text-slate-400">—</span>
   )}
+  </div>
 </td>}</tr>)}</tbody></table></div></div>
   );
 }
@@ -122,7 +124,7 @@ function GratificacoesTable({ gratificacoes, tipos, canManageGratificacoes = fal
 function CotasTable({ cotas, canManage, onEdit }) {
   if (!cotas.length) return <EmptyState message="Nenhuma cota cadastrada para os filtros atuais." />;
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Função</th><th className="px-4 py-3">Tipo / nível</th><th className="px-4 py-3">Unidade / setor</th><th className="px-4 py-3">Autorizadas</th><th className="px-4 py-3">Ato / DOEMS</th><th className="px-4 py-3">Vigência</th><th className="px-4 py-3">Status</th>{canManage && <th className="px-4 py-3 text-right">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-100">{cotas.map((cota) => <tr key={cota.id} className="align-top hover:bg-slate-50/80"><td className="px-4 py-4"><p className="font-semibold text-slate-900">{cota.funcao_gratificada || '—'}</p><p className="text-xs text-slate-500">{cota.codigo_funcao || 'Código não informado'}</p></td><td className="px-4 py-4"><p className="font-medium text-slate-900">{cota.tipo_gratificacao || '—'}</p><p className="text-xs text-slate-500">{cota.nivel_gratificacao || 'Nível não informado'}</p></td><td className="px-4 py-4"><p className="font-medium text-slate-900">{cota.unidade_nome_snapshot || '—'}</p><p className="text-xs text-slate-500">{cota.setor_nome_snapshot || 'Setor não informado'}</p></td><td className="px-4 py-4 text-base font-bold text-slate-950">{cota.quantidade_autorizada || 0}</td><td className="px-4 py-4"><p className="font-medium text-slate-900">{cota.ato_autorizativo || '—'}</p><p className="text-xs text-slate-500">{cota.doems_autorizacao_numero || cota.doems_autorizacao_edicao || 'DOEMS não informado'}</p></td><td className="px-4 py-4 text-xs text-slate-600"><p>{formatDate(cota.data_inicio_vigencia)}</p><p>{formatDate(cota.data_fim_vigencia)}</p></td><td className="px-4 py-4"><Badge variant="outline" className="rounded-full bg-slate-50 px-2.5 py-1 text-slate-700">{COTA_STATUS_LABELS[cota.status] || cota.status || '—'}</Badge></td>{canManage && <td className="px-4 py-4 text-right"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(cota)}><Edit className="h-3.5 w-3.5" /> Editar</Button></td>}</tr>)}</tbody></table></div></div>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-200 text-sm"><thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Função</th><th className="px-4 py-3">Unidade</th><th className="px-4 py-3">Autorizadas</th><th className="px-4 py-3">Ato / DOEMS</th><th className="px-4 py-3">Vigência</th><th className="px-4 py-3">Status</th>{canManage && <th className="px-4 py-3 text-right">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-100">{cotas.map((cota) => <tr key={cota.id} className="align-top hover:bg-slate-50/80"><td className="px-4 py-4"><p className="font-semibold text-slate-900">{cota.funcao_gratificada || '—'}</p><p className="text-xs text-slate-500">{cota.codigo_funcao || 'Código não informado'}</p></td><td className="px-4 py-4"><p className="font-medium text-slate-900">{cota.unidade_nome_snapshot || '—'}</p></td><td className="px-4 py-4 text-base font-bold text-slate-950">{cota.quantidade_autorizada || 0}</td><td className="px-4 py-4"><p className="font-medium text-slate-900">{cota.ato_autorizativo || '—'}</p><p className="text-xs text-slate-500">{cota.doems_autorizacao_numero || cota.doems_autorizacao_edicao || 'DOEMS não informado'}</p></td><td className="px-4 py-4 text-xs text-slate-600"><p>{formatDate(cota.data_inicio_vigencia)}</p><p>{formatDate(cota.data_fim_vigencia)}</p></td><td className="px-4 py-4"><Badge variant="outline" className="rounded-full bg-slate-50 px-2.5 py-1 text-slate-700">{COTA_STATUS_LABELS[cota.status] || cota.status || '—'}</Badge></td>{canManage && <td className="px-4 py-4 text-right"><Button type="button" variant="outline" size="sm" onClick={() => onEdit(cota)}><Edit className="h-3.5 w-3.5" /> Editar</Button></td>}</tr>)}</tbody></table></div></div>
   );
 }
 
@@ -376,6 +378,55 @@ function ConfirmarPublicacaoModal({ open, onOpenChange, item, saving, onSubmit }
   );
 }
 
+function ConfirmacaoExclusaoModal({ open, onOpenChange, onConfirm, loading }) {
+  const [confirmacao, setConfirmacao] = useState('');
+  const TEXTO_OBRIGATORIO = 'EXCLUIR GRATIFICAÇÃO';
+
+  React.useEffect(() => {
+    if (open) setConfirmacao('');
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-red-600">Confirmar Exclusão</DialogTitle>
+          <DialogDescription>
+            Esta ação é irreversível. O registro será removido permanentemente do banco de dados.
+            <div className="mt-4 rounded-lg border border-red-100 bg-red-50 p-3 text-xs text-red-800">
+              <p className="font-bold uppercase">Atenção:</p>
+              <p className="mt-1">Para confirmar, digite exatamente o texto abaixo:</p>
+              <p className="mt-2 font-mono font-bold">{TEXTO_OBRIGATORIO}</p>
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Input
+            value={confirmacao}
+            onChange={(e) => setConfirmacao(e.target.value)}
+            placeholder="Digite o texto de confirmação"
+            className="border-red-200 focus-visible:ring-red-500"
+          />
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={loading || confirmacao !== TEXTO_OBRIGATORIO}
+            onClick={onConfirm}
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Excluir permanentemente
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -474,6 +525,7 @@ function FinalizarGratificacaoModal({ open, onOpenChange, item, saving, onSubmit
 export default function GratificacoesFuncao() {
   const { isAdmin, canAccessAction, canAccessAll, permissions, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = Boolean(isAdmin || canAccessAll || hasAllPermissions(permissions));
+  const [modoAdmin, setModoAdmin] = useState(false);
   const canView = hasAbsoluteAccess || canAccessAction('visualizar_gratificacoes_funcao');
   const canManageCadastros = hasAbsoluteAccess || canAccessAction('gerir_cotas_gratificacao_funcao');
   const canManageGratificacoes = hasAbsoluteAccess || canAccessAction('gerir_gratificacoes_funcao');
@@ -494,6 +546,7 @@ export default function GratificacoesFuncao() {
   const [aguardandoPublicacaoModal, setAguardandoPublicacaoModal] = useState({ open: false, data: null });
   const [registrarPublicacaoModal, setRegistrarPublicacaoModal] = useState({ open: false, data: null });
   const [finalizarModal, setFinalizarModal] = useState({ open: false, data: null });
+  const [exclusaoModal, setExclusaoModal] = useState({ open: false, data: null });
 
   const filtrosBackend = useMemo(() => ({ tab: aba === GRATIFICACAO_TABS.CONFIGURACOES ? 'cotas' : aba, busca, status: status === TODOS ? undefined : status, tipo_gratificacao_funcao_id: tipo === TODOS ? undefined : tipo, funcao_gratificada: funcao === TODOS ? undefined : funcao, unidade_id: unidade === TODOS ? undefined : unidade, limit: 200, offset: 0 }), [aba, busca, status, tipo, funcao, unidade]);
   const query = useQuery({ queryKey: ['gratificacoes-funcao-painel', filtrosBackend], queryFn: () => fetchPainelGratificacoesFuncao(filtrosBackend), enabled: canView, staleTime: 60 * 1000, refetchOnWindowFocus: false });
@@ -507,6 +560,16 @@ export default function GratificacoesFuncao() {
       toast({ title: 'Cadastro salvo', description: 'Tipos/cotas atualizados no painel.' });
     },
     onError: (error) => toast({ title: 'Falha ao salvar', description: error?.message || 'Erro ao salvar cadastro.', variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deletarGratificacao(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['gratificacoes-funcao-painel'] });
+      setExclusaoModal({ open: false, data: null });
+      toast({ title: 'Gratificação excluída', description: 'O registro foi removido permanentemente.' });
+    },
+    onError: (error) => toast({ title: 'Falha ao excluir', description: error?.message || 'Erro ao remover registro.', variant: 'destructive' }),
   });
 
   const rascunhoMutation = useMutation({
@@ -539,6 +602,7 @@ export default function GratificacoesFuncao() {
   const marcarAguardandoPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'marcar_aguardando_publicacao', id: form.id }); };
   const registrarPublicacao = (form) => { rascunhoMutation.mutate({ operacao: 'registrar_publicacao_nomeacao', id: form.id, data: form }); };
   const finalizarGratificacao = (form) => { rascunhoMutation.mutate({ operacao: 'finalizar_gratificacao', id: form.id, data: form }); };
+  const handleExcluir = () => { if (exclusaoModal.data?.id) deleteMutation.mutate(exclusaoModal.data.id); };
 
   const gratificacoes = query.data?.gratificacoes || [];
   const cotasBackend = query.data?.cotas || [];
@@ -571,17 +635,17 @@ export default function GratificacoesFuncao() {
   if (!canView) return <AccessDenied modulo="Gratificação de Função" />;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6"><div className="mx-auto flex max-w-7xl flex-col gap-5"><header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700"><Award className="h-3.5 w-3.5" /> Fluxo de Gratificações</div><h1 className="mt-3 text-2xl font-bold text-slate-950 md:text-3xl">Gratificação de Função</h1><p className="mt-1 max-w-3xl text-sm text-slate-600">Gestão simplificada do ciclo de gratificações: registrar, acompanhar nomeações ativas e finalizar registros (histórico).</p></div><div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 lg:max-w-md"><div className="flex gap-2"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><p><span className="font-semibold">Novo fluxo simples:</span> utilize as abas para gerir registros ativos ou consultar o histórico. Ações de finalização agora estão disponíveis diretamente na listagem de ativas.</p></div></div></div></header>
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6"><div className="mx-auto flex max-w-7xl flex-col gap-5"><header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700"><Award className="h-3.5 w-3.5" /> Fluxo de Gratificações</div><h1 className="mt-3 text-2xl font-bold text-slate-950 md:text-3xl">Gratificação de Função</h1><p className="mt-1 max-w-3xl text-sm text-slate-600">Gestão simplificada do ciclo de gratificações: registrar, acompanhar nomeações ativas e finalizar registros (histórico).</p></div>{hasAbsoluteAccess && <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2"><Label htmlFor="modo-admin" className="text-xs font-bold uppercase text-slate-500 cursor-pointer">Modo Admin</Label><Switch id="modo-admin" checked={modoAdmin} onCheckedChange={setModoAdmin} /></div>}</div></header>
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">{CARD_CONFIG.map((card) => <CounterCard key={card.key} {...card} value={resumo[card.key]} />)}</section>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(18rem,1.4fr)_repeat(4,minmax(10rem,1fr))]"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Buscar por militar, matrícula, função, DOEMS ou processo" className="h-11 bg-slate-50 pl-9" /></div><Select value={status} onValueChange={setStatus} disabled={aba === GRATIFICACAO_TABS.CONFIGURACOES}><SelectTrigger className="h-11 bg-slate-50"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value={TODOS}>Todos os status</SelectItem>{Object.entries(GRATIFICACAO_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Select value={tipo} onValueChange={setTipo}><SelectTrigger className="h-11 bg-slate-50"><SelectValue placeholder="Tipo de gratificação" /></SelectTrigger><SelectContent><SelectItem value={TODOS}>Todos os tipos</SelectItem>{opcoes.tipos.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={funcao} onValueChange={setFuncao}><SelectTrigger className="h-11 bg-slate-50"><SelectValue placeholder="Função" /></SelectTrigger><SelectContent><SelectItem value={TODOS}>Todas as funções</SelectItem>{opcoes.funcoes.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select><Select value={unidade} onValueChange={setUnidade}><SelectTrigger className="h-11 bg-slate-50"><SelectValue placeholder="Unidade/setor" /></SelectTrigger><SelectContent><SelectItem value={TODOS}>Todas as unidades/setores</SelectItem>{opcoes.unidades.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div></section>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><Tabs value={aba} onValueChange={setAba} className="w-full"><TabsList className="flex h-auto flex-wrap justify-start gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">{TAB_KEYS.filter((tab) => canViewAdministrativeQuotas || tab !== GRATIFICACAO_TABS.CONFIGURACOES).map((tab) => <TabsTrigger key={tab} value={tab} className="rounded-xl px-3 py-2 text-xs md:text-sm">{GRATIFICACAO_TAB_LABELS[tab]}</TabsTrigger>)}</TabsList></Tabs><div className="flex flex-wrap gap-2">{canManageGratificacoes && <Button type="button" onClick={() => setGratificacaoModal({ open: true, data: null })}><Plus className="h-4 w-4" /> Nova Gratificação</Button>}</div></div>
       {canShowAccessDebug && <section className="rounded-2xl border border-dashed border-blue-200 bg-blue-50 p-3 text-xs text-blue-900"><p className="font-semibold">Debug de acesso — Gratificação de Função</p><div className="mt-2 grid gap-1 md:grid-cols-2 xl:grid-cols-5"><span>canAccessAll: {String(canAccessAll)}</span><span>isAdmin: {String(isAdmin)}</span><span>canManageCadastros: {String(canManageCadastros)}</span><span>canManageGratificacoes: {String(canManageGratificacoes)}</span><span>permissions ALL: {String(hasAllPermissions(permissions))}</span></div><p className="mt-2 break-words">Permissões detectadas: {permissions === 'ALL' ? 'ALL' : Object.entries(permissions || {}).filter(([, value]) => value === true).map(([key]) => key).sort().join(', ') || 'nenhuma'}</p></section>}
       {query.isLoading && <div className="flex min-h-[18rem] items-center justify-center rounded-2xl border border-slate-200 bg-white"><Loader2 className="h-8 w-8 animate-spin text-slate-500" /></div>}
       {query.error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>{query.error.message || 'Erro controlado ao carregar o painel de Gratificação de Função.'}</p></div></div>}
-      {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.ATIVAS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />}
+      {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.ATIVAS && <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} modoAdmin={modoAdmin} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} onExcluir={(item) => setExclusaoModal({ open: true, data: item })} />}
       {!query.isLoading && !query.error && aba === GRATIFICACAO_TABS.HISTORICO && (
         <div className="flex flex-col gap-6">
-          <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />
+          <GratificacoesTable gratificacoes={gratificacoesFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} modoAdmin={modoAdmin} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} onExcluir={(item) => setExclusaoModal({ open: true, data: item })} />
           {pendenciasAntigasFiltradas.length > 0 && (
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="pendencias" className="border-none">
@@ -589,7 +653,7 @@ export default function GratificacoesFuncao() {
                   <div className="flex items-center gap-2"><History className="h-4 w-4" /> Pendências antigas ({pendenciasAntigasFiltradas.length})</div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
-                  <GratificacoesTable gratificacoes={pendenciasAntigasFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} />
+                  <GratificacoesTable gratificacoes={pendenciasAntigasFiltradas} tipos={tipos} canManageGratificacoes={canManageGratificacoes} modoAdmin={modoAdmin} onEditRascunho={(item) => setGratificacaoModal({ open: true, data: item })} onEnviarDP={(item) => setEnviarDPModal({ open: true, data: item })} onAguardandoPublicacao={(item) => setAguardandoPublicacaoModal({ open: true, data: item })} onRegistrarPublicacao={(item) => setRegistrarPublicacaoModal({ open: true, data: item })} onFinalizar={(item) => setFinalizarModal({ open: true, data: item })} onExcluir={(item) => setExclusaoModal({ open: true, data: item })} />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -612,6 +676,7 @@ export default function GratificacoesFuncao() {
       <ConfirmarPublicacaoModal open={aguardandoPublicacaoModal.open} item={aguardandoPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setAguardandoPublicacaoModal({ open, data: open ? aguardandoPublicacaoModal.data : null })} onSubmit={marcarAguardandoPublicacao} />
       <RegistrarPublicacaoModal open={registrarPublicacaoModal.open} item={registrarPublicacaoModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setRegistrarPublicacaoModal({ open, data: open ? registrarPublicacaoModal.data : null })} onSubmit={registrarPublicacao} />
       <FinalizarGratificacaoModal open={finalizarModal.open} item={finalizarModal.data} saving={rascunhoMutation.isPending} onOpenChange={(open) => setFinalizarModal({ open, data: open ? finalizarModal.data : null })} onSubmit={finalizarGratificacao} />
+      <ConfirmacaoExclusaoModal open={exclusaoModal.open} onOpenChange={(open) => setExclusaoModal({ open, data: open ? exclusaoModal.data : null })} onConfirm={handleExcluir} loading={deleteMutation.isPending} />
       <TipoModal open={tipoModal.open} initialData={tipoModal.data} saving={saveMutation.isPending} onOpenChange={(open) => setTipoModal({ open, data: open ? tipoModal.data : null })} onSubmit={salvarTipo} />
       <CotaModal open={cotaModal.open} initialData={cotaModal.data} tipos={tipos} saving={saveMutation.isPending} onOpenChange={(open) => setCotaModal({ open, data: open ? cotaModal.data : null })} onSubmit={salvarCota} />
     </div></div>

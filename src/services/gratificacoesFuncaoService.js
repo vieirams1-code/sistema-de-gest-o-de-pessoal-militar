@@ -273,3 +273,12 @@ export async function gerirRascunhoGratificacaoFuncao({ operacao, id, data } = {
     throw new Error(extrairMensagemErro(err, 'Erro ao salvar rascunho de Gratificação de Função.'));
   }
 }
+
+export async function deletarGratificacao(id) {
+  try {
+    await base44.entities.GratificacaoFuncao.delete(id);
+    return true;
+  } catch (err) {
+    throw new Error(extrairMensagemErro(err, 'Erro ao excluir Gratificação de Função.'));
+  }
+}
