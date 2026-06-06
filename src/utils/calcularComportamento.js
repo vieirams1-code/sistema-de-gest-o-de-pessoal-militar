@@ -1,4 +1,4 @@
-import { obterInconsistenciasCalculoComportamento } from '@/utils/inconsistenciasCadastrais';
+import { obterInconsistenciasCalculoComportamento } from './inconsistenciasCadastrais.js';
 
 const PRACAS = new Set(['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado']);
 
