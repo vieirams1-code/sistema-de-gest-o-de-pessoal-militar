@@ -1,15 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CalendarClock, Edit3, Eye, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Edit3, Eye, Loader2, MoreHorizontal, Plus, Search, ShieldAlert, Trash2 } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { Switch } from '@/components/ui/switch';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { atualizarEscopado, criarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
@@ -84,6 +89,119 @@ function CounterCard({ title, value, tone = 'slate' }) {
   );
 }
 
+function FinalizarContratoModal({ open, onOpenChange, contrato, onSubmit, isSubmitting }) {
+  const [form, setForm] = useState({
+    data_fim_efeitos: '',
+    doems_encerramento_numero: '',
+    doems_encerramento_data: '',
+    ato_encerramento: '',
+    motivo_finalizacao: '',
+  });
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        data_fim_efeitos: contrato?.data_fim_contrato || new Date().toISOString().split('T')[0],
+        doems_encerramento_numero: '',
+        doems_encerramento_data: '',
+        ato_encerramento: '',
+        motivo_finalizacao: '',
+      });
+    }
+  }, [open, contrato]);
+
+  const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Finalizar Contrato</DialogTitle>
+          <DialogDescription>
+            Informe os dados de encerramento do contrato de designação.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="data_fim_efeitos">Data fim dos efeitos *</Label>
+            <Input id="data_fim_efeitos" type="date" value={form.data_fim_efeitos} onChange={(e) => update('data_fim_efeitos', e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="doems_numero">DOEMS encerramento</Label>
+              <Input id="doems_numero" value={form.doems_encerramento_numero} onChange={(e) => update('doems_encerramento_numero', e.target.value)} placeholder="Nº/Ano" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="doems_data">Data do DOEMS</Label>
+              <Input id="doems_data" type="date" value={form.doems_encerramento_data} onChange={(e) => update('doems_encerramento_data', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="ato">Ato/publicação de encerramento</Label>
+            <Input id="ato" value={form.ato_encerramento} onChange={(e) => update('ato_encerramento', e.target.value)} placeholder="Ex: Resolução nº..." />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="motivo">Motivo/observação</Label>
+            <Textarea id="motivo" value={form.motivo_finalizacao} onChange={(e) => update('motivo_finalizacao', e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={() => onSubmit(form)} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Finalizar contrato
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConfirmacaoExclusaoModal({ open, onOpenChange, onConfirm, isExcluindo }) {
+  const [confirmacaoText, setConfirmacaoText] = useState('');
+  const canConfirm = confirmacaoText === 'EXCLUIR CONTRATO';
+
+  useEffect(() => {
+    if (open) setConfirmacaoText('');
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="text-red-600 flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5" /> Confirmar exclusão física
+          </DialogTitle>
+          <DialogDescription>
+            Esta ação excluirá permanentemente o contrato. Esta ação não altera ficha, férias, saldos ou publicações, mas remove o vínculo administrativo deste lote.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-sm text-slate-600">Para confirmar, digite <span className="font-bold text-slate-900">EXCLUIR CONTRATO</span> abaixo:</p>
+          <input
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-100"
+            value={confirmacaoText}
+            onChange={(e) => setConfirmacaoText(e.target.value)}
+            placeholder="Digite o texto de confirmação"
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isExcluindo}>Cancelar</Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={!canConfirm || isExcluindo}
+          >
+            {isExcluindo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Confirmar exclusão
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DetailItem({ label, value }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -137,7 +255,9 @@ export default function ContratosDesignacao() {
   const [contratoEdicaoBloqueiaCadeia, setContratoEdicaoBloqueiaCadeia] = useState(false);
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
-  const [excluindoContratoId, setExcluindoContratoId] = useState(null);
+  const [excluindoContrato, setExcluindoContrato] = useState(null);
+  const [finalizandoContrato, setFinalizandoContrato] = useState(null);
+  const [modoAdmin, setModoAdmin] = useState(false);
   const [offset, setOffset] = useState(0);
   const effectiveEmail = getEffectiveEmail();
 
@@ -194,6 +314,20 @@ export default function ContratosDesignacao() {
     situacao,
     vencimento,
   }), [busca, contratos, matriculasMilitar, militaresPorId, situacao, vencimento]);
+
+  const { contratosAtivos, contratosFinalizados } = useMemo(() => {
+    const ativos = [];
+    const finalizados = [];
+    contratosFiltrados.forEach((c) => {
+      const situacaoDerivada = calcularSituacaoDerivadaContrato(c);
+      if (situacaoDerivada === SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO || situacaoDerivada === SITUACAO_CONTRATO_DESIGNACAO.CANCELADO) {
+        finalizados.push(c);
+      } else {
+        ativos.push(c);
+      }
+    });
+    return { contratosAtivos: ativos, contratosFinalizados: finalizados };
+  }, [contratosFiltrados]);
 
   const revisarPeriodosMilitar = (militarId) => {
     if (!militarId) return;
@@ -276,29 +410,51 @@ export default function ContratosDesignacao() {
     }
   };
 
-  const handleExcluirContrato = async (contrato) => {
+  const handleExcluirContrato = async () => {
+    const contrato = excluindoContrato;
     if (!contrato?.id) return;
-    const confirmado = window.confirm('Excluir fisicamente este contrato cadastrado por engano? Esta ação não altera ficha, férias, saldos ou publicações.');
-    if (!confirmado) return;
-    setExcluindoContratoId(contrato.id);
     try {
       const periodosComEfeito = await buscarEfeitosContratoControlado(contrato.id);
       if (periodosComEfeito.length > 0) {
         toast({ title: 'Exclusão bloqueada', description: MENSAGEM_CONTRATO_COM_EFEITOS, variant: 'destructive' });
+        setExcluindoContrato(null);
         return;
       }
       await excluirEscopado('ContratoDesignacaoMilitar', contrato.id);
       limparCacheEfeitosContratoDesignacao(contrato.id);
       await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
       toast({ title: 'Contrato excluído', description: 'O contrato cadastrado por engano foi removido sem afetar períodos.' });
+      setExcluindoContrato(null);
     } catch (error) {
       toast({
         title: isRateLimitError(error) ? 'Verificação temporariamente indisponível' : 'Erro ao excluir contrato',
         description: isRateLimitError(error) ? 'Aguarde alguns instantes e tente excluir novamente.' : (error?.message || 'Não foi possível excluir o contrato de designação.'),
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleFinalizarContrato = async (formData) => {
+    if (!finalizandoContrato?.id) return;
+    setSalvandoContrato(true);
+    try {
+      await atualizarEscopado('ContratoDesignacaoMilitar', finalizandoContrato.id, {
+        ...formData,
+        status_contrato: 'encerrado',
+        finalizado_em: new Date().toISOString(),
+        finalizado_por: userEmail,
+      });
+      setFinalizandoContrato(null);
+      await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
+      toast({ title: 'Contrato finalizado', description: 'O contrato foi encerrado com sucesso.' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao finalizar contrato',
+        description: error?.message || 'Não foi possível finalizar o contrato.',
+        variant: 'destructive',
+      });
     } finally {
-      setExcluindoContratoId(null);
+      setSalvandoContrato(false);
     }
   };
 
@@ -328,11 +484,17 @@ export default function ContratosDesignacao() {
               <h1 className="text-3xl font-bold text-slate-950">Contratos de Designação</h1>
               <p className="mt-1 max-w-3xl text-sm text-slate-500">Controle centralizado de contratos ativos, vencidos e encerrados, preservando os fluxos administrativos existentes.</p>
             </div>
-            {canCreate && (
-              <Button onClick={() => setNovoContratoOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700">
-                <Plus className="mr-2 h-4 w-4" />Novo contrato
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center space-x-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-sm">
+                <Switch id="modo-admin" checked={modoAdmin} onCheckedChange={setModoAdmin} />
+                <Label htmlFor="modo-admin" className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-600">Modo admin</Label>
+              </div>
+              {canCreate && (
+                <Button onClick={() => setNovoContratoOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700">
+                  <Plus className="mr-2 h-4 w-4" />Novo contrato
+                </Button>
+              )}
+            </div>
           </div>
         </header>
 
@@ -387,7 +549,7 @@ export default function ContratosDesignacao() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {contratosFiltrados.map((contrato) => {
+                  {contratosAtivos.map((contrato) => {
                     const militar = getMilitar(contrato);
                     const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
                     const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
@@ -445,18 +607,19 @@ export default function ContratosDesignacao() {
                                 <DropdownMenuItem onSelect={() => setContratoDetalhe(contrato)}>
                                   <Eye className="h-4 w-4" />Detalhes
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => revisarPeriodosMilitar(contrato.militar_id)}>
-                                  <CalendarClock className="h-4 w-4" />Revisar períodos
-                                </DropdownMenuItem>
-                                {canCreate && (
+                                {situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO && situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.CANCELADO && (
+                                  <DropdownMenuItem onSelect={() => setFinalizandoContrato(contrato)}>
+                                    <CheckCircle2 className="h-4 w-4" />Finalizar contrato
+                                  </DropdownMenuItem>
+                                )}
+                                {canCreate && modoAdmin && (
                                   <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       className="text-red-600 focus:text-red-700"
-                                      disabled={excluindoContratoId === contrato.id}
-                                      onSelect={() => handleExcluirContrato(contrato)}
+                                      onSelect={() => setExcluindoContrato(contrato)}
                                     >
-                                      {excluindoContratoId === contrato.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                      <Trash2 className="h-4 w-4" />
                                       Excluir contrato
                                     </DropdownMenuItem>
                                   </>
@@ -468,6 +631,69 @@ export default function ContratosDesignacao() {
                       </tr>
                     );
                   })}
+
+                  {contratosFinalizados.length > 0 && (
+                    <>
+                      <tr className="bg-slate-50/50">
+                        <td colSpan={5} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Contratos Finalizados / Histórico</td>
+                      </tr>
+                      {contratosFinalizados.map((contrato) => {
+                        const militar = getMilitar(contrato);
+                        const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
+                        const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
+                        const nomeMilitar = militar.nome_completo || militar.nome_guerra || 'Militar não localizado';
+                        const matriculaAtual = getMatriculaAtual(contrato);
+                        const fimContrato = contrato.data_fim_contrato || contrato.data_encerramento_operacional;
+
+                        return (
+                          <tr key={contrato.id} className="align-top opacity-70 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 transition-all">
+                            <td className="min-w-[18rem] px-4 py-4">
+                              <div className="space-y-1.5">
+                                <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-500">{militar.posto_graduacao || militar.quadro || 'Posto/graduação'}</Badge>
+                                <p className="font-semibold text-slate-700">{nomeMilitar}</p>
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                  <span>Matrícula {matriculaAtual}</span>
+                                  <Link className="font-semibold text-slate-500 hover:text-blue-700" to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}>Ver ficha</Link>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="min-w-[17rem] px-4 py-4">
+                              <div className="flex flex-wrap items-center gap-2 font-medium text-slate-600">
+                                <span>{formatDate(contrato.data_inicio_contrato)}</span>
+                                <ArrowRight className="h-4 w-4 text-slate-300" />
+                                <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-500">{fimContrato ? formatDate(fimContrato) : 'Indeterminado'}</Badge>
+                              </div>
+                            </td>
+                            <td className="min-w-[12rem] px-4 py-4">
+                              <p className="font-medium text-slate-600">{contrato.boletim_publicacao || contrato.numero_contrato || '—'}</p>
+                              <p className="text-xs text-slate-400">{contrato.data_publicacao ? formatDate(contrato.data_publicacao) : 'Data não informada'}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                              <Badge variant="outline" className={`${ui.className} rounded-full px-2.5 py-1 grayscale`}>
+                                {ui.label}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 opacity-50 hover:opacity-100" aria-label="Mais opções">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onSelect={() => setContratoDetalhe(contrato)}>
+                                      <Eye className="h-4 w-4" />Detalhes
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -520,6 +746,19 @@ export default function ContratosDesignacao() {
         isSubmitting={salvandoContrato}
       />
 
+      <ConfirmacaoExclusaoModal
+        open={Boolean(excluindoContrato)}
+        onOpenChange={(open) => !open && setExcluindoContrato(null)}
+        onConfirm={handleExcluirContrato}
+      />
+
+      <FinalizarContratoModal
+        open={Boolean(finalizandoContrato)}
+        onOpenChange={(open) => !open && setFinalizandoContrato(null)}
+        contrato={finalizandoContrato}
+        onSubmit={handleFinalizarContrato}
+        isSubmitting={salvandoContrato}
+      />
 
       {contratoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
@@ -549,6 +788,13 @@ export default function ContratosDesignacao() {
                   <DetailItem label="Data publicação" value={formatDate(contratoDetalhe.data_publicacao)} />
                   <DetailItem label="Fonte legal" value={contratoDetalhe.fonte_legal} />
                   <DetailItem label="Tipo de designação" value={contratoDetalhe.tipo_designacao} />
+                  {contratoDetalhe.data_fim_efeitos && <DetailItem label="Data fim efeitos" value={formatDate(contratoDetalhe.data_fim_efeitos)} />}
+                  {contratoDetalhe.doems_encerramento_numero && <DetailItem label="DOEMS encerramento" value={contratoDetalhe.doems_encerramento_numero} />}
+                  {contratoDetalhe.doems_encerramento_data && <DetailItem label="Data DOEMS encerramento" value={formatDate(contratoDetalhe.doems_encerramento_data)} />}
+                  {contratoDetalhe.ato_encerramento && <DetailItem label="Ato de encerramento" value={contratoDetalhe.ato_encerramento} />}
+                  {contratoDetalhe.motivo_finalizacao && <DetailItem label="Motivo finalização" value={contratoDetalhe.motivo_finalizacao} />}
+                  {contratoDetalhe.finalizado_em && <DetailItem label="Finalizado em" value={formatDate(contratoDetalhe.finalizado_em)} />}
+                  {contratoDetalhe.finalizado_por && <DetailItem label="Finalizado por" value={contratoDetalhe.finalizado_por} />}
                   {contratoDetalhe.gera_direito_ferias === false && <div className="md:col-span-2"><DetailItem label="Motivo para não gerar férias" value={contratoDetalhe.motivo_nao_gera_ferias} /></div>}
                   <div className="md:col-span-2"><DetailItem label="Observações" value={contratoDetalhe.observacoes} /></div>
                 </>);
