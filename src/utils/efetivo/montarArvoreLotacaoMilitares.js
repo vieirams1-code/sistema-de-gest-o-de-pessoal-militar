@@ -23,13 +23,26 @@ const POSTOS_OFICIAIS = new Set([
   'CORONEL',
 ]);
 
+const cacheNormalizacaoClassificacao = new Map();
+/**
+ * Normaliza o texto para classificação (removendo acentos e espaços extras).
+ * Bolt: Otimizado com cache para evitar processamento repetitivo de strings idênticas.
+ */
 function normalizarTextoClassificacao(valor) {
-  return String(valor || '')
-    .trim()
+  const texto = String(valor || '').trim();
+  if (!texto) return '';
+
+  const cache = cacheNormalizacaoClassificacao.get(texto);
+  if (cache !== undefined) return cache;
+
+  const resultado = texto
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .toUpperCase();
+
+  cacheNormalizacaoClassificacao.set(texto, resultado);
+  return resultado;
 }
 
 export function obterSexoMilitar(militar) {
@@ -94,13 +107,26 @@ function primeiroTextoValido(...valores) {
   return '';
 }
 
+const cacheNormalizacaoBusca = new Map();
+/**
+ * Normaliza o texto para chaves de busca.
+ * Bolt: Otimizado com cache (Map) para evitar operações caras de regex e normalize em loops grandes.
+ */
 export function normalizarChaveBusca(valor) {
-  return String(valor ?? '')
-    .trim()
+  const texto = String(valor ?? '').trim();
+  if (!texto) return '';
+
+  const cache = cacheNormalizacaoBusca.get(texto);
+  if (cache !== undefined) return cache;
+
+  const resultado = texto
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .toLowerCase();
+
+  cacheNormalizacaoBusca.set(texto, resultado);
+  return resultado;
 }
 
 function obterNomeGuerra(militar) {
@@ -310,15 +336,27 @@ function somarResumoEfetivo(destino, origem) {
   return resumo;
 }
 
+/**
+ * Calcula o resumo de tags para uma lista de militares.
+ * Bolt: Otimizado para reutilizar `tags_resolvidas` se já estiverem presentes no objeto,
+ * evitando a chamada recorrente e cara de `normalizarTagsMilitar`.
+ */
 export function calcularResumoTags(militares = []) {
   const mapa = new Map();
   for (const militar of militares || []) {
-    for (const tag of normalizarTagsMilitar(militar)) {
-      const chave = normalizarChaveBusca(tag.nome || tag);
+    const tags = militar?.tags_resolvidas || normalizarTagsMilitar(militar);
+
+    for (const tag of tags) {
+      const nome = tag?.nome || tag;
+      const chave = normalizarChaveBusca(nome);
       if (!chave) continue;
-      const existente = mapa.get(chave) || { id: chave, nome: tag.nome || String(tag), total: 0 };
-      existente.total += 1;
-      mapa.set(chave, existente);
+
+      const existente = mapa.get(chave);
+      if (existente) {
+        existente.total += 1;
+      } else {
+        mapa.set(chave, { id: chave, nome: String(nome), total: 1 });
+      }
     }
   }
   return Array.from(mapa.values()).sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -404,14 +442,38 @@ export default function montarArvoreLotacaoMilitares(militares = [], lotacoes = 
     const subsetores = Array.from(setor.subsetoresMap.values()).map((subsetor) => {
       const unidades = Array.from(subsetor.unidadesMap.values()).map((unidade) => {
         const militaresDaUnidade = unidade.militares || [];
+
+        // Bolt: Otimização de passagem única. Em vez de chamar calcularResumoEfetivo() e depois
+        // dois .filter() (3 loops), fazemos tudo em uma única iteração (1 loop).
+        // Isso reduz significativamente o overhead em árvores de lotação grandes.
+        const resumoEfetivo = { oficiais: 0, pracas: 0, homens: 0, mulheres: 0, sexoNaoInformado: 0 };
+        const oficiais = [];
+        const pracas = [];
+
+        for (const militar of militaresDaUnidade) {
+          const ehOficial = obterGrupoHierarquicoMilitar(militar) === 'oficial';
+          if (ehOficial) {
+            resumoEfetivo.oficiais += 1;
+            oficiais.push(militar);
+          } else {
+            resumoEfetivo.pracas += 1;
+            pracas.push(militar);
+          }
+
+          const sexo = obterSexoMilitar(militar);
+          if (sexo === 'M') resumoEfetivo.homens += 1;
+          else if (sexo === 'F') resumoEfetivo.mulheres += 1;
+          else resumoEfetivo.sexoNaoInformado += 1;
+        }
+
         return {
           ...unidade,
           total: militaresDaUnidade.length,
-          resumoEfetivo: calcularResumoEfetivo(militaresDaUnidade),
+          resumoEfetivo,
           resumoTags: calcularResumoTags(militaresDaUnidade),
           militares: militaresDaUnidade,
-          oficiais: militaresDaUnidade.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'),
-          pracas: militaresDaUnidade.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial'),
+          oficiais,
+          pracas,
         };
       }).sort((a, b) => a.unidadeNome.localeCompare(b.unidadeNome, 'pt-BR'));
       const resumoEfetivo = criarResumoVazio();
