@@ -75,9 +75,9 @@ const menuGroups = [
         description: 'Consulta e vínculos funcionais',
         items: [
           { name: 'Consulta Militar', page: 'Militares', icon: Users, moduleKey: 'militares', actionKey: 'visualizar_militares' },
-          { name: 'Visão Gestor', page: 'VisualizacaoGestorEfetivo', icon: GitBranch, moduleKey: 'militares', actionKey: 'visualizar_militares' },
+          { name: 'Organograma', page: 'VisualizacaoGestorEfetivo', icon: GitBranch, moduleKey: 'militares', actionKey: 'visualizar_militares' },
           {
-            name: 'Contratos',
+            name: 'Contratos Designados',
             page: 'ContratosDesignacao',
             icon: ClipboardList,
             anyOf: [
@@ -88,16 +88,23 @@ const menuGroups = [
           { name: 'Gratificação de Função', page: 'GratificacoesFuncao', icon: Medal, viewPermission: 'visualizar_gratificacoes_funcao' },
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
-          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },
+          { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'visualizar_armamentos' },
         ],
       },
       {
-        title: 'Férias, Livro e Publicações',
+        title: 'Férias',
         icon: CalendarDays,
-        description: 'Períodos, registros e conciliações administrativas',
+        description: 'Gestão de períodos e dias adicionais',
         items: [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
-          { name: 'Créditos Extraordinários', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
+          { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
+        ],
+      },
+      {
+        title: 'Livro e Publicações',
+        icon: BookMarked,
+        description: 'Registros e conciliações administrativas',
+        items: [
           { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_rp' },
           { name: 'Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
           { name: 'Conciliação', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
@@ -111,14 +118,15 @@ const menuGroups = [
           { name: 'Atestados', page: 'Atestados', icon: HeartPulse, viewPermission: 'visualizar_atestados' },
           { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, viewPermission: 'visualizar_atestados' },
           { name: 'Cadastro de Médicos', page: 'Medicos', icon: Stethoscope, adminOnly: true, moduleKey: 'atestados' },
-          { name: 'Controle Temporários', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
+          { name: 'Atestados - T', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
         ],
       },
       {
-        title: 'Carreira e Disciplina',
+        title: 'Carreira',
         icon: Medal,
-        description: 'Progressão, conduta e reconhecimento funcional',
+        description: 'Progressão e reconhecimento funcional',
         items: [
+          { name: 'Promoções', page: 'Promocoes', icon: ListOrdered, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
           {
             name: 'Antiguidade',
             page: 'AntiguidadePrevia',
@@ -130,22 +138,27 @@ const menuGroups = [
               { type: 'action', key: 'visualizar_rastreamento_promocoes' },
             ],
           },
+          { name: 'Medalhas', page: 'Medalhas', icon: Medal, viewPermission: 'visualizar_medalhas' },
           { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
-          { name: 'Promoções', page: 'Promocoes', icon: ListOrdered, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
+        ],
+      },
+      {
+        title: 'Disciplina',
+        icon: Shield,
+        description: 'Conduta e comportamento funcional',
+        items: [
           { name: 'Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_controle_comportamento' },
           { name: 'Punições', page: 'Punicoes', icon: Shield, viewPermission: 'visualizar_punicoes' },
-          { name: 'Medalhas', page: 'Medalhas', icon: Medal, viewPermission: 'visualizar_medalhas' },
           { name: 'Auditar Comportamento', page: 'AuditoriaComportamento', icon: ShieldCheck, adminOnly: true },
         ],
       },
       {
-        title: 'Operações e Carga',
+        title: 'Trello',
         icon: FolderKanban,
         description: 'Emprego operacional e controle de recursos',
         items: [
-          { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, viewPermission: 'visualizar_quadro_operacional' },
-          { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, viewPermission: 'visualizar_quadro_operacional' },
-          { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'visualizar_armamentos' },
+          { name: 'Quadros', page: 'QuadroOperacional', icon: FolderKanban, viewPermission: 'visualizar_quadro_operacional' },
+          { name: 'Tarefas', page: 'AgendaAcoesOperacionais', icon: CalendarClock, viewPermission: 'visualizar_quadro_operacional' },
         ],
       },
     ],
@@ -158,6 +171,7 @@ const menuGroups = [
         icon: Wrench,
         description: 'Governança técnica, segurança e manutenção',
         items: [
+          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },
           { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
           {
             name: 'Permissões',

@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ScrollText, Trash2, Pencil, ChevronsUpDown, Check, Eye, EyeOff } from 'lucide-react';
+import { ScrollText, Trash2, Pencil, ChevronsUpDown, Check, Eye, EyeOff, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 import { getRegistroTipoVisual } from '@/components/militar/registroTipoVisual';
 import {
@@ -126,6 +126,7 @@ export default function RegistrosMilitar() {
   const [filtroMilitarId, setFiltroMilitarId] = useState(() => searchParams.get('militar_id') || 'all');
   const [buscaMilitar, setBuscaMilitar] = useState('');
   const [openMilitarPopover, setOpenMilitarPopover] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const [buscaGeral, setBuscaGeral] = useState('');
   const [buscaNomeMilitar, setBuscaNomeMilitar] = useState('');
@@ -473,16 +474,27 @@ export default function RegistrosMilitar() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Filtros</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            <Filter className="w-4 h-4" />
+            <span>Filtros Avançados</span>
+            {showAdvancedFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+          </Button>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <CardContent className="space-y-4">
           {militarSelecionado && isMilitarMesclado(militarSelecionado) && (
-            <div className="xl:col-span-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               Este militar está com status <strong>MESCLADO</strong>. A consulta é administrativa e pode incluir dados históricos.
             </div>
           )}
-          <div className="space-y-2 xl:col-span-2">
+
+          <div className="space-y-2">
             <Label>Militar (nome, nome de guerra ou matrícula)</Label>
             <Popover open={openMilitarPopover} onOpenChange={setOpenMilitarPopover}>
               <PopoverTrigger asChild>
@@ -534,173 +546,177 @@ export default function RegistrosMilitar() {
             </Popover>
           </div>
 
-          <div className="space-y-2">
-            <Label>Busca textual ampla</Label>
-            <Input
-              value={buscaGeral}
-              onChange={(event) => setBuscaGeral(event.target.value)}
-              placeholder="Nome, matrícula, tipo, matéria, BG, trecho..."
-            />
-          </div>
+          {showAdvancedFilters && (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 pt-2 border-t border-slate-100">
+              <div className="space-y-2">
+                <Label>Busca textual ampla</Label>
+                <Input
+                  value={buscaGeral}
+                  onChange={(event) => setBuscaGeral(event.target.value)}
+                  placeholder="Nome, matrícula, tipo, matéria, BG, trecho..."
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Busca por nome do militar</Label>
-            <Input
-              value={buscaNomeMilitar}
-              onChange={(event) => setBuscaNomeMilitar(event.target.value)}
-              placeholder="Nome completo ou nome de guerra"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Busca por nome do militar</Label>
+                <Input
+                  value={buscaNomeMilitar}
+                  onChange={(event) => setBuscaNomeMilitar(event.target.value)}
+                  placeholder="Nome completo ou nome de guerra"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Matrícula</Label>
-            <Input
-              value={buscaMatricula}
-              onChange={(event) => setBuscaMatricula(event.target.value)}
-              placeholder="Filtrar por matrícula"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Matrícula</Label>
+                <Input
+                  value={buscaMatricula}
+                  onChange={(event) => setBuscaMatricula(event.target.value)}
+                  placeholder="Filtrar por matrícula"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Período inicial</Label>
-            <Input type="date" value={dataInicial} onChange={(event) => setDataInicial(event.target.value)} />
-          </div>
+              <div className="space-y-2">
+                <Label>Período inicial</Label>
+                <Input type="date" value={dataInicial} onChange={(event) => setDataInicial(event.target.value)} />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Período final</Label>
-            <Input type="date" value={dataFinal} onChange={(event) => setDataFinal(event.target.value)} />
-          </div>
+              <div className="space-y-2">
+                <Label>Período final</Label>
+                <Input type="date" value={dataFinal} onChange={(event) => setDataFinal(event.target.value)} />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Tipo de publicação</Label>
-            <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {tiposDisponiveisRegistros.map((tipo) => (
-                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Tipo de publicação</Label>
+                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {tiposDisponiveisRegistros.map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Status da publicação</Label>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {statusDisponiveis.map((status) => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Status da publicação</Label>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {statusDisponiveis.map((status) => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Número BG</Label>
-            <Input
-              value={filtroNumeroBg}
-              onChange={(event) => setFiltroNumeroBg(event.target.value)}
-              placeholder="Ex.: 123"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Número BG</Label>
+                <Input
+                  value={filtroNumeroBg}
+                  onChange={(event) => setFiltroNumeroBg(event.target.value)}
+                  placeholder="Ex.: 123"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Origem do registro</Label>
-            <Select value={filtroOrigem} onValueChange={setFiltroOrigem}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="sistema">Somente Sistema</SelectItem>
-                <SelectItem value="legado">Somente Legado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Origem do registro</Label>
+                <Select value={filtroOrigem} onValueChange={setFiltroOrigem}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="sistema">Somente Sistema</SelectItem>
+                    <SelectItem value="legado">Somente Legado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Tipo BG legado</Label>
-            <Select value={filtroTipoBgLegado} onValueChange={setFiltroTipoBgLegado}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {tiposBgLegadoDisponiveis.map((tipo) => (
-                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Tipo BG legado</Label>
+                <Select value={filtroTipoBgLegado} onValueChange={setFiltroTipoBgLegado}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {tiposBgLegadoDisponiveis.map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Matéria legado</Label>
-            <Select value={filtroMateriaLegado} onValueChange={setFiltroMateriaLegado}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {materiasLegadoDisponiveis.map((materia) => (
-                  <SelectItem key={materia} value={materia}>{materia}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label>Matéria legado</Label>
+                <Select value={filtroMateriaLegado} onValueChange={setFiltroMateriaLegado}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {materiasLegadoDisponiveis.map((materia) => (
+                      <SelectItem key={materia} value={materia}>{materia}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Busca no conteúdo/trecho</Label>
-            <Input
-              value={filtroTrechoLivre}
-              onChange={(event) => setFiltroTrechoLivre(event.target.value)}
-              placeholder="Trecho livre do texto"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Busca no conteúdo/trecho</Label>
+                <Input
+                  value={filtroTrechoLivre}
+                  onChange={(event) => setFiltroTrechoLivre(event.target.value)}
+                  placeholder="Trecho livre do texto"
+                />
+              </div>
 
-          <div className="space-y-3 rounded-md border p-3 md:col-span-2 xl:col-span-3">
-            <p className="text-sm font-medium text-slate-700">Filtros rápidos</p>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <Checkbox checked={somentePublicados} onCheckedChange={(checked) => setSomentePublicados(Boolean(checked))} />
-                Somente publicados
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <Checkbox checked={somenteComBg} onCheckedChange={(checked) => setSomenteComBg(Boolean(checked))} />
-                Somente com BG preenchido
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <Checkbox checked={somenteClassificacaoPendente} onCheckedChange={(checked) => setSomenteClassificacaoPendente(Boolean(checked))} />
-                Somente classificação pendente
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <Checkbox checked={somenteLegadoNaoClassificado} onCheckedChange={(checked) => setSomenteLegadoNaoClassificado(Boolean(checked))} />
-                Somente legado não classificado
-              </label>
-
-              {canManageAdminActions && (
-                <>
+              <div className="space-y-3 rounded-md border p-3 md:col-span-2 xl:col-span-3">
+                <p className="text-sm font-medium text-slate-700">Filtros rápidos</p>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                   <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <Checkbox checked={somenteEditavelExcluivel} onCheckedChange={(checked) => setSomenteEditavelExcluivel(Boolean(checked))} />
-                    Somente registros excluíveis/editáveis
+                    <Checkbox checked={somentePublicados} onCheckedChange={(checked) => setSomentePublicados(Boolean(checked))} />
+                    Somente publicados
                   </label>
 
                   <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <Checkbox checked={somenteSistemaAdmin} onCheckedChange={(checked) => setSomenteSistemaAdmin(Boolean(checked))} />
-                    Somente registros do sistema
+                    <Checkbox checked={somenteComBg} onCheckedChange={(checked) => setSomenteComBg(Boolean(checked))} />
+                    Somente com BG preenchido
                   </label>
-                </>
-              )}
+
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <Checkbox checked={somenteClassificacaoPendente} onCheckedChange={(checked) => setSomenteClassificacaoPendente(Boolean(checked))} />
+                    Somente classificação pendente
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <Checkbox checked={somenteLegadoNaoClassificado} onCheckedChange={(checked) => setSomenteLegadoNaoClassificado(Boolean(checked))} />
+                    Somente legado não classificado
+                  </label>
+
+                  {canManageAdminActions && (
+                    <>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <Checkbox checked={somenteEditavelExcluivel} onCheckedChange={(checked) => setSomenteEditavelExcluivel(Boolean(checked))} />
+                        Somente registros excluíveis/editáveis
+                      </label>
+
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <Checkbox checked={somenteSistemaAdmin} onCheckedChange={(checked) => setSomenteSistemaAdmin(Boolean(checked))} />
+                        Somente registros do sistema
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
