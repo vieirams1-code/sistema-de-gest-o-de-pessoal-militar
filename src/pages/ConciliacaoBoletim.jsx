@@ -577,7 +577,10 @@ export default function ConciliacaoBoletim() {
 
   const pendentesMap = useMemo(() => {
     const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
-      .filter((registro) => calcStatus(registro) === 'Aguardando Publicação' && registro.nota_para_bg)
+      .filter((registro) => {
+        const status = calcStatus(registro);
+        return status === 'Aguardando Publicação' && registro.nota_para_bg;
+      })
       .map((registro) => {
         const textoSistema = (registro.texto_publicacao || registro.texto || '').trim();
         const textoNorm = normalizarTextoComparacao(textoSistema);
