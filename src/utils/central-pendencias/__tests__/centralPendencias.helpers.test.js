@@ -41,11 +41,26 @@ test('diferencaDias', () => {
   const baseComHora = new Date('2023-12-01T23:59:59');
   assert.strictEqual(diferencaDias('2023-12-02', baseComHora), 1);
 
+  // Com string ISO completa
+  assert.strictEqual(diferencaDias('2023-12-05T15:00:00Z', base), 4);
+
+  // Base como string
+  assert.strictEqual(diferencaDias('2023-12-05', '2023-12-01T00:00:00'), 4);
+
+  // Diferença grande (negativa)
+  assert.strictEqual(diferencaDias('2022-12-01', base), -365);
+
   // Entrada nula
   assert.strictEqual(diferencaDias(null, base), null);
 
   // Entrada inválida
   assert.strictEqual(diferencaDias('data-errada', base), null);
+
+  // Base inválida (não deve quebrar, mas pode retornar NaN se o JS permitir)
+  // De acordo com o código: hoje = new Date(base); hoje.setHours(0,0,0,0);
+  // Se base for inválida, hoje.getTime() será NaN.
+  const diffInvalida = diferencaDias('2023-12-01', 'data-invalida');
+  assert.ok(Number.isNaN(diffInvalida));
 
   // Usando default value para base (agora)
   assert.notStrictEqual(diferencaDias('2099-01-01'), null);
