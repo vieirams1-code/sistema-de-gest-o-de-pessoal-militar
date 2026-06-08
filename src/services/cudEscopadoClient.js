@@ -50,6 +50,18 @@ const ENTIDADES_PERMITIDAS = new Set([
 
 
 const CAMPOS_DATA_ISO_POR_ENTIDADE = {
+  MilitarTag: [
+    'data_aplicacao',
+    'data_remocao',
+  ],
+  FeriasTag: [
+    'data_aplicacao',
+    'data_remocao',
+  ],
+  MilitarFuncao: [
+    'data_inicio',
+    'data_fim',
+  ],
   ContratoDesignacaoMilitar: [
     'data_inicio_contrato',
     'data_inclusao_para_ferias',

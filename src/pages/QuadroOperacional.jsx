@@ -87,17 +87,25 @@ async function reindexarColunaComEspacos(colunaId, cardsDaColuna = []) {
       ordem: (index + 1) * ORDER_STEP,
     }));
 
-  const payloads = ordenados.map((card) => ({
-    id: card.id,
-    coluna_id: colunaId,
-    ordem: card.ordem,
-  }));
+  const originalMap = new Map(cardsDaColuna.map((c) => [String(c.id), c]));
+  const payloads = ordenados
+    .filter((card) => {
+      const original = originalMap.get(String(card.id));
+      return !original || original.coluna_id !== card.coluna_id || toOrderNumber(original.ordem) !== card.ordem;
+    })
+    .map((card) => ({
+      id: card.id,
+      coluna_id: colunaId,
+      ordem: card.ordem,
+    }));
 
-  const entity = base44.entities.CardOperacional;
-  if (entity.bulkUpdate) {
-    await entity.bulkUpdate(payloads);
-  } else {
-    await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+  if (payloads.length > 0) {
+    const entity = base44.entities.CardOperacional;
+    if (entity.bulkUpdate) {
+      await entity.bulkUpdate(payloads);
+    } else {
+      await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+    }
   }
 
   return ordenados;

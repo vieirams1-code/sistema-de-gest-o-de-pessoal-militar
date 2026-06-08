@@ -197,6 +197,13 @@ Motivo: promocao.id ausente no frontend`);
     contextoPublicacao,
   };
 
+  if (import.meta.env?.DEV) {
+    console.log(
+      'PAYLOAD_PUBLICAR_PROMOCAO',
+      JSON.stringify(payload, null, 2)
+    );
+  }
+
   let response;
   try {
     response = await base44.functions.invoke('publicarPromocaoOficial', {
