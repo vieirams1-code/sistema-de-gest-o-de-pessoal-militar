@@ -29,6 +29,7 @@ import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
   ACOES_MEDALHAS,
   adicionarAuditoriaMedalha,
+  bulkUpdateMedalhas,
   listarImpedimentosEscopo,
   listarMedalhasEscopo,
   listarMilitaresEscopo,
@@ -273,19 +274,16 @@ export default function IndicacoesDomPedroII() {
       const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
 
       if (pendentesEscopo.length > 0) {
+        const dataReset = new Date().toLocaleDateString('pt-BR');
         const payloads = pendentesEscopo.map((registro) => ({
           id: registro.id,
           ...adicionarAuditoriaMedalha({
             status: 'CANCELADA',
-            observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
+            observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada administrativamente em ${dataReset}.`,
           }, { userEmail, acao: 'reset' }),
         }));
 
-        if (typeof base44.entities.Medalha.bulkUpdate === 'function') {
-          await base44.entities.Medalha.bulkUpdate(payloads);
-        } else {
-          await Promise.all(payloads.map(({ id, ...data }) => base44.entities.Medalha.update(id, data)));
-        }
+        await bulkUpdateMedalhas(base44, payloads);
       }
 
       return pendentesEscopo.length;
