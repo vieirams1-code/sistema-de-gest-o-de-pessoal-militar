@@ -300,6 +300,26 @@ export default function RPSpecificFieldsExOfficio({
       );
     }
 
+    case 'Publicação DOEMS':
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Publicação DOEMS</h3>
+          <div className="space-y-4">
+            <FormField
+              label="Edição/Número do DOEMS"
+              name="doems_edicao_numero"
+              value={formData.doems_edicao_numero}
+              onChange={handleChange}
+              placeholder="Ex: DOEMS nº 11.234"
+              required
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              A data e o texto da publicação serão solicitados nos próximos campos para manter a consistência do fluxo.
+            </p>
+          </div>
+        </div>
+      );
+
     case 'Homologação de Atestado': {
       const atestadosCurtos = atestadosMilitar.filter(a => a.dias <= 15 && !a.homologado_comandante);
       return (

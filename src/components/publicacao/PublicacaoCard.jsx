@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, ArrowRight, Calendar, Check, ChevronDown, ChevronUp, Copy, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, Check, ChevronDown, ChevronUp, Copy, FileText, Pause, Save, Shield, Trash2, X, ExternalLink, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 import { getLivroTextoPublicacaoRegistro } from '@/components/livro/livroService';
@@ -193,7 +193,33 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
         {registro.doems_edicao_numero && (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">DOEMS</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">DOEMS</p>
+              <div className="flex gap-2">
+                {registro.doems_link && (
+                  <a
+                    href={registro.doems_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-[10px] font-medium text-indigo-600 hover:underline"
+                  >
+                    <ExternalLink className="mr-1 h-3 w-3" />
+                    Abrir link
+                  </a>
+                )}
+                {registro.doems_arquivo && (
+                  <a
+                    href={registro.doems_arquivo}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-[10px] font-medium text-indigo-600 hover:underline"
+                  >
+                    <Download className="mr-1 h-3 w-3" />
+                    Baixar anexo
+                  </a>
+                )}
+              </div>
+            </div>
             <p className="text-sm text-indigo-900 whitespace-pre-wrap">{registro.doems_edicao_numero}</p>
           </div>
         )}

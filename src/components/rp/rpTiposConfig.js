@@ -320,6 +320,16 @@ export const RP_TIPOS_BASE = [
     palavrasChave: ['geral', 'livre', 'avulso'],
     destaque: false,
   },
+  {
+    value: 'Publicação DOEMS',
+    label: 'Publicação DOEMS',
+    grupo: 'Administrativo',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Registro interno de uma publicação externa já existente no Diário Oficial.',
+    palavrasChave: ['doems', 'diario oficial', 'externa'],
+    destaque: true,
+  },
 ];
 
 // ─── Labels com alias (ex: Saída Férias → Início de Férias) ─────────────────
@@ -452,11 +462,12 @@ export function getTiposRPFiltrados({
 
   // 4. Tipo legado (edição) — sempre incluso
   if (tipoAtualEdicao && !map.has(tipoAtualEdicao)) {
+    const moduloLegado = getModuloByTipo(tipoAtualEdicao, tiposCustom);
     mergeTipoMaps(map, {
       value: tipoAtualEdicao,
       label: RP_TIPO_LABELS[tipoAtualEdicao] || tipoAtualEdicao,
       grupo: 'Registro Original',
-      modulo: getModuloByTipo(tipoAtualEdicao, tiposCustom),
+      modulo: moduloLegado,
       descricao: 'Tipo preservado do registro original em edição.',
       palavrasChave: ['legado', 'registro original'],
       destaque: false,

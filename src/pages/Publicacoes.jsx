@@ -49,7 +49,7 @@ const PUBLICACOES_TEMPLATE_GOVERNANCA = {
 const TIPOS_FERIAS = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'];
 const ABAS_ORIGEM = [
   { key: 'all', label: 'Todos' },
-  { key: 'ex-officio', label: 'Ex Officio / DOEMS' },
+  { key: 'ex-officio', label: 'Publicações' },
   { key: 'livro', label: 'Livro' },
   { key: 'atestado', label: 'Atestados' },
 ];
@@ -667,7 +667,7 @@ export default function Publicacoes() {
                   <BookOpenText className="h-3.5 w-3.5" /> Controle de Publicações
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide Livro, Ex Officio/Publicação Externa (DOEMS) e Atestados no mesmo fluxo operacional.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide registros de Livro, Publicações e Atestados no mesmo fluxo operacional.</p>
                 <p className="mt-1 text-[11px] text-slate-500">
                   {PUBLICACOES_TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.PERSISTIDO
                     ? 'Texto oficial persistido.'
