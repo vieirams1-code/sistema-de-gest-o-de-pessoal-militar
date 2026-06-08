@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  aplicarSugestoesClassificacaoHistoricaEmRevisao,
   atualizarLinhaRevisaoSimplificada,
   gerarResumoRevisaoSimplificada,
   montarPayloadPublicacaoExOfficioMigracaoLegado,
@@ -207,4 +208,79 @@ test('resolver tipo usa tipo_legado e transformado.materia_legado após matéria
     resolverTipoFinalMigracaoLegado({ transformado: { materia_legado: 'Movimentação' } }),
     { tipoFinal: 'Movimentação', classificacaoPendente: true },
   );
+});
+
+const catalogoClassificacoesHistoricas = Object.freeze([
+  { id: 'ch-ferias', nome: 'Concessão de Férias', grupo: 'Férias', ativo: true, uso_migracao: true },
+  { id: 'ch-elogio', nome: 'Elogio', grupo: 'Administrativo', ativo: true, uso_migracao: true },
+]);
+
+test('aplicação em lote não sobrescreve classificação histórica já preenchida', () => {
+  const linhas = [
+    linha(2, 'NOTA-1', { texto_publicado: 'Concede férias regulamentares', classificacao_historica_id: 'humana-id', classificacao_historica_nome: 'Escolha humana' }),
+    linha(3, 'NOTA-2', { texto_publicado: 'Concede férias regulamentares' }),
+  ];
+
+  const resultado = aplicarSugestoesClassificacaoHistoricaEmRevisao(linhas, [2, 3], catalogoClassificacoesHistoricas);
+
+  assert.equal(resultado.previa.totalSelecionadas, 2);
+  assert.equal(resultado.previa.totalIgnoradasJaClassificadas, 1);
+  assert.equal(resultado.previa.totalAplicaveis, 1);
+  assert.equal(resultado.linhas[0].classificacao_historica_id, 'humana-id');
+  assert.equal(resultado.linhas[0].classificacao_historica_nome, 'Escolha humana');
+  assert.equal(resultado.linhas[1].classificacao_historica_id, 'ch-ferias');
+});
+
+test('aplicação em lote altera apenas linhas selecionadas com sugestão válida', () => {
+  const linhas = [
+    linha(2, 'NOTA-1', { texto_publicado: 'Concede férias regulamentares' }),
+    linha(3, 'NOTA-2', { texto_publicado: 'Elogio ao militar' }),
+    linha(4, 'NOTA-3', { texto_publicado: 'Concede férias regulamentares' }),
+  ];
+
+  const resultado = aplicarSugestoesClassificacaoHistoricaEmRevisao(linhas, [2, 4], catalogoClassificacoesHistoricas);
+
+  assert.equal(resultado.previa.totalAplicaveis, 2);
+  assert.equal(resultado.linhas[0].classificacao_historica_id, 'ch-ferias');
+  assert.equal(resultado.linhas[1].classificacao_historica_id, undefined);
+  assert.equal(resultado.linhas[2].classificacao_historica_id, 'ch-ferias');
+});
+
+test('aplicação em lote preserva snapshot classificacao_historica_nome sugerido', () => {
+  const [aplicada] = aplicarSugestoesClassificacaoHistoricaEmRevisao([
+    linha(2, 'NOTA-1', { texto_publicado: 'Elogio individual publicado' }),
+  ], [2], catalogoClassificacoesHistoricas).linhas;
+
+  assert.equal(aplicada.classificacao_historica_id, 'ch-elogio');
+  assert.equal(aplicada.classificacao_historica_nome, 'Elogio');
+  assert.equal(aplicada.transformado.classificacao_historica_nome, 'Elogio');
+});
+
+test('aplicação em lote ignora linhas selecionadas sem sugestão', () => {
+  const resultado = aplicarSugestoesClassificacaoHistoricaEmRevisao([
+    linha(2, 'NOTA-1', { texto_publicado: 'Texto administrativo sem termo mapeado' }),
+  ], [2], catalogoClassificacoesHistoricas);
+
+  assert.equal(resultado.previa.totalSelecionadas, 1);
+  assert.equal(resultado.previa.totalSemSugestao, 1);
+  assert.equal(resultado.previa.totalAplicaveis, 0);
+  assert.equal(resultado.linhas[0].classificacao_historica_id, undefined);
+  assert.equal(resultado.linhas[0].classificacao_historica_nome, undefined);
+});
+
+test('payload não envia metadados auxiliares da aplicação em lote', () => {
+  const payload = montarPayloadPublicacaoExOfficioMigracaoLegado(linha(2, 'NOTA-1', {
+    texto_publicado: 'Concede férias regulamentares',
+    classificacao_historica_id: 'ch-ferias',
+    classificacao_historica_nome: 'Concessão de Férias',
+    sugestao_classificacao_historica_id: 'aux-id',
+    sugestao_classificacao_historica_nome: 'Auxiliar',
+    aplicacao_sugestao_lote: true,
+  }));
+
+  assert.equal(payload.classificacao_historica_id, 'ch-ferias');
+  assert.equal(payload.classificacao_historica_nome, 'Concessão de Férias');
+  assert.ok(!Object.hasOwn(payload, 'sugestao_classificacao_historica_id'));
+  assert.ok(!Object.hasOwn(payload, 'sugestao_classificacao_historica_nome'));
+  assert.ok(!Object.hasOwn(payload, 'aplicacao_sugestao_lote'));
 });

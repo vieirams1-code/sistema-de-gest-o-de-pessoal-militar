@@ -1,3 +1,4 @@
+import { sugerirClassificacaoHistoricaLegado } from './migracaoAlteracoesLegadoClassificacaoHistoricaSugestao.js';
 import { calcularStatusPublicacaoLegado } from './migracaoAlteracoesLegadoStatusPublicacao.js';
 
 export const STATUS_REVISAO_SIMPLIFICADA = Object.freeze({
@@ -10,6 +11,76 @@ export const STATUS_REVISAO_SIMPLIFICADA = Object.freeze({
 function limparTexto(valor) {
   if (valor === null || valor === undefined) return '';
   return String(valor).trim();
+}
+
+function linhaPossuiClassificacaoHistorica(linha = {}) {
+  return Boolean(limparTexto(linha.classificacao_historica_id || linha.transformado?.classificacao_historica_id)
+    || limparTexto(linha.classificacao_historica_nome || linha.transformado?.classificacao_historica_nome));
+}
+
+export function calcularPreviaAplicacaoSugestoesClassificacaoHistorica(linhas = [], linhasSelecionadas = [], classificacoesHistoricasAtivas = []) {
+  const selecionadasSet = new Set((linhasSelecionadas || []).map((id) => String(id)));
+  const resumoPorClassificacao = new Map();
+  const aplicaveis = [];
+  let ignoradasJaClassificadas = 0;
+  let ignoradasSemSugestao = 0;
+
+  for (const linha of linhas || []) {
+    if (!selecionadasSet.has(String(linha?.linhaNumero))) continue;
+
+    if (linhaPossuiClassificacaoHistorica(linha)) {
+      ignoradasJaClassificadas += 1;
+      continue;
+    }
+
+    const sugestao = sugerirClassificacaoHistoricaLegado(linha, classificacoesHistoricasAtivas);
+    if (!sugestao?.id || !sugestao?.nome) {
+      ignoradasSemSugestao += 1;
+      continue;
+    }
+
+    aplicaveis.push({
+      linhaNumero: linha.linhaNumero,
+      classificacao_historica_id: sugestao.id,
+      classificacao_historica_nome: sugestao.nome,
+    });
+    resumoPorClassificacao.set(sugestao.nome, (resumoPorClassificacao.get(sugestao.nome) || 0) + 1);
+  }
+
+  return {
+    totalSelecionadas: selecionadasSet.size,
+    totalAplicaveis: aplicaveis.length,
+    totalIgnoradasJaClassificadas: ignoradasJaClassificadas,
+    totalSemSugestao: ignoradasSemSugestao,
+    porClassificacao: Array.from(resumoPorClassificacao.entries())
+      .map(([nome, total]) => ({ nome, total }))
+      .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, 'pt-BR')),
+    aplicaveis,
+  };
+}
+
+export function aplicarSugestoesClassificacaoHistoricaEmRevisao(linhas = [], linhasSelecionadas = [], classificacoesHistoricasAtivas = []) {
+  const previa = calcularPreviaAplicacaoSugestoesClassificacaoHistorica(linhas, linhasSelecionadas, classificacoesHistoricasAtivas);
+  if (!previa.aplicaveis.length) return { linhas: revalidarLinhasRevisaoSimplificada(linhas), previa, snapshotAnterior: [] };
+
+  const atualizacoesPorLinha = new Map(previa.aplicaveis.map((item) => [String(item.linhaNumero), item]));
+  const snapshotAnterior = [];
+  const linhasAtualizadas = (linhas || []).map((linha) => {
+    const atualizacao = atualizacoesPorLinha.get(String(linha?.linhaNumero));
+    if (!atualizacao) return linha;
+    snapshotAnterior.push({
+      linhaNumero: linha.linhaNumero,
+      classificacao_historica_id: linha.classificacao_historica_id || '',
+      classificacao_historica_nome: linha.classificacao_historica_nome || '',
+    });
+    return {
+      ...linha,
+      classificacao_historica_id: atualizacao.classificacao_historica_id,
+      classificacao_historica_nome: atualizacao.classificacao_historica_nome,
+    };
+  });
+
+  return { linhas: revalidarLinhasRevisaoSimplificada(linhasAtualizadas), previa, snapshotAnterior };
 }
 
 export function normalizarNumeroNota(valor) {

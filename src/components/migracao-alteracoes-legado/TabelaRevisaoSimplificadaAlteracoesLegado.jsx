@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { sugerirClassificacaoHistoricaLegado } from '@/services/migracaoAlteracoesLegadoClassificacaoHistoricaSugestao';
+import { calcularPreviaAplicacaoSugestoesClassificacaoHistorica } from '@/services/migracaoAlteracoesLegadoSimplificadoEdicao';
 
 const statusClass = {
   pronta: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -126,6 +127,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   onCriarClassificacaoHistorica,
   onAlterarLinha,
   onAlternarRecusa,
+  onAplicarSugestoesClassificacaoHistorica,
+  onDesfazerSugestoesClassificacaoHistorica,
 }) {
   const [selecionadaId, setSelecionadaId] = useState(null);
   const [pesquisa, setPesquisa] = useState('');
@@ -138,6 +141,9 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   const [novaClassificacaoOpen, setNovaClassificacaoOpen] = useState(false);
   const [salvandoNovaClassificacao, setSalvandoNovaClassificacao] = useState(false);
   const [linhaNovaClassificacao, setLinhaNovaClassificacao] = useState(null);
+  const [linhasSelecionadasLote, setLinhasSelecionadasLote] = useState(() => new Set());
+  const [modalAplicacaoLoteAberto, setModalAplicacaoLoteAberto] = useState(false);
+  const [ultimaAplicacaoLote, setUltimaAplicacaoLote] = useState(null);
 
   const linhasPesquisadas = useMemo(() => {
     const termo = normalizar(pesquisa.trim());
@@ -187,6 +193,59 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
     duplicadas: linhasFiltradas.filter(possuiDuplicidade).length,
     recusadas: linhasFiltradas.filter((linha) => linha.recusada).length,
   }), [linhasFiltradas]);
+
+  useEffect(() => {
+    const idsExistentes = new Set(linhas.map((linha) => String(linha.linhaNumero)));
+    setLinhasSelecionadasLote((atuais) => {
+      const proximas = new Set(Array.from(atuais).filter((id) => idsExistentes.has(String(id))));
+      return proximas.size === atuais.size ? atuais : proximas;
+    });
+  }, [linhas]);
+
+  const idsSelecionadosLote = useMemo(() => Array.from(linhasSelecionadasLote), [linhasSelecionadasLote]);
+  const previaAplicacaoLote = useMemo(() => calcularPreviaAplicacaoSugestoesClassificacaoHistorica(
+    linhas,
+    idsSelecionadosLote,
+    classificacoesHistoricas,
+  ), [classificacoesHistoricas, idsSelecionadosLote, linhas]);
+  const linhasFiltradasSelecionadas = linhasFiltradas.filter((linha) => linhasSelecionadasLote.has(String(linha.linhaNumero)));
+  const todasFiltradasSelecionadas = linhasFiltradas.length > 0 && linhasFiltradasSelecionadas.length === linhasFiltradas.length;
+
+  const alternarSelecaoLinhaLote = (linhaNumero, checked) => {
+    setLinhasSelecionadasLote((atuais) => {
+      const proximas = new Set(atuais);
+      if (checked) proximas.add(String(linhaNumero));
+      else proximas.delete(String(linhaNumero));
+      return proximas;
+    });
+  };
+
+  const alternarSelecaoLinhasFiltradas = (checked) => {
+    setLinhasSelecionadasLote((atuais) => {
+      const proximas = new Set(atuais);
+      linhasFiltradas.forEach((linha) => {
+        if (checked) proximas.add(String(linha.linhaNumero));
+        else proximas.delete(String(linha.linhaNumero));
+      });
+      return proximas;
+    });
+  };
+
+  const confirmarAplicacaoLote = () => {
+    if (!onAplicarSugestoesClassificacaoHistorica || !previaAplicacaoLote.totalAplicaveis) return;
+    const resultado = onAplicarSugestoesClassificacaoHistorica(idsSelecionadosLote);
+    setUltimaAplicacaoLote({
+      total: resultado?.aplicadas || previaAplicacaoLote.totalAplicaveis,
+      snapshotAnterior: resultado?.snapshotAnterior || [],
+    });
+    setModalAplicacaoLoteAberto(false);
+  };
+
+  const desfazerAplicacaoLote = () => {
+    if (!ultimaAplicacaoLote?.snapshotAnterior?.length || !onDesfazerSugestoesClassificacaoHistorica) return;
+    onDesfazerSugestoesClassificacaoHistorica(ultimaAplicacaoLote.snapshotAnterior);
+    setUltimaAplicacaoLote(null);
+  };
 
   const linhasDuplicadasParaRecusar = linhasFiltradas.filter((linha) => possuiDuplicidade(linha) && !linha.recusada);
   const linhasComErroParaRecusar = linhasFiltradas.filter((linha) => possuiErro(linha) && !linha.recusada);
@@ -313,6 +372,12 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               <Checkbox checked={mostrarClassificados} onCheckedChange={(checked) => setMostrarClassificados(Boolean(checked))} />
               Mostrar classificados
             </label>
+            <span className="h-4 border-l border-slate-200" />
+            <label className="flex items-center gap-1.5 font-medium text-slate-700">
+              <Checkbox checked={todasFiltradasSelecionadas} onCheckedChange={(checked) => alternarSelecaoLinhasFiltradas(Boolean(checked))} />
+              Selecionar visíveis
+            </label>
+            <span>{idsSelecionadosLote.length} selecionada(s)</span>
           </div>
           <div className="flex flex-wrap gap-1">
             <Contador rotulo="Total filtrado" valor={contadores.total} />
@@ -329,6 +394,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
             <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasDuplicadasParaRecusar.length} onClick={() => alternarRecusaEmLote(linhasDuplicadasParaRecusar, `Recusar ${linhasDuplicadasParaRecusar.length} linhas duplicadas visíveis no filtro atual?`)}>Recusar duplicadas</Button>
             <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasComErroParaRecusar.length} onClick={() => alternarRecusaEmLote(linhasComErroParaRecusar, `Recusar ${linhasComErroParaRecusar.length} linhas com erro visíveis no filtro atual?`)}>Recusar erros</Button>
             <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" disabled={!linhasParaRestaurar.length} onClick={() => alternarRecusaEmLote(linhasParaRestaurar, `Restaurar ${linhasParaRestaurar.length} linhas recusadas visíveis no filtro atual?`)}><RotateCcw className="mr-1 h-3 w-3" />Restaurar todas</Button>
+            <Button type="button" variant="outline" size="sm" className="h-7 border-emerald-200 px-2 text-[11px] text-emerald-800 hover:bg-emerald-50" disabled={!idsSelecionadosLote.length} onClick={() => setModalAplicacaoLoteAberto(true)}>Prévia sugestões</Button>
+            {ultimaAplicacaoLote?.snapshotAnterior?.length ? (
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-slate-600" onClick={desfazerAplicacaoLote}><RotateCcw className="mr-1 h-3 w-3" />Desfazer aplicação em lote</Button>
+            ) : null}
           </div>
         </div>
 
@@ -349,6 +418,12 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               )}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">
+                    <Checkbox
+                      checked={linhasSelecionadasLote.has(String(linha.linhaNumero))}
+                      onClick={(event) => event.stopPropagation()}
+                      onCheckedChange={(checked) => alternarSelecaoLinhaLote(linha.linhaNumero, Boolean(checked))}
+                      aria-label={`Selecionar linha ${linha.linhaNumero} para ação em lote`}
+                    />
                     <span className="text-[11px] font-bold text-slate-700">Linha {linha.linhaNumero}</span>
                     <Badge className={cn('border px-1 py-0 text-[9px]', statusClass[statusVisual] || statusClass.erro)}>{statusVisual.toUpperCase()}</Badge>
                   </div>
@@ -600,6 +675,43 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
         )}
       </div>
       </section>
+      <Dialog open={modalAplicacaoLoteAberto} onOpenChange={setModalAplicacaoLoteAberto}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Aplicar sugestões de classificação histórica</DialogTitle>
+            <DialogDescription>
+              Prévia da aplicação assistida somente nas linhas selecionadas. A alteração fica local nesta revisão e será persistida apenas no fluxo normal de importação.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-slate-700">
+            <div className="grid grid-cols-2 gap-2">
+              <Contador rotulo="Selecionadas" valor={previaAplicacaoLote.totalSelecionadas} />
+              <Contador rotulo="Com sugestão aplicável" valor={previaAplicacaoLote.totalAplicaveis} destaque="border-emerald-200 bg-emerald-50 text-emerald-700" />
+              <Contador rotulo="Já classificadas" valor={previaAplicacaoLote.totalIgnoradasJaClassificadas} destaque="border-indigo-200 bg-indigo-50 text-indigo-700" />
+              <Contador rotulo="Sem sugestão" valor={previaAplicacaoLote.totalSemSugestao} destaque="border-slate-200 bg-slate-50 text-slate-700" />
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Agrupamento por classificação sugerida</p>
+              {previaAplicacaoLote.porClassificacao.length ? (
+                <ul className="space-y-1 text-xs">
+                  {previaAplicacaoLote.porClassificacao.map((item) => (
+                    <li key={item.nome} className="flex justify-between gap-3 rounded bg-white px-2 py-1">
+                      <span className="font-medium text-slate-700">{item.nome}</span>
+                      <span className="text-slate-500">{item.total} linha(s)</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-xs text-slate-500">Nenhuma sugestão aplicável nas linhas selecionadas.</p>}
+            </div>
+            <p className="text-xs text-slate-500">Linhas com classificação histórica já preenchida não serão sobrescritas.</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setModalAplicacaoLoteAberto(false)}>Cancelar</Button>
+            <Button type="button" disabled={!previaAplicacaoLote.totalAplicaveis} className="bg-emerald-700 hover:bg-emerald-800" onClick={confirmarAplicacaoLote}>Aplicar sugestões</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <NovaClassificacaoHistoricaDialog
         open={novaClassificacaoOpen}
         saving={salvandoNovaClassificacao}
