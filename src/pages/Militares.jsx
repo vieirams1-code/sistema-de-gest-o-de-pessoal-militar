@@ -46,7 +46,7 @@ import { base44 } from '@/api/base44Client';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import GerarDocumentoMilitarModal from '@/components/documentosMilitares/GerarDocumentoMilitarModal';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
-import { bulkEscopado } from '@/services/cudEscopadoClient';
+import { bulkMilitarFuncoesEscopado, bulkMilitarTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
 import {
   CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
@@ -852,7 +852,7 @@ export default function Militares() {
         ...deltaFuncoesRemover.map((v) => ({ acao: 'encerrar', id: v.id, militar_id: v.militar_id, funcao_militar_id: getFuncaoMilitarId(v), motivo: motivo || undefined, data: hoje })),
       ];
       if (itensFuncoes.length > 0) {
-        const resFn = await bulkEscopado('MilitarFuncao', itensFuncoes);
+        const resFn = await bulkMilitarFuncoesEscopado(itensFuncoes);
         (resFn?.resultados || []).forEach((r) => {
           if (r.ok && r.acao === 'aplicar' && !r.skipped) funcoesCriadas += 1;
           else if (r.ok && r.acao === 'encerrar' && !r.skipped) funcoesEncerradas += 1;
@@ -866,7 +866,7 @@ export default function Militares() {
         ...paraRemover.map((v) => ({ acao: 'remover', id: v.id, militar_id: v.militar_id, tag_id: getMilitarTagTagId(v), motivo: motivo || undefined, data: hoje })),
       ];
       if (itensTags.length > 0) {
-        const resTag = await bulkEscopado('MilitarTag', itensTags);
+        const resTag = await bulkMilitarTagsEscopado(itensTags);
         (resTag?.resultados || []).forEach((r) => {
           if (r.ok && r.acao === 'aplicar' && !r.skipped) aplicadas += 1;
           else if (r.ok && r.acao === 'remover' && !r.skipped) removidas += 1;

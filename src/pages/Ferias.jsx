@@ -69,7 +69,7 @@ import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFer
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import { getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
-import { bulkEscopado } from '@/services/cudEscopadoClient';
+import { bulkFeriasTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
@@ -720,7 +720,7 @@ export default function Ferias() {
           motivo: 'Bulk férias',
           data: now,
         }));
-        const resp = await bulkEscopado('FeriasTag', itensBulk);
+        const resp = await bulkFeriasTagsEscopado(itensBulk);
         resultadosBackend = Array.isArray(resp?.resultados) ? resp.resultados : [];
       } catch (error) {
         // erro global: marca todas como falhadas
