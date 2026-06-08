@@ -433,7 +433,6 @@ Deno.serve(async (req) => {
       if (itens.length === 0) return Response.json({ total: 0, sucesso: 0, falhas: 0, resultados: [] });
       if (itens.length > BULK_MAX_ITEMS) return erro(400, `Limite de ${BULK_MAX_ITEMS} itens por chamada bulk.`);
       const out = await executarBulkVinculos(base44, entidade as any, itens, isInScope);
-      logDev('[CUD_FUNCOES_TAGS_BULK]', { entidade, total: out.total, sucesso: out.sucesso, falhas: out.falhas });
       return Response.json(out);
     }
 

@@ -140,7 +140,6 @@ export default function FeriasTagsSection({ ferias }) {
         data_aplicacao: form.data_aplicacao,
         motivo: form.motivo || null,
       });
-      // TODO: migrar CUD para endpoint escopado no backend quando disponível.
     },
     onSuccess: () => {
       toast({ title: 'Tag adicionada com sucesso.' });
