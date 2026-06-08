@@ -330,6 +330,16 @@ export const RP_TIPOS_BASE = [
     palavrasChave: ['doems', 'diario oficial', 'externa'],
     destaque: true,
   },
+  {
+    value: 'Registro de Publicação DOEMS',
+    label: 'Registro de Publicação DOEMS',
+    grupo: 'Publicações Externas',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Registro interno de publicação externa já realizada no Diário Oficial.',
+    palavrasChave: ['doems', 'diario oficial', 'publicacao externa', 'registro externo'],
+    destaque: true,
+  },
 ];
 
 // ─── Labels com alias (ex: Saída Férias → Início de Férias) ─────────────────

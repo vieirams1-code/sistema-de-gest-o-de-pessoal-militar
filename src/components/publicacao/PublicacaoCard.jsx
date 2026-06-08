@@ -87,6 +87,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const origemTipo = detectarOrigemTipo(registro);
   const isRegistroLivro = origemTipo === 'livro';
+  const isDOEMS = registro.tipo_registro === 'Registro de Publicação DOEMS' || registro.tipo === 'Registro de Publicação DOEMS';
   const textoPublicacaoPersistido = registro.texto_publicacao || '';
   const canLoadTextoLivro = Boolean(isRegistroLivro && registro.id && !textoPublicacaoPersistido && registro.texto_publicacao_lazy_disponivel !== false);
   const currentStatus = registro.status_calculado || calcularStatusPublicacaoRegistro(registro);
@@ -194,7 +195,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         {registro.doems_edicao_numero && (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">DOEMS</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                {isDOEMS ? 'DOEMS' : 'Publicação externa'}
+              </p>
               <div className="flex gap-2">
                 {registro.doems_link && (
                   <a

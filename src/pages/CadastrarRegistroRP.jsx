@@ -306,6 +306,8 @@ export default function CadastrarRegistroRP() {
 
   const militarIdSelecionado = String(formData.militar_id || '').trim();
   const tipoRegistroSelecionado = String(formData.tipo_registro || '').trim();
+  const isRegistroPublicacaoDOEMS = tipoRegistroSelecionado === 'Registro de Publicação DOEMS';
+
   const escopoQueryKey = useMemo(() => ({
     isAdmin: isAdmin === true,
     modoAcesso: modoAcesso || 'indefinido',
@@ -727,7 +729,7 @@ export default function CadastrarRegistroRP() {
     if (textoEditadoManualmente && formData.texto_publicacao) return;
 
     // Se for Publicação DOEMS, não aplicar template (o texto é manual ou colado)
-    if (formData.tipo_registro === 'Publicação DOEMS') return;
+    if (formData.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) return;
 
     // Guard: para "Homologação de Atestado", aguardar a query do médico vinculado resolver
     // antes de gerar o texto, evitando que {{medico_crm}} fique como placeholder literal.
@@ -858,7 +860,7 @@ export default function CadastrarRegistroRP() {
       };
       const metadataRender = buildTemplateRenderMetadata({
         template: templateAtivoSelecionado,
-        modulo: isLivro ? 'Livro' : 'Publicação Ex Officio / Publicação Externa (DOEMS)',
+        modulo: isLivro ? 'Livro' : 'Publicação',
         user,
         sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
       });
@@ -906,7 +908,7 @@ export default function CadastrarRegistroRP() {
           registro: { ...criado, origem_tipo: 'livro' },
           evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
           usuario: user,
-          resumo: 'Criação de publicação no módulo Livro.',
+          resumo: 'Criação de registro no módulo Livro.',
           estadoAnterior: null,
           estadoNovo: normalizarStatusPublicacao(criado.status_calculado || criado.status_publicacao || criado.status) || calcularStatusPublicacaoRegistro(criado),
           antes: null,
@@ -923,7 +925,7 @@ export default function CadastrarRegistroRP() {
         registro: { ...criado, origem_tipo: 'ex-officio' },
         evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
         usuario: user,
-        resumo: 'Criação de publicação no módulo Ex Officio / Publicação Externa (DOEMS).',
+        resumo: 'Criação de publicação.',
         estadoAnterior: null,
         estadoNovo: normalizarStatusPublicacao(criado.status_calculado || criado.status_publicacao || criado.status) || calcularStatusPublicacaoRegistro(criado),
         antes: null,
@@ -1459,16 +1461,16 @@ export default function CadastrarRegistroRP() {
                     onChange={handleChange}
                     type="date"
                   />
-                  {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
+                  {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && !isRegistroPublicacaoDOEMS && (
                     <FormField
-                      label="Edição/número do DOEMS (opcional)"
+                      label="Edição/número da publicação externa (opcional)"
                       name="doems_edicao_numero"
                       value={formData.doems_edicao_numero}
                       onChange={handleChange}
-                      placeholder="Ex: DOEMS nº 11.234 ou Edição 11.234"
+                      placeholder="Ex: Edição 11.234 ou similar"
                     />
                   )}
-                  {formData.tipo_registro === 'Publicação DOEMS' && (
+                  {(formData.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) && (
                     <FormField
                       label="Link do DOEMS (opcional)"
                       name="doems_link"
@@ -1479,9 +1481,11 @@ export default function CadastrarRegistroRP() {
                   )}
                 </div>
 
-                {formData.tipo_registro === 'Publicação DOEMS' && (
+                {(formData.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) && (
                   <div className="mt-4 space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">Anexo do DOEMS (opcional)</Label>
+                    <Label className="text-sm font-medium text-slate-700">
+                      {isRegistroPublicacaoDOEMS ? 'Link/anexo da publicação (opcional)' : 'Anexo do DOEMS (opcional)'}
+                    </Label>
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <Button
@@ -1537,25 +1541,29 @@ export default function CadastrarRegistroRP() {
                   </div>
                 )}
 
-                {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
+                {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && !isRegistroPublicacaoDOEMS && (
                   <p className="mt-2 text-xs text-slate-500">
-                    Use este campo quando a Publicação Ex Officio for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
+                    Use este campo quando a publicação for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
                   </p>
                 )}
                 <div className="mt-4">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
+                    <Label className="text-sm font-medium text-slate-700">
+                      {isRegistroPublicacaoDOEMS ? 'Texto publicado' : 'Texto de Publicação'}
+                    </Label>
                     {textoEditadoManualmente && (
                       <span className="text-xs font-medium text-amber-700">
                         Texto alterado manualmente
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
-                      ? 'Texto derivado do template com sobrescrita manual.'
-                      : 'Texto derivado do template.'}
-                  </p>
+                  {!isRegistroPublicacaoDOEMS && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
+                        ? 'Texto derivado do template com sobrescrita manual.'
+                        : 'Texto derivado do template.'}
+                    </p>
+                  )}
                   {parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json)?.rendered_at && (
                     <p className="mt-1 text-[11px] text-slate-500">
                       Gerado via template em {formatDateBR(parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json).rendered_at)}.
@@ -1569,8 +1577,8 @@ export default function CadastrarRegistroRP() {
                     }}
                     className="mt-1.5"
                     rows={4}
-                    placeholder={formData.tipo_registro === 'Publicação DOEMS' ? "Cole aqui o texto conforme publicado no Diário Oficial..." : "Texto gerado para o BG..."}
-                    required={formData.tipo_registro === 'Publicação DOEMS'}
+                    placeholder={isRegistroPublicacaoDOEMS ? "Cole o texto conforme publicado no DOEMS..." : formData.tipo_registro === 'Publicação DOEMS' ? "Cole aqui o texto conforme publicado no Diário Oficial..." : "Texto gerado para o BG..."}
+                    required={isRegistroPublicacaoDOEMS || formData.tipo_registro === 'Publicação DOEMS'}
                   />
                 </div>
                 <div className="mt-4">
