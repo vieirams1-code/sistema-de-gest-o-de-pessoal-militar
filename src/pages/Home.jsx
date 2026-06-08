@@ -229,8 +229,20 @@ export default function Home() {
   const { data: atestados = [] } = useQuery({
     queryKey: ['dashboard-atestados', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.Atestado.list();
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.Atestado.list();
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await base44.entities.Atestado.filter({
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.Atestado.list();
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
@@ -238,8 +250,20 @@ export default function Home() {
   const { data: punicoes = [] } = useQuery({
     queryKey: ['punicoes-ativas', scopeKey],
     queryFn: async () => {
-      const lista = await punicaoEntity.list();
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return punicaoEntity.list();
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await punicaoEntity.filter({
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await punicaoEntity.list();
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
@@ -247,8 +271,20 @@ export default function Home() {
   const { data: armamentos = [] } = useQuery({
     queryKey: ['armamentos', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.Armamento.list();
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.Armamento.list();
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await base44.entities.Armamento.filter({
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.Armamento.list();
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
@@ -256,8 +292,20 @@ export default function Home() {
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['dashboard-registros-livro', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.RegistroLivro.list('-created_date');
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.RegistroLivro.list('-created_date');
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await base44.entities.RegistroLivro.filter({
+          militar_id: { in: scopedIds },
+        }, '-created_date');
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.RegistroLivro.list('-created_date');
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
@@ -286,8 +334,21 @@ export default function Home() {
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['dashboard-pendencias-comportamento', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' });
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' });
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await base44.entities.PendenciaComportamento.filter({
+          status_pendencia: 'Pendente',
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' });
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
@@ -367,8 +428,16 @@ export default function Home() {
     return [...publicacoesExOfficio, ...registrosLivro]
       .filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
   }, [publicacoesExOfficio, registrosLivro]);
-  const pendenciasComportamentoValidas = filtrarPendenciasComportamentoDashboard(pendenciasComportamento, militares);
-  const inconsistenciasCadastrais = listarInconsistenciasCadastraisDashboard(militares);
+
+  // ⚡ [Performance]: Memoize behavior pendencies and cadastral audit to avoid O(N) recalculations on every render
+  const pendenciasComportamentoValidas = React.useMemo(() => (
+    filtrarPendenciasComportamentoDashboard(pendenciasComportamento, militares)
+  ), [pendenciasComportamento, militares]);
+
+  const inconsistenciasCadastrais = React.useMemo(() => (
+    listarInconsistenciasCadastraisDashboard(militares)
+  ), [militares]);
+
   const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamentoValidas.length + inconsistenciasCadastrais.length;
   const afastamentosParciais = React.useMemo(() => {
     return buildAfastamentosVigentes({ atestados, registrosLivro }).length;
