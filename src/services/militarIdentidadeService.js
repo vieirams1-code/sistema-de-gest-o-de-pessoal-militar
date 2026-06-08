@@ -249,6 +249,7 @@ export async function validarMatriculaDisponivel(matricula, excludeMilitarId = '
   if (militar) {
     throw new Error(ERROS.MATRICULA_DUPLICADA);
   }
+
   return matriculaNorm;
 }
 
