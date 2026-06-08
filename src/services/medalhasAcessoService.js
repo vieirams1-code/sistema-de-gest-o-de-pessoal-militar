@@ -53,30 +53,55 @@ export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarS
   if (isAdmin) return base44Client.entities.Militar.list('nome_completo');
 
   const scopeFilters = getMilitarScopeFilters();
-  if (!scopeFilters.length) return [];
+  if (!scopeFilters || !scopeFilters.length) return [];
 
-  const militarQueries = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
-  const mapa = new Map();
-  militarQueries.flat().forEach((militar) => mapa.set(militar.id, militar));
-  return Array.from(mapa.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || '')));
+  // Optimized: Use Promise.all but flatten more efficiently and use a Map for O(1) deduplication
+  const results = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
+  const uniqueMilitares = new Map();
+
+  for (let i = 0; i < results.length; i += 1) {
+    const batch = results[i];
+    if (Array.isArray(batch)) {
+      for (let j = 0; j < batch.length; j += 1) {
+        const m = batch[j];
+        if (m?.id) uniqueMilitares.set(m.id, m);
+      }
+    }
+  }
+
+  return Array.from(uniqueMilitares.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || ''), 'pt-BR'));
 }
 
 export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds = [] }) {
   if (isAdmin) return base44Client.entities.Medalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  const listas = await Promise.all(militarIds.map((id) => base44Client.entities.Medalha.filter({ militar_id: id }, '-created_date')));
-  const mapa = new Map();
-  listas.flat().forEach((registro) => mapa.set(registro.id, registro));
-  return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+  // Optimized: Single query using bulk filter 'in' instead of N concurrent queries
+  const registros = await base44Client.entities.Medalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+  return (registros || []).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }
 
 export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarIds = [] }) {
   if (isAdmin) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  const listas = await Promise.all(militarIds.map((id) => base44Client.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date')));
-  const mapa = new Map();
-  listas.flat().forEach((registro) => mapa.set(registro.id, registro));
-  return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+  // Optimized: Single query using bulk filter 'in' instead of N concurrent queries
+  const registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+  return (registros || []).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+}
+
+/**
+ * Executes a bulk update of medal records with a mandatory fallback for SDK compatibility.
+ * Optimized for performance in batch operations like resetting indications.
+ */
+export async function bulkUpdateMedalhas(base44Client, payloads = []) {
+  if (!payloads.length) return;
+
+  const entity = base44Client.entities.Medalha;
+  if (typeof entity.bulkUpdate === 'function') {
+    return entity.bulkUpdate(payloads);
+  }
+
+  // Fallback to concurrent individual updates if bulkUpdate is not available
+  return Promise.all(payloads.map(({ id, ...data }) => entity.update(id, data)));
 }
