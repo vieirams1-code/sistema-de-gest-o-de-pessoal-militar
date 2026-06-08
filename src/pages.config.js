@@ -65,6 +65,7 @@ import CadastrarMilitar from './pages/CadastrarMilitar';
 import CadastrarPublicacao from './pages/CadastrarPublicacao';
 import CadastrarPunicao from './pages/CadastrarPunicao';
 import ClassificacaoPendentesLegado from './pages/ClassificacaoPendentesLegado';
+import ClassificacoesHistoricasAlteracoes from './pages/ClassificacoesHistoricasAlteracoes';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import ContratosDesignacao from './pages/ContratosDesignacao';
@@ -133,6 +134,7 @@ export const PAGES = {
     "CadastrarPublicacao": CadastrarPublicacao,
     "CadastrarPunicao": CadastrarPunicao,
     "ClassificacaoPendentesLegado": ClassificacaoPendentesLegado,
+    "ClassificacoesHistoricasAlteracoes": ClassificacoesHistoricasAlteracoes,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "ConciliacaoBoletim": ConciliacaoBoletim,
     "ContratosDesignacao": ContratosDesignacao,

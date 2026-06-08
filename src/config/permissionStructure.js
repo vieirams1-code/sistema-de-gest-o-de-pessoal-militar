@@ -57,6 +57,7 @@ export const permissionStructure = [
           { key: 'perm_editar_migracao_legado', label: 'Editar Migração Legado', sensitive: true },
           { key: 'perm_excluir_migracao_legado', label: 'Excluir Migração Legado', sensitive: true },
           { key: 'perm_classificar_legado', label: 'Classificar Pendências do Legado', sensitive: true },
+          { key: 'perm_gerir_classificacoes_historicas', label: 'Gerir Classificações Históricas', sensitive: true },
           { key: 'perm_revisar_duplicidades', label: 'Revisar Duplicidades de Militar', sensitive: true },
           { key: 'perm_migrar_alteracoes_legado', label: 'Migrar Alterações Legado', sensitive: true }
         ]

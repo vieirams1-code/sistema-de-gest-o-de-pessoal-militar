@@ -90,6 +90,7 @@ const moduleGuardByPage = {
   HistoricoImportacoesMilitares: { moduleKeys: ['migracao_militares'], actionKeys: ['ver_historico_importacoes'], moduleName: 'Migração de Militares' },
   MigracaoAlteracoesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['visualizar_migracao_legado'], moduleName: 'Migração de Alterações Legado' },
   ClassificacaoPendentesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['classificar_legado'], moduleName: 'Migração de Alterações Legado' },
+  ClassificacoesHistoricasAlteracoes: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['gerir_classificacoes_historicas'], moduleName: 'Migração de Alterações Legado' },
   RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração de Alterações Legado' },
 };
 
