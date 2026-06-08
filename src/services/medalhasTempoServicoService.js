@@ -564,26 +564,39 @@ export function apurarListaMilitaresDomPedroII({
 
 export async function garantirCatalogoFixoMedalhaTempo(base44Client) {
   const existentes = [...(await base44Client.entities.TipoMedalha.list('-created_date'))];
-  let created = 0;
-  let updated = 0;
+  const aCriar = [];
+  const aAtualizar = [];
 
   for (const tipoFixo of TIPOS_FIXOS_MEDALHA_TEMPO) {
     const existente = localizarTipoExistente(tipoFixo, existentes);
     if (!existente?.id) {
-      const criado = await base44Client.entities.TipoMedalha.create(tipoFixo);
-      existentes.push(criado || tipoFixo);
-      created += 1;
+      aCriar.push(tipoFixo);
       continue;
     }
 
     const patch = gerarPatchTipoMedalha(existente, tipoFixo);
-    if (!Object.keys(patch).length) continue;
-    await base44Client.entities.TipoMedalha.update(existente.id, patch);
-    Object.assign(existente, patch);
-    updated += 1;
+    if (Object.keys(patch).length > 0) {
+      aAtualizar.push({ id: existente.id, ...patch });
+    }
   }
 
-  return { created, updated };
+  if (aCriar.length > 0) {
+    if (typeof base44Client.entities.TipoMedalha.bulkCreate === 'function') {
+      await base44Client.entities.TipoMedalha.bulkCreate(aCriar);
+    } else {
+      await Promise.all(aCriar.map((p) => base44Client.entities.TipoMedalha.create(p)));
+    }
+  }
+
+  if (aAtualizar.length > 0) {
+    if (typeof base44Client.entities.TipoMedalha.bulkUpdate === 'function') {
+      await base44Client.entities.TipoMedalha.bulkUpdate(aAtualizar);
+    } else {
+      await Promise.all(aAtualizar.map(({ id, ...rest }) => base44Client.entities.TipoMedalha.update(id, rest)));
+    }
+  }
+
+  return { created: aCriar.length, updated: aAtualizar.length };
 }
 
 export async function resolverOuGarantirTipoMedalha(base44Client, codigoOuNome, tiposMedalha = []) {

@@ -53,30 +53,75 @@ export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarS
   if (isAdmin) return base44Client.entities.Militar.list('nome_completo');
 
   const scopeFilters = getMilitarScopeFilters();
-  if (!scopeFilters.length) return [];
+  if (!scopeFilters || !scopeFilters.length) return [];
 
-  const militarQueries = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
-  const mapa = new Map();
-  militarQueries.flat().forEach((militar) => mapa.set(militar.id, militar));
-  return Array.from(mapa.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || '')));
+  // Optimized: Use Promise.all but flatten more efficiently and use a Map for O(1) deduplication
+  const results = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
+  const uniqueMilitares = new Map();
+
+  for (let i = 0; i < results.length; i += 1) {
+    const batch = results[i];
+    if (Array.isArray(batch)) {
+      for (let j = 0; j < batch.length; j += 1) {
+        const m = batch[j];
+        if (m?.id) uniqueMilitares.set(m.id, m);
+      }
+    }
+  }
+
+  return Array.from(uniqueMilitares.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || ''), 'pt-BR'));
 }
 
 export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds = [] }) {
   if (isAdmin) return base44Client.entities.Medalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  const listas = await Promise.all(militarIds.map((id) => base44Client.entities.Medalha.filter({ militar_id: id }, '-created_date')));
+  let registros = [];
+  try {
+    registros = await base44Client.entities.Medalha.filter({ militar_id: { $in: militarIds } }, '-created_date');
+  } catch (error) {
+    const listas = await Promise.all(militarIds.map((id) => base44Client.entities.Medalha.filter({ militar_id: id }, '-created_date')));
+    registros = listas.flat();
+  }
+
   const mapa = new Map();
-  listas.flat().forEach((registro) => mapa.set(registro.id, registro));
+  registros.forEach((registro) => mapa.set(registro.id, registro));
   return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+}
+
+export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userEmail, motivoReset = 'administrativamente' }) {
+  if (!medalhas.length) return 0;
+
+  const payloads = medalhas.map((registro) => ({
+    id: registro.id,
+    ...adicionarAuditoriaMedalha({
+      status: 'CANCELADA',
+      observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação resetada ${motivoReset} em ${new Date().toLocaleDateString('pt-BR')}.`,
+    }, { userEmail, acao: 'reset' }),
+  }));
+
+  if (typeof base44Client.entities.Medalha.bulkUpdate === 'function') {
+    await base44Client.entities.Medalha.bulkUpdate(payloads);
+  } else {
+    await Promise.all(payloads.map(({ id, ...data }) => base44Client.entities.Medalha.update(id, data)));
+  }
+
+  return medalhas.length;
 }
 
 export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarIds = [] }) {
   if (isAdmin) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  const listas = await Promise.all(militarIds.map((id) => base44Client.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date')));
+  let registros = [];
+  try {
+    registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { $in: militarIds } }, '-created_date');
+  } catch (error) {
+    const listas = await Promise.all(militarIds.map((id) => base44Client.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date')));
+    registros = listas.flat();
+  }
+
   const mapa = new Map();
-  listas.flat().forEach((registro) => mapa.set(registro.id, registro));
+  registros.forEach((registro) => mapa.set(registro.id, registro));
   return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }

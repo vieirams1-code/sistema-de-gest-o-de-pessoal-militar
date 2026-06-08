@@ -555,7 +555,6 @@ export default function RastreamentoPromocoes() {
           throw new Error('Promoção criada, mas a entidade PromocaoMilitar está indisponível para criar a turma automaticamente.');
         }
 
-        const existentes = typeof PromocaoMilitar.list === 'function' ? await PromocaoMilitar.list() : [];
         const militarPorId = montarMilitarPorId(data?.militaresAtivos || []);
         const historicosComMilitar = registrosAgrupamento.map((historico) => ({
           ...historico,
@@ -564,12 +563,12 @@ export default function RastreamentoPromocoes() {
         const payloadsTurma = montarPayloadsPromocaoMilitarAgrupamento({
           promocao: promocaoCriada,
           historicos: historicosComMilitar,
-          registrosExistentes: existentes || [],
+          registrosExistentes: [], // Promoção nova, sem registros existentes
           militarPorId,
         });
 
         if (payloadsTurma.length > 0) {
-          if (typeof PromocaoMilitar.bulkCreate === 'function') {
+          if (PromocaoMilitar.bulkCreate) {
             await PromocaoMilitar.bulkCreate(payloadsTurma);
           } else {
             await Promise.all(payloadsTurma.map((payloadTurma) => PromocaoMilitar.create(payloadTurma)));

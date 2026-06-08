@@ -133,8 +133,8 @@ async function localizarMilitarPorMatricula(matricula, excludeMilitarId = '') {
 
   // Fallback to in-memory search over full lists (O(N)) if filter is unavailable or data is legacy
   const [matriculas, militares] = await Promise.all([
-    listarMatriculas(),
-    listarMilitares(),
+    listarMatriculas({ matricula_normalizada: matriculaNorm }),
+    listarMilitares({ matricula: formatarMatriculaPadrao(matriculaNorm) }),
   ]);
 
   const mat = (matriculas || []).find((m) => (
