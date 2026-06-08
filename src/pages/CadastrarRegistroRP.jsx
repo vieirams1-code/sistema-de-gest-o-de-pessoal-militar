@@ -33,12 +33,7 @@ import {
 } from '@/components/rp/templateValidation';
 import {
   aplicarTemplate,
-  abreviarPosto,
-  composeTemplateVarsRP,
   formatDateBR,
-  montarPostoNomeTemplate,
-  resolveQuadroTemplate,
-  numeroPorExtenso,
 } from '@/components/utils/templateUtils.js';
 import {
   anexarEventoAuditoriaPublicacao,
@@ -1026,6 +1021,7 @@ export default function CadastrarRegistroRP() {
       return;
     }
 
+    const diasNormalizado = normalizarNumeroOpcional(formData.dias);
     const diasPunicaoNormalizado = normalizarNumeroOpcional(formData.dias_punicao);
     const payload = {
       ...formData,
@@ -1036,6 +1032,9 @@ export default function CadastrarRegistroRP() {
       alert(PLACEHOLDER_RESIDUAL_MENSAGEM);
       return;
     }
+    if (diasNormalizado === undefined) delete payload.dias;
+    else payload.dias = diasNormalizado;
+
     if (diasPunicaoNormalizado === undefined) delete payload.dias_punicao;
     else payload.dias_punicao = diasPunicaoNormalizado;
     isSubmittingRef.current = true;
