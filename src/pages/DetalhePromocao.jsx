@@ -858,15 +858,20 @@ export default function DetalhePromocao() {
           `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.encontrados}\nTotal sem histórico: ${resultado.semHistorico.length}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}${alertaResumo}`
         );
         if (!confirmou) return { cancelado: true };
-        const payloads = resultado.ordenados.map((item) => ({ id: item.id, ordem: item.ordem }));
+        const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), item.ordem]));
+        const payloads = resultado.ordenados
+          .filter((item) => Number(item.ordem) !== Number(atualMap.get(String(item.id))))
+          .map((item) => ({ id: item.id, ordem: item.ordem }));
 
-        if (base44.entities.PromocaoMilitar.bulkUpdate) {
-          await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
-        } else {
-          await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+        if (payloads.length > 0) {
+          if (base44.entities.PromocaoMilitar.bulkUpdate) {
+            await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+          } else {
+            await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+          }
         }
 
-        return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
+        return { atualizados: payloads.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
       }
 
       const previa = calcularPreviaAntiguidadeGeral({
@@ -900,15 +905,20 @@ export default function DetalhePromocao() {
       const confirmou = window.confirm(`Ordenar pela lista atual?\n\nPrévia (primeiros 10):\n${previaTexto}${ordenados.length > 10 ? '\n...' : ''}`);
       if (!confirmou) return { cancelado: true };
 
-      const payloads = ordenados.map((item) => ({ id: item.id, ordem: item.ordem }));
+      const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), item.ordem]));
+      const payloads = ordenados
+        .filter((item) => Number(item.ordem) !== Number(atualMap.get(String(item.id))))
+        .map((item) => ({ id: item.id, ordem: item.ordem }));
 
-      if (base44.entities.PromocaoMilitar.bulkUpdate) {
-        await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
-      } else {
-        await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+      if (payloads.length > 0) {
+        if (base44.entities.PromocaoMilitar.bulkUpdate) {
+          await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+        } else {
+          await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+        }
       }
 
-      return { atualizados: ordenados.length, historica: false };
+      return { atualizados: payloads.length, historica: false };
     },
     onSuccess: async (resultado) => {
       if (resultado?.cancelado) return;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -527,6 +527,7 @@ function contarOcorrenciasNotasPendentes(pendentes = []) {
 
 export default function ConciliacaoBoletim() {
   const queryClient = useQueryClient();
+  const cacheCorrespondencia = useRef(new Map());
   const [numeroBoletim, setNumeroBoletim] = useState('');
   const [dataBoletim, setDataBoletim] = useState('');
   const [arquivoPdf, setArquivoPdf] = useState(null);
@@ -729,13 +730,13 @@ export default function ConciliacaoBoletim() {
     return false;
   }, [mapaVinculosInvertido]);
 
-  const cacheCorrespondencia = React.useRef(new Map());
   useEffect(() => {
     cacheCorrespondencia.current.clear();
   }, [notasEncontradas, pendentes]);
 
   const correspondenciaPorPublicacao = useMemo(() => {
     const mapa = {};
+    const novoCache = new Map();
 
     publicacoesConciliadas.forEach((pub) => {
       const notaId = vinculosEfetivos[pub.id];
@@ -743,14 +744,17 @@ export default function ConciliacaoBoletim() {
 
       if (cacheCorrespondencia.current.has(cacheKey)) {
         mapa[pub.id] = cacheCorrespondencia.current.get(cacheKey);
-      } else {
-        const nota = mapaNotasById.get(notaId);
-        const resultado = calcularCorrespondenciaTextual(pub, nota);
-        cacheCorrespondencia.current.set(cacheKey, resultado);
-        mapa[pub.id] = resultado;
+        novoCache.set(cacheKey, mapa[pub.id]);
+        return;
       }
+
+      const nota = mapaNotasById.get(notaId);
+      const resultado = calcularCorrespondenciaTextual(pub, nota);
+      mapa[pub.id] = resultado;
+      novoCache.set(cacheKey, resultado);
     });
 
+    cacheCorrespondencia.current = novoCache;
     return mapa;
   }, [publicacoesConciliadas, vinculosEfetivos, mapaNotasById]);
 
