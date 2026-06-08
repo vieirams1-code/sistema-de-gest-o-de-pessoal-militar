@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, ChevronsUpDown, Pencil, RotateCcw, Search, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, ChevronsUpDown, Pencil, Plus, RotateCcw, Search, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,6 +29,13 @@ const possuiClassificacao = (linha) => Boolean(
 
 const tipoBgDaLinha = (linha) => linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado || '—';
 const materiaDaLinha = (linha) => linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado || '—';
+const classificacaoOriginalDaLinha = (linha) => (linha.classificacao_original_legado !== undefined
+  ? String(linha.classificacao_original_legado)
+  : (linha.transformado?.classificacao_original_legado || linha.tipo_legado || linha.materia_legado || ''));
+const classificacaoHistoricaDaLinha = (linha) => ({
+  id: linha.classificacao_historica_id || linha.transformado?.classificacao_historica_id || '',
+  nome: linha.classificacao_historica_nome || linha.transformado?.classificacao_historica_nome || '',
+});
 const statusDaLinha = (linha) => linha.recusada
   ? 'recusada'
   : (linha.statusSimplificado || linha.status?.toLowerCase() || 'erro');
@@ -67,6 +75,39 @@ function Contador({ rotulo, valor, destaque = '' }) {
   );
 }
 
+function NovaClassificacaoHistoricaDialog({ open, saving, valorInicial, onOpenChange, onSubmit }) {
+  const [form, setForm] = useState({ nome: '', grupo: '', descricao: '' });
+
+  useEffect(() => {
+    if (open) setForm({ nome: valorInicial || '', grupo: '', descricao: '' });
+  }, [open, valorInicial]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    await onSubmit(form);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nova Classificação Histórica</DialogTitle>
+          <DialogDescription>Crie uma opção do catálogo histórico sem sair da revisão. Ela será marcada como legado, uso em migração e ativa.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <CampoCompacto rotulo="Nome"><Input value={form.nome} onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))} className="h-8" required /></CampoCompacto>
+          <CampoCompacto rotulo="Grupo"><Input value={form.grupo} onChange={(event) => setForm((prev) => ({ ...prev, grupo: event.target.value }))} className="h-8" placeholder="Ex.: Férias, Administrativo" /></CampoCompacto>
+          <CampoCompacto rotulo="Descrição opcional"><Textarea value={form.descricao} onChange={(event) => setForm((prev) => ({ ...prev, descricao: event.target.value }))} className="min-h-[72px]" /></CampoCompacto>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+            <Button type="submit" disabled={saving || !form.nome.trim()} className="bg-indigo-700 hover:bg-indigo-800">{saving ? 'Criando...' : 'Criar e selecionar'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CampoCompacto({ children, rotulo, className = '' }) {
   return (
     <div className={className}>
@@ -79,6 +120,9 @@ function CampoCompacto({ children, rotulo, className = '' }) {
 export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   linhas,
   tiposPublicacaoValidos = [],
+  classificacoesHistoricas = [],
+  carregandoClassificacoesHistoricas = false,
+  onCriarClassificacaoHistorica,
   onAlterarLinha,
   onAlternarRecusa,
 }) {
@@ -89,6 +133,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   const [filtroOperacional, setFiltroOperacional] = useState('todos');
   const [textoEmEdicaoId, setTextoEmEdicaoId] = useState(null);
   const [tipoPopoverAbertoId, setTipoPopoverAbertoId] = useState(null);
+  const [classificacaoPopoverAbertoId, setClassificacaoPopoverAbertoId] = useState(null);
+  const [novaClassificacaoOpen, setNovaClassificacaoOpen] = useState(false);
+  const [salvandoNovaClassificacao, setSalvandoNovaClassificacao] = useState(false);
+  const [linhaNovaClassificacao, setLinhaNovaClassificacao] = useState(null);
 
   const linhasPesquisadas = useMemo(() => {
     const termo = normalizar(pesquisa.trim());
@@ -101,6 +149,9 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
       tipoBgDaLinha(linha),
       materiaDaLinha(linha),
       linha.tipo_classificado,
+      classificacaoOriginalDaLinha(linha),
+      linha.classificacao_historica_nome,
+      linha.transformado?.classificacao_historica_nome,
       linha.texto_publicado,
       ...(linha.erros || []),
       ...(linha.avisos || []),
@@ -158,6 +209,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   useEffect(() => {
     setTextoEmEdicaoId(null);
     setTipoPopoverAbertoId(null);
+    setClassificacaoPopoverAbertoId(null);
   }, [selecionadaId, selecionada?.recusada]);
 
   const handleNext = () => {
@@ -166,6 +218,30 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
 
   const handlePrev = () => {
     if (selecionadaIndex > 0) setSelecionadaId(linhasFiltradas[selecionadaIndex - 1].linhaNumero);
+  };
+
+  const selecionarClassificacaoHistorica = (linha, classificacao) => {
+    onAlterarLinha(linha, {
+      classificacao_historica_id: classificacao?.id || '',
+      classificacao_historica_nome: classificacao?.nome || '',
+    });
+  };
+
+  const abrirNovaClassificacao = (linha) => {
+    setLinhaNovaClassificacao(linha);
+    setNovaClassificacaoOpen(true);
+  };
+
+  const handleCriarNovaClassificacao = async (form) => {
+    if (!onCriarClassificacaoHistorica) return;
+    setSalvandoNovaClassificacao(true);
+    try {
+      const criada = await onCriarClassificacaoHistorica(form);
+      if (linhaNovaClassificacao && criada?.id) selecionarClassificacaoHistorica(linhaNovaClassificacao, criada);
+      setNovaClassificacaoOpen(false);
+    } finally {
+      setSalvandoNovaClassificacao(false);
+    }
   };
 
   const handleClassificarLinha = (linha, valor) => {
@@ -198,7 +274,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   }, [linhasFiltradas, selecionadaIndex]);
 
   return (
-    <section className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:min-h-[calc(100vh-220px)] lg:flex-row">
+    <>
+      <section className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:min-h-[calc(100vh-220px)] lg:flex-row">
       <aside className="flex max-h-[440px] w-full shrink-0 flex-col border-b border-slate-200 bg-slate-50 lg:max-h-[calc(100vh-220px)] lg:w-[360px] lg:border-b-0 lg:border-r xl:w-[410px]">
         <div className="shrink-0 space-y-1.5 border-b border-slate-200 bg-slate-100 p-2.5">
           <div>
@@ -313,11 +390,87 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               <div className="flex min-h-0 flex-1 overflow-hidden">
                 <div className="flex w-[300px] shrink-0 flex-col gap-1.5 border-r border-slate-200 bg-slate-50 p-2">
                   <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5">
-                    <CampoCompacto rotulo="Nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Número nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Tipo BG"><Input disabled value={tipoBgDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
-                    <CampoCompacto rotulo="Matéria" className="col-span-2"><Input disabled value={materiaDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Classificação original do legado" className="col-span-2"><Input disabled value={classificacaoOriginalDaLinha(linha) || '—'} className="h-7 bg-slate-100 px-2 text-xs font-medium text-slate-700" /></CampoCompacto>
+                  </div>
+
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-1.5">
+                    <label className="mb-1 block text-[11px] font-semibold text-emerald-800">Classificação histórica SGP</label>
+                    <Popover open={classificacaoPopoverAbertoId === linha.linhaNumero} onOpenChange={(open) => setClassificacaoPopoverAbertoId(open ? linha.linhaNumero : null)}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={classificacaoPopoverAbertoId === linha.linhaNumero}
+                          disabled={desabilitada || carregandoClassificacoesHistoricas}
+                          className={cn('h-8 w-full justify-between border-emerald-200 bg-white px-2 text-xs font-normal', !classificacaoHistoricaDaLinha(linha).id && 'text-slate-500')}
+                        >
+                          <span className="truncate">
+                            {classificacaoHistoricaDaLinha(linha).nome || (carregandoClassificacoesHistoricas ? 'Carregando catálogo...' : 'Pesquisar classificação histórica...')}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[420px] p-0" align="start">
+                        <Command filter={(value, search) => (normalizar(value).includes(normalizar(search)) ? 1 : 0)}>
+                          <CommandInput placeholder="Pesquisar classificação histórica..." className="h-8 text-xs" />
+                          <CommandList>
+                            <CommandEmpty className="py-3 text-center text-xs text-slate-500">Nenhuma classificação encontrada</CommandEmpty>
+                            <CommandGroup heading="Ações">
+                              <CommandItem
+                                value="nova classificacao historica criar cadastro"
+                                onSelect={() => {
+                                  abrirNovaClassificacao(linha);
+                                  setClassificacaoPopoverAbertoId(null);
+                                }}
+                                className="text-xs font-semibold text-indigo-700"
+                              >
+                                <Plus className="mr-2 h-3.5 w-3.5 shrink-0" />
+                                <span>Nova Classificação Histórica</span>
+                              </CommandItem>
+                              <CommandItem
+                                value="limpar classificacao historica"
+                                onSelect={() => {
+                                  selecionarClassificacaoHistorica(linha, null);
+                                  setClassificacaoPopoverAbertoId(null);
+                                }}
+                                className="text-xs text-slate-600 italic"
+                              >
+                                <Check className={cn('mr-2 h-3.5 w-3.5 shrink-0', !classificacaoHistoricaDaLinha(linha).id ? 'opacity-100' : 'opacity-0')} />
+                                Sem classificação histórica padronizada
+                              </CommandItem>
+                            </CommandGroup>
+                            {Object.entries(classificacoesHistoricas.reduce((acc, item) => {
+                              const grupo = item?.grupo || 'Sem grupo';
+                              if (!acc[grupo]) acc[grupo] = [];
+                              acc[grupo].push(item);
+                              return acc;
+                            }, {})).map(([grupo, itens]) => (
+                              <CommandGroup key={grupo} heading={grupo}>
+                                {itens.map((classificacao) => (
+                                  <CommandItem
+                                    key={classificacao.id}
+                                    value={`${classificacao.grupo || ''} ${classificacao.nome || ''}`}
+                                    onSelect={() => {
+                                      selecionarClassificacaoHistorica(linha, classificacao);
+                                      setClassificacaoPopoverAbertoId(null);
+                                    }}
+                                    className="text-xs"
+                                  >
+                                    <Check className={cn('mr-2 h-3.5 w-3.5 shrink-0', classificacaoHistoricaDaLinha(linha).id === classificacao.id ? 'opacity-100' : 'opacity-0')} />
+                                    <span className="min-w-0 flex-1 truncate">{classificacao.nome}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <p className="mt-1 text-[10px] leading-tight text-emerald-800/80">Independente do tipo operacional; não altera regras atuais de férias, RP, atestados ou promoções.</p>
                   </div>
 
                   <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-1.5">
@@ -424,6 +577,14 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           </div>
         )}
       </div>
-    </section>
+      </section>
+      <NovaClassificacaoHistoricaDialog
+        open={novaClassificacaoOpen}
+        saving={salvandoNovaClassificacao}
+        valorInicial={classificacaoOriginalDaLinha(linhaNovaClassificacao || {})}
+        onOpenChange={setNovaClassificacaoOpen}
+        onSubmit={handleCriarNovaClassificacao}
+      />
+    </>
   );
 }

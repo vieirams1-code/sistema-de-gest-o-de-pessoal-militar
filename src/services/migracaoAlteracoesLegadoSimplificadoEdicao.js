@@ -66,6 +66,11 @@ export function montarPayloadPublicacaoExOfficioMigracaoLegado(linha = {}) {
     data_bg: linha.data_bg_br || undefined,
     data_publicacao: dataPublicacao,
     materia_legado: limparTexto(linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado) || undefined,
+    classificacao_original_legado: linha.classificacao_original_legado !== undefined
+      ? String(linha.classificacao_original_legado)
+      : limparTexto(linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado || linha.transformado?.classificacao_original_legado),
+    classificacao_historica_id: limparTexto(linha.classificacao_historica_id || linha.transformado?.classificacao_historica_id) || undefined,
+    classificacao_historica_nome: limparTexto(linha.classificacao_historica_nome || linha.transformado?.classificacao_historica_nome) || undefined,
     tipo_bg_legado: limparTexto(linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado) || undefined,
     tipo_legado: limparTexto(linha.tipo_legado) || undefined,
     tipo: tipoFinal,
@@ -106,6 +111,11 @@ function sincronizarTransformado(linha) {
     numero_bg: linha.numero_bg_br,
     data_bg_br: resolverDataPublicacaoMigracaoLegado(linha),
     materia_legado: linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado,
+    classificacao_original_legado: linha.classificacao_original_legado !== undefined
+      ? String(linha.classificacao_original_legado)
+      : (linha.transformado?.classificacao_original_legado || linha.materia_legado || linha.tipo_legado || ''),
+    classificacao_historica_id: linha.classificacao_historica_id || linha.transformado?.classificacao_historica_id || '',
+    classificacao_historica_nome: linha.classificacao_historica_nome || linha.transformado?.classificacao_historica_nome || '',
     tipo_bg_legado: linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado,
     tipo_publicacao_sugerido: resolverTipoFinalMigracaoLegado(linha).tipoFinal,
     tipo_publicacao_confirmado: resolverTipoFinalMigracaoLegado(linha).tipoFinal,

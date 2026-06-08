@@ -319,6 +319,13 @@ function contarDuplicidadesInternas(rows, colunas) {
 
 function extrairDadosLinhaSimplificado(row, colunas) {
   const get = (campo) => limparTexto(row[colunas[campo]]);
+  const getBruto = (campo) => {
+    const idx = colunas[campo];
+    if (idx === undefined) return '';
+    const valor = row[idx];
+    if (valor === null || valor === undefined) return '';
+    return String(valor);
+  };
   const numeroNotaBruto = get('numero_nota');
   const dataBgBrBruta = row[colunas.data_bg_br];
   const dataBgIso = parseDataBrParaIso(dataBgBrBruta);
@@ -332,6 +339,7 @@ function extrairDadosLinhaSimplificado(row, colunas) {
     data_bg_iso: dataBgIso,
     data_bg_br_normalizada: dataBgIso ? formatarIsoParaBr(dataBgIso) : limparTexto(dataBgBrBruta),
     tipo_legado: get('tipo_legado'),
+    classificacao_original_legado: getBruto('tipo_legado'),
     tipo_classificado: get('tipo_classificado'),
     tipo_bg_legado: get('tipo_bg_legado'),
   };
@@ -394,6 +402,7 @@ function mapearEValidarLinha(row, index, colunas, numerosNotaJaExistentes, conta
     numero_bg_br: dados.numero_bg_br,
     data_bg_br: dados.data_bg_br_normalizada,
     tipo_legado: dados.tipo_legado,
+    classificacao_original_legado: dados.classificacao_original_legado,
     tipo_classificado: dados.tipo_classificado,
     tipo_bg_legado: dados.tipo_bg_legado,
     texto_publicado: dados.texto_publicado,
