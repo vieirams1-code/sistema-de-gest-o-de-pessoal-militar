@@ -28,6 +28,7 @@ import {
   STATUS_LINHA_SIMPLIFICADO,
 } from '@/services/migracaoAlteracoesLegadoSimplificadoService';
 import {
+  aplicarSugestoesClassificacaoHistoricaEmRevisao,
   atualizarLinhaRevisaoSimplificada,
   gerarResumoRevisaoSimplificada,
   montarPayloadPublicacaoExOfficioMigracaoLegado,
@@ -448,6 +449,39 @@ export default function MigracaoAlteracoesLegado() {
     handleAlterarLinhaSimplificada(linha, { recusada: !linha.recusada });
   };
 
+
+  const handleAplicarSugestoesClassificacaoHistorica = (linhasSelecionadas) => {
+    if (!analise?.fluxo_simplificado) return { aplicadas: 0, snapshotAnterior: [] };
+    const aplicacao = aplicarSugestoesClassificacaoHistoricaEmRevisao(analise.linhas, linhasSelecionadas, classificacoesHistoricas);
+    setAnalise((atual) => {
+      if (!atual?.fluxo_simplificado) return atual;
+      return { ...atual, linhas: aplicacao.linhas, resumo: gerarResumoRevisaoSimplificada(aplicacao.linhas) };
+    });
+    return {
+      aplicadas: aplicacao.previa.totalAplicaveis,
+      snapshotAnterior: aplicacao.snapshotAnterior,
+    };
+  };
+
+  const handleDesfazerSugestoesClassificacaoHistorica = (snapshotAnterior = []) => {
+    if (!snapshotAnterior.length) return;
+    const alteracoesPorLinha = new Map(snapshotAnterior.map((item) => [String(item.linhaNumero), item]));
+    setAnalise((atual) => {
+      if (!atual?.fluxo_simplificado) return atual;
+      const linhasRestauradas = atual.linhas.map((linha) => {
+        const restauracao = alteracoesPorLinha.get(String(linha.linhaNumero));
+        if (!restauracao) return linha;
+        return {
+          ...linha,
+          classificacao_historica_id: restauracao.classificacao_historica_id || '',
+          classificacao_historica_nome: restauracao.classificacao_historica_nome || '',
+        };
+      });
+      const linhas = revalidarLinhasRevisaoSimplificada(linhasRestauradas);
+      return { ...atual, linhas, resumo: gerarResumoRevisaoSimplificada(linhas) };
+    });
+  };
+
   const reiniciarFluxo = () => {
     setArquivo(null);
     setAnalise(null);
@@ -625,6 +659,8 @@ export default function MigracaoAlteracoesLegado() {
                 onCriarClassificacaoHistorica={handleCriarClassificacaoHistorica}
                 onAlterarLinha={handleAlterarLinhaSimplificada}
                 onAlternarRecusa={handleAlternarRecusaSimplificada}
+                onAplicarSugestoesClassificacaoHistorica={handleAplicarSugestoesClassificacaoHistorica}
+                onDesfazerSugestoesClassificacaoHistorica={handleDesfazerSugestoesClassificacaoHistorica}
               />
             ) : (
               <TabelaPreviaMigracaoAlteracoesLegado
