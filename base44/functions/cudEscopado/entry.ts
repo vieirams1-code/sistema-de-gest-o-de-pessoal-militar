@@ -41,6 +41,9 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ContratoDesignacaoMilitar',
   'PerfilPermissao',
   'UsuarioAcesso',
+  'MilitarTag',
+  'FeriasTag',
+  'MilitarFuncao',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
@@ -102,6 +105,21 @@ const PERMISSIONS_MAP = {
     create: 'gerir_permissoes',
     update: 'gerir_permissoes',
     delete: 'excluir_usuarios_acesso',
+  },
+  MilitarTag: {
+    create: 'adicionar_militares',
+    update: 'editar_militares',
+    delete: 'editar_militares',
+  },
+  FeriasTag: {
+    create: 'adicionar_ferias',
+    update: 'editar_ferias',
+    delete: 'editar_ferias',
+  },
+  MilitarFuncao: {
+    create: 'adicionar_militares',
+    update: 'editar_militares',
+    delete: 'editar_militares',
   },
 };
 
@@ -622,6 +640,11 @@ Deno.serve(async (req) => {
 
     if (operation === 'create') {
       militarAlvoId = data?.militar_id ? String(data.militar_id) : null;
+
+      if (!militarAlvoId && entityName === 'FeriasTag' && data?.ferias_id) {
+        const ferias = await buscarRegistroExistente(base44, 'Ferias', data.ferias_id);
+        militarAlvoId = ferias?.militar_id ? String(ferias.militar_id) : null;
+      }
     } else {
       // update / delete: buscar registro existente para obter militar_id canônico
       registroExistente = await buscarRegistroExistente(base44, entityName, registroId);
@@ -632,6 +655,11 @@ Deno.serve(async (req) => {
         );
       }
       militarAlvoId = registroExistente.militar_id ? String(registroExistente.militar_id) : null;
+
+      if (!militarAlvoId && entityName === 'FeriasTag' && registroExistente.ferias_id) {
+        const ferias = await buscarRegistroExistente(base44, 'Ferias', registroExistente.ferias_id);
+        militarAlvoId = ferias?.militar_id ? String(ferias.militar_id) : null;
+      }
     }
 
     if (exigeEscopoMilitar && !militarAlvoId) {
