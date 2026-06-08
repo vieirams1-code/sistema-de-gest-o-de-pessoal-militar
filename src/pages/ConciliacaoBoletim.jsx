@@ -575,9 +575,6 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
-  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
-  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
-
   const pendentesMap = useMemo(() => {
     const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
       .filter((registro) => calcStatus(registro) === 'Aguardando Publicação' && registro.nota_para_bg)
@@ -730,7 +727,6 @@ export default function ConciliacaoBoletim() {
     return false;
   }, [mapaVinculosInvertido]);
 
-  const cacheCorrespondencia = React.useRef(new Map());
   useEffect(() => {
     cacheCorrespondencia.current.clear();
   }, [notasEncontradas, pendentes]);
