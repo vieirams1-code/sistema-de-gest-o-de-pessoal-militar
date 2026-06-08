@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -242,7 +242,7 @@ function calcularCorrespondenciaTextual(pub, nota) {
   const tokensBoletim = nota?.tokens_boletim || normalizarTextoComparacao(nota?.contexto || '').split(' ').filter(Boolean);
 
   const sistemaNormalizado = pub?.texto_normalizado_sistema || tokensSistema.join(' ');
-  const boletimNormalizado = normalizarTextoComparacao(nota?.contexto || '');
+  const boletimNormalizado = nota?.texto_normalizado_boletim || normalizarTextoComparacao(nota?.contexto || '');
 
   if (!tokensSistema.length || !tokensBoletim.length) {
     return {
@@ -437,12 +437,14 @@ function extrairNotasDoTexto(textoPagina, pagina) {
     if (vistos.has(key)) continue;
 
     vistos.add(key);
+    const tokens_boletim = normalizarTextoComparacao(contexto).split(' ').filter(Boolean);
     encontrados.push({
       id: key,
       nota: notaNorm,
       nota_normalizada: notaNorm,
       contexto,
-      tokens_boletim: normalizarTextoComparacao(contexto).split(' ').filter(Boolean),
+      texto_normalizado_boletim: tokens_boletim.join(' '),
+      tokens_boletim,
       pagina,
     });
   }
@@ -524,6 +526,7 @@ function contarOcorrenciasNotasPendentes(pendentes = []) {
 
 export default function ConciliacaoBoletim() {
   const queryClient = useQueryClient();
+  const cacheCorrespondencia = useRef(new Map());
   const [numeroBoletim, setNumeroBoletim] = useState('');
   const [dataBoletim, setDataBoletim] = useState('');
   const [arquivoPdf, setArquivoPdf] = useState(null);
@@ -571,8 +574,12 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
+  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
+  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
+
   const pendentesMap = useMemo(() => {
     const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+      .filter((registro) => calcStatus(registro) === 'Aguardando Publicação' && registro.nota_para_bg)
       .map((registro) => {
         const textoSistema = (registro.texto_publicacao || registro.texto || '').trim();
         const textoNorm = normalizarTextoComparacao(textoSistema);
@@ -583,15 +590,14 @@ export default function ConciliacaoBoletim() {
         return {
           ...registro,
           origem_tipo: detectarOrigemTipo(registro),
-          status_calculado: calcStatus(registro),
+          status_calculado: 'Aguardando Publicação',
           nota_normalizada: normalizarNota(registro.nota_para_bg),
           nota_conciliada_persistida: getNotaConciliadaPersistida(registro),
           texto_normalizado_sistema: textoNorm,
           tokens_sistema: tokens,
           frequencia_sistema: freq,
         };
-      })
-      .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg);
+      });
 
     return new Map(enriched.map((p) => [p.id, p]));
   }, [registrosLivro, publicacoesExOfficio, atestados]);
@@ -661,9 +667,6 @@ export default function ConciliacaoBoletim() {
     return combinados;
   }, [conciliacaoAutomatica, vinculosPersistidos, vinculos, vinculosRemovidos]);
 
-  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
-  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
-
   const mapaVinculosInvertido = useMemo(() => {
     const mapa = new Map();
     Object.entries(vinculosEfetivos).forEach(([pubId, notaId]) => {
@@ -716,14 +719,25 @@ export default function ConciliacaoBoletim() {
 
   const correspondenciaPorPublicacao = useMemo(() => {
     const mapa = {};
+    const novoCache = new Map();
 
     publicacoesConciliadas.forEach((pub) => {
       const notaId = vinculosEfetivos[pub.id];
-      const nota = mapaNotasById.get(notaId);
+      const cacheKey = `${pub.id}-${notaId}`;
 
-      mapa[pub.id] = calcularCorrespondenciaTextual(pub, nota);
+      if (cacheCorrespondencia.current.has(cacheKey)) {
+        mapa[pub.id] = cacheCorrespondencia.current.get(cacheKey);
+        novoCache.set(cacheKey, mapa[pub.id]);
+        return;
+      }
+
+      const nota = mapaNotasById.get(notaId);
+      const resultado = calcularCorrespondenciaTextual(pub, nota);
+      mapa[pub.id] = resultado;
+      novoCache.set(cacheKey, resultado);
     });
 
+    cacheCorrespondencia.current = novoCache;
     return mapa;
   }, [publicacoesConciliadas, vinculosEfetivos, mapaNotasById]);
 
