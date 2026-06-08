@@ -41,15 +41,31 @@ test('diferencaDias', () => {
   const baseComHora = new Date('2023-12-01T23:59:59');
   assert.strictEqual(diferencaDias('2023-12-02', baseComHora), 1);
 
+  // Com string ISO completa
+  assert.strictEqual(diferencaDias('2023-12-05T15:00:00Z', base), 4);
+
+  // Base como string
+  assert.strictEqual(diferencaDias('2023-12-05', '2023-12-01T00:00:00'), 4);
+
+  // Diferença grande (negativa)
+  assert.strictEqual(diferencaDias('2022-12-01', base), -365);
+
   // Entrada nula
   assert.strictEqual(diferencaDias(null, base), null);
 
   // Entrada inválida
   assert.strictEqual(diferencaDias('data-errada', base), null);
 
+  // Base inválida (não deve quebrar, mas pode retornar NaN se o JS permitir)
+  // De acordo com o código: hoje = new Date(base); hoje.setHours(0,0,0,0);
+  // Se base for inválida, hoje.getTime() será NaN.
+  const diffInvalida = diferencaDias('2023-12-01', 'data-invalida');
+  assert.ok(Number.isNaN(diffInvalida));
+
   // Usando default value para base (agora)
-  // Não podemos testar valor exato facilmente, mas podemos testar que não explode
-  assert.notStrictEqual(diferencaDias('2099-01-01'), null);
+  const agora = new Date();
+  const hojeStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+  assert.strictEqual(diferencaDias(hojeStr), 0);
 });
 
 test('calcularPrioridadePorPrazo', () => {
@@ -96,15 +112,39 @@ test('ordenarPendencias', () => {
 
   const porData = ordenarPendencias(lista, 'data_desc');
   assert.strictEqual(porData[0].dataReferencia, '2023-12-03');
+
+  const porDataAsc = ordenarPendencias(lista, 'data_asc');
+  assert.strictEqual(porDataAsc[0].dataReferencia, '2023-12-01');
+
+  // Default case
+  const defaultOrdenada = ordenarPendencias(lista);
+  assert.strictEqual(defaultOrdenada[0].prioridade, 'critica');
 });
 
 test('filtrarPendencias', () => {
   const lista = [
-    { titulo: 'Pendencia A', categoriaSlug: 'ferias', prioridade: 'alta' },
-    { titulo: 'Pendencia B', categoriaSlug: 'atestados', prioridade: 'critica' }
+    { titulo: 'Pendencia A', categoriaSlug: 'ferias', prioridade: 'alta', situacao: 'Em Aberto' },
+    { titulo: 'Pendencia B', categoriaSlug: 'atestados', prioridade: 'critica', situacao: 'Vencido' },
+    { titulo: 'Pendencia C', categoriaSlug: 'publicacoes', prioridade: 'media', situacao: 'Aguardando' }
   ];
 
+  // Filtro categoria
   assert.strictEqual(filtrarPendencias(lista, { categoria: 'ferias' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { categoria: 'todas' }).length, 3);
+
+  // Filtro prioridade
+  assert.strictEqual(filtrarPendencias(lista, { prioridade: 'critica' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { prioridade: 'todas' }).length, 3);
+
+  // Filtro situacao
+  assert.strictEqual(filtrarPendencias(lista, { situacao: 'Vencido' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { situacao: 'todas' }).length, 3);
+
+  // Filtro texto
   assert.strictEqual(filtrarPendencias(lista, { texto: 'Pendencia B' }).length, 1);
-  assert.strictEqual(filtrarPendencias(lista, { prioridade: 'baixa' }).length, 0);
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'INEXISTENTE' }).length, 0);
+
+  // Sem filtros
+  assert.strictEqual(filtrarPendencias(lista).length, 3);
+  assert.strictEqual(filtrarPendencias(null).length, 0);
 });
