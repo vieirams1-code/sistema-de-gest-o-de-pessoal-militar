@@ -29,7 +29,6 @@ import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
   ACOES_MEDALHAS,
   adicionarAuditoriaMedalha,
-  bulkUpdateMedalhas,
   listarImpedimentosEscopo,
   listarMedalhasEscopo,
   listarMilitaresEscopo,
