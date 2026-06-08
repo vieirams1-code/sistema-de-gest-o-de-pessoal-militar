@@ -36,7 +36,8 @@ export function normalizarModulo(modulo = '') {
 }
 
 export function tipoExigeTemplate(tipoRegistro = '') {
-  return String(tipoRegistro).trim().toLowerCase() !== 'geral';
+  const t = String(tipoRegistro).trim().toLowerCase();
+  return t !== 'geral' && t !== 'publicação doems';
 }
 
 function normalizeTipoRegistroKey(value = '') {

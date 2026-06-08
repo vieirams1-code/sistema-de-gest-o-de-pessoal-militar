@@ -12,18 +12,11 @@ import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
 import { getTagGrupoId } from '@/utils/funcoesTags/contratoCampos';
 import { INSTITUCIONAIS, validarFuncao, validarTag, validarTagGrupo } from '@/utils/funcoesTags/validacoes';
 import {
-  atualizarFuncaoMilitarEscopado,
-  atualizarTagEscopado,
-  atualizarTagGrupoEscopado,
-  criarFuncaoMilitarEscopado,
-  criarTagEscopado,
-  criarTagGrupoEscopado,
-  desativarFuncaoMilitarEscopado,
-  desativarTagEscopado,
-  desativarTagGrupoEscopado,
-  excluirTagGrupoEscopado,
-  excluirTagEscopado,
-} from '@/services/cudFuncoesTagsEscopadoClient';
+  atualizarEscopado,
+  criarEscopado,
+  desativarEscopado,
+  excluirEscopado,
+} from '@/services/cudEscopadoClient';
 import IconeCatalogo, { CATEGORIAS_ICONE, OPCOES_ICONE_CATALOGO } from '@/components/funcoes-tags/IconeCatalogo';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
@@ -128,8 +121,8 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     mutationFn: (p) => {
       const editandoId = editandoFuncao?.id;
       return editandoId
-        ? atualizarFuncaoMilitarEscopado(editandoId, p)
-        : criarFuncaoMilitarEscopado(p);
+        ? atualizarEscopado('FuncaoMilitar', editandoId, p)
+        : criarEscopado('FuncaoMilitar', p);
     },
     onSuccess: () => {
       invalidate('funcoes');
@@ -143,19 +136,19 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   const saveGrupo = useMutation({
     mutationFn: ({ payload, grupoId }) => (
       grupoId
-        ? atualizarTagGrupoEscopado(grupoId, payload)
-        : criarTagGrupoEscopado(payload)
+        ? atualizarEscopado('TagGrupo', grupoId, payload)
+        : criarEscopado('TagGrupo', payload)
     ),
     onSuccess: () => { invalidate('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); },
     onError: (error) => toast({ title: 'Não foi possível salvar o grupo.', description: error?.message, variant: 'destructive' }),
   });
   const saveTag = useMutation({
-    mutationFn: (p) => editandoTag ? atualizarTagEscopado(editandoTag.id, p) : criarTagEscopado(p),
+    mutationFn: (p) => editandoTag ? atualizarEscopado('Tag', editandoTag.id, p) : criarEscopado('Tag', p),
     onSuccess: () => { invalidate('tags'); toast({ title: 'Tag salva com sucesso.' }); cancelarEdicaoTag(); },
     onError: (error) => toast({ title: 'Não foi possível salvar a tag.', description: error?.message, variant: 'destructive' }),
   });
   const desativarTagMutation = useMutation({
-    mutationFn: ({ tagId, ativo }) => desativarTagEscopado(tagId, { ativo }),
+    mutationFn: ({ tagId, ativo }) => desativarEscopado('Tag', tagId, { ativo }),
     onSuccess: async (_data, variables) => {
       await invalidate('tags');
       toast({ title: `Tag ${variables.ativo ? 'reativada' : 'desativada'} com sucesso.` });
@@ -165,7 +158,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     onError: (error) => toast({ title: 'Não foi possível alterar o status da tag.', description: error?.message, variant: 'destructive' }),
   });
   const excluirGrupoMutation = useMutation({
-    mutationFn: (grupoId) => excluirTagGrupoEscopado(grupoId),
+    mutationFn: (grupoId) => excluirEscopado('TagGrupo', grupoId),
     onSuccess: () => {
       invalidate('grupos');
       toast({ title: 'Grupo excluído com sucesso.' });
@@ -248,12 +241,12 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     saveTag.mutate(payload);
   };
 
-  const toggleFuncao = (f) => { if (INSTITUCIONAIS[f.institucional_chave]) return; desativarFuncaoMilitarEscopado(f.id, { ativa: !f.ativa }).then(() => { invalidate('funcoes'); toast({ title: `Função ${f.ativa === false ? 'reativada' : 'desativada'} com sucesso.` }); }).catch((error) => toast({ title: 'Não foi possível alterar o status da função.', description: error?.message, variant: 'destructive' })); };
-  const toggleGrupo = (g) => desativarTagGrupoEscopado(g.id, { ativo: !g.ativo }).then(() => { invalidate('grupos'); toast({ title: `Grupo ${g.ativo === false ? 'reativado' : 'desativado'} com sucesso.` }); }).catch((error) => toast({ title: 'Não foi possível alterar o status do grupo.', description: error?.message, variant: 'destructive' }));
+  const toggleFuncao = (f) => { if (INSTITUCIONAIS[f.institucional_chave]) return; desativarEscopado('FuncaoMilitar', f.id, { ativa: !f.ativa }).then(() => { invalidate('funcoes'); toast({ title: `Função ${f.ativa === false ? 'reativada' : 'desativada'} com sucesso.` }); }).catch((error) => toast({ title: 'Não foi possível alterar o status da função.', description: error?.message, variant: 'destructive' })); };
+  const toggleGrupo = (g) => desativarEscopado('TagGrupo', g.id, { ativo: !g.ativo }).then(() => { invalidate('grupos'); toast({ title: `Grupo ${g.ativo === false ? 'reativado' : 'desativado'} com sucesso.` }); }).catch((error) => toast({ title: 'Não foi possível alterar o status do grupo.', description: error?.message, variant: 'destructive' }));
   const toggleTag = (t) => desativarTagMutation.mutate({ tagId: t.id, ativo: !t.ativo });
 
   const excluirTagMutation = useMutation({
-    mutationFn: (tagId) => excluirTagEscopado(tagId),
+    mutationFn: (tagId) => excluirEscopado('Tag', tagId),
     onSuccess: async () => {
       await invalidate('tags');
       toast({ title: 'Tag excluída com sucesso.' });
@@ -310,7 +303,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     const arquivadas = [];
     for (const tag of candidatas) {
       try {
-        await desativarTagEscopado(tag.id, { ativo: false });
+        await desativarEscopado('Tag', tag.id, { ativo: false });
         arquivadas.push({ id: tag.id, nome: tag.nome });
       } catch (error) {
         console.warn('[TAGS_INSTITUCIONAIS_ARQUIVAMENTO_MANUAL_FALHA]', { id: tag.id, nome: tag.nome, error });

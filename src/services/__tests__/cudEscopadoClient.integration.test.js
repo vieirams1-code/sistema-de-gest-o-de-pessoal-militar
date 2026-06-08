@@ -1,14 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { base44 } from '@/api/base44Client';
+import { base44 } from '../../api/base44Client.js';
 import {
-  criarMilitarTagEscopado,
-  atualizarTagEscopado,
-  desativarTagEscopado,
-  excluirTagGrupoEscopado,
-  excluirTagEscopado,
-} from '../cudFuncoesTagsEscopadoClient.js';
+  criarEscopado,
+  atualizarEscopado,
+  desativarEscopado,
+  excluirEscopado,
+} from '../cudEscopadoClient.js';
 
 const originalInvoke = base44.functions?.invoke;
 
@@ -29,7 +28,7 @@ test('erro TAG_COM_VINCULOS preserva contagens', async () => {
   };
 
   await assert.rejects(
-    () => excluirTagEscopado('tag-1'),
+    () => excluirEscopado('Tag', 'tag-1'),
     (err) => {
       assert.equal(err.code, 'TAG_COM_VINCULOS');
       assert.equal(err.militar_tags, 2);
@@ -40,27 +39,27 @@ test('erro TAG_COM_VINCULOS preserva contagens', async () => {
   );
 });
 
-test('excluirTagEscopado envia entidade Tag e operacao delete', async () => {
+test('excluirEscopado envia entidade Tag e operacao delete', async () => {
   let payload = null;
   base44.functions.invoke = async (_name, body) => {
     payload = body;
-    return { data: { data: { id: 'tag-1', deleted: true } } };
+    return { data: { ok: true, entityName: 'Tag', operation: 'delete', registroId: 'tag-1', data: { id: 'tag-1', deleted: true } } };
   };
 
-  const result = await excluirTagEscopado('tag-1');
-  assert.deepEqual(payload, { entidade: 'Tag', operacao: 'delete', id: 'tag-1' });
+  const result = await excluirEscopado('Tag', 'tag-1');
+  assert.deepEqual(payload, { entityName: 'Tag', operation: 'delete', registroId: 'tag-1' });
   assert.deepEqual(result, { id: 'tag-1', deleted: true });
 });
 
-test('excluirTagGrupoEscopado envia entidade TagGrupo e operacao delete', async () => {
+test('excluirEscopado envia entidade TagGrupo e operacao delete', async () => {
   let payload = null;
   base44.functions.invoke = async (_name, body) => {
     payload = body;
-    return { data: { data: { id: 'grupo-1', deleted: true } } };
+    return { data: { ok: true, entityName: 'TagGrupo', operation: 'delete', registroId: 'grupo-1', data: { id: 'grupo-1', deleted: true } } };
   };
 
-  const result = await excluirTagGrupoEscopado('grupo-1');
-  assert.deepEqual(payload, { entidade: 'TagGrupo', operacao: 'delete', id: 'grupo-1' });
+  const result = await excluirEscopado('TagGrupo', 'grupo-1');
+  assert.deepEqual(payload, { entityName: 'TagGrupo', operation: 'delete', registroId: 'grupo-1' });
   assert.deepEqual(result, { id: 'grupo-1', deleted: true });
 });
 
@@ -79,7 +78,7 @@ test('erro GRUPO_COM_TAGS_ATIVAS preserva lista de tags ativas', async () => {
   };
 
   await assert.rejects(
-    () => excluirTagGrupoEscopado('grupo-1'),
+    () => excluirEscopado('TagGrupo', 'grupo-1'),
     (err) => {
       assert.equal(err.code, 'GRUPO_COM_TAGS_ATIVAS');
       assert.deepEqual(err.tags_ativas, ['Urgente', 'Disponível']);
@@ -95,18 +94,18 @@ test('desativar Tag com ativo false e reativar com ativo true', async () => {
     return { data: { data: { id: body.id, ativo: body?.data?.ativo } } };
   };
 
-  await desativarTagEscopado('tag-3', { ativo: false });
-  await desativarTagEscopado('tag-3', { ativo: true });
+  await desativarEscopado('Tag', 'tag-3', { ativo: false });
+  await desativarEscopado('Tag', 'tag-3', { ativo: true });
 
-  assert.equal(calls[0].operacao, 'desativar');
+  assert.equal(calls[0].operation, 'desativar');
   assert.equal(calls[0].data.ativo, false);
   assert.equal(calls[1].data.ativo, true);
 });
 
 test('normaliza sucesso da função CUD', async () => {
-  base44.functions.invoke = async () => ({ data: { data: { id: 'ok-1' } } });
+  base44.functions.invoke = async () => ({ data: { ok: true, data: { id: 'ok-1' } } });
 
-  const result = await criarMilitarTagEscopado({ militar_id: 'm2', tag_id: 't1' });
+  const result = await criarEscopado('MilitarTag', { militar_id: 'm2', tag_id: 't1' });
   assert.deepEqual(result, { id: 'ok-1' });
 });
 
