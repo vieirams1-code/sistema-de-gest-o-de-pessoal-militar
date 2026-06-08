@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import { criarEscopado, removerEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -115,14 +115,13 @@ export default function TagsMilitarSection({ militar }) {
       const erroDuplicidade = validarDuplicidadeTagAtiva({ vinculosAtivos: ativas, tagId: form.tag_id });
       if (erroDuplicidade) throw new Error(erroDuplicidade);
 
-      await criarMilitarTagEscopado({
+      await criarEscopado('MilitarTag', {
         militar_id: militar.id,
         tag_id: form.tag_id,
         status: 'ativa',
         data_aplicacao: form.data_aplicacao,
         motivo: form.motivo || null
       });
-      // TODO: migrar CUD para endpoint escopado no backend quando disponível.
     },
     onSuccess: () => {
       toast({ title: 'Tag adicionada com sucesso.' });
@@ -134,7 +133,7 @@ export default function TagsMilitarSection({ militar }) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async ({ vinculo, motivo }) => removerMilitarTagEscopado(vinculo.id, {
+    mutationFn: async ({ vinculo, motivo }) => removerEscopado('MilitarTag', vinculo.id, {
       status: 'removida',
       data_remocao: new Date().toISOString().split('T')[0],
       motivo: motivo || vinculo.motivo || null

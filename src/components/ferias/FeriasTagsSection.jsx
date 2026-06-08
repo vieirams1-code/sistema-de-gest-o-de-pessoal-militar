@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import { criarEscopado, removerEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -133,14 +133,13 @@ export default function FeriasTagsSection({ ferias }) {
       const erroDuplicidade = validarDuplicidadeTagAtivaFerias({ vinculosAtivos: ativas, tagId: form.tag_id });
       if (erroDuplicidade) throw new Error(erroDuplicidade);
 
-      await criarFeriasTagEscopado({
+      await criarEscopado('FeriasTag', {
         ferias_id: ferias.id,
         tag_id: form.tag_id,
         status: 'ativa',
         data_aplicacao: form.data_aplicacao,
         motivo: form.motivo || null,
       });
-      // TODO: migrar CUD para endpoint escopado no backend quando disponível.
     },
     onSuccess: () => {
       toast({ title: 'Tag adicionada com sucesso.' });
@@ -152,7 +151,7 @@ export default function FeriasTagsSection({ ferias }) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async ({ vinculo, motivo }) => removerFeriasTagEscopado(vinculo.id, {
+    mutationFn: async ({ vinculo, motivo }) => removerEscopado('FeriasTag', vinculo.id, {
       status: 'removida',
       data_remocao: new Date().toISOString().split('T')[0],
       motivo: motivo || vinculo.motivo || null,
