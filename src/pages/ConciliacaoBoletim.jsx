@@ -609,6 +609,9 @@ export default function ConciliacaoBoletim() {
       .map(([nota]) => nota);
   }, [ocorrenciasNotasPendentes]);
 
+  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
+  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
+
   const conciliacaoAutomatica = useMemo(() => {
     if (!conciliacaoIniciada || !pendentes.length || !mapaNotasByNumero.size) return {};
 
@@ -661,9 +664,6 @@ export default function ConciliacaoBoletim() {
     return combinados;
   }, [conciliacaoAutomatica, vinculosPersistidos, vinculos, vinculosRemovidos]);
 
-  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
-  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
-
   const mapaVinculosInvertido = useMemo(() => {
     const mapa = new Map();
     Object.entries(vinculosEfetivos).forEach(([pubId, notaId]) => {
@@ -714,14 +714,26 @@ export default function ConciliacaoBoletim() {
     return false;
   }, [mapaVinculosInvertido]);
 
+  const cacheCorrespondencia = React.useRef(new Map());
+  useEffect(() => {
+    cacheCorrespondencia.current.clear();
+  }, [notasEncontradas, pendentes]);
+
   const correspondenciaPorPublicacao = useMemo(() => {
     const mapa = {};
 
     publicacoesConciliadas.forEach((pub) => {
       const notaId = vinculosEfetivos[pub.id];
-      const nota = mapaNotasById.get(notaId);
+      const cacheKey = `${pub.id}-${notaId}`;
 
-      mapa[pub.id] = calcularCorrespondenciaTextual(pub, nota);
+      if (cacheCorrespondencia.current.has(cacheKey)) {
+        mapa[pub.id] = cacheCorrespondencia.current.get(cacheKey);
+      } else {
+        const nota = mapaNotasById.get(notaId);
+        const resultado = calcularCorrespondenciaTextual(pub, nota);
+        cacheCorrespondencia.current.set(cacheKey, resultado);
+        mapa[pub.id] = resultado;
+      }
     });
 
     return mapa;
