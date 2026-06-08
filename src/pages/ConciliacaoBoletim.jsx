@@ -243,7 +243,7 @@ function calcularCorrespondenciaTextual(pub, nota) {
   const tokensBoletim = nota?.tokens_boletim || normalizarTextoComparacao(nota?.contexto || '').split(' ').filter(Boolean);
 
   const sistemaNormalizado = pub?.texto_normalizado_sistema || tokensSistema.join(' ');
-  const boletimNormalizado = normalizarTextoComparacao(nota?.contexto || '');
+  const boletimNormalizado = nota?.texto_normalizado_boletim || normalizarTextoComparacao(nota?.contexto || '');
 
   if (!tokensSistema.length || !tokensBoletim.length) {
     return {
@@ -438,12 +438,14 @@ function extrairNotasDoTexto(textoPagina, pagina) {
     if (vistos.has(key)) continue;
 
     vistos.add(key);
+    const tokens_boletim = normalizarTextoComparacao(contexto).split(' ').filter(Boolean);
     encontrados.push({
       id: key,
       nota: notaNorm,
       nota_normalizada: notaNorm,
       contexto,
-      tokens_boletim: normalizarTextoComparacao(contexto).split(' ').filter(Boolean),
+      texto_normalizado_boletim: tokens_boletim.join(' '),
+      tokens_boletim,
       pagina,
     });
   }
@@ -574,6 +576,10 @@ export default function ConciliacaoBoletim() {
 
   const pendentesMap = useMemo(() => {
     const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+      .filter((registro) => {
+        const status = calcStatus(registro);
+        return status === 'Aguardando Publicação' && registro.nota_para_bg;
+      })
       .map((registro) => {
         const textoSistema = (registro.texto_publicacao || registro.texto || '').trim();
         const textoNorm = normalizarTextoComparacao(textoSistema);
@@ -584,15 +590,14 @@ export default function ConciliacaoBoletim() {
         return {
           ...registro,
           origem_tipo: detectarOrigemTipo(registro),
-          status_calculado: calcStatus(registro),
+          status_calculado: 'Aguardando Publicação',
           nota_normalizada: normalizarNota(registro.nota_para_bg),
           nota_conciliada_persistida: getNotaConciliadaPersistida(registro),
           texto_normalizado_sistema: textoNorm,
           tokens_sistema: tokens,
           frequencia_sistema: freq,
         };
-      })
-      .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg);
+      });
 
     return new Map(enriched.map((p) => [p.id, p]));
   }, [registrosLivro, publicacoesExOfficio, atestados]);
