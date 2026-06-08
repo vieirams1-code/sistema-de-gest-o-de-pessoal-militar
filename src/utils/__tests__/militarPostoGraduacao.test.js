@@ -48,6 +48,17 @@ test('getPostoGraduacaoOficial - handles non-string values', () => {
   assert.equal(getPostoGraduacaoOficial({ posto: 123 }), '123');
 });
 
+test('getPostoGraduacaoOficial - falls through empty strings and falsy values', () => {
+  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: '', posto: 'Capitão' }), 'Capitão');
+  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: null, posto: 'Capitão' }), 'Capitão');
+});
+
+test('getPostoGraduacaoOficial - handles non-object inputs gracefully', () => {
+  assert.equal(getPostoGraduacaoOficial('not an object'), '');
+  assert.equal(getPostoGraduacaoOficial(123), '');
+  assert.equal(getPostoGraduacaoOficial(true), '');
+});
+
 test('normalizarPostoGraduacaoMilitar - returns same object if no rank found', () => {
   const militar = { nome: 'João' };
   assert.deepEqual(normalizarPostoGraduacaoMilitar(militar), militar);
