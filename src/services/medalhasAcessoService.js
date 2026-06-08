@@ -67,7 +67,7 @@ export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds =
 
   let registros = [];
   try {
-    registros = await base44Client.entities.Medalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+    registros = await base44Client.entities.Medalha.filter({ militar_id: { $in: militarIds } }, '-created_date');
   } catch (error) {
     const listas = await Promise.all(militarIds.map((id) => base44Client.entities.Medalha.filter({ militar_id: id }, '-created_date')));
     registros = listas.flat();
@@ -104,7 +104,7 @@ export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarI
 
   let registros = [];
   try {
-    registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+    registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { $in: militarIds } }, '-created_date');
   } catch (error) {
     const listas = await Promise.all(militarIds.map((id) => base44Client.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date')));
     registros = listas.flat();
