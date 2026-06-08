@@ -301,10 +301,18 @@ export default function RPSpecificFieldsExOfficio({
     }
 
     case 'Publicação DOEMS':
+    case 'Registro de Publicação DOEMS':
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Publicação DOEMS</h3>
+          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">
+            {tipoRegistro === 'Registro de Publicação DOEMS' ? 'Registro de Publicação DOEMS' : 'Publicação DOEMS'}
+          </h3>
           <div className="space-y-4">
+            {tipoRegistro === 'Registro de Publicação DOEMS' && (
+              <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm text-blue-800 border border-blue-100">
+                Use este tipo para registrar uma publicação externa já realizada no Diário Oficial.
+              </div>
+            )}
             <FormField
               label="Edição/Número do DOEMS"
               name="doems_edicao_numero"
