@@ -133,6 +133,8 @@ test('payload preserva classificação original e snapshot da classificação hi
   assert.equal(payload.classificacao_historica_id, 'class-1');
   assert.equal(payload.classificacao_historica_nome, 'Concessão de Férias');
   assert.equal(payload.tipo, 'Concessão de Férias - Legado');
+  assert.ok(!Object.hasOwn(payload, 'sugestao_classificacao_historica_id'));
+  assert.ok(!Object.hasOwn(payload, 'sugestao_classificacao_historica_nome'));
 });
 
 test('linha sem classificação e sem matéria ou tipo legado fica bloqueada com erro claro', () => {
