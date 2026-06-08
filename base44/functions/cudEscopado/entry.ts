@@ -41,13 +41,16 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ContratoDesignacaoMilitar',
   'PerfilPermissao',
   'UsuarioAcesso',
+  'MilitarFuncao',
   'MilitarTag',
   'FeriasTag',
-  'MilitarFuncao',
+  'FuncaoMilitar',
+  'TagGrupo',
+  'Tag',
 ]);
 
-const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
-const ENTIDADES_SEM_ESCOPO_MILITAR = new Set(['PerfilPermissao', 'UsuarioAcesso']);
+const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
+const ENTIDADES_SEM_ESCOPO_MILITAR = new Set(['PerfilPermissao', 'UsuarioAcesso', 'FuncaoMilitar', 'TagGrupo', 'Tag']);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
 // =====================================================================
@@ -106,20 +109,41 @@ const PERMISSIONS_MAP = {
     update: 'gerir_permissoes',
     delete: 'excluir_usuarios_acesso',
   },
+  MilitarFuncao: {
+    create: 'adicionar_militares',
+    update: 'editar_militares',
+    encerrar: 'editar_militares',
+    delete: 'excluir_militares',
+  },
   MilitarTag: {
     create: 'adicionar_militares',
     update: 'editar_militares',
-    delete: 'editar_militares',
+    remover: 'editar_militares',
+    delete: 'excluir_militares',
   },
   FeriasTag: {
     create: 'adicionar_ferias',
     update: 'editar_ferias',
-    delete: 'editar_ferias',
+    remover: 'editar_ferias',
+    delete: 'excluir_ferias',
   },
-  MilitarFuncao: {
-    create: 'adicionar_militares',
-    update: 'editar_militares',
-    delete: 'editar_militares',
+  FuncaoMilitar: {
+    create: 'gerir_configuracoes',
+    update: 'gerir_configuracoes',
+    desativar: 'gerir_configuracoes',
+    delete: 'gerir_configuracoes',
+  },
+  TagGrupo: {
+    create: 'gerir_configuracoes',
+    update: 'gerir_configuracoes',
+    desativar: 'gerir_configuracoes',
+    delete: 'gerir_configuracoes',
+  },
+  Tag: {
+    create: 'gerir_configuracoes',
+    update: 'gerir_configuracoes',
+    desativar: 'gerir_configuracoes',
+    delete: 'gerir_configuracoes',
   },
 };
 
@@ -238,6 +262,34 @@ async function resolverPermissoes(base44, email) {
     actions,
     isAdminByAccess,
   };
+}
+
+const INSTITUCIONAIS = new Set(['comandante', 'subcomandante']);
+const BULK_MAX_ITEMS = 1000;
+const APLICABILIDADES = new Set(['militar', 'ferias', 'atestado', 'todos']);
+const TIPOS_VISUAIS = new Set(['normal', 'destaque', 'alerta', 'favorito', 'critico']);
+
+function normalizarAplicabilidade(value) {
+  const raw = String(value || '').trim();
+  const normalized = raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized === 'militar') return 'militar';
+  if (normalized === 'ferias') return 'ferias';
+  if (normalized === 'atestado') return 'atestado';
+  if (normalized === 'todos' || normalized === 'ambos' || !normalized) return 'todos';
+  return null;
+}
+
+function normalizeNome(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 // Replicação simplificada de listarMilitarIdsDoEscopo de moverMilitaresLotacao.js.
@@ -421,6 +473,193 @@ async function garantirContratoAtivoUnico(base44, militarId, registroIdIgnorado 
     erro.status = 400;
     throw erro;
   }
+}
+
+async function prepararFuncaoMilitar({ base44, operation, id, data, registroAtual, militarId }) {
+  const svc = base44.asServiceRole.entities.MilitarFuncao;
+  if (operation === 'create' || operation === 'update') {
+    const funcaoId = String(data?.funcao_militar_id || registroAtual?.funcao_militar_id || '');
+    if (!funcaoId) throw new Error('funcao_militar_id é obrigatório.');
+    const [funcao] = await base44.asServiceRole.entities.FuncaoMilitar.filter({ id: funcaoId }, undefined, 1, 0);
+    if (!funcao) throw new Error('Função não encontrada.');
+    if (!funcao.ativa) throw new Error('Função inativa.');
+
+    const ativas = await base44.asServiceRole.entities.MilitarFuncao.filter({ militar_id: militarId, status: 'ativa' }, undefined, 1000, 0);
+    const chave = String(funcao?.institucional_chave || '').toLowerCase();
+    if (INSTITUCIONAIS.has(chave)) {
+      const idsParaConsultar = Array.from(new Set((ativas || []).filter((v) => String(v.id) !== String(id || '')).map((v) => v.funcao_militar_id).filter(Boolean)));
+      if (idsParaConsultar.length > 0) {
+        const funcoes = await base44.asServiceRole.entities.FuncaoMilitar.filter({ id: { $in: idsParaConsultar } }, undefined, 1000, 0);
+        if ((funcoes || []).some((f) => String(f?.institucional_chave || '').toLowerCase() === chave)) {
+          throw new Error(`Já existe vínculo ativo de ${chave} para este militar.`);
+        }
+      }
+    }
+    if (data?.principal === true) {
+      const outrosPrincipais = (ativas || []).filter((v) => v.principal === true && String(v.id) !== String(id || ''));
+      await Promise.all(outrosPrincipais.map((v) => svc.update(String(v.id), { principal: false })));
+    }
+    if (operation === 'create') return { ...data, militar_id: militarId, status: 'ativa' };
+    return { ...data, militar_id: militarId };
+  }
+  if (operation === 'encerrar') {
+    return {
+      status: 'encerrada',
+      principal: false,
+      data_fim: data?.data_fim || new Date().toISOString().slice(0, 10),
+      motivo: data?.motivo || registroAtual?.motivo || null,
+    };
+  }
+  return data;
+}
+
+async function prepararMilitarTag({ base44, operation, id, data, registroAtual, militarId }) {
+  if (operation === 'create' || operation === 'update') {
+    const tagId = String(data?.tag_id || registroAtual?.tag_id || '');
+    if (!tagId) throw new Error('tag_id é obrigatório.');
+    const [tag] = await base44.asServiceRole.entities.Tag.filter({ id: tagId }, undefined, 1, 0);
+    if (!tag) throw new Error('Tag não encontrada.');
+    if (!tag.ativo) throw new Error('Tag inativa.');
+    if (!['militar', 'todos', 'ambos'].includes(String(tag.aplicabilidade || ''))) throw new Error('Tag incompatível para militar.');
+
+    const duplicadas = await base44.asServiceRole.entities.MilitarTag.filter({ militar_id: militarId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
+    if ((duplicadas || []).some((d) => String(d.id) !== String(id || ''))) throw new Error('Tag ativa já vinculada para este militar.');
+
+    if (operation === 'create') return { ...data, militar_id: militarId, status: 'ativa' };
+    return { ...data, militar_id: militarId };
+  }
+  if (operation === 'remover') {
+    return {
+      status: 'removida',
+      data_remocao: data?.data_remocao || new Date().toISOString().slice(0, 10),
+      motivo: data?.motivo || registroAtual?.motivo || null,
+    };
+  }
+  return data;
+}
+
+async function prepararFeriasTag({ base44, operation, id, data, registroAtual, feriasId }) {
+  if (operation === 'create' || operation === 'update') {
+    const tagId = String(data?.tag_id || registroAtual?.tag_id || '');
+    if (!tagId) throw new Error('tag_id é obrigatório.');
+    const [tag] = await base44.asServiceRole.entities.Tag.filter({ id: tagId }, undefined, 1, 0);
+    if (!tag) throw new Error('Tag não encontrada.');
+    if (!tag.ativo) throw new Error('Tag inativa.');
+    if (!['ferias', 'todos', 'ambos'].includes(String(tag.aplicabilidade || ''))) throw new Error('Tag incompatível para férias.');
+
+    const duplicadas = await base44.asServiceRole.entities.FeriasTag.filter({ ferias_id: feriasId, tag_id: tagId, status: 'ativa' }, undefined, 1000, 0);
+    if ((duplicadas || []).some((d) => String(d.id) !== String(id || ''))) throw new Error('Tag ativa já vinculada para esta férias.');
+
+    if (operation === 'create') return { ...data, ferias_id: feriasId, status: 'ativa' };
+    return { ...data, ferias_id: feriasId };
+  }
+  if (operation === 'remover') {
+    return {
+      status: 'removida',
+      data_remocao: data?.data_remocao || new Date().toISOString().slice(0, 10),
+      motivo: data?.motivo || registroAtual?.motivo || null,
+    };
+  }
+  return data;
+}
+
+async function prepararFuncaoMilitarCatalogo({ base44, operation, id, data, registroAtual }) {
+  const svc = base44.asServiceRole.entities.FuncaoMilitar;
+  if (operation === 'desativar') {
+    const chaveAtual = normalizeTipo(registroAtual?.institucional_chave);
+    if (INSTITUCIONAIS.has(chaveAtual)) throw new Error('Funções institucionais não podem ser desativadas.');
+    const ativa = typeof data?.ativa === 'boolean' ? data.ativa : false;
+    return { ativa };
+  }
+
+  const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
+  if (!nome) throw new Error('nome é obrigatório.');
+  const institucionalChave = normalizeTipo(data?.institucional_chave ?? registroAtual?.institucional_chave ?? '');
+  const prioridade = Number(data?.prioridade_lista ?? registroAtual?.prioridade_lista ?? 10);
+  if (!Number.isFinite(prioridade)) throw new Error('prioridade_lista inválida.');
+
+  const todasAtivas = await base44.asServiceRole.entities.FuncaoMilitar.filter({ ativa: true }, undefined, 1000, 0);
+  const nomeNorm = normalizeNome(nome);
+  if ((todasAtivas || []).some((f) => String(f.id) !== String(id || '') && normalizeNome(f.nome) === nomeNorm)) {
+    throw new Error('Já existe função ativa com este nome.');
+  }
+
+  if (INSTITUCIONAIS.has(institucionalChave)) {
+    if (institucionalChave === 'comandante' && prioridade !== 1) throw new Error('Comandante deve possuir prioridade 1.');
+    if (institucionalChave === 'subcomandante' && prioridade !== 2) throw new Error('Subcomandante deve possuir prioridade 2.');
+    const atualChave = normalizeTipo(registroAtual?.institucional_chave);
+    if (operation === 'update' && atualChave && atualChave !== institucionalChave) throw new Error('Não é permitido trocar institucional_chave de função institucional.');
+    if ((todasAtivas || []).some((f) => String(f.id) !== String(id || '') && normalizeTipo(f.institucional_chave) === institucionalChave)) {
+      throw new Error(`Já existe função ativa com institucional_chave ${institucionalChave}.`);
+    }
+  } else {
+    if (institucionalChave) throw new Error('Função personalizada não pode ter institucional_chave.');
+    if (prioridade < 10) throw new Error('Função personalizada deve ter prioridade_lista >= 10.');
+  }
+
+  return { ...data, nome, prioridade_lista: prioridade, institucional_chave: institucionalChave || null, ativa: true };
+}
+
+async function prepararTagGrupoCatalogo({ base44, operation, id, data, registroAtual }) {
+  if (operation === 'desativar') {
+    const ativa = typeof data?.ativo === 'boolean' ? data.ativo : false;
+    return { ativo: ativa };
+  }
+  if (operation === 'delete') return null;
+
+  const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
+  if (!nome) throw new Error('nome é obrigatório.');
+  const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
+  const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
+  const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
+  if (!aplicabilidade) throw new Error('Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
+  if (!TIPOS_VISUAIS.has(tipoVisual)) throw new Error('tipo_visual inválido.');
+
+  const gruposAtivos = await base44.asServiceRole.entities.TagGrupo.filter({ ativo: true }, undefined, 1000, 0);
+  const nomeNorm = normalizeNome(nome);
+  if ((gruposAtivos || []).some((g) => String(g.id) !== String(id || '') && normalizeNome(g.nome) === nomeNorm)) {
+    throw new Error('Já existe grupo ativo com este nome.');
+  }
+  return { ...data, nome, aplicabilidade, tipo_visual: tipoVisual, ativo: true };
+}
+
+async function prepararTagCatalogo({ base44, operation, id, data, registroAtual }) {
+  if (operation === 'desativar') {
+    const ativa = typeof data?.ativo === 'boolean' ? data.ativo : false;
+    return { ativo: ativa };
+  }
+  if (operation === 'delete') return null;
+
+  const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
+  if (!nome) throw new Error('nome é obrigatório.');
+  const grupoId = String(data?.grupo_id ?? registroAtual?.grupo_id ?? '').trim() || null;
+  const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
+  const tipoVisualRaw = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
+  const tipoVisual = tipoVisualRaw === 'chip' ? 'normal' : tipoVisualRaw;
+
+  if (!aplicabilidade) throw new Error('Aplicabilidade deve ser Militar, Férias, Atestado ou Todos.');
+  if (!TIPOS_VISUAIS.has(tipoVisual)) throw new Error('tipo_visual inválido.');
+
+  if (grupoId) {
+    const [grupo] = await base44.asServiceRole.entities.TagGrupo.filter({ id: grupoId }, undefined, 1, 0);
+    if (!grupo) throw new Error('Grupo não encontrado.');
+    if (!grupo.ativo) throw new Error('Grupo inativo.');
+    const grupoApl = normalizarAplicabilidade(grupo.aplicabilidade);
+    if (grupoApl === 'militar' && !['militar', 'todos'].includes(aplicabilidade)) throw new Error('Grupo militar só aceita tag militar/todos.');
+    if (grupoApl === 'ferias' && !['ferias', 'todos'].includes(aplicabilidade)) throw new Error('Grupo ferias só aceita tag ferias/todos.');
+  }
+
+  const ativas = await base44.asServiceRole.entities.Tag.filter({ ativo: true }, undefined, 2000, 0);
+  const nomeNorm = normalizeNome(nome);
+  const duplicada = (ativas || []).some((t) => {
+    if (String(t.id) === String(id || '')) return false;
+    if (normalizeNome(t.nome) !== nomeNorm) return false;
+    const tg = String(t.grupo_id || '').trim() || null;
+    return tg === grupoId;
+  });
+  if (duplicada) throw new Error('Já existe tag ativa com este nome no mesmo grupo.');
+
+  return { ...data, nome, grupo_id: grupoId, aplicabilidade, tipo_visual: tipoVisual, ativo: true };
 }
 
 async function prepararContratoDesignacaoMilitar({ base44, operation, registroId, data, registroExistente, militarAlvoId, userEmail }) {
@@ -638,12 +877,16 @@ Deno.serve(async (req) => {
     let militarAlvoId = null;
     let registroExistente = null;
 
-    if (operation === 'create') {
+    if (operation === 'bulk') {
+      // No bulk, a validação de escopo é interna ao loop de itens
+    } else if (operation === 'create') {
       militarAlvoId = data?.militar_id ? String(data.militar_id) : null;
-
-      if (!militarAlvoId && entityName === 'FeriasTag' && data?.ferias_id) {
-        const ferias = await buscarRegistroExistente(base44, 'Ferias', data.ferias_id);
-        militarAlvoId = ferias?.militar_id ? String(ferias.militar_id) : null;
+      if (!militarAlvoId && entityName === 'FeriasTag') {
+        const feriasId = String(data?.ferias_id || '');
+        if (feriasId) {
+          const [f] = await base44.asServiceRole.entities.Ferias.filter({ id: feriasId }, undefined, 1, 0, ['militar_id']);
+          militarAlvoId = f?.militar_id ? String(f.militar_id) : null;
+        }
       }
     } else {
       // update / delete: buscar registro existente para obter militar_id canônico
@@ -655,10 +898,12 @@ Deno.serve(async (req) => {
         );
       }
       militarAlvoId = registroExistente.militar_id ? String(registroExistente.militar_id) : null;
-
-      if (!militarAlvoId && entityName === 'FeriasTag' && registroExistente.ferias_id) {
-        const ferias = await buscarRegistroExistente(base44, 'Ferias', registroExistente.ferias_id);
-        militarAlvoId = ferias?.militar_id ? String(ferias.militar_id) : null;
+      if (!militarAlvoId && entityName === 'FeriasTag') {
+        const feriasId = String(registroExistente?.ferias_id || '');
+        if (feriasId) {
+          const [f] = await base44.asServiceRole.entities.Ferias.filter({ id: feriasId }, undefined, 1, 0, ['militar_id']);
+          militarAlvoId = f?.militar_id ? String(f.militar_id) : null;
+        }
       }
     }
 
@@ -683,7 +928,7 @@ Deno.serve(async (req) => {
     }
 
     // ---- Validação de escopo ----
-    if (exigeEscopoMilitar && !targetIsAdmin) {
+    if (exigeEscopoMilitar && !targetIsAdmin && operation !== 'bulk') {
       const idsPermitidos = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
       if (idsPermitidos !== null) {
         const setPermitidos = new Set(idsPermitidos.map(String));
@@ -705,7 +950,7 @@ Deno.serve(async (req) => {
     // ---- Validação de permissão funcional (PERMISSIONS_MAP) ----
     // Admin: bypass. Não-admin: precisa ter a action mapeada.
     if (!targetIsAdmin) {
-      if (entityName === 'ContratoDesignacaoMilitar') {
+      if (entityName === 'ContratoDesignacaoMilitar' && operation !== 'bulk') {
         const statusContratoPayload = normalizarStatusContratoDesignacao(data?.status_contrato);
         let allowed = false;
         let requiredPermission = null;
@@ -758,6 +1003,80 @@ Deno.serve(async (req) => {
     }
 
     let dataValidada = data;
+
+    // ========== BULK ==========
+    if (operation === 'bulk') {
+      const itensBulk = Array.isArray(payload?.itens) ? payload.itens : [];
+      if (itensBulk.length > BULK_MAX_ITEMS) return Response.json({ error: `Limite de ${BULK_MAX_ITEMS} itens por chamada bulk.` }, { status: 400 });
+
+      const militarIdsEscopo = targetIsAdmin ? null : await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
+      const isInScope = (mid) => militarIdsEscopo === null || (mid && militarIdsEscopo.includes(String(mid)));
+
+      const svcBulk = base44.asServiceRole.entities[entityName];
+      const resultados = [];
+
+      // Pre-carregar dados para validação em lote se necessário
+      const feriasPorId = new Map();
+      if (entityName === 'FeriasTag') {
+        const fids = Array.from(new Set(itensBulk.map((it) => String(it?.ferias_id || '')).filter(Boolean)));
+        for (let i = 0; i < fids.length; i += 100) {
+          const grupo = fids.slice(i, i + 100);
+          const lista = await base44.asServiceRole.entities.Ferias.filter({ id: { $in: grupo } }, undefined, 200, 0, ['id', 'militar_id']);
+          (lista || []).forEach((f) => feriasPorId.set(String(f.id), f));
+        }
+      }
+
+      for (const raw of itensBulk) {
+        try {
+          const itemAcao = String(raw?.acao || 'create').trim().toLowerCase();
+          const subOp = itemAcao === 'aplicar' ? 'create' : (itemAcao === 'encerrar' || itemAcao === 'remover') ? 'update' : itemAcao;
+
+          // 1) Permissão funcional do item
+          const requiredPermission = PERMISSIONS_MAP[entityName]?.[subOp];
+          if (!targetIsAdmin && (!requiredPermission || targetPerms.actions?.[requiredPermission] !== true)) {
+            resultados.push({ ok: false, error: 'Sem permissão para esta ação no item.', item: raw });
+            continue;
+          }
+
+          // 2) Escopo do item
+          let mid = raw?.militar_id;
+          if (entityName === 'FeriasTag') mid = feriasPorId.get(String(raw?.ferias_id))?.militar_id;
+
+          const exigeScope = !ENTIDADES_SEM_ESCOPO_MILITAR.has(entityName);
+          if (exigeScope && !isInScope(mid)) {
+            resultados.push({ ok: false, error: 'Militar fora do escopo.', item: raw });
+            continue;
+          }
+
+          // 3) Preparar e Executar (sequencial dentro do bulk para garantir regras de negócio como unset principal)
+          let itemData = { ...raw };
+          delete itemData.acao;
+          const itemId = itemData.id;
+          delete itemData.id;
+
+          if (entityName === 'MilitarFuncao') {
+            itemData = await prepararFuncaoMilitar({ base44, operation: subOp, id: itemId, data: itemData, militarId: mid });
+          } else if (entityName === 'MilitarTag') {
+            itemData = await prepararMilitarTag({ base44, operation: subOp, id: itemId, data: itemData, militarId: mid });
+          } else if (entityName === 'FeriasTag') {
+            itemData = await prepararFeriasTag({ base44, operation: subOp, id: itemId, data: itemData, feriasId: raw.ferias_id });
+          }
+
+          let res;
+          if (subOp === 'create') {
+            res = await svcBulk.create(itemData);
+          } else {
+            res = await svcBulk.update(itemId, itemData);
+          }
+          resultados.push({ ok: true, id: res.id || itemId, item: raw });
+        } catch (e) {
+          resultados.push({ ok: false, error: e.message, item: raw });
+        }
+      }
+
+      return Response.json({ total: resultados.length, sucesso: resultados.filter((r) => r.ok).length, resultados });
+    }
+
     if (entityName === 'UsuarioAcesso' && operation === 'create') {
       const emailNormalizado = normalizeEmail(data?.user_email);
       if (!emailNormalizado) {
@@ -779,6 +1098,19 @@ Deno.serve(async (req) => {
         militarAlvoId,
         userEmail: targetEmail,
       });
+    } else if (entityName === 'MilitarFuncao') {
+      dataValidada = await prepararFuncaoMilitar({ base44, operation, id: registroId, data, registroAtual: registroExistente, militarId: militarAlvoId });
+    } else if (entityName === 'MilitarTag') {
+      dataValidada = await prepararMilitarTag({ base44, operation, id: registroId, data, registroAtual: registroExistente, militarId: militarAlvoId });
+    } else if (entityName === 'FeriasTag') {
+      const feriasId = String(data?.ferias_id || registroExistente?.ferias_id || '');
+      dataValidada = await prepararFeriasTag({ base44, operation, id: registroId, data, registroAtual: registroExistente, feriasId });
+    } else if (entityName === 'FuncaoMilitar') {
+      dataValidada = await prepararFuncaoMilitarCatalogo({ base44, operation, id: registroId, data, registroAtual: registroExistente });
+    } else if (entityName === 'TagGrupo') {
+      dataValidada = await prepararTagGrupoCatalogo({ base44, operation, id: registroId, data, registroAtual: registroExistente });
+    } else if (entityName === 'Tag') {
+      dataValidada = await prepararTagCatalogo({ base44, operation, id: registroId, data, registroAtual: registroExistente });
     }
 
     // ---- Execução com service role ----
@@ -790,7 +1122,7 @@ Deno.serve(async (req) => {
         () => entity.create(dataValidada),
         `${entityName}.create`,
       );
-    } else if (operation === 'update') {
+    } else if (operation === 'update' || operation === 'encerrar' || operation === 'remover' || operation === 'desativar') {
       // Em update por restrito, garantimos que militar_id permaneça o canônico.
       const dataSegura = exigeEscopoMilitar && !targetIsAdmin && dataValidada
         ? { ...dataValidada, militar_id: militarAlvoId }

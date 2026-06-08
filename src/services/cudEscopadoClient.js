@@ -40,9 +40,12 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ContratoDesignacaoMilitar',
   'PerfilPermissao',
   'UsuarioAcesso',
+  'MilitarFuncao',
   'MilitarTag',
   'FeriasTag',
-  'MilitarFuncao',
+  'FuncaoMilitar',
+  'TagGrupo',
+  'Tag',
 ]);
 
 
@@ -65,6 +68,9 @@ const CAMPOS_DATA_ISO_POR_ENTIDADE = {
     'data_fim_contrato',
     'data_publicacao',
   ],
+  MilitarFuncao: ['data_inicio', 'data_fim'],
+  MilitarTag: ['data_aplicacao', 'data_remocao'],
+  FeriasTag: ['data_aplicacao', 'data_remocao'],
 };
 
 function validarDatasIsoEntity(entityName, data = {}) {
@@ -122,6 +128,53 @@ export async function atualizarEscopado(entityName, registroId, data) {
   const resp = await invocar({
     entityName,
     operation: 'update',
+    registroId: String(registroId),
+    data: data || {},
+  });
+  return resp?.data || resp;
+}
+
+export async function bulkEscopado(entityName, itens) {
+  assertEntidadePermitida(entityName);
+  if (!Array.isArray(itens)) throw new Error('cudEscopado: itens deve ser um array.');
+  const resp = await invocar({
+    entityName,
+    operation: 'bulk',
+    itens,
+  });
+  return resp?.data || resp;
+}
+
+export async function encerrarEscopado(entityName, registroId, data) {
+  assertEntidadePermitida(entityName);
+  if (!registroId) throw new Error('cudEscopado: registroId é obrigatório em encerrar.');
+  const resp = await invocar({
+    entityName,
+    operation: 'encerrar',
+    registroId: String(registroId),
+    data: data || {},
+  });
+  return resp?.data || resp;
+}
+
+export async function removerEscopado(entityName, registroId, data) {
+  assertEntidadePermitida(entityName);
+  if (!registroId) throw new Error('cudEscopado: registroId é obrigatório em remover.');
+  const resp = await invocar({
+    entityName,
+    operation: 'remover',
+    registroId: String(registroId),
+    data: data || {},
+  });
+  return resp?.data || resp;
+}
+
+export async function desativarEscopado(entityName, registroId, data) {
+  assertEntidadePermitida(entityName);
+  if (!registroId) throw new Error('cudEscopado: registroId é obrigatório em desativar.');
+  const resp = await invocar({
+    entityName,
+    operation: 'desativar',
     registroId: String(registroId),
     data: data || {},
   });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, encerrarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,12 +110,6 @@ export default function FuncoesMilitarSection({ militar }) {
       const erroInstitucional = validarDuplicidadeInstitucionalAtiva({ vinculosAtivos, funcaoSelecionada: funcao });
       if (erroInstitucional) throw new Error(erroInstitucional);
 
-      if (form.principal) {
-        await Promise.all(vinculosAtivos.filter((v) => v.principal).map((v) =>
-          atualizarEscopado('MilitarFuncao', v.id, { principal: false })
-        ));
-      }
-
       await criarEscopado('MilitarFuncao', {
         militar_id: militar.id,
         funcao_militar_id: form.funcao_militar_id,
@@ -141,8 +135,6 @@ export default function FuncoesMilitarSection({ militar }) {
 
   const setPrincipalMutation = useMutation({
     mutationFn: async (vinculo) => {
-      const ativos = vinculosAtivos.filter((v) => v.id !== vinculo.id && v.principal);
-      await Promise.all(ativos.map((v) => atualizarEscopado('MilitarFuncao', v.id, { principal: false })));
       await atualizarEscopado('MilitarFuncao', vinculo.id, { principal: true });
     },
     onSuccess: () => {toast({ title: 'Função principal atualizada.' }); invalidate();},
@@ -150,7 +142,7 @@ export default function FuncoesMilitarSection({ militar }) {
   });
 
   const encerrarMutation = useMutation({
-    mutationFn: async ({ vinculo, motivo }) => atualizarEscopado('MilitarFuncao', vinculo.id, {
+    mutationFn: async ({ vinculo, motivo }) => encerrarEscopado('MilitarFuncao', vinculo.id, {
       status: 'encerrada',
       data_fim: new Date().toISOString().split('T')[0],
       principal: false,
