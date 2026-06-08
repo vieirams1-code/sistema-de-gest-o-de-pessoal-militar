@@ -7,6 +7,7 @@ export const Medico = base44.entities.Medico;
 export const PunicaoDisciplinar = base44.entities.PunicaoDisciplinar;
 export const ImportacaoMilitares = base44.entities.ImportacaoMilitares;
 export const ImportacaoAlteracoesLegado = base44.entities.ImportacaoAlteracoesLegado;
+export const ClassificacaoHistoricaAlteracao = base44.entities.ClassificacaoHistoricaAlteracao;
 export const ImpedimentoMedalha = base44.entities.ImpedimentoMedalha;
 export const CreditoExtraFerias = base44.entities.CreditoExtraFerias;
 export const HistoricoPromocaoMilitarV2 = base44.entities.HistoricoPromocaoMilitarV2;

@@ -1,0 +1,46 @@
+{
+  "name": "ClassificacaoHistoricaAlteracao",
+  "type": "object",
+  "title": "Classificação Histórica de Alteração",
+  "description": "Catálogo administrativo de classificações históricas para alterações funcionais oriundas de migração legado, separado dos tipos operacionais atuais.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "default": "",
+      "description": "Nome da classificação histórica."
+    },
+    "grupo": {
+      "type": "string",
+      "default": "",
+      "description": "Grupo administrativo para organização visual da classificação."
+    },
+    "descricao": {
+      "type": "string",
+      "default": "",
+      "description": "Descrição opcional da classificação histórica."
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica se a classificação pode ser usada em novos fluxos de migração."
+    },
+    "ordem": {
+      "type": "number",
+      "default": null,
+      "description": "Ordem opcional para exibição dentro do grupo."
+    },
+    "uso_migracao": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica que a classificação é destinada aos fluxos de migração legado."
+    },
+    "legado": {
+      "type": "boolean",
+      "default": true,
+      "description": "Marca a classificação como catálogo de origem/uso legado, sem substituir tipos operacionais atuais."
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}
