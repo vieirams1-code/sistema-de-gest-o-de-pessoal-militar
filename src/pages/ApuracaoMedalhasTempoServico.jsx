@@ -37,6 +37,7 @@ import {
   temAlgumaPermissaoMedalhas,
   validarMilitarDentroEscopo,
   validarPermissaoAcaoMedalhas,
+  resetarMedalhasEmLote,
 } from '@/services/medalhasAcessoService';
 import {
   MOTIVO_INABILITACAO_COMPORTAMENTO_PRACA,
@@ -369,20 +370,11 @@ export default function ApuracaoMedalhasTempoServico() {
       const pendentes = filtrarIndicacoesTempoResetaveis(registrosTempo);
       const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
 
-      if (pendentesEscopo.length > 0) {
-        const dataReset = new Date().toLocaleDateString('pt-BR');
-        const payloads = pendentesEscopo.map((m) => ({
-          id: m.id,
-          ...adicionarAuditoriaMedalha({
-            status: 'CANCELADA',
-            observacoes: `${m.observacoes ? `${m.observacoes}\n` : ''}[RESET] Indicação resetada administrativamente em ${dataReset}.`,
-          }, { userEmail, acao: 'reset' }),
-        }));
-
-        await bulkUpdateMedalhas(base44, payloads);
-      }
-
-      return pendentesEscopo.length;
+      return resetarMedalhasEmLote(base44, {
+        medalhas: pendentesEscopo,
+        userEmail,
+        motivoReset: 'administrativamente',
+      });
     },
     onSuccess: (quantidade) => {
       refreshQueries();

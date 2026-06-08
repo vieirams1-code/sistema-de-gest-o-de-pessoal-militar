@@ -35,6 +35,7 @@ import {
   listarMilitaresEscopo,
   validarMilitarDentroEscopo,
   validarPermissaoAcaoMedalhas,
+  resetarMedalhasEmLote,
 } from '@/services/medalhasAcessoService';
 import {
   MOTIVO_INABILITACAO_COMPORTAMENTO_PRACA,
@@ -273,20 +274,11 @@ export default function IndicacoesDomPedroII() {
       const pendentes = filtrarIndicacoesDomPedroResetaveis(domPedroRegistros);
       const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
 
-      if (pendentesEscopo.length > 0) {
-        const dataReset = new Date().toLocaleDateString('pt-BR');
-        const payloads = pendentesEscopo.map((registro) => ({
-          id: registro.id,
-          ...adicionarAuditoriaMedalha({
-            status: 'CANCELADA',
-            observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada administrativamente em ${dataReset}.`,
-          }, { userEmail, acao: 'reset' }),
-        }));
-
-        await bulkUpdateMedalhas(base44, payloads);
-      }
-
-      return pendentesEscopo.length;
+      return resetarMedalhasEmLote(base44, {
+        medalhas: pendentesEscopo,
+        userEmail,
+        motivoReset: 'administrativamente',
+      });
     },
     onSuccess: (quantidade) => {
       refresh();

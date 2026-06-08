@@ -77,8 +77,8 @@ export async function garantirClassificacoesHistoricasIniciais() {
     legado: true,
   }));
 
-  let criados;
-  if (ENTITY().bulkCreate) {
+  let criados = [];
+  if (typeof ENTITY().bulkCreate === 'function') {
     criados = await ENTITY().bulkCreate(payloads);
   } else {
     criados = await Promise.all(payloads.map((p) => ENTITY().create(p)));
