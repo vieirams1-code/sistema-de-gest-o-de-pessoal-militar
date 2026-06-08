@@ -64,7 +64,7 @@ export async function getMilitarTimeline(militarId) {
       tipo: 'Publicação',
       categoria: 'Registro',
       titulo: item.tipo || 'Publicação Ex Officio',
-      descricao: item.conteudo || '',
+      descricao: [item.doems_edicao_numero ? `DOEMS: ${item.doems_edicao_numero}` : '', item.conteudo || item.texto_publicacao || ''].filter(Boolean).join(' — '),
       origem: 'PublicacaoExOfficio'
     })),
     ...(ferias || []).map(item => ({

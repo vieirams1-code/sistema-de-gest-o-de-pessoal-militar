@@ -191,6 +191,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </div>
         </div>
 
+        {registro.doems_edicao_numero && (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">DOEMS</p>
+            <p className="text-sm text-indigo-900 whitespace-pre-wrap">{registro.doems_edicao_numero}</p>
+          </div>
+        )}
+
         {isEditingBg && (
           <div className="grid gap-3 rounded-lg border bg-slate-50 p-4 md:grid-cols-3">
             <div className="md:col-span-3">
