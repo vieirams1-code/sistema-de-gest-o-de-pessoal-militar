@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { sugerirClassificacaoHistoricaLegado } from '@/services/migracaoAlteracoesLegadoClassificacaoHistoricaSugestao';
 
 const statusClass = {
   pronta: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -227,6 +228,11 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
     });
   };
 
+  const aplicarSugestaoClassificacaoHistorica = (linha, sugestao) => {
+    if (!sugestao?.id || classificacaoHistoricaDaLinha(linha).id) return;
+    selecionarClassificacaoHistorica(linha, sugestao);
+  };
+
   const abrirNovaClassificacao = (linha) => {
     setLinhaNovaClassificacao(linha);
     setNovaClassificacaoOpen(true);
@@ -371,6 +377,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           const desabilitada = linha.recusada;
           const statusVisual = statusDaLinha(linha);
           const textoEmEdicao = textoEmEdicaoId === linha.linhaNumero;
+          const sugestaoClassificacaoHistorica = sugerirClassificacaoHistoricaLegado(linha, classificacoesHistoricas);
 
           return (
             <>
@@ -470,7 +477,22 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                         </Command>
                       </PopoverContent>
                     </Popover>
-                    <p className="mt-1 text-[10px] leading-tight text-emerald-800/80">Independente do tipo operacional; não altera regras atuais de férias, RP, atestados ou promoções.</p>
+                    {sugestaoClassificacaoHistorica && (
+                      <div className="mt-1 flex items-center justify-between gap-2 rounded border border-emerald-200 bg-white/75 px-2 py-1">
+                        <span className="min-w-0 truncate text-[10px] font-medium text-emerald-900">Sugestão: {sugestaoClassificacaoHistorica.nome}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={desabilitada}
+                          className="h-6 shrink-0 border-emerald-300 px-2 text-[10px] text-emerald-800 hover:bg-emerald-100"
+                          onClick={() => aplicarSugestaoClassificacaoHistorica(linha, sugestaoClassificacaoHistorica)}
+                        >
+                          Aplicar sugestão
+                        </Button>
+                      </div>
+                    )}
+                    <p className="mt-1 text-[10px] leading-tight text-emerald-800/80">Independente do tipo operacional; não altera regras atuais de férias, RP, atestados ou promoções. Sugestões exigem confirmação humana.</p>
                   </div>
 
                   <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-1.5">
