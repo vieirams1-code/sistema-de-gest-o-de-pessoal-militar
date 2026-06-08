@@ -15,7 +15,7 @@ import {
   getLotacaoAtualMilitar,
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
-import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
+import { fetchScopedMilitares, getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
@@ -32,9 +32,9 @@ const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast, dismiss } = useToast();
-  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin, userEmail } = useCurrentUser();
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin } = useCurrentUser();
   const hasLotacaoAccess = canAccessModule('lotacao_militares');
-  const effectiveEmail = userEmail || 'self';
+  const effectiveEmail = getEffectiveEmailMilitares() || 'self';
 
   const [searchMilitar, setSearchMilitar] = useState('');
   const [lotacaoAtualFiltro, setLotacaoAtualFiltro] = useState(TODAS_LOTACOES_VALUE);
@@ -323,7 +323,7 @@ export default function LotacaoMilitares() {
           grupamento_raiz_id: targetNode.grupamento_raiz_id,
         },
       };
-      const emailEfetivo = userEmail;
+      const emailEfetivo = getEffectiveEmailMilitares();
       if (emailEfetivo) payload.effectiveEmail = emailEfetivo;
 
       const response = await base44.functions.invoke('moverMilitaresLotacao', payload);
