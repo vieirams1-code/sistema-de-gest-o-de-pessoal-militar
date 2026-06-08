@@ -69,14 +69,16 @@ async function getEntity(nome) {
 
 async function listarMilitares(criterios = null) {
   const entity = await getEntity('Militar');
-  if (criterios && entity?.filter) return entity.filter(criterios);
+  if (!entity) return [];
+  if (criterios && entity.filter) return entity.filter(criterios);
   if (!entity?.list) return [];
   return entity.list();
 }
 
 async function listarMatriculas(criterios = null) {
   const entity = await getEntity('MatriculaMilitar');
-  if (criterios && entity?.filter) return entity.filter(criterios);
+  if (!entity) return [];
+  if (criterios && entity.filter) return entity.filter(criterios);
   if (!entity?.list) return [];
   return entity.list();
 }
@@ -108,6 +110,28 @@ async function localizarMilitarPorMatricula(matricula, excludeMilitarId = '') {
   const matriculaNorm = normalizarMatricula(matricula);
   if (!matriculaNorm) return null;
 
+  const [matriculaEntity, militarEntity] = await Promise.all([
+    getEntity('MatriculaMilitar'),
+    getEntity('Militar'),
+  ]);
+
+  const excludeId = String(excludeMilitarId || '');
+
+  // Fast path: use server-side filter if available to avoid O(N) full list fetch
+  if (matriculaEntity?.filter) {
+    const [mat] = await matriculaEntity.filter({ matricula_normalizada: matriculaNorm });
+    if (mat && String(mat.militar_id) !== excludeId) {
+      const [militar] = await (militarEntity?.filter?.({ id: mat.militar_id }) || Promise.resolve([]));
+      if (militar) return militar;
+    }
+  }
+
+  if (militarEntity?.filter) {
+    const [militar] = await militarEntity.filter({ matricula: formatarMatriculaPadrao(matriculaNorm) });
+    if (militar && String(militar.id) !== excludeId) return militar;
+  }
+
+  // Fallback to in-memory search over full lists (O(N)) if filter is unavailable or data is legacy
   const [matriculas, militares] = await Promise.all([
     listarMatriculas({ matricula_normalizada: matriculaNorm }),
     listarMilitares({ matricula: formatarMatriculaPadrao(matriculaNorm) }),
@@ -115,20 +139,17 @@ async function localizarMilitarPorMatricula(matricula, excludeMilitarId = '') {
 
   const mat = (matriculas || []).find((m) => (
     normalizarMatricula(m?.matricula_normalizada || m?.matricula) === matriculaNorm
-    && String(m?.militar_id || '') !== String(excludeMilitarId || '')
+    && String(m?.militar_id || '') !== excludeId
   ));
 
   if (mat?.militar_id) {
-    const militarEntity = await getEntity('Militar');
-    if (militarEntity?.filter) {
-      const [militar] = await militarEntity.filter({ id: mat.militar_id });
-      if (militar) return militar;
-    }
+    const [militar] = await (militarEntity?.filter?.({ id: mat.militar_id }) || Promise.resolve([]));
+    if (militar) return militar;
   }
 
   return (militares || []).find((m) => (
     normalizarMatricula(m?.matricula) === matriculaNorm
-    && String(m?.id || '') !== String(excludeMilitarId || '')
+    && String(m?.id || '') !== excludeId
   )) || null;
 }
 
@@ -186,13 +207,29 @@ export async function resolverPendenciaPossivelDuplicidade({ pendenciaId, status
 }
 
 export async function localizarDuplicidadeForte({ cpf, nomeCanonico, dataNascimento, excludeMilitarId = '' }) {
-  const militares = await listarMilitares();
   const cpfNorm = normalizarCPF(cpf);
   const nomeNorm = normalizarNomeCanonico(nomeCanonico);
   const dataNorm = String(dataNascimento || '').trim();
+  const excludeId = String(excludeMilitarId || '');
 
+  const entity = await getEntity('Militar');
+  if (entity?.filter) {
+    const filters = [];
+    if (cpfNorm) filters.push(entity.filter({ cpf: cpfNorm }));
+    if (nomeNorm && dataNorm) {
+      filters.push(entity.filter({ nome_canonico: nomeNorm, data_nascimento: dataNorm }));
+    }
+
+    const results = await Promise.all(filters);
+    for (const list of results) {
+      const found = (list || []).find((m) => m && String(m.id) !== excludeId);
+      if (found) return found;
+    }
+  }
+
+  const militares = await listarMilitares();
   return (militares || []).find((militar) => {
-    if (!militar?.id || militar.id === excludeMilitarId) return false;
+    if (!militar?.id || String(militar.id) === excludeId) return false;
 
     const cpfMatch = cpfNorm && normalizarCPF(militar.cpf) && normalizarCPF(militar.cpf) === cpfNorm;
     const nomeDataMatch = nomeNorm
@@ -208,26 +245,8 @@ export async function validarMatriculaDisponivel(matricula, excludeMilitarId = '
   const matriculaNorm = normalizarMatricula(matricula);
   if (!matriculaNorm) throw new Error(ERROS.MATRICULA_OBRIGATORIA);
 
-  const [matriculas, militares] = await Promise.all([
-    listarMatriculas({ matricula_normalizada: matriculaNorm }),
-    listarMilitares({ matricula: formatarMatriculaPadrao(matriculaNorm) }),
-  ]);
-
-  const duplicadaNovaTabela = (matriculas || []).find((m) => (
-    normalizarMatricula(m?.matricula_normalizada || m?.matricula) === matriculaNorm
-    && String(m?.militar_id || '') !== String(excludeMilitarId || '')
-  ));
-
-  if (duplicadaNovaTabela) {
-    throw new Error(ERROS.MATRICULA_DUPLICADA);
-  }
-
-  const duplicadaLegado = (militares || []).find((m) => (
-    normalizarMatricula(m?.matricula) === matriculaNorm
-    && String(m?.id || '') !== String(excludeMilitarId || '')
-  ));
-
-  if (duplicadaLegado) {
+  const militar = await localizarMilitarPorMatricula(matricula, excludeMilitarId);
+  if (militar) {
     throw new Error(ERROS.MATRICULA_DUPLICADA);
   }
 
