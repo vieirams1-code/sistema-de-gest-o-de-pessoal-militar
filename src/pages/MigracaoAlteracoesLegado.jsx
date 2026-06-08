@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Database, Download, RefreshCcw, Search, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,10 @@ import {
   revalidarLinhasRevisaoSimplificada,
 } from '@/services/migracaoAlteracoesLegadoSimplificadoEdicao';
 import { criarEscopado } from '@/services/cudEscopadoClient';
+import {
+  listarClassificacoesHistoricasAlteracoes,
+  salvarClassificacaoHistoricaAlteracao,
+} from '@/services/classificacoesHistoricasAlteracoesService';
 
 const filtros = [
   { id: 'TODOS', label: 'Todos' },
@@ -116,6 +120,9 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
       numero_bg: linha.numero_bg_br,
       data_bg_br: linha.data_bg_br,
       materia_legado: linha.tipo_legado,
+      classificacao_original_legado: linha.classificacao_original_legado !== undefined ? String(linha.classificacao_original_legado) : linha.tipo_legado,
+      classificacao_historica_id: linha.classificacao_historica_id || '',
+      classificacao_historica_nome: linha.classificacao_historica_nome || '',
       tipo_publicacao_sugerido: linha.tipo_classificado,
       tipo_publicacao_confirmado: linha.tipo_classificado,
       conteudo_trecho_legado: linha.texto_publicado,
@@ -134,6 +141,9 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
     numero_bg_br: linha.numero_bg_br,
     data_bg_br: linha.data_bg_br,
     tipo_legado: linha.tipo_legado,
+    classificacao_original_legado: linha.classificacao_original_legado !== undefined ? String(linha.classificacao_original_legado) : linha.tipo_legado,
+    classificacao_historica_id: linha.classificacao_historica_id || '',
+    classificacao_historica_nome: linha.classificacao_historica_nome || '',
     tipo_classificado: linha.tipo_classificado,
     tipo_bg_legado: linha.tipo_bg_legado,
     texto_publicado: linha.texto_publicado,
@@ -176,6 +186,28 @@ export default function MigracaoAlteracoesLegado() {
   // (nome, posto, matrícula e — quando disponível — lotação).
   const [militarDestinoId, setMilitarDestinoId] = useState('');
   const [militarDestinoSnapshot, setMilitarDestinoSnapshot] = useState(null);
+  const [classificacoesHistoricas, setClassificacoesHistoricas] = useState([]);
+  const [carregandoClassificacoes, setCarregandoClassificacoes] = useState(false);
+
+  const carregarClassificacoesHistoricas = async () => {
+    setCarregandoClassificacoes(true);
+    try {
+      const registros = await listarClassificacoesHistoricasAlteracoes();
+      setClassificacoesHistoricas((registros || []).filter((item) => item?.ativo !== false && item?.uso_migracao !== false));
+    } catch (error) {
+      toast({
+        title: 'Falha ao carregar classificações históricas',
+        description: error?.message || 'Não foi possível listar o catálogo de classificações históricas.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCarregandoClassificacoes(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarClassificacoesHistoricas();
+  }, []);
 
   const linhasFiltradas = useMemo(() => {
     if (!analise) return [];
@@ -373,6 +405,17 @@ export default function MigracaoAlteracoesLegado() {
     if (!analise) return;
     const proxima = atualizarMilitarLinhaAnalise(analise, linha.linhaNumero, militar);
     setAnalise(proxima);
+  };
+
+  const handleCriarClassificacaoHistorica = async (form) => {
+    const criada = await salvarClassificacaoHistoricaAlteracao(null, {
+      ...form,
+      uso_migracao: true,
+      legado: true,
+      ativo: true,
+    });
+    await carregarClassificacoesHistoricas();
+    return criada;
   };
 
   const handleAjusteTipoPublicacao = (linha, tipoPublicacao) => {
@@ -577,6 +620,9 @@ export default function MigracaoAlteracoesLegado() {
               <TabelaRevisaoSimplificadaAlteracoesLegado
                 linhas={linhasFiltradas}
                 tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
+                classificacoesHistoricas={classificacoesHistoricas}
+                carregandoClassificacoesHistoricas={carregandoClassificacoes}
+                onCriarClassificacaoHistorica={handleCriarClassificacaoHistorica}
                 onAlterarLinha={handleAlterarLinhaSimplificada}
                 onAlternarRecusa={handleAlternarRecusaSimplificada}
               />

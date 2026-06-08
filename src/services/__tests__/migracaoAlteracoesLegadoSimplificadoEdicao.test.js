@@ -120,6 +120,21 @@ test('payload usa matéria legado como fallback sem bloquear e marca classifica�
   assert.equal(payload.classificacao_pendente, true);
 });
 
+
+test('payload preserva classificação original e snapshot da classificação histórica SGP', () => {
+  const payload = montarPayloadPublicacaoExOfficioMigracaoLegado(linha(2, 'NOTA-1', {
+    tipo_legado: '  Concessão de Férias - Legado  ',
+    classificacao_original_legado: '  Concessão de Férias - Legado  ',
+    classificacao_historica_id: 'class-1',
+    classificacao_historica_nome: 'Concessão de Férias',
+  }));
+
+  assert.equal(payload.classificacao_original_legado, '  Concessão de Férias - Legado  ');
+  assert.equal(payload.classificacao_historica_id, 'class-1');
+  assert.equal(payload.classificacao_historica_nome, 'Concessão de Férias');
+  assert.equal(payload.tipo, 'Concessão de Férias - Legado');
+});
+
 test('linha sem classificação e sem matéria ou tipo legado fica bloqueada com erro claro', () => {
   const entrada = linha(2, 'NOTA-1', {
     materia_legado: '',
