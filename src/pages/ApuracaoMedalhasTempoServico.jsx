@@ -30,6 +30,7 @@ import {
   ACOES_APURACAO,
   ACOES_MEDALHAS,
   adicionarAuditoriaMedalha,
+  bulkUpdateMedalhas,
   listarImpedimentosEscopo,
   listarMedalhasEscopo,
   listarMilitaresEscopo,
