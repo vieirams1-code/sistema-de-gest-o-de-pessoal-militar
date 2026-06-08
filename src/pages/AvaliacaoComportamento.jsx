@@ -189,14 +189,6 @@ export default function AvaliacaoComportamento() {
           geradoPor: '',
         });
 
-        console.info('[RP_AUTO][aplicarSugestao] resultado da geração automática', {
-          militarId: linha.militar.id,
-          historicoId: marcoParaPublicacao.id,
-          ok: resultadoRPAutomatico?.ok,
-          etapa: resultadoRPAutomatico?.etapa || '',
-          motivo: resultadoRPAutomatico?.motivo || '',
-          publicado: resultadoRPAutomatico?.publicado,
-        });
 
         const houveFalhaPublicacao = !resultadoRPAutomatico?.ok
           && resultadoRPAutomatico?.motivo !== 'publicacao_ja_existente';

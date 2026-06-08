@@ -421,7 +421,6 @@ export default function RastreamentoPromocoes() {
 
   useEffect(() => {
     if (promocaoRuntime.disponivel) {
-      console.info('[RastreamentoPromocoes] base44.entities.Promocao disponível no runtime Base44.');
       return;
     }
 

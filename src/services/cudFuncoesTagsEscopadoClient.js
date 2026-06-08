@@ -8,6 +8,7 @@ async function invocar(payload, { unwrapData = true } = {}) {
     if (!unwrapData) return body;
     return body?.data || body;
   } catch (error) {
+    const status = error?.response?.status;
     const body = error?.response?.data;
     const backendMessage = body?.message || body?.error || body?.details || error?.message;
     throw new Error(backendMessage || 'Falha ao executar operação em lote.');

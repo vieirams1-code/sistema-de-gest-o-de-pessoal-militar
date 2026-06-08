@@ -1118,9 +1118,6 @@ function assertHistoricoEntity() {
 async function atualizarHistoricoComDiagnostico(entity, historicoId, payload, contexto, avisosHistorico) {
   if (!entity || !historicoId) {
     const mensagem = `[ImportacaoMilitares] Histórico indisponível ao ${contexto}.`;
-    if (import.meta.env?.DEV) {
-      console.error(mensagem, { historicoId, payload });
-    }
     throw new Error(mensagem);
   }
 
@@ -1132,9 +1129,6 @@ async function atualizarHistoricoComDiagnostico(entity, historicoId, payload, co
       throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
     }
     const mensagem = `[ImportacaoMilitares] Falha ao ${contexto} no histórico (${historicoId}): ${error?.message || 'erro desconhecido.'}`;
-    if (import.meta.env?.DEV) {
-      console.error(mensagem, { payload, error });
-    }
     avisosHistorico.push(mensagem);
     throw new Error(mensagem);
   }

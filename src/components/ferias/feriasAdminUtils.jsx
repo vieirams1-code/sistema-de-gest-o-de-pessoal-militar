@@ -132,7 +132,7 @@ async function auditarDependenciasPosExclusao({ eventosSobreviventes = [] }) {
 
   const invalidacoes = [];
   for (const evento of eventosInvalidos) {
-    // eslint-disable-next-line no-await-in-loop
+
     const resultado = await invalidarPublicacaoDeEvento(evento, inconsistencia);
     invalidacoes.push(resultado);
   }

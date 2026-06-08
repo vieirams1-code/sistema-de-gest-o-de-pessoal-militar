@@ -77,28 +77,6 @@ export default function CarreiraAntiguidadePanel(props) {
   const promocoesAnteriores = selecaoPromocao.promocoesAnteriores;
   const haMultiplosRegistrosAtuais = ativos.length > 1;
 
-  React.useEffect(() => {
-    console.info('[CarreiraAntiguidadePanel] Diagnóstico promoção atual', {
-      militarId: militar?.id || null,
-      historicosAtivosEncontrados: ativos.map((h) => ({
-        id: h?.id || null,
-        status_registro: h?.status_registro || STATUS_ATIVO,
-        posto_graduacao_novo: h?.posto_graduacao_novo || null,
-        data_promocao: h?.data_promocao || null,
-        data_publicacao: h?.data_publicacao || null,
-        created_at: h?.created_at || null,
-      })),
-      historicoEscolhidoComoAtual: promocaoAtual ? {
-        id: promocaoAtual?.id || null,
-        posto_graduacao_novo: promocaoAtual?.posto_graduacao_novo || null,
-        data_promocao: promocaoAtual?.data_promocao || null,
-        data_publicacao: promocaoAtual?.data_publicacao || null,
-        created_at: promocaoAtual?.created_at || null,
-      } : null,
-      motivoEscolha: selecaoPromocao.motivoEscolha,
-      fallbackMilitarPostoGraduacao: !promocaoAtual ? (postoGraduacaoMilitar || null) : null,
-    });
-  }, [ativos, militar?.id, postoGraduacaoMilitar, promocaoAtual, selecaoPromocao.motivoEscolha]);
 
 
   const abrirAcaoRegistro = (tipo, registro) => {

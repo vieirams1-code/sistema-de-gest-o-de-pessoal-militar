@@ -376,23 +376,6 @@ export default function FolhaAlteracoes() {
         dataFinal: fimPeriodo,
       });
 
-      console.info('[FA DEBUG EVENTOS]', { total: eventos.length });
-      console.table(
-        eventos.map(e => ({
-          id: e.id,
-          data: e.data,
-          origem: e.origem,
-          texto: e.texto?.slice(0, 80)
-        }))
-      );
-
-      if (import.meta.env?.DEV) {
-        console.info('[FolhaAlteracoes] fluxo histórico', {
-          militarId,
-          periodo: { dataInicial: inicioPeriodo, dataFinal: fimPeriodo },
-          metricas,
-        });
-      }
 
       return { eventos, metricas };
     },
@@ -414,8 +397,6 @@ export default function FolhaAlteracoes() {
       )
     );
 
-    console.info('[FA DEBUG AGRUPADO]', { total: eventosAgrupados.length });
-    console.table(eventosAgrupados);
 
     return historicoAgrupado;
   }, [fluxoHistorico.eventos, previa]);
