@@ -10,7 +10,7 @@ import {
   resolveQuadroTemplate,
 } from './templateContratoUtils.js';
 
-export { abreviarPosto, buildTemplateVarsContrato, composeTemplateVarsRP, montarPostoNomeTemplate, resolveQuadroTemplate };
+export { abreviarPosto, buildTemplateVarsContrato, composeTemplateVarsRP, montarPostoNomeTemplate, resolveQuadroTemplate, numeroPorExtenso };
 
 const numeroPorExtenso = (num) => {
   const numeros = {
