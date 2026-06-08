@@ -65,18 +65,52 @@ export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds =
   if (isAdmin) return base44Client.entities.Medalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  const listas = await Promise.all(militarIds.map((id) => base44Client.entities.Medalha.filter({ militar_id: id }, '-created_date')));
+  let registros = [];
+  try {
+    registros = await base44Client.entities.Medalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+  } catch (error) {
+    const listas = await Promise.all(militarIds.map((id) => base44Client.entities.Medalha.filter({ militar_id: id }, '-created_date')));
+    registros = listas.flat();
+  }
+
   const mapa = new Map();
-  listas.flat().forEach((registro) => mapa.set(registro.id, registro));
+  registros.forEach((registro) => mapa.set(registro.id, registro));
   return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+}
+
+export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userEmail, motivoReset = 'administrativamente' }) {
+  if (!medalhas.length) return 0;
+
+  const payloads = medalhas.map((registro) => ({
+    id: registro.id,
+    ...adicionarAuditoriaMedalha({
+      status: 'CANCELADA',
+      observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação resetada ${motivoReset} em ${new Date().toLocaleDateString('pt-BR')}.`,
+    }, { userEmail, acao: 'reset' }),
+  }));
+
+  if (typeof base44Client.entities.Medalha.bulkUpdate === 'function') {
+    await base44Client.entities.Medalha.bulkUpdate(payloads);
+  } else {
+    await Promise.all(payloads.map(({ id, ...data }) => base44Client.entities.Medalha.update(id, data)));
+  }
+
+  return medalhas.length;
 }
 
 export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarIds = [] }) {
   if (isAdmin) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  const listas = await Promise.all(militarIds.map((id) => base44Client.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date')));
+  let registros = [];
+  try {
+    registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+  } catch (error) {
+    const listas = await Promise.all(militarIds.map((id) => base44Client.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date')));
+    registros = listas.flat();
+  }
+
   const mapa = new Map();
-  listas.flat().forEach((registro) => mapa.set(registro.id, registro));
+  registros.forEach((registro) => mapa.set(registro.id, registro));
   return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }
