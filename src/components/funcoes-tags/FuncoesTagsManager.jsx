@@ -127,19 +127,16 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   const saveFuncao = useMutation({
     mutationFn: (p) => {
       const editandoId = editandoFuncao?.id;
-      console.debug('[FUNCAO_SAVE_MUTATION_FN]', { editandoId, modo: editandoId ? 'update' : 'create' });
       return editandoId
         ? atualizarFuncaoMilitarEscopado(editandoId, p)
         : criarFuncaoMilitarEscopado(p);
     },
     onSuccess: () => {
-      console.debug('[FUNCAO_SAVE_SUCCESS]');
       invalidate('funcoes');
       toast({ title: 'Função salva com sucesso.' });
       cancelarEdicaoFuncao();
     },
     onError: (error) => {
-      console.debug('[FUNCAO_SAVE_ERROR]', error);
       toast({ title: 'Não foi possível salvar a função.', description: error?.message, variant: 'destructive' });
     },
   });
@@ -226,7 +223,6 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     };
     const erro = validarFuncao(payload, funcoes, editandoFuncao);
     if (erro) return toast({ title: erro, variant: 'destructive' });
-    console.debug('[FUNCAO_SAVE]', { editandoId: editandoFuncao?.id, payload });
     saveFuncao.mutate(payload);
   };
 

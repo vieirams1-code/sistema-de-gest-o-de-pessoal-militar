@@ -201,7 +201,7 @@ export async function reconciliarCadeiaFerias({ feriasId, ferias: feriasInput = 
   }
 
   for (const invalido of invalidos) {
-    // eslint-disable-next-line no-await-in-loop
+
     await invalidarEvento(invalido.evento, invalido.motivo);
   }
 
@@ -218,7 +218,7 @@ export async function reconciliarCadeiaFerias({ feriasId, ferias: feriasInput = 
         Number(evento.dias_gozados ?? -1) !== payload.dias_gozados ||
         Number(evento.saldo_remanescente ?? -1) !== payload.saldo_remanescente;
       if (mudou) {
-        // eslint-disable-next-line no-await-in-loop
+
         await atualizarEscopado('RegistroLivro', evento.id, payload);
       }
     }

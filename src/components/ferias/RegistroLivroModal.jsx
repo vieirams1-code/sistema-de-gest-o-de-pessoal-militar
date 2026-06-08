@@ -558,23 +558,6 @@ export default function RegistroLivroModal({
     // Proteção operacional: este texto é re-renderizado de forma determinística a cada
     // alteração de dados do formulário (fluxo TEMPLATE_IMUTAVEL/RENDER_LAZY).
     setTextoPublicacao(aplicarTemplate(tmpl.template, vars));
-    if (import.meta.env.DEV) {
-      console.info('[RegistroLivroModal] template usado na geração de férias', {
-        template_id: tmpl?.id,
-        template_nome: tmpl?.nome,
-        template_tipo: tmpl?.tipo_registro,
-        template_modulo: tmpl?.modulo,
-        template_escopo: tmpl?.escopo || 'GLOBAL',
-        tipo_registro_evento: tipoRegistro,
-        tipo_registro_resolvido: tipoTemplateResolvido,
-        militar_id: vars?.militar_id || militarCompleto?.id || ferias?.militar_id || null,
-        militar_nome: militarCompleto?.nome_completo || ferias?.militar_nome || '',
-        militar_quadro: militarCompleto?.quadro || ferias?.militar_quadro || ferias?.quadro || '',
-        vars_quadro: vars?.quadro || '',
-        vars_quadro_nome: vars?.quadro_nome || '',
-        vars_posto_nome: vars?.posto_nome || '',
-      });
-    }
   }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar, militarCompleto]);
 
   const statusPublicacao = useMemo(

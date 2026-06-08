@@ -236,7 +236,6 @@ export default function ExtratoAtestadosMedicos() {
     if (selectedIds.size === 0) return;
     setIsExporting(true);
     
-    console.info('[EXPORT_EXCEL_CLICK]', { selectedIds: Array.from(selectedIds) });
     setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'exportar_excel', timestamp: new Date().toISOString(), selectedIds: Array.from(selectedIds) }, ultimoErroAcao: null }));
 
     try {
@@ -295,7 +294,6 @@ export default function ExtratoAtestadosMedicos() {
     }
     setIsGeneratingReport(true);
 
-    console.info('[PDF_DP_DINTEL_CLICK]', { selectedIds: Array.from(selectedIds) });
     setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'pdf_dp_dintel', timestamp: new Date().toISOString(), selectedIds: Array.from(selectedIds) }, ultimoErroAcao: null }));
 
     try {
@@ -434,7 +432,6 @@ export default function ExtratoAtestadosMedicos() {
       }
     }
 
-    console.info('DP_DINTEL_CLICK', { atestadoId, destino, enviado });
     const actionName = `${enviado ? 'MARCAR' : 'DESMARCAR'}_${destino}`;
     setDiagnosticos((prev) => ({ 
       ...prev, 
@@ -460,7 +457,6 @@ export default function ExtratoAtestadosMedicos() {
         motivo,
       });
       
-      console.info('DP_DINTEL_RESPONSE', result);
       setDiagnosticos((prev) => ({
         ...prev,
         ultimaAcaoExecutada: {
@@ -472,7 +468,6 @@ export default function ExtratoAtestadosMedicos() {
       if (result?.encaminhamento) {
         atualizarEncaminhamentoNoCache(result.encaminhamento);
         await queryClient.invalidateQueries({ queryKey: ['extrato-atestados-medicos'] });
-        console.info('DP_DINTEL_REFETCH_DONE');
         toast.success(`${destino} ${enviado ? 'marcado como enviado' : 'desmarcado'} com sucesso.`);
       } else {
         throw new Error('Resposta sem encaminhamento atualizado.');
@@ -497,7 +492,6 @@ export default function ExtratoAtestadosMedicos() {
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
 
-    console.info('[ABRIR_ANEXO_CLICK]', { rowId });
     setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'abrir_anexo', timestamp: new Date().toISOString(), atestado_id: rowId }, ultimoErroAcao: null }));
 
     try {

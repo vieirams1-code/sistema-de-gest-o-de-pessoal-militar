@@ -55,10 +55,7 @@ import { canEditarOrdem, canExcluirDefinitivo, canRemoverDaTurma, canReverterIte
 import { getPostoOrigemEsperado, isPromocaoSubtenenteParaSegundoTenenteQAOBM } from '@/utils/promocao/elegibilidadePromocao';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
-const diagLog = (evento, dados = {}) => {
-  if (import.meta.env?.DEV) {
-    console.info(`${DIAG_PREFIX} ${evento}`, dados);
-  }
+const diagLog = (_evento, _dados = {}) => {
 };
 
 const CAMPOS_PROMOCAO = [
@@ -832,14 +829,6 @@ export default function DetalhePromocao() {
           itensPromocao: rascunhoTurma,
           historicoV2,
           militares: militaresQuery.data || [],
-        });
-        console.debug('[Promocao][Ordenacao]', {
-          promocaoId: promocao?.id || null,
-          dataPromocao: promocao?.data_promocao || null,
-          isHistorica: historica,
-          caminhoUsado: historica ? 'historico-v2' : 'previa-atual',
-          totalHistoricos: historicoV2.length,
-          totalBaseEncontrada: basePreview.encontrados || 0,
         });
       }
       if (historica) {

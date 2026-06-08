@@ -207,8 +207,7 @@ export default function CadastrarPunicao() {
       validarPunicaoDisciplinar(payloadNormalizado);
 
       try {
-        const diagnostico = await diagnosticarFluxoPunicaoRuntime();
-        console.info('[JD] diagnóstico de runtime', diagnostico);
+        await diagnosticarFluxoPunicaoRuntime();
       } catch (error) {
         console.warn('[JD] erro em etapa: diagnóstico de runtime', error);
       }
@@ -216,13 +215,11 @@ export default function CadastrarPunicao() {
       let punicaoSalva;
       if (punicaoId) {
         punicaoSalva = await entity.update(punicaoId, payloadNormalizado);
-        console.info('[JD] punicao criada', { punicao_id: punicaoId, modo: 'update' });
       } else {
         punicaoSalva = await entity.create({
           ...payloadNormalizado,
           created_date: new Date().toISOString(),
         });
-        console.info('[JD] punicao criada', { punicao_id: punicaoSalva?.id, modo: 'create' });
       }
 
       try {

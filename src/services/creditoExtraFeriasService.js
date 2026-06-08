@@ -66,7 +66,7 @@ export {
 export async function vincularCreditosAoGozo({ creditosSelecionados = [], gozoFeriasId }) {
   for (const credito of creditosSelecionados) {
     if (!credito?.id) continue;
-    // eslint-disable-next-line no-await-in-loop
+
     await atualizarEscopado('CreditoExtraFerias', credito.id, {
       status: STATUS_CREDITO_EXTRA_FERIAS.USADO,
       gozo_ferias_id: gozoFeriasId,
@@ -85,7 +85,7 @@ export async function liberarCreditosDoGozo({ gozoFeriasId, idsCreditos = null }
   for (const credito of creditos) {
     if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO) continue;
     if (idsPermitidos && !idsPermitidos.has(credito.id)) continue;
-    // eslint-disable-next-line no-await-in-loop
+
     await atualizarEscopado('CreditoExtraFerias', credito.id, {
       status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
       gozo_ferias_id: '',

@@ -443,14 +443,6 @@ export default function RegistrosMilitar() {
     const legado = registrosOrdenados.filter((item) => item.origem_registro === 'legado').length;
     const sistema = total - legado;
 
-    console.info('[RegistrosMilitar] Consulta por militar', {
-      militar_id: militarSelecionado.id,
-      militar_matricula: militarSelecionado.matricula,
-      militar_nome: militarSelecionado.nome_completo,
-      total,
-      legado,
-      sistema,
-    });
   }, [militarSelecionado, registrosOrdenados]);
 
   if (loadingUser || !isAccessResolved) {

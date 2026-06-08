@@ -8,15 +8,12 @@ function criarErroSemantico(message, extras = {}) {
 
 async function invocar(payload, { unwrapData = true } = {}) {
   try {
-    console.debug('[CUD_FUNCOES_TAGS_REQUEST]', payload);
     const response = await base44.functions.invoke('cudFuncoesTagsEscopado', payload);
-    console.debug('[CUD_FUNCOES_TAGS_RESPONSE]', response);
     const body = response?.data ?? response;
     if (body?.error) throw new Error(body.error);
     if (!unwrapData) return body;
     return body?.data || body;
   } catch (error) {
-    console.debug('[CUD_FUNCOES_TAGS_ERROR]', error);
     const status = error?.response?.status;
     const body = error?.response?.data;
     const backendMessage = body?.message || body?.error || body?.details || error?.message;

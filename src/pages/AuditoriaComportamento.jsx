@@ -150,14 +150,6 @@ export default function AuditoriaComportamento() {
 
         if (resp.criada) {
           criadas += 1;
-          // eslint-disable-next-line no-console
-          console.info('[AUDITORIA_MANUAL] pendência criada', {
-            militar_id: linha.militar_id,
-            militar_nome: linha.militar_nome,
-            comportamento_atual: linha.comportamento_atual,
-            comportamento_sugerido: linha.comportamento_calculado,
-            origem: ORIGEM_AUDITORIA,
-          });
         } else if (resp.motivo === 'duplicada') {
           duplicadas += 1;
         } else {
@@ -165,11 +157,6 @@ export default function AuditoriaComportamento() {
         }
       } catch (error) {
         falhas += 1;
-        // eslint-disable-next-line no-console
-        console.error('[AUDITORIA_MANUAL] falha ao criar pendência', {
-          militar_id: linha.militar_id,
-          erro: error?.message || error,
-        });
       }
     }));
 

@@ -40,7 +40,7 @@
  * ----------------------------------------------------------------------------
  */
 
-// eslint-disable-next-line no-unused-vars
+
 export default function useVerificacaoComportamentoDiaria({ incluirReabilitadas = false, enabled = true } = {}) {
   // No-op intencional. Ver bloco de documentação acima (Lote 1D-A).
   // Nenhuma chamada a entidades, nenhum useEffect, nenhuma criação de pendência.

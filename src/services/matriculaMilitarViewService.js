@@ -99,13 +99,7 @@ export async function carregarMilitaresComMatriculas(militares = []) {
     carregamentoMatriculasOk = totalSucessos > 0;
 
     if (import.meta.env.DEV && totalFalhas > 0) {
-      console.warn('[matriculaMilitarViewService] Falha parcial no fallback de matrícula por militar_id.', {
-        totalMilitares: militarIds.length,
-        sucessos: totalSucessos,
-        falhas: totalFalhas,
-        erroInOperator,
-        tamanhoLote,
-      });
+      console.warn('[matriculaMilitarViewService] Falha parcial no fallback de matrícula.');
     }
   }
 

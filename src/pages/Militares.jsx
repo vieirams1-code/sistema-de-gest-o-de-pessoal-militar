@@ -425,14 +425,8 @@ export default function Militares() {
       }
 
       const { militares: lista, meta } = await fetchScopedMilitares(payload);
-      if (debugFieldsEnabled && typeof window !== 'undefined') {
-        console.info('[ConsultaMilitar][debugFields] meta.debugFields:', meta?.debugFields || null);
-      }
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       const comLotacao = enriquecidos.map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) }));
-      if (debugFieldsEnabled && typeof window !== 'undefined') {
-        console.info('[ConsultaMilitar][debugFields] Object.keys(militaresAcumulados[0]):', Object.keys((comLotacao || [])[0] || {}));
-      }
 
       return {
         militares: comLotacao,

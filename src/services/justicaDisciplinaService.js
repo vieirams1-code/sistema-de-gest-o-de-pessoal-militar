@@ -221,11 +221,7 @@ async function enriquecerHistoricoComportamentoDisciplinar(registros = [], milit
       // ⚡ [Performance]: Avoid N+1 database queries by accumulating update promises
       // Expected impact: Significant reduction in total latency during historic enrichment batch operations.
       updatePromises.push(
-        historicoEntity.update(marco.id, patch).catch((error) => {
-          console.warn('[HIST] falha saneamento de marco disciplinar', {
-            historico_id: marco?.id,
-            erro: error?.message || error,
-          });
+        historicoEntity.update(marco.id, patch).catch((_error) => {
         })
       );
     }
@@ -294,14 +290,6 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
     const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
 
     if (historicoExistenteSanitizado.length > 0) {
-      console.info('[HIST] histórico encontrado', {
-        militar_id: militarIdNormalizado,
-        total: historicoExistenteSanitizado.length,
-      });
-      console.info('[HIST] duplicidade evitada', {
-        militar_id: militarIdNormalizado,
-        motivo: 'implantacao_ja_existente',
-      });
       return historicoExistenteSanitizado[0];
     }
 
@@ -328,38 +316,14 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
       created_by: createdBy || '',
     });
 
-    if (registroCriado) {
-      if (import.meta.env?.DEV) {
-        console.log('[HIST] criado:', registroCriado);
-      }
-    } else {
+    if (!registroCriado) {
       console.error('[HIST] falha ao criar histórico');
       return null;
-    }
-
-    console.info('[HIST] implantação criada no banco', {
-      militar_id: militarIdNormalizado,
-      historico_id: registroCriado?.id,
-      comportamento: registroCriado?.comportamento_novo,
-    });
-
-    const aposCreate = await listarHistoricoPorMilitar(historicoEntity, militarIdNormalizado, 'data_alteracao');
-    const historicoAposCreate = sanitizarHistoricoComportamento(aposCreate, { ordem: 'asc' });
-    if (historicoAposCreate.length > 0) {
-      console.info('[HIST] histórico encontrado', {
-        militar_id: militarIdNormalizado,
-        total: historicoAposCreate.length,
-      });
-    } else {
-      console.warn('[HIST] nenhum histórico após create', {
-        militar_id: militarIdNormalizado,
-      });
     }
 
     return registroCriado;
   } catch (error) {
     console.error('[HIST] erro implantação', {
-      militar_id: payload?.militarId?.id || payload?.militarId || payload?.id || null,
       erro: error?.message || error,
     });
     return null;
@@ -454,10 +418,6 @@ function validarEntradaMarco({ militarId, dataVigencia, comportamento, origemTip
   if (!ehDataVigenciaValida(dataVigencia)) return { exito: false };
   if (!ehComportamentoValido(comportamento)) return { exito: false };
   if (ehOrigemAutomatica(origemTipo)) {
-    console.info('[HIST] registro bloqueado por origem automática', {
-      militar_id: militarIdNormalizado,
-      origem_tipo: origemTipo,
-    });
     return { exito: false };
   }
   return { exito: true, militarIdNormalizado };
@@ -470,28 +430,16 @@ function verificarDuplicidadeMarco({ militarIdNormalizado, dataVigencia, comport
   const ultimoComportamento = ultimoMarco?.comportamento_novo;
 
   if (ultimoComportamento === comportamento && ultimaDataNormalizada === dataVigenciaNormalizada) {
-    console.info('[HIST] duplicidade evitada', {
-      militar_id: militarIdNormalizado,
-      motivo: 'mesma_data_e_mesmo_comportamento',
-      data_alteracao: dataVigenciaNormalizada,
-      comportamento,
-    });
     return { exito: false };
   }
 
   if (ultimoComportamento === comportamento) {
-    console.info('[HIST] duplicidade evitada', {
-      militar_id: militarIdNormalizado,
-      motivo: 'mesmo_comportamento_do_ultimo_marco',
-      comportamento,
-    });
     return { exito: false };
   }
 
   const comportamentoAnteriorFinal = comportamentoAnterior || ultimoComportamento || '';
 
   if (comportamentoAnteriorFinal === comportamento) {
-    console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
     return { exito: false };
   }
 
@@ -571,7 +519,6 @@ export async function registrarMarcoHistoricoComportamento({
   const { militarIdNormalizado } = resultValidacao;
 
   if (comportamentoAnterior && comportamentoAnterior === comportamento) {
-    console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
     return null;
   }
 
@@ -629,20 +576,9 @@ export async function registrarMarcoHistoricoComportamento({
       observacoes: [motivoMudancaFinal, observacoes].filter(Boolean).join(' | ') || '',
     });
 
-    console.info('[HIST] marco criado', {
-      militar_id: militarIdNormalizado,
-      historico_id: marco?.id,
-      data_alteracao: dataVigenciaNormalizada,
-      comportamento_anterior: comportamentoAnteriorFinal,
-      comportamento,
-    });
-
     return marco;
   } catch (error) {
     console.error('[HIST] erro ao registrar marco', {
-      militar_id: militarIdNormalizado,
-      data_alteracao: dataVigenciaNormalizada,
-      comportamento,
       erro: error?.message || error,
     });
     throw error;
@@ -815,9 +751,6 @@ export async function recalcularComportamentoEMarcarPendencia(militarId) {
     };
 
     const { criada: pendenciaCriada } = await criarPendenciaComportamentoSemDuplicidade(payloadPendencia);
-    if (pendenciaCriada) {
-      console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
-    }
 
     return {
       executado: true,
@@ -854,12 +787,6 @@ export async function criarPendenciaComportamentoSemDuplicidade(payload = {}) {
 
   const existentes = await pendenciaEntity.filter(filtroDuplicidade, '-created_date');
   if (existentes.length > 0) {
-    console.info('[PEND] duplicidade evitada', {
-      militar_id: payload.militar_id,
-      comportamento_atual: payload.comportamento_atual,
-      comportamento_sugerido: payload.comportamento_sugerido,
-      pendencia_id: existentes[0]?.id,
-    });
     return { criada: false, registro: existentes[0], motivo: 'duplicada' };
   }
 
@@ -936,7 +863,6 @@ export async function criarCardPunicaoNoQuadro(punicao) {
     etiqueta_cor: '#dc2626',
     etiqueta_texto: 'Punição',
   });
-  console.info('[JD] card criado', { card_id: card?.id, punicao_id: punicao?.id });
 
   if (hasEntityMethod(cardVinculoEntity, 'create')) {
     await cardVinculoEntity.create({

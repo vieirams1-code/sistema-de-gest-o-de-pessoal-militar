@@ -137,6 +137,6 @@ export function warnIfMissingRenderMetadata({ metadata, metadataJson, entity = '
 
   // Aviso discreto para detectar quando o provider ignora objeto JSON sem erro explícito.
   // Sem bloquear fluxo de produção e sem alterar backend.
-  // eslint-disable-next-line no-console
+
   console.warn(`[render_metadata] ausente após persistência em ${entity}. Verificar schema/provider.`);
 }
