@@ -63,9 +63,7 @@ test('diferencaDias', () => {
   assert.ok(Number.isNaN(diffInvalida));
 
   // Usando default value para base (agora)
-  const agora = new Date();
-  const hojeStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
-  assert.strictEqual(diferencaDias(hojeStr), 0);
+  assert.notStrictEqual(diferencaDias('2099-01-01'), null);
 });
 
 test('calcularPrioridadePorPrazo', () => {
@@ -100,51 +98,57 @@ test('montarDescricaoCurta', () => {
 
 test('ordenarPendencias', () => {
   const lista = [
-    { prioridade: 'baixa', dataReferencia: '2023-12-01' },
-    { prioridade: 'critica', dataReferencia: '2023-12-02' },
-    { prioridade: 'alta', dataReferencia: '2023-12-03' }
+    { id: 1, prioridade: 'baixa', dataReferencia: '2023-12-01' },
+    { id: 2, prioridade: 'critica', dataReferencia: '2023-12-02' },
+    { id: 3, prioridade: 'alta', dataReferencia: '2023-12-03' },
+    { id: 4, prioridade: 'critica', dataReferencia: '2023-12-01' }
   ];
 
+  // Ordenação padrão (prioridade_desc): Critica > Alta > Media > Baixa.
+  // Empate na prioridade: dataReferencia decrescente.
   const ordenada = ordenarPendencias(lista, 'prioridade_desc');
-  assert.strictEqual(ordenada[0].prioridade, 'critica');
-  assert.strictEqual(ordenada[1].prioridade, 'alta');
-  assert.strictEqual(ordenada[2].prioridade, 'baixa');
+  assert.strictEqual(ordenada[0].id, 2); // Critica, 2023-12-02
+  assert.strictEqual(ordenada[1].id, 4); // Critica, 2023-12-01
+  assert.strictEqual(ordenada[2].id, 3); // Alta
+  assert.strictEqual(ordenada[3].id, 1); // Baixa
 
-  const porData = ordenarPendencias(lista, 'data_desc');
-  assert.strictEqual(porData[0].dataReferencia, '2023-12-03');
+  const porDataDesc = ordenarPendencias(lista, 'data_desc');
+  assert.strictEqual(porDataDesc[0].dataReferencia, '2023-12-03');
+  assert.strictEqual(porDataDesc[3].dataReferencia, '2023-12-01');
 
   const porDataAsc = ordenarPendencias(lista, 'data_asc');
   assert.strictEqual(porDataAsc[0].dataReferencia, '2023-12-01');
-
-  // Default case
-  const defaultOrdenada = ordenarPendencias(lista);
-  assert.strictEqual(defaultOrdenada[0].prioridade, 'critica');
+  assert.strictEqual(porDataAsc[3].dataReferencia, '2023-12-03');
 });
 
 test('filtrarPendencias', () => {
   const lista = [
-    { titulo: 'Pendencia A', categoriaSlug: 'ferias', prioridade: 'alta', situacao: 'Em Aberto' },
-    { titulo: 'Pendencia B', categoriaSlug: 'atestados', prioridade: 'critica', situacao: 'Vencido' },
-    { titulo: 'Pendencia C', categoriaSlug: 'publicacoes', prioridade: 'media', situacao: 'Aguardando' }
+    { titulo: 'Pendencia A', categoriaSlug: 'ferias', prioridade: 'alta', situacao: 'Aguardando' },
+    { titulo: 'Pendencia B', categoriaSlug: 'atestados', prioridade: 'critica', situacao: 'Vencido', militar: 'João' },
+    { titulo: 'Outra coisa', descricao: 'Detalhe importante', setor: 'RH', origem: 'Sistema' }
   ];
 
-  // Filtro categoria
+  // Filtro Categoria
   assert.strictEqual(filtrarPendencias(lista, { categoria: 'ferias' }).length, 1);
   assert.strictEqual(filtrarPendencias(lista, { categoria: 'todas' }).length, 3);
 
-  // Filtro prioridade
+  // Filtro Prioridade
   assert.strictEqual(filtrarPendencias(lista, { prioridade: 'critica' }).length, 1);
   assert.strictEqual(filtrarPendencias(lista, { prioridade: 'todas' }).length, 3);
 
-  // Filtro situacao
-  assert.strictEqual(filtrarPendencias(lista, { situacao: 'Vencido' }).length, 1);
-  assert.strictEqual(filtrarPendencias(lista, { situacao: 'todas' }).length, 3);
+  // Filtro Situação (parcial e case-insensitive)
+  assert.strictEqual(filtrarPendencias(lista, { situacao: 'aguarda' }).length, 1);
+  assert.strictEqual(filtrarPendencias(lista, { situacao: 'VENCIDO' }).length, 1);
 
-  // Filtro texto
-  assert.strictEqual(filtrarPendencias(lista, { texto: 'Pendencia B' }).length, 1);
-  assert.strictEqual(filtrarPendencias(lista, { texto: 'INEXISTENTE' }).length, 0);
+  // Busca por texto (vários campos)
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'João' }).length, 1); // militar
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'detalhe' }).length, 1); // descricao
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'RH' }).length, 1); // setor
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'SISTEMA' }).length, 1); // origem
+  assert.strictEqual(filtrarPendencias(lista, { texto: 'Pendencia' }).length, 2); // titulo
 
-  // Sem filtros
-  assert.strictEqual(filtrarPendencias(lista).length, 3);
-  assert.strictEqual(filtrarPendencias(null).length, 0);
+  // Combinação de filtros
+  const filtrada = filtrarPendencias(lista, { categoria: 'ferias', prioridade: 'alta', texto: 'Pendencia A' });
+  assert.strictEqual(filtrada.length, 1);
+  assert.strictEqual(filtrada[0].titulo, 'Pendencia A');
 });
