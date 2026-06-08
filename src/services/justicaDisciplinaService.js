@@ -295,11 +295,9 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
 
     if (historicoExistenteSanitizado.length > 0) {
       console.info('[HIST] histórico encontrado', {
-        militar_id: militarIdNormalizado,
         total: historicoExistenteSanitizado.length,
       });
       console.info('[HIST] duplicidade evitada', {
-        militar_id: militarIdNormalizado,
         motivo: 'implantacao_ja_existente',
       });
       return historicoExistenteSanitizado[0];
@@ -328,17 +326,12 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
       created_by: createdBy || '',
     });
 
-    if (registroCriado) {
-      if (import.meta.env?.DEV) {
-        console.log('[HIST] criado:', registroCriado);
-      }
-    } else {
+    if (!registroCriado) {
       console.error('[HIST] falha ao criar histórico');
       return null;
     }
 
     console.info('[HIST] implantação criada no banco', {
-      militar_id: militarIdNormalizado,
       historico_id: registroCriado?.id,
       comportamento: registroCriado?.comportamento_novo,
     });
@@ -347,19 +340,15 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
     const historicoAposCreate = sanitizarHistoricoComportamento(aposCreate, { ordem: 'asc' });
     if (historicoAposCreate.length > 0) {
       console.info('[HIST] histórico encontrado', {
-        militar_id: militarIdNormalizado,
         total: historicoAposCreate.length,
       });
     } else {
-      console.warn('[HIST] nenhum histórico após create', {
-        militar_id: militarIdNormalizado,
-      });
+      console.warn('[HIST] nenhum histórico após create');
     }
 
     return registroCriado;
   } catch (error) {
     console.error('[HIST] erro implantação', {
-      militar_id: payload?.militarId?.id || payload?.militarId || payload?.id || null,
       erro: error?.message || error,
     });
     return null;
@@ -455,7 +444,6 @@ function validarEntradaMarco({ militarId, dataVigencia, comportamento, origemTip
   if (!ehComportamentoValido(comportamento)) return { exito: false };
   if (ehOrigemAutomatica(origemTipo)) {
     console.info('[HIST] registro bloqueado por origem automática', {
-      militar_id: militarIdNormalizado,
       origem_tipo: origemTipo,
     });
     return { exito: false };
@@ -471,7 +459,6 @@ function verificarDuplicidadeMarco({ militarIdNormalizado, dataVigencia, comport
 
   if (ultimoComportamento === comportamento && ultimaDataNormalizada === dataVigenciaNormalizada) {
     console.info('[HIST] duplicidade evitada', {
-      militar_id: militarIdNormalizado,
       motivo: 'mesma_data_e_mesmo_comportamento',
       data_alteracao: dataVigenciaNormalizada,
       comportamento,
@@ -481,7 +468,6 @@ function verificarDuplicidadeMarco({ militarIdNormalizado, dataVigencia, comport
 
   if (ultimoComportamento === comportamento) {
     console.info('[HIST] duplicidade evitada', {
-      militar_id: militarIdNormalizado,
       motivo: 'mesmo_comportamento_do_ultimo_marco',
       comportamento,
     });
@@ -491,7 +477,7 @@ function verificarDuplicidadeMarco({ militarIdNormalizado, dataVigencia, comport
   const comportamentoAnteriorFinal = comportamentoAnterior || ultimoComportamento || '';
 
   if (comportamentoAnteriorFinal === comportamento) {
-    console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
+    console.info('[HIST] sem mudança de comportamento', { comportamento });
     return { exito: false };
   }
 
@@ -571,7 +557,7 @@ export async function registrarMarcoHistoricoComportamento({
   const { militarIdNormalizado } = resultValidacao;
 
   if (comportamentoAnterior && comportamentoAnterior === comportamento) {
-    console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
+    console.info('[HIST] sem mudança de comportamento', { comportamento });
     return null;
   }
 
@@ -630,7 +616,6 @@ export async function registrarMarcoHistoricoComportamento({
     });
 
     console.info('[HIST] marco criado', {
-      militar_id: militarIdNormalizado,
       historico_id: marco?.id,
       data_alteracao: dataVigenciaNormalizada,
       comportamento_anterior: comportamentoAnteriorFinal,
@@ -640,7 +625,6 @@ export async function registrarMarcoHistoricoComportamento({
     return marco;
   } catch (error) {
     console.error('[HIST] erro ao registrar marco', {
-      militar_id: militarIdNormalizado,
       data_alteracao: dataVigenciaNormalizada,
       comportamento,
       erro: error?.message || error,
@@ -816,7 +800,7 @@ export async function recalcularComportamentoEMarcarPendencia(militarId) {
 
     const { criada: pendenciaCriada } = await criarPendenciaComportamentoSemDuplicidade(payloadPendencia);
     if (pendenciaCriada) {
-      console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
+      console.info('[JD] pendencia criada', { comportamento_sugerido: resultado.comportamento });
     }
 
     return {
@@ -855,7 +839,6 @@ export async function criarPendenciaComportamentoSemDuplicidade(payload = {}) {
   const existentes = await pendenciaEntity.filter(filtroDuplicidade, '-created_date');
   if (existentes.length > 0) {
     console.info('[PEND] duplicidade evitada', {
-      militar_id: payload.militar_id,
       comportamento_atual: payload.comportamento_atual,
       comportamento_sugerido: payload.comportamento_sugerido,
       pendencia_id: existentes[0]?.id,

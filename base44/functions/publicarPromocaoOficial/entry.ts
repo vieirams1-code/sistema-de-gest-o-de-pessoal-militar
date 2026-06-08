@@ -10,13 +10,13 @@ const dataSomente = (valor: unknown) => texto(valor).split('T')[0];
 const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ ?? new Set<string>();
 (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ = EXECUCOES_EM_ANDAMENTO;
 
-function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, militar_id = null, motivo = '' }: any) {
-  console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, militar_id, motivo });
+function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, motivo = '' }: any) {
+  console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, motivo });
 }
 
 function montarErro({ etapa, motivo, promocao_id = null, item_id = null, militar_id = null }: any) {
   const erro = { success: false, etapa, motivo, promocao_id, item_id, militar_id };
-  logDiagnosticoErro(erro);
+  logDiagnosticoErro({ etapa, promocao_id, item_id, motivo });
   return erro;
 }
 
@@ -95,9 +95,6 @@ Deno.serve(async (req) => {
     const parsedPayload = await parseBase44Payload(req);
     const payload = parsedPayload ?? input ?? {};
 
-    console.error('PAYLOAD_TIPO_BACKEND', typeof payload);
-    console.error('PAYLOAD_KEYS_BACKEND', Object.keys(payload || {}));
-
     const promocaoId =
       payload?.promocao_id ||
       payload?.promocaoId ||
@@ -110,20 +107,11 @@ Deno.serve(async (req) => {
     const itens = Array.isArray(payload?.itens) ? payload.itens : Array.isArray(payload?.data?.itens) ? payload.data.itens : [];
     const temAlteracoesPendentes = Boolean(payload?.temAlteracoesPendentes ?? payload?.data?.temAlteracoesPendentes);
 
-    console.error('PAYLOAD_NORMALIZADO_PUBLICAR_PROMOCAO', {
-      keys: Object.keys(payload || {}),
-      promocaoId,
-      hasPromocao: Boolean(payload?.promocao),
-      hasItens: Array.isArray(payload?.itens),
-    });
-
     console.error(
       'PROMOCAO_ITENS_RECEBIDOS',
       {
         promocao_id: promocaoId,
         quantidade: itens?.length,
-        ids: itens?.map((i: any) => i?.id),
-        militar_ids: itens?.map((i: any) => i?.militar_id),
         status: itens?.map((i: any) => i?.status),
       }
     );
@@ -161,7 +149,7 @@ Deno.serve(async (req) => {
     for (const item of itens) {
       const itemId = texto(item?.id) || null;
       const militarId = texto(item?.militar_id) || null;
-      console.error('PROCESSANDO_ITEM', { item_id: itemId, militar_id: militarId });
+      console.error('PROCESSANDO_ITEM', { item_id: itemId });
       try {
         const militarEncontrado = await Militar.get(item.militar_id).catch(() => null);
         if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
@@ -211,12 +199,6 @@ Deno.serve(async (req) => {
     const statusFinal = publicados === 0 ? 'rascunho' : (publicados < itens.length ? 'publicada_parcial' : 'publicada');
     await Promocao.update(promocaoId, { status: statusFinal });
 
-    console.error('PUBLICACAO_RESULTADO', {
-      totalRecebido: itens.length,
-      totalElegivel: itens.length,
-      totalPublicado: publicados,
-      filtro: filtrosElegibilidade,
-    });
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
   } catch (error: any) {
