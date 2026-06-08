@@ -87,11 +87,17 @@ async function reindexarColunaComEspacos(colunaId, cardsDaColuna = []) {
       ordem: (index + 1) * ORDER_STEP,
     }));
 
-  for (const card of ordenados) {
-    await base44.entities.CardOperacional.update(card.id, {
-      coluna_id: colunaId,
-      ordem: card.ordem,
-    });
+  const payloads = ordenados.map((card) => ({
+    id: card.id,
+    coluna_id: colunaId,
+    ordem: card.ordem,
+  }));
+
+  const entity = base44.entities.CardOperacional;
+  if (entity.bulkUpdate) {
+    await entity.bulkUpdate(payloads);
+  } else {
+    await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
   }
 
   return ordenados;
@@ -416,15 +422,16 @@ export default function QuadroOperacionalPage() {
     queryClient.setQueryData(['colunas', quadro?.id], colunasComNovaOrdem);
 
     try {
-      const alteradas = colunasComNovaOrdem
-        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem);
+      const payloads = colunasComNovaOrdem
+        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem)
+        .map((coluna) => ({ id: coluna.id, ordem: coluna.ordem }));
 
-      if (alteradas.length) {
-        if (base44.entities.ColunaOperacional.bulkUpdate) {
-          const payloads = alteradas.map((coluna) => ({ id: coluna.id, ordem: coluna.ordem }));
-          await base44.entities.ColunaOperacional.bulkUpdate(payloads);
+      if (payloads.length) {
+        const entity = base44.entities.ColunaOperacional;
+        if (entity.bulkUpdate) {
+          await entity.bulkUpdate(payloads);
         } else {
-          await Promise.all(alteradas.map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem })));
+          await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
         }
       }
 
@@ -553,9 +560,13 @@ export default function QuadroOperacionalPage() {
       { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 11, fixa: false, origem_coluna: 'manual' },
     ];
 
-    await base44.entities.ColunaOperacional.bulkCreate(
-      colunasPadrao.map((coluna) => ({ ...coluna, quadro_id: q.id, ativa: true }))
-    );
+    const payloads = colunasPadrao.map((coluna) => ({ ...coluna, quadro_id: q.id, ativa: true }));
+    const entity = base44.entities.ColunaOperacional;
+    if (entity.bulkCreate) {
+      await entity.bulkCreate(payloads);
+    } else {
+      await Promise.all(payloads.map((p) => entity.create(p)));
+    }
 
     queryClient.invalidateQueries({ queryKey: ['quadros'] });
     queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
