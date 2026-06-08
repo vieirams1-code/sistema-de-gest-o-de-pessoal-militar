@@ -46,20 +46,21 @@ function obterTrechosComDestaque(texto, termosRelevantes = []) {
     return [{ texto, destaque: false }];
   }
 
-  const termosOrdenados = [...new Set(termosRelevantes)]
+  const baseTermos = [...new Set(termosRelevantes)]
     .filter((termo) => termo.length >= 4)
     .sort((a, b) => b.length - a.length)
-    .slice(0, 16)
-    .map((termo) => termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    .slice(0, 16);
 
-  if (!termosOrdenados.length) {
+  if (!baseTermos.length) {
     return [{ texto, destaque: false }];
   }
 
-  const regex = new RegExp(`(${termosOrdenados.join('|')})`, 'gi');
+  const termosSet = new Set(baseTermos.map((t) => t.toLowerCase()));
+  const regex = new RegExp(`(${baseTermos.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+
   return texto.split(regex).filter(Boolean).map((parte) => ({
     texto: parte,
-    destaque: termosOrdenados.some((termo) => new RegExp(`^${termo}$`, 'i').test(parte)),
+    destaque: termosSet.has(parte.toLowerCase()),
   }));
 }
 
@@ -609,8 +610,17 @@ export default function ConciliacaoBoletim() {
       .map(([nota]) => nota);
   }, [ocorrenciasNotasPendentes]);
 
-  const mapaNotasById = useMemo(() => new Map(notasEncontradas.map((n) => [n.id, n])), [notasEncontradas]);
-  const mapaNotasByNumero = useMemo(() => new Map(notasEncontradas.map((n) => [n.nota_normalizada, n])), [notasEncontradas]);
+  const { mapaNotasById, mapaNotasByNumero } = useMemo(() => {
+    const byId = new Map();
+    const byNumero = new Map();
+
+    notasEncontradas.forEach((n) => {
+      byId.set(n.id, n);
+      byNumero.set(n.nota_normalizada, n);
+    });
+
+    return { mapaNotasById: byId, mapaNotasByNumero: byNumero };
+  }, [notasEncontradas]);
 
   const conciliacaoAutomatica = useMemo(() => {
     if (!conciliacaoIniciada || !pendentes.length || !mapaNotasByNumero.size) return {};
