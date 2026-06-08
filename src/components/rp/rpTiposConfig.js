@@ -9,6 +9,15 @@ import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 export const MODULO_LIVRO = 'Livro';
 export const MODULO_EX_OFFICIO = 'ExOfficio';
 
+export const DOEMS_SUBTIPOS = [
+  'Transferência',
+  'Promoção',
+  'Nomeação',
+  'Exoneração',
+  'Averbação',
+  'Outros',
+];
+
 // ─── Base de tipos ──────────────────────────────────────────────────────────
 export const RP_TIPOS_BASE = [
   // FÉRIAS
@@ -319,16 +328,6 @@ export const RP_TIPOS_BASE = [
     descricao: 'Publicação de texto livre sem template obrigatório.',
     palavrasChave: ['geral', 'livre', 'avulso'],
     destaque: false,
-  },
-  {
-    value: 'Publicação DOEMS',
-    label: 'Publicação DOEMS',
-    grupo: 'Administrativo',
-    modulo: MODULO_EX_OFFICIO,
-    sexo: null,
-    descricao: 'Registro interno de uma publicação externa já existente no Diário Oficial.',
-    palavrasChave: ['doems', 'diario oficial', 'externa'],
-    destaque: true,
   },
   {
     value: 'Registro de Publicação DOEMS',

@@ -48,7 +48,10 @@ export function temDadosCompletosBg(registro = {}) {
 }
 
 export function calcularStatusPublicacaoRegistro(registro = {}) {
-  if (temDadosCompletosBg(registro)) return STATUS_PUBLICACAO.PUBLICADO;
+  const tipo = String(registro.tipo_registro || registro.tipo || '').trim();
+  const isDOEMS = tipo === 'Registro de Publicação DOEMS' || tipo === 'Publicação DOEMS';
+
+  if (isDOEMS || temDadosCompletosBg(registro)) return STATUS_PUBLICACAO.PUBLICADO;
   if (temNotaParaBg(registro)) return STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO;
   return STATUS_PUBLICACAO.AGUARDANDO_NOTA;
 }
@@ -90,7 +93,10 @@ export function validarTransicaoPublicacao({
     return { valido: false, motivo: 'Status de destino inválido para o fluxo de publicações.' };
   }
 
-  if (destinoNormalizado === STATUS_PUBLICACAO.PUBLICADO && !temDadosCompletosBg(registroDestino)) {
+  const tipo = String(registroDestino.tipo_registro || registroDestino.tipo || '').trim();
+  const isDOEMS = tipo === 'Registro de Publicação DOEMS' || tipo === 'Publicação DOEMS';
+
+  if (destinoNormalizado === STATUS_PUBLICACAO.PUBLICADO && !isDOEMS && !temDadosCompletosBg(registroDestino)) {
     return { valido: false, motivo: 'Para marcar como Publicado, informe Número e Data do BG.' };
   }
 

@@ -159,9 +159,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           <div className="space-y-1">
             <h3 className="text-base font-semibold text-slate-900">{registro.militar_nome_institucional || registro.militar_nome || 'Sem militar'}</h3>
             <p className="text-sm text-slate-500">{registro.militar_nome_guerra || 'Sem nome de guerra'}</p>
-            <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tipoVisual.className}`}>
-              <TipoIcon className="h-3.5 w-3.5" />
-              <span>{tipoVisual.label}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tipoVisual.className}`}>
+                <TipoIcon className="h-3.5 w-3.5" />
+                <span>{tipoVisual.label}</span>
+              </div>
+              {isDOEMS && registro.subtipo_geral && (
+                <Badge variant="outline" className="text-[10px] font-medium border-slate-300 text-slate-600 bg-slate-100">
+                  {registro.subtipo_geral}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
