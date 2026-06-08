@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, BookOpenText, Search } from 'lucide-react';
+import { ArrowLeft, Save, BookOpenText, Search, Upload, Download, Trash2 } from 'lucide-react';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
 import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
@@ -229,6 +229,12 @@ export default function CadastrarRegistroRP() {
     data_bg: '',
     texto_publicacao: '',
     doems_edicao_numero: '',
+    doems_link: '',
+    doems_arquivo: '',
+    doems_arquivo_bucket: '',
+    doems_arquivo_path: '',
+    doems_arquivo_nome: '',
+    doems_arquivo_mime: '',
     observacoes: '',
     // Livro fields
     ferias_id: '',
@@ -292,6 +298,8 @@ export default function CadastrarRegistroRP() {
   const [selectedFerias, setSelectedFerias] = useState(null);
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(null);
   const [originalActEntries, setOriginalActEntries] = useState([]);
+  const [uploadingDoems, setUploadingDoems] = useState(false);
+  const fileInputRef = useRef(null);
   const [moduloOrigemEdicao, setModuloOrigemEdicao] = useState(null);
   const [textoEditadoManualmente, setTextoEditadoManualmente] = useState(false);
   const isSubmittingRef = useRef(false);
@@ -718,6 +726,9 @@ export default function CadastrarRegistroRP() {
 
     if (textoEditadoManualmente && formData.texto_publicacao) return;
 
+    // Se for Publicação DOEMS, não aplicar template (o texto é manual ou colado)
+    if (formData.tipo_registro === 'Publicação DOEMS') return;
+
     // Guard: para "Homologação de Atestado", aguardar a query do médico vinculado resolver
     // antes de gerar o texto, evitando que {{medico_crm}} fique como placeholder literal.
     if (
@@ -780,6 +791,51 @@ export default function CadastrarRegistroRP() {
     setSelectedTipo(tipo);
     setFormData(prev => ({ ...prev, tipo_registro: tipo.value }));
     setTipoSearch('');
+  };
+
+  const handleDoemsFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDoems(true);
+    try {
+      const uploadResponse = await base44.integrations.Core.UploadFile({ file });
+      const payload = uploadResponse && typeof uploadResponse === 'object' ? uploadResponse : {};
+      const fileUrl = String(payload.file_url || payload.url || payload.signedUrl || '').trim();
+
+      const bucket = String(payload.storage_bucket || payload.bucket || payload.bucket_name || '').trim();
+      const objectPath = String(payload.storage_object_path || payload.object_path || payload.path || '').trim();
+
+      setFormData(prev => ({
+        ...prev,
+        doems_arquivo: fileUrl,
+        doems_arquivo_bucket: bucket,
+        doems_arquivo_path: objectPath,
+        doems_arquivo_nome: file.name,
+        doems_arquivo_mime: file.type,
+      }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha no upload',
+        description: 'Não foi possível carregar o arquivo do DOEMS.',
+      });
+    } finally {
+      setUploadingDoems(false);
+    }
+  };
+
+  const handleRemoveDoemsFile = () => {
+    setFormData(prev => ({
+      ...prev,
+      doems_arquivo: '',
+      doems_arquivo_bucket: '',
+      doems_arquivo_path: '',
+      doems_arquivo_nome: '',
+      doems_arquivo_mime: '',
+    }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
 
@@ -1037,6 +1093,16 @@ export default function CadastrarRegistroRP() {
 
     if (diasPunicaoNormalizado === undefined) delete payload.dias_punicao;
     else payload.dias_punicao = diasPunicaoNormalizado;
+
+    // Se for DOEMS, garantir que campos de arquivo vazios não quebrem o backend (embora opcionais)
+    if (payload.tipo_registro === 'Publicação DOEMS' && !payload.doems_arquivo) {
+      delete payload.doems_arquivo;
+      delete payload.doems_arquivo_bucket;
+      delete payload.doems_arquivo_path;
+      delete payload.doems_arquivo_nome;
+      delete payload.doems_arquivo_mime;
+    }
+
     isSubmittingRef.current = true;
     saveMutation.mutate(payload);
   };
@@ -1161,7 +1227,7 @@ export default function CadastrarRegistroRP() {
                   <div className="flex flex-col gap-3 rounded-xl border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
-                      <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício / Externa (DOEMS)'}</p>
+                      <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Publicação'}</p>
                     </div>
                     {(!isEditing || permitirAjusteTipoLegadoPublicado) && (
                       <Button
@@ -1214,7 +1280,7 @@ export default function CadastrarRegistroRP() {
                                   <div className="flex items-start justify-between gap-3">
                                     <span className="text-sm font-semibold text-slate-800">{tipo.label}</span>
                                     <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 group-hover:bg-white">
-                                      {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício / DOEMS'}
+                                      {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Publicação'}
                                     </span>
                                   </div>
                                 </button>
@@ -1393,7 +1459,7 @@ export default function CadastrarRegistroRP() {
                     onChange={handleChange}
                     type="date"
                   />
-                  {moduloAtual === MODULO_EX_OFFICIO && (
+                  {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
                     <FormField
                       label="Edição/número do DOEMS (opcional)"
                       name="doems_edicao_numero"
@@ -1402,8 +1468,76 @@ export default function CadastrarRegistroRP() {
                       placeholder="Ex: DOEMS nº 11.234 ou Edição 11.234"
                     />
                   )}
+                  {formData.tipo_registro === 'Publicação DOEMS' && (
+                    <FormField
+                      label="Link do DOEMS (opcional)"
+                      name="doems_link"
+                      value={formData.doems_link}
+                      onChange={handleChange}
+                      placeholder="https://www.spdo.ms.gov.br/diarioms/..."
+                    />
+                  )}
                 </div>
-                {moduloAtual === MODULO_EX_OFFICIO && (
+
+                {formData.tipo_registro === 'Publicação DOEMS' && (
+                  <div className="mt-4 space-y-2">
+                    <Label className="text-sm font-medium text-slate-700">Anexo do DOEMS (opcional)</Label>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingDoems}
+                        >
+                          {uploadingDoems ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                          ) : (
+                            <Upload className="mr-2 h-4 w-4" />
+                          )}
+                          {formData.doems_arquivo ? 'Substituir arquivo' : 'Selecionar arquivo'}
+                        </Button>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleDoemsFileUpload}
+                          className="hidden"
+                          accept="application/pdf,image/*"
+                        />
+                        {formData.doems_arquivo && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={handleRemoveDoemsFile}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Remover
+                          </Button>
+                        )}
+                      </div>
+                      {formData.doems_arquivo && (
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>{formData.doems_arquivo_nome}</span>
+                          <a
+                            href={formData.doems_arquivo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 flex items-center text-blue-600 hover:underline"
+                          >
+                            <Download className="mr-1 h-3 w-3" />
+                            Visualizar
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
                   <p className="mt-2 text-xs text-slate-500">
                     Use este campo quando a Publicação Ex Officio for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
                   </p>
@@ -1435,7 +1569,8 @@ export default function CadastrarRegistroRP() {
                     }}
                     className="mt-1.5"
                     rows={4}
-                    placeholder="Texto gerado para o BG..."
+                    placeholder={formData.tipo_registro === 'Publicação DOEMS' ? "Cole aqui o texto conforme publicado no Diário Oficial..." : "Texto gerado para o BG..."}
+                    required={formData.tipo_registro === 'Publicação DOEMS'}
                   />
                 </div>
                 <div className="mt-4">
