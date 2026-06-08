@@ -416,12 +416,16 @@ export default function QuadroOperacionalPage() {
     queryClient.setQueryData(['colunas', quadro?.id], colunasComNovaOrdem);
 
     try {
-      const updates = colunasComNovaOrdem
-        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem)
-        .map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem }));
+      const alteradas = colunasComNovaOrdem
+        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem);
 
-      if (updates.length) {
-        await Promise.all(updates);
+      if (alteradas.length) {
+        if (base44.entities.ColunaOperacional.bulkUpdate) {
+          const payloads = alteradas.map((coluna) => ({ id: coluna.id, ordem: coluna.ordem }));
+          await base44.entities.ColunaOperacional.bulkUpdate(payloads);
+        } else {
+          await Promise.all(alteradas.map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem })));
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });

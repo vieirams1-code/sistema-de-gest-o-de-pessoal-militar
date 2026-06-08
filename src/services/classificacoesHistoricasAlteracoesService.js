@@ -69,13 +69,20 @@ export async function garantirClassificacoesHistoricasIniciais() {
     return { criados: 0, registros: existentes };
   }
 
-  const criados = await Promise.all(faltantes.map((item) => ENTITY().create({
+  const payloads = faltantes.map((item) => ({
     ...item,
     descricao: '',
     ativo: true,
     uso_migracao: true,
     legado: true,
-  })));
+  }));
+
+  let criados;
+  if (ENTITY().bulkCreate) {
+    criados = await ENTITY().bulkCreate(payloads);
+  } else {
+    criados = await Promise.all(payloads.map((p) => ENTITY().create(p)));
+  }
 
   return {
     criados: criados.length,
