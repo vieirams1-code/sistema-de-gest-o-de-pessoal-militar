@@ -221,10 +221,12 @@ async function executarCriacaoPublicacao({
     const registroCriado = await serviceDeps.criarEscopado('PublicacaoExOfficio', payloadPublicacao);
     return { exito: true, registroCriado };
   } catch (error) {
-    console.error('[RP_AUTO][create] erro ao criar publicação', {
-      erro: error?.message || String(error),
-      stack: error?.stack || '',
-    });
+    if (import.meta.env?.DEV) {
+      console.error('[RP_AUTO][create] erro ao criar publicação', {
+        erro: error?.message || String(error),
+        stack: error?.stack || '',
+      });
+    }
     return {
       exito: false,
       payload: {
@@ -250,18 +252,24 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
     comportamentoAnterior: normalizarTexto(marco?.comportamento_anterior),
     comportamentoNovo: normalizarTexto(marco?.comportamento_novo),
   };
-  console.info('[RP_AUTO][entrada] iniciar geração automática por histórico de comportamento', contextoLog);
+  if (import.meta.env?.DEV) {
+    console.info('[RP_AUTO][entrada] iniciar geração automática por histórico de comportamento', contextoLog);
+  }
 
   const elegibilidade = await validarElegibilidadeParaGeracao({ militar, marco });
   if (!elegibilidade.exito) {
-    console.info('[RP_AUTO][validacao] interrupção por elegibilidade', elegibilidade.payload.motivo);
+    if (import.meta.env?.DEV) {
+      console.info('[RP_AUTO][validacao] interrupção por elegibilidade', elegibilidade.payload.motivo);
+    }
     return elegibilidade.payload;
   }
 
   const { tipoTemplate } = elegibilidade;
   const templateResult = await resolverERenderizarTemplate({ tipoTemplate, militar, marco });
   if (!templateResult.exito) {
-    console.warn('[RP_AUTO][template] interrupção por template/renderização', templateResult.payload.motivo);
+    if (import.meta.env?.DEV) {
+      console.warn('[RP_AUTO][template] interrupção por template/renderização', templateResult.payload.motivo);
+    }
     return templateResult.payload;
   }
 
@@ -281,10 +289,12 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
   }
 
   const { registroCriado } = criacao;
-  console.info('[RP_AUTO][retorno] fluxo finalizado com publicação criada', {
-    status: 'criado',
-    publicacaoId: registroCriado?.id || '',
-  });
+  if (import.meta.env?.DEV) {
+    console.info('[RP_AUTO][retorno] fluxo finalizado com publicação criada', {
+      status: 'criado',
+      publicacaoId: registroCriado?.id || '',
+    });
+  }
 
   return {
     ok: true,
