@@ -36,6 +36,10 @@
       "type": "string",
       "format": "date"
     },
+    "doems_edicao_numero": {
+      "type": "string",
+      "description": "Edição ou número do DOEMS quando a Publicação Ex Officio representar uma publicação externa/DOEMS. Campo opcional."
+    },
     "texto_base": {
       "type": "string"
     },

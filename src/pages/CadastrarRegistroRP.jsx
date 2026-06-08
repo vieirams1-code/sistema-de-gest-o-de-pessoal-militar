@@ -222,6 +222,7 @@ export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = 
     tipo_atestado_texto: atestadoSelecionado?.acompanhado === true ? 'atestado de acompanhamento' : 'atestado médico',
     data_registro: formatDateBR(dataRegistro),
     data_publicacao: formatDateBR(dataRegistro),
+    doems_edicao_numero: formData.doems_edicao_numero || '',
     data_bg: formatDateBR(formData.data_bg),
     data_inicio: formatDateBR(formData.data_inicio),
     data_termino: formatDateBR(formData.data_termino),
@@ -299,6 +300,7 @@ export default function CadastrarRegistroRP() {
     numero_bg: '',
     data_bg: '',
     texto_publicacao: '',
+    doems_edicao_numero: '',
     observacoes: '',
     // Livro fields
     ferias_id: '',
@@ -872,7 +874,7 @@ export default function CadastrarRegistroRP() {
       };
       const metadataRender = buildTemplateRenderMetadata({
         template: templateAtivoSelecionado,
-        modulo: isLivro ? 'Livro' : 'Publicação Ex Officio',
+        modulo: isLivro ? 'Livro' : 'Publicação Ex Officio / Publicação Externa (DOEMS)',
         user,
         sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
       });
@@ -937,7 +939,7 @@ export default function CadastrarRegistroRP() {
         registro: { ...criado, origem_tipo: 'ex-officio' },
         evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
         usuario: user,
-        resumo: 'Criação de publicação no módulo Ex Officio.',
+        resumo: 'Criação de publicação no módulo Ex Officio / Publicação Externa (DOEMS).',
         estadoAnterior: null,
         estadoNovo: normalizarStatusPublicacao(criado.status_calculado || criado.status_publicacao || criado.status) || calcularStatusPublicacaoRegistro(criado),
         antes: null,
@@ -1227,7 +1229,7 @@ export default function CadastrarRegistroRP() {
                   <div className="flex flex-col gap-3 rounded-xl border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
-                      <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}</p>
+                      <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício / Externa (DOEMS)'}</p>
                     </div>
                     {(!isEditing || permitirAjusteTipoLegadoPublicado) && (
                       <Button
@@ -1280,7 +1282,7 @@ export default function CadastrarRegistroRP() {
                                   <div className="flex items-start justify-between gap-3">
                                     <span className="text-sm font-semibold text-slate-800">{tipo.label}</span>
                                     <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 group-hover:bg-white">
-                                      {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
+                                      {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício / DOEMS'}
                                     </span>
                                   </div>
                                 </button>
@@ -1398,7 +1400,7 @@ export default function CadastrarRegistroRP() {
                 <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Dados do Registro</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField
-                    label="Data do Registro"
+                    label={moduloAtual === MODULO_EX_OFFICIO ? 'Data da publicação' : 'Data do Registro'}
                     name="data_registro"
                     value={formData.data_registro}
                     onChange={handleChange}
@@ -1459,7 +1461,21 @@ export default function CadastrarRegistroRP() {
                     onChange={handleChange}
                     type="date"
                   />
+                  {moduloAtual === MODULO_EX_OFFICIO && (
+                    <FormField
+                      label="Edição/número do DOEMS (opcional)"
+                      name="doems_edicao_numero"
+                      value={formData.doems_edicao_numero}
+                      onChange={handleChange}
+                      placeholder="Ex: DOEMS nº 11.234 ou Edição 11.234"
+                    />
+                  )}
                 </div>
+                {moduloAtual === MODULO_EX_OFFICIO && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Use este campo quando a Publicação Ex Officio for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
+                  </p>
+                )}
                 <div className="mt-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>

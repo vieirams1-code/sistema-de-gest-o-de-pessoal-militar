@@ -49,7 +49,7 @@ const PUBLICACOES_TEMPLATE_GOVERNANCA = {
 const TIPOS_FERIAS = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'];
 const ABAS_ORIGEM = [
   { key: 'all', label: 'Todos' },
-  { key: 'ex-officio', label: 'Ex Officio' },
+  { key: 'ex-officio', label: 'Ex Officio / DOEMS' },
   { key: 'livro', label: 'Livro' },
   { key: 'atestado', label: 'Atestados' },
 ];
@@ -573,6 +573,7 @@ export default function Publicacoes() {
       containsTerm(r.militar_matriculas_busca, termo) ||
       containsTerm(r.numero_bg, termo) ||
       containsTerm(r.nota_para_bg, termo) ||
+      containsTerm(r.doems_edicao_numero, termo) ||
       containsTerm(r.tipo, termo) ||
       containsTerm(r.tipo_registro, termo) ||
       containsTerm(r.tipo_display, termo) ||
@@ -666,7 +667,7 @@ export default function Publicacoes() {
                   <BookOpenText className="h-3.5 w-3.5" /> Controle de Publicações
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide Livro, Ex Officio e Atestados no mesmo fluxo operacional.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide Livro, Ex Officio/Publicação Externa (DOEMS) e Atestados no mesmo fluxo operacional.</p>
                 <p className="mt-1 text-[11px] text-slate-500">
                   {PUBLICACOES_TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.PERSISTIDO
                     ? 'Texto oficial persistido.'
@@ -712,7 +713,7 @@ export default function Publicacoes() {
           <div className="grid gap-4 lg:grid-cols-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Busca</label>
-              <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 rounded-xl border-slate-200 pl-9" /></div>
+              <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Buscar por militar, matrícula, tipo, DOEMS, nota ou número do BG" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 rounded-xl border-slate-200 pl-9" /></div>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>

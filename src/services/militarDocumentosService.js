@@ -33,7 +33,7 @@ export function getDocumentosUnificados(params = {}) {
       tipo: 'Publicação',
       titulo: item.tipo || 'Publicação Ex Officio',
       origem: 'Publicação Ex Officio',
-      referencia: item.conteudo || ''
+      referencia: [item.doems_edicao_numero ? `DOEMS: ${item.doems_edicao_numero}` : '', item.conteudo || item.texto_publicacao || ''].filter(Boolean).join(' — ')
     })),
     ...(registrosLivro || []).map(item => ({
       data: item.data_publicacao || item.created_date,
