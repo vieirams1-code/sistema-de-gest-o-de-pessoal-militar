@@ -67,14 +67,18 @@ async function getEntity(nome) {
   return client?.entities?.[nome] || null;
 }
 
-async function listarMilitares() {
+async function listarMilitares(criterios = null) {
   const entity = await getEntity('Militar');
+  if (!entity) return [];
+  if (criterios && entity.filter) return entity.filter(criterios);
   if (!entity?.list) return [];
   return entity.list();
 }
 
-async function listarMatriculas() {
+async function listarMatriculas(criterios = null) {
   const entity = await getEntity('MatriculaMilitar');
+  if (!entity) return [];
+  if (criterios && entity.filter) return entity.filter(criterios);
   if (!entity?.list) return [];
   return entity.list();
 }
@@ -218,8 +222,8 @@ export async function localizarDuplicidadeForte({ cpf, nomeCanonico, dataNascime
 
     const results = await Promise.all(filters);
     for (const list of results) {
-      const militar = (list || [])[0];
-      if (militar && String(militar.id) !== excludeId) return militar;
+      const found = (list || []).find((m) => m && String(m.id) !== excludeId);
+      if (found) return found;
     }
   }
 
@@ -238,11 +242,14 @@ export async function localizarDuplicidadeForte({ cpf, nomeCanonico, dataNascime
 }
 
 export async function validarMatriculaDisponivel(matricula, excludeMilitarId = '') {
+  const matriculaNorm = normalizarMatricula(matricula);
+  if (!matriculaNorm) throw new Error(ERROS.MATRICULA_OBRIGATORIA);
+
   const militar = await localizarMilitarPorMatricula(matricula, excludeMilitarId);
   if (militar) {
     throw new Error(ERROS.MATRICULA_DUPLICADA);
   }
-  return normalizarMatricula(matricula);
+  return matriculaNorm;
 }
 
 function prepararPayloadMilitar(payload = {}) {
@@ -488,20 +495,14 @@ async function buscarMatriculasMilitar(militarId, matriculaEntity) {
 }
 
 async function buscarVinculosMilitar(militarId) {
-  const client = await ensureClient();
-  const militarIdStr = String(militarId || '');
-
   return Promise.all(ENTIDADES_VINCULOS_MILITAR_ID.map(async (name) => {
-    const entity = client?.entities?.[name] || null;
+    const entity = await getEntity(name);
     if (!entity?.update) return { name, entity, items: [] };
-
     const items = entity.filter
-      ? await entity.filter({ militar_id: militarIdStr })
+      ? await entity.filter({ militar_id: militarId })
       : (await (entity.list?.() || Promise.resolve([]))) ?? [];
-
     const finalItems = (Array.isArray(items) ? items : [])
-      .filter((row) => String(row?.militar_id || '') === militarIdStr);
-
+      .filter((row) => String(row?.militar_id || '') === String(militarId));
     return { name, entity, items: finalItems };
   }));
 }
@@ -706,10 +707,8 @@ export async function executarMergeManualMilitares({
   const snapshotOrigem = { ...origem };
   const snapshotDestinoAntes = { ...destino };
 
-  await Promise.all([
-    reatribuirMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId, matriculaEntity),
-    reatribuirVinculos(vinculosOrigem, militarDestinoId),
-  ]);
+  await reatribuirMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId, matriculaEntity);
+  await reatribuirVinculos(vinculosOrigem, militarDestinoId);
   await consolidarMatriculaPrincipalDestino(militarDestinoId, destino, matriculaEntity, militarEntity);
 
   const log = await finalizarMergeAuditoria({
