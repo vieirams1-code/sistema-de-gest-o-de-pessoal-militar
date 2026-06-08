@@ -124,6 +124,34 @@ function extrairDadosPublicacaoReferencia({ formData = {}, publicacoesDisponivei
   };
 }
 
+const MESES_PT_BR = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+];
+
+function formatarDataExtenso(dataStr) {
+  if (!dataStr) return '';
+  const valor = String(dataStr).trim();
+  if (!valor) return '';
+  const isoMatch = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, ano, mes, dia] = isoMatch;
+    const mesIndex = Number(mes) - 1;
+    if (mesIndex >= 0 && mesIndex < 12) {
+      return `${dia} de ${MESES_PT_BR[mesIndex]} de ${ano}`;
+    }
+  }
+  const brMatch = valor.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const [, dia, mes, ano] = brMatch;
+    const mesIndex = Number(mes) - 1;
+    if (mesIndex >= 0 && mesIndex < 12) {
+      return `${dia} de ${MESES_PT_BR[mesIndex]} de ${ano}`;
+    }
+  }
+  return valor;
+}
+
 function parseDataBGReferencia(dataStr) {
   if (!dataStr) return null;
   const valor = String(dataStr).trim();
