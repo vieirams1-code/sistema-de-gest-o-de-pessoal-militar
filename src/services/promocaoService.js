@@ -1296,10 +1296,24 @@ export function simularImpactoCadeiaPromocoes({
     .sort((a, b) => texto(a?.data_promocao).localeCompare(texto(b?.data_promocao)));
 
   const resultado = [];
+  const cacheNomes = new Map();
+
+  const getNomeCached = (item) => {
+    const mId = String(item?.militar_id || '');
+    if (cacheNomes.has(mId)) return cacheNomes.get(mId);
+    const nome = nomeMilitar(militarPorId.get(mId) || item?.militar);
+    cacheNomes.set(mId, nome);
+    return nome;
+  };
+
   futuras.forEach((promocao) => {
-    const itens = (itensPorPromocao.get(String(promocao.id)) || [])
+    const itensBrutos = itensPorPromocao.get(String(promocao.id)) || [];
+    if (itensBrutos.length === 0) return;
+
+    const itens = itensBrutos
       .filter((item) => Number(item?.ordem) > 0)
       .sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0));
+
     if (itens.length === 0) return;
 
     const idx = itens.findIndex((item) => String(item?.militar_id || '') === militarIdNormalizado);
@@ -1311,22 +1325,43 @@ export function simularImpactoCadeiaPromocoes({
 
     const semMilitar = itens.filter((item) => String(item?.militar_id || '') !== militarIdNormalizado);
     const posicaoInsercao = semMilitar.findIndex((item) => Number(item?.ordem || 0) >= ordemSugeridaFutura);
+
     const baseReordenada = posicaoInsercao >= 0
       ? [...semMilitar.slice(0, posicaoInsercao), atual, ...semMilitar.slice(posicaoInsercao)]
       : [...semMilitar, atual];
 
-    const ordemAtualLista = itens.map((item) => ({ militar_id: item.militar_id, nome: nomeMilitar(militarPorId.get(String(item.militar_id || '')) || item?.militar), ordem: Number(item.ordem) }));
-    const ordemSugeridaLista = baseReordenada.map((item, index) => ({ militar_id: item.militar_id, nome: nomeMilitar(militarPorId.get(String(item.militar_id || '')) || item?.militar), ordem: index + 1 }));
+    const ordemAtualLista = itens.map((item) => ({
+      militar_id: item.militar_id,
+      nome: getNomeCached(item),
+      ordem: Number(item.ordem),
+    }));
 
-    const ordemAtualMap = new Map(ordemAtualLista.map((at) => [String(at.militar_id || ''), at]));
+    const ordemSugeridaLista = baseReordenada.map((item, index) => ({
+      militar_id: item.militar_id,
+      nome: getNomeCached(item),
+      ordem: index + 1,
+    }));
 
-    const deslocados = ordemSugeridaLista
-      .map((novo) => {
-        const anterior = ordemAtualMap.get(String(novo.militar_id || ''));
-        if (!anterior || anterior.ordem === novo.ordem) return null;
-        return { militar_id: novo.militar_id, nome: novo.nome, ordemAtual: anterior.ordem, ordemSugerida: novo.ordem };
-      })
-      .filter(Boolean);
+    const ordemAtualMap = new Map();
+    ordemAtualLista.forEach((at) => {
+      ordemAtualMap.set(String(at.militar_id || ''), at.ordem);
+    });
+
+    const deslocados = [];
+    for (let i = 0; i < ordemSugeridaLista.length; i++) {
+      const novo = ordemSugeridaLista[i];
+      const mId = String(novo.militar_id || '');
+      const ordemAnterior = ordemAtualMap.get(mId);
+
+      if (ordemAnterior !== undefined && ordemAnterior !== novo.ordem) {
+        deslocados.push({
+          militar_id: novo.militar_id,
+          nome: novo.nome,
+          ordemAtual: ordemAnterior,
+          ordemSugerida: novo.ordem,
+        });
+      }
+    }
 
     resultado.push({
       promocao_id: promocao.id,

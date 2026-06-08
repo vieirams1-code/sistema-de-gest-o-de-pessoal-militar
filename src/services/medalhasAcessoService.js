@@ -53,12 +53,23 @@ export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarS
   if (isAdmin) return base44Client.entities.Militar.list('nome_completo');
 
   const scopeFilters = getMilitarScopeFilters();
-  if (!scopeFilters.length) return [];
+  if (!scopeFilters || !scopeFilters.length) return [];
 
-  const militarQueries = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
-  const mapa = new Map();
-  militarQueries.flat().forEach((militar) => mapa.set(militar.id, militar));
-  return Array.from(mapa.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || '')));
+  // Optimized: Use Promise.all but flatten more efficiently and use a Map for O(1) deduplication
+  const results = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
+  const uniqueMilitares = new Map();
+
+  for (let i = 0; i < results.length; i += 1) {
+    const batch = results[i];
+    if (Array.isArray(batch)) {
+      for (let j = 0; j < batch.length; j += 1) {
+        const m = batch[j];
+        if (m?.id) uniqueMilitares.set(m.id, m);
+      }
+    }
+  }
+
+  return Array.from(uniqueMilitares.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || ''), 'pt-BR'));
 }
 
 export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds = [] }) {

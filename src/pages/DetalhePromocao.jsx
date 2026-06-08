@@ -679,7 +679,13 @@ export default function DetalhePromocao() {
         id: registro.id,
         ...montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }),
       }));
-      await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+
+      if (base44.entities.PromocaoMilitar.bulkUpdate) {
+        await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+      } else {
+        await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+      }
+
       return alterados;
     },
     onSuccess: async (alterados = []) => {
@@ -853,7 +859,13 @@ export default function DetalhePromocao() {
         );
         if (!confirmou) return { cancelado: true };
         const payloads = resultado.ordenados.map((item) => ({ id: item.id, ordem: item.ordem }));
-        await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+
+        if (base44.entities.PromocaoMilitar.bulkUpdate) {
+          await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+        } else {
+          await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+        }
+
         return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
       }
 
@@ -889,7 +901,13 @@ export default function DetalhePromocao() {
       if (!confirmou) return { cancelado: true };
 
       const payloads = ordenados.map((item) => ({ id: item.id, ordem: item.ordem }));
-      await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+
+      if (base44.entities.PromocaoMilitar.bulkUpdate) {
+        await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
+      } else {
+        await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
+      }
+
       return { atualizados: ordenados.length, historica: false };
     },
     onSuccess: async (resultado) => {
