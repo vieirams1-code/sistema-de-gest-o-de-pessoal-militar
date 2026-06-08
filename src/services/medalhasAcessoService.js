@@ -76,8 +76,8 @@ export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds =
   if (isAdmin) return base44Client.entities.Medalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  // Optimized: Single query using bulk filter 'in' instead of N concurrent queries
-  const registros = await base44Client.entities.Medalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+  // Optimized: Single query using bulk filter '$in' instead of N concurrent queries
+  const registros = await base44Client.entities.Medalha.filter({ militar_id: { $in: militarIds } }, '-created_date');
   return (registros || []).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }
 
@@ -85,8 +85,8 @@ export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarI
   if (isAdmin) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
   if (!militarIds.length) return [];
 
-  // Optimized: Single query using bulk filter 'in' instead of N concurrent queries
-  const registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { in: militarIds } }, '-created_date');
+  // Optimized: Single query using bulk filter '$in' instead of N concurrent queries
+  const registros = await base44Client.entities.ImpedimentoMedalha.filter({ militar_id: { $in: militarIds } }, '-created_date');
   return (registros || []).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }
 

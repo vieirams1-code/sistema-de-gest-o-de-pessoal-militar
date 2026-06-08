@@ -18,7 +18,7 @@ test('listarMedalhasEscopo uses bulk filtering', async () => {
   const militarIds = ['m1', 'm2'];
   const result = await listarMedalhasEscopo({ base44Client, isAdmin: false, militarIds });
 
-  assert.deepEqual(capturedFilter, { militar_id: { in: militarIds } });
+  assert.deepEqual(capturedFilter, { militar_id: { $in: militarIds } });
   assert.equal(result.length, 1);
 });
 
@@ -38,7 +38,7 @@ test('listarImpedimentosEscopo uses bulk filtering', async () => {
   const militarIds = ['m1', 'm2'];
   const result = await listarImpedimentosEscopo({ base44Client, isAdmin: false, militarIds });
 
-  assert.deepEqual(capturedFilter, { militar_id: { in: militarIds } });
+  assert.deepEqual(capturedFilter, { militar_id: { $in: militarIds } });
   assert.equal(result.length, 1);
 });
 
