@@ -67,14 +67,16 @@ async function getEntity(nome) {
   return client?.entities?.[nome] || null;
 }
 
-async function listarMilitares() {
+async function listarMilitares(criterios = null) {
   const entity = await getEntity('Militar');
+  if (criterios && entity?.filter) return entity.filter(criterios);
   if (!entity?.list) return [];
   return entity.list();
 }
 
-async function listarMatriculas() {
+async function listarMatriculas(criterios = null) {
   const entity = await getEntity('MatriculaMilitar');
+  if (criterios && entity?.filter) return entity.filter(criterios);
   if (!entity?.list) return [];
   return entity.list();
 }
@@ -107,8 +109,8 @@ async function localizarMilitarPorMatricula(matricula, excludeMilitarId = '') {
   if (!matriculaNorm) return null;
 
   const [matriculas, militares] = await Promise.all([
-    listarMatriculas(),
-    listarMilitares(),
+    listarMatriculas({ matricula_normalizada: matriculaNorm }),
+    listarMilitares({ matricula: formatarMatriculaPadrao(matriculaNorm) }),
   ]);
 
   const mat = (matriculas || []).find((m) => (
@@ -207,8 +209,8 @@ export async function validarMatriculaDisponivel(matricula, excludeMilitarId = '
   if (!matriculaNorm) throw new Error(ERROS.MATRICULA_OBRIGATORIA);
 
   const [matriculas, militares] = await Promise.all([
-    listarMatriculas(),
-    listarMilitares(),
+    listarMatriculas({ matricula_normalizada: matriculaNorm }),
+    listarMilitares({ matricula: formatarMatriculaPadrao(matriculaNorm) }),
   ]);
 
   const duplicadaNovaTabela = (matriculas || []).find((m) => (
