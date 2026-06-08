@@ -1,42 +1,29 @@
-// React & Bibliotecas de terceiros
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, format as formatDate } from 'date-fns';
-import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react';
-
-// API & Hooks de Autenticação/Autorização
 import { base44 } from '@/api/base44Client';
-import { useCurrentUser } from '@/components/auth/useCurrentUser';
-import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
-import AccessDenied from '@/components/auth/AccessDenied';
-
-// Componentes UI
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-
-// Serviços e Utilitários
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react';
+import { addDays, format as formatDate } from 'date-fns';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { createPageUrl } from '@/utils';
-import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
-import { atualizarEscopado } from '@/services/cudEscopadoClient';
-import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
-import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
-import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
-import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
-import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/jisoObservacoesUtils';
 import {
   aplicarTemplate,
   buildTemplateVarsContrato,
 } from '@/components/utils/templateUtils.js';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
+import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
+import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/jisoObservacoesUtils';
 
 export default function EditarJISO() {
   // GOVERNANÇA TEMPLATE:
