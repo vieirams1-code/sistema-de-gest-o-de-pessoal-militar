@@ -481,7 +481,6 @@ async function buscarVinculosMilitar(militarId, entidadesPreCarregadas = {}) {
     const entity = entidadesPreCarregadas[name] || await getEntity(name);
     if (!entity?.update) return { name, entity, items: [] };
 
-    // Prefere filter se disponível para evitar carregar toda a tabela
     let items = [];
     if (entity.filter) {
       items = await entity.filter({ militar_id: militarId });
@@ -549,6 +548,19 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
   return Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
 }
 
+/**
+ * Reatribui vínculos de diversas entidades para o militar de destino.
+ *
+ * ESTRATÉGIA DE FILTRO E PAYLOAD:
+ * - Filtra registros pelo militar_id de origem.
+ * - Payload contém { id, militar_id: militarDestinoId }.
+ *
+ * ESTRATÉGIA DE PERFORMANCE E ROLLBACK:
+ * - Utiliza bulkUpdate se disponível para reduzir roundtrips.
+ * - Fallback para Promise.all(update) caso bulkUpdate não exista.
+ * - Em caso de falha em uma entidade, o erro é propagado, mas as reatribuições
+ *   já concluídas em outras entidades permanecem (não há transação global).
+ */
 async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
   const updates = vinculosOrigem.map((v) => {
     const payloads = (v.items || []).map((row) => ({ id: row.id, militar_id: militarDestinoId }));
@@ -668,12 +680,7 @@ async function finalizarMergeAuditoria({
   pendenciaEntity,
   mergeLogEntity,
 }) {
-  await Promise.all([
-    marcarMilitarOrigemComoMesclado(militarEntity, militarOrigemId, militarDestinoId),
-    atualizarPendenciaMerge(pendenciaEntity, pendenciaId, { militarDestinoId, militarOrigemId, executadoPor }),
-  ]);
-
-  return registrarLogAuditoriaMerge({
+  const logPromise = registrarLogAuditoriaMerge({
     mergeLogEntity,
     militarOrigemId,
     militarDestinoId,
@@ -682,6 +689,14 @@ async function finalizarMergeAuditoria({
     motivo,
     executadoPor,
   });
+
+  await Promise.all([
+    marcarMilitarOrigemComoMesclado(militarEntity, militarOrigemId, militarDestinoId),
+    atualizarPendenciaMerge(pendenciaEntity, pendenciaId, { militarDestinoId, militarOrigemId, executadoPor }),
+    logPromise,
+  ]);
+
+  return logPromise;
 }
 
 export async function executarMergeManualMilitares({
@@ -713,7 +728,6 @@ export async function executarMergeManualMilitares({
     reatribuirMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId, matriculaEntity),
     reatribuirVinculos(vinculosOrigem, militarDestinoId),
   ]);
-
   await consolidarMatriculaPrincipalDestino(militarDestinoId, destino, matriculaEntity, militarEntity);
 
   const log = await finalizarMergeAuditoria({
