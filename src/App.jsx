@@ -25,6 +25,7 @@ const adminOnlyPages = new Set([
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
   'Medicos',
+  'SubtiposDOEMS',
 ]);
 
 
@@ -48,6 +49,7 @@ const moduleGuardByPage = {
   GratificacoesFuncao: { actionKey: 'visualizar_gratificacoes_funcao', moduleName: 'Gratificação de Função' },
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   AntiguidadeConfigQuadros: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
+  SubtiposDOEMS: { moduleKey: 'rp', moduleName: 'Registro de Publicações' },
   AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadePrevia: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   RastreamentoPromocoes: { moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes', moduleName: 'Antiguidade' },
