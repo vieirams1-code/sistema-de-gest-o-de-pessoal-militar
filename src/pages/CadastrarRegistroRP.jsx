@@ -374,13 +374,24 @@ export default function CadastrarRegistroRP() {
   });
 
   const subtiposOptions = useMemo(() => {
-    if (!subtiposDoems || subtiposDoems.length === 0) return DOEMS_SUBTIPOS;
-    const fromDb = [...subtiposDoems]
-      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
-      .map(s => s.nome);
-    if (!fromDb.includes('Outros')) fromDb.push('Outros');
-    return fromDb;
-  }, [subtiposDoems]);
+    let options = [];
+    if (subtiposDoems && subtiposDoems.length > 0) {
+      options = [...subtiposDoems]
+        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
+        .map((s) => s.nome);
+    } else {
+      options = [...DOEMS_SUBTIPOS];
+    }
+
+    // Garantir que o valor atual (mesmo que inativo ou antigo) apareça nas opções
+    if (formData.subtipo_geral && !options.includes(formData.subtipo_geral)) {
+      options.push(formData.subtipo_geral);
+    }
+
+    if (!options.includes('Outros')) options.push('Outros');
+
+    return options;
+  }, [subtiposDoems, formData.subtipo_geral]);
 
   // Fetch templates ativos
   const {
@@ -1378,7 +1389,13 @@ export default function CadastrarRegistroRP() {
                   type="button"
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
                   disabled={!canAdvanceFromStep2}
-                  onClick={() => setStep(3)}
+                  onClick={() => {
+                    if (isRegistroPublicacaoDOEMS) {
+                      setStep(4);
+                    } else {
+                      setStep(3);
+                    }
+                  }}
                 >
                   Avançar
                 </Button>
@@ -1419,28 +1436,30 @@ export default function CadastrarRegistroRP() {
                 />
               )}
 
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Dados do Registro</h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label={moduloAtual === MODULO_EX_OFFICIO ? 'Data da publicação' : 'Data do Registro'}
-                    name="data_registro"
-                    value={formData.data_registro}
-                    onChange={handleChange}
-                    type="date"
-                    required
-                  />
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Status</Label>
-                    <div className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                      {statusCalculadoFormulario}
+              {!isRegistroPublicacaoDOEMS && (
+                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Dados do Registro</h2>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      label={moduloAtual === MODULO_EX_OFFICIO ? 'Data da publicação' : 'Data do Registro'}
+                      name="data_registro"
+                      value={formData.data_registro}
+                      onChange={handleChange}
+                      type="date"
+                      required
+                    />
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">Status</Label>
+                      <div className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                        {statusCalculadoFormulario}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        O status é calculado automaticamente pela máquina de estados (Nota/BG).
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      O status é calculado automaticamente pela máquina de estados (Nota/BG).
-                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setStep(2)}>
@@ -1461,10 +1480,15 @@ export default function CadastrarRegistroRP() {
           {step === 4 && (
             <>
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Finalização</h2>
+                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">
+                  {isRegistroPublicacaoDOEMS ? 'Dados da Publicação DOEMS' : 'Finalização'}
+                </h2>
 
                 {isRegistroPublicacaoDOEMS ? (
                   <div className="space-y-4">
+                    <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm text-blue-800 border border-blue-100">
+                      Esta publicação já ocorreu externamente no Diário Oficial. Preencha os dados abaixo para registro no histórico do militar.
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <FormField
                         label="Data da publicação"
@@ -1691,7 +1715,17 @@ export default function CadastrarRegistroRP() {
               )}
 
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => setStep(3)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (isRegistroPublicacaoDOEMS) {
+                      setStep(2);
+                    } else {
+                      setStep(3);
+                    }
+                  }}
+                >
                   Voltar
                 </Button>
                 <Button
