@@ -725,9 +725,10 @@ export default function RegistrosMilitar() {
             <ul className="space-y-3">
               {registrosOrdenados.map((registro) => {
                 const expanded = expandedRegistroId === registro.id;
+                const isDOEMS = registro.tipoRegistro === 'Registro de Publicação DOEMS';
                 const tipoVisual = getRegistroTipoVisual(registro.tipoRegistro, { isLegadoNaoClassificado: registro.isLegadoNaoClassificado });
                 const TipoIcon = tipoVisual.icon;
-                const origemLabel = registro.origemRegistro === 'legado' ? 'Legado' : 'Sistema';
+                const origemLabel = registro.origemRegistro === 'legado' ? 'Legado' : isDOEMS ? 'Publicação externa' : 'Sistema';
                 const statusBadgeClass = registro.publicado
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                   : 'border-blue-200 bg-blue-50 text-blue-700';
@@ -743,7 +744,7 @@ export default function RegistrosMilitar() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-slate-600">Data do registro</p>
+                        <p className="text-xs font-medium text-slate-600">Data do {isDOEMS ? 'DOEMS' : 'registro'}</p>
                         <p className="text-sm font-semibold text-slate-900">{formatarData(registro.dataEvento)}</p>
                       </div>
                     </div>
@@ -751,9 +752,16 @@ export default function RegistrosMilitar() {
                     <p className="mt-3 text-sm text-slate-700">{getResumoTexto(registro.descricao)}</p>
 
                     <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2 xl:grid-cols-4">
-                      <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Status:</strong> {registro.statusPublicacao}</p>
+                      {!isDOEMS && <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Status:</strong> {registro.statusPublicacao}</p>}
                       <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Origem:</strong> {origemLabel}</p>
-                      <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>BG:</strong> {registro.numero_bg || '-'}</p>
+                      {isDOEMS ? (
+                        <>
+                          <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>DOEMS:</strong> {registro.doems_edicao_numero || '-'}</p>
+                          <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Subtipo:</strong> {registro.subtipo_geral || '-'}</p>
+                        </>
+                      ) : (
+                        <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>BG:</strong> {registro.numero_bg || '-'}</p>
+                      )}
                       <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Matrícula:</strong> {registro.militar_matricula || registro.matricula_legado || '-'}</p>
                     </div>
 
@@ -761,9 +769,11 @@ export default function RegistrosMilitar() {
                       <Badge variant="outline" className={registro.origemRegistro === 'legado' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-100 text-slate-700'}>
                         {origemLabel}
                       </Badge>
-                      <Badge variant="outline" className={statusBadgeClass}>
-                        {registro.statusPublicacao}
-                      </Badge>
+                      {!isDOEMS && (
+                        <Badge variant="outline" className={statusBadgeClass}>
+                          {registro.statusPublicacao}
+                        </Badge>
+                      )}
                       {registro.classificacaoPendente && (
                         <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
                           Classificação pendente
@@ -827,16 +837,27 @@ export default function RegistrosMilitar() {
                     {expanded && (
                       <div className="mt-4 rounded-md border bg-slate-50 p-3 space-y-3">
                         <p className="text-xs text-slate-600">
-                          <strong>Texto completo:</strong> {registro.texto_publicacao || registro.descricao || '-'}
+                          <strong>{isDOEMS ? 'Texto publicado no DOEMS' : 'Texto completo'}:</strong> {registro.texto_publicacao || registro.descricao || '-'}
                         </p>
 
                         <div className="grid gap-2 text-xs text-slate-600 md:grid-cols-2">
                           <p><strong>Militar vinculado:</strong> {registro.militarNome}</p>
                           <p><strong>Matrícula:</strong> {registro.militar_matricula || registro.matricula_legado || '-'}</p>
-                          <p><strong>Tipo BG legado:</strong> {registro.tipoBgLegado || '-'}</p>
-                          <p><strong>Matéria legado:</strong> {registro.materiaLegado || '-'}</p>
+                          {!isDOEMS && (
+                            <>
+                              <p><strong>Tipo BG legado:</strong> {registro.tipoBgLegado || '-'}</p>
+                              <p><strong>Matéria legado:</strong> {registro.materiaLegado || '-'}</p>
+                            </>
+                          )}
                           <p><strong>Origem da fonte:</strong> {registro.origem_fonte}</p>
-                          <p><strong>BG:</strong> {registro.numero_bg || '-'}</p>
+                          {isDOEMS ? (
+                            <>
+                              <p><strong>Edição DOEMS:</strong> {registro.doems_edicao_numero || '-'}</p>
+                              <p><strong>Subtipo DOEMS:</strong> {registro.subtipo_geral || '-'}</p>
+                            </>
+                          ) : (
+                            <p><strong>BG:</strong> {registro.numero_bg || '-'}</p>
+                          )}
                         </div>
 
                         {canEditarRegistros && (

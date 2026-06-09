@@ -58,15 +58,25 @@ export async function getMilitarTimeline(militarId) {
       descricao: item.conteudo || item.descricao || '',
       origem: 'RegistroLivro'
     })),
-    ...(publicacoesExOfficio || []).map(item => ({
-      id: item.id,
-      data: item.data_publicacao || item.created_date,
-      tipo: 'Publicação',
-      categoria: 'Registro',
-      titulo: item.tipo || 'Publicação Ex Officio',
-      descricao: [item.doems_edicao_numero ? `DOEMS: ${item.doems_edicao_numero}` : '', item.conteudo || item.texto_publicacao || ''].filter(Boolean).join(' — '),
-      origem: 'PublicacaoExOfficio'
-    })),
+    ...(publicacoesExOfficio || []).map(item => {
+      const isDOEMS = item.tipo === 'Registro de Publicação DOEMS';
+      return {
+        id: item.id,
+        data: item.data_publicacao || item.created_date,
+        tipo: 'Publicação',
+        categoria: 'Registro',
+        titulo: isDOEMS
+          ? `Registro de Publicação DOEMS${item.subtipo_geral ? ` (${item.subtipo_geral})` : ''}`
+          : item.tipo || 'Publicação Ex Officio',
+        descricao: [
+          item.doems_edicao_numero ? `DOEMS: ${item.doems_edicao_numero}` : '',
+          item.conteudo || item.texto_publicacao || '',
+        ]
+          .filter(Boolean)
+          .join(' — '),
+        origem: isDOEMS ? 'Publicação externa' : 'PublicacaoExOfficio',
+      };
+    }),
     ...(ferias || []).map(item => ({
       id: item.id,
       data: item.data_inicio,

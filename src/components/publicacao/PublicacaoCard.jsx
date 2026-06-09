@@ -184,20 +184,22 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border bg-slate-50 p-3">
-            <p className="text-xs font-semibold text-slate-500">Nota para BG</p>
-            <p className="text-sm text-slate-800 whitespace-pre-wrap">{registro.nota_para_bg || '—'}</p>
+        {!isDOEMS && (
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-500">Nota para BG</p>
+              <p className="text-sm text-slate-800 whitespace-pre-wrap">{registro.nota_para_bg || '—'}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-500">Número BG</p>
+              <p className="text-sm text-slate-800">{registro.numero_bg || '—'}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-500">Data BG</p>
+              <p className="text-sm text-slate-800">{formatDate(registro.data_bg)}</p>
+            </div>
           </div>
-          <div className="rounded-lg border bg-slate-50 p-3">
-            <p className="text-xs font-semibold text-slate-500">Número BG</p>
-            <p className="text-sm text-slate-800">{registro.numero_bg || '—'}</p>
-          </div>
-          <div className="rounded-lg border bg-slate-50 p-3">
-            <p className="text-xs font-semibold text-slate-500">Data BG</p>
-            <p className="text-sm text-slate-800">{formatDate(registro.data_bg)}</p>
-          </div>
-        </div>
+        )}
 
         {registro.doems_edicao_numero && (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
@@ -296,7 +298,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         {showTextoPublicacao && (
           <div className="rounded-lg border bg-slate-50 p-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-slate-500">Texto para publicação</p>
+              <p className="text-xs font-semibold text-slate-500">
+                {isDOEMS ? 'Texto publicado no DOEMS' : 'Texto para publicação'}
+              </p>
               <Button
                 type="button"
                 variant="ghost"
