@@ -1,0 +1,1319 @@
+
+> base44-app@0.0.0 test:unit
+> node --test src/pages/extracaoEfetivo/__tests__/*.test.js src/components/publicacao/__tests__/*.test.js src/components/folha-alteracoes/*.test.js src/pages/consultaMilitar/*.test.js src/components/atestado/*.test.js src/services/documentosMilitares/*.test.js src/components/quadro/__tests__/*.test.js src/utils/efetivo/__tests__/*.test.js src/utils/central-pendencias/__tests__/*.test.js src/services/__tests__/migracaoAlteracoesLegadoSimplificadoEdicao.test.js
+
+TAP version 13
+# Subtest: campo de nome do dependente só deve aparecer quando acompanhado é estritamente true
+ok 1 - campo de nome do dependente só deve aparecer quando acompanhado é estritamente true
+  ---
+  duration_ms: 1.24339
+  type: 'test'
+  ...
+# Subtest: nome e parentesco do acompanhado persistem no atestado de acompanhamento
+ok 2 - nome e parentesco do acompanhado persistem no atestado de acompanhamento
+  ---
+  duration_ms: 0.21389
+  type: 'test'
+  ...
+# Subtest: nome e parentesco são limpos quando deixa de ser atestado de acompanhamento
+ok 3 - nome e parentesco são limpos quando deixa de ser atestado de acompanhamento
+  ---
+  duration_ms: 0.181428
+  type: 'test'
+  ...
+# Subtest: homologação usa CRM do médico cadastrado quando o atestado possui somente snapshot do nome
+ok 4 - homologação usa CRM do médico cadastrado quando o atestado possui somente snapshot do nome
+  ---
+  duration_ms: 1.707253
+  type: 'test'
+  ...
+# Subtest: atestado comum mantém a chave atual de template de homologação
+ok 5 - atestado comum mantém a chave atual de template de homologação
+  ---
+  duration_ms: 0.272846
+  type: 'test'
+  ...
+# Subtest: atestado de acompanhamento usa chave específica e renderiza variáveis seguras sem placeholders residuais
+ok 6 - atestado de acompanhamento usa chave específica e renderiza variáveis seguras sem placeholders residuais
+  ---
+  duration_ms: 0.536727
+  type: 'test'
+  ...
+# Subtest: medicoUtils
+    # Subtest: normaliza espaços e caixa do CRM
+    ok 1 - normaliza espaços e caixa do CRM
+      ---
+      duration_ms: 1.185772
+      type: 'test'
+      ...
+    # Subtest: compara CRM ignorando pontuação para evitar duplicidade simples
+    ok 2 - compara CRM ignorando pontuação para evitar duplicidade simples
+      ---
+      duration_ms: 0.269138
+      type: 'test'
+      ...
+    # Subtest: monta rótulo com snapshot ou legado de médico
+    ok 3 - monta rótulo com snapshot ou legado de médico
+      ---
+      duration_ms: 1.274935
+      type: 'test'
+      ...
+    # Subtest: normaliza o formulário e impede nome ou CRM vazio
+    ok 4 - normaliza o formulário e impede nome ou CRM vazio
+      ---
+      duration_ms: 1.075476
+      type: 'test'
+      ...
+    # Subtest: localiza CRM duplicado e permite ignorar o registro editado
+    ok 5 - localiza CRM duplicado e permite ignorar o registro editado
+      ---
+      duration_ms: 0.359652
+      type: 'test'
+      ...
+    # Subtest: pesquisa médico por nome ou CRM
+    ok 6 - pesquisa médico por nome ou CRM
+      ---
+      duration_ms: 0.257983
+      type: 'test'
+      ...
+    1..6
+ok 7 - medicoUtils
+  ---
+  duration_ms: 6.084879
+  type: 'suite'
+  ...
+# Subtest: Folha de Alterações preserva múltiplos registros publicados na mesma data
+ok 8 - Folha de Alterações preserva múltiplos registros publicados na mesma data
+  ---
+  duration_ms: 13.91347
+  type: 'test'
+  ...
+# Subtest: Folha de Alterações deduplica somente o mesmo registro por origem e id
+ok 9 - Folha de Alterações deduplica somente o mesmo registro por origem e id
+  ---
+  duration_ms: 0.364104
+  type: 'test'
+  ...
+# Subtest: Folha de Alterações monta o fluxo completo com RegistroLivro e PublicacaoExOfficio do mesmo dia
+ok 10 - Folha de Alterações monta o fluxo completo com RegistroLivro e PublicacaoExOfficio do mesmo dia
+  ---
+  duration_ms: 2.524143
+  type: 'test'
+  ...
+# Subtest: abreviarPostoGraduacao - abreviações básicas
+ok 11 - abreviarPostoGraduacao - abreviações básicas
+  ---
+  duration_ms: 1.429281
+  type: 'test'
+  ...
+# Subtest: abreviarPostoGraduacao - abreviações compostas mapeadas
+ok 12 - abreviarPostoGraduacao - abreviações compostas mapeadas
+  ---
+  duration_ms: 0.289988
+  type: 'test'
+  ...
+# Subtest: abreviarPostoGraduacao - abreviações compostas dinâmicas (regex)
+ok 13 - abreviarPostoGraduacao - abreviações compostas dinâmicas (regex)
+  ---
+  duration_ms: 0.264241
+  type: 'test'
+  ...
+# Subtest: abreviarPostoGraduacao - normalização de entrada
+ok 14 - abreviarPostoGraduacao - normalização de entrada
+  ---
+  duration_ms: 0.218277
+  type: 'test'
+  ...
+# Subtest: abreviarPostoGraduacao - casos de borda e fallback
+ok 15 - abreviarPostoGraduacao - casos de borda e fallback
+  ---
+  duration_ms: 0.252282
+  type: 'test'
+  ...
+# Subtest: montarLinhaAssinatura - composição completa
+ok 16 - montarLinhaAssinatura - composição completa
+  ---
+  duration_ms: 0.215175
+  type: 'test'
+  ...
+# Subtest: montarLinhaAssinatura - sem quadro
+ok 17 - montarLinhaAssinatura - sem quadro
+  ---
+  duration_ms: 0.340867
+  type: 'test'
+  ...
+# Subtest: montarLinhaAssinatura - sem posto
+ok 18 - montarLinhaAssinatura - sem posto
+  ---
+  duration_ms: 0.161798
+  type: 'test'
+  ...
+# Subtest: montarLinhaAssinatura - apenas nome
+ok 19 - montarLinhaAssinatura - apenas nome
+  ---
+  duration_ms: 0.480273
+  type: 'test'
+  ...
+# Subtest: calcularFoiApostilada considera campos da original quando há vínculo ativo
+ok 20 - calcularFoiApostilada considera campos da original quando há vínculo ativo
+  ---
+  duration_ms: 1.201096
+  type: 'test'
+  ...
+# Subtest: calcularFoiApostilada desmarca quando apostila de referência foi tornada sem efeito
+ok 21 - calcularFoiApostilada desmarca quando apostila de referência foi tornada sem efeito
+  ---
+  duration_ms: 0.222431
+  type: 'test'
+  ...
+# Subtest: montarPayloadOriginalApostilada gera update esperado da publicação original
+ok 22 - montarPayloadOriginalApostilada gera update esperado da publicação original
+  ---
+  duration_ms: 0.83257
+  type: 'test'
+  ...
+# Subtest: calcularStatusPublicacaoRegistro - DOEMS deve retornar Publicado mesmo sem BG
+ok 23 - calcularStatusPublicacaoRegistro - DOEMS deve retornar Publicado mesmo sem BG
+  ---
+  duration_ms: 1.022688
+  type: 'test'
+  ...
+# Subtest: calcularStatusPublicacaoRegistro - Tipo comum sem nota nem BG deve retornar Aguardando Nota
+ok 24 - calcularStatusPublicacaoRegistro - Tipo comum sem nota nem BG deve retornar Aguardando Nota
+  ---
+  duration_ms: 0.248527
+  type: 'test'
+  ...
+# Subtest: calcularStatusPublicacaoRegistro - Tipo comum com nota deve retornar Aguardando Publicação
+ok 25 - calcularStatusPublicacaoRegistro - Tipo comum com nota deve retornar Aguardando Publicação
+  ---
+  duration_ms: 0.17911
+  type: 'test'
+  ...
+# Subtest: calcularStatusPublicacaoRegistro - Tipo comum com BG deve retornar Publicado
+ok 26 - calcularStatusPublicacaoRegistro - Tipo comum com BG deve retornar Publicado
+  ---
+  duration_ms: 0.215332
+  type: 'test'
+  ...
+# Subtest: Subtenente é tratado como praça
+ok 27 - Subtenente é tratado como praça
+  ---
+  duration_ms: 1.143588
+  type: 'test'
+  ...
+# Subtest: Subtenente aceita quadros de praça esperados
+ok 28 - Subtenente aceita quadros de praça esperados
+  ---
+  duration_ms: 1.104001
+  type: 'test'
+  ...
+# Subtest: ST + QBMP-1.b é compatível
+ok 29 - ST + QBMP-1.b é compatível
+  ---
+  duration_ms: 0.310469
+  type: 'test'
+  ...
+# Subtest: ST + QBMP-1.B é compatível após normalização
+ok 30 - ST + QBMP-1.B é compatível após normalização
+  ---
+  duration_ms: 1.396252
+  type: 'test'
+  ...
+# Subtest: ST + QPTBM é compatível
+ok 31 - ST + QPTBM é compatível
+  ---
+  duration_ms: 0.342356
+  type: 'test'
+  ...
+# Subtest: ST + QOBM é incompatível
+ok 32 - ST + QOBM é incompatível
+  ---
+  duration_ms: 0.164267
+  type: 'test'
+  ...
+# Subtest: obterStatusCanonicoPublicacao prioriza BG completo mesmo com status legado divergente
+ok 33 - obterStatusCanonicoPublicacao prioriza BG completo mesmo com status legado divergente
+  ---
+  duration_ms: 1.152812
+  type: 'test'
+  ...
+# Subtest: obterStatusCanonicoPublicacao respeita a precedência do estado canônico usada pelo painel principal
+ok 34 - obterStatusCanonicoPublicacao respeita a precedência do estado canônico usada pelo painel principal
+  ---
+  duration_ms: 0.250585
+  type: 'test'
+  ...
+# Subtest: obterStatusCanonicoPublicacao usa o cálculo por campos como fallback canônico
+ok 35 - obterStatusCanonicoPublicacao usa o cálculo por campos como fallback canônico
+  ---
+  duration_ms: 0.274815
+  type: 'test'
+  ...
+# Subtest: buildChecklistResumo handles empty array
+ok 36 - buildChecklistResumo handles empty array
+  ---
+  duration_ms: 1.112983
+  type: 'test'
+  ...
+# Subtest: buildChecklistResumo handles all completed items
+ok 37 - buildChecklistResumo handles all completed items
+  ---
+  duration_ms: 0.254669
+  type: 'test'
+  ...
+# Subtest: buildChecklistResumo handles none completed items
+ok 38 - buildChecklistResumo handles none completed items
+  ---
+  duration_ms: 0.198208
+  type: 'test'
+  ...
+# Subtest: buildChecklistResumo handles mixed completion status
+ok 39 - buildChecklistResumo handles mixed completion status
+  ---
+  duration_ms: 0.258237
+  type: 'test'
+  ...
+# Subtest: buildChecklistResumo handles items without concluido property
+ok 40 - buildChecklistResumo handles items without concluido property
+  ---
+  duration_ms: 1.593687
+  type: 'test'
+  ...
+# Subtest: buildChecklistResumo handles default parameter
+ok 41 - buildChecklistResumo handles default parameter
+  ---
+  duration_ms: 0.170891
+  type: 'test'
+  ...
+# Subtest: admin vê todas as colunas sensíveis (telefone, email, tipo_sanguineo)
+ok 42 - admin vê todas as colunas sensíveis (telefone, email, tipo_sanguineo)
+  ---
+  duration_ms: 1.329207
+  type: 'test'
+  ...
+# Subtest: usuário comum com acesso_dados_sensiveis vê colunas sensíveis
+ok 43 - usuário comum com acesso_dados_sensiveis vê colunas sensíveis
+  ---
+  duration_ms: 1.7667
+  type: 'test'
+  ...
+# Subtest: usuário comum sem permissão não vê colunas sensíveis
+ok 44 - usuário comum sem permissão não vê colunas sensíveis
+  ---
+  duration_ms: 0.380879
+  type: 'test'
+  ...
+# Subtest: colunas não sensíveis sempre aparecem para usuário comum
+ok 45 - colunas não sensíveis sempre aparecem para usuário comum
+  ---
+  duration_ms: 0.396056
+  type: 'test'
+  ...
+# Subtest: fallback visibleFor em colunas sensíveis segue decisão atual e libera para role compatível
+ok 46 - fallback visibleFor em colunas sensíveis segue decisão atual e libera para role compatível
+  ---
+  duration_ms: 1.218139
+  type: 'test'
+  ...
+# Subtest: lista retornada não contém colunas duplicadas
+ok 47 - lista retornada não contém colunas duplicadas
+  ---
+  duration_ms: 0.280622
+  type: 'test'
+  ...
+# Subtest: localStorage legado: coluna sensível salva é descartada quando usuário perde permissão
+ok 48 - localStorage legado: coluna sensível salva é descartada quando usuário perde permissão
+  ---
+  duration_ms: 0.328713
+  type: 'test'
+  ...
+# Subtest: resolve posto_graduacao com precedência
+ok 49 - resolve posto_graduacao com precedência
+  ---
+  duration_ms: 1.274448
+  type: 'test'
+  ...
+# Subtest: classificação institucional
+ok 50 - classificação institucional
+  ---
+  duration_ms: 0.801494
+  type: 'test'
+  ...
+# Subtest: ordenação por antiguidade com fallback estável
+ok 51 - ordenação por antiguidade com fallback estável
+  ---
+  duration_ms: 15.116927
+  type: 'test'
+  ...
+# Subtest: busca local de cartões filtra por unidade/sigla/setor/subsetor
+ok 52 - busca local de cartões filtra por unidade/sigla/setor/subsetor
+  ---
+  duration_ms: 0.299147
+  type: 'test'
+  ...
+# Subtest: árvore do gestor agrupa unidades irmãs sem repetir setor e subsetor
+ok 53 - árvore do gestor agrupa unidades irmãs sem repetir setor e subsetor
+  ---
+  duration_ms: 2.672053
+  type: 'test'
+  ...
+# Subtest: árvore do gestor usa raiz institucional consolidada para lotações planas sem setor ou subsetor
+ok 54 - árvore do gestor usa raiz institucional consolidada para lotações planas sem setor ou subsetor
+  ---
+  duration_ms: 0.483976
+  type: 'test'
+  ...
+# Subtest: árvore do gestor incorpora marcadores não informados à única raiz real disponível
+ok 55 - árvore do gestor incorpora marcadores não informados à única raiz real disponível
+  ---
+  duration_ms: 0.742919
+  type: 'test'
+  ...
+# Subtest: calcula resumo do efetivo por unidade separando oficiais, praças, homens e mulheres
+ok 56 - calcula resumo do efetivo por unidade separando oficiais, praças, homens e mulheres
+  ---
+  duration_ms: 0.850092
+  type: 'test'
+  ...
+# Subtest: não descarta militares ao montar a árvore mesmo com lotação incompleta
+ok 57 - não descarta militares ao montar a árvore mesmo com lotação incompleta
+  ---
+  duration_ms: 2.577181
+  type: 'test'
+  ...
+# Subtest: soma resumoEfetivo no setor e subsetor a partir das unidades subordinadas
+ok 58 - soma resumoEfetivo no setor e subsetor a partir das unidades subordinadas
+  ---
+  duration_ms: 0.933386
+  type: 'test'
+  ...
+# Subtest: normaliza tags dos militares e calcula resumoTags da unidade
+ok 59 - normaliza tags dos militares e calcula resumoTags da unidade
+  ---
+  duration_ms: 0.621548
+  type: 'test'
+  ...
+# Subtest: vincula militar por campos alternativos e aceita lotação embutida como objeto
+ok 60 - vincula militar por campos alternativos e aceita lotação embutida como objeto
+  ---
+  duration_ms: 0.404104
+  type: 'test'
+  ...
+# Subtest: normaliza tags em múltiplos formatos compatíveis com o efetivo
+ok 61 - normaliza tags em múltiplos formatos compatíveis com o efetivo
+  ---
+  duration_ms: 0.462575
+  type: 'test'
+  ...
+# Subtest: lista tags disponíveis e filtra militares por todas as tags selecionadas
+ok 62 - lista tags disponíveis e filtra militares por todas as tags selecionadas
+  ---
+  duration_ms: 0.524901
+  type: 'test'
+  ...
+# Subtest: resolve a tag real da lista do Efetivo pelo catálogo Tag e vínculo MilitarTag
+ok 63 - resolve a tag real da lista do Efetivo pelo catálogo Tag e vínculo MilitarTag
+  ---
+  duration_ms: 0.617719
+  type: 'test'
+  ...
+# Subtest: fetchAllScopedMilitaresPages continua após 100 registros até carregar todo o escopo
+ok 64 - fetchAllScopedMilitaresPages continua após 100 registros até carregar todo o escopo
+  ---
+  duration_ms: 2.430986
+  type: 'test'
+  ...
+# Subtest: fetchAllScopedMilitaresPages remove duplicados entre páginas sem interromper a paginação
+ok 65 - fetchAllScopedMilitaresPages remove duplicados entre páginas sem interromper a paginação
+  ---
+  duration_ms: 0.441011
+  type: 'test'
+  ...
+# Subtest: EXTRACAO_EFETIVO_FIELDS é uma allowlist íntegra e sem ids duplicados
+ok 66 - EXTRACAO_EFETIVO_FIELDS é uma allowlist íntegra e sem ids duplicados
+  ---
+  duration_ms: 3.070106
+  type: 'test'
+  ...
+# Subtest: EXTRACAO_EFETIVO_DEFAULT_COLUMNS contém apenas referências da allowlist em ordem estável
+ok 67 - EXTRACAO_EFETIVO_DEFAULT_COLUMNS contém apenas referências da allowlist em ordem estável
+  ---
+  duration_ms: 0.976245
+  type: 'test'
+  ...
+# Subtest: colunas padrão não incluem campos proibidos nem campos sensíveis
+ok 68 - colunas padrão não incluem campos proibidos nem campos sensíveis
+  ---
+  duration_ms: 1.127285
+  type: 'test'
+  ...
+# Subtest: colunas selecionáveis vêm apenas da allowlist positiva e respeitam metadados seguros
+ok 69 - colunas selecionáveis vêm apenas da allowlist positiva e respeitam metadados seguros
+  ---
+  duration_ms: 0.849333
+  type: 'test'
+  ...
+# Subtest: colunas de Férias são apenas visuais e bloqueadas para exportação
+ok 70 - colunas de Férias são apenas visuais e bloqueadas para exportação
+  ---
+  duration_ms: 0.285303
+  type: 'test'
+  ...
+# Subtest: colunas obrigatórias são metadado explícito e fazem parte das colunas padrão
+ok 71 - colunas obrigatórias são metadado explícito e fazem parte das colunas padrão
+  ---
+  duration_ms: 0.283347
+  type: 'test'
+  ...
+# Subtest: metadados de ordenação e filtro permanecem restritos à allowlist segura
+ok 72 - metadados de ordenação e filtro permanecem restritos à allowlist segura
+  ---
+  duration_ms: 0.612605
+  type: 'test'
+  ...
+# Subtest: EXTRACAO_EFETIVO_FORBIDDEN_FIELDS permanece documental e fora da montagem do catálogo
+ok 73 - EXTRACAO_EFETIVO_FORBIDDEN_FIELDS permanece documental e fora da montagem do catálogo
+  ---
+  duration_ms: 0.588031
+  type: 'test'
+  ...
+# Subtest: getValorCampoEfetivo retorna valores seguros, aplica fallbacks e normaliza quadro legado
+ok 74 - getValorCampoEfetivo retorna valores seguros, aplica fallbacks e normaliza quadro legado
+  ---
+  duration_ms: 1.017293
+  type: 'test'
+  ...
+# Subtest: renderAs é controlado e restrito a renderizadores conhecidos da allowlist
+ok 75 - renderAs é controlado e restrito a renderizadores conhecidos da allowlist
+  ---
+  duration_ms: 0.651047
+  type: 'test'
+  ...
+# Subtest: data-base antiga gera apenas períodos ainda úteis e um futuro
+ok 76 - data-base antiga gera apenas períodos ainda úteis e um futuro
+  ---
+  duration_ms: 4.104489
+  type: 'test'
+  ...
+# Subtest: data-base recente gera período atual e um futuro
+ok 77 - data-base recente gera período atual e um futuro
+  ---
+  duration_ms: 0.392448
+  type: 'test'
+  ...
+# Subtest: checagem de duplicidade considera período existente do mesmo militar por início ou referência
+ok 78 - checagem de duplicidade considera período existente do mesmo militar por início ou referência
+  ---
+  duration_ms: 0.395877
+  type: 'test'
+  ...
+# Subtest: rotina de geração automática não cria mais de um período futuro
+ok 79 - rotina de geração automática não cria mais de um período futuro
+  ---
+  duration_ms: 0.815411
+  type: 'test'
+  ...
+# Subtest: helper considera indisponíveis períodos arquivados/cancelados/inativos
+ok 80 - helper considera indisponíveis períodos arquivados/cancelados/inativos
+  ---
+  duration_ms: 1.157352
+  type: 'test'
+  ...
+# Subtest: generator centraliza a janela e a duplicidade no helper de geração automática
+ok 81 - generator centraliza a janela e a duplicidade no helper de geração automática
+  ---
+  duration_ms: 6.997134
+  type: 'test'
+  ...
+# Subtest: revalida obrigatórios e duplicidade dentro da própria análise
+ok 82 - revalida obrigatórios e duplicidade dentro da própria análise
+  ---
+  duration_ms: 3.895605
+  type: 'test'
+  ...
+# Subtest: nota importada deixa de ser duplicada quando usuário informa número livre
+ok 83 - nota importada deixa de ser duplicada quando usuário informa número livre
+  ---
+  duration_ms: 0.506114
+  type: 'test'
+  ...
+# Subtest: linha recusada sai dos bloqueios e restauração revalida o lote
+ok 84 - linha recusada sai dos bloqueios e restauração revalida o lote
+  ---
+  duration_ms: 0.72493
+  type: 'test'
+  ...
+# Subtest: calcula status de publicação sem usar AGUARDANDO_NOTA e sincroniza futura importação
+ok 85 - calcula status de publicação sem usar AGUARDANDO_NOTA e sincroniza futura importação
+  ---
+  duration_ms: 0.297091
+  type: 'test'
+  ...
+# Subtest: linha sem nota continua erro bloqueante e não recebe AGUARDANDO_NOTA
+ok 86 - linha sem nota continua erro bloqueante e não recebe AGUARDANDO_NOTA
+  ---
+  duration_ms: 0.29898
+  type: 'test'
+  ...
+# Subtest: payload usa classificação manual e marca classificação como concluída
+ok 87 - payload usa classificação manual e marca classificação como concluída
+  ---
+  duration_ms: 0.411728
+  type: 'test'
+  ...
+# Subtest: payload usa matéria legado como fallback sem bloquear e marca classificação pendente
+ok 88 - payload usa matéria legado como fallback sem bloquear e marca classificação pendente
+  ---
+  duration_ms: 0.406996
+  type: 'test'
+  ...
+# Subtest: payload preserva classificação original e snapshot da classificação histórica SGP
+ok 89 - payload preserva classificação original e snapshot da classificação histórica SGP
+  ---
+  duration_ms: 0.433311
+  type: 'test'
+  ...
+# Subtest: linha sem classificação e sem matéria ou tipo legado fica bloqueada com erro claro
+ok 90 - linha sem classificação e sem matéria ou tipo legado fica bloqueada com erro claro
+  ---
+  duration_ms: 0.865569
+  type: 'test'
+  ...
+# Subtest: payload persiste data_publicacao, data_bg, texto_publicacao, metadados legado e status publicado
+ok 91 - payload persiste data_publicacao, data_bg, texto_publicacao, metadados legado e status publicado
+  ---
+  duration_ms: 0.647823
+  type: 'test'
+  ...
+# Subtest: data_publicacao usa transformado.data_bg_br e data_bg como fallbacks
+ok 92 - data_publicacao usa transformado.data_bg_br e data_bg como fallbacks
+  ---
+  duration_ms: 0.350479
+  type: 'test'
+  ...
+# Subtest: linha sem data_publicacao válida fica bloqueada antes da importação
+not ok 93 - linha sem data_publicacao válida fica bloqueada antes da importação
+  ---
+  duration_ms: 1.294996
+  type: 'test'
+  location: '/app/src/services/__tests__/migracaoAlteracoesLegadoSimplificadoEdicao.test.js:189:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'pronta' !== 'erro'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'erro'
+  actual: 'pronta'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///app/src/services/__tests__/migracaoAlteracoesLegadoSimplificadoEdicao.test.js:193:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: resolver tipo usa tipo_legado e transformado.materia_legado após matéria legado
+ok 94 - resolver tipo usa tipo_legado e transformado.materia_legado após matéria legado
+  ---
+  duration_ms: 1.126133
+  type: 'test'
+  ...
+# Subtest: identifica campos dinâmicos válidos e ignora variáveis normais ou formatos inválidos
+ok 95 - identifica campos dinâmicos válidos e ignora variáveis normais ou formatos inválidos
+  ---
+  duration_ms: 2.267321
+  type: 'test'
+  ...
+# Subtest: aceita espaços internos e normaliza chaves para minúsculas e snake_case
+ok 96 - aceita espaços internos e normaliza chaves para minúsculas e snake_case
+  ---
+  duration_ms: 0.339068
+  type: 'test'
+  ...
+# Subtest: remove duplicidades normalizadas mantendo a ordem da primeira ocorrência
+ok 97 - remove duplicidades normalizadas mantendo a ordem da primeira ocorrência
+  ---
+  duration_ms: 0.225732
+  type: 'test'
+  ...
+# Subtest: substitui somente campos dinâmicos que possuem valores manuais informados
+ok 98 - substitui somente campos dinâmicos que possuem valores manuais informados
+  ---
+  duration_ms: 0.360022
+  type: 'test'
+  ...
+# Subtest: mantém placeholder dinâmico visível quando o valor manual não existe ou não é textual
+ok 99 - mantém placeholder dinâmico visível quando o valor manual não existe ou não é textual
+  ---
+  duration_ms: 1.664525
+  type: 'test'
+  ...
+# Subtest: CSS não usa position fixed na prévia/impressão
+ok 100 - CSS não usa position fixed na prévia/impressão
+  ---
+  duration_ms: 8.787523
+  type: 'test'
+  ...
+# Subtest: CSS contém regras para evitar fragmentação do cabeçalho, título e assinatura
+ok 101 - CSS contém regras para evitar fragmentação do cabeçalho, título e assinatura
+  ---
+  duration_ms: 1.692206
+  type: 'test'
+  ...
+# Subtest: DocumentoMilitarPreview separa variante visual e variante de impressão
+ok 102 - DocumentoMilitarPreview separa variante visual e variante de impressão
+  ---
+  duration_ms: 2.636418
+  type: 'test'
+  ...
+# Subtest: Modal possui prévia visual em tela e documento de impressão separados
+ok 103 - Modal possui prévia visual em tela e documento de impressão separados
+  ---
+  duration_ms: 1.281476
+  type: 'test'
+  ...
+# Subtest: Versão de impressão fica oculta em tela
+ok 104 - Versão de impressão fica oculta em tela
+  ---
+  duration_ms: 1.080925
+  type: 'test'
+  ...
+# Subtest: No print, a prévia visual é ocultada e só o documento dedicado fica visível
+ok 105 - No print, a prévia visual é ocultada e só o documento dedicado fica visível
+  ---
+  duration_ms: 1.377432
+  type: 'test'
+  ...
+# Subtest: Root compatível contém exatamente uma prévia de impressão
+ok 106 - Root compatível contém exatamente uma prévia de impressão
+  ---
+  duration_ms: 1.470853
+  type: 'test'
+  ...
+# Subtest: CSS de impressão não depende de modal/grid/flex no documento dedicado
+ok 107 - CSS de impressão não depende de modal/grid/flex no documento dedicado
+  ---
+  duration_ms: 1.249902
+  type: 'test'
+  ...
+# Subtest: Documento curto não tem regra estrutural que force quebra antes do corpo
+ok 108 - Documento curto não tem regra estrutural que force quebra antes do corpo
+  ---
+  duration_ms: 2.166884
+  type: 'test'
+  ...
+# Subtest: Impressão usa A4 com margem de página, sem largura A4 fixa no print
+ok 109 - Impressão usa A4 com margem de página, sem largura A4 fixa no print
+  ---
+  duration_ms: 1.576844
+  type: 'test'
+  ...
+# Subtest: Não usa position: fixed em nenhum lugar do CSS
+ok 110 - Não usa position: fixed em nenhum lugar do CSS
+  ---
+  duration_ms: 1.931724
+  type: 'test'
+  ...
+# Subtest: retorna defaults quando localStorage está vazio
+ok 111 - retorna defaults quando localStorage está vazio
+  ---
+  duration_ms: 2.076324
+  type: 'test'
+  ...
+# Subtest: mescla configuração parcial salva com defaults
+ok 112 - mescla configuração parcial salva com defaults
+  ---
+  duration_ms: 2.006246
+  type: 'test'
+  ...
+# Subtest: salva e recarrega configuração local normalizada
+ok 113 - salva e recarrega configuração local normalizada
+  ---
+  duration_ms: 0.350872
+  type: 'test'
+  ...
+# Subtest: defaults do papel timbrado incluem 5 linhas institucionais
+ok 114 - defaults do papel timbrado incluem 5 linhas institucionais
+  ---
+  duration_ms: 0.309231
+  type: 'test'
+  ...
+# Subtest: configurações antigas com apenas 3 linhas continuam compatíveis
+ok 115 - configurações antigas com apenas 3 linhas continuam compatíveis
+  ---
+  duration_ms: 0.387905
+  type: 'test'
+  ...
+# Subtest: imagemCabecalhoSrc vazia não quebra preview
+ok 116 - imagemCabecalhoSrc vazia não quebra preview
+  ---
+  duration_ms: 0.189431
+  type: 'test'
+  ...
+# Subtest: imagemCabecalhoSrc preenchida aparece nos dados do preview
+ok 117 - imagemCabecalhoSrc preenchida aparece nos dados do preview
+  ---
+  duration_ms: 0.235532
+  type: 'test'
+  ...
+# Subtest: mostrarRodape controla renderização lógica do rodapé
+ok 118 - mostrarRodape controla renderização lógica do rodapé
+  ---
+  duration_ms: 0.234661
+  type: 'test'
+  ...
+# Subtest: tituloDocumento usa valor do modal quando preenchido
+ok 119 - tituloDocumento usa valor do modal quando preenchido
+  ---
+  duration_ms: 0.507895
+  type: 'test'
+  ...
+# Subtest: tituloDocumento vazio usa tituloDocumentoPadrao
+ok 120 - tituloDocumento vazio usa tituloDocumentoPadrao
+  ---
+  duration_ms: 0.572827
+  type: 'test'
+  ...
+# Subtest: salvamento persiste somente campos textuais/booleanos conhecidos da configuração
+ok 121 - salvamento persiste somente campos textuais/booleanos conhecidos da configuração
+  ---
+  duration_ms: 0.262923
+  type: 'test'
+  ...
+# Subtest: dados do preview respeitam cabeçalho, assinatura, brasão disponível e cidade padrão
+ok 122 - dados do preview respeitam cabeçalho, assinatura, brasão disponível e cidade padrão
+  ---
+  duration_ms: 0.338539
+  type: 'test'
+  ...
+# Subtest: Documentos Militares renderiza versões separadas para tela e impressão
+ok 123 - Documentos Militares renderiza versões separadas para tela e impressão
+  ---
+  duration_ms: 1.19902
+  type: 'test'
+  ...
+# Subtest: versão exclusiva de impressão fica oculta em screen
+ok 124 - versão exclusiva de impressão fica oculta em screen
+  ---
+  duration_ms: 0.313164
+  type: 'test'
+  ...
+# Subtest: prévia visual não participa da impressão
+ok 125 - prévia visual não participa da impressão
+  ---
+  duration_ms: 0.457669
+  type: 'test'
+  ...
+# Subtest: no print apenas documento-militar-print-only-document fica visível
+ok 126 - no print apenas documento-militar-print-only-document fica visível
+  ---
+  duration_ms: 0.363849
+  type: 'test'
+  ...
+# Subtest: CSS segue padrão A4 da Folha de Alterações para impressão
+ok 127 - CSS segue padrão A4 da Folha de Alterações para impressão
+  ---
+  duration_ms: 0.264735
+  type: 'test'
+  ...
+# Subtest: print não usa dimensões A4 fixas nem quebras estruturais forçadas
+ok 128 - print não usa dimensões A4 fixas nem quebras estruturais forçadas
+  ---
+  duration_ms: 0.330106
+  type: 'test'
+  ...
+# Subtest: documento curto não possui regra estrutural que empurre corpo para página 2
+ok 129 - documento curto não possui regra estrutural que empurre corpo para página 2
+  ---
+  duration_ms: 1.477273
+  type: 'test'
+  ...
+# Subtest: botão de impressão continua acionando window.print sem janela isolada
+ok 130 - botão de impressão continua acionando window.print sem janela isolada
+  ---
+  duration_ms: 0.301346
+  type: 'test'
+  ...
+# Subtest: normaliza militar signatário para campos textuais editáveis
+ok 131 - normaliza militar signatário para campos textuais editáveis
+  ---
+  duration_ms: 2.156538
+  type: 'test'
+  ...
+# Subtest: monta assinatura institucional do signatário em até três linhas sem campos vazios
+ok 132 - monta assinatura institucional do signatário em até três linhas sem campos vazios
+  ---
+  duration_ms: 0.327748
+  type: 'test'
+  ...
+# Subtest: monta variáveis canônicas do signatário preservando aliases antigos da configuração
+ok 133 - monta variáveis canônicas do signatário preservando aliases antigos da configuração
+  ---
+  duration_ms: 0.385336
+  type: 'test'
+  ...
+# Subtest: expõe DocumentosMilitares como módulo disponível para templates
+ok 134 - expõe DocumentosMilitares como módulo disponível para templates
+  ---
+  duration_ms: 2.097716
+  type: 'test'
+  ...
+# Subtest: variáveis conhecidas de DocumentosMilitares não geram alerta
+ok 135 - variáveis conhecidas de DocumentosMilitares não geram alerta
+  ---
+  duration_ms: 1.068318
+  type: 'test'
+  ...
+# Subtest: variável desconhecida de DocumentosMilitares gera alerta controlado sem bloquear salvamento
+ok 136 - variável desconhecida de DocumentosMilitares gera alerta controlado sem bloquear salvamento
+  ---
+  duration_ms: 0.277852
+  type: 'test'
+  ...
+# Subtest: preview administrativo substitui conhecidas e mantém desconhecidas evidentes
+ok 137 - preview administrativo substitui conhecidas e mantém desconhecidas evidentes
+  ---
+  duration_ms: 2.270017
+  type: 'test'
+  ...
+# Subtest: lint de outros módulos preserva o comportamento anterior
+ok 138 - lint de outros módulos preserva o comportamento anterior
+  ---
+  duration_ms: 0.673321
+  type: 'test'
+  ...
+# Subtest: lint de DocumentosMilitares aceita campo dinâmico válido e alerta formatos inválidos
+ok 139 - lint de DocumentosMilitares aceita campo dinâmico válido e alerta formatos inválidos
+  ---
+  duration_ms: 0.250581
+  type: 'test'
+  ...
+# Subtest: preview administrativo substitui campos dinâmicos simulados e preserva os sem simulação
+ok 140 - preview administrativo substitui campos dinâmicos simulados e preserva os sem simulação
+  ---
+  duration_ms: 0.639472
+  type: 'test'
+  ...
+# Subtest: preview administrativo resolve variáveis canônicas do signatário e título
+ok 141 - preview administrativo resolve variáveis canônicas do signatário e título
+  ---
+  duration_ms: 0.447924
+  type: 'test'
+  ...
+# Subtest: expõe a categoria lógica canônica para templates de documentos militares
+ok 142 - expõe a categoria lógica canônica para templates de documentos militares
+  ---
+  duration_ms: 1.491938
+  type: 'test'
+  ...
+# Subtest: monta variáveis amplas formatando datas e calculando o tempo de serviço
+ok 143 - monta variáveis amplas formatando datas e calculando o tempo de serviço
+  ---
+  duration_ms: 2.444093
+  type: 'test'
+  ...
+# Subtest: resolve aliases defensivos para nascimento, unidade, situação e promoção atual
+ok 144 - resolve aliases defensivos para nascimento, unidade, situação e promoção atual
+  ---
+  duration_ms: 0.281608
+  type: 'test'
+  ...
+# Subtest: retorna strings vazias quando o militar ou seus dados não estão disponíveis
+ok 145 - retorna strings vazias quando o militar ou seus dados não estão disponíveis
+  ---
+  duration_ms: 0.303521
+  type: 'test'
+  ...
+# Subtest: formatação de data é defensiva para valores inválidos
+ok 146 - formatação de data é defensiva para valores inválidos
+  ---
+  duration_ms: 0.29624
+  type: 'test'
+  ...
+# Subtest: substitui data_nascimento quando o dado chega no alias camelCase
+ok 147 - substitui data_nascimento quando o dado chega no alias camelCase
+  ---
+  duration_ms: 0.246695
+  type: 'test'
+  ...
+# Subtest: substitui unidade quando o dado chega por lotação atual enriquecida
+ok 148 - substitui unidade quando o dado chega por lotação atual enriquecida
+  ---
+  duration_ms: 0.295665
+  type: 'test'
+  ...
+# Subtest: substitui data_promocao_atual quando o dado chega no alias camelCase
+ok 149 - substitui data_promocao_atual quando o dado chega no alias camelCase
+  ---
+  duration_ms: 0.242391
+  type: 'test'
+  ...
+# Subtest: substitui variáveis residuais quando aliases enriquecidos existem
+ok 150 - substitui variáveis residuais quando aliases enriquecidos existem
+  ---
+  duration_ms: 0.556645
+  type: 'test'
+  ...
+# Subtest: substitui data_nascimento pelos aliases aninhados em dados_pessoais
+ok 151 - substitui data_nascimento pelos aliases aninhados em dados_pessoais
+  ---
+  duration_ms: 0.654972
+  type: 'test'
+  ...
+# Subtest: substitui data_nascimento pelo alias aninhado em dadosPessoais camelCase
+ok 152 - substitui data_nascimento pelo alias aninhado em dadosPessoais camelCase
+  ---
+  duration_ms: 0.449866
+  type: 'test'
+  ...
+# Subtest: substitui data_promocao_atual pelo alias historico_promocao_atual
+ok 153 - substitui data_promocao_atual pelo alias historico_promocao_atual
+  ---
+  duration_ms: 0.245035
+  type: 'test'
+  ...
+# Subtest: substitui data_promocao_atual pelo alias historicoPromocaoAtual camelCase com dataPromocao
+ok 154 - substitui data_promocao_atual pelo alias historicoPromocaoAtual camelCase com dataPromocao
+  ---
+  duration_ms: 0.223723
+  type: 'test'
+  ...
+# Subtest: aliases reais de data_nascimento são resolvidos quando shape do Efetivo é diverso
+ok 155 - aliases reais de data_nascimento são resolvidos quando shape do Efetivo é diverso
+  ---
+  duration_ms: 0.652006
+  type: 'test'
+  ...
+# Subtest: aliases reais de data_promocao_atual são resolvidos quando shape do Efetivo é diverso
+ok 156 - aliases reais de data_promocao_atual são resolvidos quando shape do Efetivo é diverso
+  ---
+  duration_ms: 0.45787
+  type: 'test'
+  ...
+# Subtest: mantém data_nascimento e data_promocao_atual vazios quando dado realmente não existe
+ok 157 - mantém data_nascimento e data_promocao_atual vazios quando dado realmente não existe
+  ---
+  duration_ms: 0.213194
+  type: 'test'
+  ...
+# Subtest: helpers de documentos militares permanecem isolados de entidades remotas e Militar.list()
+ok 158 - helpers de documentos militares permanecem isolados de entidades remotas e Militar.list()
+  ---
+  duration_ms: 10.667833
+  type: 'test'
+  ...
+# Subtest: Efetivo adiciona ação de Gerar Documento com guarda de seleção única
+ok 159 - Efetivo adiciona ação de Gerar Documento com guarda de seleção única
+  ---
+  duration_ms: 2.268911
+  type: 'test'
+  ...
+# Subtest: VerMilitar não renderiza painéis de Tags e Funções Militar na ficha
+ok 160 - VerMilitar não renderiza painéis de Tags e Funções Militar na ficha
+  ---
+  duration_ms: 3.056991
+  type: 'test'
+  ...
+# Subtest: renderiza fluxo individual combinando template, militar e campos manuais
+ok 161 - renderiza fluxo individual combinando template, militar e campos manuais
+  ---
+  duration_ms: 3.681331
+  type: 'test'
+  ...
+# Subtest: mantém campo dinâmico sem valor visível na prévia
+ok 162 - mantém campo dinâmico sem valor visível na prévia
+  ---
+  duration_ms: 0.564363
+  type: 'test'
+  ...
+# Subtest: renderiza diretamente template sem campo dinâmico
+ok 163 - renderiza diretamente template sem campo dinâmico
+  ---
+  duration_ms: 1.130283
+  type: 'test'
+  ...
+# Subtest: mantém variável militar sem valor visível na prévia
+ok 164 - mantém variável militar sem valor visível na prévia
+  ---
+  duration_ms: 0.384635
+  type: 'test'
+  ...
+# Subtest: considera somente templates do módulo DocumentosMilitares
+ok 165 - considera somente templates do módulo DocumentosMilitares
+  ---
+  duration_ms: 0.460462
+  type: 'test'
+  ...
+# Subtest: preserva acentos, símbolos institucionais e quebras de linha do template e dos campos manuais
+ok 166 - preserva acentos, símbolos institucionais e quebras de linha do template e dos campos manuais
+  ---
+  duration_ms: 0.459484
+  type: 'test'
+  ...
+# Subtest: renderiza template grande sem truncar conteúdo equivalente a cinco páginas
+ok 167 - renderiza template grande sem truncar conteúdo equivalente a cinco páginas
+  ---
+  duration_ms: 0.992477
+  type: 'test'
+  ...
+# Subtest: renderização final substitui nascimento, unidade e promoção quando presentes
+ok 168 - renderização final substitui nascimento, unidade e promoção quando presentes
+  ---
+  duration_ms: 0.456182
+  type: 'test'
+  ...
+# Subtest: renderização final mantém placeholders quando os dados não existem
+ok 169 - renderização final mantém placeholders quando os dados não existem
+  ---
+  duration_ms: 0.785417
+  type: 'test'
+  ...
+# Subtest: renderização final normaliza template com linha gigante sem criar nova linha artificial
+ok 170 - renderização final normaliza template com linha gigante sem criar nova linha artificial
+  ---
+  duration_ms: 1.030518
+  type: 'test'
+  ...
+# Subtest: renderização final injeta título e assinatura canônica do signatário
+ok 171 - renderização final injeta título e assinatura canônica do signatário
+  ---
+  duration_ms: 0.659916
+  type: 'test'
+  ...
+# Subtest: normaliza quebras de linha excessivas sem criar páginas artificiais
+ok 172 - normaliza quebras de linha excessivas sem criar páginas artificiais
+  ---
+  duration_ms: 1.733714
+  type: 'test'
+  ...
+# Subtest: trata palavra gigante sem espaços com pontos de quebra invisíveis
+ok 173 - trata palavra gigante sem espaços com pontos de quebra invisíveis
+  ---
+  duration_ms: 0.342642
+  type: 'test'
+  ...
+# Subtest: mantém textos curtos sem inserir quebras invisíveis
+ok 174 - mantém textos curtos sem inserir quebras invisíveis
+  ---
+  duration_ms: 0.18376
+  type: 'test'
+  ...
+# Subtest: substitui placeholders aceitando espaços internos e ocorrências repetidas
+ok 175 - substitui placeholders aceitando espaços internos e ocorrências repetidas
+  ---
+  duration_ms: 1.269721
+  type: 'test'
+  ...
+# Subtest: substitui variáveis ausentes ou não textuais por string vazia
+ok 176 - substitui variáveis ausentes ou não textuais por string vazia
+  ---
+  duration_ms: 0.255338
+  type: 'test'
+  ...
+# Subtest: retorna texto vazio quando o template não é uma string
+ok 177 - retorna texto vazio quando o template não é uma string
+  ---
+  duration_ms: 0.16625
+  type: 'test'
+  ...
+# Subtest: pode manter placeholders desconhecidos evidentes para preview administrativo
+ok 178 - pode manter placeholders desconhecidos evidentes para preview administrativo
+  ---
+  duration_ms: 0.170194
+  type: 'test'
+  ...
+# Subtest: normalizarTexto
+ok 179 - normalizarTexto
+  ---
+  duration_ms: 1.226049
+  type: 'test'
+  ...
+# Subtest: formatarDataSegura
+ok 180 - formatarDataSegura
+  ---
+  duration_ms: 1.192879
+  type: 'test'
+  ...
+# Subtest: diferencaDias
+ok 181 - diferencaDias
+  ---
+  duration_ms: 0.480688
+  type: 'test'
+  ...
+# Subtest: calcularPrioridadePorPrazo
+ok 182 - calcularPrioridadePorPrazo
+  ---
+  duration_ms: 0.224056
+  type: 'test'
+  ...
+# Subtest: normalizarTipoCategoria
+ok 183 - normalizarTipoCategoria
+  ---
+  duration_ms: 0.265377
+  type: 'test'
+  ...
+# Subtest: montarDescricaoCurta
+ok 184 - montarDescricaoCurta
+  ---
+  duration_ms: 0.35123
+  type: 'test'
+  ...
+# Subtest: ordenarPendencias
+ok 185 - ordenarPendencias
+  ---
+  duration_ms: 0.340374
+  type: 'test'
+  ...
+# Subtest: filtrarPendencias
+ok 186 - filtrarPendencias
+  ---
+  duration_ms: 0.677246
+  type: 'test'
+  ...
+# Subtest: constants are exported correctly
+ok 187 - constants are exported correctly
+  ---
+  duration_ms: 2.681883
+  type: 'test'
+  ...
+# Subtest: obterSexoMilitar identifies genders correctly
+ok 188 - obterSexoMilitar identifies genders correctly
+  ---
+  duration_ms: 0.523405
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar identifies oficial correctly by canonical posts
+ok 189 - obterGrupoHierarquicoMilitar identifies oficial correctly by canonical posts
+  ---
+  duration_ms: 0.353257
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar identifies oficial by text contained in the name
+ok 190 - obterGrupoHierarquicoMilitar identifies oficial by text contained in the name
+  ---
+  duration_ms: 0.778568
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar identifies praca correctly
+ok 191 - obterGrupoHierarquicoMilitar identifies praca correctly
+  ---
+  duration_ms: 0.396418
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar treats Subtenente as praca even if it contains "tenente"
+ok 192 - obterGrupoHierarquicoMilitar treats Subtenente as praca even if it contains "tenente"
+  ---
+  duration_ms: 0.214972
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar follows priority of military fields
+ok 193 - obterGrupoHierarquicoMilitar follows priority of military fields
+  ---
+  duration_ms: 0.284922
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar normalizes the post text
+ok 194 - obterGrupoHierarquicoMilitar normalizes the post text
+  ---
+  duration_ms: 0.184583
+  type: 'test'
+  ...
+# Subtest: obterGrupoHierarquicoMilitar handles null or empty input
+ok 195 - obterGrupoHierarquicoMilitar handles null or empty input
+  ---
+  duration_ms: 0.542591
+  type: 'test'
+  ...
+# Subtest: calcularResumoEfetivo summarizes a list of military personnel
+ok 196 - calcularResumoEfetivo summarizes a list of military personnel
+  ---
+  duration_ms: 1.440481
+  type: 'test'
+  ...
+# Subtest: calcularResumoEfetivo handles empty or null input
+ok 197 - calcularResumoEfetivo handles empty or null input
+  ---
+  duration_ms: 0.274223
+  type: 'test'
+  ...
+# Subtest: calcularResumoEfetivo handles mixed property names in list
+ok 198 - calcularResumoEfetivo handles mixed property names in list
+  ---
+  duration_ms: 0.26946
+  type: 'test'
+  ...
+# Subtest: calcularResumoEfetivo handles malformed input in list
+ok 199 - calcularResumoEfetivo handles malformed input in list
+  ---
+  duration_ms: 0.287127
+  type: 'test'
+  ...
+# Subtest: calcularResumoTags aggregates tags correctly
+ok 200 - calcularResumoTags aggregates tags correctly
+  ---
+  duration_ms: 13.165077
+  type: 'test'
+  ...
+# Subtest: calcularResumoTags handles empty or null input
+ok 201 - calcularResumoTags handles empty or null input
+  ---
+  duration_ms: 0.157078
+  type: 'test'
+  ...
+# Subtest: calcularResumoTags sorts by total descending and then by name
+ok 202 - calcularResumoTags sorts by total descending and then by name
+  ---
+  duration_ms: 0.269764
+  type: 'test'
+  ...
+# Subtest: filtrarUnidadesCartoes filters by various fields
+ok 203 - filtrarUnidadesCartoes filters by various fields
+  ---
+  duration_ms: 1.209208
+  type: 'test'
+  ...
+# Subtest: listarTagsDisponiveisGestor aggregates and sorts tags correctly
+ok 204 - listarTagsDisponiveisGestor aggregates and sorts tags correctly
+  ---
+  duration_ms: 13.045304
+  type: 'test'
+  ...
+# Subtest: filtrarMilitaresGestor filters by search term
+ok 205 - filtrarMilitaresGestor filters by search term
+  ---
+  duration_ms: 1.876565
+  type: 'test'
+  ...
+# Subtest: filtrarMilitaresGestor filters by tags (AND logic)
+ok 206 - filtrarMilitaresGestor filters by tags (AND logic)
+  ---
+  duration_ms: 0.361626
+  type: 'test'
+  ...
+# Subtest: filtrarMilitaresGestor combines search and tags
+ok 207 - filtrarMilitaresGestor combines search and tags
+  ---
+  duration_ms: 0.443855
+  type: 'test'
+  ...
+# Subtest: filtrarMilitaresGestor handles normalization and case-insensitivity
+ok 208 - filtrarMilitaresGestor handles normalization and case-insensitivity
+  ---
+  duration_ms: 0.308615
+  type: 'test'
+  ...
+1..208
+# tests 213
+# suites 1
+# pass 212
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1040.731363

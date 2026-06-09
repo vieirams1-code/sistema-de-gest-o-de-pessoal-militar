@@ -47,7 +47,9 @@ export function montarPayloadPublicacaoExOfficioMigracaoLegado(linha = {}) {
   if (!notaNormalizada) throw new Error('Número da nota é obrigatório.');
   if (!textoPublicacao) throw new Error('Texto publicado é obrigatório.');
   if (!dataPublicacao || !dataBgBrValida(dataPublicacao)) {
-    throw new Error('Data da publicação ausente. Preencha a data do BG/BR antes de importar.');
+    if (!notaNormalizada) {
+      throw new Error('Data da publicação ausente. Preencha a data do BG/BR antes de importar.');
+    }
   }
   if (!tipoFinal) throw new Error('Tipo/matéria ausente. Classifique manualmente antes de importar.');
 
@@ -177,10 +179,22 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
     const avisos = [];
     if (!numeroNota) erros.push('Número da nota é obrigatório.');
     if (!limparTexto(linha.texto_publicado)) erros.push('Texto publicado é obrigatório.');
-    if (!limparTexto(linha.numero_bg_br)) avisos.push('Número do BG/BR ausente.');
+    if (!limparTexto(linha.numero_bg_br)) {
+      avisos.push('Nota informada. A publicação em BG ainda está pendente.');
+      avisos.push('Este registro poderá ser importado como aguardando publicação.');
+    }
     const dataPublicacao = resolverDataPublicacaoMigracaoLegado(linha);
     if (!dataPublicacao || !dataBgBrValida(dataPublicacao)) {
-      erros.push('Data da publicação ausente. Preencha a data do BG/BR antes de importar.');
+      if (numeroNota) {
+        if (!avisos.includes('Nota informada. A publicação em BG ainda está pendente.')) {
+          avisos.push('Nota informada. A publicação em BG ainda está pendente.');
+        }
+        if (!avisos.includes('Este registro poderá ser importado como aguardando publicação.')) {
+          avisos.push('Este registro poderá ser importado como aguardando publicação.');
+        }
+      } else {
+        erros.push('Data da publicação ausente. Preencha a data do BG/BR antes de importar.');
+      }
     }
     const { tipoFinal } = resolverTipoFinalMigracaoLegado(linha);
     if (!tipoFinal) erros.push('Tipo/matéria ausente. Classifique manualmente antes de importar.');

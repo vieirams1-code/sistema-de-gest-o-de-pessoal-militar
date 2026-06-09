@@ -498,7 +498,8 @@ export default function MigracaoAlteracoesLegado() {
               <ul className="list-disc pl-6 space-y-1">
                 <li>A importação é feita por militar selecionado: todas as linhas da planilha serão vinculadas a esse militar.</li>
                 <li>Cada linha da planilha gera um registro individual em PublicacaoExOfficio.</li>
-                <li>Registros válidos entram como publicados, com BG e data BG obrigatórios.</li>
+                <li>Registros sem BG/Data BG entram como 'Aguardando Publicação' se possuírem nota.</li>
+                <li>Informe número e data do BG apenas quando a publicação estiver disponível.</li>
                 <li>A origem legado é marcada com <code>origem_registro=legado</code> e <code>importado_legado=true</code>.</li>
                 <li>Nota ID legado é preservada em campo próprio, separado do número do BG.</li>
                 <li>O sistema não tenta mais identificar o militar pela planilha.</li>
