@@ -271,12 +271,12 @@ export default function IndicacoesDomPedroII() {
     mutationFn: async () => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.RESETAR, mensagem: 'Sem permissão para resetar indicações.' });
       const pendentes = filtrarIndicacoesDomPedroResetaveis(domPedroRegistros);
-      const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
+      const pendentesEscopo = isAdmin ? pendentes : pendentes.filter((m) => militarIdsEscopo.has(m.militar_id));
 
       return resetarMedalhasEmLote(base44, {
         medalhas: pendentesEscopo,
         userEmail,
-        motivoReset: 'administrativamente',
+        motivoReset: 'Dom Pedro II administrativamente',
       });
     },
     onSuccess: (quantidade) => {
