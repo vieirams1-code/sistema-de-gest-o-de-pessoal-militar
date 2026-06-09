@@ -1,14 +1,23 @@
 let runtimeClient = null;
+let clientPromise = null;
+let entityCache = new Map();
 
 export function __setMilitarIdentidadeClientForTests(client) {
   runtimeClient = client || null;
+  clientPromise = client ? Promise.resolve(client) : null;
+  entityCache = new Map();
 }
 
 async function ensureClient() {
   if (runtimeClient) return runtimeClient;
-  const mod = await import('../api/base44Client.js');
-  runtimeClient = mod.base44;
-  return runtimeClient;
+  if (clientPromise) return clientPromise;
+
+  clientPromise = import('../api/base44Client.js').then((mod) => {
+    runtimeClient = mod.base44;
+    return runtimeClient;
+  });
+
+  return clientPromise;
 }
 
 const ERROS = {
@@ -63,8 +72,21 @@ export function normalizarNomeCanonico(value = '') {
 }
 
 async function getEntity(nome) {
+  if (entityCache.has(nome)) return entityCache.get(nome);
   const client = await ensureClient();
-  return client?.entities?.[nome] || null;
+  const entity = client?.entities?.[nome] || null;
+  if (entity) entityCache.set(nome, entity);
+  return entity;
+}
+
+async function getEntities(nomes = []) {
+  const client = await ensureClient();
+  return nomes.map((nome) => {
+    if (entityCache.has(nome)) return entityCache.get(nome);
+    const entity = client?.entities?.[nome] || null;
+    if (entity) entityCache.set(nome, entity);
+    return entity;
+  });
 }
 
 async function listarMilitares(criterios = null) {
@@ -110,10 +132,7 @@ async function localizarMilitarPorMatricula(matricula, excludeMilitarId = '') {
   const matriculaNorm = normalizarMatricula(matricula);
   if (!matriculaNorm) return null;
 
-  const [matriculaEntity, militarEntity] = await Promise.all([
-    getEntity('MatriculaMilitar'),
-    getEntity('Militar'),
-  ]);
+  const [matriculaEntity, militarEntity] = await getEntities(['MatriculaMilitar', 'Militar']);
 
   const excludeId = String(excludeMilitarId || '');
 
@@ -495,9 +514,11 @@ async function buscarMatriculasMilitar(militarId, matriculaEntity) {
   return list.filter((m) => String(m.militar_id) === String(militarId));
 }
 
-async function buscarVinculosMilitar(militarId) {
-  return Promise.all(ENTIDADES_VINCULOS_MILITAR_ID.map(async (name) => {
-    const entity = await getEntity(name);
+async function buscarVinculosMilitar(militarId, entidadesPreCarregadas = null) {
+  const entities = entidadesPreCarregadas || await getEntities(ENTIDADES_VINCULOS_MILITAR_ID);
+
+  return Promise.all(ENTIDADES_VINCULOS_MILITAR_ID.map(async (name, index) => {
+    const entity = entities[index];
     if (!entity?.update) return { name, entity, items: [] };
     const items = entity.filter
       ? await entity.filter({ militar_id: militarId })
@@ -509,12 +530,14 @@ async function buscarVinculosMilitar(militarId) {
 }
 
 async function buscarDadosMerge(militarOrigemId, militarDestinoId, matriculaEntity) {
+  const vinculoEntities = await getEntities(ENTIDADES_VINCULOS_MILITAR_ID);
+
   const [origem, destino, matriculasOrigem, matriculasDestino, vinculosOrigem] = await Promise.all([
     obterMilitarPorId(militarOrigemId),
     obterMilitarPorId(militarDestinoId),
     buscarMatriculasMilitar(militarOrigemId, matriculaEntity),
     buscarMatriculasMilitar(militarDestinoId, matriculaEntity),
-    buscarVinculosMilitar(militarOrigemId),
+    buscarVinculosMilitar(militarOrigemId, vinculoEntities),
   ]);
 
   if (!origem) throw new Error('Militar de origem não encontrado.');
