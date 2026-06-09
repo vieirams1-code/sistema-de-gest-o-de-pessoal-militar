@@ -4,6 +4,7 @@ import { atualizarHistoricoImportacaoAlteracoesLegado, criarHistoricoImportacaoA
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 import { gerarChaveOrigemLinhaDeterministica, gerarHashLotePorTabelaDeterministico } from '@/services/migracaoAlteracoesLegadoIdempotencia';
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
+import { calcularStatusPublicacaoLegado } from './migracaoAlteracoesLegadoStatusPublicacao';
 
 let client = defaultBase44;
 
@@ -432,9 +433,10 @@ function mapCamposTransformados(row, colunas) {
   const valor = (campo) => limparTexto(row[colunas[campo]]);
   const dataBg = parseDate(row[colunas.data_publicacao]);
   const bg = valor('numero_bg');
+  const notaId = valor('nota_id_legado');
 
   return {
-    nota_id_legado: valor('nota_id_legado'),
+    nota_id_legado: notaId,
     cargo_legado: valor('cargo_legado'),
     nome_guerra_legado: valor('nome_guerra_legado'),
     nome_completo_legado: valor('nome_completo_legado'),
@@ -461,7 +463,11 @@ function mapCamposTransformados(row, colunas) {
     destino_final: '',
     tipo_publicacao_confirmado: '',
     tipo_publicacao_confirmado_manualmente: false,
-    status_publicacao: 'Publicado',
+    status_publicacao: calcularStatusPublicacaoLegado({
+      numero_nota: notaId,
+      numero_bg_br: bg,
+      data_bg_br: formatDateBr(dataBg),
+    }),
     origem_registro: 'legado',
     importado_legado: true,
   };
@@ -696,8 +702,27 @@ async function analisarLinhaIndividualLegado({
 
   aplicarClassificacaoAutomaticaLegado(transformado, tiposValidosMap, revisoes);
 
-  if (!transformado.numero_bg) erros.push('Número do BG obrigatório ausente.');
-  if (!transformado.data_bg) erros.push('Data de publicação/BG inválida ou ausente.');
+  if (!transformado.numero_bg) {
+    if (transformado.nota_id_legado) {
+      alertas.push('Nota informada. A publicação em BG ainda está pendente.');
+      alertas.push('Este registro poderá ser importado como aguardando publicação.');
+    } else {
+      erros.push('Número do BG obrigatório ausente.');
+    }
+  }
+
+  if (!transformado.data_bg) {
+    if (transformado.nota_id_legado) {
+      if (!alertas.includes('Nota informada. A publicação em BG ainda está pendente.')) {
+        alertas.push('Nota informada. A publicação em BG ainda está pendente.');
+      }
+      if (!alertas.includes('Este registro poderá ser importado como aguardando publicação.')) {
+        alertas.push('Este registro poderá ser importado como aguardando publicação.');
+      }
+    } else {
+      erros.push('Data de publicação/BG inválida ou ausente.');
+    }
+  }
 
   if (!statusEhPublicadoLegado(transformado.status_legado || 'Publicado')) {
     erros.push('Status legado não publicado. Apenas registros já publicados podem ser importados.');
@@ -1085,6 +1110,14 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     motivo_destino: t.motivo_destino || '',
   };
 
+  const statusPublicacao = calcularStatusPublicacaoLegado({
+    numero_nota: t.nota_id_legado,
+    numero_bg_br: t.numero_bg,
+    data_bg_br: t.data_bg_br || formatDateBr(t.data_bg),
+  });
+
+  const statusSchema = statusPublicacao === 'PUBLICADO' ? 'Publicado' : 'Aguardando Publicação';
+
   return {
     militar_id: t.militar_id,
     militar_nome: t.militar_nome,
@@ -1092,8 +1125,8 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     militar_matricula_atual: t.militar_matricula_atual || t.militar_matricula || '',
     militar_matricula_vinculo: t.militar_matricula_vinculo || t.matricula_legado || '',
     tipo: tipoFinal,
-    status: 'Publicado',
-    status_publicacao: 'Publicado',
+    status: statusSchema,
+    status_publicacao: statusSchema,
     numero_bg: t.numero_bg,
     data_bg: t.data_bg,
     data_publicacao: t.data_bg,

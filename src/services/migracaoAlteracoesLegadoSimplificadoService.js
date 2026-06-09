@@ -352,11 +352,19 @@ function validarDadosLinhaSimplificado(dados) {
   if (!dados.numero_nota_norm) erros.push('Número da nota é obrigatório.');
   if (!dados.texto_publicado) erros.push('Texto publicado é obrigatório.');
 
-  if (!dados.numero_bg_br) avisos.push('Número do BG/BR ausente.');
+  if (!dados.numero_bg_br) {
+    avisos.push('Nota informada. A publicação em BG ainda está pendente.');
+    avisos.push('Este registro poderá ser importado como aguardando publicação.');
+  }
   if (dados.data_bg_br_bruta && !dados.data_bg_iso) {
     avisos.push('Data do BG/BR inválida; valor preservado, mas precisa ser revisado.');
   } else if (!dados.data_bg_br_bruta) {
-    avisos.push('Data do BG/BR ausente.');
+    if (!avisos.includes('Nota informada. A publicação em BG ainda está pendente.')) {
+      avisos.push('Nota informada. A publicação em BG ainda está pendente.');
+    }
+    if (!avisos.includes('Este registro poderá ser importado como aguardando publicação.')) {
+      avisos.push('Este registro poderá ser importado como aguardando publicação.');
+    }
   }
   if (!dados.tipo_legado) avisos.push('Tipo legado ausente.');
   if (!dados.tipo_classificado) avisos.push('Tipo classificado ausente.');
