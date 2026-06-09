@@ -22,7 +22,7 @@ const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_L
 
 function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, militar_id = null, motivo = '' }: any) {
   if (isDevRuntime()) {
-    console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, militar_id, motivo });
+    console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, motivo });
   }
 }
 
@@ -138,7 +138,6 @@ Deno.serve(async (req) => {
           promocao_id: promocaoId,
           quantidade: itens?.length,
           ids: itens?.map((i: any) => i?.id),
-          militar_ids: itens?.map((i: any) => i?.militar_id),
           status: itens?.map((i: any) => i?.status),
         }
       );
@@ -178,7 +177,7 @@ Deno.serve(async (req) => {
       const itemId = texto(item?.id) || null;
       const militarId = texto(item?.militar_id) || null;
       if (isDevRuntime()) {
-        console.error('PROCESSANDO_ITEM', { item_id: itemId, militar_id: militarId });
+        console.error('PROCESSANDO_ITEM', { item_id: itemId });
       }
       try {
         const militarEncontrado = await Militar.get(item.militar_id).catch(() => null);
