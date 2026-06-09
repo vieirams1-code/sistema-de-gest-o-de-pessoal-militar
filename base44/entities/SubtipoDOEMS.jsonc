@@ -1,0 +1,44 @@
+{
+  "name": "SubtipoDOEMS",
+  "type": "object",
+  "title": "Subtipo DOEMS",
+  "description": "Cadastro de subtipos para registros de publicação DOEMS.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "ordem": {
+      "type": "number",
+      "default": 0
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": [
+    "nome"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

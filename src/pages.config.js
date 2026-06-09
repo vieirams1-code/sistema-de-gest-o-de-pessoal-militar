@@ -92,6 +92,7 @@ import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
 import QuadroOperacional from './pages/QuadroOperacional';
 import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
+import SubtiposDOEMS from './pages/SubtiposDOEMS';
 import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
@@ -161,6 +162,7 @@ export const PAGES = {
     "Punicoes": Punicoes,
     "QuadroOperacional": QuadroOperacional,
     "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
+    "SubtiposDOEMS": SubtiposDOEMS,
     "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,

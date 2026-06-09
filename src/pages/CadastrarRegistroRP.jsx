@@ -363,6 +363,25 @@ export default function CadastrarRegistroRP() {
     refetchOnWindowFocus: false,
   });
 
+  // Fetch subtipos DOEMS ativos
+  const {
+    data: subtiposDoems = [],
+  } = useQuery({
+    queryKey: ['subtipos-doems-selector', escopoQueryKey],
+    queryFn: () => base44.entities.SubtipoDOEMS.filter({ ativo: true }),
+    enabled: canRunScopedQueries,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const subtiposOptions = useMemo(() => {
+    if (!subtiposDoems || subtiposDoems.length === 0) return DOEMS_SUBTIPOS;
+    const fromDb = [...subtiposDoems]
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
+      .map(s => s.nome);
+    if (!fromDb.includes('Outros')) fromDb.push('Outros');
+    return fromDb;
+  }, [subtiposDoems]);
+
   // Fetch templates ativos
   const {
     data: templatesAtivos = [],
@@ -1097,12 +1116,16 @@ export default function CadastrarRegistroRP() {
     else payload.dias_punicao = diasPunicaoNormalizado;
 
     // Se for DOEMS, garantir que campos de arquivo vazios não quebrem o backend (embora opcionais)
-    if (isRegistroPublicacaoDOEMS && !payload.doems_arquivo) {
-      delete payload.doems_arquivo;
-      delete payload.doems_arquivo_bucket;
-      delete payload.doems_arquivo_path;
-      delete payload.doems_arquivo_nome;
-      delete payload.doems_arquivo_mime;
+    // No fluxo DOEMS, link e anexo não são necessários.
+    if (isRegistroPublicacaoDOEMS) {
+      if (!payload.doems_link) delete payload.doems_link;
+      if (!payload.doems_arquivo) {
+        delete payload.doems_arquivo;
+        delete payload.doems_arquivo_bucket;
+        delete payload.doems_arquivo_path;
+        delete payload.doems_arquivo_nome;
+        delete payload.doems_arquivo_mime;
+      }
     }
 
     isSubmittingRef.current = true;
@@ -1457,7 +1480,7 @@ export default function CadastrarRegistroRP() {
                         value={formData.subtipo_geral}
                         onChange={handleChange}
                         type="select"
-                        options={DOEMS_SUBTIPOS}
+                        options={subtiposOptions}
                         required
                       />
                       <FormField
@@ -1468,71 +1491,6 @@ export default function CadastrarRegistroRP() {
                         placeholder="Ex: DOEMS nº 11.234"
                         required
                       />
-                      <FormField
-                        label="Link do DOEMS (opcional)"
-                        name="doems_link"
-                        value={formData.doems_link}
-                        onChange={handleChange}
-                        placeholder="https://www.spdo.ms.gov.br/diarioms/..."
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">
-                        Link/anexo da publicação (opcional)
-                      </Label>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={uploadingDoems}
-                          >
-                            {uploadingDoems ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-                            ) : (
-                              <Upload className="mr-2 h-4 w-4" />
-                            )}
-                            {formData.doems_arquivo ? 'Substituir arquivo' : 'Selecionar arquivo'}
-                          </Button>
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleDoemsFileUpload}
-                            className="hidden"
-                            accept="application/pdf,image/*"
-                          />
-                          {formData.doems_arquivo && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                              onClick={handleRemoveDoemsFile}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Remover
-                            </Button>
-                          )}
-                        </div>
-                        {formData.doems_arquivo && (
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <FileText className="h-3.5 w-3.5" />
-                            <span>{formData.doems_arquivo_nome}</span>
-                            <a
-                              href={formData.doems_arquivo}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ml-2 flex items-center text-blue-600 hover:underline"
-                            >
-                              <Download className="mr-1 h-3 w-3" />
-                              Visualizar
-                            </a>
-                          </div>
-                        )}
-                      </div>
                     </div>
 
                     <div>
