@@ -310,19 +310,14 @@ export default function RPSpecificFieldsExOfficio({
           <div className="space-y-4">
             {tipoRegistro === 'Registro de Publicação DOEMS' && (
               <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm text-blue-800 border border-blue-100">
-                Use este tipo para registrar uma publicação externa já realizada no Diário Oficial.
+                Use este fluxo para registrar no sistema uma publicação que já ocorreu no DOEMS.
               </div>
             )}
-            <FormField
-              label="Edição/Número do DOEMS"
-              name="doems_edicao_numero"
-              value={formData.doems_edicao_numero}
-              onChange={handleChange}
-              placeholder="Ex: DOEMS nº 11.234"
-              required
-            />
+            <p className="text-sm text-slate-600">
+              As informações específicas do DOEMS (subtipo, edição e texto) deverão ser preenchidas na etapa de <strong>Finalização</strong>.
+            </p>
             <p className="text-xs text-slate-500 mt-2">
-              A data e o texto da publicação serão solicitados nos próximos campos para manter a consistência do fluxo.
+              A data do registro e o vínculo com o militar permanecem necessários para a organização do histórico.
             </p>
           </div>
         </div>

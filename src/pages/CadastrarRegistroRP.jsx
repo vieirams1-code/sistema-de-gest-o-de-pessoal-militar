@@ -24,6 +24,7 @@ import {
   getModuloByTipo,
   MODULO_LIVRO,
   MODULO_EX_OFFICIO,
+  DOEMS_SUBTIPOS,
 } from '@/components/rp/rpTiposConfig';
 import { getLivroOperacaoFerias } from '@/components/livro/feriasOperacaoUtils';
 import {
@@ -305,8 +306,7 @@ export default function CadastrarRegistroRP() {
   const isSubmittingRef = useRef(false);
 
   const militarIdSelecionado = String(formData.militar_id || '').trim();
-  const tipoRegistroSelecionado = String(formData.tipo_registro || '').trim();
-  const isRegistroPublicacaoDOEMS = tipoRegistroSelecionado === 'Registro de Publicação DOEMS';
+  const isRegistroPublicacaoDOEMS = formData.tipo_registro === 'Registro de Publicação DOEMS';
 
   const escopoQueryKey = useMemo(() => ({
     isAdmin: isAdmin === true,
@@ -1097,7 +1097,7 @@ export default function CadastrarRegistroRP() {
     else payload.dias_punicao = diasPunicaoNormalizado;
 
     // Se for DOEMS, garantir que campos de arquivo vazios não quebrem o backend (embora opcionais)
-    if (payload.tipo_registro === 'Publicação DOEMS' && !payload.doems_arquivo) {
+    if ((payload.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) && !payload.doems_arquivo) {
       delete payload.doems_arquivo;
       delete payload.doems_arquivo_bucket;
       delete payload.doems_arquivo_path;
@@ -1439,158 +1439,289 @@ export default function CadastrarRegistroRP() {
             <>
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Finalização</h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Nota para BG"
-                    name="nota_para_bg"
-                    value={formData.nota_para_bg}
-                    onChange={handleChange}
-                    placeholder="Ex: 01"
-                  />
-                  <FormField
-                    label="Número do BG"
-                    name="numero_bg"
-                    value={formData.numero_bg}
-                    onChange={handleChange}
-                    placeholder="Ex: 123"
-                  />
-                  <FormField
-                    label="Data do BG"
-                    name="data_bg"
-                    value={formData.data_bg}
-                    onChange={handleChange}
-                    type="date"
-                  />
-                  {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && !isRegistroPublicacaoDOEMS && (
-                    <FormField
-                      label="Edição/número da publicação externa (opcional)"
-                      name="doems_edicao_numero"
-                      value={formData.doems_edicao_numero}
-                      onChange={handleChange}
-                      placeholder="Ex: Edição 11.234 ou similar"
-                    />
-                  )}
-                  {(formData.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) && (
-                    <FormField
-                      label="Link do DOEMS (opcional)"
-                      name="doems_link"
-                      value={formData.doems_link}
-                      onChange={handleChange}
-                      placeholder="https://www.spdo.ms.gov.br/diarioms/..."
-                    />
-                  )}
-                </div>
 
-                {(formData.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) && (
-                  <div className="mt-4 space-y-2">
-                    <Label className="text-sm font-medium text-slate-700">
-                      {isRegistroPublicacaoDOEMS ? 'Link/anexo da publicação (opcional)' : 'Anexo do DOEMS (opcional)'}
-                    </Label>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploadingDoems}
-                        >
-                          {uploadingDoems ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-                          ) : (
-                            <Upload className="mr-2 h-4 w-4" />
-                          )}
-                          {formData.doems_arquivo ? 'Substituir arquivo' : 'Selecionar arquivo'}
-                        </Button>
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleDoemsFileUpload}
-                          className="hidden"
-                          accept="application/pdf,image/*"
-                        />
-                        {formData.doems_arquivo && (
+                {isRegistroPublicacaoDOEMS ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        label="Data da publicação"
+                        name="data_registro"
+                        value={formData.data_registro}
+                        onChange={handleChange}
+                        type="date"
+                        required
+                      />
+                      <FormField
+                        label="Subtipo do DOEMS"
+                        name="subtipo_geral"
+                        value={formData.subtipo_geral}
+                        onChange={handleChange}
+                        type="select"
+                        options={DOEMS_SUBTIPOS}
+                        required
+                      />
+                      <FormField
+                        label="Edição/Número do DOEMS"
+                        name="doems_edicao_numero"
+                        value={formData.doems_edicao_numero}
+                        onChange={handleChange}
+                        placeholder="Ex: DOEMS nº 11.234"
+                        required
+                      />
+                      <FormField
+                        label="Link do DOEMS (opcional)"
+                        name="doems_link"
+                        value={formData.doems_link}
+                        onChange={handleChange}
+                        placeholder="https://www.spdo.ms.gov.br/diarioms/..."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-slate-700">
+                        Link/anexo da publicação (opcional)
+                      </Label>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                            onClick={handleRemoveDoemsFile}
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadingDoems}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Remover
+                            {uploadingDoems ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                            ) : (
+                              <Upload className="mr-2 h-4 w-4" />
+                            )}
+                            {formData.doems_arquivo ? 'Substituir arquivo' : 'Selecionar arquivo'}
                           </Button>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleDoemsFileUpload}
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                          />
+                          {formData.doems_arquivo && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={handleRemoveDoemsFile}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remover
+                            </Button>
+                          )}
+                        </div>
+                        {formData.doems_arquivo && (
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <FileText className="h-3.5 w-3.5" />
+                            <span>{formData.doems_arquivo_nome}</span>
+                            <a
+                              href={formData.doems_arquivo}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-2 flex items-center text-blue-600 hover:underline"
+                            >
+                              <Download className="mr-1 h-3 w-3" />
+                              Visualizar
+                            </a>
+                          </div>
                         )}
                       </div>
-                      {formData.doems_arquivo && (
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <FileText className="h-3.5 w-3.5" />
-                          <span>{formData.doems_arquivo_nome}</span>
-                          <a
-                            href={formData.doems_arquivo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="ml-2 flex items-center text-blue-600 hover:underline"
-                          >
-                            <Download className="mr-1 h-3 w-3" />
-                            Visualizar
-                          </a>
-                        </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium text-slate-700">Texto publicado</Label>
+                        {textoEditadoManualmente && (
+                          <span className="text-xs font-medium text-amber-700">
+                            Texto alterado manualmente
+                          </span>
+                        )}
+                      </div>
+                      <Textarea
+                        value={formData.texto_publicacao || ''}
+                        onChange={e => {
+                          setTextoEditadoManualmente(true);
+                          handleChange('texto_publicacao', e.target.value);
+                        }}
+                        className="mt-1.5"
+                        rows={6}
+                        placeholder="Cole o texto conforme publicado no DOEMS..."
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">Observações internas</Label>
+                      <Textarea
+                        value={formData.observacoes || ''}
+                        onChange={e => handleChange('observacoes', e.target.value)}
+                        className="mt-1.5"
+                        rows={2}
+                        placeholder="Observações internas..."
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        label="Nota para BG"
+                        name="nota_para_bg"
+                        value={formData.nota_para_bg}
+                        onChange={handleChange}
+                        placeholder="Ex: 01"
+                      />
+                      <FormField
+                        label="Número do BG"
+                        name="numero_bg"
+                        value={formData.numero_bg}
+                        onChange={handleChange}
+                        placeholder="Ex: 123"
+                      />
+                      <FormField
+                        label="Data do BG"
+                        name="data_bg"
+                        value={formData.data_bg}
+                        onChange={handleChange}
+                        type="date"
+                      />
+                      {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
+                        <FormField
+                          label="Edição/número da publicação externa (opcional)"
+                          name="doems_edicao_numero"
+                          value={formData.doems_edicao_numero}
+                          onChange={handleChange}
+                          placeholder="Ex: Edição 11.234 ou similar"
+                        />
                       )}
+                      {formData.tipo_registro === 'Publicação DOEMS' && (
+                        <FormField
+                          label="Link do DOEMS (opcional)"
+                          name="doems_link"
+                          value={formData.doems_link}
+                          onChange={handleChange}
+                          placeholder="https://www.spdo.ms.gov.br/diarioms/..."
+                        />
+                      )}
+                    </div>
+
+                    {formData.tipo_registro === 'Publicação DOEMS' && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-slate-700">
+                          Anexo do DOEMS (opcional)
+                        </Label>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={uploadingDoems}
+                            >
+                              {uploadingDoems ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                              ) : (
+                                <Upload className="mr-2 h-4 w-4" />
+                              )}
+                              {formData.doems_arquivo ? 'Substituir arquivo' : 'Selecionar arquivo'}
+                            </Button>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleDoemsFileUpload}
+                              className="hidden"
+                              accept="application/pdf,image/*"
+                            />
+                            {formData.doems_arquivo && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                onClick={handleRemoveDoemsFile}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remover
+                              </Button>
+                            )}
+                          </div>
+                          {formData.doems_arquivo && (
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <FileText className="h-3.5 w-3.5" />
+                              <span>{formData.doems_arquivo_nome}</span>
+                              <a
+                                href={formData.doems_arquivo}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 flex items-center text-blue-600 hover:underline"
+                              >
+                                <Download className="mr-1 h-3 w-3" />
+                                Visualizar
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Use este campo quando a publicação for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
+                      </p>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
+                        {textoEditadoManualmente && (
+                          <span className="text-xs font-medium text-amber-700">
+                            Texto alterado manualmente
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
+                          ? 'Texto derivado do template com sobrescrita manual.'
+                          : 'Texto derivado do template.'}
+                      </p>
+                      {parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json)?.rendered_at && (
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Gerado via template em {formatDateBR(parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json).rendered_at)}.
+                        </p>
+                      )}
+                      <Textarea
+                        value={formData.texto_publicacao || ''}
+                        onChange={e => {
+                          setTextoEditadoManualmente(true);
+                          handleChange('texto_publicacao', e.target.value);
+                        }}
+                        className="mt-1.5"
+                        rows={4}
+                        placeholder={formData.tipo_registro === 'Publicação DOEMS' ? "Cole aqui o texto conforme publicado no Diário Oficial..." : "Texto gerado para o BG..."}
+                        required={formData.tipo_registro === 'Publicação DOEMS'}
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">Observações</Label>
+                      <Textarea
+                        value={formData.observacoes || ''}
+                        onChange={e => handleChange('observacoes', e.target.value)}
+                        className="mt-1.5"
+                        rows={2}
+                        placeholder="Observações internas..."
+                      />
                     </div>
                   </div>
                 )}
-
-                {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && !isRegistroPublicacaoDOEMS && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Use este campo quando a publicação for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
-                  </p>
-                )}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-slate-700">
-                      {isRegistroPublicacaoDOEMS ? 'Texto publicado' : 'Texto de Publicação'}
-                    </Label>
-                    {textoEditadoManualmente && (
-                      <span className="text-xs font-medium text-amber-700">
-                        Texto alterado manualmente
-                      </span>
-                    )}
-                  </div>
-                  {!isRegistroPublicacaoDOEMS && (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
-                        ? 'Texto derivado do template com sobrescrita manual.'
-                        : 'Texto derivado do template.'}
-                    </p>
-                  )}
-                  {parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json)?.rendered_at && (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Gerado via template em {formatDateBR(parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json).rendered_at)}.
-                    </p>
-                  )}
-                  <Textarea
-                    value={formData.texto_publicacao || ''}
-                    onChange={e => {
-                      setTextoEditadoManualmente(true);
-                      handleChange('texto_publicacao', e.target.value);
-                    }}
-                    className="mt-1.5"
-                    rows={4}
-                    placeholder={isRegistroPublicacaoDOEMS ? "Cole o texto conforme publicado no DOEMS..." : formData.tipo_registro === 'Publicação DOEMS' ? "Cole aqui o texto conforme publicado no Diário Oficial..." : "Texto gerado para o BG..."}
-                    required={isRegistroPublicacaoDOEMS || formData.tipo_registro === 'Publicação DOEMS'}
-                  />
-                </div>
-                <div className="mt-4">
-                  <Label className="text-sm font-medium text-slate-700">Observações</Label>
-                  <Textarea
-                    value={formData.observacoes || ''}
-                    onChange={e => handleChange('observacoes', e.target.value)}
-                    className="mt-1.5"
-                    rows={2}
-                    placeholder="Observações internas..."
-                  />
-                </div>
               </div>
 
               {templateObrigatorioAusente && (
