@@ -373,12 +373,18 @@ export default function DetalhePromocao() {
   });
 
   const promocaoMilitarQuery = useQuery({
-    queryKey: ['detalhe-promocao-promocao-militar'],
+    queryKey: ['detalhe-promocao-promocao-militar', promocaoId],
     queryFn: async () => {
       const entity = base44.entities.PromocaoMilitar;
-      if (!entity || typeof entity.list !== 'function') return [];
+      if (!entity) return [];
       try {
-        return await entity.list();
+        if (promocaoId && typeof entity.filter === 'function') {
+          return await entity.filter({ promocao_id: promocaoId });
+        }
+        if (typeof entity.list === 'function') {
+          return await entity.list();
+        }
+        return [];
       } catch (error) {
         if (import.meta.env?.DEV) {
           console.warn('[DetalhePromocao] PromocaoMilitar indisponível; lista principal usará registros já vinculados.', error);
@@ -662,23 +668,13 @@ export default function DetalhePromocao() {
       const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocaoReferenciaCadastro));
       const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao: promocaoReferenciaCadastro });
       if (!validacao.valido) throw new Error(mensagensValidacaoSimples(validacao).join(' '));
-      const originaisPatchesStr = new Map(turmaBaseComparacao.map((registro) => [
-        String(registro.id),
-        JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })),
-      ]));
-
-      const alterados = [];
-      const payloads = [];
-
-      turmaComEfeito.forEach((registro) => {
-        const patch = montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro });
-        const patchStr = JSON.stringify(patch);
-
-        if (patchStr !== originaisPatchesStr.get(String(registro.id))) {
-          alterados.push(registro);
-          payloads.push({ id: registro.id, ...patch });
-        }
-      });
+      const originais = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })]));
+      const alteradosComPatch = turmaComEfeito.map((registro) => ({
+        registro,
+        patch: montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }),
+      })).filter(({ registro, patch }) => (
+        JSON.stringify(patch) !== JSON.stringify(originais.get(String(registro.id)) || {})
+      ));
 
       const validacaoImutabilidade = validarImutabilidadePosPublicacao({
         itensOriginais: turmaBaseComparacao,
@@ -686,6 +682,11 @@ export default function DetalhePromocao() {
         historicosV2: historicosVinculados,
       });
       if (!validacaoImutabilidade.valido) throw new Error(validacaoImutabilidade.mensagens.join(' '));
+
+      const payloads = alteradosComPatch.map(({ registro, patch }) => ({
+        id: registro.id,
+        ...patch,
+      }));
 
       if (payloads.length > 0) {
         if (base44.entities.PromocaoMilitar.bulkUpdate) {
@@ -695,7 +696,7 @@ export default function DetalhePromocao() {
         }
       }
 
-      return alterados;
+      return alteradosComPatch.map((x) => x.registro);
     },
     onSuccess: async (alterados = []) => {
       if (alterados.length > 0) {
@@ -834,15 +835,6 @@ export default function DetalhePromocao() {
       if (!promocao) throw new Error('Promoção não carregada.');
       if (!promocaoContext.permiteOrdenacao) throw new Error('Promoção de início de cadeia mantém classificação manual.');
       const historica = isPromocaoHistorica(promocao);
-      if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-        const historicoV2 = historicosQuery.data || [];
-        const basePreview = ordenarPorAntiguidadeAnterior({
-          promocao,
-          itensPromocao: rascunhoTurma,
-          historicoV2,
-          militares: militaresQuery.data || [],
-        });
-      }
       if (historica) {
         const resultado = ordenarPorAntiguidadeAnterior({
           promocao,
@@ -859,7 +851,8 @@ export default function DetalhePromocao() {
           `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.encontrados}\nTotal sem histórico: ${resultado.semHistorico.length}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}${alertaResumo}`
         );
         if (!confirmou) return { cancelado: true };
-        const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), Number(item.ordem)]));
+
+        const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), item.ordem]));
         const payloads = resultado.ordenados
           .filter((item) => Number(item.ordem) !== atualMap.get(String(item.id)))
           .map((item) => ({ id: item.id, ordem: Number(item.ordem) }));
