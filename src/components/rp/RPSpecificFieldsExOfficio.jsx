@@ -300,19 +300,16 @@ export default function RPSpecificFieldsExOfficio({
       );
     }
 
-    case 'Publicação DOEMS':
     case 'Registro de Publicação DOEMS':
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">
-            {tipoRegistro === 'Registro de Publicação DOEMS' ? 'Registro de Publicação DOEMS' : 'Publicação DOEMS'}
+            Registro de Publicação DOEMS
           </h3>
           <div className="space-y-4">
-            {tipoRegistro === 'Registro de Publicação DOEMS' && (
-              <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm text-blue-800 border border-blue-100">
-                Use este fluxo para registrar no sistema uma publicação que já ocorreu no DOEMS.
-              </div>
-            )}
+            <div className="mb-4 rounded-lg bg-blue-50 p-4 text-sm text-blue-800 border border-blue-100">
+              Use este fluxo para registrar no sistema uma publicação que já ocorreu no DOEMS.
+            </div>
             <p className="text-sm text-slate-600">
               As informações específicas do DOEMS (subtipo, edição e texto) deverão ser preenchidas na etapa de <strong>Finalização</strong>.
             </p>

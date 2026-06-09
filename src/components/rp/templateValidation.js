@@ -39,7 +39,6 @@ export function tipoExigeTemplate(tipoRegistro = '') {
   const t = String(tipoRegistro).trim().toLowerCase();
   return (
     t !== 'geral' &&
-    t !== 'publicação doems' &&
     t !== 'registro de publicação doems'
   );
 }
