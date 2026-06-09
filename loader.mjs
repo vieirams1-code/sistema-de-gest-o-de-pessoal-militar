@@ -14,8 +14,13 @@ export async function resolve(specifier, context, nextResolve) {
     let finalPath = join(rootPath, 'src', subPath);
 
     if (!finalPath.endsWith('.js') && !finalPath.endsWith('.jsx')) {
+      if (existsSync(finalPath + '.js')) {
+        finalPath += '.js';
+      } else {
         finalPath += '.jsx';
+      }
     }
+    return nextResolve(pathToFileURL(finalPath).href, context);
   }
 
   if (specifier.includes('/src/') && specifier.endsWith('.js')) {
