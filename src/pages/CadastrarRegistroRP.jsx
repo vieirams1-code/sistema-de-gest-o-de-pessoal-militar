@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, BookOpenText, Search, Upload, Download, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, BookOpenText, Search, Upload, Download, Trash2, FileText } from 'lucide-react';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
 import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
@@ -370,7 +370,7 @@ export default function CadastrarRegistroRP() {
     isFetching: fetchingTemplatesAtivos,
     isError: erroTemplatesAtivos,
   } = useQuery({
-    queryKey: ['templates-ativos', tipoRegistroSelecionado || null, escopoQueryKey],
+    queryKey: ['templates-ativos', formData.tipo_registro || null, escopoQueryKey],
     queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
     enabled: canRunScopedQueries,
     staleTime: 5 * 60 * 1000,
@@ -378,9 +378,9 @@ export default function CadastrarRegistroRP() {
   });
 
   const moduloAtual = useMemo(() => {
-    if (!tipoRegistroSelecionado) return null;
-    return getModuloByTipo(tipoRegistroSelecionado, tiposCustom);
-  }, [tipoRegistroSelecionado, tiposCustom]);
+    if (!formData.tipo_registro) return null;
+    return getModuloByTipo(formData.tipo_registro, tiposCustom);
+  }, [formData.tipo_registro, tiposCustom]);
 
   const livroOperacaoFerias = useMemo(
     () => getLivroOperacaoFerias(formData.tipo_registro),
@@ -393,13 +393,13 @@ export default function CadastrarRegistroRP() {
   const deveCarregarAtestados = Boolean(
     deveCarregarMilitar
       && moduloAtual === MODULO_EX_OFFICIO
-      && ['Ata JISO', 'Homologação de Atestado'].includes(tipoRegistroSelecionado)
+      && ['Ata JISO', 'Homologação de Atestado'].includes(formData.tipo_registro)
       && step >= 3
   );
   const deveCarregarPublicacoes = Boolean(
     deveCarregarMilitar
       && moduloAtual === MODULO_EX_OFFICIO
-      && ['Apostila', 'Tornar sem Efeito'].includes(tipoRegistroSelecionado)
+      && ['Apostila', 'Tornar sem Efeito'].includes(formData.tipo_registro)
       && step >= 3
   );
 
@@ -411,7 +411,7 @@ export default function CadastrarRegistroRP() {
     isSuccess: militarSelecionadoCarregado,
     isError: erroMilitarSelecionado,
   } = useQuery({
-    queryKey: ['militar-rp', militarIdSelecionado || null, tipoRegistroSelecionado || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
+    queryKey: ['militar-rp', militarIdSelecionado || null, formData.tipo_registro || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
     queryFn: () => base44.entities.Militar.filter({ id: militarIdSelecionado }).then(r => r[0] || null),
     enabled: deveCarregarMilitar,
     placeholderData: keepPreviousData,
@@ -427,7 +427,7 @@ export default function CadastrarRegistroRP() {
     isSuccess: atestadosMilitarCarregados,
     isError: erroAtestadosMilitar,
   } = useQuery({
-    queryKey: ['atestados-militar-rp', militarIdSelecionado || null, tipoRegistroSelecionado || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
+    queryKey: ['atestados-militar-rp', militarIdSelecionado || null, formData.tipo_registro || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
     queryFn: () => base44.entities.Atestado.filter({ militar_id: militarIdSelecionado }),
     enabled: deveCarregarAtestados,
     placeholderData: keepPreviousData,
@@ -467,7 +467,7 @@ export default function CadastrarRegistroRP() {
     isSuccess: publicacoesMilitarCarregadas,
     isError: erroPublicacoesMilitar,
   } = useQuery({
-    queryKey: ['publicacoes-militar-rp', militarIdSelecionado || null, tipoRegistroSelecionado || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
+    queryKey: ['publicacoes-militar-rp', militarIdSelecionado || null, formData.tipo_registro || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
     queryFn: async () => {
       const [livros, exoff] = await Promise.all([
         base44.entities.RegistroLivro.filter({ militar_id: militarIdSelecionado }),
@@ -728,8 +728,8 @@ export default function CadastrarRegistroRP() {
 
     if (textoEditadoManualmente && formData.texto_publicacao) return;
 
-    // Se for Publicação DOEMS, não aplicar template (o texto é manual ou colado)
-    if (formData.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) return;
+    // Se for DOEMS, não aplicar template (o texto é manual ou colado)
+    if (isRegistroPublicacaoDOEMS) return;
 
     // Guard: para "Homologação de Atestado", aguardar a query do médico vinculado resolver
     // antes de gerar o texto, evitando que {{medico_crm}} fique como placeholder literal.
@@ -1097,7 +1097,7 @@ export default function CadastrarRegistroRP() {
     else payload.dias_punicao = diasPunicaoNormalizado;
 
     // Se for DOEMS, garantir que campos de arquivo vazios não quebrem o backend (embora opcionais)
-    if ((payload.tipo_registro === 'Publicação DOEMS' || isRegistroPublicacaoDOEMS) && !payload.doems_arquivo) {
+    if (isRegistroPublicacaoDOEMS && !payload.doems_arquivo) {
       delete payload.doems_arquivo;
       delete payload.doems_arquivo_bucket;
       delete payload.doems_arquivo_path;
@@ -1592,7 +1592,7 @@ export default function CadastrarRegistroRP() {
                         onChange={handleChange}
                         type="date"
                       />
-                      {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
+                      {moduloAtual === MODULO_EX_OFFICIO && (
                         <FormField
                           label="Edição/número da publicação externa (opcional)"
                           name="doems_edicao_numero"
@@ -1601,21 +1601,12 @@ export default function CadastrarRegistroRP() {
                           placeholder="Ex: Edição 11.234 ou similar"
                         />
                       )}
-                      {formData.tipo_registro === 'Publicação DOEMS' && (
-                        <FormField
-                          label="Link do DOEMS (opcional)"
-                          name="doems_link"
-                          value={formData.doems_link}
-                          onChange={handleChange}
-                          placeholder="https://www.spdo.ms.gov.br/diarioms/..."
-                        />
-                      )}
                     </div>
 
-                    {formData.tipo_registro === 'Publicação DOEMS' && (
+                    {moduloAtual === MODULO_EX_OFFICIO && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-slate-700">
-                          Anexo do DOEMS (opcional)
+                          Anexo da publicação externa (opcional)
                         </Label>
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
@@ -1672,7 +1663,7 @@ export default function CadastrarRegistroRP() {
                       </div>
                     )}
 
-                    {moduloAtual === MODULO_EX_OFFICIO && formData.tipo_registro !== 'Publicação DOEMS' && (
+                    {moduloAtual === MODULO_EX_OFFICIO && (
                       <p className="mt-2 text-xs text-slate-500">
                         Use este campo quando a publicação for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
                       </p>
@@ -1705,8 +1696,7 @@ export default function CadastrarRegistroRP() {
                         }}
                         className="mt-1.5"
                         rows={4}
-                        placeholder={formData.tipo_registro === 'Publicação DOEMS' ? "Cole aqui o texto conforme publicado no Diário Oficial..." : "Texto gerado para o BG..."}
-                        required={formData.tipo_registro === 'Publicação DOEMS'}
+                        placeholder="Texto gerado para o BG..."
                       />
                     </div>
 
