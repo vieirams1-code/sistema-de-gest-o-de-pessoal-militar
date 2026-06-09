@@ -1,0 +1,139 @@
+
+/app/src/components/antiguidade/CarreiraAntiguidadePanel.jsx
+  24:7  warning  'isOrdemPreenchida' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/antiguidade/PromocoesTimeline.jsx
+    7:7   warning  'STATUS_PREVISTO' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  125:45  warning  'historico' is defined but never used. Allowed unused args must match /^_/u                 unused-imports/no-unused-vars
+
+/app/src/components/atestado/AtestadoCard.jsx
+  134:34  warning  'form' is defined but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/atestado/JisoHistoricoModal.jsx
+  68:11  warning  'entry' is assigned a value but never used. Allowed unused vars must match /^_/u        unused-imports/no-unused-vars
+  71:9   warning  'novaTermino' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/auth/useCurrentUser.jsx
+   57:12  warning  '_e' is defined but never used                                                              unused-imports/no-unused-vars
+  139:9   warning  'isAdminByAccess' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/debug/DataDebugPanel.jsx
+  17:12  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+
+/app/src/components/ferias/AdminCadeiaPanel.jsx
+  34:7  warning  'statusResultante' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/ferias/feriasAdminUtils.jsx
+  252:12  warning  '_' is defined but never used                                             unused-imports/no-unused-vars
+  280:58  warning  'cadeia' is defined but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+  285:12  warning  '_' is defined but never used                                             unused-imports/no-unused-vars
+
+/app/src/components/funcoes-tags/FuncoesTagsManager.jsx
+  45:108  warning  'isAdmin' is assigned a value but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/livro/livroRegistrosMapper.js
+  238:24  warning  'registro' is defined but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/militar/ContratoDesignacaoModal.jsx
+  49:104  warning  '_e' is defined but never used  unused-imports/no-unused-vars
+
+/app/src/components/militar/ContratosDesignacaoSection.jsx
+  30:104  warning  '_e' is defined but never used                                                unused-imports/no-unused-vars
+  39:10   warning  'DetailItem' is defined but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/militar/MilitarTagsBulkPanel.jsx
+  70:3  warning  'vinculosTagsAtivos' is assigned a value but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/militar/NomeMilitar.jsx
+  25:7  warning  'abrevQuadro' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/militar/SolicitarAtualizacaoModal.jsx
+  36:71  warning  'onSaved' is defined but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/quadro/CardDetalheModal.jsx
+  724:9  warning  'ataJisoAtiva' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/quadro/ColunaBoard.jsx
+  15:10  warning  'hover' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/components/rp/RPSpecificFieldsLivro.jsx
+  20:3  warning  'registroEdicao' is defined but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/AuditoriaComportamento.jsx
+  158:16  warning  'error' is defined but never used  unused-imports/no-unused-vars
+
+/app/src/pages/CadastrarMilitar.jsx
+  155:37  warning  'subgrupamentoTipo' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/CadastrarRegistroRP.jsx
+   55:10  warning  'mapearEntityPublicacaoPorModulo' is defined but never used. Allowed unused vars must match /^_/u   unused-imports/no-unused-vars
+   87:10  warning  'extrairDadosPublicacaoReferencia' is defined but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  151:10  warning  'parseDataBGReferencia' is defined but never used. Allowed unused vars must match /^_/u             unused-imports/no-unused-vars
+  331:16  warning  '_' is defined but never used                                                                       unused-imports/no-unused-vars
+  335:16  warning  '_' is defined but never used                                                                       unused-imports/no-unused-vars
+  820:14  warning  'error' is defined but never used                                                                   unused-imports/no-unused-vars
+
+/app/src/pages/ConciliacaoBoletim.jsx
+  220:10  warning  'calcularPercentualTrechos' is defined but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  893:16  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+  925:14  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+  958:14  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+  993:14  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+
+/app/src/pages/DetalhePromocao.jsx
+   57:7   warning  'DIAG_PREFIX' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  621:34  warning  'registroPromocao' is defined but never used. Allowed unused args must match /^_/u      unused-imports/no-unused-vars
+  750:34  warning  'registroPromocao' is defined but never used. Allowed unused args must match /^_/u      unused-imports/no-unused-vars
+
+/app/src/pages/EstruturaOrganizacional.jsx
+  81:9  warning  'unidades' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/ExtracaoEfetivo.jsx
+  1135:14  warning  '_auditError' is defined but never used  unused-imports/no-unused-vars
+
+/app/src/pages/FolhaAlteracoes.jsx
+  171:12  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+  191:14  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+  203:12  warning  'error' is defined but never used                                                            unused-imports/no-unused-vars
+  389:11  warning  'eventosAgrupados' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/GratificacoesFuncao.jsx
+   95:9   warning  'tiposById' is assigned a value but never used. Allowed unused vars must match /^_/u       unused-imports/no-unused-vars
+  124:10  warning  'CotasTable' is defined but never used. Allowed unused vars must match /^_/u               unused-imports/no-unused-vars
+  616:9   warning  'cotasFiltradas' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/Home.jsx
+  221:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  242:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  263:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  284:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  305:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  327:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  348:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+  376:16  warning  '_error' is defined but never used  unused-imports/no-unused-vars
+
+/app/src/pages/Militares.jsx
+   97:7   warning  'WRAP_COLUMN_KEYS' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  561:11  warning  'gruposById' is assigned a value but never used. Allowed unused vars must match /^_/u        unused-imports/no-unused-vars
+
+/app/src/pages/PlanoAnualFerias.jsx
+  34:17  warning  'planos' is assigned a value but never used. Allowed unused vars must match /^_/u         unused-imports/no-unused-vars
+  34:41  warning  'loadingPlanos' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  39:41  warning  'loadingFerias' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/Publicacoes.jsx
+  433:13  warning  'entity' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  485:13  warning  'entity' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  618:13  warning  'entity' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+/app/src/pages/Punicoes.jsx
+  37:47  warning  '_' is defined but never used  unused-imports/no-unused-vars
+
+/app/src/pages/RegistrosMilitar.jsx
+  291:15  warning  'numeroBgBusca' is assigned a value but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+  444:11  warning  'sistema' is assigned a value but never used. Allowed unused vars must match /^_/u        unused-imports/no-unused-vars
+
+/app/src/pages/__tests__/DetalhePromocao.perf_audit.test.js
+  64:10  warning  'simulateHistoricalOrderingPayloads' is defined but never used. Allowed unused vars must match /^_/u  unused-imports/no-unused-vars
+
+✖ 69 problems (0 errors, 69 warnings)
