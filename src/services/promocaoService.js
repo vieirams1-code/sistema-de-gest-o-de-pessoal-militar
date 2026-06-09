@@ -1404,3 +1404,17 @@ export function simularImpactoCadeiaPromocoes({
 
   return { promocoesAfetadas: resultado, alertas };
 }
+
+export async function bulkUpdatePromocaoMilitar(payloads = []) {
+  if (!Array.isArray(payloads) || payloads.length === 0) return { atualizados: 0 };
+  const entity = base44.entities.PromocaoMilitar;
+  if (!entity) throw new Error('Entidade PromocaoMilitar indisponível para atualização em lote.');
+
+  if (typeof entity.bulkUpdate === 'function') {
+    await entity.bulkUpdate(payloads);
+  } else {
+    await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+  }
+
+  return { atualizados: payloads.length };
+}

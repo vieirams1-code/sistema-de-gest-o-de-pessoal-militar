@@ -41,7 +41,8 @@ import {
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
   validarImutabilidadePosPublicacao,
-  valorOuTraco
+  valorOuTraco,
+  bulkUpdatePromocaoMilitar
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
 import {
@@ -668,12 +669,19 @@ export default function DetalhePromocao() {
       const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocaoReferenciaCadastro));
       const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao: promocaoReferenciaCadastro });
       if (!validacao.valido) throw new Error(mensagensValidacaoSimples(validacao).join(' '));
-      const originais = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })]));
-      const alteradosComPatch = turmaComEfeito.map((registro) => ({
-        registro,
-        patch: montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }),
-      })).filter(({ registro, patch }) => (
-        JSON.stringify(patch) !== JSON.stringify(originais.get(String(registro.id)) || {})
+      const originais = new Map(turmaBaseComparacao.map((registro) => [
+        String(registro.id),
+        JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })),
+      ]));
+      const alteradosComPatch = turmaComEfeito.map((registro) => {
+        const patch = montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro });
+        return {
+          registro,
+          patch,
+          patchString: JSON.stringify(patch),
+        };
+      }).filter(({ registro, patchString }) => (
+        patchString !== (originais.get(String(registro.id)) || '{}')
       ));
 
       const validacaoImutabilidade = validarImutabilidadePosPublicacao({
@@ -689,11 +697,7 @@ export default function DetalhePromocao() {
       }));
 
       if (payloads.length > 0) {
-        if (base44.entities.PromocaoMilitar.bulkUpdate) {
-          await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
-        } else {
-          await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
-        }
+        await bulkUpdatePromocaoMilitar(payloads);
       }
 
       return alteradosComPatch.map((x) => x.registro);
@@ -852,17 +856,13 @@ export default function DetalhePromocao() {
         );
         if (!confirmou) return { cancelado: true };
 
-        const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), item.ordem]));
+        const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), Number(item.ordem)]));
         const payloads = resultado.ordenados
-          .filter((item) => Number(item.ordem) !== atualMap.get(String(item.id)))
+          .filter((item) => Number(item.ordem) !== (atualMap.get(String(item.id)) || 0))
           .map((item) => ({ id: item.id, ordem: Number(item.ordem) }));
 
         if (payloads.length > 0) {
-          if (base44.entities.PromocaoMilitar.bulkUpdate) {
-            await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
-          } else {
-            await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
-          }
+          await bulkUpdatePromocaoMilitar(payloads);
         }
 
         return { atualizados: payloads.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
@@ -901,15 +901,11 @@ export default function DetalhePromocao() {
 
       const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), Number(item.ordem)]));
       const payloads = ordenados
-        .filter((item) => Number(item.ordem) !== atualMap.get(String(item.id)))
+        .filter((item) => Number(item.ordem) !== (atualMap.get(String(item.id)) || 0))
         .map((item) => ({ id: item.id, ordem: Number(item.ordem) }));
 
       if (payloads.length > 0) {
-        if (base44.entities.PromocaoMilitar.bulkUpdate) {
-          await base44.entities.PromocaoMilitar.bulkUpdate(payloads);
-        } else {
-          await Promise.all(payloads.map(({ id, ...rest }) => base44.entities.PromocaoMilitar.update(id, rest)));
-        }
+        await bulkUpdatePromocaoMilitar(payloads);
       }
 
       return { atualizados: payloads.length, historica: false };
