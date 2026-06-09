@@ -20,14 +20,14 @@ const isDevRuntime = () => {
 const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ ?? new Set<string>();
 (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ = EXECUCOES_EM_ANDAMENTO;
 
-function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, militar_id = null, motivo = '' }: any) {
+function logDiagnosticoErro({ etapa, promocao_id = null, item_id = null, motivo = '' }: any) {
   if (isDevRuntime()) {
-    console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, militar_id, motivo });
+    console.error('[publicarPromocaoOficial][erro]', { etapa, promocao_id, item_id, motivo });
   }
 }
 
-function montarErro({ etapa, motivo, promocao_id = null, item_id = null, militar_id = null }: any) {
-  const erro = { success: false, etapa, motivo, promocao_id, item_id, militar_id };
+function montarErro({ etapa, motivo, promocao_id = null, item_id = null }: any) {
+  const erro = { success: false, etapa, motivo, promocao_id, item_id };
   logDiagnosticoErro(erro);
   return erro;
 }
@@ -52,15 +52,15 @@ function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAl
     const ordem = Number(item?.ordem);
     const status = normalizar(item?.status);
 
-    if (!itemId) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_sem_id', promocao_id: promocaoId, item_id: null, militar_id: militarId});
-    if (!militarId) return montarErro({ etapa: 'validacao_entrada', motivo: 'militar_id_ausente', promocao_id: promocaoId, item_id: itemId, militar_id: null});
-    if (militarIds.has(militarId)) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_militar_id', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
-    if (!Number.isFinite(ordem) || ordem <= 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_invalida', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
-    if (ordens.has(String(ordem))) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_ordem', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+    if (!itemId) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_sem_id', promocao_id: promocaoId, item_id: null });
+    if (!militarId) return montarErro({ etapa: 'validacao_entrada', motivo: 'militar_id_ausente', promocao_id: promocaoId, item_id: itemId });
+    if (militarIds.has(militarId)) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_militar_id', promocao_id: promocaoId, item_id: itemId });
+    if (!Number.isFinite(ordem) || ordem <= 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'ordem_invalida', promocao_id: promocaoId, item_id: itemId });
+    if (ordens.has(String(ordem))) return montarErro({ etapa: 'validacao_entrada', motivo: 'duplicidade_ordem', promocao_id: promocaoId, item_id: itemId });
     ordens.add(String(ordem));
     militarIds.add(militarId);
     itensComOrdem.push({ itemId, militarId, ordem });
-    if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_status_bloqueado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+    if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) return montarErro({ etapa: 'validacao_entrada', motivo: 'item_status_bloqueado', promocao_id: promocaoId, item_id: itemId });
   }
 
   const ordensOrdenadas = itensComOrdem.map((i: any) => i.ordem).sort((a: number, b: number) => a - b);
@@ -138,7 +138,6 @@ Deno.serve(async (req) => {
           promocao_id: promocaoId,
           quantidade: itens?.length,
           ids: itens?.map((i: any) => i?.id),
-          militar_ids: itens?.map((i: any) => i?.militar_id),
           status: itens?.map((i: any) => i?.status),
         }
       );
@@ -178,11 +177,11 @@ Deno.serve(async (req) => {
       const itemId = texto(item?.id) || null;
       const militarId = texto(item?.militar_id) || null;
       if (isDevRuntime()) {
-        console.error('PROCESSANDO_ITEM', { item_id: itemId, militar_id: militarId });
+        console.error('PROCESSANDO_ITEM', { item_id: itemId });
       }
       try {
         const militarEncontrado = await Militar.get(item.militar_id).catch(() => null);
-        if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+        if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId });
 
         const payloadHistorico = {
           militar_id: militarId,
@@ -206,13 +205,13 @@ Deno.serve(async (req) => {
         let historico = historicoExistente;
         if (!historico) {
           historico = await Historico.create(payloadHistorico).catch(() => null);
-          if (!historico?.id) throw montarErro({ etapa: 'criar_historico', motivo: 'historico_criacao_falhou', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+          if (!historico?.id) throw montarErro({ etapa: 'criar_historico', motivo: 'historico_criacao_falhou', promocao_id: promocaoId, item_id: itemId });
         } else if (!texto(historico?.promocao_id)) {
           historico = await Historico.update(historico.id, { promocao_id: promocaoId });
         }
 
         const atualizacaoMilitar = await Militar.update(item.militar_id, { posto_graduacao: texto(promocao.posto_graduacao), quadro: texto(promocao.quadro) }).catch(() => null);
-        if (!atualizacaoMilitar) throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+        if (!atualizacaoMilitar) throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId });
 
         await PromocaoMilitar.update(item.id, { status: 'publicado', publicado: true, historico_promocao_v2_id: texto(historico?.id), atualizar_cadastro_militar: true, motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role.', resultado_aplicacao_cadastro: 'imediatamente_superior' });
 
@@ -220,7 +219,7 @@ Deno.serve(async (req) => {
         militarIdsAfetados.add(militarId);
         publicados += 1;
       } catch (error: any) {
-        const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId, militar_id: militarId});
+        const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId });
         errors.push({ ...erroItem, message: erroItem?.motivo || error?.message || 'Falha ao publicar item.' });
       }
     }
