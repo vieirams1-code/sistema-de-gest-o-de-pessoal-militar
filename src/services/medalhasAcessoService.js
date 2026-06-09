@@ -33,11 +33,11 @@ export function validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscop
   }
 }
 
-export function adicionarAuditoriaMedalha(payload = {}, { userEmail, acao } = {}) {
+export function adicionarAuditoriaMedalha(payload = {}, { userEmail, acao, timestamp } = {}) {
   const auditoria = {
     ...payload,
     updated_by: userEmail || payload.updated_by || '',
-    updated_at: new Date().toISOString(),
+    updated_at: timestamp || new Date().toISOString(),
   };
 
   if (!userEmail) return auditoria;
@@ -92,12 +92,15 @@ export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds =
 export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userEmail, motivoReset = 'administrativamente' }) {
   if (!medalhas.length) return 0;
 
+  const timestamp = new Date().toISOString();
+  const dataHoje = new Date().toLocaleDateString('pt-BR');
+
   const payloads = medalhas.map((registro) => ({
     id: registro.id,
     ...adicionarAuditoriaMedalha({
       status: 'CANCELADA',
-      observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação resetada ${motivoReset} em ${new Date().toLocaleDateString('pt-BR')}.`,
-    }, { userEmail, acao: 'reset' }),
+      observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação resetada ${motivoReset} em ${dataHoje}.`,
+    }, { userEmail, acao: 'reset', timestamp }),
   }));
 
   if (typeof base44Client.entities.Medalha.bulkUpdate === 'function') {

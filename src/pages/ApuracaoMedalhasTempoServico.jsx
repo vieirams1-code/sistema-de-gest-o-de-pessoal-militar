@@ -367,7 +367,7 @@ export default function ApuracaoMedalhasTempoServico() {
         mensagem: 'Sem permissão para resetar indicações.',
       });
       const pendentes = filtrarIndicacoesTempoResetaveis(registrosTempo);
-      const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
+      const pendentesEscopo = isAdmin ? pendentes : pendentes.filter((m) => militarIdsEscopo.has(m.militar_id));
 
       return resetarMedalhasEmLote(base44, {
         medalhas: pendentesEscopo,
