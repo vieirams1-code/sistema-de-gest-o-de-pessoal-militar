@@ -854,8 +854,8 @@ export default function DetalhePromocao() {
 
         const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), item.ordem]));
         const payloads = resultado.ordenados
-          .filter((item) => Number(item.ordem) !== Number(atualMap.get(String(item.id))))
-          .map((item) => ({ id: item.id, ordem: item.ordem }));
+          .filter((item) => Number(item.ordem) !== atualMap.get(String(item.id)))
+          .map((item) => ({ id: item.id, ordem: Number(item.ordem) }));
 
         if (payloads.length > 0) {
           if (base44.entities.PromocaoMilitar.bulkUpdate) {
@@ -899,10 +899,10 @@ export default function DetalhePromocao() {
       const confirmou = window.confirm(`Ordenar pela lista atual?\n\nPrévia (primeiros 10):\n${previaTexto}${ordenados.length > 10 ? '\n...' : ''}`);
       if (!confirmou) return { cancelado: true };
 
-      const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), item.ordem]));
+      const atualMap = new Map(rascunhoTurma.map((item) => [String(item.id), Number(item.ordem)]));
       const payloads = ordenados
-        .filter((item) => Number(item.ordem) !== Number(atualMap.get(String(item.id))))
-        .map((item) => ({ id: item.id, ordem: item.ordem }));
+        .filter((item) => Number(item.ordem) !== atualMap.get(String(item.id)))
+        .map((item) => ({ id: item.id, ordem: Number(item.ordem) }));
 
       if (payloads.length > 0) {
         if (base44.entities.PromocaoMilitar.bulkUpdate) {
