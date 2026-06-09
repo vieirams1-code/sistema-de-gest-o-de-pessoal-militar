@@ -1519,7 +1519,9 @@ export default function CadastrarRegistroRP() {
 
                     <div>
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium text-slate-700">Texto publicado</Label>
+                        <Label className="text-sm font-medium text-slate-700">
+                          {isRegistroPublicacaoDOEMS ? 'Texto publicado no DOEMS' : 'Texto publicado'}
+                        </Label>
                         {textoEditadoManualmente && (
                           <span className="text-xs font-medium text-amber-700">
                             Texto alterado manualmente
