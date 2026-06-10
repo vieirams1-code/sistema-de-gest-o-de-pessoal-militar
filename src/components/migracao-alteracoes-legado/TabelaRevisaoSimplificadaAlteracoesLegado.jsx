@@ -168,8 +168,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   }, [linhas, pesquisa]);
 
   const linhasFiltradas = useMemo(() => linhasPesquisadas.filter((linha) => {
-    if (possuiClassificacao(linha) && !mostrarClassificados) return false;
-    if (!possuiClassificacao(linha) && !mostrarPendentes) return false;
+    if (possuiAlgumaSelecaoClassificacao(linha) && !mostrarClassificados) return false;
+    if (!possuiAlgumaSelecaoClassificacao(linha) && !mostrarPendentes) return false;
 
     if (filtroOperacional === 'pendentes-classificacao') return estaPendenteClassificacao(linha);
     if (filtroOperacional === 'erros') return possuiErro(linha);
@@ -534,7 +534,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                           )}
                         >
                           <span className="truncate">
-                            {possuiClassificacao(linha) ? linha.tipo_classificado : 'Pesquisar tipo de publicação...'}
+                            {possuiAlgumaSelecaoClassificacao(linha) ? linha.tipo_classificado : 'Pesquisar tipo de publicação...'}
                           </span>
                           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                         </Button>
@@ -558,7 +558,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                                 }}
                                 className="text-xs text-slate-600 italic"
                               >
-                                <Check className={cn('mr-2 h-3.5 w-3.5 shrink-0', !possuiClassificacao(linha) ? 'opacity-100' : 'opacity-0')} />
+                                <Check className={cn('mr-2 h-3.5 w-3.5 shrink-0', !possuiAlgumaSelecaoClassificacao(linha) ? 'opacity-100' : 'opacity-0')} />
                                 <span className="truncate">Usar tipo legado / sem classificação manual</span>
                               </CommandItem>
                               {tiposPublicacaoValidos.map((tipo) => (
