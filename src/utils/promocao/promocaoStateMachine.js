@@ -30,7 +30,12 @@ export function getEstadoItemPromocao(item = {}) {
 export function getEstadoPromocao(promocao = {}, itens = []) {
   const status = statusNormalizado(promocao?.status);
   if (['cancelada', 'cancelado'].includes(status)) return ESTADOS_PROMOCAO.CANCELADA;
-  if (['publicada', 'publicado', 'consolidada', 'consolidado'].includes(status)) return ESTADOS_PROMOCAO.PUBLICADA;
+  if (['publicada', 'publicado', 'consolidada', 'consolidado'].includes(status)) {
+    if (Array.isArray(itens) && itens.some((item) => getEstadoItemPromocao(item) === ESTADOS_PROMOCAO.EM_EDICAO)) {
+      return ESTADOS_PROMOCAO.PRONTA_PUBLICAR;
+    }
+    return ESTADOS_PROMOCAO.PUBLICADA;
+  }
   if (status === 'revertida' || itens.some((item) => getEstadoItemPromocao(item) === ESTADOS_PROMOCAO.REVERTIDA)) return ESTADOS_PROMOCAO.REVERTIDA;
   if (status === 'rascunho') return ESTADOS_PROMOCAO.RASCUNHO;
   if ((itens || []).length === 0) return ESTADOS_PROMOCAO.EM_EDICAO;
