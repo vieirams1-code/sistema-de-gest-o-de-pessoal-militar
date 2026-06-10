@@ -154,6 +154,41 @@ test('Folha de Alterações inclui e formata corretamente registros DOEMS', () =
   assert.equal(eventos.length, 1);
   const doems = eventos[0];
   assert.equal(doems.texto, 'Promovido ao posto de Capitão');
-  assert.equal(doems.referenciaBoletim, 'DOEMS nº 1234, de 22/05/2026');
+  assert.equal(doems.referenciaBoletim, 'DOEMS nº 1234, de 22/05/2026. Subtipo: Promoção.');
   assert.equal(doems.descricao, 'Registro de Publicação DOEMS - DOEMS nº 1234');
+});
+
+test('Folha de Alterações inclui registros DOEMS usando data_registro como fallback', () => {
+  const militar = {
+    id: 'militar-edson',
+    nome_completo: 'Edson Vieira',
+    matricula: '999888',
+  };
+
+  const registros = [
+    {
+      id: 'doems-fallback-date',
+      origem_fonte: 'PublicacaoExOfficio',
+      militar_id: 'militar-edson',
+      tipo: 'Registro de Publicação DOEMS',
+      subtipo_geral: 'Promoção',
+      texto_publicacao: 'Texto da promoção do Edson',
+      doems_edicao_numero: '5678',
+      data_registro: '2026-06-09',
+      status_publicacao: 'Publicado',
+    },
+  ];
+
+  const { eventos } = montarHistoricoFolhaAlteracoes({
+    registros,
+    atestados: [],
+    militar,
+    dataInicial: '2026-06-01',
+    dataFinal: '2026-06-30',
+  });
+
+  assert.equal(eventos.length, 1, 'O registro DOEMS deve ser incluído usando data_registro');
+  const doems = eventos[0];
+  assert.equal(doems.data, '2026-06-09');
+  assert.equal(doems.referenciaBoletim, 'DOEMS nº 5678, de 09/06/2026. Subtipo: Promoção.');
 });
