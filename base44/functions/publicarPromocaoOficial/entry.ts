@@ -36,7 +36,17 @@ function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAl
   const promocaoId = texto(promocao_id) || texto(promocao?.id) || null;
   if (!promocaoId) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', promocao_id: null});
   if (!promocao || Object.keys(promocao).length === 0) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_nao_encontrada', promocao_id: promocaoId});
-  if (STATUS_PROMOCAO_PUBLICADA.has(normalizar(promocao?.status))) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_ja_publicada', promocao_id: promocaoId});
+
+  if (STATUS_PROMOCAO_PUBLICADA.has(normalizar(promocao?.status))) {
+    const temItensParaPublicar = (itens || []).some(item =>
+      !STATUS_PROMOCAO_PUBLICADA.has(normalizar(item?.status)) &&
+      !STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(normalizar(item?.status))
+    );
+    if (!temItensParaPublicar) {
+      return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_ja_publicada', promocao_id: promocaoId});
+    }
+  }
+
   if (!dataSomente(promocao?.data_promocao)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_data', promocao_id: promocaoId});
   if (!texto(promocao?.posto_graduacao)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_posto', promocao_id: promocaoId});
   if (!texto(promocao?.quadro)) return montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_sem_quadro', promocao_id: promocaoId});

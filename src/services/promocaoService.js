@@ -1,4 +1,4 @@
-import { base44 } from '@/api/base44Client';
+import { base44 } from '../api/base44Client.js';
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 import { deveAtualizarCadastroMilitarPorPromocao } from '../utils/promocao/deveAtualizarCadastroMilitarPorPromocao.js';
@@ -58,7 +58,7 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
 
   if (!promocao || !texto(promocao.id)) bloqueios.push('Promoção não carregada.');
 
-  const itensParaPublicar = (itens || []).filter((item) => !ehStatusPublicado(item?.status) && !STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(statusNormalizado(item?.status)));
+  const itensParaPublicar = (itens || []).filter((item) => isItemPublicavel(item));
   if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status)) && itensParaPublicar.length === 0) {
     bloqueios.push('Promoção já publicada/consolidada.');
   }
@@ -86,11 +86,7 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
     const militarId = texto(item?.militar_id);
     const ordem = Number(item?.ordem);
     const status = statusNormalizado(item?.status);
-    const efeito = getSugestaoAtualizacaoCadastro({ militar: item?.militar, promocao });
 
-    if (!militarId) bloqueios.push(`${linha}: militar_id ausente.`);
-    if (!item?.militar) bloqueios.push(`${linha}: militar não carregado.`);
-    if (!Number.isFinite(ordem) || ordem <= 0) bloqueios.push(`${linha}: ordem inválida.`);
     if (militarId) {
       if (militares.has(militarId)) bloqueios.push('Há militar duplicado na promoção.');
       militares.add(militarId);
@@ -100,6 +96,15 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
       if (ordens.has(chaveOrdem)) bloqueios.push('Há ordem duplicada na promoção.');
       ordens.add(chaveOrdem);
     }
+
+    if (!isItemPublicavel(item)) return;
+
+    const efeito = getSugestaoAtualizacaoCadastro({ militar: item?.militar, promocao });
+
+    if (!militarId) bloqueios.push(`${linha}: militar_id ausente.`);
+    if (!item?.militar) bloqueios.push(`${linha}: militar não carregado.`);
+    if (!Number.isFinite(ordem) || ordem <= 0) bloqueios.push(`${linha}: ordem inválida.`);
+
     if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) bloqueios.push(`${linha}: item bloqueado/cancelado/retificado não pode ser publicado.`);
     if (!promocaoInicioCadeia) {
       if (efeito.tipo === 'incompativel') bloqueios.push(`${linha}: militar incompatível com o posto/graduação destino.`);
@@ -183,7 +188,7 @@ export async function publicarPromocaoOficial({ promocao, itens = [], temAlterac
   const itensElegiveis = (itens || []).filter((item) => {
     const bloqueado = STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(statusNormalizado(item?.status));
     if (bloqueado) filtroElegibilidade.status_bloqueado += 1;
-    return !bloqueado && !ehStatusPublicado(item?.status);
+    return isItemPublicavel(item);
   });
 
   const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
@@ -268,8 +273,21 @@ Militar: ${militarIdErro}`);
 }
 
 
-function ehStatusPublicado(status) {
+export function ehStatusPublicado(status) {
   return STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(status));
+}
+
+export function isItemPublicavel(item) {
+  const status = statusNormalizado(item?.status);
+  const militarId = texto(item?.militar_id);
+  const publicado = STATUS_PROMOCAO_PUBLICADA.has(status) || Boolean(item?.publicado);
+  const bloqueado = STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status);
+
+  if (!militarId || publicado || bloqueado) return false;
+
+  // Um item é publicável se está "Na promoção" (nem publicado, nem bloqueado/cancelado).
+  // Consideramos publicável se está explicitamente selecionado ou possui um status operacional inicial.
+  return Boolean(item?.selecionado) || ['elegivel', 'selecionado', 'em_edicao'].includes(status);
 }
 
 
