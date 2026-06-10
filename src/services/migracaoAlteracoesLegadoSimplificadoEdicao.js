@@ -242,6 +242,7 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
     });
     const proxima = {
       ...linha,
+      classificacao_confirmada: !!linha.classificacao_confirmada,
       status,
       statusSimplificado: status,
       status_publicacao: statusPublicacao,
