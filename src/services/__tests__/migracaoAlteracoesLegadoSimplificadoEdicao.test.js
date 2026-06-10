@@ -26,8 +26,8 @@ function linha(linhaNumero, numero_nota, extras = {}) {
 
 test('revalida obrigatórios e duplicidade dentro da própria análise', () => {
   const linhas = revalidarLinhasRevisaoSimplificada([
-    linha(2, 'NOTA-1'),
-    linha(3, ' NOTA-1 '),
+    linha(2, 'NOTA-1', { classificacao_confirmada: true }),
+    linha(3, ' NOTA-1 ', { classificacao_confirmada: true }),
     linha(4, '', { texto_publicado: '' }),
   ]);
 
@@ -38,9 +38,34 @@ test('revalida obrigatórios e duplicidade dentro da própria análise', () => {
   assert.match(linhas[2].erros.join(' '), /Texto publicado é obrigatório/);
 });
 
+test('exige confirmação explícita para status pronta', () => {
+  const [pendente] = revalidarLinhasRevisaoSimplificada([
+    linha(2, 'NOTA-1', { classificacao_confirmada: false })
+  ]);
+  assert.equal(pendente.status, 'pendente_confirmacao');
+
+  const [pronta] = revalidarLinhasRevisaoSimplificada([
+    linha(2, 'NOTA-1', { classificacao_confirmada: true })
+  ]);
+  assert.equal(pronta.status, 'pronta');
+});
+
+test('classificação histórica é suficiente para deixar pronta após confirmação', () => {
+  const [historica] = revalidarLinhasRevisaoSimplificada([
+    linha(2, 'NOTA-1', {
+      numero_bg_br: 'BG-10',
+      tipo_classificado: '',
+      classificacao_historica_id: 'class-1',
+      classificacao_confirmada: true
+    })
+  ]);
+  assert.equal(historica.status, 'pronta');
+  assert.equal(historica.avisos.length, 0);
+});
+
 test('nota importada deixa de ser duplicada quando usuário informa número livre', () => {
   const original = revalidarLinhasRevisaoSimplificada([
-    linha(2, 'NOTA-1', { numerosNotaImportados: ['NOTA-1', 'NOTA-2'] }),
+    linha(2, 'NOTA-1', { numerosNotaImportados: ['NOTA-1', 'NOTA-2'], classificacao_confirmada: true }),
   ]);
   assert.equal(original[0].status, 'duplicada');
 
@@ -52,7 +77,10 @@ test('nota importada deixa de ser duplicada quando usuário informa número livr
 });
 
 test('linha recusada sai dos bloqueios e restauração revalida o lote', () => {
-  const duplicadas = revalidarLinhasRevisaoSimplificada([linha(2, 'A'), linha(3, 'A')]);
+  const duplicadas = revalidarLinhasRevisaoSimplificada([
+    linha(2, 'A', { classificacao_confirmada: true }),
+    linha(3, 'A', { classificacao_confirmada: true })
+  ]);
   const recusada = atualizarLinhaRevisaoSimplificada(duplicadas, 2, { recusada: true });
   assert.equal(recusada[0].status, 'recusada');
   assert.equal(recusada[0].status_publicacao, 'AGUARDANDO_PUBLICACAO');
@@ -67,7 +95,7 @@ test('linha recusada sai dos bloqueios e restauração revalida o lote', () => {
 
 test('calcula status de publicação sem usar AGUARDANDO_NOTA e sincroniza futura importação', () => {
   const aguardandoSemBg = revalidarLinhasRevisaoSimplificada([
-    linha(2, 'NOTA-1', { data_bg_br: '' }),
+    linha(2, 'NOTA-1', { data_bg_br: '', classificacao_confirmada: true }),
   ]);
   assert.equal(aguardandoSemBg[0].status_publicacao, 'AGUARDANDO_PUBLICACAO');
   assert.equal(aguardandoSemBg[0].transformado.status_publicacao, 'AGUARDANDO_PUBLICACAO');
@@ -109,6 +137,7 @@ test('payload usa matéria legado como fallback sem bloquear e marca classifica�
     materia_legado: 'Licença Especial',
     tipo_legado: '',
     tipo_classificado: '__fallback__',
+    classificacao_confirmada: true,
   });
   const [validada] = revalidarLinhasRevisaoSimplificada([entrada]);
   const payload = montarPayloadPublicacaoExOfficioMigracaoLegado(validada);
@@ -186,16 +215,13 @@ test('data_publicacao usa transformado.data_bg_br e data_bg como fallbacks', () 
   assert.equal(viaDataBg.data_publicacao, '29/05/2026');
 });
 
-test('linha sem data_publicacao válida fica bloqueada antes da importação', () => {
+test('linha com nota e sem data_publicacao fica pendente de confirmação em vez de erro', () => {
   const entrada = linha(2, 'NOTA-1', { data_bg_br: '' });
   const [validada] = revalidarLinhasRevisaoSimplificada([entrada]);
 
-  assert.equal(validada.status, 'erro');
-  assert.match(validada.erros.join(' '), /Data da publicação ausente\. Preencha a data do BG\/BR antes de importar\./);
-  assert.throws(
-    () => montarPayloadPublicacaoExOfficioMigracaoLegado(entrada),
-    /Data da publicação ausente\. Preencha a data do BG\/BR antes de importar\./,
-  );
+  assert.equal(validada.status, 'pendente_confirmacao');
+  assert.equal(validada.erros.length, 0);
+  assert.match(validada.avisos.join(' '), /A publicação em BG ainda está pendente/);
 });
 
 test('resolver tipo usa tipo_legado e transformado.materia_legado após matéria legado', () => {
