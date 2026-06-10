@@ -64,11 +64,11 @@ function obterTrechosComDestaque(texto, termosRelevantes = []) {
   }));
 }
 
-function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.', termosRelevantes = [] }) {
+const TextoExpansivel = React.memo(({ texto = '', textoVazio = 'Sem conteúdo para exibir.', termosRelevantes = [] }) => {
   const [expandido, setExpandido] = useState(false);
   const textoFinal = texto?.trim() || textoVazio;
   const podeExpandir = textoFinal.length > 170;
-  const partes = obterTrechosComDestaque(textoFinal, termosRelevantes);
+  const partes = useMemo(() => obterTrechosComDestaque(textoFinal, termosRelevantes), [textoFinal, termosRelevantes]);
 
   return (
     <div className="space-y-1">
@@ -101,7 +101,7 @@ function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.'
       ) : null}
     </div>
   );
-}
+});
 
 function obterTermosRelevantesComparacao(correspondencia) {
   const textoCombinado = `${correspondencia?.trechoComparadoSistema || ''} ${correspondencia?.trechoComparadoBoletim || ''}`;
@@ -743,13 +743,16 @@ export default function ConciliacaoBoletim() {
       const cacheKey = `${pub.id}-${notaId}`;
 
       if (cacheCorrespondencia.current.has(cacheKey)) {
-        mapa[pub.id] = cacheCorrespondencia.current.get(cacheKey);
-        novoCache.set(cacheKey, mapa[pub.id]);
+        const cachedRes = cacheCorrespondencia.current.get(cacheKey);
+        mapa[pub.id] = cachedRes;
+        novoCache.set(cacheKey, cachedRes);
         return;
       }
 
       const nota = mapaNotasById.get(notaId);
       const resultado = calcularCorrespondenciaTextual(pub, nota);
+      resultado.termosRelevantes = obterTermosRelevantesComparacao(resultado);
+
       mapa[pub.id] = resultado;
       novoCache.set(cacheKey, resultado);
     });
@@ -1080,9 +1083,9 @@ export default function ConciliacaoBoletim() {
             const notaId = vinculosEfetivos[pub.id];
             const nota = mapaNotasById.get(notaId);
             const automatico = conciliacaoAutomatica[pub.id] === notaId;
-            const correspondencia = correspondenciaPorPublicacao[pub.id] || { percentual: 0, trechoComparadoSistema: '', trechoComparadoBoletim: '' };
+            const correspondencia = correspondenciaPorPublicacao[pub.id] || { percentual: 0, trechoComparadoSistema: '', trechoComparadoBoletim: '', termosRelevantes: [] };
             const faixa = classificarCorrespondencia(correspondencia.percentual);
-            const termosRelevantes = obterTermosRelevantesComparacao(correspondencia);
+            const termosRelevantes = correspondencia.termosRelevantes;
 
             return (
               <div key={pub.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
