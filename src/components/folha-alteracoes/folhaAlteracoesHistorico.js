@@ -154,6 +154,11 @@ function getTextoOficialRegistroFolhaAlteracoes(item) {
   return '';
 }
 
+function isRegistroDOEMS(item = {}) {
+  const tipo = toText(item?.tipo_registro || item?.tipo || '');
+  return tipo === 'Registro de Publicação DOEMS';
+}
+
 function extrairDadosBgFolhaAlteracoes(item = {}) {
   const numero = toText(item?.numero_bg || item?.publicacao?.numero_bg || item?.boletim_numero);
   const data = normalizarDataISOFolhaAlteracoes(item?.data_bg || item?.publicacao?.data_bg || item?.boletim_data);
@@ -165,6 +170,22 @@ function extrairDadosBgFolhaAlteracoes(item = {}) {
 }
 
 function montarReferenciaBoletimFolhaAlteracoes(item = {}) {
+  if (isRegistroDOEMS(item)) {
+    const edicao = toText(item.doems_edicao_numero);
+    const dataPub = normalizarDataISOFolhaAlteracoes(item.data_publicacao);
+    if (!edicao && !dataPub) return '';
+
+    if (edicao && dataPub) {
+      const [ano, mes, dia] = dataPub.split('-');
+      return `DOEMS nº ${edicao}, de ${dia}/${mes}/${ano}`;
+    }
+
+    if (edicao) return `DOEMS nº ${edicao}`;
+
+    const [ano, mes, dia] = dataPub.split('-');
+    return `DOEMS de ${dia}/${mes}/${ano}`;
+  }
+
   const bg = extrairDadosBgFolhaAlteracoes(item);
   if (!bg.completo) return '';
   const [ano, mes, dia] = bg.data.split('-');
@@ -172,8 +193,13 @@ function montarReferenciaBoletimFolhaAlteracoes(item = {}) {
 }
 
 function registroPublicadoEmBgFolhaAlteracoes(item = {}) {
+  const statusPublicado = obterStatusCanonicoPublicacao(item) === STATUS_PUBLICACAO.PUBLICADO;
+  if (isRegistroDOEMS(item)) {
+    return statusPublicado;
+  }
+
   const bg = extrairDadosBgFolhaAlteracoes(item);
-  return bg.completo && obterStatusCanonicoPublicacao(item) === STATUS_PUBLICACAO.PUBLICADO;
+  return bg.completo && statusPublicado;
 }
 
 function getDataEventoFolhaAlteracoes(item = {}) {
@@ -189,13 +215,24 @@ export function montarEventoRegistroMilitarFolhaAlteracoes(item, dataEvento = ge
   const tipoPublicacao = item?.tipo_registro || item?.tipo || item?.categoria || 'Publicação';
   const origem = item?.origem_fonte || item?.origem || (item?.tipo_registro ? 'RegistroLivro' : 'PublicacaoExOfficio');
 
+  let refIdentificador = '';
+  if (isRegistroDOEMS(item)) {
+    const edicao = toText(item.doems_edicao_numero);
+    refIdentificador = edicao ? `DOEMS nº ${edicao}` : 'DOEMS';
+  } else {
+    const bgNumero = extrairDadosBgFolhaAlteracoes(item).numero;
+    refIdentificador = bgNumero ? `BG ${bgNumero}` : '';
+  }
+
+  const descricao = [tipoPublicacao, refIdentificador].filter(Boolean).join(' - ');
+
   return {
     id: item.id,
     data: dataEvento,
     tipo: 'Publicação',
     texto: textoOficial,
     referenciaBoletim: montarReferenciaBoletimFolhaAlteracoes(item),
-    descricao: `${tipoPublicacao} - BG ${extrairDadosBgFolhaAlteracoes(item).numero}`,
+    descricao,
     origem,
   };
 }

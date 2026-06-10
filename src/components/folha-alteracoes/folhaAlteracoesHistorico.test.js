@@ -121,3 +121,39 @@ test('Folha de Alterações monta o fluxo completo com RegistroLivro e Publicaca
     renderizados: 2,
   });
 });
+
+test('Folha de Alterações inclui e formata corretamente registros DOEMS', () => {
+  const militar = {
+    id: 'militar-gabriel',
+    nome_completo: 'Gabriel Mendes dos Santos',
+    matricula: '123456',
+  };
+
+  const registros = [
+    {
+      id: 'doems-promocao',
+      origem_fonte: 'PublicacaoExOfficio',
+      militar_id: 'militar-gabriel',
+      tipo: 'Registro de Publicação DOEMS',
+      subtipo_geral: 'Promoção',
+      texto_publicacao: 'Promovido ao posto de Capitão',
+      doems_edicao_numero: '1234',
+      data_publicacao: '2026-05-22',
+      status_publicacao: 'Publicado',
+    },
+  ];
+
+  const { eventos } = montarHistoricoFolhaAlteracoes({
+    registros,
+    atestados: [],
+    militar,
+    dataInicial: '2026-05-01',
+    dataFinal: '2026-05-31',
+  });
+
+  assert.equal(eventos.length, 1);
+  const doems = eventos[0];
+  assert.equal(doems.texto, 'Promovido ao posto de Capitão');
+  assert.equal(doems.referenciaBoletim, 'DOEMS nº 1234, de 22/05/2026');
+  assert.equal(doems.descricao, 'Registro de Publicação DOEMS - DOEMS nº 1234');
+});
