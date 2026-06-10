@@ -57,7 +57,12 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
   const fonteOrdem = statusNormalizado(contextoPublicacao?.fonteOrdem || '');
 
   if (!promocao || !texto(promocao.id)) bloqueios.push('Promoção não carregada.');
-  if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status))) bloqueios.push('Promoção já publicada/consolidada.');
+
+  const itensParaPublicar = (itens || []).filter((item) => !ehStatusPublicado(item?.status) && !STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(statusNormalizado(item?.status)));
+  if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status)) && itensParaPublicar.length === 0) {
+    bloqueios.push('Promoção já publicada/consolidada.');
+  }
+
   if (!dataSomente(promocao?.data_promocao)) bloqueios.push('Informe a data da promoção antes de publicar.');
   if (!texto(promocao?.posto_graduacao)) bloqueios.push('Informe o posto/graduação destino antes de publicar.');
   if (!texto(promocao?.quadro)) bloqueios.push('Informe o quadro destino antes de publicar.');
@@ -178,7 +183,7 @@ export async function publicarPromocaoOficial({ promocao, itens = [], temAlterac
   const itensElegiveis = (itens || []).filter((item) => {
     const bloqueado = STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(statusNormalizado(item?.status));
     if (bloqueado) filtroElegibilidade.status_bloqueado += 1;
-    return !bloqueado;
+    return !bloqueado && !ehStatusPublicado(item?.status);
   });
 
   const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
@@ -745,7 +750,7 @@ export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, 
     historico_promocao_v2_id: texto(historico?.id),
     ordem: ordemNumerica,
     status: 'elegivel',
-    selecionado: false,
+    selecionado: true,
     publicado: false,
     origem: 'adicao_manual',
     data_vinculo: agora,
