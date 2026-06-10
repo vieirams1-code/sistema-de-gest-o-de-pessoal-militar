@@ -81,6 +81,7 @@ import FolhaAlteracoes from './pages/FolhaAlteracoes';
 import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
+import ImportarMedalhaDomPedroII from './pages/ImportarMedalhaDomPedroII';
 import IndicacoesDomPedroII from './pages/IndicacoesDomPedroII';
 import Medalhas from './pages/Medalhas';
 import Medicos from './pages/Medicos';
@@ -151,6 +152,7 @@ export const PAGES = {
     "GratificacoesFuncao": GratificacoesFuncao,
     "Home": Home,
     "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
+    "ImportarMedalhaDomPedroII": ImportarMedalhaDomPedroII,
     "IndicacoesDomPedroII": IndicacoesDomPedroII,
     "Medalhas": Medalhas,
     "Medicos": Medicos,
