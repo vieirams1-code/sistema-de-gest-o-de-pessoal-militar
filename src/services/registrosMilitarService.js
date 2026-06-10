@@ -43,29 +43,14 @@ export async function listarRegistrosMilitar() {
   const exOfficioNormalizado = (Array.isArray(registrosExOfficio) ? registrosExOfficio : []).map((registro) => normalizarRegistro(registro, 'PublicacaoExOfficio'));
   const registrosUnificados = [...sistemaNormalizado, ...exOfficioNormalizado];
 
-  const porId = new Map(registrosUnificados.map((r) => [r.id, r]));
-  const porReferenciaId = new Map();
-  for (const r of registrosUnificados) {
-    if (r.publicacao_referencia_id) {
-      if (!porReferenciaId.has(r.publicacao_referencia_id)) porReferenciaId.set(r.publicacao_referencia_id, []);
-      porReferenciaId.get(r.publicacao_referencia_id).push(r);
-    }
-  }
-
   return registrosUnificados.map((registro) => {
-    const relacionados = porReferenciaId.get(registro.id) || [];
-    const apostilas = relacionados.filter((item) => item.tipo === 'Apostila');
-
-    const tsesPorApostila = apostilas.map((apostila) => {
-      let tse = null;
-      if (apostila.tornada_sem_efeito_por_id) {
-        tse = porId.get(apostila.tornada_sem_efeito_por_id);
-      } else {
-        const relApostila = porReferenciaId.get(apostila.id) || [];
-        tse = relApostila.find((item) => item.tipo === 'Tornar sem Efeito') || null;
-      }
-      return { apostila, tse };
-    });
+    const apostilas = registrosUnificados.filter((item) => item.publicacao_referencia_id === registro.id && item.tipo === 'Apostila');
+    const tsesPorApostila = apostilas.map((apostila) => ({
+      apostila,
+      tse: apostila.tornada_sem_efeito_por_id
+        ? registrosUnificados.find((item) => item.id === apostila.tornada_sem_efeito_por_id)
+        : registrosUnificados.find((item) => item.publicacao_referencia_id === apostila.id && item.tipo === 'Tornar sem Efeito') || null,
+    }));
 
     const foiApostilada = calcularFoiApostilada({
       raiz: registro,
@@ -73,12 +58,9 @@ export async function listarRegistrosMilitar() {
       tsesPorApostila,
     });
 
-    let tseVinculada = null;
-    if (registro.tornada_sem_efeito_por_id) {
-      tseVinculada = porId.get(registro.tornada_sem_efeito_por_id);
-    } else {
-      tseVinculada = relacionados.find((item) => item.tipo === 'Tornar sem Efeito');
-    }
+    const tseVinculada = registro.tornada_sem_efeito_por_id
+      ? registrosUnificados.find((item) => item.id === registro.tornada_sem_efeito_por_id)
+      : registrosUnificados.find((item) => item.publicacao_referencia_id === registro.id && item.tipo === 'Tornar sem Efeito');
 
     return {
       ...registro,

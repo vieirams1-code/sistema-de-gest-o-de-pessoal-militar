@@ -304,13 +304,14 @@ export async function sincronizarHistoricoPromocaoPublicada({
   );
   if (!houveMudancaEstrutural) return { atualizados: 0, ignorado: true };
 
-  const ativosDaPromocao = await Historico.filter({
-    status_registro: 'ativo',
-    promocao_id: texto(promocaoDepois.id),
-  });
+  const historicos = await Historico.list();
+  const ativosDaPromocao = (historicos || []).filter((registro) => (
+    statusNormalizado(registro?.status_registro) === 'ativo'
+    && texto(registro?.promocao_id) === texto(promocaoDepois.id)
+  ));
 
   const patch = montarPatchSincronizacaoHistoricoPromocao(promocaoDepois);
-  diagLog('sincronizacao-historico:busca-vinculados', { totalHistoricos: (ativosDaPromocao || []).length, encontrados: ativosDaPromocao.length, idsHistoricos: ativosDaPromocao.map((r) => r?.id), patch });
+  diagLog('sincronizacao-historico:busca-vinculados', { totalHistoricos: (historicos || []).length, encontrados: ativosDaPromocao.length, idsHistoricos: ativosDaPromocao.map((r) => r?.id), patch });
   await sincronizarHistoricoPromocaoPublicadaTx({
     promocaoId: promocaoDepois.id,
     idsHistoricos: ativosDaPromocao.map((registro) => registro?.id).filter(Boolean),

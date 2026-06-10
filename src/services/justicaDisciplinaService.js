@@ -129,27 +129,23 @@ function precisaSaneamentoMarcoDisciplinar(registro = {}) {
   return !motivo || !fundamento;
 }
 
-function encontrarPendenciaCorrespondente(marco = {}, pendencias = [], context = {}) {
-  const { pendenciasPorId, pendenciasPorComportamento } = context;
+function encontrarPendenciaCorrespondente(marco = {}, pendencias = []) {
+  if (!Array.isArray(pendencias) || !pendencias.length) return null;
 
   const origemId = String(marco?.origem_id || '').trim();
   if (origemId) {
-    const porOrigem = (pendenciasPorId && pendenciasPorId.get(origemId)) || (Array.isArray(pendencias) && pendencias.find((pendencia) => String(pendencia?.id || '').trim() === origemId));
+    const porOrigem = pendencias.find((pendencia) => String(pendencia?.id || '').trim() === origemId);
     if (porOrigem) return porOrigem;
   }
 
   const comportamentoNovo = String(marco?.comportamento_novo || '').trim().toUpperCase();
-  const candidatos = (pendenciasPorComportamento && pendenciasPorComportamento.get(comportamentoNovo)) || (Array.isArray(pendencias) ? pendencias : []);
-
-  if (!candidatos || !candidatos.length) return null;
-
   const comportamentoAnterior = String(marco?.comportamento_anterior || '').trim().toUpperCase();
   const dataMarco = normalizarDataVigencia(marco?.data_alteracao);
 
-  return candidatos.find((pendencia) => {
+  return pendencias.find((pendencia) => {
     const sugerido = String(pendencia?.comportamento_sugerido || '').trim().toUpperCase();
     const atual = String(pendencia?.comportamento_atual || '').trim().toUpperCase();
-    if (sugerido !== comportamentoNovo) return false;
+    if (!sugerido || sugerido !== comportamentoNovo) return false;
     if (comportamentoAnterior && atual && atual !== comportamentoAnterior) return false;
     const dataPendencia = normalizarDataVigencia(pendencia?.data_confirmacao || pendencia?.data_detectada);
     return !dataMarco || !dataPendencia || dataPendencia <= dataMarco;
@@ -194,21 +190,8 @@ async function enriquecerHistoricoComportamentoDisciplinar(registros = [], milit
   const atualizados = new Map();
   const updatePromises = [];
 
-  const contextPendencias = {
-    pendenciasPorId: new Map((pendencias || []).map((p) => [String(p.id).trim(), p])),
-    pendenciasPorComportamento: new Map(),
-  };
-
-  (pendencias || []).forEach((p) => {
-    const sug = String(p.comportamento_sugerido || '').trim().toUpperCase();
-    if (!contextPendencias.pendenciasPorComportamento.has(sug)) {
-      contextPendencias.pendenciasPorComportamento.set(sug, []);
-    }
-    contextPendencias.pendenciasPorComportamento.get(sug).push(p);
-  });
-
   for (const marco of candidatos) {
-    const pendencia = encontrarPendenciaCorrespondente(marco, pendencias, contextPendencias);
+    const pendencia = encontrarPendenciaCorrespondente(marco, pendencias);
     const motivoAtual = String(marco?.motivo_mudanca || '').trim();
     const fundamentoAtual = String(marco?.fundamento_legal || '').trim();
 
