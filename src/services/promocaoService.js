@@ -1358,37 +1358,42 @@ export function simularImpactoCadeiaPromocoes({
     const ordemAtual = Number(atual?.ordem || 0);
     const ordemSugeridaFutura = Math.max(1, ordemAtual + delta);
 
-    const posicaoInsercao = semMilitar.findIndex((item) => Number(item?.ordem || 0) >= ordemSugeridaFutura);
-
-    const baseReordenada = posicaoInsercao >= 0
-      ? [...semMilitar.slice(0, posicaoInsercao), atual, ...semMilitar.slice(posicaoInsercao)]
-      : [...semMilitar, atual];
-
     const deslocados = [];
     const ordemSugeridaLista = [];
+    let inserido = false;
+    let novaOrdem = 1;
 
-    for (let i = 0; i < baseReordenada.length; i++) {
-      const item = baseReordenada[i];
-      const mId = item.militar_id;
-      const mIdStr = String(mId || '');
-      const novaOrdem = i + 1;
+    const processarItem = (item, mId, mIdStr, ordemDestino) => {
       const infoAnterior = ordemAtualMap.get(mIdStr);
       const nome = infoAnterior?.nome || getNomeCached(item);
 
       ordemSugeridaLista.push({
         militar_id: mId,
         nome,
-        ordem: novaOrdem,
+        ordem: ordemDestino,
       });
 
-      if (infoAnterior !== undefined && infoAnterior.ordem !== novaOrdem) {
+      if (infoAnterior !== undefined && infoAnterior.ordem !== ordemDestino) {
         deslocados.push({
           militar_id: mId,
           nome,
           ordemAtual: infoAnterior.ordem,
-          ordemSugerida: novaOrdem,
+          ordemSugerida: ordemDestino,
         });
       }
+    };
+
+    for (let i = 0; i < semMilitar.length; i++) {
+      const item = semMilitar[i];
+      if (!inserido && Number(item?.ordem || 0) >= ordemSugeridaFutura) {
+        processarItem(atual, atual.militar_id, militarIdNormalizado, novaOrdem++);
+        inserido = true;
+      }
+      processarItem(item, item.militar_id, String(item.militar_id || ''), novaOrdem++);
+    }
+
+    if (!inserido) {
+      processarItem(atual, atual.militar_id, militarIdNormalizado, novaOrdem++);
     }
 
     resultado.push({
