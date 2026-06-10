@@ -25,6 +25,20 @@ const normalizar = (valor) => String(valor ?? '')
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase();
 
+const formatBrToIso = (valor) => {
+  if (!valor) return '';
+  const match = String(valor).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  return valor;
+};
+
+const formatIsoToBr = (valor) => {
+  if (!valor) return '';
+  const match = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return valor;
+};
+
 const possuiAlgumaSelecaoClassificacao = (linha) => Boolean(
   (String(linha.tipo_classificado || '').trim() && linha.tipo_classificado !== '__fallback__') ||
   linha.classificacao_historica_id
@@ -421,7 +435,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                   <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5">
                     <CampoCompacto rotulo="Número nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                    <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Data BG"><Input type="date" disabled={desabilitada} value={formatBrToIso(linha.data_bg_br)} onChange={(event) => onAlterarLinha(linha, { data_bg_br: formatIsoToBr(event.target.value) })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Tipo BG"><Input disabled value={tipoBgDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Classificação original do legado" className="col-span-2"><Input disabled value={classificacaoOriginalDaLinha(linha) || '—'} className="h-7 bg-slate-100 px-2 text-xs font-medium text-slate-700" /></CampoCompacto>
                   </div>
