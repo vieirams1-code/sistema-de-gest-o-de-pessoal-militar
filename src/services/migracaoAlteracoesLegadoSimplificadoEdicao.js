@@ -254,8 +254,28 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
 }
 
 export function atualizarLinhaRevisaoSimplificada(linhas, linhaNumero, alteracoes) {
+  const camposQueResetamConfirmacao = [
+    'numero_nota',
+    'numero_bg_br',
+    'data_bg_br',
+    'tipo_classificado',
+    'classificacao_historica_id',
+    'texto_publicado',
+  ];
+
   return revalidarLinhasRevisaoSimplificada(linhas.map((linha) => {
     if (linha.linhaNumero !== linhaNumero) return linha;
-    return { ...linha, ...alteracoes };
+
+    const novaLinha = { ...linha, ...alteracoes };
+
+    const houveAlteracaoSensivel = camposQueResetamConfirmacao.some(
+      (campo) => alteracoes[campo] !== undefined && alteracoes[campo] !== linha[campo],
+    );
+
+    if (houveAlteracaoSensivel && alteracoes.classificacao_confirmada !== true) {
+      novaLinha.classificacao_confirmada = false;
+    }
+
+    return novaLinha;
   }));
 }

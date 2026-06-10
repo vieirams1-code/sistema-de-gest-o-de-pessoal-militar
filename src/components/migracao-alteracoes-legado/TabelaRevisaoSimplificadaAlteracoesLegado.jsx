@@ -168,8 +168,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   }, [linhas, pesquisa]);
 
   const linhasFiltradas = useMemo(() => linhasPesquisadas.filter((linha) => {
-    if (possuiAlgumaSelecaoClassificacao(linha) && !mostrarClassificados) return false;
-    if (!possuiAlgumaSelecaoClassificacao(linha) && !mostrarPendentes) return false;
+    if (possuiClassificacaoConfirmada(linha) && !mostrarClassificados) return false;
+    if (!possuiClassificacaoConfirmada(linha) && !mostrarPendentes) return false;
 
     if (filtroOperacional === 'pendentes-classificacao') return estaPendenteClassificacao(linha);
     if (filtroOperacional === 'erros') return possuiErro(linha);
@@ -185,8 +185,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
     pendentesClassificacao: linhasFiltradas.filter(estaPendenteClassificacao).length,
     pendentesConfirmacao: linhasFiltradas.filter(estaPendenteConfirmacao).length,
     prontas: linhasFiltradas.filter(estaPronta).length,
-    semClassificacao: linhasFiltradas.filter((linha) => !possuiAlgumaSelecaoClassificacao(linha)).length,
-    classificados: linhasFiltradas.filter(possuiAlgumaSelecaoClassificacao).length,
+    semClassificacao: linhasFiltradas.filter((linha) => !possuiClassificacaoConfirmada(linha)).length,
+    classificados: linhasFiltradas.filter(possuiClassificacaoConfirmada).length,
     erros: linhasFiltradas.filter(possuiErro).length,
     avisos: linhasFiltradas.filter(possuiAviso).length,
     duplicadas: linhasFiltradas.filter(possuiDuplicidade).length,
@@ -231,7 +231,6 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
       classificacao_historica_id: classificacao?.id || '',
       classificacao_historica_nome: classificacao?.nome || '',
       tipo_classificado: '',
-      classificacao_confirmada: false,
     });
   };
 
@@ -263,7 +262,6 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
       tipo_classificado: tipoClassificado,
       classificacao_historica_id: '',
       classificacao_historica_nome: '',
-      classificacao_confirmada: false,
     });
   };
 
@@ -421,9 +419,9 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               <div className="flex min-h-0 flex-1 overflow-hidden">
                 <div className="flex w-[300px] shrink-0 flex-col gap-1.5 border-r border-slate-200 bg-slate-50 p-2">
                   <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5">
-                    <CampoCompacto rotulo="Número nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value, classificacao_confirmada: false })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                    <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value, classificacao_confirmada: false })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                    <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value, classificacao_confirmada: false })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Número nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Tipo BG"><Input disabled value={tipoBgDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Classificação original do legado" className="col-span-2"><Input disabled value={classificacaoOriginalDaLinha(linha) || '—'} className="h-7 bg-slate-100 px-2 text-xs font-medium text-slate-700" /></CampoCompacto>
                   </div>

@@ -70,7 +70,8 @@ test('nota importada deixa de ser duplicada quando usuário informa número livr
   assert.equal(original[0].status, 'duplicada');
 
   const livre = atualizarLinhaRevisaoSimplificada(original, 2, { numero_nota: 'NOTA-3' });
-  assert.equal(livre[0].status, 'pronta');
+  assert.equal(livre[0].status, 'pendente_confirmacao');
+  assert.equal(livre[0].classificacao_confirmada, false);
 
   const outraImportada = atualizarLinhaRevisaoSimplificada(livre, 2, { numero_nota: 'NOTA-2' });
   assert.equal(outraImportada[0].status, 'duplicada');
@@ -233,4 +234,23 @@ test('resolver tipo usa tipo_legado e transformado.materia_legado após matéria
     resolverTipoFinalMigracaoLegado({ transformado: { materia_legado: 'Movimentação' } }),
     { tipoFinal: 'Movimentação', classificacaoPendente: true },
   );
+});
+
+test('atualizarLinharesumo reseta classificacao_confirmada se campos sensíveis mudarem', () => {
+  const linhas = [linha(2, 'NOTA-1', { classificacao_confirmada: true })];
+
+  const atualizadaNota = atualizarLinhaRevisaoSimplificada(linhas, 2, { numero_nota: 'NOTA-2' });
+  assert.equal(atualizadaNota[0].classificacao_confirmada, false, 'Resetou ao mudar nota');
+
+  const atualizadaTexto = atualizarLinhaRevisaoSimplificada(linhas, 2, { texto_publicado: 'Novo texto' });
+  assert.equal(atualizadaTexto[0].classificacao_confirmada, false, 'Resetou ao mudar texto');
+
+  const atualizadaTipo = atualizarLinhaRevisaoSimplificada(linhas, 2, { tipo_classificado: 'Elogio' });
+  assert.equal(atualizadaTipo[0].classificacao_confirmada, false, 'Resetou ao mudar tipo');
+
+  const mantidaConfirmada = atualizarLinhaRevisaoSimplificada(linhas, 2, { numero_nota: 'NOTA-2', classificacao_confirmada: true });
+  assert.equal(mantidaConfirmada[0].classificacao_confirmada, true, 'Manteve true quando explicitamente passado');
+
+  const atualizadaOutro = atualizarLinhaRevisaoSimplificada(linhas, 2, { recusada: true });
+  assert.equal(atualizadaOutro[0].classificacao_confirmada, true, 'Não resetou para campos não sensíveis');
 });
