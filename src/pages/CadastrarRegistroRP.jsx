@@ -651,7 +651,7 @@ export default function CadastrarRegistroRP() {
   const hasTemplateConflict = conflitoTemplateSelecionado.temConflito;
   const statusCalculadoFormulario = useMemo(
     () => calcularStatusPublicacaoRegistro(formData),
-    [formData.nota_para_bg, formData.numero_bg, formData.data_bg]
+    [formData.nota_para_bg, formData.numero_bg, formData.data_bg, formData.tipo_registro]
   );
   const isRegistroLegadoImportado = Boolean(
     registroEdicao?.importado_legado || String(registroEdicao?.origem_registro || '').toLowerCase() === 'legado'

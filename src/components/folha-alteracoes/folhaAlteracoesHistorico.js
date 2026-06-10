@@ -172,18 +172,24 @@ function extrairDadosBgFolhaAlteracoes(item = {}) {
 function montarReferenciaBoletimFolhaAlteracoes(item = {}) {
   if (isRegistroDOEMS(item)) {
     const edicao = toText(item.doems_edicao_numero);
-    const dataPub = normalizarDataISOFolhaAlteracoes(item.data_publicacao);
-    if (!edicao && !dataPub) return '';
+    const dataPub = normalizarDataISOFolhaAlteracoes(item.data_publicacao || item.data_registro);
+    const subtipo = toText(item.subtipo_geral);
 
+    let base = '';
     if (edicao && dataPub) {
       const [ano, mes, dia] = dataPub.split('-');
-      return `DOEMS nº ${edicao}, de ${dia}/${mes}/${ano}`;
+      base = `DOEMS nº ${edicao}, de ${dia}/${mes}/${ano}`;
+    } else if (edicao) {
+      base = `DOEMS nº ${edicao}`;
+    } else if (dataPub) {
+      const [ano, mes, dia] = dataPub.split('-');
+      base = `DOEMS de ${dia}/${mes}/${ano}`;
     }
 
-    if (edicao) return `DOEMS nº ${edicao}`;
-
-    const [ano, mes, dia] = dataPub.split('-');
-    return `DOEMS de ${dia}/${mes}/${ano}`;
+    if (!base && !subtipo) return '';
+    if (base && subtipo) return `${base}. Subtipo: ${subtipo}.`;
+    if (base) return `${base}.`;
+    return `Subtipo: ${subtipo}.`;
   }
 
   const bg = extrairDadosBgFolhaAlteracoes(item);
@@ -204,7 +210,12 @@ function registroPublicadoEmBgFolhaAlteracoes(item = {}) {
 
 function getDataEventoFolhaAlteracoes(item = {}) {
   return normalizarDataISOFolhaAlteracoes(
-    item?.data_bg || item?.publicacao?.data_bg || item?.data_publicacao || item?.data_evento || item?.created_date
+    item?.data_bg ||
+    item?.publicacao?.data_bg ||
+    item?.data_publicacao ||
+    item?.data_registro ||
+    item?.data_evento ||
+    item?.created_date
   );
 }
 
