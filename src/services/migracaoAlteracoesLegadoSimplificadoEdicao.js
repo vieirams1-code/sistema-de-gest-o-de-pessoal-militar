@@ -2,6 +2,7 @@ import { calcularStatusPublicacaoLegado } from './migracaoAlteracoesLegadoStatus
 
 export const STATUS_REVISAO_SIMPLIFICADA = Object.freeze({
   PRONTA: 'pronta',
+  PENDENTE_CONFIRMACAO: 'pendente_confirmacao',
   ERRO: 'erro',
   DUPLICADA: 'duplicada',
   RECUSADA: 'recusada',
@@ -18,8 +19,21 @@ export function normalizarNumeroNota(valor) {
 
 export function resolverTipoFinalMigracaoLegado(linha = {}) {
   const tipoClassificado = limparTexto(linha.tipo_classificado);
+  const classificacaoHistoricaId = limparTexto(linha.classificacao_historica_id || linha.transformado?.classificacao_historica_id);
+
   if (tipoClassificado && tipoClassificado !== '__fallback__') {
     return { tipoFinal: tipoClassificado, classificacaoPendente: false };
+  }
+
+  if (classificacaoHistoricaId) {
+    const tipoLegadoParaHistorico = limparTexto(
+      linha.materia_legado
+        || linha.tipo_legado
+        || linha.transformado?.materia_legado
+        || linha.transformado?.classificacao_original_legado
+        || linha.classificacao_original_legado,
+    );
+    return { tipoFinal: tipoLegadoParaHistorico, classificacaoPendente: false };
   }
 
   const tipoLegado = limparTexto(
@@ -131,6 +145,7 @@ export function gerarResumoRevisaoSimplificada(linhas) {
   return linhas.reduce((resumo, linha) => {
     resumo.total_linhas += 1;
     if (linha.status === STATUS_REVISAO_SIMPLIFICADA.PRONTA) resumo.total_aptas += 1;
+    if (linha.status === STATUS_REVISAO_SIMPLIFICADA.PENDENTE_CONFIRMACAO) resumo.total_pendentes_confirmacao += 1;
     if (linha.status === STATUS_REVISAO_SIMPLIFICADA.ERRO) resumo.total_erros += 1;
     if (linha.status === STATUS_REVISAO_SIMPLIFICADA.DUPLICADA) {
       resumo.total_revisar += 1;
@@ -148,6 +163,7 @@ export function gerarResumoRevisaoSimplificada(linhas) {
     total_erros: 0,
     total_excluidas_lote: 0,
     total_pendentes_classificacao: 0,
+    total_pendentes_confirmacao: 0,
     total_alertas: 0,
     total_duplicidades: 0,
   });
@@ -199,11 +215,18 @@ export function revalidarLinhasRevisaoSimplificada(linhas) {
     const { tipoFinal } = resolverTipoFinalMigracaoLegado(linha);
     if (!tipoFinal) erros.push('Tipo/matéria ausente. Classifique manualmente antes de importar.');
     if (!limparTexto(linha.tipo_legado) && !limparTexto(linha.materia_legado) && !limparTexto(linha.transformado?.materia_legado)) avisos.push('Tipo legado ausente.');
-    if (!limparTexto(linha.tipo_classificado) || limparTexto(linha.tipo_classificado) === '__fallback__') {
-      if (tipoFinal) avisos.push('Tipo classificado ausente; usando tipo legado como fallback.');
+    const possuiClassificacaoManual = (limparTexto(linha.tipo_classificado) && linha.tipo_classificado !== '__fallback__')
+      || (limparTexto(linha.classificacao_historica_id) || limparTexto(linha.transformado?.classificacao_historica_id));
+
+    if (!possuiClassificacaoManual) {
+      if (tipoFinal) avisos.push('Classificação manual ausente; usando tipo legado como fallback.');
     }
 
     let status = erros.length ? STATUS_REVISAO_SIMPLIFICADA.ERRO : STATUS_REVISAO_SIMPLIFICADA.PRONTA;
+
+    if (status === STATUS_REVISAO_SIMPLIFICADA.PRONTA && !linha.classificacao_confirmada) {
+      status = STATUS_REVISAO_SIMPLIFICADA.PENDENTE_CONFIRMACAO;
+    }
     if (!erros.length && numeroNota && linha.numerosNotaImportados?.some((nota) => normalizarNumeroNota(nota) === numeroNota)) {
       status = STATUS_REVISAO_SIMPLIFICADA.DUPLICADA;
       erros.push('Nota já importada anteriormente para este militar.');

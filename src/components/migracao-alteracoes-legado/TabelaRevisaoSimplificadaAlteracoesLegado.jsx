@@ -14,6 +14,7 @@ import { sugerirClassificacaoHistoricaLegado } from '@/services/migracaoAlteraco
 
 const statusClass = {
   pronta: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  pendente_confirmacao: 'bg-blue-100 text-blue-800 border-blue-200',
   erro: 'bg-orange-100 text-orange-800 border-orange-200',
   duplicada: 'bg-red-100 text-red-800 border-red-200',
   recusada: 'bg-slate-200 text-slate-700 border-slate-300',
@@ -24,9 +25,12 @@ const normalizar = (valor) => String(valor ?? '')
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase();
 
-const possuiClassificacao = (linha) => Boolean(
-  String(linha.tipo_classificado || '').trim() && linha.tipo_classificado !== '__fallback__'
+const possuiAlgumaSelecaoClassificacao = (linha) => Boolean(
+  (String(linha.tipo_classificado || '').trim() && linha.tipo_classificado !== '__fallback__') ||
+  linha.classificacao_historica_id
 );
+
+const possuiClassificacaoConfirmada = (linha) => Boolean(linha.classificacao_confirmada);
 
 const tipoBgDaLinha = (linha) => linha.tipo_bg_legado || linha.transformado?.tipo_bg_legado || '—';
 const materiaDaLinha = (linha) => linha.materia_legado || linha.tipo_legado || linha.transformado?.materia_legado || '—';
@@ -44,9 +48,9 @@ const possuiAviso = (linha) => linha.avisos?.length > 0;
 const possuiMensagemErro = (linha) => linha.erros?.length > 0;
 const possuiErro = (linha) => linha.statusSimplificado === 'erro' || possuiMensagemErro(linha);
 const possuiDuplicidade = (linha) => linha.statusSimplificado === 'duplicada';
-const estaPendenteClassificacao = (linha) => !linha.recusada && !possuiClassificacao(linha);
-const estaPronta = (linha) => !linha.recusada && linha.statusSimplificado === 'pronta' && possuiClassificacao(linha)
-  && !possuiMensagemErro(linha) && !possuiAviso(linha);
+const estaPendenteClassificacao = (linha) => !linha.recusada && !possuiAlgumaSelecaoClassificacao(linha);
+const estaPendenteConfirmacao = (linha) => !linha.recusada && linha.statusSimplificado === 'pendente_confirmacao';
+const estaPronta = (linha) => !linha.recusada && linha.statusSimplificado === 'pronta';
 
 function ListaMensagens({ itens, tipo = 'aviso' }) {
   if (!itens?.length) return null;
@@ -179,9 +183,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
   const contadores = useMemo(() => ({
     total: linhasFiltradas.length,
     pendentesClassificacao: linhasFiltradas.filter(estaPendenteClassificacao).length,
+    pendentesConfirmacao: linhasFiltradas.filter(estaPendenteConfirmacao).length,
     prontas: linhasFiltradas.filter(estaPronta).length,
-    semClassificacao: linhasFiltradas.filter((linha) => !possuiClassificacao(linha)).length,
-    classificados: linhasFiltradas.filter(possuiClassificacao).length,
+    semClassificacao: linhasFiltradas.filter((linha) => !possuiAlgumaSelecaoClassificacao(linha)).length,
+    classificados: linhasFiltradas.filter(possuiAlgumaSelecaoClassificacao).length,
     erros: linhasFiltradas.filter(possuiErro).length,
     avisos: linhasFiltradas.filter(possuiAviso).length,
     duplicadas: linhasFiltradas.filter(possuiDuplicidade).length,
@@ -225,6 +230,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
     onAlterarLinha(linha, {
       classificacao_historica_id: classificacao?.id || '',
       classificacao_historica_nome: classificacao?.nome || '',
+      tipo_classificado: '',
+      classificacao_confirmada: false,
     });
   };
 
@@ -252,15 +259,12 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
 
   const handleClassificarLinha = (linha, valor) => {
     const tipoClassificado = valor === '__fallback__' ? '' : valor;
-    onAlterarLinha(linha, { tipo_classificado: tipoClassificado });
-    if (!tipoClassificado) return;
-
-    const linhasAposSelecionada = [
-      ...linhasFiltradas.slice(selecionadaIndex + 1),
-      ...linhasFiltradas.slice(0, selecionadaIndex),
-    ];
-    const proximaPendente = linhasAposSelecionada.find(estaPendenteClassificacao);
-    if (proximaPendente) setSelecionadaId(proximaPendente.linhaNumero);
+    onAlterarLinha(linha, {
+      tipo_classificado: tipoClassificado,
+      classificacao_historica_id: '',
+      classificacao_historica_nome: '',
+      classificacao_confirmada: false,
+    });
   };
 
   useEffect(() => {
@@ -317,6 +321,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           <div className="flex flex-wrap gap-1">
             <Contador rotulo="Total filtrado" valor={contadores.total} />
             <Contador rotulo="Pendentes classificação" valor={contadores.pendentesClassificacao} destaque="border-amber-200 bg-amber-50 text-amber-700" />
+            <Contador rotulo="Pendentes confirmação" valor={contadores.pendentesConfirmacao} destaque="border-blue-200 bg-blue-50 text-blue-700" />
             <Contador rotulo="Prontas" valor={contadores.prontas} destaque="border-emerald-200 bg-emerald-50 text-emerald-700" />
             <Contador rotulo="Classificados" valor={contadores.classificados} destaque="border-indigo-200 bg-indigo-50 text-indigo-700" />
             <Contador rotulo="Sem classificação" valor={contadores.semClassificacao} destaque="border-amber-200 bg-amber-50 text-amber-700" />
@@ -336,7 +341,8 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
           {!linhasFiltradas.length && <div className="p-4 text-center text-xs text-slate-500">Nenhum registro encontrado para a pesquisa e os filtros aplicados.</div>}
           {linhasFiltradas.map((linha) => {
             const statusVisual = statusDaLinha(linha);
-            const classificada = possuiClassificacao(linha);
+            const selecionadaClassificacao = possuiAlgumaSelecaoClassificacao(linha);
+            const confirmada = possuiClassificacaoConfirmada(linha);
             const isSelected = linha.linhaNumero === selecionadaId;
 
             return (
@@ -356,9 +362,9 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                     {linha.recusada ? <RotateCcw className="h-3.5 w-3.5 text-slate-600" /> : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
                   </Button>
                 </div>
-                <Badge variant="outline" className={cn('mt-1 px-1 py-0 text-[9px]', classificada ? 'border-emerald-400 bg-emerald-100 font-semibold text-emerald-800' : 'border-amber-400 bg-amber-200 font-bold text-amber-900')}>
-                  {classificada && <Check className="mr-0.5 h-3 w-3" />}
-                  {classificada ? 'CLASSIFICADO' : 'SEM CLASSIFICAÇÃO'}
+                <Badge variant="outline" className={cn('mt-1 px-1 py-0 text-[9px]', confirmada ? 'border-emerald-400 bg-emerald-100 font-semibold text-emerald-800' : (selecionadaClassificacao ? 'border-blue-400 bg-blue-100 font-semibold text-blue-800' : 'border-amber-400 bg-amber-200 font-bold text-amber-900'))}>
+                  {confirmada ? <Check className="mr-0.5 h-3 w-3" /> : (selecionadaClassificacao && <Pencil className="mr-0.5 h-3 w-3" />)}
+                  {confirmada ? 'CLASSIFICAÇÃO CONFIRMADA' : (selecionadaClassificacao ? 'AGUARDANDO CONFIRMAÇÃO' : 'SEM CLASSIFICAÇÃO')}
                 </Badge>
                 <div className="mt-1 grid grid-cols-2 gap-x-1 text-[10px] leading-tight text-slate-600">
                   <span><strong>Nota:</strong> {linha.numero_nota || '—'}</span>
@@ -389,6 +395,24 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                   <span className="text-[11px] text-slate-500">Registro {selecionadaIndex + 1} de {linhasFiltradas.length}</span>
                 </div>
                 <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="h-7 bg-indigo-600 px-3 text-xs hover:bg-indigo-700"
+                    disabled={desabilitada || statusVisual === 'erro' || statusVisual === 'pronta' || !possuiAlgumaSelecaoClassificacao(linha)}
+                    onClick={() => {
+                      onAlterarLinha(linha, { classificacao_confirmada: true });
+                      const linhasAposSelecionada = [
+                        ...linhasFiltradas.slice(selecionadaIndex + 1),
+                        ...linhasFiltradas.slice(0, selecionadaIndex),
+                      ];
+                      const proximaPendente = linhasAposSelecionada.find((l) => !estaPronta(l) && !l.recusada);
+                      if (proximaPendente) setSelecionadaId(proximaPendente.linhaNumero);
+                    }}
+                  >
+                    Aplicar classificação
+                  </Button>
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handlePrev} disabled={selecionadaIndex <= 0}><ChevronLeft className="h-3.5 w-3.5" /> Anterior</Button>
                   <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleNext} disabled={selecionadaIndex >= linhasFiltradas.length - 1}>Próximo <ChevronRight className="h-3.5 w-3.5" /></Button>
                 </div>
@@ -397,9 +421,9 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
               <div className="flex min-h-0 flex-1 overflow-hidden">
                 <div className="flex w-[300px] shrink-0 flex-col gap-1.5 border-r border-slate-200 bg-slate-50 p-2">
                   <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5">
-                    <CampoCompacto rotulo="Número nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                    <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
-                    <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Número nota"><Input disabled={desabilitada} value={linha.numero_nota || ''} onChange={(event) => onAlterarLinha(linha, { numero_nota: event.target.value, classificacao_confirmada: false })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="BG"><Input disabled={desabilitada} value={linha.numero_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { numero_bg_br: event.target.value, classificacao_confirmada: false })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
+                    <CampoCompacto rotulo="Data BG"><Input disabled={desabilitada} value={linha.data_bg_br || ''} onChange={(event) => onAlterarLinha(linha, { data_bg_br: event.target.value, classificacao_confirmada: false })} className="h-7 bg-white px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Tipo BG"><Input disabled value={tipoBgDaLinha(linha)} className="h-7 bg-slate-100 px-2 text-xs" /></CampoCompacto>
                     <CampoCompacto rotulo="Classificação original do legado" className="col-span-2"><Input disabled value={classificacaoOriginalDaLinha(linha) || '—'} className="h-7 bg-slate-100 px-2 text-xs font-medium text-slate-700" /></CampoCompacto>
                   </div>
@@ -412,7 +436,7 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                           variant="outline"
                           role="combobox"
                           aria-expanded={classificacaoPopoverAbertoId === linha.linhaNumero}
-                          disabled={desabilitada || carregandoClassificacoesHistoricas}
+                          disabled={desabilitada || carregandoClassificacoesHistoricas || (Boolean(linha.tipo_classificado) && linha.tipo_classificado !== '__fallback__')}
                           className={cn('h-8 w-full justify-between border-emerald-200 bg-white px-2 text-xs font-normal', !classificacaoHistoricaDaLinha(linha).id && 'text-slate-500')}
                         >
                           <span className="truncate">
@@ -503,10 +527,10 @@ export default function TabelaRevisaoSimplificadaAlteracoesLegado({
                           variant="outline"
                           role="combobox"
                           aria-expanded={tipoPopoverAbertoId === linha.linhaNumero}
-                          disabled={desabilitada}
+                          disabled={desabilitada || Boolean(linha.classificacao_historica_id)}
                           className={cn(
                             'h-8 w-full justify-between border-indigo-200 bg-white px-2 text-xs font-normal',
-                            !possuiClassificacao(linha) && 'text-slate-500'
+                            !possuiAlgumaSelecaoClassificacao(linha) && 'text-slate-500'
                           )}
                         >
                           <span className="truncate">

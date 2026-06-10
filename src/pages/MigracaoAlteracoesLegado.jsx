@@ -50,6 +50,7 @@ const filtros = [
 const filtrosSimplificados = [
   { id: 'TODOS', label: 'Todos' },
   { id: 'pronta', label: 'Prontas' },
+  { id: 'pendente_confirmacao', label: 'Pendentes Confirmação' },
   { id: 'erro', label: 'Erros' },
   { id: 'duplicada', label: 'Duplicadas' },
   { id: 'recusada', label: 'Recusadas' },
@@ -137,6 +138,7 @@ function adaptarAnaliseSimplificadaParaTabela(analiseSimples, militarDestinoSnap
     observacoes: [],
     ajustes_manuais: [],
     recusada: linha.recusada,
+    classificacao_confirmada: false,
     numero_nota: linha.numero_nota,
     numero_bg_br: linha.numero_bg_br,
     data_bg_br: linha.data_bg_br,
