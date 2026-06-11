@@ -183,7 +183,7 @@ export async function analisarPlanilhaDomPedro(file) {
   const rows = tabela.slice(1).filter(r => r.some(c => limparTexto(c)));
 
   // Cache de militares para busca por nome
-  const todosMilitares = await base44.entities.Militar.list('id, nome_completo, matricula, posto_graduacao');
+  const todosMilitares = await base44.entities.Militar.list('-created_date');
   const mapaMilitares = new Map();
   todosMilitares.forEach(m => {
     const nomeNorm = normalizarNome(m.nome_completo);
