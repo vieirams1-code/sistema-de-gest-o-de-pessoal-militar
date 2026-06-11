@@ -192,3 +192,36 @@ test('Folha de Alterações inclui registros DOEMS usando data_registro como fal
   assert.equal(doems.data, '2026-06-09');
   assert.equal(doems.referenciaBoletim, 'DOEMS nº 5678, de 09/06/2026. Subtipo: Promoção.');
 });
+
+test('Folha de Alterações inclui DOEMS mesmo com status diferente de Publicado ou data_bg acidental', () => {
+  const militar = {
+    id: 'militar-edson',
+    nome_completo: 'Edson Vieira',
+  };
+
+  const registros = [
+    {
+      id: 'doems-complexo',
+      origem_fonte: 'PublicacaoExOfficio',
+      militar_id: 'militar-edson',
+      tipo: 'Registro de Publicação DOEMS',
+      subtipo_geral: 'Subtipo',
+      texto_publicacao: 'Texto DOEMS',
+      doems_edicao_numero: '999',
+      data_publicacao: '2026-06-09',
+      data_bg: '2026-12-31', // Data acidental fora do período
+      status_publicacao: 'Aguardando Publicação', // Status que normalmente filtraria
+    },
+  ];
+
+  const { eventos } = montarHistoricoFolhaAlteracoes({
+    registros,
+    atestados: [],
+    militar,
+    dataInicial: '2026-06-01',
+    dataFinal: '2026-06-30',
+  });
+
+  assert.equal(eventos.length, 1, 'DOEMS deve ser incluído independente de status ou data_bg');
+  assert.equal(eventos[0].data, '2026-06-09', 'Deve usar data_publicacao em vez de data_bg');
+});

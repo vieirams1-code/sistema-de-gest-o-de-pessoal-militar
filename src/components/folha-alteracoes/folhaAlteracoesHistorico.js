@@ -199,16 +199,24 @@ function montarReferenciaBoletimFolhaAlteracoes(item = {}) {
 }
 
 function registroPublicadoEmBgFolhaAlteracoes(item = {}) {
-  const statusPublicado = obterStatusCanonicoPublicacao(item) === STATUS_PUBLICACAO.PUBLICADO;
   if (isRegistroDOEMS(item)) {
-    return statusPublicado;
+    return true;
   }
 
+  const statusPublicado = obterStatusCanonicoPublicacao(item) === STATUS_PUBLICACAO.PUBLICADO;
   const bg = extrairDadosBgFolhaAlteracoes(item);
   return bg.completo && statusPublicado;
 }
 
 function getDataEventoFolhaAlteracoes(item = {}) {
+  if (isRegistroDOEMS(item)) {
+    return normalizarDataISOFolhaAlteracoes(
+      item?.data_publicacao ||
+      item?.data_registro ||
+      item?.created_date
+    );
+  }
+
   return normalizarDataISOFolhaAlteracoes(
     item?.data_bg ||
     item?.publicacao?.data_bg ||
