@@ -1,37 +1,30 @@
 import re
 
-with open('src/pages/Ferias.jsx', 'r') as f:
+with open('src/pages/CadastrarAtestado.jsx', 'r') as f:
     lines = f.readlines()
 
+identifiers = []
+for line in lines:
+    if line.strip().startswith('import'):
+        # match symbols inside braces
+        braced = re.search(r'\{([^}]+)\}', line)
+        if braced:
+            symbols = braced.group(1).split(',')
+            for s in symbols:
+                s = s.strip()
+                if not s: continue
+                if ' as ' in s:
+                    identifiers.append(s.split(' as ')[1].strip())
+                else:
+                    identifiers.append(s)
+        else:
+            # match default import
+            m = re.search(r'import\s+(\w+)\s+from', line)
+            if m:
+                identifiers.append(m.group(1))
+
 content = "".join(lines)
-
-# Find all lines with 'import'
-import_lines = [l for l in lines if 'import' in l and 'from' in l]
-
-for line in import_lines:
-    # Named imports
-    named = re.search(r'\{([^}]+)\}', line)
-    if named:
-        parts = named.group(1).split(',')
-        for p in parts:
-            p = p.strip()
-            if not p: continue
-            if ' as ' in p:
-                alias = p.split(' as ')[1].strip()
-                original = p.split(' as ')[0].strip()
-            else:
-                alias = p
-                original = p
-
-            # Count occurrences in the whole file
-            count = len(re.findall(r'\b' + re.escape(alias) + r'\b', content))
-            if count == 1:
-                print(f"UNUSED Named: {alias} (original: {original}) in line: {line.strip()}")
-    else:
-        # Default imports
-        match = re.search(r'import\s+([^\s{]+)\s+from', line)
-        if match:
-            name = match.group(1).strip()
-            count = len(re.findall(r'\b' + re.escape(name) + r'\b', content))
-            if count == 1:
-                print(f"UNUSED Default: {name} in line: {line.strip()}")
+for id in identifiers:
+    matches = re.findall(r'\b' + id + r'\b', content)
+    if len(matches) == 1:
+        print(f"UNUSED: {id}")
