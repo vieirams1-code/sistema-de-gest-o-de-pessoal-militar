@@ -43,6 +43,7 @@ import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamen
 import useQuickAccessPreferences from '@/hooks/useQuickAccessPreferences';
 import { DEFAULT_WIDGET } from '@/services/quickAccessPreferencesService';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
+import AlertasOperacionais from '@/components/quadro/AlertasOperacionais';
 import QuickAccessWidget from '@/components/layout/QuickAccessWidget';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
 import SgpThemeProfileSelector from '@/themes/sgpThemeModes/SgpThemeProfileSelector';
@@ -607,6 +608,8 @@ export default function Layout({ children, currentPageName }) {
           return item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
         }}
       />
+
+      {canAccessAction('perm_visualizar_quadro_operacional') && <AlertasOperacionais />}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
