@@ -26,6 +26,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import {
   ACOES_MEDALHAS,
   adicionarAuditoriaMedalha,
@@ -138,20 +139,24 @@ export default function IndicacoesDomPedroII() {
   const unidades = useMemo(() => [...new Set(militares.map((m) => m.lotacao || m.unidade).filter(Boolean))], [militares]);
   const postos = useMemo(() => [...new Set(militares.map((m) => m.posto_graduacao).filter(Boolean))], [militares]);
 
-  const rows = useMemo(() => militares.filter((m) => {
-    const registro = registroPorMilitar.get(m.id);
-    const apuracao = apuracaoPorMilitar.get(m.id);
-    const status = normalizarStatusMedalha(registro?.status) || 'SEM_INDICACAO';
-    const termo = search.toLowerCase();
-    const unidade = m.lotacao || m.unidade;
-    const medalhaCodigo = registro ? resolverCodigoTipoMedalha(registro) : 'SEM_INDICACAO';
-    const situacao = apuracao?.situacao || 'SEM_DIREITO';
-    return (!termo || `${m.nome_completo || ''} ${m.matricula || ''}`.toLowerCase().includes(termo))
-      && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
-      && (postoFilter === 'TODOS' || m.posto_graduacao === postoFilter)
-      && (statusFilter === 'TODOS' || status === statusFilter || (statusFilter === 'BLOQUEADO' && situacao === 'IMPEDIDO') || (statusFilter === 'INABILITADO' && situacao !== 'ELEGIVEL' && situacao !== 'IMPEDIDO'))
-      && (medalhaFilter === 'TODAS' || medalhaCodigo === medalhaFilter);
-  }), [militares, registroPorMilitar, apuracaoPorMilitar, search, unidadeFilter, postoFilter, statusFilter, medalhaFilter]);
+  const rows = useMemo(() => {
+    const filtered = militares.filter((m) => {
+      const registro = registroPorMilitar.get(m.id);
+      const apuracao = apuracaoPorMilitar.get(m.id);
+      const status = normalizarStatusMedalha(registro?.status) || 'SEM_INDICACAO';
+      const termo = search.toLowerCase();
+      const unidade = m.lotacao || m.unidade;
+      const medalhaCodigo = registro ? resolverCodigoTipoMedalha(registro) : 'SEM_INDICACAO';
+      const situacao = apuracao?.situacao || 'SEM_DIREITO';
+      return (!termo || `${m.nome_completo || ''} ${m.matricula || ''}`.toLowerCase().includes(termo))
+        && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
+        && (postoFilter === 'TODOS' || m.posto_graduacao === postoFilter)
+        && (statusFilter === 'TODOS' || status === statusFilter || (statusFilter === 'BLOQUEADO' && situacao === 'IMPEDIDO') || (statusFilter === 'INABILITADO' && situacao !== 'ELEGIVEL' && situacao !== 'IMPEDIDO'))
+        && (medalhaFilter === 'TODAS' || medalhaCodigo === medalhaFilter);
+    });
+
+    return ordenarMilitaresPorAntiguidadeInstitucional(filtered);
+  }, [militares, registroPorMilitar, apuracaoPorMilitar, search, unidadeFilter, postoFilter, statusFilter, medalhaFilter]);
 
   const exportRows = useMemo(() => rows.flatMap((militar) => {
     const registro = registroPorMilitar.get(militar.id);
