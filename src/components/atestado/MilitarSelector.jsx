@@ -18,6 +18,7 @@ import { getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUt
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 
 const BACKEND_LIMIT = 100;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -155,8 +156,10 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
     return militaresElegiveis;
   }, [isElegibilidadeIndisponivel, isErrorElegibilidade, isModoElegibilidade, militares, militaresElegiveis]);
 
-  // O backend já aplica o filtro de busca; exibimos a lista como vem.
-  const filteredMilitares = militaresDisponiveis;
+  // O backend já aplica o filtro de busca; exibimos a lista ordenada por antiguidade.
+  const filteredMilitares = useMemo(() => {
+    return ordenarMilitaresPorAntiguidadeInstitucional(militaresDisponiveis);
+  }, [militaresDisponiveis]);
   const bloqueiaSelecaoPorErroElegibilidade = isModoElegibilidade && isErrorElegibilidade;
 
   const handleSelect = (militar) => {

@@ -23,6 +23,7 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
@@ -111,7 +112,10 @@ export default function IndicacoesDomPedroII() {
     enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
   });
 
-  const militares = militaresQuery.data || [];
+  const militares = useMemo(() => {
+    const lista = militaresQuery.data || [];
+    return ordenarMilitaresPorAntiguidadeInstitucional(lista);
+  }, [militaresQuery.data]);
   const medalhas = medalhasQuery.data || [];
   const tipos = tiposQuery.data || [];
   const impedimentos = impedimentosQuery.data || [];

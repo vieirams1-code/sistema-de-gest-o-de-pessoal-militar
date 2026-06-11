@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -94,6 +95,19 @@ export default function ImportarMedalhaDomPedroII() {
     setAnalise(null);
     setResultadoImportacao(null);
   };
+
+  const analiseOrdenada = useMemo(() => {
+    if (!analise) return [];
+    // Mapear campos para compatibilidade com o ordenador institucional
+    const listaParaOrdenar = analise.map(l => ({
+      ...l,
+      posto_graduacao: l.militar_posto,
+      nome_completo: l.militar_nome,
+      matricula: l.militar_matricula,
+      id: l.militar_id
+    }));
+    return ordenarMilitaresPorAntiguidadeInstitucional(listaParaOrdenar);
+  }, [analise]);
 
   const resumoAnalise = useMemo(() => {
     if (!analise) return null;
@@ -191,7 +205,7 @@ export default function ImportarMedalhaDomPedroII() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analise.map((linha, i) => (
+                  {analiseOrdenada.map((linha, i) => (
                     <TableRow key={i}>
                       <TableCell className="text-center text-slate-400 text-xs">{linha.rowIndex}</TableCell>
                       <TableCell>

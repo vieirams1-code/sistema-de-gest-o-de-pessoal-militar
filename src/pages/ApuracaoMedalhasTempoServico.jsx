@@ -23,6 +23,7 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
@@ -168,12 +169,20 @@ export default function ApuracaoMedalhasTempoServico() {
     return mapa;
   }, [registrosTempo]);
 
-  const apuracoes = useMemo(() => apurarListaMilitaresTempoServico({
-    militares,
-    medalhas,
-    impedimentos,
-    tiposMedalha: tiposCatalogo,
-  }), [militares, medalhas, impedimentos, tiposCatalogo]);
+  const apuracoes = useMemo(() => {
+    const lista = apurarListaMilitaresTempoServico({
+      militares,
+      medalhas,
+      impedimentos,
+      tiposMedalha: tiposCatalogo,
+    });
+    // Ordenar por antiguidade institucional do militar.
+    const militaresUnicos = Array.from(new Map(lista.map(i => [i.militar?.id, i.militar])).values());
+    const militaresOrdenados = ordenarMilitaresPorAntiguidadeInstitucional(militaresUnicos);
+    const mapaOrdem = new Map(militaresOrdenados.map((m, idx) => [m.id, idx]));
+
+    return lista.sort((a, b) => (mapaOrdem.get(a.militar?.id) ?? 0) - (mapaOrdem.get(b.militar?.id) ?? 0));
+  }, [militares, medalhas, impedimentos, tiposCatalogo]);
 
   const unidadesDisponiveis = useMemo(
     () => [...new Set(apuracoes.map((item) => item.militar?.lotacao || item.militar?.unidade).filter(Boolean))],
