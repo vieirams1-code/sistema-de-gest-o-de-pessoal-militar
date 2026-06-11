@@ -207,17 +207,12 @@ Motivo: promocao.id ausente no frontend`);
     contextoPublicacao,
   };
 
-
   let response;
   try {
     response = await base44.functions.invoke('publicarPromocaoOficial', {
       body: payload,
     });
   } catch (error) {
-    if (import.meta.env?.DEV) {
-      console.error('[publicarPromocaoOficial][frontend][invoke-error][message]', error?.message);
-    }
-
     const dadosErro = error?.response?.data || error?.data || {};
     const etapaErro = (
       dadosErro?.etapa
