@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { normalizarStatusMedalha, obterTipoMedalhaPorCodigo, resolverCodigoTipoMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS } from '@/services/medalhasAcessoService';
@@ -103,15 +104,21 @@ export default function Medalhas() {
     },
   });
 
-  const medalhasExibicao = medalhas.map((medalha) => {
-    const codigoNormalizado = resolverCodigoTipoMedalha(medalha);
-    const tipoCatalogado = obterTipoMedalhaPorCodigo(codigoNormalizado, tiposMedalha);
-    return {
-      ...medalha,
-      tipo_medalha_codigo_normalizado: codigoNormalizado,
-      tipo_medalha_exibicao: tipoCatalogado?.nome || medalha.tipo_medalha_nome,
-    };
-  });
+  const medalhasExibicao = useMemo(() => {
+    const lista = medalhas.map((medalha) => {
+      const codigoNormalizado = resolverCodigoTipoMedalha(medalha);
+      const tipoCatalogado = obterTipoMedalhaPorCodigo(codigoNormalizado, tiposMedalha);
+      return {
+        ...medalha,
+        posto_graduacao: medalha.militar_posto,
+        nome_completo: medalha.militar_nome,
+        matricula: medalha.militar_matricula,
+        tipo_medalha_codigo_normalizado: codigoNormalizado,
+        tipo_medalha_exibicao: tipoCatalogado?.nome || medalha.tipo_medalha_nome,
+      };
+    });
+    return ordenarMilitaresPorAntiguidadeInstitucional(lista);
+  }, [medalhas, tiposMedalha]);
 
   const tiposDisponiveis = [...new Set(medalhasExibicao.map((item) => item.tipo_medalha_exibicao).filter(Boolean))];
   const unidadesDisponiveis = [...new Set(medalhasExibicao.map((item) => item.militar_unidade).filter(Boolean))];

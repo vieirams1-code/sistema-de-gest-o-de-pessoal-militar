@@ -1,3 +1,5 @@
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '../utils/antiguidade/ordenacaoMilitarInstitucional.js';
+
 export const ACOES_MEDALHAS = {
   INDICAR: 'indicar_medalhas',
   ADMIN_OVERRIDE: 'editar_medalhas',
@@ -50,13 +52,16 @@ export function adicionarAuditoriaMedalha(payload = {}, { userEmail, acao, times
 }
 
 export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarScopeFilters }) {
-  if (isAdmin) return base44Client.entities.Militar.list('nome_completo');
+  if (isAdmin) {
+    const todos = await base44Client.entities.Militar.list();
+    return ordenarMilitaresPorAntiguidadeInstitucional(todos || []);
+  }
 
   const scopeFilters = getMilitarScopeFilters();
   if (!scopeFilters || !scopeFilters.length) return [];
 
   // Optimized: Use Promise.all but flatten more efficiently and use a Map for O(1) deduplication
-  const results = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f, 'nome_completo')));
+  const results = await Promise.all(scopeFilters.map((f) => base44Client.entities.Militar.filter(f)));
   const uniqueMilitares = new Map();
 
   for (let i = 0; i < results.length; i += 1) {
@@ -69,7 +74,7 @@ export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarS
     }
   }
 
-  return Array.from(uniqueMilitares.values()).sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || ''), 'pt-BR'));
+  return ordenarMilitaresPorAntiguidadeInstitucional(Array.from(uniqueMilitares.values()));
 }
 
 export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds = [] }) {
