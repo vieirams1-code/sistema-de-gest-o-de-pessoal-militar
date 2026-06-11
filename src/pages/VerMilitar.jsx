@@ -55,6 +55,7 @@ import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitar
 import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMilitar } from '@/utils/funcoesTags/decoracaoInstitucionalMilitar';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { montarMilitar360Bundle } from '@/services/militar360Service';
+import { canShowArmamentosTab, canShowAtestadosTab } from '@/services/militarFichaTabsVisibility';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -130,7 +131,7 @@ export default function VerMilitar() {
   const id = searchParams.get('id');
   const registrosLivro = [];
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, hasAccess, hasSelfAccess, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const effectiveEmail = getEffectiveEmail();
   const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
@@ -214,7 +215,7 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
-  const { data: atestados = [] } = useQuery({
+  const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['ver-atestados', id],
     queryFn: () => base44.entities.Atestado.filter({ militar_id: id }, '-data_inicio'),
     enabled: !!id && isAccessResolved && canViewMilitar
@@ -236,7 +237,7 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
-  const { data: armamentos = [] } = useQuery({
+  const { data: armamentos = [], isLoading: isLoadingArmamentos } = useQuery({
     queryKey: ['ver-armamentos', id],
     queryFn: () => base44.entities.Armamento.filter({ militar_id: id }),
     enabled: !!id && isAccessResolved && canViewMilitar
@@ -692,7 +693,12 @@ export default function VerMilitar() {
         key: 'atestados',
         label: 'Atestados',
         icon: FileText,
-        visible: true,
+        visible: canShowAtestadosTab({
+          atestados: atestadosSistema,
+          isLoadingAtestados,
+          canAccessModule,
+          canAccessAction,
+        }),
         content: (
           <div className="space-y-3">
             <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
@@ -829,7 +835,12 @@ export default function VerMilitar() {
         key: 'armamentos',
         label: 'Armamentos',
         icon: Shield,
-        visible: true,
+        visible: canShowArmamentosTab({
+          armamentos: armamentosSistema,
+          isLoadingArmamentos,
+          canAccessModule,
+          canAccessAction,
+        }),
         content: (
           <div className="space-y-3">
             <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
@@ -918,10 +929,10 @@ export default function VerMilitar() {
     mensagemRegistrosSistema, pendenciasComportamentoSistema, ultimaPunicaoPorMilitar,
     historicoChartData, historicoComportamentoSistema, punicoesSistema,
     militarEnriquecido, postoGraduacaoMilitar, feriasSistema, periodosSistema,
-    periodosFeriasResumo, creditosExtraPorPeriodo, atestadosSistema,
+    periodosFeriasResumo, creditosExtraPorPeriodo, atestadosSistema, isLoadingAtestados,
     apuracaoTempoServico, impedimentoAtivoGeral, podeGerirImpedimentosMedalha,
     removerImpedimentoMutation.isPending, impedimentoForm, criarImpedimentoMutation.isPending,
-    medalhasConcedidasSistema, armamentosSistema, podeVisualizarContratosDesignacao,
+    medalhasConcedidasSistema, armamentosSistema, isLoadingArmamentos, canAccessModule, canAccessAction, podeVisualizarContratosDesignacao,
     contratosDesignacaoMilitar, matriculasMilitar, id, isLoadingContratosDesignacao,
     podeCriarContratoDesignacao, podeEditarContratoDesignacao, podeEncerrarContratoDesignacao,
     podeCancelarContratoDesignacao, podeExcluirContratoDesignacao,
