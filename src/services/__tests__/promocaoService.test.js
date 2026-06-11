@@ -766,6 +766,50 @@ test('alertas cobrem publicado sem histórico e publicado desselecionado', () =>
   ]);
 });
 
+test('bulkCreatePromocaoMilitar usa bulkCreate quando disponível', async () => {
+  let bulkCalled = false;
+  const payloads = [{ militar_id: 'm1' }, { militar_id: 'm2' }];
+  const originalEntity = base44.entities.PromocaoMilitar;
+
+  base44.entities.PromocaoMilitar = {
+    bulkCreate: async (p) => {
+      bulkCalled = true;
+      assert.deepEqual(p, payloads);
+    },
+  };
+
+  try {
+    const { bulkCreatePromocaoMilitar } = await import(`../promocaoService.js?t=${Date.now()}`);
+    const resultado = await bulkCreatePromocaoMilitar(payloads);
+    assert.equal(bulkCalled, true);
+    assert.equal(resultado.criados, 2);
+  } finally {
+    base44.entities.PromocaoMilitar = originalEntity;
+  }
+});
+
+test('bulkCreatePromocaoMilitar cai para Promise.all(create) quando bulkCreate não existe', async () => {
+  const criados = [];
+  const payloads = [{ militar_id: 'm1' }, { militar_id: 'm2' }];
+  const originalEntity = base44.entities.PromocaoMilitar;
+
+  base44.entities.PromocaoMilitar = {
+    create: async (p) => {
+      criados.push(p);
+    },
+  };
+
+  try {
+    const { bulkCreatePromocaoMilitar } = await import(`../promocaoService.js?t=${Date.now()}`);
+    const resultado = await bulkCreatePromocaoMilitar(payloads);
+    assert.equal(criados.length, 2);
+    assert.deepEqual(criados, payloads);
+    assert.equal(resultado.criados, 2);
+  } finally {
+    base44.entities.PromocaoMilitar = originalEntity;
+  }
+});
+
 
 test('salvar turma não depende mais de marcação manual para promoção inferior', () => {
   const validacao = validarSalvarTurmaOperacional([

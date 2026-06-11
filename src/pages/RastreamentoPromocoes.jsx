@@ -14,7 +14,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { montarMilitarPorId, montarPayloadsPromocaoMilitarAgrupamento } from '@/services/promocaoService';
+import {
+  montarMilitarPorId,
+  montarPayloadsPromocaoMilitarAgrupamento,
+  bulkCreatePromocaoMilitar,
+} from '@/services/promocaoService';
 
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'retificado', 'retificada', 'cancelada']);
@@ -567,11 +571,7 @@ export default function RastreamentoPromocoes() {
         });
 
         if (payloadsTurma.length > 0) {
-          if (PromocaoMilitar.bulkCreate) {
-            await PromocaoMilitar.bulkCreate(payloadsTurma);
-          } else {
-            await Promise.all(payloadsTurma.map((payloadTurma) => PromocaoMilitar.create(payloadTurma)));
-          }
+          await bulkCreatePromocaoMilitar(payloadsTurma);
         }
         return { ...promocaoCriada, total_promocao_militar_criados: payloadsTurma.length };
       } catch (createError) {

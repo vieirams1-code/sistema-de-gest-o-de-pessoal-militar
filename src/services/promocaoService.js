@@ -1446,3 +1446,17 @@ export async function bulkUpdatePromocaoMilitar(payloads = []) {
 
   return { atualizados: payloads.length };
 }
+
+export async function bulkCreatePromocaoMilitar(payloads = []) {
+  if (!Array.isArray(payloads) || payloads.length === 0) return { criados: 0 };
+  const entity = base44.entities.PromocaoMilitar;
+  if (!entity) throw new Error('Entidade PromocaoMilitar indisponível para criação em lote.');
+
+  if (typeof entity.bulkCreate === 'function') {
+    await entity.bulkCreate(payloads);
+  } else {
+    await Promise.all(payloads.map((payload) => entity.create(payload)));
+  }
+
+  return { criados: payloads.length };
+}
