@@ -94,6 +94,19 @@ export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds =
   return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }
 
+export async function bulkUpdateMedalhas(base44Client, payloads = []) {
+  if (!Array.isArray(payloads) || payloads.length === 0) return 0;
+
+  const entity = base44Client.entities.Medalha;
+  if (typeof entity.bulkUpdate === 'function') {
+    await entity.bulkUpdate(payloads);
+  } else {
+    await Promise.all(payloads.map(({ id, ...data }) => entity.update(id, data)));
+  }
+
+  return payloads.length;
+}
+
 export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userEmail, motivoReset = 'administrativamente' }) {
   if (!medalhas.length) return 0;
 
@@ -108,13 +121,7 @@ export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userE
     }, { userEmail, acao: 'reset', timestamp }),
   }));
 
-  if (typeof base44Client.entities.Medalha.bulkUpdate === 'function') {
-    await base44Client.entities.Medalha.bulkUpdate(payloads);
-  } else {
-    await Promise.all(payloads.map(({ id, ...data }) => base44Client.entities.Medalha.update(id, data)));
-  }
-
-  return medalhas.length;
+  return bulkUpdateMedalhas(base44Client, payloads);
 }
 
 export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarIds = [] }) {
