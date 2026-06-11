@@ -67,7 +67,6 @@ import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/se
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
-import { getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { bulkFeriasTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
@@ -429,7 +428,6 @@ export default function Ferias() {
   const [feriasTagsBulkOpen, setFeriasTagsBulkOpen] = useState(false);
   const [feriasTagsBulkResultado, setFeriasTagsBulkResultado] = useState(null);
 
-  const effectiveEmail = getEffectiveEmailMilitares();
   const {
     data: feriasData,
     isLoading,
@@ -439,7 +437,7 @@ export default function Ferias() {
     error: feriasError,
     refetch: refetchFerias,
   } = useQuery({
-    queryKey: ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
+    queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
       const bundle = await fetchScopedFeriasBundle();
       const ferias = await enriquecerFeriasComContextoMilitar(bundle.ferias || [], { contexto: 'operacional' });
@@ -464,7 +462,7 @@ export default function Ferias() {
   const hasPartialDataWarning = feriasPartialFailures > 0;
   const hasFeriasLoadError = isFeriasError;
   const isPageLoading = isLoading;
-  const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
+  const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail];
   const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
 
   const getFeriasEstagioProvavel = () => {
@@ -521,7 +519,7 @@ export default function Ferias() {
   };
 
   const { data: creditosExtraFerias = [] } = useQuery({
-    queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
+    queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail],
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
