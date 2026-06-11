@@ -82,6 +82,7 @@ import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
 import ImportarMedalhaDomPedroII from './pages/ImportarMedalhaDomPedroII';
+import ImportarMedalhaTempoServico from './pages/ImportarMedalhaTempoServico';
 import IndicacoesDomPedroII from './pages/IndicacoesDomPedroII';
 import Medalhas from './pages/Medalhas';
 import Medicos from './pages/Medicos';
@@ -153,6 +154,7 @@ export const PAGES = {
     "Home": Home,
     "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
     "ImportarMedalhaDomPedroII": ImportarMedalhaDomPedroII,
+    "ImportarMedalhaTempoServico": ImportarMedalhaTempoServico,
     "IndicacoesDomPedroII": IndicacoesDomPedroII,
     "Medalhas": Medalhas,
     "Medicos": Medicos,

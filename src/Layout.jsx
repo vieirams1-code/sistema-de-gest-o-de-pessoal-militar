@@ -202,6 +202,7 @@ const menuGroups = [
               { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, moduleKey: 'migracao_militares', actionKey: 'ver_historico_importacoes' },
               { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, moduleKey: 'migracao_alteracoes_legado', actionKey: 'migrar_alteracoes_legado' },
               { name: 'Importar Dom Pedro II', page: 'ImportarMedalhaDomPedroII', icon: Medal, moduleKey: 'migracao_alteracoes_legado' },
+              { name: 'Importar Medalhas Tempo Serviço', page: 'ImportarMedalhaTempoServico', icon: Medal, moduleKey: 'migracao_alteracoes_legado' },
               { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'classificar_legado' },
               { name: 'Classificações Históricas', page: 'ClassificacoesHistoricasAlteracoes', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'gerir_classificacoes_historicas' },
             ],
