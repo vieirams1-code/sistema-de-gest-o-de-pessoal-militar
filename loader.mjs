@@ -8,6 +8,8 @@ export async function resolve(specifier, context, nextResolve) {
     globalThis.importMetaEnvInjected = true;
   }
 
+  let resolvedSpecifier = specifier;
+
   if (specifier.startsWith('@/')) {
     const rootPath = process.cwd();
     const subPath = specifier.slice(2);
@@ -16,22 +18,47 @@ export async function resolve(specifier, context, nextResolve) {
     if (!finalPath.endsWith('.js') && !finalPath.endsWith('.jsx')) {
       if (existsSync(finalPath + '.js')) {
         finalPath += '.js';
-      } else {
+      } else if (existsSync(finalPath + '.jsx')) {
         finalPath += '.jsx';
+      } else if (existsSync(join(finalPath, 'index.js'))) {
+        finalPath = join(finalPath, 'index.js');
+      } else if (existsSync(join(finalPath, 'index.jsx'))) {
+        finalPath = join(finalPath, 'index.jsx');
       }
     }
-    return nextResolve(pathToFileURL(finalPath).href, context);
+    resolvedSpecifier = pathToFileURL(finalPath).href;
   }
 
-  if (specifier.includes('/src/') && specifier.endsWith('.js')) {
-      const path = specifier.startsWith('file://') ? new URL(specifier).pathname : specifier;
-      if (!existsSync(path) && existsSync(path.replace(/\.js$/, '.jsx'))) {
-          const newSpecifier = specifier.replace(/\.js$/, '.jsx');
-          return nextResolve(newSpecifier, context);
+  // Handle case where it's already a relative path but needs extension or index
+  if (resolvedSpecifier.startsWith('.') || resolvedSpecifier.startsWith('/') || resolvedSpecifier.startsWith('file:')) {
+     const url = resolvedSpecifier.startsWith('file:') ? new URL(resolvedSpecifier) : pathToFileURL(join(process.cwd(), resolvedSpecifier));
+     let path = url.pathname;
+
+     if (!path.endsWith('.js') && !path.endsWith('.jsx') && !path.endsWith('.json')) {
+         if (existsSync(path + '.js')) {
+            resolvedSpecifier = pathToFileURL(path + '.js').href;
+         } else if (existsSync(path + '.jsx')) {
+            resolvedSpecifier = pathToFileURL(path + '.jsx').href;
+         } else if (existsSync(join(path, 'index.js'))) {
+            resolvedSpecifier = pathToFileURL(join(path, 'index.js')).href;
+         } else if (existsSync(join(path, 'index.jsx'))) {
+            resolvedSpecifier = pathToFileURL(join(path, 'index.jsx')).href;
+         }
+     }
+  }
+
+  try {
+      return await nextResolve(resolvedSpecifier, context);
+  } catch (e) {
+      if (specifier.startsWith('@/api/')) {
+           // Fallback manual resolution for @/api
+           const manualPath = join(process.cwd(), 'src', 'api', specifier.slice(6) + (specifier.endsWith('.js') ? '' : '.js'));
+           if (existsSync(manualPath)) {
+               return nextResolve(pathToFileURL(manualPath).href, context);
+           }
       }
+      throw e;
   }
-
-  return nextResolve(specifier, context);
 }
 
 export async function load(url, context, nextLoad) {
