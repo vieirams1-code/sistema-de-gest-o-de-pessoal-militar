@@ -41,6 +41,8 @@ function detectarOrigemTipo(registro) {
   return 'livro';
 }
 
+const cacheRegexDestaque = new Map();
+
 function obterTrechosComDestaque(texto, termosRelevantes = []) {
   if (!texto?.trim() || !termosRelevantes.length) {
     return [{ texto, destaque: false }];
@@ -55,8 +57,22 @@ function obterTrechosComDestaque(texto, termosRelevantes = []) {
     return [{ texto, destaque: false }];
   }
 
-  const termosSet = new Set(baseTermos.map((t) => t.toLowerCase()));
-  const regex = new RegExp(`(${baseTermos.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  const cacheKey = baseTermos.join('|');
+  let regexData = cacheRegexDestaque.get(cacheKey);
+
+  if (!regexData) {
+    const regex = new RegExp(`(${baseTermos.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    const termosSet = new Set(baseTermos.map((t) => t.toLowerCase()));
+    regexData = { regex, termosSet };
+
+    if (cacheRegexDestaque.size > 50) {
+      const firstKey = cacheRegexDestaque.keys().next().value;
+      cacheRegexDestaque.delete(firstKey);
+    }
+    cacheRegexDestaque.set(cacheKey, regexData);
+  }
+
+  const { regex, termosSet } = regexData;
 
   return texto.split(regex).filter(Boolean).map((parte) => ({
     texto: parte,
@@ -708,15 +724,20 @@ export default function ConciliacaoBoletim() {
     });
   }, [pendentes]);
 
-  const pendentesSemCorrespondencia = useMemo(
-    () => pendentes.filter((pub) => !vinculosEfetivos[pub.id]),
-    [pendentes, vinculosEfetivos]
-  );
+  const { pendentesSemCorrespondencia, publicacoesConciliadas } = useMemo(() => {
+    const sem = [];
+    const conc = [];
 
-  const publicacoesConciliadas = useMemo(
-    () => pendentes.filter((pub) => !!vinculosEfetivos[pub.id]),
-    [pendentes, vinculosEfetivos]
-  );
+    pendentes.forEach((pub) => {
+      if (vinculosEfetivos[pub.id]) {
+        conc.push(pub);
+      } else {
+        sem.push(pub);
+      }
+    });
+
+    return { pendentesSemCorrespondencia: sem, publicacoesConciliadas: conc };
+  }, [pendentes, vinculosEfetivos]);
 
   const notasSemItem = useMemo(
     () => notasEncontradas.filter((nota) => !notasConciliadasIds.has(nota.id)),
