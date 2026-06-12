@@ -80,6 +80,14 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_acervo_historico',
+        label: 'Acervo Funcional Histórico',
+        actions: [
+          { key: 'perm_visualizar_acervo_historico', label: 'Visualizar Acervo Histórico' },
+          { key: 'perm_gerir_acervo_historico', label: 'Gerir Acervo Histórico', sensitive: true }
+        ]
+      },
+      {
         key: 'acesso_registros_militar',
         label: 'Registros do Militar',
         actions: [
@@ -293,6 +301,13 @@ export const permissionStructure = [
         label: 'Perfis de Permissão',
         actions: [
           { key: 'perm_gerir_perfis_permissao', label: 'Gerir Perfis de Permissão', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_repositorios_documentais',
+        label: 'Repositórios Documentais',
+        actions: [
+          { key: 'perm_gerir_repositorios_documentais', label: 'Gerir Repositórios Documentais', sensitive: true }
         ]
       },
       {
