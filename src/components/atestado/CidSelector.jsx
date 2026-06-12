@@ -44,6 +44,7 @@ export default function CidSelector({ cidValue, descricaoValue, onChange }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       handleSearch();
     }
   };

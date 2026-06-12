@@ -54,6 +54,7 @@ export default function MedicoFormDialog({ open, onOpenChange, initialSearch = '
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    event.stopPropagation();
     setError('');
 
     const normalizedForm = normalizeMedicoForm(form);
