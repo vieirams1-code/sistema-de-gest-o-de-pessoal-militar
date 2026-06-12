@@ -9,9 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Database, Check, X, Server, Wifi, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Database, Check, X, Server, Wifi, RefreshCw, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function RepositoriosDocumentais() {
   const { toast } = useToast();
@@ -19,6 +29,7 @@ export default function RepositoriosDocumentais() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRepo, setEditingRepo] = useState(null);
   const [testingId, setTestingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
   const { data: repositorios = [], isLoading } = useQuery({
     queryKey: ['repositorios-documentais'],
@@ -53,6 +64,18 @@ export default function RepositoriosDocumentais() {
     },
     onError: (error) => {
       toast({ title: 'Erro ao salvar repositório', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => excluirEscopado('RepositorioDocumental', id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repositorios-documentais'] });
+      toast({ title: 'Repositório excluído com sucesso!' });
+      setDeleteDialog({ open: false, id: null });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao excluir repositório', description: error.message, variant: 'destructive' });
     }
   });
 
@@ -274,6 +297,14 @@ export default function RepositoriosDocumentais() {
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)} className="h-8 w-8 p-0">
                           <Pencil className="w-4 h-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteDialog({ open: true, id: repo.id })}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -283,6 +314,27 @@ export default function RepositoriosDocumentais() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este repositório? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate(deleteDialog.id)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
