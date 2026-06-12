@@ -36,6 +36,7 @@ import {
   Pin,
   Tags as TagsIcon,
   Stethoscope,
+  Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
