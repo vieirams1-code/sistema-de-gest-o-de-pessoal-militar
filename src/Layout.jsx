@@ -189,6 +189,7 @@ const menuGroups = [
           { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },
           { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
           { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp' },
+          { name: 'Repositórios Documentais', page: 'RepositoriosDocumentais', icon: Database, moduleKey: 'acesso_repositorios_documentais', actionKey: 'perm_gerir_repositorios_documentais' },
           {
             name: 'Permissões',
             page: 'PermissoesUsuarios',
