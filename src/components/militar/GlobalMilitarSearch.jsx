@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, UserRound, BadgeCheck, Hash, Building2, ArrowRight } from 'lucide-react';
+import { Search, UserRound, BadgeCheck, Hash, Building2, ArrowRight, FileText } from 'lucide-react';
+import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -298,14 +299,14 @@ export default function GlobalMilitarSearch() {
               <div className="space-y-4">
                 <div>
                   <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-sky-600">Melhor correspondência</p>
-                  <div className="mt-2">{renderMilitarCard(melhorResultado, 0)}</div>
+                  <div className="mt-2">{renderResultCard(melhorResultado, 0)}</div>
                 </div>
 
                 {outrosResultados.length > 0 && (
                   <div>
                     <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-500">Outros resultados</p>
                     <div className="mt-2 space-y-2">
-                      {outrosResultados.map((militar, index) => renderMilitarCard(militar, index + 1))}
+                      {outrosResultados.map((militar, index) => renderResultCard(militar, index + 1))}
                     </div>
                   </div>
                 )}
