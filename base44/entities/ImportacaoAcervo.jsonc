@@ -1,0 +1,57 @@
+{
+  "name": "ImportacaoAcervo",
+  "type": "object",
+  "title": "Importação de Acervo Histórico",
+  "description": "Fila de processamento e auditoria de importações em lote do acervo.",
+  "properties": {
+    "usuario": {
+      "type": "string"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "AGUARDANDO",
+        "PROCESSANDO",
+        "CONCLUIDA",
+        "CONCLUIDA_COM_RESSALVAS",
+        "FALHOU"
+      ],
+      "default": "AGUARDANDO"
+    },
+    "percentual": {
+      "type": "integer",
+      "default": 0
+    },
+    "total_arquivos": {
+      "type": "integer",
+      "default": 0
+    },
+    "importados": {
+      "type": "integer",
+      "default": 0
+    },
+    "ignorados": {
+      "type": "integer",
+      "default": 0
+    },
+    "duplicados": {
+      "type": "integer",
+      "default": 0
+    },
+    "falhas": {
+      "type": "integer",
+      "default": 0
+    },
+    "relatorio_json": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "usuario",
+    "data_inicio"
+  ]
+}

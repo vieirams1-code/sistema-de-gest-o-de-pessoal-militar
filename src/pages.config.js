@@ -81,6 +81,9 @@ import FichaMilitar from './pages/FichaMilitar';
 import FolhaAlteracoes from './pages/FolhaAlteracoes';
 import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
+import DashboardAcervo from './pages/DashboardAcervo';
+import ImportacaoLoteAcervo from './pages/ImportacaoLoteAcervo';
+import RevisaoAcervo from './pages/RevisaoAcervo';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
 import ImportarMedalhaDomPedroII from './pages/ImportarMedalhaDomPedroII';
 import ImportarMedalhaTempoServico from './pages/ImportarMedalhaTempoServico';
@@ -155,6 +158,9 @@ export const PAGES = {
     "FolhaAlteracoes": FolhaAlteracoes,
     "GratificacoesFuncao": GratificacoesFuncao,
     "Home": Home,
+    "DashboardAcervo": DashboardAcervo,
+    "ImportacaoLoteAcervo": ImportacaoLoteAcervo,
+    "RevisaoAcervo": RevisaoAcervo,
     "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
     "ImportarMedalhaDomPedroII": ImportarMedalhaDomPedroII,
     "ImportarMedalhaTempoServico": ImportarMedalhaTempoServico,

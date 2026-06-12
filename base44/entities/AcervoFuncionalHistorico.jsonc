@@ -97,6 +97,41 @@
     },
     "matricula_utilizada": {
       "type": "string"
+    },
+    "origem_documento_fisico": {
+      "type": "string"
+    },
+    "digitalizado_por": {
+      "type": "string"
+    },
+    "digitalizado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "conferido_por": {
+      "type": "string"
+    },
+    "conferido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observacoes_conferencia": {
+      "type": "string"
+    },
+    "confianca_identificacao": {
+      "type": "string",
+      "enum": [
+        "ALTA",
+        "MEDIA",
+        "BAIXA"
+      ]
+    },
+    "validado": {
+      "type": "boolean",
+      "default": false
+    },
+    "importacao_id": {
+      "type": "string"
     }
   },
   "required": [
