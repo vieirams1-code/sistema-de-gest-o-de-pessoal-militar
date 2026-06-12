@@ -31,6 +31,7 @@ import {
   History,
   UserCircle2,
   ListOrdered,
+  BarChart3,
   PanelLeftClose,
   Pin,
   Tags as TagsIcon,
@@ -110,6 +111,18 @@ const menuGroups = [
           { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_rp' },
           { name: 'Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
           { name: 'Conciliação', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
+          {
+            name: 'Acervo Histórico',
+            page: 'DashboardAcervo',
+            icon: Archive,
+            actionKey: 'gerir_acervo_historico',
+            children: [
+              { name: 'Painel Operacional', page: 'DashboardAcervo', icon: BarChart3, actionKey: 'gerir_acervo_historico' },
+              { name: 'Importação em Lote', page: 'ImportacaoLoteAcervo', icon: FileUp, actionKey: 'gerir_acervo_historico' },
+              { name: 'Fila de Revisão', page: 'RevisaoAcervo', icon: ShieldCheck, actionKey: 'gerir_acervo_historico' },
+              { name: 'Auditoria de Integridade', page: 'AuditoriaAcervo', icon: Shield, actionKey: 'gerir_acervo_historico' },
+            ],
+          },
         ],
       },
       {
