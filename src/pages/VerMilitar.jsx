@@ -12,9 +12,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList, Clock } from
+  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList, Clock, Plus, Trash2, RotateCcw, Archive } from
 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
@@ -54,11 +62,20 @@ import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
+import CoberturaHistorica from '@/components/militar/CoberturaHistorica';
 import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMilitar } from '@/utils/funcoesTags/decoracaoInstitucionalMilitar';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { montarMilitar360Bundle } from '@/services/militar360Service';
 import { canShowArmamentosTab, canShowAtestadosTab } from '@/services/militarFichaTabsVisibility';
-import { cadastrarDocumentoHistorico, listarAcervoMilitar } from '@/services/acervoHistoricoService';
+import {
+  cadastrarDocumentoHistorico,
+  listarAcervoMilitar,
+  excluirDocumentoHistorico,
+  restaurarDocumentoHistorico,
+  listarLixeiraAcervo,
+  arquivarDefinitivamenteAcervo,
+  listarHistoricoVersoes
+} from '@/services/acervoHistoricoService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -137,6 +154,7 @@ export default function VerMilitar() {
   const { isAdmin, hasAccess, hasSelfAccess, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const podeGerirAcervo = canAccessAction('gerir_acervo_historico');
+  const podeBaixarAcervo = canAccessAction('baixar_acervo_historico');
   const effectiveEmail = getEffectiveEmail();
   const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
   const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
@@ -159,9 +177,14 @@ export default function VerMilitar() {
     periodo_final: '',
     data_documento: '',
     comportamento_certificado: 'BOM',
-    observacoes: ''
+    observacoes: '',
+    substituir_existente: false,
+    substitui_documento_id: '',
+    confirmar_sobreposicao: false,
+    confirmar_duplicidade: false
   });
   const [acervoFile, setAcervoFile] = useState(null);
+  const [docParaVersoes, setDocParaVersoes] = useState(null);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
     data_fim: '',
@@ -323,6 +346,18 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
+  const { data: lixeiraAcervo = [] } = useQuery({
+    queryKey: ['ver-lixeira-acervo', id],
+    queryFn: () => listarLixeiraAcervo(id),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeGerirAcervo
+  });
+
+  const { data: historicoVersoes = [] } = useQuery({
+    queryKey: ['ver-historico-versoes', docParaVersoes?.id],
+    queryFn: () => listarHistoricoVersoes(docParaVersoes?.id),
+    enabled: !!docParaVersoes?.id
+  });
+
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['ver-pendencias-comportamento', id],
     queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
@@ -399,6 +434,22 @@ export default function VerMilitar() {
     mutationFn: async () => {
       if (!acervoFile) throw new Error('PDF obrigatório.');
 
+      // Detecção de sobreposição de períodos para ALTERACAO
+      if (acervoForm.tipo_documento === 'ALTERACAO' && !acervoForm.confirmar_sobreposicao) {
+        const sobrepostos = acervoHistorico.filter(a =>
+          a.tipo_documento === 'ALTERACAO' &&
+          a.periodo_inicial <= acervoForm.periodo_final &&
+          a.periodo_final >= acervoForm.periodo_inicial
+        );
+        if (sobrepostos.length > 0) {
+          const titulos = sobrepostos.map(s => s.titulo).join(', ');
+          if (!confirm(`Aviso de sobreposição: Este período conflita com os documentos: ${titulos}. Deseja continuar mesmo assim?`)) {
+            throw new Error('Operação cancelada pelo usuário devido à sobreposição de períodos.');
+          }
+          setAcervoForm(prev => ({ ...prev, confirmar_sobreposicao: true }));
+        }
+      }
+
       // Converter arquivo para base64 para o backend
       const reader = new FileReader();
       const filePromise = new Promise((resolve, reject) => {
@@ -408,25 +459,85 @@ export default function VerMilitar() {
       });
       const content = await filePromise;
 
-      return await cadastrarDocumentoHistorico({
-        militar_id: id,
-        tipo_documento: acervoForm.tipo_documento,
-        data: acervoForm,
-        file: {
-          name: acervoFile.name,
-          type: acervoFile.type,
-          content
+      try {
+        return await cadastrarDocumentoHistorico({
+          militar_id: id,
+          tipo_documento: acervoForm.tipo_documento,
+          data: acervoForm,
+          file: {
+            name: acervoFile.name,
+            type: acervoFile.type,
+            content
+          }
+        });
+      } catch (err) {
+        if (err.message === 'DUPLICIDADE_DETECTADA') {
+          if (confirm('Este documento aparentemente já foi cadastrado anteriormente. Deseja continuar mesmo assim?')) {
+            setAcervoForm(prev => ({ ...prev, confirmar_duplicidade: true }));
+            return await cadastrarDocumentoHistorico({
+              militar_id: id,
+              tipo_documento: acervoForm.tipo_documento,
+              data: { ...acervoForm, confirmar_duplicidade: true },
+              file: {
+                name: acervoFile.name,
+                type: acervoFile.type,
+                content
+              }
+            });
+          } else {
+            throw new Error('Operação cancelada devido à duplicidade de arquivo.');
+          }
         }
-      });
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ver-acervo-historico', id] });
       toast({ title: 'Documento salvo no acervo histórico com sucesso!' });
       setShowNovoAcervoModal(false);
       setAcervoFile(null);
+      setAcervoForm({
+        tipo_documento: 'ALTERACAO',
+        titulo: '',
+        periodo_inicial: '',
+        periodo_final: '',
+        data_documento: '',
+        comportamento_certificado: 'BOM',
+        observacoes: '',
+        substituir_existente: false,
+        substitui_documento_id: '',
+        confirmar_sobreposicao: false,
+        confirmar_duplicidade: false
+      });
     },
     onError: (err) => {
       toast({ title: 'Erro ao salvar documento', description: err.message, variant: 'destructive' });
+    }
+  });
+
+  const excluirAcervoMutation = useMutation({
+    mutationFn: (docId) => excluirDocumentoHistorico(docId, userEmail),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-acervo-historico', id] });
+      queryClient.invalidateQueries({ queryKey: ['ver-lixeira-acervo', id] });
+      toast({ title: 'Documento movido para a lixeira.' });
+    }
+  });
+
+  const restaurarAcervoMutation = useMutation({
+    mutationFn: (docId) => restaurarDocumentoHistorico(docId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-acervo-historico', id] });
+      queryClient.invalidateQueries({ queryKey: ['ver-lixeira-acervo', id] });
+      toast({ title: 'Documento restaurado.' });
+    }
+  });
+
+  const arquivarAcervoMutation = useMutation({
+    mutationFn: (docId) => arquivarDefinitivamenteAcervo(docId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-lixeira-acervo', id] });
+      toast({ title: 'Documento arquivado definitivamente.' });
     }
   });
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
@@ -998,111 +1109,213 @@ export default function VerMilitar() {
       },
       {
         key: 'acervo-historico',
-        label: 'Acervo Histórico',
+        label: `Acervo Histórico (${acervoHistorico.length})`,
         icon: FileText,
         visible: canAccessAction('visualizar_acervo_historico'),
         content: (
           <div className="space-y-6">
+            <CoberturaHistorica acervo={acervoHistorico} dataInclusao={militar.data_inclusao} />
+
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-slate-700">Documentos Históricos</h3>
-              {podeGerirAcervo && (
-                <Button className="bg-[#1e3a5f]" onClick={() => setShowNovoAcervoModal(true)}>
-                  <Plus className="w-4 h-4 mr-2" /> Novo Documento
-                </Button>
-              )}
+              <div className="flex gap-2">
+                {podeGerirAcervo && (
+                  <Button className="bg-[#1e3a5f]" onClick={() => setShowNovoAcervoModal(true)}>
+                    <Plus className="w-4 h-4 mr-2" /> Novo Documento
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {/* Seção Alterações */}
-            <Section title="Alterações" icon={ClipboardList}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Período</TableHead>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Observações</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-4">Nenhuma alteração cadastrada.</TableCell></TableRow>
-                  ) : (
-                    acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').map(a => (
-                      <TableRow key={a.id}>
-                        <TableCell className="text-xs">{formatDate(a.periodo_inicial)} - {formatDate(a.periodo_final)}</TableCell>
-                        <TableCell>{a.titulo}</TableCell>
-                        <TableCell>{formatDate(a.data_documento)}</TableCell>
-                        <TableCell className="text-xs text-slate-500">{a.observacoes}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>Abrir PDF</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Section>
+            <Tabs defaultValue="documentos">
+              <TabsList>
+                <TabsTrigger value="documentos">Documentos</TabsTrigger>
+                {podeGerirAcervo && <TabsTrigger value="lixeira">Lixeira ({lixeiraAcervo.length})</TabsTrigger>}
+              </TabsList>
 
-            {/* Seção Certidões */}
-            <Section title="Certidões de Comportamento" icon={Shield}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Comportamento</TableHead>
-                    <TableHead>Observações</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-4">Nenhuma certidão cadastrada.</TableCell></TableRow>
-                  ) : (
-                    acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').map(a => (
-                      <TableRow key={a.id}>
-                        <TableCell>{formatDate(a.data_documento)}</TableCell>
-                        <TableCell>{a.comportamento_certificado}</TableCell>
-                        <TableCell className="text-xs text-slate-500">{a.observacoes}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>Abrir PDF</Button>
-                        </TableCell>
+              <TabsContent value="documentos" className="space-y-6 pt-4">
+                {/* Seção Alterações */}
+                <Section title={`Alterações (${acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').length})`} icon={ClipboardList}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Período</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Section>
+                    </TableHeader>
+                    <TableBody>
+                      {acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').length === 0 ? (
+                        <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-4">Nenhuma alteração cadastrada.</TableCell></TableRow>
+                      ) : (
+                        acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').map(a => (
+                          <TableRow key={a.id}>
+                            <TableCell className="text-xs">{formatDate(a.periodo_inicial)} - {formatDate(a.periodo_final)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {a.titulo}
+                                {a.versao > 1 && <Badge variant="outline">v{a.versao}</Badge>}
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDate(a.data_documento)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setDocParaVersoes(a)}>Histórico</Button>
+                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>PDF</Button>}
+                                {podeGerirAcervo && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => excluirAcervoMutation.mutate(a.id)}><Trash2 className="w-4 h-4" /></Button>}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Section>
 
-            {/* Seção Diversos */}
-            <Section title="Diversos" icon={FileText}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Observações</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-4">Nenhum documento cadastrado.</TableCell></TableRow>
-                  ) : (
-                    acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').map(a => (
-                      <TableRow key={a.id}>
-                        <TableCell>{formatDate(a.data_documento)}</TableCell>
-                        <TableCell>{a.titulo}</TableCell>
-                        <TableCell className="text-xs text-slate-500">{a.observacoes}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>Abrir PDF</Button>
-                        </TableCell>
+                {/* Seção Certidões */}
+                <Section title={`Certidões (${acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').length})`} icon={Shield}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Comportamento</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Section>
+                    </TableHeader>
+                    <TableBody>
+                      {acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').length === 0 ? (
+                        <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4">Nenhuma certidão cadastrada.</TableCell></TableRow>
+                      ) : (
+                        acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').map(a => (
+                          <TableRow key={a.id}>
+                            <TableCell>{formatDate(a.data_documento)}</TableCell>
+                            <TableCell>{a.comportamento_certificado}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setDocParaVersoes(a)}>Histórico</Button>
+                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>PDF</Button>}
+                                {podeGerirAcervo && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => excluirAcervoMutation.mutate(a.id)}><Trash2 className="w-4 h-4" /></Button>}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Section>
+
+                {/* Seção Diversos */}
+                <Section title={`Diversos (${acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').length})`} icon={FileText}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').length === 0 ? (
+                        <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4">Nenhum documento cadastrado.</TableCell></TableRow>
+                      ) : (
+                        acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').map(a => (
+                          <TableRow key={a.id}>
+                            <TableCell>{formatDate(a.data_documento)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {a.titulo}
+                                {a.versao > 1 && <Badge variant="outline">v{a.versao}</Badge>}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setDocParaVersoes(a)}>Histórico</Button>
+                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>PDF</Button>}
+                                {podeGerirAcervo && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => excluirAcervoMutation.mutate(a.id)}><Trash2 className="w-4 h-4" /></Button>}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Section>
+              </TabsContent>
+
+              {podeGerirAcervo && (
+                <TabsContent value="lixeira" className="pt-4">
+                  <Section title="Lixeira do Acervo" icon={Trash2}>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Documento</TableHead>
+                          <TableHead>Excluído em</TableHead>
+                          <TableHead>Excluído por</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {lixeiraAcervo.length === 0 ? (
+                          <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-4">A lixeira está vazia.</TableCell></TableRow>
+                        ) : (
+                          lixeiraAcervo.map(a => (
+                            <TableRow key={a.id}>
+                              <TableCell>
+                                <p className="font-medium">{a.titulo || a.tipo_documento}</p>
+                                <p className="text-[10px] text-slate-500">{formatDate(a.data_documento)}</p>
+                              </TableCell>
+                              <TableCell className="text-xs">{formatDate(a.deleted_at?.split('T')[0])}</TableCell>
+                              <TableCell className="text-xs">{a.deleted_by}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="outline" size="sm" onClick={() => restaurarAcervoMutation.mutate(a.id)}><RotateCcw className="w-4 h-4 mr-1" /> Restaurar</Button>
+                                  <Button variant="outline" size="sm" className="text-red-600" onClick={() => arquivarAcervoMutation.mutate(a.id)}><Archive className="w-4 h-4 mr-1" /> Arquivar</Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </Section>
+                </TabsContent>
+              )}
+            </Tabs>
+
+            {/* Modal Histórico de Versões */}
+            <Dialog open={!!docParaVersoes} onOpenChange={() => setDocParaVersoes(null)}>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Histórico de Versões: {docParaVersoes?.titulo}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Versão</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* Incluir o documento atual se for solicitado histórico a partir dele */}
+                      {[docParaVersoes, ...historicoVersoes].filter(Boolean).map((v, idx) => (
+                        <TableRow key={v.id + idx}>
+                          <TableCell>v{v.versao}</TableCell>
+                          <TableCell>{formatDate(v.data_documento)}</TableCell>
+                          <TableCell><Badge variant="outline">{v.status_documento}</Badge></TableCell>
+                          <TableCell className="text-right">
+                            {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(v.drive_url, '_blank')}>Abrir PDF</Button>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Modal Novo Documento */}
             <Dialog open={showNovoAcervoModal} onOpenChange={setShowNovoAcervoModal}>
@@ -1122,6 +1335,31 @@ export default function VerMilitar() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="flex items-center gap-2 py-2">
+                    <input
+                      type="checkbox"
+                      id="substituir_existente"
+                      checked={acervoForm.substituir_existente}
+                      onChange={e => setAcervoForm({ ...acervoForm, substituir_existente: e.target.checked })}
+                      className="rounded border-slate-300"
+                    />
+                    <Label htmlFor="substituir_existente" className="text-sm cursor-pointer">Substituir documento existente</Label>
+                  </div>
+
+                  {acervoForm.substituir_existente && (
+                    <div className="space-y-2">
+                      <Label>Documento a ser substituído</Label>
+                      <Select value={acervoForm.substitui_documento_id} onValueChange={v => setAcervoForm({ ...acervoForm, substitui_documento_id: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o documento..." /></SelectTrigger>
+                        <SelectContent>
+                          {acervoHistorico.filter(a => a.tipo_documento === acervoForm.tipo_documento).map(a => (
+                            <SelectItem key={a.id} value={a.id}>{a.titulo || formatDate(a.data_documento)} (v{a.versao})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {(acervoForm.tipo_documento === 'ALTERACAO' || acervoForm.tipo_documento === 'DIVERSOS') && (
                     <div className="space-y-2">

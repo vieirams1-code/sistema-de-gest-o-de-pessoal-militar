@@ -84,6 +84,7 @@ export const permissionStructure = [
         label: 'Acervo Funcional Histórico',
         actions: [
           { key: 'perm_visualizar_acervo_historico', label: 'Visualizar Acervo Histórico' },
+          { key: 'perm_baixar_acervo_historico', label: 'Baixar Documentos do Acervo', sensitive: true },
           { key: 'perm_gerir_acervo_historico', label: 'Gerir Acervo Histórico', sensitive: true }
         ]
       },

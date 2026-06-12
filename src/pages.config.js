@@ -49,6 +49,7 @@
  */
 import AgendaAcoesOperacionais from './pages/AgendaAcoesOperacionais';
 import AgendarJISO from './pages/AgendarJISO';
+import AuditoriaAcervo from './pages/AuditoriaAcervo';
 import AuditoriaComportamento from './pages/AuditoriaComportamento';
 import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
@@ -122,6 +123,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
+    "AuditoriaAcervo": AuditoriaAcervo,
     "AuditoriaComportamento": AuditoriaComportamento,
     "AvaliacaoComportamento": AvaliacaoComportamento,
     "Armamentos": Armamentos,

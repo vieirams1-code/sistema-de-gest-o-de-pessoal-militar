@@ -1,0 +1,22 @@
+{
+  "name": "AuditAcervoLog",
+  "type": "object",
+  "title": "Log de Auditoria do Acervo",
+  "description": "Registros de execuções da auditoria do acervo histórico.",
+  "properties": {
+    "data_execucao": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "usuario_execucao": {
+      "type": "string"
+    },
+    "resultado": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "data_execucao",
+    "usuario_execucao"
+  ]
+}

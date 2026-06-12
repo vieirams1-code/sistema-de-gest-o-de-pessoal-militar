@@ -153,80 +153,110 @@ export default function GlobalMilitarSearch() {
 
   if (!hasAnyPermissaoAtalho) return null;
 
-  const renderMilitarCard = (militar, index) => {
+  const renderResultCard = (item, index) => {
     const selected = index === selectedIndex;
-    const atalhos = construirAtalhosMilitar({ militarId: militar.id, canAccessAction });
-    const status = getMilitarStatus(militar);
 
-    return (
-      <div
-        key={militar.id}
-        role="option"
-        aria-selected={selected}
-        tabIndex={-1}
-        onClick={(event) => {
-          if (event.target.closest('a')) return;
-          handleSelect(militar);
-        }}
-        className={`rounded-2xl border p-3 transition ${selected ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'} cursor-pointer`}
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-700">
-            {militar.foto ? (
-              <img src={militar.foto} alt={militar.nome_guerra || militar.nome_completo} className="h-12 w-12 rounded-2xl object-cover" />
-            ) : getAvatarLabel(militar)}
-          </div>
+    if (item.type === 'militar') {
+      const militar = item.data;
+      const atalhos = construirAtalhosMilitar({ militarId: militar.id, canAccessAction });
+      const status = getMilitarStatus(militar);
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {militar.posto_graduacao && (
-                <Badge variant="outline" className="text-slate-700">
-                  <BadgeCheck className="w-3 h-3 mr-1" />
-                  {militar.posto_graduacao}
-                </Badge>
-              )}
-              {status && (
-                <Badge variant="secondary" className="text-slate-700 bg-slate-100">
-                  {status}
-                </Badge>
-              )}
+      return (
+        <div
+          key={militar.id}
+          role="option"
+          aria-selected={selected}
+          tabIndex={-1}
+          onClick={(event) => {
+            if (event.target.closest('a')) return;
+            handleSelect(item);
+          }}
+          className={`rounded-2xl border p-3 transition ${selected ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'} cursor-pointer`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-700">
+              {militar.foto ? (
+                <img src={militar.foto} alt={militar.nome_guerra || militar.nome_completo} className="h-12 w-12 rounded-2xl object-cover" />
+              ) : getAvatarLabel(militar)}
             </div>
 
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-slate-900">{militar.nome_guerra || militar.nome_completo}</p>
-                <p className="truncate text-sm text-slate-500">{militar.nome_guerra && militar.nome_completo ? militar.nome_completo : ''}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {militar.posto_graduacao && (
+                  <Badge variant="outline" className="text-slate-700">
+                    <BadgeCheck className="w-3 h-3 mr-1" />
+                    {militar.posto_graduacao}
+                  </Badge>
+                )}
+                {status && (
+                  <Badge variant="secondary" className="text-slate-700 bg-slate-100">
+                    {status}
+                  </Badge>
+                )}
               </div>
-              <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">{militar.quadro || ''}</span>
-            </div>
 
-            <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-              <span className="inline-flex items-center gap-1"><UserRound className="w-3.5 h-3.5" /> {militar.nome_completo || '-'}</span>
-              <span className="inline-flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> {militar.matricula || '-'}</span>
-              {(militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao) && (
-                <span className="inline-flex items-center gap-1 col-span-full sm:col-auto"><Building2 className="w-3.5 h-3.5" /> {militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao}</span>
-              )}
-            </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-slate-900">{militar.nome_guerra || militar.nome_completo}</p>
+                  <p className="truncate text-sm text-slate-500">{militar.nome_guerra && militar.nome_completo ? militar.nome_completo : ''}</p>
+                </div>
+                <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">{militar.quadro || ''}</span>
+              </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              {atalhos.map((atalho) => (
-                <Button
-                  key={atalho.key}
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                >
-                  <Link to={`${createPageUrl(atalho.page)}${atalho.query}`}>
-                    {atalho.label}
-                  </Link>
-                </Button>
-              ))}
+              <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                <span className="inline-flex items-center gap-1"><UserRound className="w-3.5 h-3.5" /> {militar.nome_completo || '-'}</span>
+                <span className="inline-flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> {militar.matricula || '-'}</span>
+                {(militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao) && (
+                  <span className="inline-flex items-center gap-1 col-span-full sm:col-auto"><Building2 className="w-3.5 h-3.5" /> {militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao}</span>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {atalhos.map((atalho) => (
+                  <Button
+                    key={atalho.key}
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                  >
+                    <Link to={`${createPageUrl(atalho.page)}${atalho.query}`}>
+                      {atalho.label}
+                    </Link>
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    } else {
+      const doc = item.data;
+      return (
+        <div
+          key={doc.id}
+          role="option"
+          aria-selected={selected}
+          tabIndex={-1}
+          onClick={() => handleSelect(item)}
+          className={`rounded-2xl border p-3 transition ${selected ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'} cursor-pointer`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] uppercase">{doc.tipo_documento}</Badge>
+                <span className="text-[10px] text-slate-400">{doc.data_documento ? format(new Date(doc.data_documento + 'T00:00:00'), "dd/MM/yyyy") : ''}</span>
+              </div>
+              <p className="truncate text-sm font-semibold text-slate-900">{doc.titulo || 'Documento sem título'}</p>
+              {doc.observacoes && <p className="truncate text-xs text-slate-500">{doc.observacoes}</p>}
+            </div>
+          </div>
+        </div>
+      );
+    }
   };
 
   return (
