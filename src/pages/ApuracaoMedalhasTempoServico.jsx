@@ -248,8 +248,8 @@ export default function ApuracaoMedalhasTempoServico() {
     { key: 'medalha', group: 'Dados da indicação', label: 'Medalha', getValue: (row) => `Medalha de Tempo de Serviço - ${row.faixaLabel}` },
     { key: 'status', group: 'Dados da indicação', label: 'Status', getValue: (row) => normalizarStatusMedalha(row.registro?.status) || '' },
     { key: 'data_indicacao', group: 'Dados da indicação', label: 'Data da indicação', getValue: (row) => formatarData(row.registro?.data_indicacao) },
-    { key: 'data_concessao', group: 'Dados da indicação', label: 'Data da concessão', getValue: (row) => formatarData(row.registro?.data_concessao) },
-    { key: 'doems', group: 'Dados da indicação', label: 'Número do DOEMS', getValue: (row) => row.registro?.numero_publicacao || row.registro?.doems_numero || '' },
+    { key: 'data_concessao', group: 'Dados da indicação', label: 'Data da concessão', getValue: (row) => row.registro?.documento_referencia === 'INFORMAÇÃO DP' ? 'Informação DP' : formatarData(row.registro?.data_concessao) },
+    { key: 'doems', group: 'Dados da indicação', label: 'Número do DOEMS', getValue: (row) => row.registro?.documento_referencia === 'INFORMAÇÃO DP' ? 'Não localizado' : (row.registro?.numero_publicacao || row.registro?.doems_numero || '') },
     { key: 'observacoes', group: 'Dados da indicação', label: 'Observações', getValue: (row) => row.registro?.observacoes || '' },
   ];
   const camposPadrao = ['nome', 'matricula', 'posto', 'unidade', 'tempo_servico', 'medalha', 'status', 'data_indicacao'];

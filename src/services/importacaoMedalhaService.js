@@ -75,6 +75,15 @@ export function normalizarDoems(valor) {
   return soNumeros || txt;
 }
 
+/**
+ * Identifica se o valor do DOEMS refere-se a uma informação oficial da DP
+ * (quando a publicação original não foi localizada).
+ */
+export function ehInformacaoDP(valor) {
+  const txt = normalizarNome(valor);
+  return txt === 'nao localizado';
+}
+
 export function parseDataExcel(valor) {
   if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
     const ano = valor.getUTCFullYear();
@@ -227,7 +236,8 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
     const dataBruta = row[colIndex.data];
 
     const nomeNorm = normalizarNome(nomeBruto);
-    const doemsNorm = normalizarDoems(doemsBruto);
+    const isInformacaoDP = ehInformacaoDP(doemsBruto);
+    const doemsNorm = isInformacaoDP ? null : normalizarDoems(doemsBruto);
     const dataIso = parseDataExcel(dataBruta);
 
     let status = STATUS_LINHA_MEDALHA.PRONTO;
@@ -244,15 +254,17 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
       erros.push('Múltiplos militares encontrados com este nome.');
     }
 
-    if (!doemsNorm) {
-      status = STATUS_LINHA_MEDALHA.DOEMS_INVALIDO;
+    if (!isInformacaoDP) {
+      if (!doemsNorm) {
+        status = STATUS_LINHA_MEDALHA.DOEMS_INVALIDO;
+      }
+
+      if (!dataIso) {
+        status = STATUS_LINHA_MEDALHA.DATA_INVALIDA;
+      }
     }
 
-    if (!dataIso) {
-      status = STATUS_LINHA_MEDALHA.DATA_INVALIDA;
-    }
-
-    const chaveUnica = `${nomeNorm}|${doemsNorm}|${dataIso}`;
+    const chaveUnica = isInformacaoDP ? `${nomeNorm}|INFORMACAO_DP` : `${nomeNorm}|${doemsNorm}|${dataIso}`;
     if (contagemPlanilha.has(chaveUnica)) {
       status = STATUS_LINHA_MEDALHA.DUPLICADO_PLANILHA;
     } else {
@@ -279,6 +291,7 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
       status,
       erros,
       tipo_medalha_codigo: medalhaCodigo,
+      is_informacao_dp: isInformacaoDP,
     };
   });
 
@@ -315,7 +328,11 @@ export async function importarMedalhas(linhas, userEmail) {
       const tipoMedalha = tiposMedalha.find(t => t.codigo === config.codigo);
 
       const dataBr = formatarDataBr(linha.data_concessao);
-      const textoAlteracao = config.getTextoAlteracao(linha.doems_numero, dataBr);
+      const textoAlteracao = linha.is_informacao_dp
+        ? `Concedida a ${config.nome}. Informação oficial da Diretoria de Pessoal (publicação original não localizada).`
+        : config.getTextoAlteracao(linha.doems_numero, dataBr);
+
+      const observacoesDP = "Concessão informada oficialmente pela Diretoria de Pessoal. A publicação correspondente não foi localizada em razão da limitação de pesquisa textual dos DOEMS anteriores a 2007.";
 
       // 1. Criar Registro de Medalha
       await base44.entities.Medalha.create({
@@ -326,13 +343,14 @@ export async function importarMedalhas(linhas, userEmail) {
         tipo_medalha_id: tipoMedalha?.id,
         tipo_medalha_nome: config.nome,
         tipo_medalha_codigo: config.codigo,
-        data_indicacao: linha.data_concessao,
+        data_indicacao: linha.data_concessao || new Date().toISOString().split('T')[0],
         data_concessao: linha.data_concessao,
         status: 'CONCEDIDA',
         numero_publicacao: linha.doems_numero,
         boletim_ou_do: 'DOEMS',
-        documento_referencia: `DOEMS ${linha.doems_numero}`,
-        origem_registro: 'MIGRACAO_FIXA',
+        documento_referencia: linha.is_informacao_dp ? 'INFORMAÇÃO DP' : `DOEMS ${linha.doems_numero}`,
+        origem_registro: linha.is_informacao_dp ? 'INFORMACAO_DP' : 'MIGRACAO_FIXA',
+        observacoes: linha.is_informacao_dp ? observacoesDP : null,
         concedido_por: userEmail,
         updated_by: userEmail,
         updated_at: new Date().toISOString(),
