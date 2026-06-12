@@ -99,14 +99,20 @@ test('CONFIG_MEDALHAS - deve gerar textos de alteração corretos', () => {
 
 function ehInformacaoDP(valor) {
   const txt = normalizarNome(valor);
-  return txt === 'nao localizado';
+  return txt === 'nao localizado' || txt === 'informacao dp' || txt === '-';
 }
 
-test('ehInformacaoDP - deve identificar "Não localizado" em diversas variações', () => {
+test('ehInformacaoDP - deve identificar "Não localizado", "Informação DP" e "-" em diversas variações', () => {
   assert.strictEqual(ehInformacaoDP('Não localizado'), true);
   assert.strictEqual(ehInformacaoDP('NÃO LOCALIZADO'), true);
   assert.strictEqual(ehInformacaoDP('não localizado'), true);
   assert.strictEqual(ehInformacaoDP('  Não localizado  '), true);
+  assert.strictEqual(ehInformacaoDP('Informação DP'), true);
+  assert.strictEqual(ehInformacaoDP('INFORMACAO DP'), true);
+  assert.strictEqual(ehInformacaoDP('informacao dp'), true);
+  assert.strictEqual(ehInformacaoDP('  Informação DP  '), true);
+  assert.strictEqual(ehInformacaoDP('-'), true);
+  assert.strictEqual(ehInformacaoDP('Informação da DP'), false); // Deve ser exato ou conforme normalização prevista
   assert.strictEqual(ehInformacaoDP('Localizado'), false);
   assert.strictEqual(ehInformacaoDP('12345'), false);
   assert.strictEqual(ehInformacaoDP(''), false);

@@ -76,12 +76,12 @@ export function normalizarDoems(valor) {
 }
 
 /**
- * Identifica se o valor do DOEMS refere-se a uma informação oficial da DP
+ * Identifica se o valor (de DOEMS ou Data) refere-se a uma informação oficial da DP
  * (quando a publicação original não foi localizada).
  */
 export function ehInformacaoDP(valor) {
   const txt = normalizarNome(valor);
-  return txt === 'nao localizado';
+  return txt === 'nao localizado' || txt === 'informacao dp' || txt === '-';
 }
 
 export function parseDataExcel(valor) {
@@ -236,7 +236,7 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
     const dataBruta = row[colIndex.data];
 
     const nomeNorm = normalizarNome(nomeBruto);
-    const isInformacaoDP = ehInformacaoDP(doemsBruto);
+    const isInformacaoDP = ehInformacaoDP(doemsBruto) || ehInformacaoDP(dataBruta);
     const doemsNorm = isInformacaoDP ? null : normalizarDoems(doemsBruto);
     const dataIso = parseDataExcel(dataBruta);
 
@@ -261,6 +261,11 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
 
       if (!dataIso) {
         status = STATUS_LINHA_MEDALHA.DATA_INVALIDA;
+      }
+    } else {
+      // Se for informação DP, garantimos que o status seja PRONTO se não houver erro de militar
+      if (status === STATUS_LINHA_MEDALHA.DOEMS_INVALIDO || status === STATUS_LINHA_MEDALHA.DATA_INVALIDA) {
+        status = STATUS_LINHA_MEDALHA.PRONTO;
       }
     }
 
