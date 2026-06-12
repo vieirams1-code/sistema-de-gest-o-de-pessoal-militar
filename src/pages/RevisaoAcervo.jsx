@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { format } from 'date-fns';
 
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function RevisaoAcervo() {
   const { canAccessAction } = useCurrentUser();

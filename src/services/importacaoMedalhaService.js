@@ -1,7 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { strFromU8, unzipSync } from 'fflate';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
-import { normalizarStatusMedalha } from './medalhasTempoServicoService';
+import { normalizarStatusMedalha, getChaveDuplicidadeMedalha } from './medalhasTempoServicoService';
 
 /**
  * Módulo de Migração de Medalhas (Genérico).
@@ -206,7 +206,7 @@ export function analisarLinhaImportacaoMedalha({
   dataBruta,
   medalhaCodigo,
   mapaMilitares,
-  setMedalhasMilitarIdAtivas,
+  setMedalhasAtivas,
   contagemPlanilha,
 }) {
   const nomeNorm = normalizarNome(nomeBruto);
@@ -250,8 +250,11 @@ export function analisarLinhaImportacaoMedalha({
   }
 
   // Já importado (na Base44)
-  if (status === STATUS_LINHA_MEDALHA.PRONTO && militar && setMedalhasMilitarIdAtivas.has(String(militar.id))) {
-    status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
+  if (status === STATUS_LINHA_MEDALHA.PRONTO && militar) {
+    const chaveDuplicidade = getChaveDuplicidadeMedalha({ militar_id: militar.id, tipo_medalha_codigo: medalhaCodigo });
+    if (setMedalhasAtivas.has(chaveDuplicidade)) {
+      status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
+    }
   }
 
   return {
@@ -300,13 +303,14 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
   if (!configMedalha) throw new Error(`Configuração de medalha não encontrada: ${medalhaCodigo}`);
 
   const medalhasExistentes = await base44.entities.Medalha.filter({ tipo_medalha_codigo: medalhaCodigo });
-  const setMedalhasMilitarIdAtivas = new Set(
+  const setMedalhasAtivas = new Set(
     medalhasExistentes
       .filter(m => {
         const st = normalizarStatusMedalha(m.status);
         return st !== 'CANCELADA' && st !== 'REVOGADA';
       })
-      .map(m => String(m.militar_id))
+      .map(m => getChaveDuplicidadeMedalha(m))
+      .filter(Boolean)
   );
 
   const contagemPlanilha = new Map();
@@ -322,7 +326,7 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
       dataBruta,
       medalhaCodigo,
       mapaMilitares,
-      setMedalhasMilitarIdAtivas,
+      setMedalhasAtivas,
       contagemPlanilha,
     });
 
@@ -373,13 +377,14 @@ export async function importarMedalhas(linhas, userEmail) {
   // Assumimos que todas as linhas elegíveis são do mesmo tipo de medalha
   const medalhaCodigo = elegiveis[0].tipo_medalha_codigo;
   const medalhasExistentes = await base44.entities.Medalha.filter({ tipo_medalha_codigo: medalhaCodigo });
-  const setMedalhasMilitarIdAtivas = new Set(
+  const setMedalhasAtivas = new Set(
     medalhasExistentes
       .filter(m => {
         const st = normalizarStatusMedalha(m.status);
         return st !== 'CANCELADA' && st !== 'REVOGADA';
       })
-      .map(m => String(m.militar_id))
+      .map(m => getChaveDuplicidadeMedalha(m))
+      .filter(Boolean)
   );
 
   const contagemPlanilha = new Map();
@@ -393,7 +398,7 @@ export async function importarMedalhas(linhas, userEmail) {
         dataBruta: linha.data_bruta,
         medalhaCodigo: linha.tipo_medalha_codigo,
         mapaMilitares,
-        setMedalhasMilitarIdAtivas,
+        setMedalhasAtivas,
         contagemPlanilha,
       });
 
@@ -455,7 +460,8 @@ export async function importarMedalhas(linhas, userEmail) {
       });
 
       // Atualizar cache de medalhas ativas para evitar duplicidade na mesma importação se houver nomes repetidos (embora contagemPlanilha já cuide disso)
-      setMedalhasMilitarIdAtivas.add(String(linha.militar_id));
+      const chaveCriada = getChaveDuplicidadeMedalha({ militar_id: linha.militar_id, tipo_medalha_codigo: linha.tipo_medalha_codigo });
+      if (chaveCriada) setMedalhasAtivas.add(chaveCriada);
 
       resultados.push({ rowIndex: linha.rowIndex, status: 'SUCESSO' });
       importados++;

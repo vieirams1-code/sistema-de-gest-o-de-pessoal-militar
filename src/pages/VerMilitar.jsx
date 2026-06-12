@@ -77,6 +77,10 @@ import {
   listarHistoricoVersoes
 } from '@/services/acervoHistoricoService';
 
+const STATUS_COLORS = { 'Ativo': 'bg-emerald-100 text-emerald-700', 'Inativo': 'bg-slate-100 text-slate-700' };
+const MEDALHA_STATUS_COLORS = { 'Indicado': 'bg-yellow-100 text-yellow-700', 'Concedido': 'bg-green-100 text-green-700', 'Negado': 'bg-red-100 text-red-700' };
+const ARM_STATUS_COLORS = { 'Ativo': 'bg-green-100 text-green-700', 'Vendido': 'bg-blue-100 text-blue-700', 'Extraviado': 'bg-orange-100 text-orange-700', 'Furtado': 'bg-red-100 text-red-700', 'Baixado': 'bg-slate-100 text-slate-700' };
+
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
   MAU: 1,
@@ -132,7 +136,21 @@ function Section({ title, icon: Icon, children, className }) {
 
 function formatDate(date) {
   if (!date) return null;
-  try {return format(new Date(date + 'T00:00:00'), "dd/MM/yyyy");} catch {return date;}
+  try {
+    let d;
+    if (date instanceof Date) {
+      d = date;
+    } else if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      d = new Date(date + 'T00:00:00');
+    } else {
+      d = new Date(date);
+    }
+
+    if (Number.isNaN(d.getTime())) return date;
+    return format(d, "dd/MM/yyyy");
+  } catch {
+    return date;
+  }
 }
 
 function AvisoRegistrosSistema({ mensagemRegistrosSistema }) {
@@ -176,6 +194,12 @@ export default function VerMilitar() {
   const [showPromocaoFuturaModal, setShowPromocaoFuturaModal] = useState(false);
   const [promocaoFuturaEdicao, setPromocaoFuturaEdicao] = useState(null);
   const [showNovoAcervoModal, setShowNovoAcervoModal] = useState(false);
+  const { data: activeRepositorios = [] } = useQuery({
+    queryKey: ['active-repositorios'],
+    queryFn: () => base44.entities.RepositorioDocumental.filter({ ativo: true, status: 'ATIVO' }),
+    enabled: podeGerirAcervo
+  });
+
   const [acervoForm, setAcervoForm] = useState({
     tipo_documento: 'ALTERACAO',
     titulo: '',
@@ -1014,7 +1038,7 @@ export default function VerMilitar() {
             <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-slate-800">{m.tipo_medalha_nome}</span>
-                  <Badge className={medalhaStatusColor[m.status] || ''}>{m.status}</Badge>
+                  <Badge className={MEDALHA_STATUS_COLORS[m.status] || ''}>{m.status}</Badge>
                 </div>
                 {m.documento_referencia === 'INFORMAÇÃO DP' ? (
                   <div className="mt-1 space-y-1">
@@ -1058,7 +1082,7 @@ export default function VerMilitar() {
             <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-slate-800">{a.tipo} — {a.marca || ''} {a.calibre}</span>
-                  <Badge className={armStatusColor[a.status] || ''}>{a.status}</Badge>
+                  <Badge className={ARM_STATUS_COLORS[a.status] || ''}>{a.status}</Badge>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   Série: {a.numero_serie} {a.numero_sigma ? `· SIGMA: ${a.numero_sigma}` : ''}
@@ -1538,9 +1562,6 @@ export default function VerMilitar() {
 
   }
 
-  const statusColors = { 'Ativo': 'bg-emerald-100 text-emerald-700', 'Inativo': 'bg-slate-100 text-slate-700' };
-  const medalhaStatusColor = { 'Indicado': 'bg-yellow-100 text-yellow-700', 'Concedido': 'bg-green-100 text-green-700', 'Negado': 'bg-red-100 text-red-700' };
-  const armStatusColor = { 'Ativo': 'bg-green-100 text-green-700', 'Vendido': 'bg-blue-100 text-blue-700', 'Extraviado': 'bg-orange-100 text-orange-700', 'Furtado': 'bg-red-100 text-red-700', 'Baixado': 'bg-slate-100 text-slate-700' };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -1732,7 +1753,7 @@ export default function VerMilitar() {
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <Badge className={statusColors[militar.status_cadastro] || 'bg-emerald-100 text-emerald-700'}>
+                  <Badge className={STATUS_COLORS[militar.status_cadastro] || 'bg-emerald-100 text-emerald-700'}>
                     {militar.status_cadastro || 'Ativo'}
                   </Badge>
                   {militar.condicao && <Badge variant="outline" className="border-white/30 text-white">{militar.condicao}</Badge>}

@@ -11,13 +11,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Database, Check, X, Server, Wifi } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function RepositoriosDocumentais() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRepo, setEditingRepo] = useState(null);
+  const [testingId, setTestingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
   const { data: repositorios = [], isLoading } = useQuery({
     queryKey: ['repositorios-documentais'],
@@ -52,6 +64,18 @@ export default function RepositoriosDocumentais() {
     },
     onError: (error) => {
       toast({ title: 'Erro ao salvar repositório', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => excluirEscopado('RepositorioDocumental', id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repositorios-documentais'] });
+      toast({ title: 'Repositório excluído com sucesso!' });
+      setDeleteDialog({ open: false, id: null });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao excluir repositório', description: error.message, variant: 'destructive' });
     }
   });
 
@@ -96,6 +120,32 @@ export default function RepositoriosDocumentais() {
       observacoes: repo.observacoes
     });
     setIsModalOpen(true);
+  };
+
+  const handleTestarConexao = async (repoId) => {
+    setTestingId(repoId);
+    try {
+      const response = await base44.functions.invoke('testarConexaoDrive', { repositorio_id: repoId });
+      const data = response?.data || response;
+
+      if (data.ok) {
+        toast({
+          title: 'Conexão OK!',
+          description: `Acessado: ${data.details.folder_name} (${data.details.mime_type})`,
+          variant: 'default'
+        });
+      } else {
+        throw new Error(data.error || 'Falha desconhecida');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro na Conexão',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setTestingId(null);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -266,6 +316,27 @@ export default function RepositoriosDocumentais() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este repositório? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate(deleteDialog.id)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
