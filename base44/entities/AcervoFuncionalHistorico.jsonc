@@ -1,0 +1,71 @@
+{
+  "name": "AcervoFuncionalHistorico",
+  "type": "object",
+  "title": "Acervo Funcional Histórico",
+  "description": "Metadados de documentos históricos do militar armazenados em repositório externo (Google Drive).",
+  "properties": {
+    "militar_id": {
+      "type": "string"
+    },
+    "tipo_documento": {
+      "type": "string",
+      "enum": [
+        "ALTERACAO",
+        "CERTIDAO_COMPORTAMENTO",
+        "DIVERSOS"
+      ]
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "periodo_inicial": {
+      "type": "string",
+      "format": "date"
+    },
+    "periodo_final": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_documento": {
+      "type": "string",
+      "format": "date"
+    },
+    "comportamento_certificado": {
+      "type": "string",
+      "enum": [
+        "EXCEPCIONAL",
+        "OTIMO",
+        "BOM",
+        "INSUFICIENTE",
+        "MAU"
+      ]
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "repositorio_id": {
+      "type": "string"
+    },
+    "drive_folder_id": {
+      "type": "string"
+    },
+    "drive_file_id": {
+      "type": "string"
+    },
+    "drive_url": {
+      "type": "string"
+    },
+    "usuario_cadastro": {
+      "type": "string"
+    },
+    "arquivado": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "militar_id",
+    "tipo_documento",
+    "drive_file_id"
+  ]
+}

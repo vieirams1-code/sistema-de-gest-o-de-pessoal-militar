@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
@@ -56,6 +58,7 @@ import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMili
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { montarMilitar360Bundle } from '@/services/militar360Service';
 import { canShowArmamentosTab, canShowAtestadosTab } from '@/services/militarFichaTabsVisibility';
+import { cadastrarDocumentoHistorico, listarAcervoMilitar } from '@/services/acervoHistoricoService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -133,6 +136,7 @@ export default function VerMilitar() {
   const selectedTab = searchParams.get('tab') || 'comportamento';
   const { isAdmin, hasAccess, hasSelfAccess, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
+  const podeGerirAcervo = canAccessAction('gerir_acervo_historico');
   const effectiveEmail = getEffectiveEmail();
   const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
   const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
@@ -147,6 +151,17 @@ export default function VerMilitar() {
   const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
   const [showPromocaoFuturaModal, setShowPromocaoFuturaModal] = useState(false);
   const [promocaoFuturaEdicao, setPromocaoFuturaEdicao] = useState(null);
+  const [showNovoAcervoModal, setShowNovoAcervoModal] = useState(false);
+  const [acervoForm, setAcervoForm] = useState({
+    tipo_documento: 'ALTERACAO',
+    titulo: '',
+    periodo_inicial: '',
+    periodo_final: '',
+    data_documento: '',
+    comportamento_certificado: 'BOM',
+    observacoes: ''
+  });
+  const [acervoFile, setAcervoFile] = useState(null);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
     data_fim: '',
@@ -302,6 +317,12 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
 
+  const { data: acervoHistorico = [] } = useQuery({
+    queryKey: ['ver-acervo-historico', id],
+    queryFn: () => listarAcervoMilitar(id),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['ver-pendencias-comportamento', id],
     queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
@@ -371,6 +392,41 @@ export default function VerMilitar() {
       queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
       toast({ title: 'Impedimento removido' });
+    }
+  });
+
+  const salvarAcervoMutation = useMutation({
+    mutationFn: async () => {
+      if (!acervoFile) throw new Error('PDF obrigatório.');
+
+      // Converter arquivo para base64 para o backend
+      const reader = new FileReader();
+      const filePromise = new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(acervoFile);
+      });
+      const content = await filePromise;
+
+      return await cadastrarDocumentoHistorico({
+        militar_id: id,
+        tipo_documento: acervoForm.tipo_documento,
+        data: acervoForm,
+        file: {
+          name: acervoFile.name,
+          type: acervoFile.type,
+          content
+        }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-acervo-historico', id] });
+      toast({ title: 'Documento salvo no acervo histórico com sucesso!' });
+      setShowNovoAcervoModal(false);
+      setAcervoFile(null);
+    },
+    onError: (err) => {
+      toast({ title: 'Erro ao salvar documento', description: err.message, variant: 'destructive' });
     }
   });
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
@@ -453,6 +509,8 @@ export default function VerMilitar() {
   const tabsConfig = React.useMemo(() => {
     if (!militar) return [];
 
+    const certidoesHistoricas = (acervoHistorico || []).filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO');
+
     const configs = [
       {
         key: 'comportamento',
@@ -462,6 +520,23 @@ export default function VerMilitar() {
         content: (
           <div className="space-y-6">
             <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
+
+            {certidoesHistoricas.length > 0 && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                <p className="font-semibold flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> Existem certidões históricas de comportamento vinculadas a este militar para validação manual.
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {certidoesHistoricas.map(cert => (
+                    <li key={cert.id} className="flex items-center justify-between">
+                      <span>{formatDate(cert.data_documento)} — {cert.comportamento_certificado}</span>
+                      <Button variant="link" size="sm" onClick={() => window.open(cert.drive_url, '_blank')}>Abrir</Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <Section title="Situação Atual do Comportamento" icon={Activity}>
               <div className="grid md:grid-cols-3 gap-3 text-sm">
                 <div className="rounded-lg border p-3">
@@ -909,6 +984,196 @@ export default function VerMilitar() {
               await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
             }}
           />
+        )
+      },
+      {
+        key: 'acervo-historico',
+        label: 'Acervo Histórico',
+        icon: FileText,
+        visible: canAccessAction('visualizar_acervo_historico'),
+        content: (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold text-slate-700">Documentos Históricos</h3>
+              {podeGerirAcervo && (
+                <Button className="bg-[#1e3a5f]" onClick={() => setShowNovoAcervoModal(true)}>
+                  <Plus className="w-4 h-4 mr-2" /> Novo Documento
+                </Button>
+              )}
+            </div>
+
+            {/* Seção Alterações */}
+            <Section title="Alterações" icon={ClipboardList}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Período</TableHead>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Observações</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center text-slate-500 py-4">Nenhuma alteração cadastrada.</TableCell></TableRow>
+                  ) : (
+                    acervoHistorico.filter(a => a.tipo_documento === 'ALTERACAO').map(a => (
+                      <TableRow key={a.id}>
+                        <TableCell className="text-xs">{formatDate(a.periodo_inicial)} - {formatDate(a.periodo_final)}</TableCell>
+                        <TableCell>{a.titulo}</TableCell>
+                        <TableCell>{formatDate(a.data_documento)}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{a.observacoes}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>Abrir PDF</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Section>
+
+            {/* Seção Certidões */}
+            <Section title="Certidões de Comportamento" icon={Shield}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Comportamento</TableHead>
+                    <TableHead>Observações</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-4">Nenhuma certidão cadastrada.</TableCell></TableRow>
+                  ) : (
+                    acervoHistorico.filter(a => a.tipo_documento === 'CERTIDAO_COMPORTAMENTO').map(a => (
+                      <TableRow key={a.id}>
+                        <TableCell>{formatDate(a.data_documento)}</TableCell>
+                        <TableCell>{a.comportamento_certificado}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{a.observacoes}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>Abrir PDF</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Section>
+
+            {/* Seção Diversos */}
+            <Section title="Diversos" icon={FileText}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Observações</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center text-slate-500 py-4">Nenhum documento cadastrado.</TableCell></TableRow>
+                  ) : (
+                    acervoHistorico.filter(a => a.tipo_documento === 'DIVERSOS').map(a => (
+                      <TableRow key={a.id}>
+                        <TableCell>{formatDate(a.data_documento)}</TableCell>
+                        <TableCell>{a.titulo}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{a.observacoes}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>Abrir PDF</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Section>
+
+            {/* Modal Novo Documento */}
+            <Dialog open={showNovoAcervoModal} onOpenChange={setShowNovoAcervoModal}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Novo Documento Histórico</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Tipo de Documento</Label>
+                    <Select value={acervoForm.tipo_documento} onValueChange={v => setAcervoForm({...acervoForm, tipo_documento: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALTERACAO">Alteração</SelectItem>
+                        <SelectItem value="CERTIDAO_COMPORTAMENTO">Certidão de Comportamento</SelectItem>
+                        <SelectItem value="DIVERSOS">Diversos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(acervoForm.tipo_documento === 'ALTERACAO' || acervoForm.tipo_documento === 'DIVERSOS') && (
+                    <div className="space-y-2">
+                      <Label>Título</Label>
+                      <Input value={acervoForm.titulo} onChange={e => setAcervoForm({...acervoForm, titulo: e.target.value})} required />
+                    </div>
+                  )}
+
+                  {acervoForm.tipo_documento === 'ALTERACAO' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Período Inicial</Label>
+                        <Input type="date" value={acervoForm.periodo_inicial} onChange={e => setAcervoForm({...acervoForm, periodo_inicial: e.target.value})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Período Final</Label>
+                        <Input type="date" value={acervoForm.periodo_final} onChange={e => setAcervoForm({...acervoForm, periodo_final: e.target.value})} required />
+                      </div>
+                    </div>
+                  )}
+
+                  {acervoForm.tipo_documento === 'CERTIDAO_COMPORTAMENTO' && (
+                    <div className="space-y-2">
+                      <Label>Comportamento Certificado</Label>
+                      <Select value={acervoForm.comportamento_certificado} onValueChange={v => setAcervoForm({...acervoForm, comportamento_certificado: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="EXCEPCIONAL">Excepcional</SelectItem>
+                          <SelectItem value="OTIMO">Ótimo</SelectItem>
+                          <SelectItem value="BOM">Bom</SelectItem>
+                          <SelectItem value="INSUFICIENTE">Insuficiente</SelectItem>
+                          <SelectItem value="MAU">Mau</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {(acervoForm.tipo_documento === 'CERTIDAO_COMPORTAMENTO' || acervoForm.tipo_documento === 'DIVERSOS') && (
+                    <div className="space-y-2">
+                      <Label>Data do Documento</Label>
+                      <Input type="date" value={acervoForm.data_documento} onChange={e => setAcervoForm({...acervoForm, data_documento: e.target.value})} required />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Input value={acervoForm.observacoes} onChange={e => setAcervoForm({...acervoForm, observacoes: e.target.value})} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Upload PDF</Label>
+                    <Input type="file" accept="application/pdf" onChange={e => setAcervoFile(e.target.files[0])} required />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button className="w-full bg-[#1e3a5f]" onClick={() => salvarAcervoMutation.mutate()} disabled={salvarAcervoMutation.isPending}>
+                    {salvarAcervoMutation.isPending ? 'Enviando para o Drive...' : 'Salvar Documento'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         )
       },
       {

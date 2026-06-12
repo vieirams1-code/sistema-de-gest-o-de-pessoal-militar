@@ -46,6 +46,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'FuncaoMilitar',
   'TagGrupo',
   'Tag',
+  'AcervoFuncionalHistorico',
+  'RepositorioDocumental',
 ]);
 
 

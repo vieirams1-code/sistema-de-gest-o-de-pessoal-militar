@@ -47,10 +47,12 @@ const ENTIDADES_PERMITIDAS = new Set([
   'FuncaoMilitar',
   'TagGrupo',
   'Tag',
+  'AcervoFuncionalHistorico',
+  'RepositorioDocumental',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
-const ENTIDADES_SEM_ESCOPO_MILITAR = new Set(['PerfilPermissao', 'UsuarioAcesso', 'FuncaoMilitar', 'TagGrupo', 'Tag']);
+const ENTIDADES_SEM_ESCOPO_MILITAR = new Set(['PerfilPermissao', 'UsuarioAcesso', 'FuncaoMilitar', 'TagGrupo', 'Tag', 'RepositorioDocumental']);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
 // =====================================================================
@@ -144,6 +146,16 @@ const PERMISSIONS_MAP = {
     update: 'gerir_configuracoes',
     desativar: 'gerir_configuracoes',
     delete: 'gerir_configuracoes',
+  },
+  AcervoFuncionalHistorico: {
+    create: 'gerir_acervo_historico',
+    update: 'gerir_acervo_historico',
+    delete: 'gerir_acervo_historico',
+  },
+  RepositorioDocumental: {
+    create: 'gerir_repositorios_documentais',
+    update: 'gerir_repositorios_documentais',
+    delete: 'gerir_repositorios_documentais',
   },
 };
 
