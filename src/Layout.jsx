@@ -222,6 +222,12 @@ const menuGroups = [
             ],
           },
           {
+            name: 'Repositórios',
+            page: 'RepositoriosDocumentais',
+            icon: Database,
+            actionKey: 'gerir_repositorios_documentais',
+          },
+          {
             name: 'Configurações',
             page: 'Configuracoes',
             path: '/Configuracoes',

@@ -155,6 +155,12 @@ export default function VerMilitar() {
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const podeGerirAcervo = canAccessAction('gerir_acervo_historico');
   const podeBaixarAcervo = canAccessAction('baixar_acervo_historico');
+
+  const { data: repositoriosAtivos = [] } = useQuery({
+    queryKey: ['repositorios-ativos'],
+    queryFn: () => base44.entities.RepositorioDocumental.filter({ ativo: true, status: 'ATIVO' }),
+    enabled: podeGerirAcervo
+  });
   const effectiveEmail = getEffectiveEmail();
   const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
   const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
@@ -183,7 +189,7 @@ export default function VerMilitar() {
     confirmar_sobreposicao: false,
     confirmar_duplicidade: false
   });
-  const [acervoFile, setAcervoFile] = useState(null);
+  const [acervoFiles, setAcervoFiles] = useState([]);
   const [docParaVersoes, setDocParaVersoes] = useState(null);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
@@ -432,70 +438,72 @@ export default function VerMilitar() {
 
   const salvarAcervoMutation = useMutation({
     mutationFn: async () => {
-      if (!acervoFile) throw new Error('PDF obrigatório.');
+      if (acervoFiles.length === 0) throw new Error('PDF obrigatório.');
 
-      // Detecção de sobreposição de períodos para ALTERACAO
-      if (acervoForm.tipo_documento === 'ALTERACAO' && !acervoForm.confirmar_sobreposicao) {
-        const sobrepostos = acervoHistorico.filter(a =>
-          a.tipo_documento === 'ALTERACAO' &&
-          a.periodo_inicial <= acervoForm.periodo_final &&
-          a.periodo_final >= acervoForm.periodo_inicial
-        );
-        if (sobrepostos.length > 0) {
-          const titulos = sobrepostos.map(s => s.titulo).join(', ');
-          if (!confirm(`Aviso de sobreposição: Este período conflita com os documentos: ${titulos}. Deseja continuar mesmo assim?`)) {
-            throw new Error('Operação cancelada pelo usuário devido à sobreposição de períodos.');
+      const results = [];
+      for (const file of acervoFiles) {
+        // Detecção de sobreposição de períodos para ALTERACAO
+        if (acervoForm.tipo_documento === 'ALTERACAO' && !acervoForm.confirmar_sobreposicao) {
+          const sobrepostos = acervoHistorico.filter(a =>
+            a.tipo_documento === 'ALTERACAO' &&
+            a.periodo_inicial <= acervoForm.periodo_final &&
+            a.periodo_final >= acervoForm.periodo_inicial
+          );
+          if (sobrepostos.length > 0) {
+            const titulos = sobrepostos.map(s => s.titulo).join(', ');
+            if (!confirm(`Aviso de sobreposição: Este período conflita com os documentos: ${titulos}. Deseja continuar mesmo assim?`)) {
+              throw new Error('Operação cancelada pelo usuário devido à sobreposição de períodos.');
+            }
+            setAcervoForm(prev => ({ ...prev, confirmar_sobreposicao: true }));
           }
-          setAcervoForm(prev => ({ ...prev, confirmar_sobreposicao: true }));
         }
-      }
 
-      // Converter arquivo para base64 para o backend
-      const reader = new FileReader();
-      const filePromise = new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(acervoFile);
-      });
-      const content = await filePromise;
-
-      try {
-        return await cadastrarDocumentoHistorico({
-          militar_id: id,
-          tipo_documento: acervoForm.tipo_documento,
-          data: acervoForm,
-          file: {
-            name: acervoFile.name,
-            type: acervoFile.type,
-            content
-          }
+        // Converter arquivo para base64 para o backend
+        const reader = new FileReader();
+        const content = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
-      } catch (err) {
-        if (err.message === 'DUPLICIDADE_DETECTADA') {
-          if (confirm('Este documento aparentemente já foi cadastrado anteriormente. Deseja continuar mesmo assim?')) {
-            setAcervoForm(prev => ({ ...prev, confirmar_duplicidade: true }));
-            return await cadastrarDocumentoHistorico({
-              militar_id: id,
-              tipo_documento: acervoForm.tipo_documento,
-              data: { ...acervoForm, confirmar_duplicidade: true },
-              file: {
-                name: acervoFile.name,
-                type: acervoFile.type,
-                content
-              }
-            });
-          } else {
-            throw new Error('Operação cancelada devido à duplicidade de arquivo.');
+
+        try {
+          const res = await cadastrarDocumentoHistorico({
+            militar_id: id,
+            tipo_documento: acervoForm.tipo_documento,
+            data: {
+              ...acervoForm,
+              titulo: acervoFiles.length > 1 ? `${acervoForm.titulo || 'Doc'} - ${file.name}` : acervoForm.titulo
+            },
+            file: {
+              name: file.name,
+              type: file.type,
+              content
+            }
+          });
+          results.push(res);
+        } catch (err) {
+          if (err.message === 'DUPLICIDADE_DETECTADA') {
+            if (confirm(`O arquivo ${file.name} já existe. Deseja continuar?`)) {
+              const res = await cadastrarDocumentoHistorico({
+                militar_id: id,
+                tipo_documento: acervoForm.tipo_documento,
+                data: { ...acervoForm, confirmar_duplicidade: true },
+                file: { name: file.name, type: file.type, content }
+              });
+              results.push(res);
+              continue;
+            }
           }
+          throw err;
         }
-        throw err;
       }
+      return results;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ver-acervo-historico', id] });
-      toast({ title: 'Documento salvo no acervo histórico com sucesso!' });
+      toast({ title: 'Documento(s) salvo(s) com sucesso!' });
       setShowNovoAcervoModal(false);
-      setAcervoFile(null);
+      setAcervoFiles([]);
       setAcervoForm({
         tipo_documento: 'ALTERACAO',
         titulo: '',
@@ -511,7 +519,7 @@ export default function VerMilitar() {
       });
     },
     onError: (err) => {
-      toast({ title: 'Erro ao salvar documento', description: err.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar documento(s)', description: err.message, variant: 'destructive' });
     }
   });
 
@@ -1120,7 +1128,16 @@ export default function VerMilitar() {
               <h3 className="font-semibold text-slate-700">Documentos Históricos</h3>
               <div className="flex gap-2">
                 {podeGerirAcervo && (
-                  <Button className="bg-[#1e3a5f]" onClick={() => setShowNovoAcervoModal(true)}>
+                  <Button
+                    className="bg-[#1e3a5f]"
+                    onClick={() => {
+                      if (repositoriosAtivos.length === 0) {
+                        toast({ title: 'Indisponível', description: 'Nenhum repositório documental ativo configurado. Contate o administrador.', variant: 'destructive' });
+                        return;
+                      }
+                      setShowNovoAcervoModal(true);
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" /> Novo Documento
                   </Button>
                 )}
@@ -1410,8 +1427,9 @@ export default function VerMilitar() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Upload PDF</Label>
-                    <Input type="file" accept="application/pdf" onChange={e => setAcervoFile(e.target.files[0])} required />
+                    <Label>Upload PDF(s)</Label>
+                    <Input type="file" accept="application/pdf" multiple onChange={e => setAcervoFiles(Array.from(e.target.files))} required />
+                    {acervoFiles.length > 0 && <p className="text-xs text-slate-500">{acervoFiles.length} selecionado(s)</p>}
                   </div>
                 </div>
                 <DialogFooter>

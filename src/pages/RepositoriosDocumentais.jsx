@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Database, Check, X, Server } from 'lucide-react';
+import { Plus, Pencil, Database, Check, X, Server, Wifi } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 
@@ -67,6 +67,21 @@ export default function RepositoriosDocumentais() {
       observacoes: ''
     });
   };
+
+  const testarConexaoMutation = useMutation({
+    mutationFn: async (drive_root_folder_id) => {
+      const response = await base44.functions.invoke('testarConexaoDrive', { drive_root_folder_id });
+      const body = response?.data ?? response;
+      if (body?.error) throw new Error(body.error);
+      return body;
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Sucesso!', description: data.message });
+    },
+    onError: (error) => {
+      toast({ title: 'Falha na conexão', description: error.message, variant: 'destructive' });
+    }
+  });
 
   const handleEdit = (repo) => {
     setEditingRepo(repo);
@@ -229,9 +244,20 @@ export default function RepositoriosDocumentais() {
                       {repo.ativo ? <Check className="w-4 h-4 text-emerald-600" /> : <X className="w-4 h-4 text-red-600" />}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => testarConexaoMutation.mutate(repo.drive_root_folder_id)}
+                          disabled={testarConexaoMutation.isPending}
+                          title="Testar Conexão"
+                        >
+                          <Wifi className={`w-4 h-4 ${testarConexaoMutation.isPending ? 'animate-pulse' : ''}`} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
