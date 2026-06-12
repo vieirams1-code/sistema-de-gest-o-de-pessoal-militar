@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { strFromU8, unzipSync } from 'fflate';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
+import { normalizarStatusMedalha } from './medalhasTempoServicoService';
 
 /**
  * Módulo de Migração de Medalhas (Genérico).
@@ -14,6 +15,7 @@ export const STATUS_LINHA_MEDALHA = Object.freeze({
   JA_IMPORTADO: 'Já importado',
   DUPLICADO_PLANILHA: 'Duplicado na planilha',
   ERRO: 'Erro',
+  ERRO_IMPORTACAO: 'Erro na importação',
 });
 
 export const CONFIG_MEDALHAS = {
@@ -194,6 +196,79 @@ async function lerXlsx(file) {
   return Array.from(linhasMap.values());
 }
 
+/**
+ * Função central de decisão para uma linha de importação.
+ * Unifica a lógica da prévia e da importação efetiva.
+ */
+export function analisarLinhaImportacaoMedalha({
+  nomeBruto,
+  doemsBruto,
+  dataBruta,
+  medalhaCodigo,
+  mapaMilitares,
+  setMedalhasMilitarIdAtivas,
+  contagemPlanilha,
+}) {
+  const nomeNorm = normalizarNome(nomeBruto);
+  const isInformacaoDP = ehInformacaoDP(doemsBruto) || ehInformacaoDP(dataBruta);
+  const doemsNorm = isInformacaoDP ? null : normalizarDoems(doemsBruto);
+  const dataIso = parseDataExcel(dataBruta);
+
+  let status = STATUS_LINHA_MEDALHA.PRONTO;
+  const erros = [];
+  const militaresEncontrados = mapaMilitares.get(nomeNorm) || [];
+
+  if (!nomeNorm) {
+    status = STATUS_LINHA_MEDALHA.ERRO;
+    erros.push('Nome do militar ausente.');
+  } else if (militaresEncontrados.length === 0) {
+    status = STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO;
+  } else if (militaresEncontrados.length > 1) {
+    status = STATUS_LINHA_MEDALHA.ERRO;
+    erros.push('Múltiplos militares encontrados com este nome.');
+  }
+
+  if (status === STATUS_LINHA_MEDALHA.PRONTO || status === STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO) {
+    if (!isInformacaoDP) {
+      if (!doemsNorm) {
+        status = STATUS_LINHA_MEDALHA.DOEMS_INVALIDO;
+      }
+      if (!dataIso) {
+        status = STATUS_LINHA_MEDALHA.DATA_INVALIDA;
+      }
+    }
+  }
+
+  const militar = militaresEncontrados[0] || null;
+
+  // Duplicidade na planilha
+  const chaveUnicaPlanilha = isInformacaoDP ? `${nomeNorm}|INFORMACAO_DP` : `${nomeNorm}|${doemsNorm}|${dataIso}`;
+  if (contagemPlanilha.has(chaveUnicaPlanilha)) {
+    status = STATUS_LINHA_MEDALHA.DUPLICADO_PLANILHA;
+  } else {
+    contagemPlanilha.set(chaveUnicaPlanilha, true);
+  }
+
+  // Já importado (na Base44)
+  if (status === STATUS_LINHA_MEDALHA.PRONTO && militar && setMedalhasMilitarIdAtivas.has(String(militar.id))) {
+    status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
+  }
+
+  return {
+    militar_id: militar?.id || null,
+    militar,
+    militar_nome: militar?.nome_completo || nomeBruto,
+    militar_matricula: militar?.matricula || '',
+    militar_posto: militar?.posto_graduacao || '',
+    doems_numero: doemsNorm,
+    data_concessao: dataIso,
+    status,
+    erros,
+    is_informacao_dp: isInformacaoDP,
+    podeImportar: status === STATUS_LINHA_MEDALHA.PRONTO,
+  };
+}
+
 export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
   const tabela = await lerXlsx(file);
   if (!tabela.length) throw new Error('Planilha vazia.');
@@ -212,7 +287,6 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
   const rows = tabela.slice(1).filter(r => r.some(c => limparTexto(c)));
 
   // Cache de militares para busca por nome
-  // Nota: SDK list com sort simples permitido e ordenar por antiguidade em memória.
   const todosMilitares = await base44.entities.Militar.list('-created_date');
   const mapaMilitares = new Map();
   todosMilitares.forEach(m => {
@@ -221,12 +295,19 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
     mapaMilitares.get(nomeNorm).push(m);
   });
 
-  // Medalhas do tipo selecionado já existentes
+  // Medalhas do tipo selecionado já existentes (Ativas)
   const configMedalha = CONFIG_MEDALHAS[medalhaCodigo];
   if (!configMedalha) throw new Error(`Configuração de medalha não encontrada: ${medalhaCodigo}`);
 
   const medalhasExistentes = await base44.entities.Medalha.filter({ tipo_medalha_codigo: medalhaCodigo });
-  const setMedalhasMilitarId = new Set(medalhasExistentes.map(m => String(m.militar_id)));
+  const setMedalhasMilitarIdAtivas = new Set(
+    medalhasExistentes
+      .filter(m => {
+        const st = normalizarStatusMedalha(m.status);
+        return st !== 'CANCELADA' && st !== 'REVOGADA';
+      })
+      .map(m => String(m.militar_id))
+  );
 
   const contagemPlanilha = new Map();
 
@@ -235,73 +316,27 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
     const doemsBruto = limparTexto(row[colIndex.doems]);
     const dataBruta = row[colIndex.data];
 
-    const nomeNorm = normalizarNome(nomeBruto);
-    const isInformacaoDP = ehInformacaoDP(doemsBruto) || ehInformacaoDP(dataBruta);
-    const doemsNorm = isInformacaoDP ? null : normalizarDoems(doemsBruto);
-    const dataIso = parseDataExcel(dataBruta);
-
-    let status = STATUS_LINHA_MEDALHA.PRONTO;
-    const erros = [];
-    const militaresEncontrados = mapaMilitares.get(nomeNorm);
-
-    if (!nomeNorm) {
-      status = STATUS_LINHA_MEDALHA.ERRO;
-      erros.push('Nome do militar ausente.');
-    } else if (!militaresEncontrados || militaresEncontrados.length === 0) {
-      status = STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO;
-    } else if (militaresEncontrados.length > 1) {
-      status = STATUS_LINHA_MEDALHA.ERRO;
-      erros.push('Múltiplos militares encontrados com este nome.');
-    }
-
-    if (!isInformacaoDP) {
-      if (!doemsNorm) {
-        status = STATUS_LINHA_MEDALHA.DOEMS_INVALIDO;
-      }
-
-      if (!dataIso) {
-        status = STATUS_LINHA_MEDALHA.DATA_INVALIDA;
-      }
-    } else {
-      // Se for informação DP, garantimos que o status seja PRONTO se não houver erro de militar
-      if (status === STATUS_LINHA_MEDALHA.DOEMS_INVALIDO || status === STATUS_LINHA_MEDALHA.DATA_INVALIDA) {
-        status = STATUS_LINHA_MEDALHA.PRONTO;
-      }
-    }
-
-    const chaveUnica = isInformacaoDP ? `${nomeNorm}|INFORMACAO_DP` : `${nomeNorm}|${doemsNorm}|${dataIso}`;
-    if (contagemPlanilha.has(chaveUnica)) {
-      status = STATUS_LINHA_MEDALHA.DUPLICADO_PLANILHA;
-    } else {
-      contagemPlanilha.set(chaveUnica, true);
-    }
-
-    const militar = militaresEncontrados?.[0];
-    if (status === STATUS_LINHA_MEDALHA.PRONTO && militar && setMedalhasMilitarId.has(String(militar.id))) {
-      status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
-    }
+    const resultado = analisarLinhaImportacaoMedalha({
+      nomeBruto,
+      doemsBruto,
+      dataBruta,
+      medalhaCodigo,
+      mapaMilitares,
+      setMedalhasMilitarIdAtivas,
+      contagemPlanilha,
+    });
 
     return {
       rowIndex: index + 2,
       militar_nome_bruto: nomeBruto,
       doems_bruto: doemsBruto,
       data_bruta: dataBruta,
-      militar_id: militar?.id || null,
-      militar: militar || null, // Guardar objeto para ordenação
-      militar_nome: militar?.nome_completo || nomeBruto,
-      militar_matricula: militar?.matricula || '',
-      militar_posto: militar?.posto_graduacao || '',
-      doems_numero: doemsNorm,
-      data_concessao: dataIso,
-      status,
-      erros,
       tipo_medalha_codigo: medalhaCodigo,
-      is_informacao_dp: isInformacaoDP,
+      ...resultado,
     };
   });
 
   // Ordenação por antiguidade institucional
-  // Para militares não encontrados (militar === null), eles ficam no final.
   analise.sort((a, b) => {
     if (a.militar && b.militar) {
       const listaOrdenada = ordenarMilitaresPorAntiguidadeInstitucional([a.militar, b.militar]);
@@ -316,17 +351,58 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
 }
 
 export async function importarMedalhas(linhas, userEmail) {
-  const prontas = linhas.filter(l => l.status === STATUS_LINHA_MEDALHA.PRONTO);
-  if (!prontas.length) return { importados: 0, erros: 0 };
+  const elegiveis = linhas.filter(l => l.podeImportar);
+  if (!elegiveis.length) return { importados: 0, erros: 0, resultados: [] };
 
   let importados = 0;
   let erros = 0;
+  const resultados = [];
 
   // Cache de tipos de medalha
   const tiposMedalha = await base44.entities.TipoMedalha.list();
 
-  for (const linha of prontas) {
+  // Cache de militares e medalhas para re-verificação de integridade no momento da importação
+  const todosMilitares = await base44.entities.Militar.list('-created_date');
+  const mapaMilitares = new Map();
+  todosMilitares.forEach(m => {
+    const nomeNorm = normalizarNome(m.nome_completo);
+    if (!mapaMilitares.has(nomeNorm)) mapaMilitares.set(nomeNorm, []);
+    mapaMilitares.get(nomeNorm).push(m);
+  });
+
+  // Assumimos que todas as linhas elegíveis são do mesmo tipo de medalha
+  const medalhaCodigo = elegiveis[0].tipo_medalha_codigo;
+  const medalhasExistentes = await base44.entities.Medalha.filter({ tipo_medalha_codigo: medalhaCodigo });
+  const setMedalhasMilitarIdAtivas = new Set(
+    medalhasExistentes
+      .filter(m => {
+        const st = normalizarStatusMedalha(m.status);
+        return st !== 'CANCELADA' && st !== 'REVOGADA';
+      })
+      .map(m => String(m.militar_id))
+  );
+
+  const contagemPlanilha = new Map();
+
+  for (const linha of elegiveis) {
     try {
+      // Re-verificar integridade
+      const analiseFinal = analisarLinhaImportacaoMedalha({
+        nomeBruto: linha.militar_nome_bruto,
+        doemsBruto: linha.doems_bruto,
+        dataBruta: linha.data_bruta,
+        medalhaCodigo: linha.tipo_medalha_codigo,
+        mapaMilitares,
+        setMedalhasMilitarIdAtivas,
+        contagemPlanilha,
+      });
+
+      if (!analiseFinal.podeImportar) {
+        resultados.push({ rowIndex: linha.rowIndex, status: analiseFinal.status, erro: analiseFinal.erros.join(', ') });
+        erros++;
+        continue;
+      }
+
       const config = CONFIG_MEDALHAS[linha.tipo_medalha_codigo];
       if (!config) throw new Error(`Configuração não encontrada para ${linha.tipo_medalha_codigo}`);
 
@@ -378,12 +454,17 @@ export async function importarMedalhas(linhas, userEmail) {
         importado_legado: true,
       });
 
+      // Atualizar cache de medalhas ativas para evitar duplicidade na mesma importação se houver nomes repetidos (embora contagemPlanilha já cuide disso)
+      setMedalhasMilitarIdAtivas.add(String(linha.militar_id));
+
+      resultados.push({ rowIndex: linha.rowIndex, status: 'SUCESSO' });
       importados++;
     } catch (e) {
       console.error('Erro ao importar linha:', linha, e);
+      resultados.push({ rowIndex: linha.rowIndex, status: STATUS_LINHA_MEDALHA.ERRO_IMPORTACAO, erro: e.message });
       erros++;
     }
   }
 
-  return { importados, erros };
+  return { importados, erros, resultados };
 }
