@@ -76,13 +76,21 @@ function parseDataExcel(valor) {
   return null;
 }
 
+function getChaveDuplicidadeMedalha(medalha) {
+  if (!medalha) return null;
+  const militarId = medalha.militar_id;
+  const codigo = medalha.tipo_medalha_codigo;
+  if (!militarId || !codigo) return null;
+  return `${militarId}|${codigo}`;
+}
+
 function analisarLinhaImportacaoMedalha({
   nomeBruto,
   doemsBruto,
   dataBruta,
   medalhaCodigo,
   mapaMilitares,
-  setMedalhasMilitarIdAtivas,
+  setMedalhasAtivas,
   contagemPlanilha,
 }) {
   const nomeNorm = normalizarNome(nomeBruto);
@@ -126,8 +134,11 @@ function analisarLinhaImportacaoMedalha({
   }
 
   // Já importado (na Base44)
-  if (status === STATUS_LINHA_MEDALHA.PRONTO && militar && setMedalhasMilitarIdAtivas.has(String(militar.id))) {
-    status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
+  if (status === STATUS_LINHA_MEDALHA.PRONTO && militar) {
+    const chaveDuplicidade = getChaveDuplicidadeMedalha({ militar_id: militar.id, tipo_medalha_codigo: medalhaCodigo });
+    if (setMedalhasAtivas.has(chaveDuplicidade)) {
+      status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
+    }
   }
 
   return {
@@ -147,7 +158,7 @@ function analisarLinhaImportacaoMedalha({
 
 test('analisarLinhaImportacaoMedalha - cenário básico OK', () => {
   const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
-  const setMedalhasMilitarIdAtivas = new Set();
+  const setMedalhasAtivas = new Set();
   const contagemPlanilha = new Map();
 
   const res = analisarLinhaImportacaoMedalha({
@@ -156,7 +167,7 @@ test('analisarLinhaImportacaoMedalha - cenário básico OK', () => {
     dataBruta: '2023-01-01',
     medalhaCodigo: 'TEMPO_10',
     mapaMilitares,
-    setMedalhasMilitarIdAtivas,
+    setMedalhasAtivas,
     contagemPlanilha,
   });
 
@@ -167,7 +178,7 @@ test('analisarLinhaImportacaoMedalha - cenário básico OK', () => {
 
 test('analisarLinhaImportacaoMedalha - JA_IMPORTADO se militar já possui medalha ativa', () => {
   const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
-  const setMedalhasMilitarIdAtivas = new Set(['1']);
+  const setMedalhasAtivas = new Set(['1|TEMPO_10']);
   const contagemPlanilha = new Map();
 
   const res = analisarLinhaImportacaoMedalha({
@@ -176,7 +187,7 @@ test('analisarLinhaImportacaoMedalha - JA_IMPORTADO se militar já possui medalh
     dataBruta: '2023-01-01',
     medalhaCodigo: 'TEMPO_10',
     mapaMilitares,
-    setMedalhasMilitarIdAtivas,
+    setMedalhasAtivas,
     contagemPlanilha,
   });
 
@@ -184,9 +195,28 @@ test('analisarLinhaImportacaoMedalha - JA_IMPORTADO se militar já possui medalh
   assert.strictEqual(res.podeImportar, false);
 });
 
+test('analisarLinhaImportacaoMedalha - Permite importar se for tipo de medalha diferente', () => {
+  const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
+  const setMedalhasAtivas = new Set(['1|TEMPO_20']);
+  const contagemPlanilha = new Map();
+
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: '123',
+    dataBruta: '2023-01-01',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.PRONTO);
+  assert.strictEqual(res.podeImportar, true);
+});
+
 test('analisarLinhaImportacaoMedalha - DUPLICADO_PLANILHA se repetido no mesmo lote', () => {
   const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
-  const setMedalhasMilitarIdAtivas = new Set();
+  const setMedalhasAtivas = new Set();
   const contagemPlanilha = new Map();
 
   // Primeira vez
@@ -196,7 +226,7 @@ test('analisarLinhaImportacaoMedalha - DUPLICADO_PLANILHA se repetido no mesmo l
     dataBruta: '2023-01-01',
     medalhaCodigo: 'TEMPO_10',
     mapaMilitares,
-    setMedalhasMilitarIdAtivas,
+    setMedalhasAtivas,
     contagemPlanilha,
   });
 
@@ -207,7 +237,7 @@ test('analisarLinhaImportacaoMedalha - DUPLICADO_PLANILHA se repetido no mesmo l
     dataBruta: '2023-01-01',
     medalhaCodigo: 'TEMPO_10',
     mapaMilitares,
-    setMedalhasMilitarIdAtivas,
+    setMedalhasAtivas,
     contagemPlanilha,
   });
 
@@ -217,7 +247,7 @@ test('analisarLinhaImportacaoMedalha - DUPLICADO_PLANILHA se repetido no mesmo l
 
 test('analisarLinhaImportacaoMedalha - Informação DP bypassa DOEMS/Data', () => {
   const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
-  const setMedalhasMilitarIdAtivas = new Set();
+  const setMedalhasAtivas = new Set();
   const contagemPlanilha = new Map();
 
   const res = analisarLinhaImportacaoMedalha({
@@ -226,7 +256,7 @@ test('analisarLinhaImportacaoMedalha - Informação DP bypassa DOEMS/Data', () =
     dataBruta: '-',
     medalhaCodigo: 'TEMPO_10',
     mapaMilitares,
-    setMedalhasMilitarIdAtivas,
+    setMedalhasAtivas,
     contagemPlanilha,
   });
 
@@ -237,7 +267,7 @@ test('analisarLinhaImportacaoMedalha - Informação DP bypassa DOEMS/Data', () =
 
 test('analisarLinhaImportacaoMedalha - Militar não encontrado', () => {
   const mapaMilitares = new Map();
-  const setMedalhasMilitarIdAtivas = new Set();
+  const setMedalhasAtivas = new Set();
   const contagemPlanilha = new Map();
 
   const res = analisarLinhaImportacaoMedalha({
@@ -246,10 +276,29 @@ test('analisarLinhaImportacaoMedalha - Militar não encontrado', () => {
     dataBruta: '2023-01-01',
     medalhaCodigo: 'TEMPO_10',
     mapaMilitares,
-    setMedalhasMilitarIdAtivas,
+    setMedalhasAtivas,
     contagemPlanilha,
   });
 
   assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO);
+  assert.strictEqual(res.podeImportar, false);
+});
+
+test('analisarLinhaImportacaoMedalha - Informação DP bloqueada se já existe medalha do mesmo tipo', () => {
+  const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
+  const setMedalhasAtivas = new Set(['1|TEMPO_10']);
+  const contagemPlanilha = new Map();
+
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: 'Informação DP',
+    dataBruta: '-',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.JA_IMPORTADO);
   assert.strictEqual(res.podeImportar, false);
 });
