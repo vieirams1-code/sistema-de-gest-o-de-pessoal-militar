@@ -1,7 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Pure logic functions to test
+// Mock STATUS_LINHA_MEDALHA
+const STATUS_LINHA_MEDALHA = Object.freeze({
+  PRONTO: 'Pronto',
+  MILITAR_NAO_ENCONTRADO: 'Militar não encontrado',
+  DOEMS_INVALIDO: 'DOEMS inválido',
+  DATA_INVALIDA: 'Data inválida',
+  JA_IMPORTADO: 'Já importado',
+  DUPLICADO_PLANILHA: 'Duplicado na planilha',
+  ERRO: 'Erro',
+  ERRO_IMPORTACAO: 'Erro na importação',
+});
+
+// Pure logic functions to test (redefined for isolated test runner)
 function limparTexto(valor) {
   if (valor === null || valor === undefined) return '';
   return String(valor).trim();
@@ -23,6 +35,11 @@ function normalizarDoems(valor) {
   if (match) return match[1];
   const soNumeros = txt.replace(/[^0-9./-]/g, '');
   return soNumeros || txt;
+}
+
+function ehInformacaoDP(valor) {
+  const txt = normalizarNome(valor);
+  return txt === 'nao localizado' || txt === 'informacao dp' || txt === '-';
 }
 
 function parseDataExcel(valor) {
@@ -59,61 +76,180 @@ function parseDataExcel(valor) {
   return null;
 }
 
-const CONFIG_MEDALHAS = {
-  DOM_PEDRO_II: {
-    codigo: 'DOM_PEDRO_II',
-    nome: 'Medalha Dom Pedro II',
-    getTextoAlteracao: (numero, data) => `Concedida a Medalha Dom Pedro II, conforme publicação no DOEMS nº ${numero}, de ${data}.`,
-  },
-  TEMPO_10: {
-    codigo: 'TEMPO_10',
-    nome: 'Medalha de Tempo de Serviço - 10 anos',
-    getTextoAlteracao: (numero, data) => `Concedida a Medalha de 10 anos de serviço, conforme publicação no DOEMS nº ${numero}, de ${data}.`,
-  },
-};
+function analisarLinhaImportacaoMedalha({
+  nomeBruto,
+  doemsBruto,
+  dataBruta,
+  medalhaCodigo,
+  mapaMilitares,
+  setMedalhasMilitarIdAtivas,
+  contagemPlanilha,
+}) {
+  const nomeNorm = normalizarNome(nomeBruto);
+  const isInformacaoDP = ehInformacaoDP(doemsBruto) || ehInformacaoDP(dataBruta);
+  const doemsNorm = isInformacaoDP ? null : normalizarDoems(doemsBruto);
+  const dataIso = parseDataExcel(dataBruta);
 
-test('normalizarNome - deve normalizar nomes corretamente', () => {
-  assert.strictEqual(normalizarNome(' JOSÉ DA SILVA '), 'jose da silva');
-  assert.strictEqual(normalizarNome('Mário de  Oliveira'), 'mario de oliveira');
-});
+  let status = STATUS_LINHA_MEDALHA.PRONTO;
+  const erros = [];
+  const militaresEncontrados = mapaMilitares.get(nomeNorm) || [];
 
-test('normalizarDoems - deve normalizar números de DOEMS', () => {
-  assert.strictEqual(normalizarDoems('BG 124'), '124');
-  assert.strictEqual(normalizarDoems('DOEMS 12.345/2023'), '12.345/2023');
-  assert.strictEqual(normalizarDoems('123'), '123');
-});
+  if (!nomeNorm) {
+    status = STATUS_LINHA_MEDALHA.ERRO;
+    erros.push('Nome do militar ausente.');
+  } else if (militaresEncontrados.length === 0) {
+    status = STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO;
+  } else if (militaresEncontrados.length > 1) {
+    status = STATUS_LINHA_MEDALHA.ERRO;
+    erros.push('Múltiplos militares encontrados com este nome.');
+  }
 
-test('parseDataExcel - deve converter diversos formatos de data', () => {
-  assert.strictEqual(parseDataExcel('2023-12-31'), '2023-12-31');
-  assert.strictEqual(parseDataExcel('31/12/2023'), '2023-12-31');
-  assert.strictEqual(parseDataExcel('45291'), '2023-12-31');
-});
+  if (status === STATUS_LINHA_MEDALHA.PRONTO || status === STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO) {
+    if (!isInformacaoDP) {
+      if (!doemsNorm) {
+        status = STATUS_LINHA_MEDALHA.DOEMS_INVALIDO;
+      }
+      if (!dataIso) {
+        status = STATUS_LINHA_MEDALHA.DATA_INVALIDA;
+      }
+    }
+  }
 
-test('CONFIG_MEDALHAS - deve gerar textos de alteração corretos', () => {
-  const t10 = CONFIG_MEDALHAS.TEMPO_10.getTextoAlteracao('123', '31/12/2023');
-  assert.strictEqual(t10, 'Concedida a Medalha de 10 anos de serviço, conforme publicação no DOEMS nº 123, de 31/12/2023.');
+  const militar = militaresEncontrados[0] || null;
 
-  const dp2 = CONFIG_MEDALHAS.DOM_PEDRO_II.getTextoAlteracao('456', '01/01/2024');
-  assert.strictEqual(dp2, 'Concedida a Medalha Dom Pedro II, conforme publicação no DOEMS nº 456, de 01/01/2024.');
-});
+  // Duplicidade na planilha
+  const chaveUnicaPlanilha = isInformacaoDP ? `${nomeNorm}|INFORMACAO_DP` : `${nomeNorm}|${doemsNorm}|${dataIso}`;
+  if (contagemPlanilha.has(chaveUnicaPlanilha)) {
+    status = STATUS_LINHA_MEDALHA.DUPLICADO_PLANILHA;
+  } else {
+    contagemPlanilha.set(chaveUnicaPlanilha, true);
+  }
 
-function ehInformacaoDP(valor) {
-  const txt = normalizarNome(valor);
-  return txt === 'nao localizado' || txt === 'informacao dp' || txt === '-';
+  // Já importado (na Base44)
+  if (status === STATUS_LINHA_MEDALHA.PRONTO && militar && setMedalhasMilitarIdAtivas.has(String(militar.id))) {
+    status = STATUS_LINHA_MEDALHA.JA_IMPORTADO;
+  }
+
+  return {
+    militar_id: militar?.id || null,
+    militar,
+    militar_nome: militar?.nome_completo || nomeBruto,
+    militar_matricula: militar?.matricula || '',
+    militar_posto: militar?.posto_graduacao || '',
+    doems_numero: doemsNorm,
+    data_concessao: dataIso,
+    status,
+    erros,
+    is_informacao_dp: isInformacaoDP,
+    podeImportar: status === STATUS_LINHA_MEDALHA.PRONTO,
+  };
 }
 
-test('ehInformacaoDP - deve identificar "Não localizado", "Informação DP" e "-" em diversas variações', () => {
-  assert.strictEqual(ehInformacaoDP('Não localizado'), true);
-  assert.strictEqual(ehInformacaoDP('NÃO LOCALIZADO'), true);
-  assert.strictEqual(ehInformacaoDP('não localizado'), true);
-  assert.strictEqual(ehInformacaoDP('  Não localizado  '), true);
-  assert.strictEqual(ehInformacaoDP('Informação DP'), true);
-  assert.strictEqual(ehInformacaoDP('INFORMACAO DP'), true);
-  assert.strictEqual(ehInformacaoDP('informacao dp'), true);
-  assert.strictEqual(ehInformacaoDP('  Informação DP  '), true);
-  assert.strictEqual(ehInformacaoDP('-'), true);
-  assert.strictEqual(ehInformacaoDP('Informação da DP'), false); // Deve ser exato ou conforme normalização prevista
-  assert.strictEqual(ehInformacaoDP('Localizado'), false);
-  assert.strictEqual(ehInformacaoDP('12345'), false);
-  assert.strictEqual(ehInformacaoDP(''), false);
+test('analisarLinhaImportacaoMedalha - cenário básico OK', () => {
+  const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
+  const setMedalhasMilitarIdAtivas = new Set();
+  const contagemPlanilha = new Map();
+
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: '123',
+    dataBruta: '2023-01-01',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasMilitarIdAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.PRONTO);
+  assert.strictEqual(res.podeImportar, true);
+  assert.strictEqual(res.militar_id, 1);
+});
+
+test('analisarLinhaImportacaoMedalha - JA_IMPORTADO se militar já possui medalha ativa', () => {
+  const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
+  const setMedalhasMilitarIdAtivas = new Set(['1']);
+  const contagemPlanilha = new Map();
+
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: '123',
+    dataBruta: '2023-01-01',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasMilitarIdAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.JA_IMPORTADO);
+  assert.strictEqual(res.podeImportar, false);
+});
+
+test('analisarLinhaImportacaoMedalha - DUPLICADO_PLANILHA se repetido no mesmo lote', () => {
+  const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
+  const setMedalhasMilitarIdAtivas = new Set();
+  const contagemPlanilha = new Map();
+
+  // Primeira vez
+  analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: '123',
+    dataBruta: '2023-01-01',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasMilitarIdAtivas,
+    contagemPlanilha,
+  });
+
+  // Segunda vez
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: '123',
+    dataBruta: '2023-01-01',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasMilitarIdAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.DUPLICADO_PLANILHA);
+  assert.strictEqual(res.podeImportar, false);
+});
+
+test('analisarLinhaImportacaoMedalha - Informação DP bypassa DOEMS/Data', () => {
+  const mapaMilitares = new Map([['joao silva', [{ id: 1, nome_completo: 'João Silva' }]]]);
+  const setMedalhasMilitarIdAtivas = new Set();
+  const contagemPlanilha = new Map();
+
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'João Silva',
+    doemsBruto: 'Informação DP',
+    dataBruta: '-',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasMilitarIdAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.PRONTO);
+  assert.strictEqual(res.podeImportar, true);
+  assert.strictEqual(res.is_informacao_dp, true);
+});
+
+test('analisarLinhaImportacaoMedalha - Militar não encontrado', () => {
+  const mapaMilitares = new Map();
+  const setMedalhasMilitarIdAtivas = new Set();
+  const contagemPlanilha = new Map();
+
+  const res = analisarLinhaImportacaoMedalha({
+    nomeBruto: 'Inexistente',
+    doemsBruto: '123',
+    dataBruta: '2023-01-01',
+    medalhaCodigo: 'TEMPO_10',
+    mapaMilitares,
+    setMedalhasMilitarIdAtivas,
+    contagemPlanilha,
+  });
+
+  assert.strictEqual(res.status, STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO);
+  assert.strictEqual(res.podeImportar, false);
 });

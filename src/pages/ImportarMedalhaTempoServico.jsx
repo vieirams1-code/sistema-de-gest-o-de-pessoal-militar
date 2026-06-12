@@ -86,6 +86,19 @@ export default function ImportarMedalhaTempoServico() {
     try {
       const resultado = await importarMedalhas(analise, userEmail);
       setResultadoImportacao(resultado);
+
+      // Atualizar a análise local para refletir o que foi importado com sucesso ou falha
+      setAnalise(prev => prev.map(linha => {
+        const res = resultado.resultados?.find(r => r.rowIndex === linha.rowIndex);
+        if (res) {
+          if (res.status === 'SUCESSO') {
+            return { ...linha, status: STATUS_LINHA_MEDALHA.JA_IMPORTADO, podeImportar: false };
+          }
+          return { ...linha, status: res.status, erros: res.erro ? [res.erro] : linha.erros, podeImportar: false };
+        }
+        return linha;
+      }));
+
       toast({
         title: 'Importação concluída',
         description: `${resultado.importados} medalhas importadas com sucesso.`,
@@ -114,7 +127,7 @@ export default function ImportarMedalhaTempoServico() {
     if (!analise) return null;
     return analise.reduce((acc, l) => {
       acc.total++;
-      if (l.status === STATUS_LINHA_MEDALHA.PRONTO) acc.validos++;
+      if (l.podeImportar) acc.validos++;
       else if (l.status === STATUS_LINHA_MEDALHA.MILITAR_NAO_ENCONTRADO) acc.naoEncontrados++;
       else if (l.status === STATUS_LINHA_MEDALHA.JA_IMPORTADO) acc.jaImportados++;
       else acc.erros++;
