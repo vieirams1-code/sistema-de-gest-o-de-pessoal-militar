@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, MoreHorizontal, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Eye, History, MoreHorizontal, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import SincronizacaoPromocoesDialog from '@/components/promocao/SincronizacaoPromocoesDialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -87,6 +88,7 @@ export default function Promocoes() {
   const [ano, setAno] = useState('todos');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [promocaoAtiva, setPromocaoAtiva] = useState(null);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
 
   const promocoesQuery = useQuery({
     queryKey: ['promocoes-operacionais'],
@@ -244,6 +246,16 @@ export default function Promocoes() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+              onClick={() => setSyncDialogOpen(true)}
+            >
+              <History className="h-4 w-4 mr-2" />
+              Sincronizar graduações atuais
+            </Button>
+          )}
           <Button className="h-11 rounded-xl px-5 font-bold bg-[#07172A] hover:bg-[#0F2647]" onClick={() => novaPromocaoMutation.mutate()}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Promoção
@@ -332,6 +344,8 @@ export default function Promocoes() {
           </TableBody>
         </Table>
       </div>
+
+      <SincronizacaoPromocoesDialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen} />
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent side="right" className="w-full sm:max-w-[500px] overflow-y-auto p-0">

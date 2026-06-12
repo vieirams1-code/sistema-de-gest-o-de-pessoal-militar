@@ -1441,3 +1441,17 @@ export async function bulkUpdatePromocaoMilitar(payloads = []) {
 
   return { atualizados: payloads.length };
 }
+
+export async function diagnosticarDivergenciasGraduacoes() {
+  const response = await base44.functions.invoke('sincronizarGraduacoesPromocao', {
+    body: { dryRun: true },
+  });
+  return response?.data || response;
+}
+
+export async function executarSincronizacaoGraduacoes() {
+  const response = await base44.functions.invoke('sincronizarGraduacoesPromocao', {
+    body: { dryRun: false, confirmacao: 'SINCRONIZAR' },
+  });
+  return response?.data || response;
+}
