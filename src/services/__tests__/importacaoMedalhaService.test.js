@@ -96,3 +96,18 @@ test('CONFIG_MEDALHAS - deve gerar textos de alteração corretos', () => {
   const dp2 = CONFIG_MEDALHAS.DOM_PEDRO_II.getTextoAlteracao('456', '01/01/2024');
   assert.strictEqual(dp2, 'Concedida a Medalha Dom Pedro II, conforme publicação no DOEMS nº 456, de 01/01/2024.');
 });
+
+function ehInformacaoDP(valor) {
+  const txt = normalizarNome(valor);
+  return txt === 'nao localizado';
+}
+
+test('ehInformacaoDP - deve identificar "Não localizado" em diversas variações', () => {
+  assert.strictEqual(ehInformacaoDP('Não localizado'), true);
+  assert.strictEqual(ehInformacaoDP('NÃO LOCALIZADO'), true);
+  assert.strictEqual(ehInformacaoDP('não localizado'), true);
+  assert.strictEqual(ehInformacaoDP('  Não localizado  '), true);
+  assert.strictEqual(ehInformacaoDP('Localizado'), false);
+  assert.strictEqual(ehInformacaoDP('12345'), false);
+  assert.strictEqual(ehInformacaoDP(''), false);
+});

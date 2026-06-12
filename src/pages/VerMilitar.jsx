@@ -822,10 +822,20 @@ export default function VerMilitar() {
                   <span className="font-medium text-slate-800">{m.tipo_medalha_nome}</span>
                   <Badge className={medalhaStatusColor[m.status] || ''}>{m.status}</Badge>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Indicação: {formatDate(m.data_indicacao)} · Concessão: {formatDate(m.data_concessao) || '—'}
-                  {m.documento_referencia && ` · ${m.documento_referencia}`}
-                </p>
+                {m.documento_referencia === 'INFORMAÇÃO DP' ? (
+                  <div className="mt-1 space-y-1">
+                    <p className="text-xs text-slate-500">Indicação: {formatDate(m.data_indicacao)}</p>
+                    <p className="text-xs font-medium text-blue-600">Origem: Informação DP — Publicação original não localizada.</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Indicação: {formatDate(m.data_indicacao)} · Concessão: {formatDate(m.data_concessao) || '—'}
+                    {m.documento_referencia && ` · ${m.documento_referencia}`}
+                  </p>
+                )}
+                {m.observacoes && (
+                  <p className="text-xs text-slate-400 mt-1 italic">{m.observacoes}</p>
+                )}
               </div>
             )}
           </div>

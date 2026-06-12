@@ -288,8 +288,17 @@ export default function Medalhas() {
                     <p className="text-sm text-slate-500">Mat: {medalha.militar_matricula}</p>
                     <div className="flex gap-4 mt-2 text-xs text-slate-500">
                       <span>Indicação: {formatDate(medalha.data_indicacao)}</span>
-                      {medalha.data_concessao && <span>Concessão: {formatDate(medalha.data_concessao)}</span>}
-                      {medalha.numero_publicacao && <span>DOEMS: {medalha.numero_publicacao}</span>}
+                      {medalha.documento_referencia === 'INFORMAÇÃO DP' ? (
+                        <>
+                          <span className="font-medium text-blue-600">Origem: Informação DP</span>
+                          <span className="italic">Referência: Publicação original não localizada.</span>
+                        </>
+                      ) : (
+                        <>
+                          {medalha.data_concessao && <span>Concessão: {formatDate(medalha.data_concessao)}</span>}
+                          {medalha.numero_publicacao && <span>DOEMS: {medalha.numero_publicacao}</span>}
+                        </>
+                      )}
                     </div>
                     {medalha.observacoes && (
                       <p className="text-sm text-slate-500 mt-2">{medalha.observacoes}</p>
