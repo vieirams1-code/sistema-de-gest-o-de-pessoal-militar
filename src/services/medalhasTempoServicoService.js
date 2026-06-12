@@ -109,6 +109,18 @@ export function normalizarStatusMedalha(status) {
   return STATUS_MAP.get(chave) || chave || null;
 }
 
+/**
+ * Gera uma chave de duplicidade para medalhas.
+ * A regra padrão é: militar_id + código do tipo de medalha.
+ */
+export function getChaveDuplicidadeMedalha(medalha) {
+  if (!medalha) return null;
+  const militarId = medalha.militar_id;
+  const codigo = resolverCodigoTipoMedalha(medalha);
+  if (!militarId || !codigo) return null;
+  return `${militarId}|${codigo}`;
+}
+
 export function deduplicarTiposMedalha(tipos = []) {
   const unicos = new Map();
 

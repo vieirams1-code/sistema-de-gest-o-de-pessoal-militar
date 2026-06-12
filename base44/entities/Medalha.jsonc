@@ -41,9 +41,13 @@
       "enum": [
         "Indicado",
         "Concedido",
-        "Negado"
+        "Negado",
+        "INDICADA",
+        "CONCEDIDA",
+        "CANCELADA",
+        "REVOGADA"
       ],
-      "default": "Indicado",
+      "default": "INDICADA",
       "description": "Status da medalha"
     },
     "documento_referencia": {
@@ -53,6 +57,43 @@
     "observacoes": {
       "type": "string",
       "description": "Observa\u00e7\u00f5es"
+    },
+    "tipo_medalha_codigo": {
+      "type": "string",
+      "description": "Código técnico do tipo de medalha"
+    },
+    "numero_publicacao": {
+      "type": "string",
+      "description": "Número da publicação (DOEMS ou BG)"
+    },
+    "boletim_ou_do": {
+      "type": "string",
+      "description": "Tipo de publicação (DOEMS ou BG)"
+    },
+    "origem_registro": {
+      "type": "string",
+      "description": "Origem do registro (ex: MIGRACAO_FIXA, INFORMACAO_DP)"
+    },
+    "concedido_por": {
+      "type": "string",
+      "description": "Email do usuário que concedeu a medalha"
+    },
+    "indicado_por": {
+      "type": "string",
+      "description": "Email do usuário que indicou a medalha"
+    },
+    "resetado_por": {
+      "type": "string",
+      "description": "Email do usuário que resetou a indicação"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Email do último usuário que alterou o registro"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora da última atualização"
     }
   },
   "required": [
