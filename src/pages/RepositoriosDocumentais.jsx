@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Database, Check, X, Server } from 'lucide-react';
+import { Plus, Pencil, Database, Check, X, Server, Wifi, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 
@@ -18,6 +18,7 @@ export default function RepositoriosDocumentais() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRepo, setEditingRepo] = useState(null);
+  const [testingId, setTestingId] = useState(null);
 
   const { data: repositorios = [], isLoading } = useQuery({
     queryKey: ['repositorios-documentais'],
@@ -81,6 +82,32 @@ export default function RepositoriosDocumentais() {
       observacoes: repo.observacoes
     });
     setIsModalOpen(true);
+  };
+
+  const handleTestarConexao = async (repoId) => {
+    setTestingId(repoId);
+    try {
+      const response = await base44.functions.invoke('testarConexaoDrive', { repositorio_id: repoId });
+      const data = response?.data || response;
+
+      if (data.ok) {
+        toast({
+          title: 'Conexão OK!',
+          description: `Acessado: ${data.details.folder_name} (${data.details.mime_type})`,
+          variant: 'default'
+        });
+      } else {
+        throw new Error(data.error || 'Falha desconhecida');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro na Conexão',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setTestingId(null);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -229,9 +256,25 @@ export default function RepositoriosDocumentais() {
                       {repo.ativo ? <Check className="w-4 h-4 text-emerald-600" /> : <X className="w-4 h-4 text-red-600" />}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTestarConexao(repo.id)}
+                          disabled={testingId === repo.id}
+                          className="h-8 px-2 text-xs"
+                        >
+                          {testingId === repo.id ? (
+                            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <Wifi className="w-3 h-3 mr-1" />
+                          )}
+                          Testar
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)} className="h-8 w-8 p-0">
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

@@ -170,6 +170,12 @@ export default function VerMilitar() {
   const [showPromocaoFuturaModal, setShowPromocaoFuturaModal] = useState(false);
   const [promocaoFuturaEdicao, setPromocaoFuturaEdicao] = useState(null);
   const [showNovoAcervoModal, setShowNovoAcervoModal] = useState(false);
+  const { data: activeRepositorios = [] } = useQuery({
+    queryKey: ['active-repositorios'],
+    queryFn: () => base44.entities.RepositorioDocumental.filter({ ativo: true, status: 'ATIVO' }),
+    enabled: podeGerirAcervo
+  });
+
   const [acervoForm, setAcervoForm] = useState({
     tipo_documento: 'ALTERACAO',
     titulo: '',
@@ -1120,7 +1126,20 @@ export default function VerMilitar() {
               <h3 className="font-semibold text-slate-700">Documentos Históricos</h3>
               <div className="flex gap-2">
                 {podeGerirAcervo && (
-                  <Button className="bg-[#1e3a5f]" onClick={() => setShowNovoAcervoModal(true)}>
+                  <Button
+                    className="bg-[#1e3a5f]"
+                    onClick={() => {
+                      if (activeRepositorios.length === 0) {
+                        toast({
+                          title: 'Configuração Necessária',
+                          description: 'Nenhum repositório documental ativo encontrado. Configure um repositório no Google Drive antes de realizar o upload.',
+                          variant: 'destructive'
+                        });
+                        return;
+                      }
+                      setShowNovoAcervoModal(true);
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" /> Novo Documento
                   </Button>
                 )}
