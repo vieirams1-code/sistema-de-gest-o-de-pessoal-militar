@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Database, Check, X, Server, Wifi, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Database, Check, X, Server, Wifi } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import {
@@ -91,6 +91,21 @@ export default function RepositoriosDocumentais() {
       observacoes: ''
     });
   };
+
+  const testarConexaoMutation = useMutation({
+    mutationFn: async (drive_root_folder_id) => {
+      const response = await base44.functions.invoke('testarConexaoDrive', { drive_root_folder_id });
+      const body = response?.data ?? response;
+      if (body?.error) throw new Error(body.error);
+      return body;
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Sucesso!', description: data.message });
+    },
+    onError: (error) => {
+      toast({ title: 'Falha na conexão', description: error.message, variant: 'destructive' });
+    }
+  });
 
   const handleEdit = (repo) => {
     setEditingRepo(repo);
@@ -279,31 +294,18 @@ export default function RepositoriosDocumentais() {
                       {repo.ativo ? <Check className="w-4 h-4 text-emerald-600" /> : <X className="w-4 h-4 text-red-600" />}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTestarConexao(repo.id)}
-                          disabled={testingId === repo.id}
-                          className="h-8 px-2 text-xs"
-                        >
-                          {testingId === repo.id ? (
-                            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                          ) : (
-                            <Wifi className="w-3 h-3 mr-1" />
-                          )}
-                          Testar
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)} className="h-8 w-8 p-0">
-                          <Pencil className="w-4 h-4" />
-                        </Button>
+                      <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDeleteDialog({ open: true, id: repo.id })}
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => testarConexaoMutation.mutate(repo.drive_root_folder_id)}
+                          disabled={testarConexaoMutation.isPending}
+                          title="Testar Conexão"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Wifi className={`w-4 h-4 ${testarConexaoMutation.isPending ? 'animate-pulse' : ''}`} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)}>
+                          <Pencil className="w-4 h-4" />
                         </Button>
                       </div>
                     </TableCell>

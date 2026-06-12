@@ -3,140 +3,131 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 /**
  * gerirAcervoHistorico
  *
- * Função para gerenciar documentos históricos integrados ao Google Drive.
+ * Função para gerenciar documentos históricos integrados ao Google Drive via Service Account Real.
  */
 
-// --- Google Drive Helpers ---
-
-function base64url(buf: ArrayBuffer): string {
-  const binString = Array.from(new Uint8Array(buf), (byte) =>
-    String.fromCharCode(byte),
-  ).join("");
-  return btoa(binString)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-async function getAccessToken(credentialsJson: string): Promise<string> {
-  const credentials = JSON.parse(credentialsJson);
+// Helpers para Google Drive API v3
+async function getAccessToken(credentials: any) {
+  const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const payload = {
+  const claim = {
     iss: credentials.client_email,
-    scope: "https://www.googleapis.com/auth/drive.file",
-    aud: "https://oauth2.googleapis.com/token",
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
     iat: now,
   };
 
-  const encodedHeader = base64url(new TextEncoder().encode(JSON.stringify(header)));
-  const encodedPayload = base64url(new TextEncoder().encode(JSON.stringify(payload)));
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
+  const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '');
+  const encodedClaim = btoa(JSON.stringify(claim)).replace(/=/g, '');
+  const signatureInput = `${encodedHeader}.${encodedClaim}`;
 
-  const pemContents = credentials.private_key
-    .replace(/\\n/g, "\n")
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\s/g, "");
-
-  const binaryDerString = atob(pemContents);
-  const binaryDer = new Uint8Array(binaryDerString.length);
-  for (let i = 0; i < binaryDerString.length; i++) {
-    binaryDer[i] = binaryDerString.charCodeAt(i);
-  }
-
+  const pem = credentials.private_key;
+  const binaryDer = str2ab(atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '')));
   const key = await crypto.subtle.importKey(
-    "pkcs8",
+    'pkcs8',
     binaryDer,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
-    ["sign"]
+    ['sign']
   );
 
   const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
+    'RSASSA-PKCS1-v1_5',
     key,
-    new TextEncoder().encode(dataToSign)
+    new TextEncoder().encode(signatureInput)
   );
 
-  const jwt = `${dataToSign}.${base64url(signature)}`;
+  const encodedSignature = ab2base64url(signature);
+  const jwt = `${signatureInput}.${encodedSignature}`;
 
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
-    }),
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
   });
 
-  const data = await response.json();
+  const data = await res.json();
   if (data.error) throw new Error(`Auth Error: ${data.error_description || data.error}`);
   return data.access_token;
 }
 
-async function localizarOuCriarPastaMilitar(token: string, matricula: string, rootFolderId: string): Promise<string> {
-  const q = `name = '${matricula}' and '${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-  const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`;
-  const listResp = await fetch(listUrl, {
+function str2ab(str: string) {
+  const buf = new ArrayBuffer(str.length);
+  const bufView = new Uint8Array(buf);
+  for (let i = 0, strLen = str.length; i < strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return buf;
+}
+
+function ab2base64url(buf: ArrayBuffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+async function findOrCreateFolder(token: string, name: string, parentId: string) {
+  const query = `name = '${name}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  const listData = await listResp.json();
+  const listData = await listRes.json();
 
   if (listData.files && listData.files.length > 0) {
     return listData.files[0].id;
   }
 
-  const createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      name: matricula,
+      name,
       mimeType: 'application/vnd.google-apps.folder',
-      parents: [rootFolderId]
+      parents: [parentId]
     })
   });
-  const createData = await createResp.json();
+  const createData = await createRes.json();
   if (createData.error) throw new Error(`Folder Create Error: ${createData.error.message}`);
   return createData.id;
 }
 
-async function uploadArquivoDrive(token: string, folderId: string, file: { name: string, type: string, content: string }, titulo: string): Promise<{ id: string, webViewLink: string }> {
+async function uploadFile(token: string, name: string, folderId: string, mimeType: string, contentBase64: string) {
   const metadata = {
-    name: `${titulo || file.name}.pdf`.replace(/\.pdf\.pdf$/i, '.pdf'),
+    name,
     parents: [folderId]
   };
 
   const boundary = '-------314159265358979323846';
   const delimiter = `\r\n--${boundary}\r\n`;
-  const close_delim = `\r\n--${boundary}--`;
+  const closeDelimiter = `\r\n--${boundary}--`;
 
-  const multipartBody =
+  const body =
     delimiter +
     'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
     JSON.stringify(metadata) +
     delimiter +
-    `Content-Type: ${file.type}\r\n` +
+    `Content-Type: ${mimeType}\r\n` +
     'Content-Transfer-Encoding: base64\r\n\r\n' +
-    file.content +
-    close_delim;
+    contentBase64 +
+    closeDelimiter;
 
-  const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': `multipart/related; boundary=${boundary}`
     },
-    body: multipartBody
+    body
   });
 
-  const data = await resp.json();
-  if (data.error) throw new Error(`Drive Upload Error: ${data.error.message}`);
-  return data;
+  const data = await res.json();
+  if (data.error) throw new Error(`Upload Error: ${data.error.message}`);
+  return { id: data.id, url: data.webViewLink };
 }
 
 Deno.serve(async (req) => {
@@ -164,7 +155,7 @@ Deno.serve(async (req) => {
       .join('');
     const arquivo_tamanho = bytes.byteLength;
 
-    // 1. Detectar Duplicidade (Mesmo militar + Mesmo hash)
+    // 1. Detectar Duplicidade
     const duplicados = await base44.asServiceRole.entities.AcervoFuncionalHistorico.filter({
       militar_id,
       arquivo_sha256,
@@ -172,10 +163,7 @@ Deno.serve(async (req) => {
     });
 
     if (duplicados.length > 0 && !data.confirmar_duplicidade) {
-      return Response.json({
-        error: 'DUPLICIDADE_DETECTADA',
-        documento: duplicados[0]
-      }, { status: 409 });
+      return Response.json({ error: 'DUPLICIDADE_DETECTADA', documento: duplicados[0] }, { status: 409 });
     }
 
     // 2. Localizar militar e repositórios
@@ -191,10 +179,15 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Nenhum repositório documental ativo configurado.' }, { status: 503 });
     }
 
+    const driveCredentialsStr = Deno.env.get('GOOGLE_DRIVE_CREDENTIALS');
+    if (!driveCredentialsStr) {
+      return Response.json({ error: 'GOOGLE_DRIVE_CREDENTIALS não configurado no servidor.' }, { status: 500 });
+    }
+    const credentials = JSON.parse(driveCredentialsStr);
+
     // 3. Gerenciar Versionamento
     let versao = 1;
     const substitui_documento_id = data.substitui_documento_id || null;
-
     if (substitui_documento_id) {
       const docAnterior = await base44.asServiceRole.entities.AcervoFuncionalHistorico.get(substitui_documento_id);
       if (docAnterior) {
@@ -202,44 +195,37 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Integração com Drive (com Failover e Concorrência)
-    const driveCredentials = Deno.env.get('GOOGLE_DRIVE_CREDENTIALS');
+    // 4. Integração REAL com Google Drive
     let drive_file_id, drive_folder_id, drive_url, repoSelecionado;
-
     let sucessoDrive = false;
     let erroUltimaTentativa = '';
+
+    const SUBPASTAS: Record<string, string> = {
+      'ALTERACAO': 'Alterações',
+      'CERTIDAO_COMPORTAMENTO': 'Certidões de Comportamento',
+      'DIVERSOS': 'Diversos'
+    };
 
     for (const repo of repositorios) {
       try {
         repoSelecionado = repo;
+        const accessToken = await getAccessToken(credentials);
 
-        // Concorrência: Tentar localizar drive_folder_id existente para este militar NESTE repositório
-        const registrosRepo = await base44.asServiceRole.entities.AcervoFuncionalHistorico.filter({
-          militar_id,
-          repositorio_id: repo.id
-        }, '-created_date');
+        // Root -> Militar (Matrícula)
+        const folderMilitarId = await findOrCreateFolder(accessToken, militar.matricula, repo.drive_root_folder_id);
 
-        const folderIdExistente = registrosRepo.find(r => r.drive_folder_id)?.drive_folder_id;
+        // Militar -> Tipo (Subpasta)
+        const subpastaNome = SUBPASTAS[tipo_documento] || 'Diversos';
+        drive_folder_id = await findOrCreateFolder(accessToken, subpastaNome, folderMilitarId);
 
-        if (driveCredentials) {
-          const token = await getAccessToken(driveCredentials);
-          const folderId = folderIdExistente || await localizarOuCriarPastaMilitar(token, militar.matricula, repo.drive_root_folder_id);
-          const uploadResult = await uploadArquivoDrive(token, folderId, file, data.titulo);
+        // Upload
+        const uploadResult = await uploadFile(accessToken, file.name, drive_folder_id, file.type, file.content);
 
-          drive_file_id = uploadResult.id;
-          drive_folder_id = folderId;
-          drive_url = uploadResult.webViewLink;
-          sucessoDrive = true;
-        } else {
-          // Fallback simulado (Apenas se não houver credenciais configuradas no ambiente)
-          drive_file_id = `simulated_file_${Date.now()}`;
-          drive_folder_id = folderIdExistente || `simulated_folder_${militar.matricula}`;
-          drive_url = `https://drive.google.com/file/d/${drive_file_id}/view`;
-          sucessoDrive = true;
-        }
-
-        if (sucessoDrive) break;
-      } catch (err) {
+        drive_file_id = uploadResult.id;
+        drive_url = uploadResult.url;
+        sucessoDrive = true;
+        break;
+      } catch (err: any) {
         erroUltimaTentativa = err.message;
         console.error(`[gerirAcervoHistorico] Falha no repositório ${repo.nome}:`, err);
         if (err.message.includes('quota') || err.message.includes('full')) {
@@ -249,13 +235,12 @@ Deno.serve(async (req) => {
     }
 
     if (!sucessoDrive) {
-      return Response.json({ error: `Falha em todos os repositórios: ${erroUltimaTentativa}` }, { status: 500 });
+      return Response.json({ error: `Falha na integração real com Google Drive: ${erroUltimaTentativa}` }, { status: 500 });
     }
 
     // 5. Salvar registro no Base44
     try {
-      // Limpar campos auxiliares do payload que não pertencem à entidade
-      const { confirmar_duplicidade, confirmar_sobreposicao, substituir_existente, ...dataToSave } = data;
+      const { confirmar_duplicidade, substituir_existente, ...dataToSave } = data;
 
       const registroAcervo = await base44.asServiceRole.entities.AcervoFuncionalHistorico.create({
         ...dataToSave,
@@ -276,35 +261,20 @@ Deno.serve(async (req) => {
         arquivado: false
       });
 
-      // 6. Atualizar documento substituído
       if (substitui_documento_id) {
         await base44.asServiceRole.entities.AcervoFuncionalHistorico.update(substitui_documento_id, {
           status_documento: 'SUBSTITUIDO'
         });
       }
 
-      return Response.json({
-        ok: true,
-        registro: registroAcervo,
-        drive: {
-          file_id: drive_file_id,
-          folder_id: drive_folder_id,
-          url: drive_url
-        }
-      });
+      return Response.json({ ok: true, registro: registroAcervo });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[gerirAcervoHistorico] Erro ao salvar registro:', error);
-      // Aqui poderíamos tentar remover o arquivo do Drive (Rollback)
-      return Response.json({
-        error: 'Erro ao persistir metadados no sistema.',
-        details: error.message,
-        status: 'PENDENTE_RECONCILIACAO',
-        drive_file_id
-      }, { status: 500 });
+      return Response.json({ error: 'Erro ao persistir metadados no sistema.', details: error.message }, { status: 500 });
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[gerirAcervoHistorico] Erro Fatal:', error);
     return Response.json({ error: error.message || 'Erro interno.' }, { status: 500 });
   }
