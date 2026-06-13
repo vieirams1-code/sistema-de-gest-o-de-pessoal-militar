@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { atualizarCadastroMilitar } from '../utils.ts';
 
 const POSTOS_HIERARQUIA = [
   'Soldado',
@@ -75,7 +76,6 @@ Deno.serve(async (req) => {
 
     const Militar = base44.asServiceRole.entities.Militar;
     const Historico = base44.asServiceRole.entities.HistoricoPromocaoMilitarV2;
-    const AssistenteLog = base44.asServiceRole.entities.AssistenteLog;
 
     const [militares, historicosTodos] = await Promise.all([
       Militar.list(),
@@ -116,13 +116,14 @@ Deno.serve(async (req) => {
 
     const resumo = {
       analisados: 0,
-      atualizados: 0,
-      compativeis: 0,
+      atualizados: 0, // "atualizados confirmados"
+      compativeis: 0, // "já compatíveis"
       ignorados: 0,
+      falhas: [] as any[], // "falhas de atualização"
       divergencias: [] as any[]
     };
 
-    const updates = [];
+    const pendingUpdates = [];
 
     for (const militar of militares) {
       const statusMilitar = normalizar(militar.status_cadastro);
@@ -169,7 +170,7 @@ Deno.serve(async (req) => {
       }
 
       debug.militaresComHistorico++;
-      resumo.analisados++; // Rafael Stort deve cair aqui agora
+      resumo.analisados++;
 
       const ultimoHistorico = [...mHistoricos].sort(compararHistoricosDesc)[0];
 
@@ -190,15 +191,13 @@ Deno.serve(async (req) => {
       const idxNovo = INDICE_POR_POSTO.get(obterPostoCanonico(ultimoHistorico.posto_graduacao_novo)) ?? -1;
 
       // Regra: Não rebaixar se o cadastro atual for MAIS RECENTE que o histórico.
-      // Como estamos pegando o ÚLTIMO histórico, se o cadastro for maior que o histórico,
-      // presume-se que o cadastro tem uma informação manual que ainda não está no Histórico V2.
       if (idxNovo < idxAtual && idxNovo !== -1 && idxAtual !== -1) {
           debug.descartados.rebaixamento++;
           resumo.ignorados++;
           continue;
       }
 
-      resumo.divergencias.push({
+      const infoMilitar = {
         militar_id: mid,
         nome: militar.nome_completo || militar.nome_guerra || 'Militar ' + mid,
         matricula: militar.matricula,
@@ -209,39 +208,57 @@ Deno.serve(async (req) => {
         historico_id: ultimoHistorico.id,
         data_promocao: ultimoHistorico.data_promocao,
         tipo: 'atualização automática'
-      });
+      };
+
+      resumo.divergencias.push(infoMilitar);
 
       if (!dryRun) {
-        updates.push(async () => {
-          await Militar.update(mid, {
+        pendingUpdates.push({
+          militarId: mid,
+          nome: infoMilitar.nome,
+          dados: {
             posto_graduacao: ultimoHistorico.posto_graduacao_novo,
             quadro: ultimoHistorico.quadro_novo
-          });
-
-          await AssistenteLog.create({
-            tipo: 'sincronizacao_promocao',
-            acao: 'atualizar_militar_por_sincronizacao_em_lote',
-            descricao: `Sincronização administrativa: ${militar.posto_graduacao}/${militar.quadro} -> ${ultimoHistorico.posto_graduacao_novo}/${ultimoHistorico.quadro_novo}`,
-            metadata: {
-              militar_id: mid,
-              nome: militar.nome_completo,
-              posto_anterior: militar.posto_graduacao,
-              quadro_anterior: militar.quadro,
-              posto_novo: ultimoHistorico.posto_graduacao_novo,
-              quadro_novo: ultimoHistorico.quadro_novo,
-              historico_id: ultimoHistorico.id,
-              executado_por: authUser.email,
-              origem: 'sincronizacao_automatica_promocoes'
-            }
-          });
+          },
+          contexto: {
+            executado_por: authUser.email,
+            origem: 'sincronizacao_automatica_promocoes',
+            historico_id: ultimoHistorico.id
+          }
         });
       }
-      resumo.atualizados++;
     }
 
-    if (!dryRun && updates.length > 0) {
-      for (const updateFn of updates) {
-        await updateFn();
+    if (!dryRun && pendingUpdates.length > 0) {
+      for (const update of pendingUpdates) {
+        try {
+          const result = await atualizarCadastroMilitar(base44, update.militarId, update.dados, update.contexto);
+          if (result.success) {
+            resumo.atualizados++;
+          } else {
+            // Requisito 4: Return in "falhas" with specific fields
+            for (const u of result.updates) {
+                if (!u.confirmado || result.erro_api) {
+                    resumo.falhas.push({
+                        militar: update.nome,
+                        matricula: result.matricula,
+                        militar_id: update.militarId,
+                        campo_tentado: u.campo,
+                        valor_anterior: u.anterior,
+                        valor_esperado: u.esperado,
+                        valor_apos_releitura: u.apos_releitura,
+                        erro_api: result.erro_api
+                    });
+                }
+            }
+          }
+        } catch (err: any) {
+          resumo.falhas.push({
+            militar: update.nome,
+            militar_id: update.militarId,
+            erro: err.message || String(err)
+          });
+        }
       }
     }
 
