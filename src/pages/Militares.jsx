@@ -63,7 +63,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
 import { carregarParticipantesAtivosPorMilitar, decorarMilitares, listarMilitarIdsEmCursoAtivo } from '@/services/decorarMilitaresPostoVirtual';
-import { compararPorPostoVirtual } from '@/services/militarStatusVirtual';
+import { compararPorPostoVirtualDescendente } from '@/services/militarStatusVirtual';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -767,7 +767,10 @@ export default function Militares() {
           // Não altera o cálculo oficial de antiguidade — só a ordem de exibição.
           const postoVirtualA = a?.militar?.posto_graduacao_exibicao || a?.militar?.posto_graduacao;
           const postoVirtualB = b?.militar?.posto_graduacao_exibicao || b?.militar?.posto_graduacao;
-          const ordemPosto = compararPorPostoVirtual(
+          // Precedência institucional do MAIOR para o MENOR (Oficiais primeiro,
+          // Soldado por último), inserindo Aluno a Sargento / Aluno a Cabo nos
+          // pontos corretos. Não altera o cálculo oficial de antiguidade.
+          const ordemPosto = compararPorPostoVirtualDescendente(
             { posto_exibicao: postoVirtualA, snapshot_antiguidade: a?.militar?.snapshot_antiguidade, ordem_antiguidade_origem: a?.militar?.ordem_antiguidade_origem },
             { posto_exibicao: postoVirtualB, snapshot_antiguidade: b?.militar?.snapshot_antiguidade, ordem_antiguidade_origem: b?.militar?.ordem_antiguidade_origem },
           );

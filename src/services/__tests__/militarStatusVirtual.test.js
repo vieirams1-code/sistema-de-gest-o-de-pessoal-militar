@@ -4,6 +4,7 @@ import {
   resolverStatusMilitarComCurso,
   getPostoExibicaoMilitar,
   compararPorPostoVirtual,
+  compararPorPostoVirtualDescendente,
   ALUNO_CABO,
   ALUNO_SARGENTO,
 } from '../militarStatusVirtual.js';
@@ -101,6 +102,41 @@ test('Desempate usa ordem_antiguidade_origem quando snapshot ausente', () => {
   ];
   const ordenado = [...itens].sort(compararPorPostoVirtual).map((i) => i.ordem_antiguidade_origem);
   assert.deepEqual(ordenado, [2, 5]);
+});
+
+// 12 — precedência operacional (maior -> menor) com postos virtuais inseridos
+test('Descendente: 3º Sgt > Aluno a Sargento > Cabo > Aluno a Cabo > Soldado', () => {
+  const itens = [
+    { posto_exibicao: 'Soldado' },
+    { posto_exibicao: ALUNO_CABO },
+    { posto_exibicao: 'Cabo' },
+    { posto_exibicao: ALUNO_SARGENTO },
+    { posto_exibicao: '3º Sargento' },
+  ];
+  const ordenado = [...itens].sort(compararPorPostoVirtualDescendente).map((i) => i.posto_exibicao);
+  assert.deepEqual(ordenado, ['3º Sargento', ALUNO_SARGENTO, 'Cabo', ALUNO_CABO, 'Soldado']);
+});
+
+// 13 — desempate de antiguidade dentro do posto continua "mais antigo primeiro"
+test('Descendente: antiguidade interna não é invertida (mais antigo primeiro)', () => {
+  const itens = [
+    { posto_exibicao: ALUNO_CABO, snapshot_antiguidade: 3 },
+    { posto_exibicao: ALUNO_CABO, snapshot_antiguidade: 1 },
+    { posto_exibicao: ALUNO_CABO, snapshot_antiguidade: 2 },
+  ];
+  const ordenado = [...itens].sort(compararPorPostoVirtualDescendente).map((i) => i.snapshot_antiguidade);
+  assert.deepEqual(ordenado, [1, 2, 3]);
+});
+
+// 14 — Oficiais antes das praças
+test('Descendente: oficiais aparecem antes das praças', () => {
+  const itens = [
+    { posto_exibicao: 'Soldado' },
+    { posto_exibicao: 'Coronel' },
+    { posto_exibicao: 'Subtenente' },
+  ];
+  const ordenado = [...itens].sort(compararPorPostoVirtualDescendente).map((i) => i.posto_exibicao);
+  assert.deepEqual(ordenado, ['Coronel', 'Subtenente', 'Soldado']);
 });
 
 // 11

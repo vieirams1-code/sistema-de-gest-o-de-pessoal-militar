@@ -142,6 +142,15 @@ export function compararPorPostoVirtual(a, b) {
   const pesoB = pesoPostoVirtual(b?.posto_exibicao);
   if (pesoA !== pesoB) return pesoA - pesoB;
 
+  return compararAntiguidadeInternaPostoVirtual(a, b);
+}
+
+/**
+ * Desempate de antiguidade DENTRO de um mesmo posto de exibição.
+ * Mais antigo primeiro (menor snapshot/ordem). Independe da direção da
+ * precedência hierárquica.
+ */
+function compararAntiguidadeInternaPostoVirtual(a, b) {
   const antA = a?.snapshot_antiguidade ?? a?.ordem_antiguidade_origem ?? Number.MAX_SAFE_INTEGER;
   const antB = b?.snapshot_antiguidade ?? b?.ordem_antiguidade_origem ?? Number.MAX_SAFE_INTEGER;
   if (antA !== antB) return antA - antB;
@@ -149,4 +158,21 @@ export function compararPorPostoVirtual(a, b) {
   const ordA = a?.ordem_antiguidade_origem ?? Number.MAX_SAFE_INTEGER;
   const ordB = b?.ordem_antiguidade_origem ?? Number.MAX_SAFE_INTEGER;
   return ordA - ordB;
+}
+
+/**
+ * Comparador de PRECEDÊNCIA OPERACIONAL (maior → menor): Oficiais primeiro,
+ * Soldado por último. Insere as posições virtuais nos pontos institucionais:
+ *   ... 3º Sargento > Aluno a Sargento > Cabo > Aluno a Cabo > Soldado.
+ *
+ * O desempate de antiguidade DENTRO de cada posto permanece "mais antigo
+ * primeiro" (não é invertido). Itens com `posto_exibicao` ausente recaem no
+ * peso de posto desconhecido (vão para o fim).
+ */
+export function compararPorPostoVirtualDescendente(a, b) {
+  const pesoA = pesoPostoVirtual(a?.posto_exibicao);
+  const pesoB = pesoPostoVirtual(b?.posto_exibicao);
+  if (pesoA !== pesoB) return pesoB - pesoA;
+
+  return compararAntiguidadeInternaPostoVirtual(a, b);
 }

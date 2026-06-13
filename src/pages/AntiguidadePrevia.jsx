@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ANTIGUIDADE_OFICIAL_ITENS_QUERY_KEY } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
+import { carregarParticipantesAtivosPorMilitar } from '@/services/decorarMilitaresPostoVirtual';
+import { aplicarPostoOperacionalEReordenar, montarMapaPostoOperacionalPorMilitar } from '@/utils/antiguidade/aplicarPostoOperacionalPrevia';
 
 const TODOS = '__todos__';
 
@@ -277,10 +279,30 @@ export default function AntiguidadePrevia() {
   }, [data, selecaoConfiguracao]);
 
   useEffect(() => {
+    // Mantém o cache oficial com os itens ORIGINAIS (antiguidade oficial),
+    // sem reordenação operacional.
     queryClient.setQueryData(ANTIGUIDADE_OFICIAL_ITENS_QUERY_KEY, resultado?.itens || []);
   }, [queryClient, resultado]);
 
-  const itensResultado = resultado?.itens || [];
+  // Posto operacional (read-only): militares em CFC/CFS ativo são exibidos como
+  // Aluno a Cabo / Aluno a Sargento e reordenados pela precedência operacional.
+  // Não altera o cálculo oficial nem o cache de antiguidade acima.
+  const { data: participantesCursoAtivo } = useQuery({
+    queryKey: ['antiguidade-previa-posto-operacional'],
+    queryFn: () => carregarParticipantesAtivosPorMilitar(),
+  });
+
+  const mapaPostoOperacional = useMemo(() => {
+    const participantes = participantesCursoAtivo instanceof Map
+      ? Array.from(participantesCursoAtivo.values())
+      : [];
+    return montarMapaPostoOperacionalPorMilitar(participantes);
+  }, [participantesCursoAtivo]);
+
+  const itensResultado = useMemo(
+    () => aplicarPostoOperacionalEReordenar(resultado?.itens || [], mapaPostoOperacional),
+    [resultado, mapaPostoOperacional],
+  );
 
   const itensComBuscaIndexada = useMemo(() => (
     itensResultado.map((item) => ({
@@ -615,10 +637,24 @@ export default function AntiguidadePrevia() {
                     return (
                       <React.Fragment key={chaveLinha}>
                         <tr className="border-b align-top hover:bg-slate-50">
-                          <td className="px-2 py-3 font-semibold">{item.posicao ?? '—'}</td>
+                          <td className="px-2 py-3 font-semibold">{item.posicao_operacional ?? item.posicao ?? '—'}</td>
                           <td className="px-2 py-3">{item.nome || '—'}</td>
                           <td className="px-2 py-3">{item.matricula || '—'}</td>
-                          <td className="px-2 py-3">{item.posto_graduacao || '—'}</td>
+                          <td className="px-2 py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span>{item.posto_operacional || item.posto_graduacao || '—'}</span>
+                                {item.possui_posto_virtual && item.tipo_curso_formacao && (
+                                  <Badge variant="outline" className="whitespace-nowrap border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] text-emerald-700">
+                                    {item.tipo_curso_formacao}
+                                  </Badge>
+                                )}
+                              </span>
+                              {item.possui_posto_virtual && item.posto_graduacao && (
+                                <span className="text-[11px] text-slate-400">Origem: {item.posto_graduacao}</span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-2 py-3">{item.quadro || '—'}</td>
                           <td className="px-2 py-3">{formatarData(item.data_promocao)}</td>
                           <td className="px-2 py-3">{item.antiguidade_referencia_ordem ?? '—'}</td>
