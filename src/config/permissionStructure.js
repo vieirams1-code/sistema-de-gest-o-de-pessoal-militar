@@ -305,13 +305,6 @@ export const permissionStructure = [
         ]
       },
       {
-        key: 'acesso_repositorios_documentais',
-        label: 'Repositórios Documentais',
-        actions: [
-          { key: 'perm_gerir_repositorios_documentais', label: 'Gerir Repositórios Documentais', sensitive: true }
-        ]
-      },
-      {
         key: 'acesso_estrutura_organizacional',
         label: 'Estrutura Organizacional',
         actions: [

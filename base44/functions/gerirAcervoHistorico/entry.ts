@@ -4,7 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * gerirAcervoHistorico
  *
  * Faz upload do documento histórico DIRETAMENTE no storage do Base44
- * (sem dependências externas como Google Drive) e persiste o registro
+ * e persiste o registro
  * em AcervoFuncionalHistorico. Mantém detecção de duplicidade por SHA-256
  * e versionamento.
  *
@@ -85,7 +85,6 @@ Deno.serve(async (req) => {
       militar_id,
       tipo_documento,
       arquivo_url,
-      drive_url: arquivo_url,
       usuario_cadastro: authUser.email,
       status_documento: 'ATIVO',
       versao,

@@ -49,7 +49,6 @@
  */
 import AgendaAcoesOperacionais from './pages/AgendaAcoesOperacionais';
 import AgendarJISO from './pages/AgendarJISO';
-import AuditoriaAcervo from './pages/AuditoriaAcervo';
 import AuditoriaComportamento from './pages/AuditoriaComportamento';
 import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
@@ -82,8 +81,6 @@ import FolhaAlteracoes from './pages/FolhaAlteracoes';
 import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
 import DashboardAcervo from './pages/DashboardAcervo';
-import ImportacaoLoteAcervo from './pages/ImportacaoLoteAcervo';
-import RevisaoAcervo from './pages/RevisaoAcervo';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
 import ImportarMedalhaDomPedroII from './pages/ImportarMedalhaDomPedroII';
 import ImportarMedalhaTempoServico from './pages/ImportarMedalhaTempoServico';
@@ -126,7 +123,6 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
-    "AuditoriaAcervo": AuditoriaAcervo,
     "AuditoriaComportamento": AuditoriaComportamento,
     "AvaliacaoComportamento": AvaliacaoComportamento,
     "Armamentos": Armamentos,
@@ -159,8 +155,6 @@ export const PAGES = {
     "GratificacoesFuncao": GratificacoesFuncao,
     "Home": Home,
     "DashboardAcervo": DashboardAcervo,
-    "ImportacaoLoteAcervo": ImportacaoLoteAcervo,
-    "RevisaoAcervo": RevisaoAcervo,
     "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
     "ImportarMedalhaDomPedroII": ImportarMedalhaDomPedroII,
     "ImportarMedalhaTempoServico": ImportarMedalhaTempoServico,

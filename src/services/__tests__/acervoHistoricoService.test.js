@@ -1,31 +1,23 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 
-// Mock do base44Client
+// Mock mínimo do backend oficial de upload do acervo.
 const mockBase44 = {
   functions: {
     invoke: async (name, payload) => {
       if (name === 'gerirAcervoHistorico') {
-        return { data: { ok: true, registro: { id: 'test_id', ...payload.data } } };
+        return { data: { ok: true, registro: { id: 'test_id', arquivo_url: 'https://storage/arquivo.pdf', ...payload.data } } };
       }
       return { data: { error: 'Unknown function' } };
     }
   },
   entities: {
     AcervoFuncionalHistorico: {
-      filter: async (filter, sort) => {
-        return [{ id: 'test_id', militar_id: filter.militar_id, tipo_documento: 'ALTERACAO' }];
-      }
-    },
-    RepositorioDocumental: {
-      list: async (sort) => {
-        return [{ id: 'repo_id', nome: 'Test Repo' }];
-      }
+      filter: async (filter) => [{ id: 'test_id', militar_id: filter.militar_id, tipo_documento: 'ALTERACAO', arquivo_url: 'https://storage/arquivo.pdf' }]
     }
   }
 };
 
-// Redefinir funções do service para usar o mock
 async function cadastrarDocumentoHistorico({ militar_id, tipo_documento, data, file }) {
   const response = await mockBase44.functions.invoke('gerirAcervoHistorico', {
     militar_id,
@@ -41,12 +33,28 @@ async function cadastrarDocumentoHistorico({ militar_id, tipo_documento, data, f
 async function listarAcervoMilitar(militar_id) {
   return await mockBase44.entities.AcervoFuncionalHistorico.filter({
     militar_id,
+    ativo: true,
+    status_documento: 'ATIVO',
     arquivado: false
   }, '-data_documento');
 }
 
+function contarDocumentosAcervo(acervo = []) {
+  return acervo.reduce((acc, doc) => {
+    if (!doc || doc.arquivado) return acc;
+    if (doc.ativo !== false && doc.status_documento === 'ATIVO') {
+      if (doc.tipo_documento === 'ALTERACAO') acc.alteracoes += 1;
+      if (doc.tipo_documento === 'CERTIDAO_COMPORTAMENTO') acc.certidoes += 1;
+      if (doc.tipo_documento === 'DIVERSOS') acc.diversos += 1;
+      acc.total += 1;
+    }
+    if (doc.ativo === false && !doc.arquivado) acc.lixeira += 1;
+    return acc;
+  }, { alteracoes: 0, certidoes: 0, diversos: 0, total: 0, lixeira: 0 });
+}
+
 describe('Acervo Historico Service', () => {
-  test('cadastrarDocumentoHistorico deve retornar o registro criado', async () => {
+  test('cadastrarDocumentoHistorico retorna registro criado no storage oficial', async () => {
     const data = { titulo: 'Teste' };
     const result = await cadastrarDocumentoHistorico({
       militar_id: 'm1',
@@ -56,11 +64,22 @@ describe('Acervo Historico Service', () => {
     });
     assert.strictEqual(result.ok, true);
     assert.strictEqual(result.registro.titulo, 'Teste');
+    assert.strictEqual(result.registro.arquivo_url, 'https://storage/arquivo.pdf');
   });
 
-  test('listarAcervoMilitar deve retornar lista de registros', async () => {
+  test('listarAcervoMilitar retorna lista de registros ativos', async () => {
     const result = await listarAcervoMilitar('m1');
     assert.strictEqual(result.length, 1);
     assert.strictEqual(result[0].militar_id, 'm1');
+  });
+
+  test('contarDocumentosAcervo consolida cobertura e lixeira', () => {
+    const contadores = contarDocumentosAcervo([
+      { tipo_documento: 'ALTERACAO', ativo: true, status_documento: 'ATIVO' },
+      { tipo_documento: 'CERTIDAO_COMPORTAMENTO', ativo: true, status_documento: 'ATIVO' },
+      { tipo_documento: 'DIVERSOS', ativo: false, status_documento: 'ATIVO' },
+    ]);
+
+    assert.deepStrictEqual(contadores, { alteracoes: 1, certidoes: 1, diversos: 0, total: 2, lixeira: 1 });
   });
 });
