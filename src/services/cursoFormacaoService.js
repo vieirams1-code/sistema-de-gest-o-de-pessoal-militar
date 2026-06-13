@@ -73,15 +73,20 @@ export async function registrarAuditoriaCursoFormacao(registro, usuario) {
 }
 
 export async function listarAuditoriaCurso(cursoId) {
-  const query = cursoId ? { curso_id: cursoId } : {};
-  return (await getClient()).entities[ENTITY_AUDIT].list({ query, sort: '-data_hora' });
+  const client = await getClient();
+  if (cursoId) return client.entities[ENTITY_AUDIT].filter({ curso_id: cursoId }, '-data_hora');
+  return client.entities[ENTITY_AUDIT].list('-data_hora');
 }
 
 // ============================================================
 // Cursos
 // ============================================================
 export async function listarCursosFormacao(filtros = {}) {
-  return (await getClient()).entities[ENTITY_CURSO].list({ query: filtros, sort: '-created_date' });
+  const client = await getClient();
+  if (filtros && Object.keys(filtros).length > 0) {
+    return client.entities[ENTITY_CURSO].filter(filtros, '-created_date');
+  }
+  return client.entities[ENTITY_CURSO].list('-created_date');
 }
 
 export async function obterCursoFormacao(cursoId) {
@@ -175,10 +180,10 @@ export async function encerrarCursoFormacao(cursoId, usuario) {
 // ============================================================
 export async function listarParticipantesCurso(cursoId) {
   if (!cursoId) return [];
-  return (await getClient()).entities[ENTITY_PARTICIPANTE].list({
-    query: { curso_id: cursoId },
-    sort: 'snapshot_antiguidade',
-  });
+  return (await getClient()).entities[ENTITY_PARTICIPANTE].filter(
+    { curso_id: cursoId },
+    'snapshot_antiguidade',
+  );
 }
 
 /**
@@ -211,9 +216,7 @@ export async function adicionarParticipantesCurso(cursoId, militares, usuario) {
     }
 
     // Impede militar em dois cursos de formação ativos simultaneamente
-    const vinculos = await (await getClient()).entities[ENTITY_PARTICIPANTE].list({
-      query: { militar_id: militarId },
-    });
+    const vinculos = await (await getClient()).entities[ENTITY_PARTICIPANTE].filter({ militar_id: militarId });
     for (const vinculo of vinculos) {
       if (STATUS_PENDENTES_PARTICIPANTE.includes(vinculo.status) && vinculo.curso_id !== cursoId) {
         const outroCurso = await (await getClient()).entities[ENTITY_CURSO].get(vinculo.curso_id).catch(() => null);
@@ -426,9 +429,9 @@ export async function sincronizarParticipantesPromovidos(cursoId, usuario) {
 
   let promovidos = 0;
   for (const participante of comPromocao) {
-    const vinculos = await (await getClient()).entities[ENTITY_PROMOCAO_MILITAR].list({
-      query: { promocao_id: participante.promocao_id, militar_id: participante.militar_id },
-    });
+    const vinculos = await (await getClient()).entities[ENTITY_PROMOCAO_MILITAR].filter(
+      { promocao_id: participante.promocao_id, militar_id: participante.militar_id },
+    );
     const publicado = vinculos.some(
       (v) => v.publicado === true || STATUS_PROMOCAO_PUBLICADA.has(String(v.status || '').toLowerCase()),
     );
