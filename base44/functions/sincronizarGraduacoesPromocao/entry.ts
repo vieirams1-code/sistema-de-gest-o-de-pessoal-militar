@@ -20,6 +20,18 @@ const INDICE_POR_POSTO = new Map(POSTOS_HIERARQUIA.map((posto, indice) => [posto
 
 const texto = (valor: unknown) => String(valor ?? '').trim();
 
+const normalizar = (valor: unknown) => {
+  return texto(valor)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[°º]/g, 'o')
+    .replace(/[•|/]/g, ' ')
+    .replace(/[-–—]/g, ' ')
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+};
+
 const toTime = (value: unknown) => {
   if (!value) return Number.NEGATIVE_INFINITY;
   const ts = new Date(value as string).getTime();
@@ -35,8 +47,14 @@ function compararHistoricosDesc(a: any, b: any) {
   return String(b?.id).localeCompare(String(a?.id));
 }
 
-function normalizarPosto(v: string) {
-  return texto(v).replace(/°/g, 'º');
+function obterPostoCanonico(v: string) {
+  const t = normalizar(v);
+  // Mapeamento simples para garantir que "Soldado" vs "SD" ou variações batam se necessário.
+  // No Historico V2, geralmente já está o nome por extenso, mas o normalizar garante case/acentos.
+  for (const p of POSTOS_HIERARQUIA) {
+    if (normalizar(p) === t) return p;
+  }
+  return v;
 }
 
 Deno.serve(async (req) => {
@@ -59,18 +77,42 @@ Deno.serve(async (req) => {
     const Historico = base44.asServiceRole.entities.HistoricoPromocaoMilitarV2;
     const AssistenteLog = base44.asServiceRole.entities.AssistenteLog;
 
-    const [militares, historicos] = await Promise.all([
+    const [militares, historicosTodos] = await Promise.all([
       Militar.list(),
-      Historico.filter({ status_registro: 'ativo' })
+      Historico.list()
     ]);
 
-    const historicosPorMilitar = new Map<string, any[]>();
-    for (const h of historicos) {
-      const mid = texto(h.militar_id);
-      if (!mid) continue;
-      if (!historicosPorMilitar.has(mid)) historicosPorMilitar.set(mid, []);
-      historicosPorMilitar.get(mid)!.push(h);
+    // Linking logic: use ID and Matricula
+    const historicosPorMilitarId = new Map<string, any[]>();
+    const historicosPorMatricula = new Map<string, any[]>();
+
+    for (const h of historicosTodos) {
+      // Multiple fields for linking as requested
+      const mid = texto(h.militar_id || h.militarId || (typeof h.militar === 'string' ? h.militar : h.militar?.id));
+      const mat = texto(h.matricula || (typeof h.militar === 'object' ? h.militar?.matricula : ''));
+
+      if (mid) {
+        if (!historicosPorMilitarId.has(mid)) historicosPorMilitarId.set(mid, []);
+        historicosPorMilitarId.get(mid)!.push(h);
+      }
+      if (mat) {
+        if (!historicosPorMatricula.has(mat)) historicosPorMatricula.set(mat, []);
+        historicosPorMatricula.get(mat)!.push(h);
+      }
     }
+
+    const debug = {
+      totalMilitares: militares.length,
+      totalHistoricos: historicosTodos.length,
+      militaresAtivos: 0,
+      militaresComHistorico: 0,
+      historicosPublicados: 0,
+      descartados: {
+        inativo: 0,
+        semHistorico: 0,
+        rebaixamento: 0
+      }
+    };
 
     const resumo = {
       analisados: 0,
@@ -83,23 +125,58 @@ Deno.serve(async (req) => {
     const updates = [];
 
     for (const militar of militares) {
-      if (texto(militar.status_cadastro) !== 'ativo') continue;
+      const statusMilitar = normalizar(militar.status_cadastro);
+      if (statusMilitar !== 'ativo') {
+        debug.descartados.inativo++;
+        continue;
+      }
+      debug.militaresAtivos++;
 
-      resumo.analisados++;
       const mid = texto(militar.id);
-      const mHistoricos = historicosPorMilitar.get(mid) || [];
+      const mat = texto(militar.matricula);
+
+      // Agrupar históricos por ID ou Matrícula, removendo duplicados pelo ID do registro
+      const historicosMap = new Map<string, any>();
+      (historicosPorMilitarId.get(mid) || []).forEach(h => historicosMap.set(String(h.id), h));
+      (historicosPorMatricula.get(mat) || []).forEach(h => historicosMap.set(String(h.id), h));
+
+      const mHistoricosRaw = Array.from(historicosMap.values());
+
+      // Filtro de "publicados"
+      const mHistoricos = mHistoricosRaw.filter(h => {
+        const statusReg = normalizar(h.status_registro);
+        if (['cancelado', 'cancelada', 'retificado', 'retificada'].includes(statusReg)) return false;
+
+        const isPublicado = h.publicado === true || h.publicado === 'true';
+        const isConsolidado = h.consolidado === true || h.consolidado === 'true';
+        const stPub = normalizar(h.status_publicacao || h.situacao || h.status || h.status_promocao);
+
+        const temDataPublicacao = !!h.data_publicacao || !!h.data_promocao;
+        const temReferencia = !!h.boletim_referencia || !!h.ato_referencia || !!h.numero_publicacao;
+
+        // Critério amplo de publicação conforme solicitado
+        const publicadoPorStatus = ['publicado', 'publicada', 'consolidado', 'consolidada', 'ativo'].includes(stPub);
+
+        const res = (statusReg === 'ativo') || isPublicado || isConsolidado || publicadoPorStatus || (temDataPublicacao && temReferencia);
+        if (res) debug.historicosPublicados++;
+        return res;
+      });
 
       if (mHistoricos.length === 0) {
+        debug.descartados.semHistorico++;
         resumo.ignorados++;
         continue;
       }
 
+      debug.militaresComHistorico++;
+      resumo.analisados++; // Rafael Stort deve cair aqui agora
+
       const ultimoHistorico = [...mHistoricos].sort(compararHistoricosDesc)[0];
 
-      const postoAtual = normalizarPosto(militar.posto_graduacao);
-      const quadroAtual = texto(militar.quadro);
-      const postoNovo = normalizarPosto(ultimoHistorico.posto_graduacao_novo);
-      const quadroNovo = texto(ultimoHistorico.quadro_novo);
+      const postoAtual = normalizar(militar.posto_graduacao);
+      const quadroAtual = normalizar(militar.quadro);
+      const postoNovo = normalizar(ultimoHistorico.posto_graduacao_novo);
+      const quadroNovo = normalizar(ultimoHistorico.quadro_novo);
 
       const divergePosto = postoAtual !== postoNovo;
       const divergeQuadro = quadroAtual !== quadroNovo;
@@ -109,13 +186,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const idxAtual = INDICE_POR_POSTO.get(postoAtual) ?? -1;
-      const idxNovo = INDICE_POR_POSTO.get(postoNovo) ?? -1;
+      const idxAtual = INDICE_POR_POSTO.get(obterPostoCanonico(militar.posto_graduacao)) ?? -1;
+      const idxNovo = INDICE_POR_POSTO.get(obterPostoCanonico(ultimoHistorico.posto_graduacao_novo)) ?? -1;
 
       // Regra: Não rebaixar se o cadastro atual for MAIS RECENTE que o histórico.
       // Como estamos pegando o ÚLTIMO histórico, se o cadastro for maior que o histórico,
       // presume-se que o cadastro tem uma informação manual que ainda não está no Histórico V2.
       if (idxNovo < idxAtual && idxNovo !== -1 && idxAtual !== -1) {
+          debug.descartados.rebaixamento++;
           resumo.ignorados++;
           continue;
       }
@@ -129,7 +207,8 @@ Deno.serve(async (req) => {
         posto_novo: ultimoHistorico.posto_graduacao_novo,
         quadro_novo: ultimoHistorico.quadro_novo,
         historico_id: ultimoHistorico.id,
-        data_promocao: ultimoHistorico.data_promocao
+        data_promocao: ultimoHistorico.data_promocao,
+        tipo: 'atualização automática'
       });
 
       if (!dryRun) {
@@ -166,7 +245,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ success: true, dryRun, resumo });
+    return Response.json({ success: true, dryRun, resumo, debug });
 
   } catch (error: any) {
     return Response.json({ success: false, error: error.message }, { status: 500 });
