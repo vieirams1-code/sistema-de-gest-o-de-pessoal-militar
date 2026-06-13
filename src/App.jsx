@@ -36,6 +36,7 @@ const moduleGuardByPage = {
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
   EditarJiso: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  RotinasAdministrativas: { moduleKey: 'acesso_rotinas_administrativas', actionKey: 'perm_visualizar_rotinas_administrativas', moduleName: 'Rotinas Administrativas' },
   CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   Medicos: { moduleKey: 'atestados', moduleName: 'Atestados' },
