@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Medal, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 
 const TABS = [

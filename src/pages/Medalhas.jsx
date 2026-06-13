@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Edit, Trash2, Medal, ChevronDown, Shield } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Medal, Shield } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import {
   Accordion,
@@ -260,22 +260,22 @@ export default function Medalhas() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             {
-              label: 'Militares com medalhas concedidas',
+              label: 'Homenageados',
               value: new Set(medalhas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').map(m => m.militar_id)).size,
-              color: 'text-blue-600',
-              bg: 'bg-blue-100'
+              color: 'text-[#1e3a5f]',
+              bg: 'bg-[#1e3a5f]/10'
             },
             {
-              label: 'Medalhas concedidas',
+              label: 'Condecorações',
               value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length,
-              color: 'text-green-600',
-              bg: 'bg-green-100'
+              color: 'text-emerald-600',
+              bg: 'bg-emerald-50'
             },
             {
-              label: 'Indicações pendentes',
+              label: 'Pendências',
               value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'INDICADA').length,
-              color: 'text-yellow-600',
-              bg: 'bg-yellow-100'
+              color: 'text-amber-600',
+              bg: 'bg-amber-50'
             },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
@@ -285,7 +285,7 @@ export default function Medalhas() {
                 </div>
                 <div>
                   <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-slate-500">{s.label}</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{s.label}</p>
                 </div>
               </div>
             </div>
@@ -339,17 +339,23 @@ export default function Medalhas() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="CONCEDIDA">Com medalha concedida</SelectItem>
-                <SelectItem value="INDICADA">Com indicação pendente</SelectItem>
+                <SelectItem value="CONCEDIDA">Possui medalha</SelectItem>
+                <SelectItem value="INDICADA">Possui indicação pendente</SelectItem>
               </SelectContent>
             </Select>
             <Select value={tipoFilter} onValueChange={setTipoFilter}>
               <SelectTrigger className="h-10 border-slate-200">
-                <SelectValue placeholder="Tipo de medalha" />
+                <SelectValue placeholder="Medalha/Honraria" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="TODOS">Todos os tipos</SelectItem>
-                {tiposDisponiveis.map((tipo) => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
+                <SelectItem value="TODOS">Todas as honrarias</SelectItem>
+                {['Bronze', 'Prata', 'Ouro', 'Platina', 'Dom Pedro II'].map(tipo => (
+                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                ))}
+                {tiposDisponiveis
+                  .filter(t => !['Bronze', 'Prata', 'Ouro', 'Platina', 'Dom Pedro II'].includes(t))
+                  .map((tipo) => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)
+                }
               </SelectContent>
             </Select>
             <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
@@ -407,82 +413,88 @@ export default function Medalhas() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 md:gap-8">
+                  <div className="flex flex-wrap items-center gap-6 md:gap-12">
                     {/* Tempo de Serviço */}
-                    <div className="flex items-center gap-2 md:gap-4">
-                      {RULER_MILESTONES.filter(m => m.codigo.startsWith('TEMPO')).map((milestone, idx, arr) => {
-                        const medalha = grupo.todasMedalhas.find(m => m.tipo_medalha_codigo_normalizado === milestone.codigo);
-                        const isConcedida = medalha && normalizarStatusMedalha(medalha.status) === 'CONCEDIDA';
-                        const isIndicada = medalha && normalizarStatusMedalha(medalha.status) === 'INDICADA';
-                        const colors = MILESTONE_COLORS[milestone.color];
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Tempo de Serviço</span>
+                      <div className="flex items-center gap-2 md:gap-4">
+                        {RULER_MILESTONES.filter(m => m.codigo.startsWith('TEMPO')).map((milestone, idx, arr) => {
+                          const medalha = grupo.todasMedalhas.find(m => m.tipo_medalha_codigo_normalizado === milestone.codigo);
+                          const isConcedida = medalha && normalizarStatusMedalha(medalha.status) === 'CONCEDIDA';
+                          const isIndicada = medalha && normalizarStatusMedalha(medalha.status) === 'INDICADA';
+                          const colors = MILESTONE_COLORS[milestone.color];
 
-                        return (
-                          <Fragment key={milestone.codigo}>
-                            <div className="flex flex-col items-center gap-1.5">
+                          return (
+                            <Fragment key={milestone.codigo}>
+                              <div className="flex flex-col items-center gap-1.5">
+                                <div
+                                  className={`
+                                    w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all
+                                    ${isConcedida
+                                      ? `${colors.icon} border-white text-white shadow-md ring-2 ring-offset-1 ring-slate-100`
+                                      : isIndicada
+                                        ? `${colors.border} ${colors.text} border-dashed opacity-70 bg-white`
+                                        : 'border-slate-100 text-slate-200 bg-slate-50/50'
+                                    }
+                                  `}
+                                  title={`${isConcedida ? 'Concedida' : isIndicada ? 'Indicada' : 'Não possui'}: ${milestone.metal}`}
+                                >
+                                  <span className={`text-sm font-bold`}>
+                                    {milestone.label}
+                                  </span>
+                                </div>
+                                <span className={`text-[9px] font-bold uppercase tracking-tight ${isConcedida ? 'text-slate-600' : isIndicada ? 'text-slate-400 italic' : 'text-slate-300'}`}>
+                                  {milestone.metal}
+                                </span>
+                              </div>
+                              {idx < arr.length - 1 && (
+                                <div className="flex flex-col items-center">
+                                  <div className={`w-3 md:w-6 h-0.5 ${isConcedida && grupo.todasMedalhas.some(m => m.tipo_medalha_codigo_normalizado === arr[idx+1].codigo && normalizarStatusMedalha(m.status) === 'CONCEDIDA') ? colors.icon : 'bg-slate-100'}`} />
+                                </div>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="hidden md:block w-px h-16 bg-slate-100 self-end" />
+
+                    {/* Dom Pedro II */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Dom Pedro II</span>
+                      <div className="flex items-center gap-2 md:gap-4">
+                        {RULER_MILESTONES.filter(m => m.codigo === 'DOM_PEDRO_II').map((milestone) => {
+                          const medalha = grupo.todasMedalhas.find(m => m.tipo_medalha_codigo_normalizado === milestone.codigo);
+                          const isConcedida = medalha && normalizarStatusMedalha(medalha.status) === 'CONCEDIDA';
+                          const isIndicada = medalha && normalizarStatusMedalha(medalha.status) === 'INDICADA';
+                          const colors = MILESTONE_COLORS[milestone.color];
+
+                          return (
+                            <div key={milestone.codigo} className="flex flex-col items-center gap-1.5">
                               <div
                                 className={`
                                   w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all
                                   ${isConcedida
-                                    ? `${colors.bg} ${colors.border} ${colors.text} shadow-sm ring-2 ring-offset-2 ring-slate-200`
+                                    ? `${colors.icon} border-white text-white shadow-md ring-2 ring-offset-1 ring-slate-100`
                                     : isIndicada
-                                      ? `${colors.border} ${colors.text} border-dashed opacity-80 bg-white`
+                                      ? `${colors.border} ${colors.text} border-dashed opacity-70 bg-white`
                                       : 'border-slate-100 text-slate-200 bg-slate-50/50'
                                   }
                                 `}
-                                title={`${isConcedida ? 'Concedida' : isIndicada ? 'Indicada' : 'Não possui'}: ${milestone.metal}`}
+                                title={`${isConcedida ? 'Concedida' : isIndicada ? 'Indicada' : 'Não possui'}: Dom Pedro II`}
                               >
-                                <span className={`text-sm font-bold ${!isConcedida && !isIndicada ? 'text-slate-200' : ''}`}>
+                                <span>
                                   {milestone.label}
                                 </span>
                               </div>
                               <span className={`text-[9px] font-bold uppercase tracking-tight ${isConcedida ? 'text-slate-600' : isIndicada ? 'text-slate-400 italic' : 'text-slate-300'}`}>
-                                {milestone.metal}
+                                Dom Pedro II
                               </span>
                             </div>
-                            {idx < arr.length - 1 && (
-                              <div className="flex flex-col items-center -mt-4">
-                                <div className={`w-4 md:w-8 h-0.5 ${isConcedida && grupo.todasMedalhas.some(m => m.tipo_medalha_codigo_normalizado === arr[idx+1].codigo && normalizarStatusMedalha(m.status) === 'CONCEDIDA') ? colors.bg : 'bg-slate-100'}`} />
-                              </div>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </div>
-
-                    <div className="hidden md:block w-px h-12 bg-slate-200 mx-2" />
-
-                    {/* Dom Pedro II */}
-                    <div className="flex items-center gap-2 md:gap-4">
-                      {RULER_MILESTONES.filter(m => m.codigo === 'DOM_PEDRO_II').map((milestone) => {
-                        const medalha = grupo.todasMedalhas.find(m => m.tipo_medalha_codigo_normalizado === milestone.codigo);
-                        const isConcedida = medalha && normalizarStatusMedalha(medalha.status) === 'CONCEDIDA';
-                        const isIndicada = medalha && normalizarStatusMedalha(medalha.status) === 'INDICADA';
-                        const colors = MILESTONE_COLORS[milestone.color];
-
-                        return (
-                          <div key={milestone.codigo} className="flex flex-col items-center gap-1.5">
-                            <div
-                              className={`
-                                w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all
-                                ${isConcedida
-                                  ? `${colors.bg} ${colors.border} ${colors.text} shadow-sm ring-2 ring-offset-2 ring-slate-200`
-                                  : isIndicada
-                                    ? `${colors.border} ${colors.text} border-dashed opacity-80 bg-white`
-                                    : 'border-slate-100 text-slate-200 bg-slate-50/50'
-                                }
-                              `}
-                              title={`${isConcedida ? 'Concedida' : isIndicada ? 'Indicada' : 'Não possui'}: Dom Pedro II`}
-                            >
-                              <span className={`${!isConcedida && !isIndicada ? 'text-slate-200' : ''}`}>
-                                {milestone.label}
-                              </span>
-                            </div>
-                            <span className={`text-[9px] font-bold uppercase tracking-tight ${isConcedida ? 'text-slate-600' : isIndicada ? 'text-slate-400 italic' : 'text-slate-300'}`}>
-                              Dom Pedro II
-                            </span>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -500,17 +512,21 @@ export default function Medalhas() {
                         {grupo.militar_posto} {grupo.militar_nome}
                       </h3>
                       <div className="flex items-center gap-2">
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100">
-                          {grupo.medalhasFiltradas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length} Concedida(s)
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm">
+                          🏅 {grupo.todasMedalhas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length} {grupo.todasMedalhas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length === 1 ? 'medalha concedida' : 'medalhas concedidas'}
                         </Badge>
-                        {grupo.medalhasFiltradas.some(m => normalizarStatusMedalha(m.status) === 'INDICADA') && (
-                          <Badge variant="outline" className="border-yellow-200 text-yellow-700 bg-yellow-50/50">
-                            Possui Indicação
+                        {grupo.todasMedalhas.some(m => normalizarStatusMedalha(m.status) === 'INDICADA') && (
+                          <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50 shadow-sm">
+                            ⚠ {grupo.todasMedalhas.filter(m => normalizarStatusMedalha(m.status) === 'INDICADA').length} {grupo.todasMedalhas.filter(m => normalizarStatusMedalha(m.status) === 'INDICADA').length === 1 ? 'indicação pendente' : 'indicações pendentes'}
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <p className="text-sm text-slate-500 mt-1">Mat: {grupo.militar_matricula} | {grupo.militar_unidade}</p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Mat: {grupo.militar_matricula}
+                      {grupo.militar_unidade && <span className="mx-2 text-slate-300">|</span>}
+                      {grupo.militar_unidade}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-4">
@@ -534,16 +550,17 @@ export default function Medalhas() {
                   <div className="space-y-6">
                     {/* Concedidas */}
                     {grupo.medalhasFiltradas.some(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA') && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
+                      <div className="mb-8">
+                        <div className="flex items-center gap-2 mb-4">
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Medalhas Concedidas</h4>
+                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Medalhas Concedidas</h4>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-left text-slate-500 border-b border-slate-100">
+                              <tr className="text-left text-slate-400 border-b border-slate-100">
                                 <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Tipo</th>
+                                <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Status</th>
                                 <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Indicação</th>
                                 <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Concessão</th>
                                 <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">DOEMS</th>
@@ -551,18 +568,23 @@ export default function Medalhas() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                              {grupo.medalhasFiltradas
+                              {grupo.todasMedalhas
                                 .filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA')
                                 .map((medalha) => (
                                   <tr key={medalha.id} className="group">
                                     <td className="py-4">
-                                      <p className="font-medium text-slate-700">{medalha.tipo_medalha_exibicao}</p>
+                                      <p className="font-bold text-slate-700">{medalha.tipo_medalha_exibicao}</p>
                                       {medalha.tipo_medalha_nome && medalha.tipo_medalha_nome !== medalha.tipo_medalha_exibicao && (
                                         <p className="text-[10px] text-slate-400">Legado: {medalha.tipo_medalha_nome}</p>
                                       )}
                                       {medalha.observacoes && (
                                         <p className="text-[11px] text-slate-500 mt-1 italic max-w-xs">{medalha.observacoes}</p>
                                       )}
+                                    </td>
+                                    <td className="py-4">
+                                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-[10px] font-bold">
+                                        CONCEDIDA
+                                      </Badge>
                                     </td>
                                     <td className="py-4 text-slate-600">{formatDate(medalha.data_indicacao)}</td>
                                     <td className="py-4 text-slate-600">
@@ -607,35 +629,36 @@ export default function Medalhas() {
 
                     {/* Indicações */}
                     {grupo.medalhasFiltradas.some(m => normalizarStatusMedalha(m.status) === 'INDICADA') && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Indicações Pendentes</h4>
+                      <div className="bg-amber-50/30 -mx-4 px-4 py-6 border-y border-amber-100/50">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Indicações Pendentes</h4>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-left text-slate-500 border-b border-slate-100">
-                                <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Tipo</th>
-                                <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Indicação</th>
+                              <tr className="text-left text-amber-600/60 border-b border-amber-100">
+                                <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Medalha Pretendida</th>
+                                <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Data da Indicação</th>
+                                <th className="pb-3 font-medium uppercase tracking-wider text-[10px]">Observações</th>
                                 <th className="pb-3 font-medium uppercase tracking-wider text-[10px] text-right">Ações</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
-                              {grupo.medalhasFiltradas
+                            <tbody className="divide-y divide-amber-50/50">
+                              {grupo.todasMedalhas
                                 .filter(m => normalizarStatusMedalha(m.status) === 'INDICADA')
                                 .map((medalha) => (
                                   <tr key={medalha.id} className="group">
                                     <td className="py-4">
-                                      <p className="font-medium text-slate-700">{medalha.tipo_medalha_exibicao}</p>
+                                      <p className="font-bold text-amber-900">{medalha.tipo_medalha_exibicao}</p>
                                       {medalha.tipo_medalha_nome && medalha.tipo_medalha_nome !== medalha.tipo_medalha_exibicao && (
-                                        <p className="text-[10px] text-slate-400">Legado: {medalha.tipo_medalha_nome}</p>
-                                      )}
-                                      {medalha.observacoes && (
-                                        <p className="text-[11px] text-slate-500 mt-1 italic max-w-xs">{medalha.observacoes}</p>
+                                        <p className="text-[10px] text-amber-600/70">Legado: {medalha.tipo_medalha_nome}</p>
                                       )}
                                     </td>
-                                    <td className="py-4 text-slate-600">{formatDate(medalha.data_indicacao)}</td>
+                                    <td className="py-4 text-amber-800">{formatDate(medalha.data_indicacao)}</td>
+                                    <td className="py-4 text-amber-700/80 text-[11px] italic max-w-xs">
+                                      {medalha.observacoes || '—'}
+                                    </td>
                                     <td className="py-4 text-right">
                                       {podeIndicar && (
                                         <div className="flex justify-end gap-1">
@@ -643,7 +666,7 @@ export default function Medalhas() {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => handleEditarMedalha(medalha)}
-                                            className="h-8 w-8 p-0 text-slate-400 hover:text-[#1e3a5f]"
+                                            className="h-8 w-8 p-0 text-amber-400 hover:text-amber-600 hover:bg-amber-100"
                                           >
                                             <Edit className="w-4 h-4" />
                                           </Button>
@@ -651,7 +674,7 @@ export default function Medalhas() {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => handleAbrirExcluirMedalha(medalha)}
-                                            className="h-8 w-8 p-0 text-slate-400 hover:text-red-600"
+                                            className="h-8 w-8 p-0 text-amber-400 hover:text-red-600 hover:bg-red-50"
                                           >
                                             <Trash2 className="w-4 h-4" />
                                           </Button>
