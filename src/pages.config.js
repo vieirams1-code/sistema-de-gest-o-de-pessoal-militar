@@ -119,6 +119,7 @@ import VisualizacaoGestorEfetivo from './pages/VisualizacaoGestorEfetivo';
 import Tags from './pages/Tags';
 import BackupSistema from './pages/BackupSistema';
 import CursosFormacao from './pages/CursosFormacao';
+import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import __Layout from './Layout.jsx';
 
 
@@ -195,6 +196,7 @@ export const PAGES = {
     "Tags": Tags,
     "BackupSistema": BackupSistema,
     "CursosFormacao": CursosFormacao,
+    "ConferenciasMilitares": ConferenciasMilitares,
 }
 
 export const pagesConfig = {
