@@ -190,6 +190,14 @@ export const permissionStructure = [
           { key: 'perm_executar_rotinas_administrativas', label: 'Executar Rotinas Administrativas', sensitive: true },
           { key: 'perm_visualizar_rotinas_globais_administrativas', label: 'Visualizar Rotinas Globais' }
         ]
+      },
+      {
+        key: 'acesso_conferencias_militares',
+        label: 'Conferência Cadastral de Militar',
+        actions: [
+          { key: 'perm_visualizar_conferencias_militares', label: 'Visualizar Conferências Militares' },
+          { key: 'perm_gerir_conferencias_militares', label: 'Gerir Conferências Militares', sensitive: true }
+        ]
       }
     ]
   },
