@@ -1,4 +1,3 @@
-
 /**
  * Helpers oficiais para leitura de Posto/Graduação e Quadro da entidade Militar.
  * Centraliza a lógica de prioridade de campos (oficial vs aliases) para evitar divergências.
@@ -66,3 +65,21 @@ export function getQuadroMilitar(militar) {
  * @deprecated Use getPostoGraduacaoMilitar
  */
 export const getPostoGraduacaoOficial = (m) => getPostoGraduacaoMilitar(m);
+
+/**
+ * Normaliza o objeto militar garantindo que `posto_graduacao` e `quadro`
+ * estejam preenchidos a partir do alias de maior prioridade disponível.
+ * Preserva os demais campos sem alteração.
+ */
+export function normalizarPostoGraduacaoMilitar(militar) {
+  if (!militar || typeof militar !== 'object') return militar;
+
+  const postoNormalizado = getPostoGraduacaoMilitar(militar);
+  const quadroNormalizado = getQuadroMilitar(militar);
+
+  return {
+    ...militar,
+    posto_graduacao: postoNormalizado || militar.posto_graduacao || '',
+    quadro: quadroNormalizado || militar.quadro || '',
+  };
+}
