@@ -1,0 +1,51 @@
+{
+  "name": "AuditCursoFormacao",
+  "type": "object",
+  "title": "Auditoria de Curso de Forma\u00e7\u00e3o",
+  "description": "Trilha de auditoria para todas as a\u00e7\u00f5es do m\u00f3dulo de Cursos de Forma\u00e7\u00e3o.",
+  "properties": {
+    "curso_id": {
+      "type": "string"
+    },
+    "participante_id": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "acao": {
+      "type": "string",
+      "description": "A\u00e7\u00e3o realizada (ex: criar_curso, adicionar_participante, alterar_status, remover_participante, cancelar_curso, encerrar_curso)"
+    },
+    "status_anterior": {
+      "type": "string"
+    },
+    "status_novo": {
+      "type": "string"
+    },
+    "dados_anteriores": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "dados_novos": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "justificativa": {
+      "type": "string"
+    },
+    "usuario_id": {
+      "type": "string"
+    },
+    "usuario_nome": {
+      "type": "string"
+    },
+    "data_hora": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "acao"
+  ]
+}

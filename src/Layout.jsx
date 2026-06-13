@@ -35,6 +35,7 @@ import {
   Pin,
   Tags as TagsIcon,
   Stethoscope,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -148,6 +149,7 @@ const menuGroups = [
             ],
           },
           { name: 'Medalhas', page: 'Medalhas', icon: Medal, viewPermission: 'visualizar_medalhas' },
+          { name: 'Cursos de Formação', page: 'CursosFormacao', icon: GraduationCap, moduleKey: 'cursos_formacao', actionKey: 'visualizar_cursos_formacao' },
           { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
         ],
       },

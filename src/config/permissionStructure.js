@@ -174,6 +174,14 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_cursos_formacao',
+        label: 'Cursos de Formação',
+        actions: [
+          { key: 'perm_visualizar_cursos_formacao', label: 'Visualizar Cursos de Formação' },
+          { key: 'perm_gerir_cursos_formacao', label: 'Gerir Cursos de Formação', sensitive: true }
+        ]
+      },
+      {
         key: 'acesso_rotinas_administrativas',
         label: 'Rotinas Administrativas',
         actions: [

@@ -1,0 +1,59 @@
+{
+  "name": "CursoFormacao",
+  "type": "object",
+  "title": "Curso de Forma\u00e7\u00e3o",
+  "description": "Curso de forma\u00e7\u00e3o (CFC/CFS) representando situa\u00e7\u00e3o transit\u00f3ria. N\u00c3O altera posto_graduacao do cadastro Militar.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do curso de forma\u00e7\u00e3o"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "CFC",
+        "CFS"
+      ],
+      "description": "Tipo do curso: CFC (Curso de Forma\u00e7\u00e3o de Cabos) ou CFS (Curso de Forma\u00e7\u00e3o de Sargentos)"
+    },
+    "turma_referencia": {
+      "type": "string",
+      "description": "Identificador da turma"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "aberto",
+        "em_andamento",
+        "encerrado",
+        "cancelado"
+      ],
+      "default": "aberto",
+      "description": "Status do curso"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_matricula": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da publica\u00e7\u00e3o do ato de matr\u00edcula"
+    },
+    "ato_publicacao": {
+      "type": "string",
+      "description": "Ato/portaria que publicou o curso"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome",
+    "tipo"
+  ]
+}

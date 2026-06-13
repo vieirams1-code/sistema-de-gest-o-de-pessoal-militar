@@ -99,6 +99,7 @@ const moduleGuardByPage = {
   RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração de Alterações Legado' },
   BackupSistema: { moduleName: 'Backup do Sistema' },
   DashboardAcervo: { actionKey: 'visualizar_acervo_historico', moduleName: 'Documentos Históricos' },
+  CursosFormacao: { moduleKey: 'cursos_formacao', actionKey: 'visualizar_cursos_formacao', moduleName: 'Cursos de Formação' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

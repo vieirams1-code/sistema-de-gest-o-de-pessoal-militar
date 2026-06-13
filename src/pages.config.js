@@ -118,6 +118,7 @@ import DetalhePromocao from './pages/DetalhePromocao';
 import VisualizacaoGestorEfetivo from './pages/VisualizacaoGestorEfetivo';
 import Tags from './pages/Tags';
 import BackupSistema from './pages/BackupSistema';
+import CursosFormacao from './pages/CursosFormacao';
 import __Layout from './Layout.jsx';
 
 
@@ -193,6 +194,7 @@ export const PAGES = {
     "VisualizacaoGestorEfetivo": VisualizacaoGestorEfetivo,
     "Tags": Tags,
     "BackupSistema": BackupSistema,
+    "CursosFormacao": CursosFormacao,
 }
 
 export const pagesConfig = {
