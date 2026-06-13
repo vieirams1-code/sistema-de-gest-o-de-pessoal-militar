@@ -174,10 +174,23 @@ Deno.serve(async (req) => {
           historico = await Historico.update(historico.id, { promocao_id: promocaoId });
         }
 
-        const atualizacaoMilitar = await Militar.update(item.militar_id, { posto_graduacao: texto(promocao.posto_graduacao), quadro: texto(promocao.quadro) }).catch(() => null);
-        if (!atualizacaoMilitar) throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId });
+        const atualizacaoMilitar = await Militar.update(item.militar_id, {
+          posto_graduacao: texto(promocao.posto_graduacao),
+          quadro: texto(promocao.quadro),
+        }).catch(() => null);
 
-        await PromocaoMilitar.update(item.id, { status: 'publicado', publicado: true, historico_promocao_v2_id: texto(historico?.id), atualizar_cadastro_militar: true, motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role.', resultado_aplicacao_cadastro: 'imediatamente_superior' });
+        if (!atualizacaoMilitar) {
+          throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId });
+        }
+
+        await PromocaoMilitar.update(item.id, {
+          status: 'publicado',
+          publicado: true,
+          historico_promocao_v2_id: texto(historico?.id),
+          atualizar_cadastro_militar: true,
+          motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role.',
+          resultado_aplicacao_cadastro: 'imediatamente_superior',
+        });
 
         historicos.push({ promocao_militar_id: item.id, historico_promocao_v2_id: texto(historico?.id) });
         militarIdsAfetados.add(militarId);
