@@ -112,9 +112,11 @@ export default function RotinasAdministrativas() {
   // Mutations
   const mutationSalvar = useMutation({
     mutationFn: (vars) => salvarRotina(vars.rotina, vars.usuario),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['rotinas-administrativas']);
+    onSuccess: (data) => {
+      console.log('[RotinasAdministrativas] mutationSalvar sucesso:', data);
+      queryClient.invalidateQueries({ queryKey: ['rotinas-administrativas'] });
       setIsEditModalOpen(false);
+      setActiveTab('rotinas');
       toast({ title: 'Sucesso', description: 'Rotina salva com sucesso.' });
     },
     onError: (error) => {
