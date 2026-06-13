@@ -54,7 +54,19 @@ Deno.serve(async (req) => {
       ativo: true
     });
     if (duplicados.length > 0 && !data.confirmar_duplicidade) {
-      return Response.json({ error: 'DUPLICIDADE_DETECTADA', documento: duplicados[0] }, { status: 409 });
+      const documento = duplicados[0];
+      return Response.json({
+        code: 'ARQUIVO_DUPLICADO',
+        message: 'Este arquivo já foi cadastrado para este militar.',
+        documento_existente: {
+          id: documento.id,
+          tipo_documento: documento.tipo_documento,
+          titulo: documento.titulo,
+          data_documento: documento.data_documento,
+          periodo_inicial: documento.periodo_inicial,
+          periodo_final: documento.periodo_final
+        }
+      }, { status: 409 });
     }
 
     // 3. Localizar militar

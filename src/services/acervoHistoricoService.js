@@ -1,22 +1,49 @@
 import { base44 } from '@/api/base44Client';
+import { AcervoHistoricoError } from './acervoHistoricoErrors.js';
+
+function extrairStatusErro(error, response) {
+  return response?.status || error?.status || error?.response?.status || null;
+}
+
+function extrairBodyErro(error, response) {
+  return response?.data || error?.response?.data || error?.data || error;
+}
+
+function criarErroAcervo(body, status) {
+  const code = body?.code || body?.error;
+  const documento_existente = body?.documento_existente || body?.documento;
+  const message = body?.message || body?.error || 'Erro ao salvar documento histórico.';
+  return new AcervoHistoricoError(message, { status, code, documento_existente, data: body });
+}
 
 /**
  * Cadastra um novo documento histórico no storage oficial do SGP/Base44.
  */
 export async function cadastrarDocumentoHistorico({ militar_id, tipo_documento, data, file }) {
-  // Invoca a função backend para gerenciar o upload e o salvamento do registro
-  const response = await base44.functions.invoke('gerirAcervoHistorico', {
-    militar_id,
-    tipo_documento,
-    data,
-    file
-  });
+  try {
+    // Invoca a função backend para gerenciar o upload e o salvamento do registro
+    const response = await base44.functions.invoke('gerirAcervoHistorico', {
+      militar_id,
+      tipo_documento,
+      data,
+      file
+    });
 
-  const body = response?.data ?? response;
-  if (body?.error) {
-    throw new Error(body.error);
+    const body = response?.data ?? response;
+    const status = extrairStatusErro(null, response);
+    if (body?.error || body?.code) {
+      throw criarErroAcervo(body, status);
+    }
+    return body;
+  } catch (error) {
+    if (error instanceof AcervoHistoricoError) throw error;
+    const body = extrairBodyErro(error);
+    const status = extrairStatusErro(error);
+    if (body?.error || body?.code) {
+      throw criarErroAcervo(body, status);
+    }
+    throw error;
   }
-  return body;
 }
 
 /**
