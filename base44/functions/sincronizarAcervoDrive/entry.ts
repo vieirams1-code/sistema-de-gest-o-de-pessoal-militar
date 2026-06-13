@@ -235,14 +235,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Caminho 2: Invocação manual/cron — exige admin
-    const authUser = await base44.auth.me();
-    if (!authUser || authUser.role !== 'admin') {
-      return Response.json({ error: 'Acesso restrito a administradores.' }, { status: 403 });
-    }
-
     const payload = await req.json().catch(() => ({}));
-    const { repositorio_id } = payload;
+    const { repositorio_id, automatico } = payload;
+
+    // Caminho 2: Invocação manual exige admin. Invocação automática (cron) é liberada.
+    if (!automatico) {
+      const authUser = await base44.auth.me();
+      if (!authUser || authUser.role !== 'admin') {
+        return Response.json({ error: 'Acesso restrito a administradores.' }, { status: 403 });
+      }
+    }
 
     let repositorios;
     if (repositorio_id) {

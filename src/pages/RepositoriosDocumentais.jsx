@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Database, Check, X, Server, Wifi, RefreshCw, Radio } from 'lucide-react';
+import { Plus, Pencil, Database, Check, X, Server, Wifi, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import {
@@ -110,33 +110,6 @@ export default function RepositoriosDocumentais() {
     },
     onError: (error) => {
       toast({ title: 'Falha na sincronização', description: error.message, variant: 'destructive' });
-    }
-  });
-
-  const ativarWatchMutation = useMutation({
-    mutationFn: async (repositorio_id) => {
-      const webhook_url = window.prompt(
-        'Informe a URL pública da função sincronizarAcervoDrive (necessária para o Drive enviar push notifications). Encontre em Dashboard → Code → Functions → sincronizarAcervoDrive.'
-      );
-      if (!webhook_url) throw new Error('URL do webhook não informada.');
-      const response = await base44.functions.invoke('gerirWatchDrive', {
-        action: 'renovar',
-        repositorio_id,
-        webhook_url
-      });
-      const body = response?.data ?? response;
-      if (body?.error) throw new Error(body.error);
-      return body;
-    },
-    onSuccess: (data) => {
-      const resumo = (data?.resultados || []).map(r => r.erro
-        ? `${r.repositorio}: ${r.erro}`
-        : `${r.repositorio}: watch ativo até ${new Date(r.expira).toLocaleString()}`
-      ).join(' | ');
-      toast({ title: 'Watch configurado', description: resumo || 'OK' });
-    },
-    onError: (error) => {
-      toast({ title: 'Falha ao ativar watch', description: error.message, variant: 'destructive' });
     }
   });
 
@@ -360,15 +333,6 @@ export default function RepositoriosDocumentais() {
                           title="Sincronizar agora (Drive → SGP)"
                         >
                           <RefreshCw className={`w-4 h-4 ${sincronizarMutation.isPending ? 'animate-spin' : ''}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => ativarWatchMutation.mutate(repo.id)}
-                          disabled={ativarWatchMutation.isPending}
-                          title="Ativar/Renovar Watch (push em tempo real)"
-                        >
-                          <Radio className={`w-4 h-4 ${ativarWatchMutation.isPending ? 'animate-pulse text-emerald-600' : ''}`} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(repo)}>
                           <Pencil className="w-4 h-4" />
