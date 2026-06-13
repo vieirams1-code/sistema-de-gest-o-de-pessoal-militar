@@ -1,8 +1,8 @@
 {
   "name": "AcervoFuncionalHistorico",
   "type": "object",
-  "title": "Acervo Funcional Histórico",
-  "description": "Metadados de documentos históricos do militar armazenados em repositório externo (Google Drive).",
+  "title": "Acervo Funcional Hist\u00f3rico",
+  "description": "Metadados de documentos hist\u00f3ricos do militar armazenados no storage do Base44.",
   "properties": {
     "militar_id": {
       "type": "string"
@@ -43,17 +43,25 @@
     "observacoes": {
       "type": "string"
     },
+    "arquivo_url": {
+      "type": "string",
+      "description": "URL do arquivo no storage do Base44."
+    },
     "repositorio_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado \u2014 Google Drive descontinuado."
     },
     "drive_folder_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado \u2014 Google Drive descontinuado."
     },
     "drive_file_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado \u2014 Google Drive descontinuado."
     },
     "drive_url": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado \u2014 Google Drive descontinuado. Use arquivo_url."
     },
     "usuario_cadastro": {
       "type": "string"
@@ -136,7 +144,6 @@
   },
   "required": [
     "militar_id",
-    "tipo_documento",
-    "drive_file_id"
+    "tipo_documento"
   ]
 }

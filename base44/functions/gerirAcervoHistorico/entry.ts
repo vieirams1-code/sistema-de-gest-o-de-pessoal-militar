@@ -85,6 +85,7 @@ Deno.serve(async (req) => {
       militar_id,
       tipo_documento,
       arquivo_url,
+      drive_url: arquivo_url,
       usuario_cadastro: authUser.email,
       status_documento: 'ATIVO',
       versao,
