@@ -110,6 +110,10 @@ const DEFAULT_GRID_COLUMN_WIDTH = 'minmax(180px, 1fr)';
 const SELECTION_COLUMN_WIDTH = '44px';
 const ACTIONS_COLUMN_WIDTH = '140px';
 
+// Postos virtuais (Curso de Formação ativo) — tratados client-side, pois o
+// backend só conhece o posto real. Operação atual = aluno.
+const POSTOS_VIRTUAIS_VALUES = new Set(['Aluno a Cabo', 'Aluno a Sargento']);
+
 const POSTOS_GRADUACOES_OPCOES = [
   { value: 'Coronel', label: 'Coronel' },
   { value: 'Tenente Coronel', label: 'Tenente Coronel' },
@@ -122,7 +126,9 @@ const POSTOS_GRADUACOES_OPCOES = [
   { value: '1º Sargento', label: '1º Sargento' },
   { value: '2º Sargento', label: '2º Sargento' },
   { value: '3º Sargento', label: '3º Sargento' },
+  { value: 'Aluno a Sargento', label: 'Aluno a Sargento' },
   { value: 'Cabo', label: 'Cabo' },
+  { value: 'Aluno a Cabo', label: 'Aluno a Cabo' },
   { value: 'Soldado', label: 'Soldado' },
 ];
 
@@ -300,7 +306,15 @@ export default function Militares() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const selectedPostos = debouncedPostos;
+  // Separa postos reais (filtrados no backend) dos virtuais (client-side).
+  const selectedPostos = useMemo(
+    () => debouncedPostos.filter((p) => !POSTOS_VIRTUAIS_VALUES.has(p)),
+    [debouncedPostos],
+  );
+  const postosVirtuaisSelecionados = useMemo(
+    () => debouncedPostos.filter((p) => POSTOS_VIRTUAIS_VALUES.has(p)),
+    [debouncedPostos],
+  );
 
   const effectiveEmail = getEffectiveEmail();
   const shouldQuery = isAccessResolved;
@@ -365,6 +379,7 @@ export default function Militares() {
     debugFieldsEnabled ? 'debugFields' : 'noDebugFields',
     lotacaoFilter,
     selectedPostos.join('|'),
+    postosVirtuaisSelecionados.join('|'),
     quadrosSelecionados.join('|'),
     condicaoFilter,
     movimentoFilter,
@@ -411,7 +426,14 @@ export default function Militares() {
       if (tagsSelecionadas.length > 0) payload.tagsIds = tagsSelecionadas.map(normalizeScopedId);
       if (gruposSelecionados.length > 0) payload.gruposIds = gruposSelecionados.map(normalizeScopedId);
       if (situacoesSelecionadas.length > 0) payload.situacaoMilitarFiltros = situacoesSelecionadas;
-      if (debouncedSearchTerm) {
+      // Termos puramente de graduação virtual / tipo de curso (CFC, CFS, Aluno a
+      // Cabo, Aluno a Sargento) não existem no backend — a busca por eles é
+      // resolvida client-side sobre o efetivo carregado. Para não zerar o
+      // resultado, NÃO enviamos esses termos como busca de backend.
+      const termoLower = String(debouncedSearchTerm || '').trim().toLowerCase();
+      const termoApenasVirtual = ['cfc', 'cfs', 'aluno a cabo', 'aluno a sargento']
+        .some((t) => t === termoLower);
+      if (debouncedSearchTerm && !termoApenasVirtual) {
         // O mesmo termo digitado é avaliado pelo backend como busca (nome,
         // nome_guerra, matricula) e também como busca em origem/destino.
         // Mantém o comportamento OR anterior (client-side) sem onerar a UI.
@@ -638,7 +660,36 @@ export default function Militares() {
 
   const filteredMilitares = useMemo(
     () => {
-      const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, allowedColumns, columnFilters);
+      // Operação atual = graduação virtual. Busca e filtro de posto consideram
+      // o posto de EXIBIÇÃO (aluno quando em curso ativo), não o posto real.
+      let baseList = filteredMilitaresComFuncoesTags;
+
+      // Filtro virtual (Aluno a Cabo / Aluno a Sargento) — client-side.
+      if (postosVirtuaisSelecionados.length > 0) {
+        const virtuaisSet = new Set(postosVirtuaisSelecionados);
+        baseList = baseList.filter((m) => virtuaisSet.has(m?.posto_graduacao_exibicao));
+      }
+
+      // Busca pela graduação virtual: complementa a busca de backend (nome /
+      // matrícula / origem-destino) para que termos como "Aluno a Cabo",
+      // "Aluno a Sargento", "CFC" ou "CFS" localizem o militar pela operação atual.
+      const termoBusca = String(debouncedSearchTerm || '').trim().toLowerCase();
+      if (termoBusca) {
+        baseList = baseList.filter((m) => {
+          // Mantém quem já casou no backend por nome/matrícula/origem.
+          const camposBackend = [m?.nome_completo, m?.nome_guerra, m?.matricula, m?.condicao_origem_destino, m?.destino]
+            .map((v) => String(v || '').toLowerCase());
+          const casouBackend = camposBackend.some((v) => v.includes(termoBusca));
+          // Adiciona casamento pela graduação virtual e tipo de curso.
+          const casouVirtual = m?.possui_posto_virtual && [
+            String(m?.posto_graduacao_exibicao || '').toLowerCase(),
+            String(m?.tipo_curso_formacao || '').toLowerCase(),
+          ].some((v) => v.includes(termoBusca));
+          return casouBackend || casouVirtual;
+        });
+      }
+
+      const filtradosPorColuna = applyColumnFilters(baseList, allowedColumns, columnFilters);
 
       const compararFallbackEstavel = (a, b) => {
         const nomeA = String(a?.nome || '').trim();
@@ -680,7 +731,7 @@ export default function Militares() {
         })
         .map((item) => item.militar);
     },
-    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters, ordemAntiguidadeMap],
+    [filteredMilitaresComFuncoesTags, allowedColumns, columnFilters, ordemAntiguidadeMap, postosVirtuaisSelecionados, debouncedSearchTerm],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, allowedColumns)), [columnFilters]);
   const hiddenColumnFilterKeys = useMemo(

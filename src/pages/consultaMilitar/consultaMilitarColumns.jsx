@@ -144,6 +144,25 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     accessor: (militar) => toText(militar?.matricula),
   },
   {
+    key: 'graduacao_origem_curso',
+    label: 'Graduação de origem no curso',
+    group: 'Carreira',
+    defaultVisible: false,
+    futureFilterType: 'text',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
+    minWidth: 200,
+    align: 'left',
+    nowrap: true,
+    // Dado técnico interno do vínculo do curso (auditoria / retorno em caso de
+    // reprovação/desligamento). Só tem valor quando há posto virtual ativo.
+    accessor: (militar) => (
+      militar?.possui_posto_virtual
+        ? toText(militar?.posto_graduacao_real || getPostoGraduacaoMilitar(militar))
+        : '—'
+    ),
+  },
+  {
     key: 'quadro',
     label: 'Quadro',
     group: 'Carreira',
