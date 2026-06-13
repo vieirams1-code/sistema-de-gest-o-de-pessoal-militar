@@ -100,23 +100,34 @@ export function getDecoracaoCursoMilitar(militar, participantesAtivos) {
 }
 
 /* ----------------------------------------------------------------------------
- * ORDENAÇÃO VIRTUAL (comparadora — ainda NÃO aplicada globalmente)
+ * ORDENAÇÃO VIRTUAL (comparadora)
  *
- * Hierarquia visual temporária:
- *   Soldado < Aluno a Cabo < Cabo < Aluno a Sargento < 3º Sargento
+ * Usa a hierarquia institucional COMPLETA (constants/postosGraduacoes) e apenas
+ * INSERE as posições virtuais nos pontos corretos:
+ *   ... Soldado < Aluno a Cabo < Cabo < Aluno a Sargento < 3º Sargento < ...
+ *
+ * Estratégia: o peso de cada posto oficial é o seu índice na hierarquia
+ * multiplicado por 10. As posições virtuais recebem um peso intermediário
+ * (índice do posto imediatamente inferior * 10 + 5), preservando todos os
+ * demais postos oficiais inalterados.
  * -------------------------------------------------------------------------- */
 
-// Peso visual temporário apenas para o trecho relevante da hierarquia.
-const PESO_HIERARQUIA_VIRTUAL = {
-  Soldado: 10,
-  [ALUNO_CABO]: 20,
-  Cabo: 30,
-  [ALUNO_SARGENTO]: 40,
-  '3º Sargento': 50,
+import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
+
+const PESO_POSTO_OFICIAL = new Map(
+  POSTOS_GRADUACOES_HIERARQUIA.map((posto, indice) => [posto, indice * 10]),
+);
+
+// Posições virtuais inseridas logo acima do posto base correspondente.
+const PESO_POSTO_VIRTUAL = {
+  [ALUNO_CABO]: (PESO_POSTO_OFICIAL.get('Soldado') ?? 0) + 5, // entre Soldado e Cabo
+  [ALUNO_SARGENTO]: (PESO_POSTO_OFICIAL.get('Cabo') ?? 0) + 5, // entre Cabo e 3º Sargento
 };
 
 function pesoPostoVirtual(posto) {
-  return PESO_HIERARQUIA_VIRTUAL[posto] ?? 0;
+  if (posto in PESO_POSTO_VIRTUAL) return PESO_POSTO_VIRTUAL[posto];
+  if (PESO_POSTO_OFICIAL.has(posto)) return PESO_POSTO_OFICIAL.get(posto);
+  return Number.MAX_SAFE_INTEGER; // postos desconhecidos vão para o fim
 }
 
 /**

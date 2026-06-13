@@ -186,6 +186,26 @@ function MilitarConsultaRow({
               </div>
             );
           }
+          if (key === 'posto_graduacao' && militar?.possui_posto_virtual) {
+            return (
+              <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`.trim()}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="truncate text-indigo-700 font-medium">{militar.posto_graduacao_exibicao}</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex shrink-0 items-center rounded border border-indigo-200 bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                        {militar.tipo_curso_formacao}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Posto virtual por matrícula em Curso de Formação</p>
+                      <p className="text-xs text-slate-400">Posto real: {militar.posto_graduacao_real || militar.posto_graduacao}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            );
+          }
           const value = columnMetaByKey.get(key)?.accessor?.(militar) || '—';
           return (
             <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`.trim()}>

@@ -62,6 +62,8 @@ import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
+import { carregarParticipantesAtivosPorMilitar, decorarMilitares } from '@/services/decorarMilitaresPostoVirtual';
+import { compararPorPostoVirtual } from '@/services/militarStatusVirtual';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -455,9 +457,23 @@ export default function Militares() {
   };
 
   const militares = militaresAcumulados;
-  const operacionais = useMemo(
+  const operacionaisBase = useMemo(
     () => filtrarMilitaresOperacionais(militares, { incluirInativos }),
     [militares, incluirInativos],
+  );
+
+  // Posto Virtual (Fase 2B) — decora militares com curso de formação ativo.
+  // Não altera o cadastro; apenas adiciona campos derivados de exibição.
+  const { data: participantesPostoVirtual } = useQuery({
+    queryKey: ['posto-virtual-participantes-ativos', effectiveEmail || 'self'],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery,
+    queryFn: () => carregarParticipantesAtivosPorMilitar(),
+  });
+
+  const operacionais = useMemo(
+    () => decorarMilitares(operacionaisBase, participantesPostoVirtual),
+    [operacionaisBase, participantesPostoVirtual],
   );
   const idsMilitaresCarregados = useMemo(
     () => operacionais.map((m) => String(m?.id || '')).filter(Boolean),
@@ -639,6 +655,17 @@ export default function Militares() {
       return filtradosPorColuna
         .map((militar, index) => ({ militar, index }))
         .sort((a, b) => {
+          // Precedência visual do posto de EXIBIÇÃO (insere posições virtuais
+          // Aluno a Cabo / Aluno a Sargento na hierarquia institucional completa).
+          // Não altera o cálculo oficial de antiguidade — só a ordem de exibição.
+          const postoVirtualA = a?.militar?.posto_graduacao_exibicao || a?.militar?.posto_graduacao;
+          const postoVirtualB = b?.militar?.posto_graduacao_exibicao || b?.militar?.posto_graduacao;
+          const ordemPosto = compararPorPostoVirtual(
+            { posto_exibicao: postoVirtualA, snapshot_antiguidade: a?.militar?.snapshot_antiguidade, ordem_antiguidade_origem: a?.militar?.ordem_antiguidade_origem },
+            { posto_exibicao: postoVirtualB, snapshot_antiguidade: b?.militar?.snapshot_antiguidade, ordem_antiguidade_origem: b?.militar?.ordem_antiguidade_origem },
+          );
+          if (ordemPosto !== 0) return ordemPosto;
+
           const posA = ordemAntiguidadeMap.get(String(a?.militar?.id || ''));
           const posB = ordemAntiguidadeMap.get(String(b?.militar?.id || ''));
           const ordemA = Number.isFinite(posA) ? posA : VALOR_AUSENTE_ORDENACAO;
