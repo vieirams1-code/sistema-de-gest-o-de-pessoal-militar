@@ -44,6 +44,16 @@ export function montarMensagemArquivoDuplicado(documento = {}) {
   return 'Este arquivo já foi cadastrado para este militar.';
 }
 
+export const TOAST_DUPLICIDADE_ACERVO_DURATION = 8000;
+
+export function getOpcoesToastErroAcervo(err = {}) {
+  if (err.status === 409 && err.code === 'ARQUIVO_DUPLICADO') {
+    return { duration: TOAST_DUPLICIDADE_ACERVO_DURATION };
+  }
+
+  return {};
+}
+
 export function criarMensagemErroAcervo(err = {}) {
   if (err.status === 409 && err.code === 'ARQUIVO_DUPLICADO') {
     const base = err.message || 'Este arquivo já foi cadastrado para este militar.';

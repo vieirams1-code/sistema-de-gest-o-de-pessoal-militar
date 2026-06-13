@@ -76,7 +76,7 @@ import {
   arquivarDefinitivamenteAcervo,
   listarHistoricoVersoes
 } from '@/services/acervoHistoricoService';
-import { criarMensagemErroAcervo } from '@/services/acervoHistoricoErrors';
+import { AcervoHistoricoError, criarMensagemErroAcervo, getOpcoesToastErroAcervo } from '@/services/acervoHistoricoErrors';
 
 const STATUS_COLORS = { 'Ativo': 'bg-emerald-100 text-emerald-700', 'Inativo': 'bg-slate-100 text-slate-700' };
 const MEDALHA_STATUS_COLORS = { 'Indicado': 'bg-yellow-100 text-yellow-700', 'Concedido': 'bg-green-100 text-green-700', 'Negado': 'bg-red-100 text-red-700' };
@@ -497,7 +497,12 @@ export default function VerMilitar() {
           results.push(res);
         } catch (err) {
           if (err.status === 409 && err.code === 'ARQUIVO_DUPLICADO') {
-            throw new Error(criarMensagemErroAcervo(err));
+            throw new AcervoHistoricoError(criarMensagemErroAcervo(err), {
+              status: err.status,
+              code: err.code,
+              documento_existente: err.documento_existente,
+              data: err.data
+            });
           }
           if (err.status === 409) {
             throw new Error(criarMensagemErroAcervo(err));
@@ -528,7 +533,12 @@ export default function VerMilitar() {
     },
     onError: (err) => {
       const description = criarMensagemErroAcervo(err);
-      toast({ title: 'Erro ao salvar documento(s)', description, variant: 'destructive' });
+      toast({
+        title: 'Erro ao salvar documento(s)',
+        description,
+        variant: 'destructive',
+        ...getOpcoesToastErroAcervo(err)
+      });
     }
   });
 
