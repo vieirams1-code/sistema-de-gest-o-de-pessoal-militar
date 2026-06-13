@@ -62,7 +62,7 @@ import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 import { getPosicaoOficialAntiguidadeFromCache } from '@/utils/antiguidade/getPosicaoOficialAntiguidade';
-import { carregarParticipantesAtivosPorMilitar, decorarMilitares } from '@/services/decorarMilitaresPostoVirtual';
+import { carregarParticipantesAtivosPorMilitar, decorarMilitares, listarMilitarIdsEmCursoAtivo } from '@/services/decorarMilitaresPostoVirtual';
 import { compararPorPostoVirtual } from '@/services/militarStatusVirtual';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
@@ -493,10 +493,66 @@ export default function Militares() {
     queryFn: () => carregarParticipantesAtivosPorMilitar(),
   });
 
-  const operacionais = useMemo(
+  const operacionaisCarregados = useMemo(
     () => decorarMilitares(operacionaisBase, participantesPostoVirtual),
     [operacionaisBase, participantesPostoVirtual],
   );
+
+  // Busca operacional por posto virtual deve alcançar TODOS os alunos em curso
+  // ativo, mesmo os que não estejam na página carregada. Quando o termo de busca
+  // ou o filtro indicam interesse em CFC/CFS / Aluno, identificamos os militar_id
+  // em curso e carregamos os que ainda faltam, mesclando-os sem duplicidade.
+  const termoBuscaLower = String(debouncedSearchTerm || '').trim().toLowerCase();
+  const interesseCfc = termoBuscaLower === 'cfc' || termoBuscaLower === 'aluno a cabo' || postosVirtuaisSelecionados.includes('Aluno a Cabo');
+  const interesseCfs = termoBuscaLower === 'cfs' || termoBuscaLower === 'aluno a sargento' || postosVirtuaisSelecionados.includes('Aluno a Sargento');
+  const buscaVirtualAtiva = interesseCfc || interesseCfs;
+
+  const idsCursoAlvo = useMemo(() => {
+    if (!buscaVirtualAtiva || !(participantesPostoVirtual instanceof Map)) return [];
+    const ids = new Set();
+    if (interesseCfc) listarMilitarIdsEmCursoAtivo(participantesPostoVirtual, { tipo: 'CFC' }).forEach((id) => ids.add(id));
+    if (interesseCfs) listarMilitarIdsEmCursoAtivo(participantesPostoVirtual, { tipo: 'CFS' }).forEach((id) => ids.add(id));
+    return Array.from(ids);
+  }, [buscaVirtualAtiva, interesseCfc, interesseCfs, participantesPostoVirtual]);
+
+  const idsCarregadosSet = useMemo(
+    () => new Set(operacionaisCarregados.map((m) => String(m?.id || ''))),
+    [operacionaisCarregados],
+  );
+  const idsCursoFaltantes = useMemo(
+    () => idsCursoAlvo.filter((id) => !idsCarregadosSet.has(id)),
+    [idsCursoAlvo, idsCarregadosSet],
+  );
+  const idsCursoFaltantesHash = idsCursoFaltantes.join('|');
+
+  const { data: militaresEmCursoFaltantes = [] } = useQuery({
+    queryKey: ['militares-em-curso-faltantes', effectiveEmail || 'self', idsCursoFaltantesHash],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery && idsCursoFaltantes.length > 0,
+    queryFn: async () => {
+      const { militares: lista } = await fetchScopedMilitares({
+        militarIds: idsCursoFaltantes,
+        includeFoto: false,
+        limit: idsCursoFaltantes.length,
+        offset: 0,
+      });
+      const enriquecidos = await carregarMilitaresComMatriculas(lista || []);
+      const comLotacao = enriquecidos.map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) }));
+      const operacionais = filtrarMilitaresOperacionais(comLotacao, { incluirInativos });
+      return decorarMilitares(operacionais, participantesPostoVirtual);
+    },
+  });
+
+  // Mescla carregados + faltantes (deduplica por id), preservando o conjunto base.
+  const operacionais = useMemo(() => {
+    if (!militaresEmCursoFaltantes.length) return operacionaisCarregados;
+    const mapa = new Map(operacionaisCarregados.map((m) => [String(m?.id || ''), m]));
+    militaresEmCursoFaltantes.forEach((m) => {
+      const id = String(m?.id || '');
+      if (id && !mapa.has(id)) mapa.set(id, m);
+    });
+    return Array.from(mapa.values());
+  }, [operacionaisCarregados, militaresEmCursoFaltantes]);
   const idsMilitaresCarregados = useMemo(
     () => operacionais.map((m) => String(m?.id || '')).filter(Boolean),
     [operacionais],

@@ -56,6 +56,23 @@ export async function carregarParticipantesAtivosPorMilitar() {
 }
 
 /**
+ * Retorna os militar_id (string) em curso de formação ativo, opcionalmente
+ * filtrados por tipo de curso ('CFC' | 'CFS'). Usado para mesclar alunos que
+ * não estejam na página carregada ao buscar por posto virtual.
+ * @param {Map} participantesPorMilitar Map militar_id -> participante (com tipo_curso)
+ * @param {{ tipo?: 'CFC'|'CFS' }} [opcoes]
+ */
+export function listarMilitarIdsEmCursoAtivo(participantesPorMilitar, { tipo } = {}) {
+  const mapa = participantesPorMilitar instanceof Map ? participantesPorMilitar : new Map();
+  const ids = [];
+  for (const [militarId, participante] of mapa.entries()) {
+    if (tipo && String(participante?.tipo_curso || '') !== tipo) continue;
+    if (militarId) ids.push(String(militarId));
+  }
+  return ids;
+}
+
+/**
  * Decora uma lista de militares com os campos derivados de posto virtual.
  * @param {Array} militares
  * @param {Map} participantesPorMilitar Map militar_id -> participante (com tipo_curso)
