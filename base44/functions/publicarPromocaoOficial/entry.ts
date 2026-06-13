@@ -8,6 +8,32 @@ const texto = (valor: unknown) => String(valor ?? '').trim();
 const normalizar = (valor: unknown) => texto(valor).toLowerCase();
 const dataSomente = (valor: unknown) => texto(valor).split('T')[0];
 
+// === Regra do Cadastro Presumidamente Correto ===
+// Hierarquia oficial de postos. O índice maior = posto superior.
+const POSTOS_HIERARQUIA = [
+  'Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente',
+  'Aspirante a Oficial', '2º Tenente', '1º Tenente', 'Capitão', 'Major',
+  'Tenente-Coronel', 'Coronel',
+];
+const chavePosto = (valor: unknown) => texto(valor)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[°º]/g, 'o').replace(/[-–—.]/g, ' ')
+  .replace(/\s+/g, ' ').trim().toLowerCase();
+const INDICE_POR_POSTO = new Map(POSTOS_HIERARQUIA.map((p, i) => [chavePosto(p), i]));
+const indicePosto = (valor: unknown) => {
+  const idx = INDICE_POR_POSTO.get(chavePosto(valor));
+  return Number.isInteger(idx) ? (idx as number) : -1;
+};
+// Retorna: 'superior' | 'igual' | 'inferior' | 'indefinido'
+function compararPromocaoComCadastro(postoPromocao: unknown, postoCadastro: unknown) {
+  const idxPromocao = indicePosto(postoPromocao);
+  const idxCadastro = indicePosto(postoCadastro);
+  if (idxPromocao === -1 || idxCadastro === -1) return 'indefinido';
+  if (idxPromocao > idxCadastro) return 'superior';
+  if (idxPromocao === idxCadastro) return 'igual';
+  return 'inferior';
+}
+
 const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ ?? new Set<string>();
 (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ = EXECUCOES_EM_ANDAMENTO;
 
@@ -176,36 +202,61 @@ Deno.serve(async (req) => {
           historico = await Historico.update(historico.id, { promocao_id: promocaoId });
         }
 
-        const atualizacaoMilitar = await atualizarCadastroMilitar(
-          base44,
-          militarId!,
-          {
-            posto_graduacao: texto(promocao.posto_graduacao),
-            quadro: texto(promocao.quadro),
-          },
-          {
-            executado_por: authUser?.email || 'sistema_publicacao',
-            origem: 'publicacao_oficial_promocao',
-            historico_id: historico?.id
-          }
-        ).catch(() => null);
+        // === Regra do Cadastro Presumidamente Correto ===
+        // Compara o posto da promoção com o posto ATUAL do cadastro do militar.
+        // Só atualiza o cadastro quando a promoção for SUPERIOR (avanço hierárquico).
+        const comparacaoCadastro = compararPromocaoComCadastro(
+          texto(promocao.posto_graduacao),
+          texto(militarEncontrado?.posto_graduacao)
+        );
 
-        if (!atualizacaoMilitar || !atualizacaoMilitar.success) {
-          throw montarErro({
-            etapa: 'atualizar_militar',
-            motivo: atualizacaoMilitar?.erro_api || 'update_militar_falhou',
-            promocao_id: promocaoId,
-            item_id: itemId
-          });
+        let resultadoAplicacao = 'cadastro_preservado';
+        let motivoAplicacao = 'Cadastro atual preservado (superior ao evento histórico).';
+
+        if (comparacaoCadastro === 'superior') {
+          const atualizacaoMilitar = await atualizarCadastroMilitar(
+            base44,
+            militarId!,
+            {
+              posto_graduacao: texto(promocao.posto_graduacao),
+              quadro: texto(promocao.quadro),
+            },
+            {
+              executado_por: authUser?.email || 'sistema_publicacao',
+              origem: 'publicacao_oficial_promocao',
+              historico_id: historico?.id
+            }
+          ).catch(() => null);
+
+          if (!atualizacaoMilitar || !atualizacaoMilitar.success) {
+            throw montarErro({
+              etapa: 'atualizar_militar',
+              motivo: atualizacaoMilitar?.erro_api || 'update_militar_falhou',
+              promocao_id: promocaoId,
+              item_id: itemId
+            });
+          }
+          resultadoAplicacao = 'imediatamente_superior';
+          motivoAplicacao = 'Cadastro atualizado por publicação oficial (promoção superior ao cadastro atual).';
+        } else if (comparacaoCadastro === 'igual') {
+          resultadoAplicacao = 'atual';
+          motivoAplicacao = 'Cadastro já compatível com a promoção publicada.';
+        } else if (comparacaoCadastro === 'indefinido') {
+          resultadoAplicacao = 'revisao';
+          motivoAplicacao = 'Posto da promoção ou do cadastro não reconhecido. Verifique manualmente.';
+          warnings.push({ etapa: 'aplicar_cadastro', motivo: 'comparacao_indefinida', promocao_id: promocaoId, item_id: itemId, militar_id: militarId });
+        } else {
+          // inferior: cadastro preservado (não rebaixar automaticamente)
+          warnings.push({ etapa: 'aplicar_cadastro', motivo: 'cadastro_preservado_superior_ao_historico', promocao_id: promocaoId, item_id: itemId, militar_id: militarId });
         }
 
         await PromocaoMilitar.update(item.id, {
           status: 'publicado',
           publicado: true,
           historico_promocao_v2_id: texto(historico?.id),
-          atualizar_cadastro_militar: true,
-          motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role com confirmação de persistência.',
-          resultado_aplicacao_cadastro: 'imediatamente_superior',
+          atualizar_cadastro_militar: comparacaoCadastro === 'superior',
+          motivo_atualizacao_cadastro: motivoAplicacao,
+          resultado_aplicacao_cadastro: resultadoAplicacao,
         });
 
         historicos.push({ promocao_militar_id: item.id, historico_promocao_v2_id: texto(historico?.id) });

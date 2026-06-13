@@ -177,11 +177,15 @@ Deno.serve(async (req) => {
 
     const resumo = {
       analisados: 0,
-      atualizados: 0, // "atualizados confirmados"
-      compativeis: 0, // "já compatíveis"
+      atualizados: 0, // atualizações automáticas (histórico superior ao cadastro)
+      compativeis: 0, // histórico igual ao cadastro
+      cadastros_preservados: 0, // histórico inferior ao cadastro (cadastro atual mantido)
+      divergencias_criticas: 0, // casos indefinidos que exigem análise humana
       ignorados: 0,
-      falhas: [] as any[], // "falhas de atualização"
+      falhas: [] as any[], // falhas de atualização
       divergencias: [] as any[],
+      cadastros_preservados_detalhe: [] as any[],
+      divergencias_criticas_detalhe: [] as any[],
       stort_debug: null as any
     };
 
@@ -256,11 +260,34 @@ Deno.serve(async (req) => {
       const idxAtual = INDICE_POR_POSTO.get(obterPostoCanonico(postoAtualRaw)) ?? -1;
       const idxNovo = INDICE_POR_POSTO.get(obterPostoCanonico(ultimoHistorico.posto_graduacao_novo)) ?? -1;
 
-      // Regra: Não rebaixar se o cadastro atual for MAIS RECENTE que o histórico.
-      if (idxNovo < idxAtual && idxNovo !== -1 && idxAtual !== -1) {
-          debug.descartados.rebaixamento++;
-          resumo.ignorados++;
-          continue;
+      // === Regra do Cadastro Presumidamente Correto ===
+      // Divergência crítica: algum dos postos não foi reconhecido na hierarquia.
+      if (idxAtual === -1 || idxNovo === -1) {
+        resumo.divergencias_criticas++;
+        resumo.divergencias_criticas_detalhe.push({
+          militar_id: mid,
+          nome: militar.nome_completo || militar.nome_guerra || 'Militar ' + mid,
+          matricula: militar.matricula,
+          posto_cadastro: postoAtualRaw,
+          posto_historico: ultimoHistorico.posto_graduacao_novo,
+          motivo: 'Posto do cadastro ou do histórico não reconhecido na hierarquia.'
+        });
+        continue;
+      }
+
+      // Cadastro preservado: histórico INFERIOR ao cadastro atual (nunca rebaixar).
+      if (idxNovo < idxAtual) {
+        debug.descartados.rebaixamento++;
+        resumo.cadastros_preservados++;
+        resumo.cadastros_preservados_detalhe.push({
+          militar_id: mid,
+          nome: militar.nome_completo || militar.nome_guerra || 'Militar ' + mid,
+          matricula: militar.matricula,
+          posto_cadastro: postoAtualRaw,
+          posto_historico: ultimoHistorico.posto_graduacao_novo,
+          mensagem: 'Cadastro atual superior ao histórico. Nenhuma ação automática realizada.'
+        });
+        continue;
       }
 
       const infoMilitar = {
