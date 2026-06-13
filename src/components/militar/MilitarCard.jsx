@@ -35,6 +35,7 @@ const postoAbreviado = {
 };
 
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '@/utils/militarPostoGraduacao';
 
 export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
   const { hasAccess, hasSelfAccess } = useCurrentUser();
@@ -64,9 +65,9 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {militar.posto_graduacao && (
+                  {getPostoGraduacaoMilitar(militar) && (
                     <span className="text-sm font-bold text-[#1e3a5f]">
-                      {postoAbreviado[militar.posto_graduacao] || militar.posto_graduacao}
+                      {postoAbreviado[getPostoGraduacaoMilitar(militar)] || getPostoGraduacaoMilitar(militar)}
                     </span>
                   )}
                   <h3 className="font-semibold text-slate-900 truncate">
@@ -127,8 +128,8 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit
               {militar.matricula && (
                 <span>Mat: {militar.matricula}</span>
               )}
-              {militar.quadro && (
-                <span>{militar.quadro}</span>
+              {getQuadroMilitar(militar) && (
+                <span>{getQuadroMilitar(militar)}</span>
               )}
             </div>
           </div>

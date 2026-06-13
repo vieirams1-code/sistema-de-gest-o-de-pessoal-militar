@@ -1,5 +1,7 @@
-export const resolvePostoGraduacao = (m = {}) => String(m.posto_graduacao || m.posto_grad || m.posto || m.graduacao || '').toUpperCase();
-export const toQuadro = (m = {}) => String(m.quadro || m.condicao || m.situacao || 'Não informada').toUpperCase();
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '../militarPostoGraduacao.js';
+
+export const resolvePostoGraduacao = (m = {}) => String(getPostoGraduacaoMilitar(m)).toUpperCase();
+export const toQuadro = (m = {}) => String(getQuadroMilitar(m)).toUpperCase();
 
 const isTemporario = (m = {}) => /(TEMP|VOLUNT|CONTRAT|QOETBM|QOSTBM|QPTBM)/i.test([m.condicao, m.quadro, m.situacao, m.vinculo, m.tipo_vinculo, m.regime].join(' '));
 const isOficial = (m = {}) => /(CEL|TCEL|MAJ|CAP|TEN|ASP|QOBM|QAOBM|QOEBM|QOSAU|OFICIAL|CORONEL)/i.test(`${resolvePostoGraduacao(m)} ${toQuadro(m)}`);
