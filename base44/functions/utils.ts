@@ -34,8 +34,13 @@ export async function atualizarCadastroMilitar(
 
   const matricula = String(militarAntes.matricula || '');
 
-  // Mapeamento de campos redundantes/alias identificados no sistema
-  const camposPosto = ['posto_graduacao', 'posto_graduacao_atual', 'posto_grad', 'posto', 'graduacao'];
+  // Mapeamento de campos redundantes/alias identificados no sistema.
+  // IMPORTANTE:
+  // - 'posto_graduacao' e 'quadro' são os campos OFICIAIS da entidade Militar.
+  // - 'posto_graduação' (acentuado) é um alias legado/acidental.
+  // - Outros campos são aliases históricos.
+  // A atualização de todos é necessária para garantir compatibilidade temporária com UI e views legadas.
+  const camposPosto = ['posto_graduacao', 'posto_graduação', 'posto_graduacao_atual', 'posto_grad', 'posto', 'graduacao'];
   const camposQuadro = ['quadro', 'quadro_atual', 'militar_quadro'];
 
   const payload: Record<string, string> = {};
