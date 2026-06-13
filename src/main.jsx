@@ -28,6 +28,9 @@ import {
   Tag,
   MilitarTag,
   FeriasTag,
+  RotinaAdministrativa,
+  ExecucaoRotinaAdministrativa,
+  ItemExecucaoRotinaAdministrativa,
 } from '@/api/entities'
 
 
@@ -57,6 +60,9 @@ void TagGrupo;
 void Tag;
 void MilitarTag;
 void FeriasTag;
+void RotinaAdministrativa;
+void ExecucaoRotinaAdministrativa;
+void ItemExecucaoRotinaAdministrativa;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   // <React.StrictMode>
