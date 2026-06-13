@@ -1,0 +1,30 @@
+{
+  "name": "ItemConferenciaMilitar",
+  "type": "object",
+  "title": "Item de Conferência Militar",
+  "description": "Item individual do checklist de conferência cadastral.",
+  "properties": {
+    "conferencia_id": { "type": "string" },
+    "militar_id": { "type": "string" },
+    "categoria": { "type": "string" },
+    "titulo": { "type": "string" },
+    "descricao": { "type": "string" },
+    "ordem": { "type": "number", "default": 0 },
+    "obrigatorio": { "type": "boolean", "default": true },
+    "status": {
+      "type": "string",
+      "enum": ["pendente", "em_andamento", "conferido", "cadastrado", "nao_possui", "nao_localizado", "revisar", "pendente_justificado"],
+      "default": "pendente"
+    },
+    "observacao": { "type": "string" },
+    "entidade_relacionada": { "type": "string" },
+    "entidade_relacionada_id": { "type": "string" },
+    "documento_referencia": { "type": "string" },
+    "responsavel_id": { "type": "string" },
+    "responsavel_nome": { "type": "string" },
+    "data_conferencia": { "type": "string", "format": "date-time" },
+    "created_date": { "type": "string", "format": "date-time" },
+    "updated_date": { "type": "string", "format": "date-time" }
+  },
+  "required": ["conferencia_id", "titulo", "status"]
+}

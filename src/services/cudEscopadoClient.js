@@ -51,6 +51,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RotinaAdministrativa',
   'ExecucaoRotinaAdministrativa',
   'ItemExecucaoRotinaAdministrativa',
+  'ConferenciaMilitar',
+  'ItemConferenciaMilitar',
 ]);
 
 
