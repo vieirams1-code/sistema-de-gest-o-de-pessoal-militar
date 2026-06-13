@@ -17,6 +17,7 @@ import {
 } from '@/services/matriculaMilitarViewService';
 import { fetchScopedMilitares, getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { getPostoGraduacaoMilitar } from '@/utils/militarPostoGraduacao';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const normalizeTipo = (tipo) => {
@@ -614,7 +615,7 @@ export default function LotacaoMilitares() {
                           {isSelected ? <CheckSquare className="w-5 h-5 text-blue-600 shrink-0" /> : <Square className="w-5 h-5 text-slate-300 shrink-0" />}
                           <div className="min-w-0">
                             <p className="text-sm font-bold text-slate-800 truncate">
-                              <span className="text-blue-700/80 mr-1">{m.posto_graduacao}</span>
+                              <span className="text-blue-700/80 mr-1">{getPostoGraduacaoMilitar(m)}</span>
                               {m.nome_completo}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">

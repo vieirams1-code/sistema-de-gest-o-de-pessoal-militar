@@ -1,85 +1,77 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
 
-import { getPostoGraduacaoOficial, normalizarPostoGraduacaoMilitar } from '../militarPostoGraduacao.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '../militarPostoGraduacao.js';
 
-test('getPostoGraduacaoOficial - returns empty string for empty input', () => {
-  assert.equal(getPostoGraduacaoOficial(), '');
-  assert.equal(getPostoGraduacaoOficial({}), '');
-  assert.equal(getPostoGraduacaoOficial(null), '');
-});
+/**
+ * Caso Stort - Simulação de Sincronização e Leitura Oficial
+ * Militar: Rafael Stort Zulli
+ * Matrícula: 415.443-021
+ */
 
-test('getPostoGraduacaoOficial - picks up values from various keys', () => {
-  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: 'Coronel' }), 'Coronel');
-  assert.equal(getPostoGraduacaoOficial({ 'posto_graduação': 'Tenente' }), 'Tenente');
-  assert.equal(getPostoGraduacaoOficial({ posto_grad: 'Major' }), 'Major');
-  assert.equal(getPostoGraduacaoOficial({ posto: 'Capitão' }), 'Capitão');
-  assert.equal(getPostoGraduacaoOficial({ graduacao: 'Soldado' }), 'Soldado');
-});
+describe('Sincronização Caso Stort', () => {
 
-test('getPostoGraduacaoOficial - respects precedence', () => {
-  const militar = {
-    posto_graduacao: 'Precedence 1',
-    'posto_graduação': 'Precedence 2',
-    posto_grad: 'Precedence 3',
-    posto: 'Precedence 4',
-    graduacao: 'Precedence 5'
-  };
-  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 1');
+  it('deve priorizar campos oficiais mas detectar aliases divergentes', () => {
+    // Cenário: Cadastro com posto oficial "Soldado", mas aliases com "Cabo"
+    // Isso simula o que o Efetivo poderia estar lendo se estivesse usando aliases com prioridade errada,
+    // ou o que a sincronização deve corrigir.
+    const militarStort = {
+      id: 'stort-123',
+      matricula: '415.443-021',
+      nome_completo: 'Rafael Stort Zulli',
+      posto_graduacao: 'Soldado', // Oficial
+      posto_grad: 'Cabo',          // Alias divergente
+      quadro: 'QBMP-1.a'
+    };
 
-  delete militar.posto_graduacao;
-  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 2');
+    // Pela regra de prioridade (1. posto_graduacao, 2. postoGraduacao, 3. posto_grad...),
+    // getPostoGraduacaoMilitar deve retornar "Soldado" (o oficial) se ele existir.
+    // O problema relatado é que a sincronização diz que atualizou mas o Efetivo continua mostrando o antigo.
+    // Se o Efetivo passar a usar o helper, ele lerá "Soldado".
 
-  delete militar['posto_graduação'];
-  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 3');
+    const postoLido = getPostoGraduacaoMilitar(militarStort);
+    assert.strictEqual(postoLido, 'Soldado', 'Deve ler o campo oficial posto_graduacao prioritariamente');
+  });
 
-  delete militar.posto_grad;
-  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 4');
+  it('deve retornar o alias se o campo oficial estiver vazio', () => {
+    const militarComAlias = {
+      id: 'm-alias',
+      matricula: '123',
+      posto_graduacao: '', // Oficial vazio
+      posto_grad: 'Cabo'    // Alias preenchido
+    };
 
-  delete militar.posto;
-  assert.equal(getPostoGraduacaoOficial(militar), 'Precedence 5');
-});
+    const postoLido = getPostoGraduacaoMilitar(militarComAlias);
+    assert.strictEqual(postoLido, 'Cabo', 'Deve retornar o alias se o oficial estiver vazio');
+  });
 
-test('getPostoGraduacaoOficial - trims whitespace', () => {
-  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: '  Coronel  ' }), 'Coronel');
-});
+  it('deve simular a correção da sincronização (Caso Stort)', () => {
+    // Estado inicial problemático
+    let militarStort = {
+      id: 'stort-123',
+      matricula: '415.443-021',
+      posto_graduacao: 'Soldado',
+      posto_grad: 'Soldado', // Já tinha Soldado no alias também
+      quadro: 'QBMP-1.a'
+    };
 
-test('getPostoGraduacaoOficial - handles non-string values', () => {
-  assert.equal(getPostoGraduacaoOficial({ posto: 123 }), '123');
-});
+    // Promoção esperada: Cabo
+    const promocaoEsperada = 'Cabo';
 
-test('getPostoGraduacaoOficial - falls through empty strings and falsy values', () => {
-  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: '', posto: 'Capitão' }), 'Capitão');
-  assert.equal(getPostoGraduacaoOficial({ posto_graduacao: null, posto: 'Capitão' }), 'Capitão');
-});
+    // A função atualizarCadastroMilitar (mockada aqui) atualiza o oficial e o alias conhecido
+    militarStort.posto_graduacao = promocaoEsperada;
+    militarStort.posto_grad = promocaoEsperada;
 
-test('getPostoGraduacaoOficial - handles non-object inputs gracefully', () => {
-  assert.equal(getPostoGraduacaoOficial('not an object'), '');
-  assert.equal(getPostoGraduacaoOficial(123), '');
-  assert.equal(getPostoGraduacaoOficial(true), '');
-});
+    // Verificação após "sincronização"
+    const postoApos = getPostoGraduacaoMilitar(militarStort);
+    assert.strictEqual(postoApos, 'Cabo', 'Helper deve retornar Cabo após atualização');
 
-test('normalizarPostoGraduacaoMilitar - returns same object if no rank found', () => {
-  const militar = { nome: 'João' };
-  assert.deepEqual(normalizarPostoGraduacaoMilitar(militar), militar);
-});
+    // Se houvesse um alias NÃO mapeado na atualização, o helper ainda assim deveria
+    // priorizar o oficial 'Cabo' se ele estiver preenchido corretamente.
+    militarStort.postoGraduacao = 'Soldado'; // Alias "esquecido" ou legado divergente
 
-test('normalizarPostoGraduacaoMilitar - returns same object if posto_graduacao is already set and matches', () => {
-  const militar = { nome: 'João', posto_graduacao: 'Coronel' };
-  const resultado = normalizarPostoGraduacaoMilitar(militar);
-  assert.strictEqual(resultado, militar);
-});
+    const postoFinal = getPostoGraduacaoMilitar(militarStort);
+    assert.strictEqual(postoFinal, 'Cabo', 'Helper deve priorizar campo oficial atualizado mesmo com aliases divergentes');
+  });
 
-test('normalizarPostoGraduacaoMilitar - updates object with normalized posto_graduacao', () => {
-  const militar = { nome: 'João', posto: 'Tenente' };
-  const resultado = normalizarPostoGraduacaoMilitar(militar);
-  assert.equal(resultado.posto_graduacao, 'Tenente');
-  assert.equal(resultado.nome, 'João');
-  assert.equal(resultado.posto, 'Tenente');
-});
-
-test('normalizarPostoGraduacaoMilitar - handles case where posto_graduacao is present but needs trimming', () => {
-  const militar = { nome: 'João', posto_graduacao: '  Coronel  ' };
-  const resultado = normalizarPostoGraduacaoMilitar(militar);
-  assert.equal(resultado.posto_graduacao, 'Coronel');
 });

@@ -6,6 +6,7 @@ import { consolidarSaudeMilitar } from './militarSaudeService.js';
 import { consolidarFerias } from './militarFeriasService.js';
 import { getDocumentosUnificados } from './militarDocumentosService.js';
 import { calcularCompletudeMilitar } from './completudeMilitarService.js';
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '../utils/militarPostoGraduacao.js';
 
 /**
  * Monta o bundle de informações da Ficha 360º do Militar.
@@ -36,8 +37,8 @@ export function montarMilitar360Bundle({
     matricula: militar?.matricula || 'Sem matrícula',
     cpf: militar?.cpf || 'Não informado',
     rg: militar?.rg || 'Não informado',
-    postoGraduacao: militar?.posto_graduacao || 'Não informado',
-    quadro: militar?.quadro || 'Não informado',
+    postoGraduacao: getPostoGraduacaoMilitar(militar),
+    quadro: getQuadroMilitar(militar),
     foto: militar?.foto || null,
   };
 
@@ -81,7 +82,7 @@ export function montarMilitar360Bundle({
   });
   const carreira = {
     ...carreiraConsolidada,
-    postoAtual: militar?.posto_graduacao || 'Não informado',
+    postoAtual: getPostoGraduacaoMilitar(militar),
     dataUltimaPromocao: carreiraConsolidada.promocaoAtual?.data_promocao || null,
     proximaPromocaoEstimada: 'Não calculado',
     historicoResumido: carreiraConsolidada.historicoPromocoes.slice(0, 3),
