@@ -1,5 +1,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import {
+  criarMensagemErroAcervo,
+  montarMensagemArquivoDuplicado,
+} from '../acervoHistoricoErrors.js';
 
 // Mock mínimo do backend oficial de upload do acervo.
 const mockBase44 = {
@@ -81,5 +85,43 @@ describe('Acervo Historico Service', () => {
     ]);
 
     assert.deepStrictEqual(contadores, { alteracoes: 1, certidoes: 1, diversos: 0, total: 2, lixeira: 1 });
+  });
+});
+
+
+describe('Tratamento de duplicidade do acervo histórico', () => {
+  test('formata duplicidade de Certidão de Comportamento', () => {
+    assert.strictEqual(
+      montarMensagemArquivoDuplicado({ tipo_documento: 'CERTIDAO_COMPORTAMENTO', data_documento: '2000-01-01' }),
+      'Arquivo já cadastrado como Certidão de Comportamento em 01/01/2000.'
+    );
+  });
+
+  test('formata duplicidade de Alteração', () => {
+    assert.strictEqual(
+      montarMensagemArquivoDuplicado({ tipo_documento: 'ALTERACAO', periodo_inicial: '2020-01-01', periodo_final: '2020-12-31' }),
+      'Arquivo já cadastrado como Alteração referente ao período de 01/01/2020 a 31/12/2020.'
+    );
+  });
+
+  test('formata duplicidade de Diversos', () => {
+    assert.strictEqual(
+      montarMensagemArquivoDuplicado({ tipo_documento: 'DIVERSOS', titulo: 'Portaria interna' }),
+      'Arquivo já cadastrado como Diversos: Portaria interna.'
+    );
+  });
+
+  test('usa mensagem segura para 409 genérico desconhecido', () => {
+    assert.strictEqual(
+      criarMensagemErroAcervo({ status: 409, message: 'Request failed with status code 409' }),
+      'Não foi possível salvar o documento por conflito de dados. Verifique se o arquivo já está cadastrado.'
+    );
+  });
+
+  test('usa mensagem base quando documento_existente está ausente', () => {
+    assert.strictEqual(
+      criarMensagemErroAcervo({ status: 409, code: 'ARQUIVO_DUPLICADO', message: 'Este arquivo já foi cadastrado para este militar.' }),
+      'Este arquivo já foi cadastrado para este militar.'
+    );
   });
 });
