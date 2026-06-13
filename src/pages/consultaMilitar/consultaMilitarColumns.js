@@ -53,6 +53,8 @@ const getFirstFromPaths = (obj, paths = []) => {
   return null;
 };
 
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '../../utils/militarPostoGraduacao.js';
+
 const buildEndereco = (militar) => {
   const logradouro = getFirst(militar, ['logradouro', 'endereco_logradouro']);
   const numero = getFirst(militar, ['numero', 'endereco_numero']);
@@ -79,7 +81,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     minWidth: 140,
     align: 'left',
     nowrap: true,
-    accessor: (militar) => toText(militar?.posto_graduacao, 'Sem posto'),
+    accessor: (militar) => getPostoGraduacaoMilitar(militar),
   },
   {
     key: 'nome',
@@ -144,7 +146,7 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     minWidth: 120,
     align: 'left',
     nowrap: true,
-    accessor: (militar) => toText(militar?.quadro),
+    accessor: (militar) => getQuadroMilitar(militar),
   },
   {
     key: 'antiguidade_ordem',

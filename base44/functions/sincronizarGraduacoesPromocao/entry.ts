@@ -33,6 +33,53 @@ const normalizar = (valor: unknown) => {
     .toLowerCase();
 };
 
+const ALIASES_POSTO = [
+  'posto_graduacao',
+  'postoGraduacao',
+  'posto_grad',
+  'posto_graduacao_atual',
+  'posto',
+  'graduacao',
+  'rank'
+];
+
+const ALIASES_QUADRO = [
+  'quadro',
+  'quadro_atual',
+  'quadroAtual',
+  'quadro_militar',
+  'militar_quadro',
+  'qbmp'
+];
+
+function getPostoGraduacaoMilitar(militar: any) {
+  if (!militar) return { valor: '', campo: 'N/A' };
+  for (const campo of ALIASES_POSTO) {
+    const valor = militar[campo];
+    if (valor && String(valor).trim()) {
+      if (campo !== 'posto_graduacao') {
+         console.warn(`[MilitarPostoGraduacao] Alias utilizado: militarId=${militar.id || 'N/A'} matricula=${militar.matricula || 'N/A'} campo=${campo}`);
+      }
+      return { valor: String(valor).trim(), campo };
+    }
+  }
+  return { valor: '', campo: 'N/A' };
+}
+
+function getQuadroMilitar(militar: any) {
+  if (!militar) return { valor: '', campo: 'N/A' };
+  for (const campo of ALIASES_QUADRO) {
+    const valor = militar[campo];
+    if (valor && String(valor).trim()) {
+      if (campo !== 'quadro') {
+         console.warn(`[MilitarPostoGraduacao] Alias utilizado: militarId=${militar.id || 'N/A'} matricula=${militar.matricula || 'N/A'} campo=${campo}`);
+      }
+      return { valor: String(valor).trim(), campo };
+    }
+  }
+  return { valor: '', campo: 'N/A' };
+}
+
 const toTime = (value: unknown) => {
   if (!value) return Number.NEGATIVE_INFINITY;
   const ts = new Date(value as string).getTime();
@@ -174,8 +221,12 @@ Deno.serve(async (req) => {
 
       const ultimoHistorico = [...mHistoricos].sort(compararHistoricosDesc)[0];
 
-      const postoAtual = normalizar(militar.posto_graduacao);
-      const quadroAtual = normalizar(militar.quadro);
+      const postoAtualResult = getPostoGraduacaoMilitar(militar);
+      const quadroAtualResult = getQuadroMilitar(militar);
+      const postoAtualRaw = postoAtualResult.valor;
+      const quadroAtualRaw = quadroAtualResult.valor;
+      const postoAtual = normalizar(postoAtualRaw);
+      const quadroAtual = normalizar(quadroAtualRaw);
       const postoNovo = normalizar(ultimoHistorico.posto_graduacao_novo);
       const quadroNovo = normalizar(ultimoHistorico.quadro_novo);
 
@@ -187,7 +238,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const idxAtual = INDICE_POR_POSTO.get(obterPostoCanonico(militar.posto_graduacao)) ?? -1;
+      const idxAtual = INDICE_POR_POSTO.get(obterPostoCanonico(postoAtualRaw)) ?? -1;
       const idxNovo = INDICE_POR_POSTO.get(obterPostoCanonico(ultimoHistorico.posto_graduacao_novo)) ?? -1;
 
       // Regra: Não rebaixar se o cadastro atual for MAIS RECENTE que o histórico.
@@ -223,7 +274,9 @@ Deno.serve(async (req) => {
           contexto: {
             executado_por: authUser.email,
             origem: 'sincronizacao_automatica_promocoes',
-            historico_id: ultimoHistorico.id
+            historico_id: ultimoHistorico.id,
+            posto_anterior: postoAtualRaw,
+            quadro_anterior: quadroAtualRaw
           }
         });
       }
@@ -233,24 +286,35 @@ Deno.serve(async (req) => {
       for (const update of pendingUpdates) {
         try {
           const result = await atualizarCadastroMilitar(base44, update.militarId, update.dados, update.contexto);
-          if (result.success) {
+
+          // Re-leitura obrigatória para validação via helpers
+          const militarRefreshed = await base44.asServiceRole.entities.Militar.get(update.militarId);
+          const postoAposResult = getPostoGraduacaoMilitar(militarRefreshed);
+          const quadroAposResult = getQuadroMilitar(militarRefreshed);
+          const postoApos = postoAposResult.valor;
+          const quadroApos = quadroAposResult.valor;
+
+          const verificadoPosto = normalizar(postoApos) === normalizar(update.dados.posto_graduacao);
+          const verificadoQuadro = normalizar(quadroApos) === normalizar(update.dados.quadro);
+
+          if (result.success && verificadoPosto && verificadoQuadro) {
             resumo.atualizados++;
           } else {
-            // Requisito 4: Return in "falhas" with specific fields
-            for (const u of result.updates) {
-                if (!u.confirmado || result.erro_api) {
-                    resumo.falhas.push({
-                        militar: update.nome,
-                        matricula: result.matricula,
-                        militar_id: update.militarId,
-                        campo_tentado: u.campo,
-                        valor_anterior: u.anterior,
-                        valor_esperado: u.esperado,
-                        valor_apos_releitura: u.apos_releitura,
-                        erro_api: result.erro_api
-                    });
-                }
-            }
+            resumo.falhas.push({
+              militar: update.nome,
+              matricula: result.matricula,
+              militar_id: update.militarId,
+              posto_antes: update.contexto.posto_anterior,
+              posto_esperado: update.dados.posto_graduacao,
+              posto_apos_releitura: postoApos,
+              campo_utilizado_posto: postoAposResult.campo,
+              quadro_antes: update.contexto.quadro_anterior,
+              quadro_esperado: update.dados.quadro,
+              quadro_apos_releitura: quadroApos,
+              campo_utilizado_quadro: quadroAposResult.campo,
+              erro_api: result.erro_api,
+              verificacao_falhou: !(verificadoPosto && verificadoQuadro)
+            });
           }
         } catch (err: any) {
           resumo.falhas.push({

@@ -1,20 +1,68 @@
-export function getPostoGraduacaoOficial(militar = {}) {
-  return String(
-    militar?.posto_graduacao
-    || militar?.['posto_graduação']
-    || militar?.posto_grad
-    || militar?.posto
-    || militar?.graduacao
-    || ''
-  ).trim();
+
+/**
+ * Helpers oficiais para leitura de Posto/Graduação e Quadro da entidade Militar.
+ * Centraliza a lógica de prioridade de campos (oficial vs aliases) para evitar divergências.
+ */
+
+const ALIASES_POSTO = [
+  'posto_graduacao',
+  'postoGraduacao',
+  'posto_grad',
+  'posto_graduacao_atual',
+  'posto',
+  'graduacao',
+  'rank'
+];
+
+const ALIASES_QUADRO = [
+  'quadro',
+  'quadro_atual',
+  'quadroAtual',
+  'quadro_militar',
+  'militar_quadro',
+  'qbmp'
+];
+
+/**
+ * Obtém o Posto/Graduação do militar seguindo a ordem de prioridade.
+ */
+export function getPostoGraduacaoMilitar(militar) {
+  if (!militar) return '';
+
+  for (const campo of ALIASES_POSTO) {
+    const valor = militar[campo];
+    if (valor && String(valor).trim()) {
+      if (campo !== 'posto_graduacao') {
+        console.warn(`[MilitarPostoGraduacao] Alias utilizado: militarId=${militar.id || 'N/A'} matricula=${militar.matricula || 'N/A'} campo=${campo}`);
+      }
+      return String(valor).trim();
+    }
+  }
+
+  return '';
 }
 
-export function normalizarPostoGraduacaoMilitar(militar = {}) {
-  const postoGraduacao = getPostoGraduacaoOficial(militar);
-  if (!postoGraduacao) return militar;
-  if (militar?.posto_graduacao === postoGraduacao) return militar;
-  return {
-    ...militar,
-    posto_graduacao: postoGraduacao,
-  };
+/**
+ * Obtém o Quadro do militar seguindo a ordem de prioridade.
+ */
+export function getQuadroMilitar(militar) {
+  if (!militar) return '';
+
+  for (const campo of ALIASES_QUADRO) {
+    const valor = militar[campo];
+    if (valor && String(valor).trim()) {
+      if (campo !== 'quadro') {
+        console.warn(`[MilitarPostoGraduacao] Alias utilizado: militarId=${militar.id || 'N/A'} matricula=${militar.matricula || 'N/A'} campo=${campo}`);
+      }
+      return String(valor).trim();
+    }
+  }
+
+  return '';
 }
+
+/**
+ * Alias para manter compatibilidade com chamadas existentes.
+ * @deprecated Use getPostoGraduacaoMilitar
+ */
+export const getPostoGraduacaoOficial = (m) => getPostoGraduacaoMilitar(m);

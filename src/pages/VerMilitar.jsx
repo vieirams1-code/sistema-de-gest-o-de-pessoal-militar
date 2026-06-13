@@ -59,7 +59,7 @@ import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularP
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
-import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
+import { getPostoGraduacaoMilitar, getQuadroMilitar, getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
 import CoberturaHistorica from '@/components/militar/CoberturaHistorica';
@@ -768,8 +768,8 @@ export default function VerMilitar() {
                 <div className="grid grid-cols-2 gap-x-4">
                   <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
                   <InfoItem label="Matrícula atual" value={militarEnriquecido?.matricula_atual || militar.matricula} />
-                  <InfoItem label="Posto/Graduação" value={postoGraduacaoMilitar} />
-                  <InfoItem label="Quadro" value={militar.quadro} />
+                  <InfoItem label="Posto/Graduação" value={getPostoGraduacaoMilitar(militar)} />
+                  <InfoItem label="Quadro" value={getQuadroMilitar(militar)} />
                   <InfoItem label="Situação" value={militar.situacao_militar} />
                   <InfoItem label="Condição" value={militar.condicao} />
                   <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
@@ -1764,7 +1764,7 @@ export default function VerMilitar() {
                 {militar.nome_guerra && <p className="text-white/80">{militar.nome_completo}</p>}
                 <div className="flex flex-wrap gap-4 mt-3 text-sm text-white/80">
                   {(militarEnriquecido?.matricula_atual || militar.matricula) && <span>Mat. atual: {militarEnriquecido?.matricula_atual || militar.matricula}</span>}
-                  {militar.quadro && <span>Quadro: {militar.quadro}</span>}
+                  <span>Quadro: {getQuadroMilitar(militar)}</span>
                   {militar.lotacao && <span>Lotação: {militar.lotacao}</span>}
                   {militar.funcao && <span>Função: {militar.funcao}</span>}
                 </div>

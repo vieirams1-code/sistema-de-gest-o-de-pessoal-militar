@@ -1,4 +1,5 @@
 import { normalizarQuadroLegado } from '../../utils/postoQuadroCompatibilidade.js';
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '../../utils/militarPostoGraduacao.js';
 
 const MATRICULA_FIELDS = ['matricula_atual', 'matricula'];
 const LOTACAO_NOME_FIELDS = [
@@ -34,7 +35,7 @@ export function getLotacaoNomeEfetivo(militar = {}) {
 }
 
 export function getQuadroEfetivo(militar = {}) {
-  return normalizarQuadroLegado(militar?.quadro) || normalizarTextoCampo(militar?.quadro);
+  return normalizarQuadroLegado(getQuadroMilitar(militar)) || normalizarTextoCampo(getQuadroMilitar(militar));
 }
 
 export const EXTRACAO_EFETIVO_FIELDS = Object.freeze({
@@ -45,7 +46,7 @@ export const EXTRACAO_EFETIVO_FIELDS = Object.freeze({
     defaultVisible: true,
     displayOrder: 10,
     category: 'Identificação',
-    accessor: (militar) => normalizarTextoCampo(militar?.posto_graduacao),
+    accessor: (militar) => normalizarTextoCampo(getPostoGraduacaoMilitar(militar)),
     sortable: true,
     sortType: 'postoGraduacao',
     sortRank: 10,

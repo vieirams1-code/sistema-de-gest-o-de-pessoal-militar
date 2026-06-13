@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Eye, Pencil, Trash2, CalendarClock, Car, HeartPulse, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { isQuadroComDestaque } from '@/utils/postoQuadroCompatibilidade';
+import { getQuadroMilitar } from '@/utils/militarPostoGraduacao';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import CondicaoBadge from '@/components/militar/CondicaoBadge';
@@ -67,7 +68,7 @@ function MilitarConsultaRow({
   onAskDelete,
 }) {
   const navigate = useNavigate();
-  const destacarQuadro = isQuadroComDestaque(militar?.quadro);
+  const destacarQuadro = isQuadroComDestaque(getQuadroMilitar(militar));
 
   return (
     <div
