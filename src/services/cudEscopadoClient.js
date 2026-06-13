@@ -47,7 +47,6 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TagGrupo',
   'Tag',
   'AcervoFuncionalHistorico',
-  'RepositorioDocumental',
 ]);
 
 

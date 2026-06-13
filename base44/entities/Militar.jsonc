@@ -330,10 +330,6 @@
         "Unidade"
       ],
       "description": "Tipo do n\u00f3 da estrutura ao qual o militar est\u00e1 lotado"
-    },
-    "link_alteracoes_anteriores": {
-      "type": "string",
-      "description": "Link para pasta no Drive com altera\u00e7\u00f5es anteriores do militar"
     }
   },
   "required": [

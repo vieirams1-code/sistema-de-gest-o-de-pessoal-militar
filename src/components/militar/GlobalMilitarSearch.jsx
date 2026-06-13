@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, UserRound, BadgeCheck, Hash, Building2, ArrowRight, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ export default function GlobalMilitarSearch() {
     || canAccessAction('visualizar_ferias')
     || canAccessAction('visualizar_medalhas')
     || canAccessAction('visualizar_registros_militar')
+    || canAccessAction('visualizar_acervo_historico')
   );
 
   const { data: militaresAcessiveis = [], isLoading } = useQuery({
@@ -90,7 +92,32 @@ export default function GlobalMilitarSearch() {
         includeFoto: false,
       });
       const enriquecidos = await carregarMilitaresComMatriculas(militares);
-      return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
+      const militaresOperacionais = filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
+      const resultadosMilitares = militaresOperacionais.map((militar) => ({ type: 'militar', id: `militar-${militar.id}`, data: militar }));
+
+      if (!canAccessAction('visualizar_acervo_historico')) return resultadosMilitares;
+
+      const termo = debouncedTerm.toLowerCase();
+      const [documentos, todosMilitares] = await Promise.all([
+        base44.entities.AcervoFuncionalHistorico.list(),
+        base44.entities.Militar.list(),
+      ]);
+      const militarPorId = new Map(todosMilitares.map((militar) => [militar.id, militar]));
+      const resultadosDocumentos = documentos
+        .filter((doc) => doc?.ativo !== false && doc?.status_documento === 'ATIVO')
+        .map((doc) => ({ ...doc, militar: militarPorId.get(doc.militar_id) }))
+        .filter((doc) => {
+          const militar = doc.militar || {};
+          const texto = [doc.titulo, doc.observacoes, doc.tipo_documento, militar.nome_guerra, militar.nome_completo, militar.matricula]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return texto.includes(termo);
+        })
+        .slice(0, Math.max(0, RESULT_LIMIT - resultadosMilitares.length))
+        .map((doc) => ({ type: 'documento', id: `documento-${doc.id}`, data: doc }));
+
+      return [...resultadosMilitares, ...resultadosDocumentos];
     },
     enabled: isAccessResolved && hasAnyPermissaoAtalho && debouncedTerm.length > 0,
     staleTime: 2 * 60 * 1000,
@@ -115,7 +142,16 @@ export default function GlobalMilitarSearch() {
     });
   }, [resultados.length, showDropdown]);
 
-  const handleSelect = (militar) => {
+  const handleSelect = (item) => {
+    if (item?.type === 'documento') {
+      const militarId = item.data?.militar_id;
+      if (!militarId) return;
+      navigate(`${createPageUrl('VerMilitar')}?id=${militarId}&tab=acervo-historico`);
+      setShowDropdown(false);
+      return;
+    }
+
+    const militar = item?.type === 'militar' ? item.data : item;
     if (!militar?.id) return;
     navigate(`${createPageUrl('VerMilitar')}?id=${militar.id}`);
     setShowDropdown(false);
@@ -164,7 +200,7 @@ export default function GlobalMilitarSearch() {
 
       return (
         <div
-          key={militar.id}
+          key={`militar-${militar.id}`}
           role="option"
           aria-selected={selected}
           tabIndex={-1}
@@ -235,7 +271,7 @@ export default function GlobalMilitarSearch() {
       const doc = item.data;
       return (
         <div
-          key={doc.id}
+          key={`documento-${doc.id}`}
           role="option"
           aria-selected={selected}
           tabIndex={-1}
@@ -252,6 +288,7 @@ export default function GlobalMilitarSearch() {
                 <span className="text-[10px] text-slate-400">{doc.data_documento ? format(new Date(doc.data_documento + 'T00:00:00'), "dd/MM/yyyy") : ''}</span>
               </div>
               <p className="truncate text-sm font-semibold text-slate-900">{doc.titulo || 'Documento sem título'}</p>
+              <p className="truncate text-xs text-slate-500">{doc.militar?.nome_guerra || doc.militar?.nome_completo || 'Militar não identificado'} · {doc.militar?.matricula || 'sem matrícula'}</p>
               {doc.observacoes && <p className="truncate text-xs text-slate-500">{doc.observacoes}</p>}
             </div>
           </div>

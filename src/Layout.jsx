@@ -31,12 +31,10 @@ import {
   History,
   UserCircle2,
   ListOrdered,
-  BarChart3,
   PanelLeftClose,
   Pin,
   Tags as TagsIcon,
   Stethoscope,
-  Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -113,16 +111,10 @@ const menuGroups = [
           { name: 'Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
           { name: 'Conciliação', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
           {
-            name: 'Acervo Histórico',
+            name: 'Documentos Históricos',
             page: 'DashboardAcervo',
             icon: Archive,
-            actionKey: 'gerir_acervo_historico',
-            children: [
-              { name: 'Painel Operacional', page: 'DashboardAcervo', icon: BarChart3, actionKey: 'gerir_acervo_historico' },
-              { name: 'Importação em Lote', page: 'ImportacaoLoteAcervo', icon: FileUp, actionKey: 'gerir_acervo_historico' },
-              { name: 'Fila de Revisão', page: 'RevisaoAcervo', icon: ShieldCheck, actionKey: 'gerir_acervo_historico' },
-              { name: 'Auditoria de Integridade', page: 'AuditoriaAcervo', icon: Shield, actionKey: 'gerir_acervo_historico' },
-            ],
+            actionKey: 'visualizar_acervo_historico',
           },
         ],
       },
