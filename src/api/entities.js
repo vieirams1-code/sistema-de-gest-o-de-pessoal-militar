@@ -36,3 +36,7 @@ export const TagGrupo = base44.entities.TagGrupo;
 export const Tag = base44.entities.Tag;
 export const MilitarTag = base44.entities.MilitarTag;
 export const FeriasTag = base44.entities.FeriasTag;
+
+export const RotinaAdministrativa = base44.entities.RotinaAdministrativa;
+export const ExecucaoRotinaAdministrativa = base44.entities.ExecucaoRotinaAdministrativa;
+export const ItemExecucaoRotinaAdministrativa = base44.entities.ItemExecucaoRotinaAdministrativa;
