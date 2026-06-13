@@ -1,8 +1,8 @@
 {
   "name": "AcervoFuncionalHistorico",
   "type": "object",
-  "title": "Acervo Funcional Hist\u00f3rico",
-  "description": "Metadados de documentos hist\u00f3ricos do militar armazenados no storage do Base44.",
+  "title": "Acervo Funcional Histórico",
+  "description": "Metadados de documentos históricos do militar armazenados no storage do Base44.",
   "properties": {
     "militar_id": {
       "type": "string"
@@ -47,22 +47,6 @@
       "type": "string",
       "description": "URL do arquivo no storage do Base44."
     },
-    "repositorio_id": {
-      "type": "string",
-      "description": "Campo legado \u2014 Google Drive descontinuado."
-    },
-    "drive_folder_id": {
-      "type": "string",
-      "description": "Campo legado \u2014 Google Drive descontinuado."
-    },
-    "drive_file_id": {
-      "type": "string",
-      "description": "Campo legado \u2014 Google Drive descontinuado."
-    },
-    "drive_url": {
-      "type": "string",
-      "description": "Campo legado \u2014 Google Drive descontinuado. Use arquivo_url."
-    },
     "usuario_cadastro": {
       "type": "string"
     },
@@ -104,41 +88,6 @@
       "type": "integer"
     },
     "matricula_utilizada": {
-      "type": "string"
-    },
-    "origem_documento_fisico": {
-      "type": "string"
-    },
-    "digitalizado_por": {
-      "type": "string"
-    },
-    "digitalizado_em": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "conferido_por": {
-      "type": "string"
-    },
-    "conferido_em": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "observacoes_conferencia": {
-      "type": "string"
-    },
-    "confianca_identificacao": {
-      "type": "string",
-      "enum": [
-        "ALTA",
-        "MEDIA",
-        "BAIXA"
-      ]
-    },
-    "validado": {
-      "type": "boolean",
-      "default": false
-    },
-    "importacao_id": {
       "type": "string"
     }
   },

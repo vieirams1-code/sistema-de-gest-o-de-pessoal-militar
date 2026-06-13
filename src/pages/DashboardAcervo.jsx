@@ -1,187 +1,255 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { createPageUrl } from '@/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Archive, CheckCircle2, FileText, Search, Trash2, Users, XCircle } from 'lucide-react';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
-  BarChart3,
-  Users,
-  FileText,
-  History,
-  AlertTriangle,
-  CheckCircle2
-} from 'lucide-react';
-import { format } from 'date-fns';
+  calcularIndicadoresAcervo,
+  filtrarResumoAcervo,
+  montarResumoAcervoPorMilitar,
+  TIPOS_DOCUMENTAIS_ACERVO,
+} from '@/services/acervoHistoricoService';
+
+const tipoOptions = [
+  { value: 'TODOS', label: 'Todos' },
+  { value: TIPOS_DOCUMENTAIS_ACERVO.ALTERACAO, label: 'Alterações' },
+  { value: TIPOS_DOCUMENTAIS_ACERVO.CERTIDAO_COMPORTAMENTO, label: 'Certidões' },
+  { value: TIPOS_DOCUMENTAIS_ACERVO.DIVERSOS, label: 'Diversos' },
+];
+
+const situacaoOptions = [
+  { value: 'TODAS', label: 'Todas' },
+  { value: 'COMPLETA', label: 'Documentação completa' },
+  { value: 'PARCIAL', label: 'Documentação parcial' },
+  { value: 'SEM_DOCUMENTACAO', label: 'Sem documentação' },
+];
 
 export default function DashboardAcervo() {
-  const { data: stats } = useQuery({
-    queryKey: ['acervo-stats'],
-    queryFn: async () => {
-      const acervo = await base44.entities.AcervoFuncionalHistorico.list();
-      const militares = await base44.entities.Militar.list();
-      const importacoes = await base44.entities.ImportacaoAcervo.list('-data_inicio', 5);
-
-      const comAcervo = new Set(acervo.map(a => a.militar_id)).size;
-
-      return {
-        totalDocumentos: acervo.length,
-        militaresComAcervo: comAcervo,
-        militaresSemAcervo: militares.length - comAcervo,
-        totalMilitares: militares.length,
-        pendenciasRevisao: acervo.filter(a => !a.validado || a.confianca_identificacao === 'BAIXA').length,
-        duplicidades: acervo.filter(a => a.status_documento === 'SUBSTITUIDO').length,
-        ultimasImportacoes: importacoes
-      };
-    }
+  const { canAccessAction } = useCurrentUser();
+  const [filtros, setFiltros] = React.useState({
+    nome: '',
+    matricula: '',
+    unidade: '',
+    tipo_documental: 'TODOS',
+    situacao: 'TODAS',
   });
+
+  const podeVisualizarAcervo = canAccessAction('visualizar_acervo_historico');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard-acervo-simplificado'],
+    queryFn: async () => {
+      const [acervo, militares] = await Promise.all([
+        base44.entities.AcervoFuncionalHistorico.list(),
+        base44.entities.Militar.list(),
+      ]);
+      const linhas = montarResumoAcervoPorMilitar({ militares, acervo });
+      return { linhas, indicadores: calcularIndicadoresAcervo(linhas) };
+    },
+    enabled: podeVisualizarAcervo,
+  });
+
+  const linhasFiltradas = React.useMemo(
+    () => filtrarResumoAcervo(data?.linhas || [], filtros),
+    [data?.linhas, filtros],
+  );
+
+  const atualizarFiltro = (campo, valor) => setFiltros((prev) => ({ ...prev, [campo]: valor }));
+
+  if (!podeVisualizarAcervo) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="py-10 text-center text-slate-600">
+            Sem permissão para visualizar o acervo histórico.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const indicadores = data?.indicadores || {};
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-[#1e3a5f] mb-2 flex items-center gap-2">
-          <BarChart3 className="w-6 h-6" /> Painel Operacional da Digitalização
+          <Archive className="w-6 h-6" /> Documentos Históricos
         </h1>
-        <p className="text-slate-500">Métricas e acompanhamento do Acervo Funcional Histórico</p>
+        <p className="text-slate-500">Gestão centralizada do complemento eletrônico dos assentamentos funcionais físicos.</p>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-4">
-        <MetricCard
-          title="Militares com Acervo"
-          value={stats?.militaresComAcervo}
-          subtitle={`${Math.round((stats?.militaresComAcervo / stats?.totalMilitares) * 100) || 0}% do efetivo`}
-          icon={Users}
-          color="emerald"
-        />
-        <MetricCard
-          title="Militares sem Acervo"
-          value={stats?.militaresSemAcervo}
-          subtitle="Aguardando digitalização"
-          icon={Users}
-          color="amber"
-        />
-        <MetricCard
-          title="Total Documentos"
-          value={stats?.totalDocumentos}
-          subtitle="Arquivos no Drive"
-          icon={FileText}
-          color="blue"
-        />
-        <MetricCard
-          title="Pendências de Revisão"
-          value={stats?.pendenciasRevisao}
-          subtitle="Confiança baixa ou manual"
-          icon={AlertTriangle}
-          color="red"
-        />
+      <div className="grid md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <MetricCard title="Militares com documentos" value={indicadores.militaresComDocumentos} icon={Users} color="emerald" />
+        <MetricCard title="Militares sem documentos" value={indicadores.militaresSemDocumentos} icon={Users} color="amber" />
+        <MetricCard title="Total de Alterações" value={indicadores.totalAlteracoes} icon={FileText} color="blue" />
+        <MetricCard title="Total de Certidões" value={indicadores.totalCertidoes} icon={FileText} color="indigo" />
+        <MetricCard title="Total de Diversos" value={indicadores.totalDiversos} icon={FileText} color="slate" />
+        <MetricCard title="Documentos na lixeira" value={indicadores.documentosLixeira} icon={Trash2} color="red" />
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <History className="w-5 h-5 text-blue-600" /> Últimas Importações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Arquivos</TableHead>
-                  <TableHead className="text-right">Sucesso</TableHead>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2 text-[#1e3a5f]"><Search className="w-5 h-5" /> Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-5 gap-4">
+          <FilterInput label="Nome" value={filtros.nome} onChange={(v) => atualizarFiltro('nome', v)} />
+          <FilterInput label="Matrícula" value={filtros.matricula} onChange={(v) => atualizarFiltro('matricula', v)} />
+          <FilterInput label="Unidade" value={filtros.unidade} onChange={(v) => atualizarFiltro('unidade', v)} />
+          <SelectFilter label="Tipo documental" value={filtros.tipo_documental} options={tipoOptions} onChange={(v) => atualizarFiltro('tipo_documental', v)} />
+          <SelectFilter label="Situação" value={filtros.situacao} options={situacaoOptions} onChange={(v) => atualizarFiltro('situacao', v)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg text-[#1e3a5f]">Efetivo e documentação histórica</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Militar</TableHead>
+                <TableHead>Matrícula</TableHead>
+                <TableHead>Unidade</TableHead>
+                <TableHead className="text-right">Qtd Alterações</TableHead>
+                <TableHead className="text-right">Qtd Certidões</TableHead>
+                <TableHead className="text-right">Qtd Diversos</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-slate-500">Carregando documentos históricos...</TableCell></TableRow>
+              ) : linhasFiltradas.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-slate-500">Nenhum militar encontrado para os filtros selecionados.</TableCell></TableRow>
+              ) : linhasFiltradas.map((linha) => (
+                <TableRow key={linha.militar_id}>
+                  <TableCell className="font-medium">{linha.nome || linha.nome_completo || '-'}</TableCell>
+                  <TableCell>{linha.matricula || '-'}</TableCell>
+                  <TableCell>{linha.unidade || '-'}</TableCell>
+                  <TableCell className="text-right">{linha.alteracoes}</TableCell>
+                  <TableCell className="text-right">{linha.certidoes}</TableCell>
+                  <TableCell className="text-right">{linha.diversos}</TableCell>
+                  <TableCell className="text-right font-bold">{linha.total}</TableCell>
+                  <TableCell className="text-right">
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={`${createPageUrl('VerMilitar')}?id=${linha.militar_id}&tab=acervo-historico`}>Abrir acervo</Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stats?.ultimasImportacoes?.map(imp => (
-                  <TableRow key={imp.id}>
-                    <TableCell className="text-sm">
-                      {format(new Date(imp.data_inicio), 'dd/MM/yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell className="text-sm">{imp.usuario}</TableCell>
-                    <TableCell>
-                      <Badge className={
-                        imp.status === 'CONCLUIDA' ? 'bg-emerald-100 text-emerald-700' :
-                        imp.status === 'PROCESSANDO' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
-                      }>
-                        {imp.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-sm font-bold">{imp.total_arquivos}</TableCell>
-                    <TableCell className="text-right text-sm text-emerald-600 font-bold">{imp.importados}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" /> Cobertura Documental
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <CoverageItem label="Cobertura Completa" value={stats?.militaresComAcervo} total={stats?.totalMilitares} color="bg-emerald-500" />
-            <CoverageItem label="Cobertura Parcial" value={0} total={stats?.totalMilitares} color="bg-amber-500" />
-            <CoverageItem label="Sem Acervo" value={stats?.militaresSemAcervo} total={stats?.totalMilitares} color="bg-slate-300" />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg text-[#1e3a5f]">Pendências de Digitalização</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-4 gap-4">
+            <MetricCard title="Efetivo total" value={indicadores.efetivoTotal} icon={Users} color="slate" compact />
+            <MetricCard title="Com documentação completa" value={indicadores.documentacaoCompleta} icon={CheckCircle2} color="emerald" compact />
+            <MetricCard title="Com documentação parcial" value={indicadores.documentacaoParcial} icon={FileText} color="amber" compact />
+            <MetricCard title="Sem documentação" value={indicadores.semDocumentacao} icon={XCircle} color="red" compact />
+          </div>
 
-            <div className="pt-4 border-t">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-slate-500">Meta de Digitalização</span>
-                <span className="font-bold">65%</span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600" style={{ width: '45%' }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Militar</TableHead>
+                <TableHead>Matrícula</TableHead>
+                <TableHead>Unidade</TableHead>
+                <TableHead>Alterações</TableHead>
+                <TableHead>Certidões</TableHead>
+                <TableHead>Diversos</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {linhasFiltradas.map((linha) => (
+                <TableRow key={`pendencia-${linha.militar_id}`}>
+                  <TableCell className="font-medium">{linha.nome || linha.nome_completo || '-'}</TableCell>
+                  <TableCell>{linha.matricula || '-'}</TableCell>
+                  <TableCell>{linha.unidade || '-'}</TableCell>
+                  <StatusCell ok={linha.alteracoes > 0} textoOk={`${linha.alteracoes} período(s)`} />
+                  <StatusCell ok={linha.certidoes > 0} textoOk={`${linha.certidoes} documento(s)`} />
+                  <StatusCell ok={linha.diversos > 0} textoOk={`${linha.diversos} documento(s)`} />
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, color }) {
-  const colors = {
-    emerald: 'text-emerald-600 bg-emerald-50',
-    amber: 'text-amber-600 bg-amber-50',
-    blue: 'text-blue-600 bg-blue-50',
-    red: 'text-red-600 bg-red-50'
+function MetricCard({ title, value, icon: Icon, color = 'slate', compact = false }) {
+  const colorMap = {
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    slate: 'bg-slate-50 text-slate-700 border-slate-100',
   };
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between">
+    <Card className={`border ${colorMap[color] || colorMap.slate}`}>
+      <CardContent className={compact ? 'p-4' : 'p-5'}>
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase text-slate-500 mb-1">{title}</p>
-            <h3 className="text-3xl font-black text-slate-800">{value || 0}</h3>
-            <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+            <p className="text-xs font-medium opacity-80">{title}</p>
+            <p className="text-2xl font-bold mt-1">{value ?? 0}</p>
           </div>
-          <div className={`p-2 rounded-lg ${colors[color]}`}>
-            <Icon className="w-5 h-5" />
-          </div>
+          {Icon && <Icon className="w-7 h-7 opacity-70" />}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function CoverageItem({ label, value, total, color }) {
-  const percent = Math.round((value / total) * 100) || 0;
+function FilterInput({ label, value, onChange }) {
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs font-bold">
-        <span>{label}</span>
-        <span>{value} ({percent}%)</span>
-      </div>
-      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full ${color}`} style={{ width: `${percent}%` }} />
-      </div>
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
+  );
+}
+
+function SelectFilter({ label, value, options, onChange }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function StatusCell({ ok, textoOk }) {
+  return (
+    <TableCell>
+      <Badge className={ok ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}>
+        {ok ? `✓ ${textoOk}` : '❌ Não possui documento'}
+      </Badge>
+    </TableCell>
   );
 }

@@ -98,9 +98,7 @@ const moduleGuardByPage = {
   ClassificacoesHistoricasAlteracoes: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['gerir_classificacoes_historicas'], moduleName: 'Migração de Alterações Legado' },
   RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração de Alterações Legado' },
   BackupSistema: { moduleName: 'Backup do Sistema' },
-  ImportacaoLoteAcervo: { actionKey: 'gerir_acervo_historico', moduleName: 'Acervo Histórico' },
-  DashboardAcervo: { actionKey: 'gerir_acervo_historico', moduleName: 'Acervo Histórico' },
-  RevisaoAcervo: { actionKey: 'gerir_acervo_historico', moduleName: 'Acervo Histórico' },
+  DashboardAcervo: { actionKey: 'visualizar_acervo_historico', moduleName: 'Documentos Históricos' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

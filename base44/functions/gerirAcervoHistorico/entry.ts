@@ -4,7 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * gerirAcervoHistorico
  *
  * Faz upload do documento histórico DIRETAMENTE no storage do Base44
- * (sem dependências externas como Google Drive) e persiste o registro
+ * e persiste o registro
  * em AcervoFuncionalHistorico. Mantém detecção de duplicidade por SHA-256
  * e versionamento.
  *
@@ -54,7 +54,19 @@ Deno.serve(async (req) => {
       ativo: true
     });
     if (duplicados.length > 0 && !data.confirmar_duplicidade) {
-      return Response.json({ error: 'DUPLICIDADE_DETECTADA', documento: duplicados[0] }, { status: 409 });
+      const documento = duplicados[0];
+      return Response.json({
+        code: 'ARQUIVO_DUPLICADO',
+        message: 'Este arquivo já foi cadastrado para este militar.',
+        documento_existente: {
+          id: documento.id,
+          tipo_documento: documento.tipo_documento,
+          titulo: documento.titulo,
+          data_documento: documento.data_documento,
+          periodo_inicial: documento.periodo_inicial,
+          periodo_final: documento.periodo_final
+        }
+      }, { status: 409 });
     }
 
     // 3. Localizar militar
@@ -85,7 +97,6 @@ Deno.serve(async (req) => {
       militar_id,
       tipo_documento,
       arquivo_url,
-      drive_url: arquivo_url,
       usuario_cadastro: authUser.email,
       status_documento: 'ATIVO',
       versao,

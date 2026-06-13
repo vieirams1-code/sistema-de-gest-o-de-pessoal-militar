@@ -76,6 +76,7 @@ import {
   arquivarDefinitivamenteAcervo,
   listarHistoricoVersoes
 } from '@/services/acervoHistoricoService';
+import { AcervoHistoricoError, criarMensagemErroAcervo, getOpcoesToastErroAcervo } from '@/services/acervoHistoricoErrors';
 
 const STATUS_COLORS = { 'Ativo': 'bg-emerald-100 text-emerald-700', 'Inativo': 'bg-slate-100 text-slate-700' };
 const MEDALHA_STATUS_COLORS = { 'Indicado': 'bg-yellow-100 text-yellow-700', 'Concedido': 'bg-green-100 text-green-700', 'Negado': 'bg-red-100 text-red-700' };
@@ -174,11 +175,6 @@ export default function VerMilitar() {
   const podeGerirAcervo = canAccessAction('gerir_acervo_historico');
   const podeBaixarAcervo = canAccessAction('baixar_acervo_historico');
 
-  const { data: repositoriosAtivos = [] } = useQuery({
-    queryKey: ['repositorios-ativos'],
-    queryFn: () => base44.entities.RepositorioDocumental.filter({ ativo: true, status: 'ATIVO' }),
-    enabled: podeGerirAcervo
-  });
   const effectiveEmail = getEffectiveEmail();
   const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
   const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
@@ -194,12 +190,6 @@ export default function VerMilitar() {
   const [showPromocaoFuturaModal, setShowPromocaoFuturaModal] = useState(false);
   const [promocaoFuturaEdicao, setPromocaoFuturaEdicao] = useState(null);
   const [showNovoAcervoModal, setShowNovoAcervoModal] = useState(false);
-  const { data: activeRepositorios = [] } = useQuery({
-    queryKey: ['active-repositorios'],
-    queryFn: () => base44.entities.RepositorioDocumental.filter({ ativo: true, status: 'ATIVO' }),
-    enabled: podeGerirAcervo
-  });
-
   const [acervoForm, setAcervoForm] = useState({
     tipo_documento: 'ALTERACAO',
     titulo: '',
@@ -506,17 +496,16 @@ export default function VerMilitar() {
           });
           results.push(res);
         } catch (err) {
-          if (err.message === 'DUPLICIDADE_DETECTADA') {
-            if (confirm(`O arquivo ${file.name} já existe. Deseja continuar?`)) {
-              const res = await cadastrarDocumentoHistorico({
-                militar_id: id,
-                tipo_documento: acervoForm.tipo_documento,
-                data: { ...acervoForm, confirmar_duplicidade: true },
-                file: { name: file.name, type: file.type, content }
-              });
-              results.push(res);
-              continue;
-            }
+          if (err.status === 409 && err.code === 'ARQUIVO_DUPLICADO') {
+            throw new AcervoHistoricoError(criarMensagemErroAcervo(err), {
+              status: err.status,
+              code: err.code,
+              documento_existente: err.documento_existente,
+              data: err.data
+            });
+          }
+          if (err.status === 409) {
+            throw new Error(criarMensagemErroAcervo(err));
           }
           throw err;
         }
@@ -543,7 +532,13 @@ export default function VerMilitar() {
       });
     },
     onError: (err) => {
-      toast({ title: 'Erro ao salvar documento(s)', description: err.message, variant: 'destructive' });
+      const description = criarMensagemErroAcervo(err);
+      toast({
+        title: 'Erro ao salvar documento(s)',
+        description,
+        variant: 'destructive',
+        ...getOpcoesToastErroAcervo(err)
+      });
     }
   });
 
@@ -673,7 +668,7 @@ export default function VerMilitar() {
                   {certidoesHistoricas.map(cert => (
                     <li key={cert.id} className="flex items-center justify-between">
                       <span>{formatDate(cert.data_documento)} — {cert.comportamento_certificado}</span>
-                      <Button variant="link" size="sm" onClick={() => window.open(cert.drive_url, '_blank')}>Abrir</Button>
+                      {podeBaixarAcervo && cert.arquivo_url && <Button variant="link" size="sm" onClick={() => window.open(cert.arquivo_url, '_blank')}>Abrir</Button>}
                     </li>
                   ))}
                 </ul>
@@ -1154,13 +1149,7 @@ export default function VerMilitar() {
                 {podeGerirAcervo && (
                   <Button
                     className="bg-[#1e3a5f]"
-                    onClick={() => {
-                      if (repositoriosAtivos.length === 0) {
-                        toast({ title: 'Indisponível', description: 'Nenhum repositório documental ativo configurado. Contate o administrador.', variant: 'destructive' });
-                        return;
-                      }
-                      setShowNovoAcervoModal(true);
-                    }}
+                    onClick={() => setShowNovoAcervoModal(true)}
                   >
                     <Plus className="w-4 h-4 mr-2" /> Novo Documento
                   </Button>
@@ -1203,7 +1192,7 @@ export default function VerMilitar() {
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm" onClick={() => setDocParaVersoes(a)}>Histórico</Button>
-                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>PDF</Button>}
+                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.arquivo_url, '_blank')}>PDF</Button>}
                                 {podeGerirAcervo && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => excluirAcervoMutation.mutate(a.id)}><Trash2 className="w-4 h-4" /></Button>}
                               </div>
                             </TableCell>
@@ -1235,7 +1224,7 @@ export default function VerMilitar() {
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm" onClick={() => setDocParaVersoes(a)}>Histórico</Button>
-                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>PDF</Button>}
+                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.arquivo_url, '_blank')}>PDF</Button>}
                                 {podeGerirAcervo && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => excluirAcervoMutation.mutate(a.id)}><Trash2 className="w-4 h-4" /></Button>}
                               </div>
                             </TableCell>
@@ -1272,7 +1261,7 @@ export default function VerMilitar() {
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm" onClick={() => setDocParaVersoes(a)}>Histórico</Button>
-                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.drive_url, '_blank')}>PDF</Button>}
+                                {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(a.arquivo_url, '_blank')}>PDF</Button>}
                                 {podeGerirAcervo && <Button variant="ghost" size="sm" className="text-red-600" onClick={() => excluirAcervoMutation.mutate(a.id)}><Trash2 className="w-4 h-4" /></Button>}
                               </div>
                             </TableCell>
@@ -1348,7 +1337,7 @@ export default function VerMilitar() {
                           <TableCell>{formatDate(v.data_documento)}</TableCell>
                           <TableCell><Badge variant="outline">{v.status_documento}</Badge></TableCell>
                           <TableCell className="text-right">
-                            {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(v.drive_url, '_blank')}>Abrir PDF</Button>}
+                            {podeBaixarAcervo && <Button variant="outline" size="sm" onClick={() => window.open(v.arquivo_url, '_blank')}>Abrir PDF</Button>}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1458,7 +1447,7 @@ export default function VerMilitar() {
                 </div>
                 <DialogFooter>
                   <Button className="w-full bg-[#1e3a5f]" onClick={() => salvarAcervoMutation.mutate()} disabled={salvarAcervoMutation.isPending}>
-                    {salvarAcervoMutation.isPending ? 'Enviando para o Drive...' : 'Salvar Documento'}
+                    {salvarAcervoMutation.isPending ? 'Salvando PDF...' : 'Salvar Documento'}
                   </Button>
                 </DialogFooter>
               </DialogContent>

@@ -36,7 +36,7 @@ const ENTIDADES_BACKUP = [
   'QuadroOperacional', 'ColunaOperacional', 'CardOperacional', 'CardAcao', 'CardChecklistItem', 'CardComentario', 'CardVinculo',
   'Demanda', 'DemandaComentario', 'Tarefa',
   'Processo', 'ProcedimentoProcesso', 'ProcedimentoEnvolvido', 'ProcedimentoPendencia', 'ProcedimentoPrazoHistorico', 'ProcedimentoViatura', 'BaseConhecimentoProcedimento',
-  'AcervoFuncionalHistorico', 'AuditAcervoLog', 'ImportacaoAcervo',
+  'AcervoFuncionalHistorico',
   'ImportacaoMilitares', 'ImportacaoAlteracoesLegado', 'PossivelDuplicidadeMilitar',
   'MatriculaMilitar', 'Familiar', 'CursoMilitar',
   'ConfiguracaoUnidade', 'PrazoAlerta', 'AssistenteLog',
