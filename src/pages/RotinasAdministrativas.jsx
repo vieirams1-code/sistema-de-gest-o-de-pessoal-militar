@@ -116,6 +116,14 @@ export default function RotinasAdministrativas() {
       queryClient.invalidateQueries(['rotinas-administrativas']);
       setIsEditModalOpen(false);
       toast({ title: 'Sucesso', description: 'Rotina salva com sucesso.' });
+    },
+    onError: (error) => {
+      console.error('[RotinasAdministrativas] erro ao salvar rotina:', error);
+      toast({
+        title: 'Erro ao Salvar',
+        description: error.message || 'Não foi possível salvar a rotina.',
+        variant: 'destructive'
+      });
     }
   });
 
@@ -210,6 +218,38 @@ export default function RotinasAdministrativas() {
       });
     }
     setIsEditModalOpen(true);
+  };
+
+  const handleSalvarRotina = () => {
+    console.log('[RotinasAdministrativas] clique salvar rotina');
+    try {
+      const { destinatario, orgao_destino, assunto, ...rest } = editFormData;
+
+      // Sanitizar: remover undefined por string vazia e garantir campos básicos
+      const sanitizedData = Object.keys(rest).reduce((acc, key) => {
+        acc[key] = rest[key] === undefined ? '' : rest[key];
+        return acc;
+      }, {});
+
+      const payload = {
+        ...sanitizedData,
+        configuracao_json: {
+          destinatario: destinatario || '',
+          orgao_destino: orgao_destino || '',
+          assunto: assunto || ''
+        }
+      };
+
+      console.log('[RotinasAdministrativas] payload salvar rotina', payload);
+      mutationSalvar.mutate({ rotina: payload, usuario: user });
+    } catch (error) {
+      console.error('[RotinasAdministrativas] erro ao montar payload:', error);
+      toast({
+        title: 'Erro de Validação',
+        description: 'Ocorreu um erro ao preparar os dados da rotina.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleViewExecucao = async (exec) => {
@@ -674,18 +714,13 @@ export default function RotinasAdministrativas() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
-            <Button onClick={() => {
-              const { destinatario, orgao_destino, assunto, ...rest } = editFormData;
-              const rotinaData = {
-                ...rest,
-                configuracao_json: {
-                  destinatario,
-                  orgao_destino,
-                  assunto
-                }
-              };
-              mutationSalvar.mutate({ rotina: rotinaData, usuario: user });
-            }}>Salvar Rotina</Button>
+            <Button
+              type="button"
+              onClick={handleSalvarRotina}
+              disabled={mutationSalvar.isPending}
+            >
+              Salvar Rotina
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
