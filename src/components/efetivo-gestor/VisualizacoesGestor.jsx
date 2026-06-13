@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListTree, AlignLeft, GitBranch, X } from 'lucide-react';
 import { ordenarMilitaresAntiguidade, resolvePostoGraduacao } from '@/utils/efetivo/gestorClassificacao';
 import { filtrarUnidadesCartoes } from '@/utils/efetivo/visualizacaoGestor';
+import { getPostoGraduacaoMilitar } from '@/utils/militarPostoGraduacao';
 import { calcularResumoEfetivo, calcularResumoTags, obterGrupoHierarquicoMilitar, obterSexoMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 
 const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
@@ -65,14 +66,7 @@ const obterNomeExibicaoMilitar = (militar) => (
   || 'Militar'
 );
 
-const obterPostoExibicaoMilitar = (militar) => (
-  militar?.posto_graduacao_resolvido
-  || militar?.posto_graduacao
-  || militar?.postoGraduacao
-  || militar?.posto
-  || militar?.graduacao
-  || ''
-);
+const obterPostoExibicaoMilitar = (militar) => getPostoGraduacaoMilitar(militar);
 
 const obterMatriculaExibicaoMilitar = (militar) => militar?.matricula || militar?.matricula_funcional || militar?.numero_matricula || '';
 

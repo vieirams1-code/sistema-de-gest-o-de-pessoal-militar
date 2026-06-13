@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
 import { montarDivergenciasPromocao, construirPayloadSincronizacaoPromocao } from '@/utils/antiguidade/saneamentoPromocaoDivergencia';
+import { getPostoGraduacaoMilitar, getQuadroMilitar } from '@/utils/militarPostoGraduacao';
 
 export const CONFIRMACAO_SINCRONIZACAO_PROMOCAO = 'SINCRONIZAR PROMOCAO';
 
@@ -12,8 +13,8 @@ export async function auditarMilitaresDivergentesPromocao({ entities = base44.en
     militar_id: item.militar_id,
     nome: item.militar.nome_completo || item.militar.nome_guerra || '—',
     matricula: item.militar.matricula || item.militar.matricula_atual || '—',
-    posto_atual_militar: item.militar.posto_graduacao || '',
-    quadro_atual_militar: item.militar.quadro || '',
+    posto_atual_militar: getPostoGraduacaoMilitar(item.militar),
+    quadro_atual_militar: getQuadroMilitar(item.militar),
     posto_historico_ativo: item.historico.posto_graduacao_novo || '',
     quadro_historico_ativo: item.historico.quadro_novo || '',
     data_promocao: item.historico.data_promocao || null,

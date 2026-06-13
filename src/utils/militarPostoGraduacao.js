@@ -33,7 +33,7 @@ export function getPostoGraduacaoMilitar(militar) {
     const valor = militar[campo];
     if (valor && String(valor).trim()) {
       if (campo !== 'posto_graduacao') {
-        console.warn(`[MilitarPostoGraduacao] Alias utilizado: militarId=${militar.id || 'N/A'} matricula=${militar.matricula || 'N/A'} campo=${campo}`);
+        console.warn(`[MilitarPostoGraduacao]\nAlias utilizado:\nmilitarId=${militar.id || 'N/A'}\nmatricula=${militar.matricula || 'N/A'}\ncampo=${campo}`);
       }
       return String(valor).trim();
     }
@@ -52,7 +52,7 @@ export function getQuadroMilitar(militar) {
     const valor = militar[campo];
     if (valor && String(valor).trim()) {
       if (campo !== 'quadro') {
-        console.warn(`[MilitarPostoGraduacao] Alias utilizado: militarId=${militar.id || 'N/A'} matricula=${militar.matricula || 'N/A'} campo=${campo}`);
+        console.warn(`[MilitarPostoGraduacao]\nAlias utilizado:\nmilitarId=${militar.id || 'N/A'}\nmatricula=${militar.matricula || 'N/A'}\ncampo=${campo}`);
       }
       return String(valor).trim();
     }
