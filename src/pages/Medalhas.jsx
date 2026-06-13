@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Medal, Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -26,6 +26,7 @@ import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { normalizarStatusMedalha, obterTipoMedalhaPorCodigo, resolverCodigoTipoMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS } from '@/services/medalhasAcessoService';
+import MedalhasTabNavigation from '@/components/medalhas/MedalhasTabNavigation';
 
 const statusColors = {
   INDICADA: 'bg-yellow-100 text-yellow-700',
@@ -143,44 +144,27 @@ export default function Medalhas() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <Medal className="w-8 h-8 text-[#1e3a5f]" />
-            <div>
-              <h1 className="text-3xl font-bold text-[#1e3a5f]">Medalhas</h1>
-              <p className="text-slate-500">Controle de indicações e concessões</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {podeIndicar && (
-              <Button
-                onClick={() => navigate(createPageUrl('CadastrarMedalha'))}
-                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Nova Indicação
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => navigate(createPageUrl('ApuracaoMedalhasTempoServico'))}
-            >
-              Apuração de Tempo
-            </Button>
-            {podeGerirDomPedro && (
-              <Button
-                variant="outline"
-                onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}
-              >
-                Dom Pedro II
-              </Button>
-            )}
-          </div>
-        </div>
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        <MedalhasTabNavigation
+          activeTab="registradas"
+          canAccessAction={canAccessAction}
+          actions={(
+            <>
+              {podeIndicar && (
+                <Button
+                  onClick={() => navigate(createPageUrl('CadastrarMedalha'))}
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Nova Indicação
+                </Button>
+              )}
+            </>
+          )}
+        />
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4">
             {[
             { label: 'Indicadas', value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'INDICADA').length, color: 'text-yellow-600', bg: 'bg-yellow-100' },
             { label: 'Concedidas', value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length, color: 'text-green-600', bg: 'bg-green-100' },
@@ -201,7 +185,7 @@ export default function Medalhas() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />

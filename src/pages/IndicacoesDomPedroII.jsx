@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Download, Medal, Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -26,6 +26,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
+import MedalhasTabNavigation from '@/components/medalhas/MedalhasTabNavigation';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
   ACOES_MEDALHAS,
@@ -298,42 +299,38 @@ export default function IndicacoesDomPedroII() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-5">
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('ApuracaoMedalhasTempoServico'))}><ArrowLeft className="w-4 h-4" /></Button>
-            <Medal className="w-6 h-6 text-[#1e3a5f]" />
-            <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Indicações Dom Pedro II</h1>
-              <p className="text-sm text-slate-600">Fluxo manual separado para indicação e concessão da medalha Dom Pedro II.</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {podeModoAdmin && (
-              <Button
-                variant={adminModeAtivo ? 'destructive' : 'outline'}
-                onClick={() => setAdminModeAtivo((prev) => !prev)}
+        <MedalhasTabNavigation
+          activeTab="dompedro"
+          canAccessAction={canAccessAction}
+          actions={(
+            <>
+              {podeModoAdmin && (
+                <Button
+                  variant={adminModeAtivo ? 'destructive' : 'outline'}
+                  onClick={() => setAdminModeAtivo((prev) => !prev)}
+                >
+                  {adminModeAtivo ? 'Modo Admin ativo' : 'Ativar Modo Admin'}
+                </Button>
+              )}
+              {podeExportar && <Button
+                variant="outline"
+                onClick={() => {
+                  if (!exportRows.length) {
+                    toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
+                    return;
+                  }
+                  setExportModalOpen(true);
+                }}
               >
-                {adminModeAtivo ? 'Modo Admin ativo' : 'Ativar Modo Admin'}
-              </Button>
-            )}
-            {podeExportar && <Button
-              variant="outline"
-              onClick={() => {
-                if (!exportRows.length) {
-                  toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
-                  return;
-                }
-                setExportModalOpen(true);
-              }}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exportar indicados
-            </Button>}
-            {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
-              Resetar indicados
-            </Button>}
-          </div>
-        </div>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar indicados
+              </Button>}
+              {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
+                Resetar indicados
+              </Button>}
+            </>
+          )}
+        />
 
         {adminModeAtivo && podeModoAdmin && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
