@@ -60,15 +60,15 @@
     },
     "tipo_medalha_codigo": {
       "type": "string",
-      "description": "Código técnico do tipo de medalha"
+      "description": "C\u00f3digo t\u00e9cnico do tipo de medalha"
     },
     "numero_publicacao": {
       "type": "string",
-      "description": "Número da publicação (DOEMS ou BG)"
+      "description": "N\u00famero da publica\u00e7\u00e3o (DOEMS ou BG)"
     },
     "boletim_ou_do": {
       "type": "string",
-      "description": "Tipo de publicação (DOEMS ou BG)"
+      "description": "Tipo de publica\u00e7\u00e3o (DOEMS ou BG)"
     },
     "origem_registro": {
       "type": "string",
@@ -76,29 +76,86 @@
     },
     "concedido_por": {
       "type": "string",
-      "description": "Email do usuário que concedeu a medalha"
+      "description": "Email do usu\u00e1rio que concedeu a medalha"
     },
     "indicado_por": {
       "type": "string",
-      "description": "Email do usuário que indicou a medalha"
+      "description": "Email do usu\u00e1rio que indicou a medalha"
     },
     "resetado_por": {
       "type": "string",
-      "description": "Email do usuário que resetou a indicação"
+      "description": "Email do usu\u00e1rio que resetou a indica\u00e7\u00e3o"
     },
     "updated_by": {
       "type": "string",
-      "description": "Email do último usuário que alterou o registro"
+      "description": "Email do \u00faltimo usu\u00e1rio que alterou o registro"
     },
     "updated_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Data e hora da última atualização"
+      "description": "Data e hora da \u00faltima atualiza\u00e7\u00e3o"
     }
   },
   "required": [
     "militar_id",
     "tipo_medalha_id",
     "data_indicacao"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "created_by_id": "{{user.id}}",
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.militar_id": "{{user.data.militar_id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.militar_id": "{{user.data.militar_id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.militar_id": "{{user.data.militar_id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }
