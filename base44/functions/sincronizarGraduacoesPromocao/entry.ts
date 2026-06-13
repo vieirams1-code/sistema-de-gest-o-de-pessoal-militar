@@ -58,6 +58,20 @@ function obterPostoCanonico(v: string) {
   return v;
 }
 
+/**
+ * Simula a lógica getPostoGraduacaoOficial usada pelo Efetivo no frontend.
+ */
+function calcularPostoEfetivo(militar: any) {
+  return String(
+    militar?.posto_graduacao ||
+    militar?.['posto_graduação'] ||
+    militar?.posto_grad ||
+    militar?.posto ||
+    militar?.graduacao ||
+    ''
+  ).trim();
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
@@ -120,7 +134,8 @@ Deno.serve(async (req) => {
       compativeis: 0, // "já compatíveis"
       ignorados: 0,
       falhas: [] as any[], // "falhas de atualização"
-      divergencias: [] as any[]
+      divergencias: [] as any[],
+      stort_debug: null as any
     };
 
     const pendingUpdates = [];
@@ -215,6 +230,7 @@ Deno.serve(async (req) => {
       if (!dryRun) {
         pendingUpdates.push({
           militarId: mid,
+          matricula: mat,
           nome: infoMilitar.nome,
           dados: {
             posto_graduacao: ultimoHistorico.posto_graduacao_novo,
@@ -231,12 +247,54 @@ Deno.serve(async (req) => {
 
     if (!dryRun && pendingUpdates.length > 0) {
       for (const update of pendingUpdates) {
+        const isStort = update.matricula === "415.443-021" || update.matricula === "415443021";
+        const stortDebug: any = isStort ? {
+          militarId: update.militarId,
+          matricula: update.matricula,
+          payload_enviado: update.dados,
+        } : null;
+
         try {
+          // 1. Antes de atualizar, captura o valor atual "como o Efetivo vê" para o debug do Stort
+          if (isStort) {
+            const respAntes = await base44.functions.invoke('getScopedMilitares', { militarIds: [update.militarId] });
+            const militarAntesEfetivo = respAntes?.data?.militares?.[0] || respAntes?.militares?.[0];
+            stortDebug.valor_efetivo_antes = calcularPostoEfetivo(militarAntesEfetivo);
+          }
+
+          // 2. Executa a atualização robusta (sincroniza todos os aliases)
           const result = await atualizarCadastroMilitar(base44, update.militarId, update.dados, update.contexto);
+
+          if (isStort) {
+            stortDebug.retorno_bruto_update = result;
+          }
+
           if (result.success) {
-            resumo.atualizados++;
+            // 3. RE-LEITURA ALINHADA AO EFETIVO (Task 4)
+            // Não basta o result.success (que usa Militar.get), precisamos provar que getScopedMilitares reflete a mudança.
+            const respDepois = await base44.functions.invoke('getScopedMilitares', { militarIds: [update.militarId] });
+            const militarDepoisEfetivo = respDepois?.data?.militares?.[0] || respDepois?.militares?.[0];
+            const valorPosVerificacao = calcularPostoEfetivo(militarDepoisEfetivo);
+
+            if (isStort) {
+              stortDebug.militar_relido_efetivo = militarDepoisEfetivo;
+              stortDebug.valor_calculado_efetivo_depois = valorPosVerificacao;
+            }
+
+            if (valorPosVerificacao === update.dados.posto_graduacao) {
+              resumo.atualizados++;
+            } else {
+              // Task 5: Se a atualização não refletir no Efetivo, falha.
+              resumo.falhas.push({
+                militar: update.nome,
+                matricula: update.matricula,
+                militar_id: update.militarId,
+                erro: `A atualização foi persistida mas o Efetivo continua exibindo "${valorPosVerificacao}" (esperado: "${update.dados.posto_graduacao}"). Verifique aliases ou projeção da view.`,
+                detalhe_releitura: militarDepoisEfetivo
+              });
+            }
           } else {
-            // Requisito 4: Return in "falhas" with specific fields
+            // Falha reportada pela utility (ex: erro de API ou releitura inconsistente no Get)
             for (const u of result.updates) {
                 if (!u.confirmado || result.erro_api) {
                     resumo.falhas.push({
@@ -258,6 +316,11 @@ Deno.serve(async (req) => {
             militar_id: update.militarId,
             erro: err.message || String(err)
           });
+          if (isStort) stortDebug.erro_fatal = err.message || String(err);
+        }
+
+        if (isStort) {
+          resumo.stort_debug = stortDebug;
         }
       }
     }

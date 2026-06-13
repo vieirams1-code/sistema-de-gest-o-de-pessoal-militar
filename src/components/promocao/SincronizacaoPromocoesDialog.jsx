@@ -30,6 +30,10 @@ export default function SincronizacaoPromocoesDialog({ open, onOpenChange }) {
       setEtapa('summary');
       queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
       queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais-militares'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
+      queryClient.invalidateQueries({ queryKey: ['gestor-efetivo-militares'] });
+      queryClient.invalidateQueries({ queryKey: ['gestor-efetivo-lotacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['militar'] });
       toast({ title: 'Sincronização concluída', description: 'Os cadastros militares foram atualizados com sucesso.' });
     },
     onError: (error) => {
