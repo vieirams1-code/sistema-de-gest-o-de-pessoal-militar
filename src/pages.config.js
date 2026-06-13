@@ -109,6 +109,7 @@ import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import RP from './pages/RP';
 import RegistrosMilitar from './pages/RegistrosMilitar';
+import RotinasAdministrativas from './pages/RotinasAdministrativas';
 import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
 import RevisaoDuplicidadesMilitar from './pages/RevisaoDuplicidadesMilitar';
 import RastreamentoPromocoes from './pages/RastreamentoPromocoes';
@@ -183,6 +184,7 @@ export const PAGES = {
     "PermissoesUsuarios": PermissoesUsuarios,
     "RP": RP,
     "RegistrosMilitar": RegistrosMilitar,
+    "RotinasAdministrativas": RotinasAdministrativas,
     "CadastrarRegistroRP": CadastrarRegistroRP,
     "RevisaoDuplicidadesMilitar": RevisaoDuplicidadesMilitar,
     "RastreamentoPromocoes": RastreamentoPromocoes,

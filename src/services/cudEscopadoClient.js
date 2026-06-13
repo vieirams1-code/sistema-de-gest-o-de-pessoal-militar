@@ -47,6 +47,10 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TagGrupo',
   'Tag',
   'AcervoFuncionalHistorico',
+  'RepositorioDocumental',
+  'RotinaAdministrativa',
+  'ExecucaoRotinaAdministrativa',
+  'ItemExecucaoRotinaAdministrativa',
 ]);
 
 
@@ -68,6 +72,14 @@ const CAMPOS_DATA_ISO_POR_ENTIDADE = {
     'data_inclusao_para_ferias',
     'data_fim_contrato',
     'data_publicacao',
+  ],
+  ExecucaoRotinaAdministrativa: [
+    'competencia_inicio',
+    'competencia_fim',
+  ],
+  ItemExecucaoRotinaAdministrativa: [
+    'data_inicio',
+    'data_fim',
   ],
   MilitarFuncao: ['data_inicio', 'data_fim'],
   MilitarTag: ['data_aplicacao', 'data_remocao'],

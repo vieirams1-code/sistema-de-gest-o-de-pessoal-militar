@@ -88,9 +88,10 @@ const menuGroups = [
             ],
           },
           { name: 'Gratificação de Função', page: 'GratificacoesFuncao', icon: Medal, viewPermission: 'visualizar_gratificacoes_funcao' },
-          { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
-          { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
-          { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'visualizar_armamentos' },
+          { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'perm_visualizar_folha_alteracoes' },
+          { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'perm_visualizar_registros_militar' },
+          { name: 'Rotinas Adm.', page: 'RotinasAdministrativas', icon: ClipboardList, viewPermission: 'perm_visualizar_rotinas_administrativas' },
+          { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'perm_visualizar_armamentos' },
         ],
       },
       {

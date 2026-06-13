@@ -1,0 +1,32 @@
+{
+  "name": "ExecucaoRotinaAdministrativa",
+  "type": "object",
+  "title": "Execução de Rotina Administrativa",
+  "description": "Registro de uma execução específica de uma rotina administrativa.",
+  "properties": {
+    "rotina_id": { "type": "string", "default": "" },
+    "rotina_nome": { "type": "string", "default": "" },
+    "status": {
+      "type": "string",
+      "enum": ["pendente", "em_conferencia", "concluida", "cancelada"],
+      "default": "pendente"
+    },
+    "competencia_inicio": { "type": "string", "format": "date", "default": "" },
+    "competencia_fim": { "type": "string", "format": "date", "default": "" },
+    "data_geracao": { "type": "string", "format": "date-time" },
+    "data_conclusao": { "type": "string", "format": "date-time" },
+    "responsavel_id": { "type": "string", "default": "" },
+    "responsavel_nome": { "type": "string", "default": "" },
+    "unidade_id": { "type": "string", "default": "" },
+    "unidade_nome": { "type": "string", "default": "" },
+    "resumo": { "type": "string", "default": "" },
+    "texto_gerado": { "type": "string", "default": "" },
+    "quantidade_itens": { "type": "number", "default": 0 },
+    "observacoes": { "type": "string", "default": "" },
+    "link_documento_gerado": { "type": "string", "default": "" },
+    "link_pacote_anexos": { "type": "string", "default": "" },
+    "created_date": { "type": "string", "format": "date-time" },
+    "updated_date": { "type": "string", "format": "date-time" }
+  },
+  "required": ["rotina_id", "status"]
+}

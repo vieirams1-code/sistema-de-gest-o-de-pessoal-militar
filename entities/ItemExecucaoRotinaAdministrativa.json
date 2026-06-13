@@ -1,0 +1,21 @@
+{
+  "name": "ItemExecucaoRotinaAdministrativa",
+  "type": "object",
+  "title": "Item de Execução de Rotina",
+  "description": "Item individual processado durante a execução de uma rotina administrativa.",
+  "properties": {
+    "execucao_id": { "type": "string", "default": "" },
+    "origem_tipo": { "type": "string", "default": "manual" },
+    "origem_id": { "type": "string", "default": "" },
+    "militar_id": { "type": "string", "default": "" },
+    "militar_nome": { "type": "string", "default": "" },
+    "militar_posto_graduacao": { "type": "string", "default": "" },
+    "militar_matricula": { "type": "string", "default": "" },
+    "descricao": { "type": "string", "default": "" },
+    "data_inicio": { "type": "string", "format": "date", "default": "" },
+    "data_fim": { "type": "string", "format": "date", "default": "" },
+    "observacao": { "type": "string", "default": "" },
+    "possui_anexo": { "type": "boolean", "default": false }
+  },
+  "required": ["execucao_id"]
+}
