@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, Download, Medal, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
+import { CheckCircle2, Download, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -26,6 +26,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
+import MedalhasTabNavigation from '@/components/medalhas/MedalhasTabNavigation';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
   ACOES_APURACAO,
@@ -176,13 +177,32 @@ export default function ApuracaoMedalhasTempoServico() {
       impedimentos,
       tiposMedalha: tiposCatalogo,
     });
+
+    const enhanced = lista.map((item) => {
+      const statusPorFaixa = {};
+      CODIGOS_TEMPO.forEach((codigo) => {
+        const reg = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
+        statusPorFaixa[codigo] = normalizarStatusMedalha(reg?.status);
+      });
+
+      const possuiContemplada = Object.values(statusPorFaixa).includes('CONCEDIDA');
+      const possuiIndicada = Object.values(statusPorFaixa).includes('INDICADA');
+
+      return {
+        ...item,
+        statusPorFaixa,
+        possuiContemplada,
+        possuiIndicada,
+      };
+    });
+
     // Ordenar por antiguidade institucional do militar.
-    const militaresUnicos = Array.from(new Map(lista.map(i => [i.militar?.id, i.militar])).values());
+    const militaresUnicos = Array.from(new Map(enhanced.map((i) => [i.militar?.id, i.militar])).values());
     const militaresOrdenados = ordenarMilitaresPorAntiguidadeInstitucional(militaresUnicos);
     const mapaOrdem = new Map(militaresOrdenados.map((m, idx) => [m.id, idx]));
 
-    return lista.sort((a, b) => (mapaOrdem.get(a.militar?.id) ?? 0) - (mapaOrdem.get(b.militar?.id) ?? 0));
-  }, [militares, medalhas, impedimentos, tiposCatalogo]);
+    return enhanced.sort((a, b) => (mapaOrdem.get(a.militar?.id) ?? 0) - (mapaOrdem.get(b.militar?.id) ?? 0));
+  }, [militares, medalhas, impedimentos, tiposCatalogo, registroPorMilitarCodigo]);
 
   const unidadesDisponiveis = useMemo(
     () => [...new Set(apuracoes.map((item) => item.militar?.lotacao || item.militar?.unidade).filter(Boolean))],
@@ -199,13 +219,33 @@ export default function ApuracaoMedalhasTempoServico() {
     const termo = search.toLowerCase();
     const unidade = militar.lotacao || militar.unidade;
     const posto = militar.posto_graduacao;
-    const faixaDevida = item.medalha_devida_codigo;
     const situacao = item.situacao || 'NAO_ELEGIVEL';
-    return (!termo || nome.includes(termo) || String(militar.matricula || '').toLowerCase().includes(termo))
-      && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
-      && (postoFilter === 'TODOS' || posto === postoFilter)
-      && (statusFilter === 'TODOS' || situacao === statusFilter)
-      && (faixaFilter === 'TODAS' || faixaDevida === faixaFilter);
+
+    const matchSearch = !termo || nome.includes(termo) || String(militar.matricula || '').toLowerCase().includes(termo);
+    const matchUnidade = unidadeFilter === 'TODAS' || unidade === unidadeFilter;
+    const matchPosto = postoFilter === 'TODOS' || posto === postoFilter;
+
+    let matchStatus = statusFilter === 'TODOS';
+    if (!matchStatus) {
+      if (statusFilter === 'ELEGIVEL') matchStatus = situacao === 'ELEGIVEL';
+      else if (statusFilter === 'JA_CONTEMPLADO') matchStatus = item.possuiContemplada;
+      else if (statusFilter === 'INDICADO') matchStatus = item.possuiIndicada;
+      else if (statusFilter === 'IMPEDIDO') matchStatus = situacao === 'IMPEDIDO';
+      else if (statusFilter === 'NAO_ELEGIVEL') matchStatus = situacao === 'NAO_ELEGIVEL';
+    }
+
+    let matchFaixa = faixaFilter === 'TODAS';
+    if (!matchFaixa) {
+      if (statusFilter === 'JA_CONTEMPLADO') {
+        matchFaixa = item.statusPorFaixa[faixaFilter] === 'CONCEDIDA';
+      } else if (statusFilter === 'INDICADO') {
+        matchFaixa = item.statusPorFaixa[faixaFilter] === 'INDICADA';
+      } else {
+        matchFaixa = item.medalha_devida_codigo === faixaFilter;
+      }
+    }
+
+    return matchSearch && matchUnidade && matchPosto && matchStatus && matchFaixa;
   }), [apuracoes, search, unidadeFilter, postoFilter, statusFilter, faixaFilter]);
 
   const getCellState = (item, codigo) => {
@@ -269,11 +309,11 @@ export default function ApuracaoMedalhasTempoServico() {
   };
 
   const totais = useMemo(() => {
-    const indicados = registrosTempo.filter((m) => normalizarStatusMedalha(m.status) === 'INDICADA').length;
-    const contemplados = registrosTempo.filter((m) => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length;
+    const indicados = apuracoes.filter((item) => item.possuiIndicada).length;
+    const contemplados = apuracoes.filter((item) => item.possuiContemplada).length;
     const elegiveis = apuracoes.filter((item) => item.situacao === 'ELEGIVEL').length;
     return { indicados, contemplados, elegiveis };
-  }, [apuracoes, registrosTempo]);
+  }, [apuracoes]);
 
   const refreshQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-registros'] });
@@ -401,43 +441,38 @@ export default function ApuracaoMedalhasTempoServico() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
       <div className="max-w-[1500px] mx-auto px-4 py-8 space-y-5">
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Medalhas'))}><ArrowLeft className="w-4 h-4" /></Button>
-            <div className="rounded-xl bg-slate-100 p-2 mt-0.5"><Medal className="w-6 h-6 text-[#1e3a5f]" /></div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[#1e3a5f]">Apuração de Tempo de Serviço</h1>
-              <p className="text-sm text-slate-600 mt-1">Tabela operacional por militar para indicação e concessão das faixas de 10, 20, 30 e 40 anos.</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {podeModoAdmin && (
-              <Button
-                variant={adminModeAtivo ? 'destructive' : 'outline'}
-                onClick={() => setAdminModeAtivo((prev) => !prev)}
-              >
-                {adminModeAtivo ? 'Modo Admin ativo' : 'Ativar Modo Admin'}
-              </Button>
-            )}
-            {podeExportar && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (!exportRows.length) {
-                    toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
-                    return;
-                  }
-                  setExportModalOpen(true);
-                }}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar indicados
-              </Button>
-            )}
-            {canAccessAction(ACOES_MEDALHAS.DOM_PEDRO) && <Button variant="outline" onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}>Dom Pedro II</Button>}
-            {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>}
-          </div>
-        </div>
+        <MedalhasTabNavigation
+          activeTab="tempo"
+          canAccessAction={canAccessAction}
+          actions={(
+            <>
+              {podeModoAdmin && (
+                <Button
+                  variant={adminModeAtivo ? 'destructive' : 'outline'}
+                  onClick={() => setAdminModeAtivo((prev) => !prev)}
+                >
+                  {adminModeAtivo ? 'Modo Admin ativo' : 'Ativar Modo Admin'}
+                </Button>
+              )}
+              {podeExportar && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!exportRows.length) {
+                      toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
+                      return;
+                    }
+                    setExportModalOpen(true);
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar indicados
+                </Button>
+              )}
+              {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>}
+            </>
+          )}
+        />
 
         {adminModeAtivo && podeModoAdmin && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -481,6 +516,7 @@ export default function ApuracaoMedalhasTempoServico() {
             <SelectContent>
               <SelectItem value="TODOS">Todas situações</SelectItem>
               <SelectItem value="ELEGIVEL">Elegível</SelectItem>
+              <SelectItem value="INDICADO">Indicado</SelectItem>
               <SelectItem value="JA_CONTEMPLADO">Já contemplado</SelectItem>
               <SelectItem value="IMPEDIDO">Impedido</SelectItem>
               <SelectItem value="NAO_ELEGIVEL">Não elegível</SelectItem>
