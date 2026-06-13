@@ -2,7 +2,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
   criarMensagemErroAcervo,
+  getOpcoesToastErroAcervo,
   montarMensagemArquivoDuplicado,
+  TOAST_DUPLICIDADE_ACERVO_DURATION,
 } from '../acervoHistoricoErrors.js';
 
 // Mock mínimo do backend oficial de upload do acervo.
@@ -123,5 +125,21 @@ describe('Tratamento de duplicidade do acervo histórico', () => {
       criarMensagemErroAcervo({ status: 409, code: 'ARQUIVO_DUPLICADO', message: 'Este arquivo já foi cadastrado para este militar.' }),
       'Este arquivo já foi cadastrado para este militar.'
     );
+  });
+});
+
+
+describe('Toast de duplicidade do acervo histórico', () => {
+  test('dobra o tempo de exibição apenas para ARQUIVO_DUPLICADO', () => {
+    assert.deepStrictEqual(
+      getOpcoesToastErroAcervo({ status: 409, code: 'ARQUIVO_DUPLICADO' }),
+      { duration: TOAST_DUPLICIDADE_ACERVO_DURATION }
+    );
+    assert.strictEqual(TOAST_DUPLICIDADE_ACERVO_DURATION, 8000);
+  });
+
+  test('mantém demais erros sem duração customizada', () => {
+    assert.deepStrictEqual(getOpcoesToastErroAcervo({ status: 409 }), {});
+    assert.deepStrictEqual(getOpcoesToastErroAcervo(new Error('Falha')), {});
   });
 });
