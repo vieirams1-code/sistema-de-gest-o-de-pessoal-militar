@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { atualizarCadastroMilitar } from '../utils.ts';
 
 const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
 const STATUS_ITEM_BLOQUEADO_PUBLICACAO = new Set(['bloqueado', 'bloqueada', 'cancelado', 'cancelada', 'retificado', 'retificada']);
@@ -96,6 +97,7 @@ Deno.serve(async (req) => {
 
   let lockId = '';
   try {
+    const authUser = await base44.auth.me();
     const input = (globalThis as any)?.input;
     const parsedPayload = await parseBase44Payload(req);
     const payload = parsedPayload ?? input ?? {};
@@ -174,13 +176,27 @@ Deno.serve(async (req) => {
           historico = await Historico.update(historico.id, { promocao_id: promocaoId });
         }
 
-        const atualizacaoMilitar = await Militar.update(item.militar_id, {
-          posto_graduacao: texto(promocao.posto_graduacao),
-          quadro: texto(promocao.quadro),
-        }).catch(() => null);
+        const atualizacaoMilitar = await atualizarCadastroMilitar(
+          base44,
+          militarId!,
+          {
+            posto_graduacao: texto(promocao.posto_graduacao),
+            quadro: texto(promocao.quadro),
+          },
+          {
+            executado_por: authUser?.email || 'sistema_publicacao',
+            origem: 'publicacao_oficial_promocao',
+            historico_id: historico?.id
+          }
+        ).catch(() => null);
 
-        if (!atualizacaoMilitar) {
-          throw montarErro({ etapa: 'atualizar_militar', motivo: 'update_militar_falhou', promocao_id: promocaoId, item_id: itemId });
+        if (!atualizacaoMilitar || !atualizacaoMilitar.success) {
+          throw montarErro({
+            etapa: 'atualizar_militar',
+            motivo: atualizacaoMilitar?.erro_api || 'update_militar_falhou',
+            promocao_id: promocaoId,
+            item_id: itemId
+          });
         }
 
         await PromocaoMilitar.update(item.id, {
@@ -188,12 +204,12 @@ Deno.serve(async (req) => {
           publicado: true,
           historico_promocao_v2_id: texto(historico?.id),
           atualizar_cadastro_militar: true,
-          motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role.',
+          motivo_atualizacao_cadastro: 'Cadastro atualizado por publicação oficial via backend service-role com confirmação de persistência.',
           resultado_aplicacao_cadastro: 'imediatamente_superior',
         });
 
         historicos.push({ promocao_militar_id: item.id, historico_promocao_v2_id: texto(historico?.id) });
-        militarIdsAfetados.add(militarId);
+        militarIdsAfetados.add(militarId!);
         publicados += 1;
       } catch (error: any) {
         const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId });

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { atualizarCadastroMilitar } from '../utils.ts';
 
 const texto = (valor: unknown) => String(valor ?? '').trim();
 const normalizar = (valor: unknown) => texto(valor).toLowerCase();
@@ -64,7 +65,26 @@ Deno.serve(async (req) => {
 
     try {
       await Historico.update(historicoId, { status_registro: 'cancelado', motivo_retificacao: motivo, observacoes: [texto(historicoAtual?.observacoes), trilhaAdmin].filter(Boolean).join('\n') });
-      if (precisaRollbackCadastro) await Militar.update(militarAnterior.id, { posto_graduacao: texto(historicoAtual?.posto_graduacao_anterior), quadro: texto(historicoAtual?.quadro_anterior) });
+
+      if (precisaRollbackCadastro) {
+        const rollbackResult = await atualizarCadastroMilitar(
+          base44,
+          militarAnterior.id,
+          {
+            posto_graduacao: texto(historicoAtual?.posto_graduacao_anterior),
+            quadro: texto(historicoAtual?.quadro_anterior),
+          },
+          {
+            executado_por: texto(usuario?.email) || 'sistema_reversao',
+            origem: 'reversao_promocao_oficial',
+            historico_id: historicoId
+          }
+        );
+        if (!rollbackResult.success) {
+           throw new Error(rollbackResult.erro_api || 'falha_rollback_cadastro');
+        }
+      }
+
       await PromocaoMilitar.update(itemAtual.id, { status: 'cancelado', publicado: false });
       await Promocao.update(promocao.id, { status: statusPromocao });
     } catch (error: any) {
@@ -72,7 +92,20 @@ Deno.serve(async (req) => {
       try { await PromocaoMilitar.update(itemAtual.id, itemSnapshot); } catch (_) {}
       try { await Promocao.update(promocao.id, promocaoSnapshot); } catch (_) {}
       if (precisaRollbackCadastro && militarAnterior?.id) {
-        try { await Militar.update(militarAnterior.id, { posto_graduacao: militarAnterior?.posto_graduacao, quadro: militarAnterior?.quadro }); } catch (_) {}
+        try {
+            await atualizarCadastroMilitar(
+                base44,
+                militarAnterior.id,
+                {
+                    posto_graduacao: militarAnterior?.posto_graduacao,
+                    quadro: militarAnterior?.quadro,
+                },
+                {
+                    executado_por: 'recuperacao_falha_reversao',
+                    origem: 'reversao_promocao_oficial'
+                }
+            );
+        } catch (_) {}
       }
       return Response.json({ success: false, etapa: 'transacao', motivo: error?.message || 'falha_reversao' }, { status: 500 });
     }
