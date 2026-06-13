@@ -48,10 +48,23 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TagGrupo',
   'Tag',
   'AcervoFuncionalHistorico',
+  'RotinaAdministrativa',
+  'ExecucaoRotinaAdministrativa',
+  'ItemExecucaoRotinaAdministrativa',
+  'RepositorioDocumental',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
-const ENTIDADES_SEM_ESCOPO_MILITAR = new Set(['PerfilPermissao', 'UsuarioAcesso', 'FuncaoMilitar', 'TagGrupo', 'Tag']);
+const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
+  'PerfilPermissao',
+  'UsuarioAcesso',
+  'FuncaoMilitar',
+  'TagGrupo',
+  'Tag',
+  'RotinaAdministrativa',
+  'ExecucaoRotinaAdministrativa',
+  'RepositorioDocumental',
+]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
 // =====================================================================
@@ -147,6 +160,26 @@ const PERMISSIONS_MAP = {
     delete: 'gerir_configuracoes',
   },
   AcervoFuncionalHistorico: {
+    create: 'gerir_acervo_historico',
+    update: 'gerir_acervo_historico',
+    delete: 'gerir_acervo_historico',
+  },
+  RotinaAdministrativa: {
+    create: 'gerir_rotinas_administrativas',
+    update: 'gerir_rotinas_administrativas',
+    delete: 'gerir_rotinas_administrativas',
+  },
+  ExecucaoRotinaAdministrativa: {
+    create: 'executar_rotinas_administrativas',
+    update: 'executar_rotinas_administrativas',
+    delete: 'gerir_rotinas_administrativas',
+  },
+  ItemExecucaoRotinaAdministrativa: {
+    create: 'executar_rotinas_administrativas',
+    update: 'executar_rotinas_administrativas',
+    delete: 'gerir_rotinas_administrativas',
+  },
+  RepositorioDocumental: {
     create: 'gerir_acervo_historico',
     update: 'gerir_acervo_historico',
     delete: 'gerir_acervo_historico',
