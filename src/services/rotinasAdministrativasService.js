@@ -52,6 +52,9 @@ export async function salvarRotina(rotina, usuario) {
     unidade: usuario?.unidade
   });
 
+  console.log('[RotinasAdministrativas] user completo', usuario);
+  console.log('[RotinasAdministrativas] chaves do usuário', Object.keys(usuario || {}));
+
   const payload = {
     ...rotina,
     updated_date: new Date().toISOString()
@@ -59,11 +62,42 @@ export async function salvarRotina(rotina, usuario) {
 
   // Fallbacks para unidade e escopo
   if (!payload.unidade_id) {
-    payload.unidade_id = usuario?.unidade_id || usuario?.unidade?.id || usuario?.subgrupamento_id;
+    const idFallbacks = [
+      { path: 'unidade_id', value: usuario?.unidade_id },
+      { path: 'unidade.id', value: usuario?.unidade?.id },
+      { path: 'unidade.entity_id', value: usuario?.unidade?.entity_id },
+      { path: 'subgrupamento_id', value: usuario?.subgrupamento_id },
+      { path: 'lotacao_id', value: usuario?.lotacao_id },
+      { path: 'estrutura_id', value: usuario?.estrutura_id },
+      { path: 'custom_data?.unidade_id', value: usuario?.custom_data?.unidade_id },
+      { path: 'metadata?.unidade_id', value: usuario?.metadata?.unidade_id },
+    ];
+
+    const resolved = idFallbacks.find(f => f.value);
+    if (resolved) {
+      payload.unidade_id = resolved.value;
+      console.log(`[RotinasAdministrativas] unidade resolvida via user.${resolved.path}`);
+    }
   }
+
   if (!payload.unidade_nome) {
-    payload.unidade_nome = usuario?.unidade_nome || usuario?.unidade?.nome || usuario?.subgrupamento_nome;
+    const nomeFallbacks = [
+      { path: 'unidade_nome', value: usuario?.unidade_nome },
+      { path: 'unidade.nome', value: usuario?.unidade?.nome },
+      { path: 'subgrupamento_nome', value: usuario?.subgrupamento_nome },
+      { path: 'lotacao_nome', value: usuario?.lotacao_nome },
+      { path: 'estrutura_nome', value: usuario?.estrutura_nome },
+      { path: 'custom_data?.unidade_nome', value: usuario?.custom_data?.unidade_nome },
+      { path: 'metadata?.unidade_nome', value: usuario?.metadata?.unidade_nome },
+    ];
+
+    const resolved = nomeFallbacks.find(f => f.value);
+    if (resolved) {
+      payload.unidade_nome = resolved.value;
+      console.log(`[RotinasAdministrativas] unidade_nome resolvida via user.${resolved.path}`);
+    }
   }
+
   if (!payload.escopo_tipo) {
     payload.escopo_tipo = 'unidade';
   }
@@ -79,6 +113,7 @@ export async function salvarRotina(rotina, usuario) {
   }
 
   if (!payload.unidade_id && payload.escopo_tipo === 'unidade') {
+    console.log('[RotinasAdministrativas] unidade não encontrada para o usuário autenticado');
     throw new Error('Não foi possível determinar a unidade para salvar a rotina. Por favor, verifique seu perfil.');
   }
 
