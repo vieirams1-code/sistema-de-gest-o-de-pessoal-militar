@@ -1,13 +1,26 @@
-import { base44 as defaultBase44 } from '@/api/base44Client';
+// O client real é resolvido de forma preguiçosa via Vite (alias @/api/base44Client).
+// Mantemos a resolução tolerante para permitir injeção de dependência nos testes
+// (node:test não resolve o alias @/), sem alterar o comportamento em produção.
+let base44 = null;
 
-let base44 = defaultBase44;
+async function resolverClientPadrao() {
+  if (base44) return base44;
+  const mod = await import('@/api/base44Client');
+  base44 = mod.base44;
+  return base44;
+}
 
 export function __setCursoFormacaoClientForTests(client) {
   base44 = client;
 }
 
 export function __resetCursoFormacaoClientForTests() {
-  base44 = defaultBase44;
+  base44 = null;
+}
+
+// Acesso ao client: usa o injetado (testes) ou resolve o real (produção).
+async function getClient() {
+  return base44 || resolverClientPadrao();
 }
 
 /**
@@ -26,12 +39,25 @@ export function __resetCursoFormacaoClientForTests() {
 const ENTITY_CURSO = 'CursoFormacao';
 const ENTITY_PARTICIPANTE = 'ParticipanteCursoFormacao';
 const ENTITY_AUDIT = 'AuditCursoFormacao';
+const ENTITY_PROMOCAO = 'Promocao';
+const ENTITY_PROMOCAO_MILITAR = 'PromocaoMilitar';
 
 export const STATUS_FINAIS_PARTICIPANTE = ['reprovado', 'desligado', 'promovido'];
 export const STATUS_PENDENTES_PARTICIPANTE = ['em_curso', 'aguardando_nova_etapa'];
 export const STATUS_QUE_EXIGEM_JUSTIFICATIVA = ['reprovado', 'desligado', 'aguardando_nova_etapa'];
 export const STATUS_PARTICIPANTE_EDITAVEIS = ['aprovado', 'reprovado', 'desligado', 'aguardando_nova_etapa'];
+// Participantes elegíveis para entrar numa promoção a partir do curso.
+export const STATUS_ELEGIVEIS_PROMOCAO = ['aprovado', 'aguardando_nova_etapa'];
 const CURSOS_ATIVOS = ['aberto', 'em_andamento'];
+
+// Destino oficial da promoção por tipo de curso de formação.
+export const DESTINO_PROMOCAO_POR_TIPO = {
+  CFC: 'Cabo',
+  CFS: '3º Sargento',
+};
+
+// Status de PromocaoMilitar/Promocao considerados "publicados" no módulo oficial.
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
 
 // ============================================================
 // Auditoria
@@ -43,30 +69,30 @@ export async function registrarAuditoriaCursoFormacao(registro, usuario) {
     usuario_nome: usuario?.full_name || usuario?.email || null,
     data_hora: new Date().toISOString(),
   };
-  return base44.entities[ENTITY_AUDIT].create(payload);
+  return (await getClient()).entities[ENTITY_AUDIT].create(payload);
 }
 
 export async function listarAuditoriaCurso(cursoId) {
   const query = cursoId ? { curso_id: cursoId } : {};
-  return base44.entities[ENTITY_AUDIT].list({ query, sort: '-data_hora' });
+  return (await getClient()).entities[ENTITY_AUDIT].list({ query, sort: '-data_hora' });
 }
 
 // ============================================================
 // Cursos
 // ============================================================
 export async function listarCursosFormacao(filtros = {}) {
-  return base44.entities[ENTITY_CURSO].list({ query: filtros, sort: '-created_date' });
+  return (await getClient()).entities[ENTITY_CURSO].list({ query: filtros, sort: '-created_date' });
 }
 
 export async function obterCursoFormacao(cursoId) {
-  return base44.entities[ENTITY_CURSO].get(cursoId);
+  return (await getClient()).entities[ENTITY_CURSO].get(cursoId);
 }
 
 export async function criarCursoFormacao(dados, usuario) {
   if (!dados?.nome?.trim()) throw new Error('O nome do curso é obrigatório.');
   if (!['CFC', 'CFS'].includes(dados?.tipo)) throw new Error('Tipo do curso inválido. Use CFC ou CFS.');
 
-  const curso = await base44.entities[ENTITY_CURSO].create({
+  const curso = await (await getClient()).entities[ENTITY_CURSO].create({
     ...dados,
     status: dados.status || 'aberto',
   });
@@ -82,8 +108,8 @@ export async function criarCursoFormacao(dados, usuario) {
 }
 
 export async function atualizarCursoFormacao(cursoId, dados, usuario) {
-  const anterior = await base44.entities[ENTITY_CURSO].get(cursoId);
-  const atualizado = await base44.entities[ENTITY_CURSO].update(cursoId, dados);
+  const anterior = await (await getClient()).entities[ENTITY_CURSO].get(cursoId);
+  const atualizado = await (await getClient()).entities[ENTITY_CURSO].update(cursoId, dados);
 
   await registrarAuditoriaCursoFormacao({
     curso_id: cursoId,
@@ -104,8 +130,8 @@ export async function cancelarCursoFormacao(cursoId, justificativa, usuario) {
     throw new Error('Não é possível cancelar um curso que já possui participantes promovidos.');
   }
 
-  const anterior = await base44.entities[ENTITY_CURSO].get(cursoId);
-  const atualizado = await base44.entities[ENTITY_CURSO].update(cursoId, { status: 'cancelado' });
+  const anterior = await (await getClient()).entities[ENTITY_CURSO].get(cursoId);
+  const atualizado = await (await getClient()).entities[ENTITY_CURSO].update(cursoId, { status: 'cancelado' });
 
   await registrarAuditoriaCursoFormacao({
     curso_id: cursoId,
@@ -120,15 +146,19 @@ export async function cancelarCursoFormacao(cursoId, justificativa, usuario) {
 
 export async function encerrarCursoFormacao(cursoId, usuario) {
   const participantes = await listarParticipantesCurso(cursoId);
-  const pendentes = participantes.filter((p) => STATUS_PENDENTES_PARTICIPANTE.includes(p.status));
-  if (pendentes.length > 0) {
+  // Curso só encerra quando TODOS estão em status final: promovido, reprovado ou desligado.
+  // 'aprovado' e 'aguardando_nova_etapa' não são finais: o aprovado precisa ter a promoção
+  // publicada (virando 'promovido') antes do encerramento.
+  const naoFinais = participantes.filter((p) => !STATUS_FINAIS_PARTICIPANTE.includes(p.status));
+  if (naoFinais.length > 0) {
     throw new Error(
-      `Não é possível encerrar o curso: existem ${pendentes.length} participante(s) com status pendente (em_curso ou aguardando_nova_etapa).`,
+      `Não é possível encerrar o curso: existem ${naoFinais.length} participante(s) sem status final. `
+      + 'Todos devem estar promovido, reprovado ou desligado (aprovados precisam ter a promoção publicada).',
     );
   }
 
-  const anterior = await base44.entities[ENTITY_CURSO].get(cursoId);
-  const atualizado = await base44.entities[ENTITY_CURSO].update(cursoId, { status: 'encerrado' });
+  const anterior = await (await getClient()).entities[ENTITY_CURSO].get(cursoId);
+  const atualizado = await (await getClient()).entities[ENTITY_CURSO].update(cursoId, { status: 'encerrado' });
 
   await registrarAuditoriaCursoFormacao({
     curso_id: cursoId,
@@ -145,7 +175,7 @@ export async function encerrarCursoFormacao(cursoId, usuario) {
 // ============================================================
 export async function listarParticipantesCurso(cursoId) {
   if (!cursoId) return [];
-  return base44.entities[ENTITY_PARTICIPANTE].list({
+  return (await getClient()).entities[ENTITY_PARTICIPANTE].list({
     query: { curso_id: cursoId },
     sort: 'snapshot_antiguidade',
   });
@@ -181,12 +211,12 @@ export async function adicionarParticipantesCurso(cursoId, militares, usuario) {
     }
 
     // Impede militar em dois cursos de formação ativos simultaneamente
-    const vinculos = await base44.entities[ENTITY_PARTICIPANTE].list({
+    const vinculos = await (await getClient()).entities[ENTITY_PARTICIPANTE].list({
       query: { militar_id: militarId },
     });
     for (const vinculo of vinculos) {
       if (STATUS_PENDENTES_PARTICIPANTE.includes(vinculo.status) && vinculo.curso_id !== cursoId) {
-        const outroCurso = await base44.entities[ENTITY_CURSO].get(vinculo.curso_id).catch(() => null);
+        const outroCurso = await (await getClient()).entities[ENTITY_CURSO].get(vinculo.curso_id).catch(() => null);
         if (!outroCurso || CURSOS_ATIVOS.includes(outroCurso.status)) {
           throw new Error(
             `O militar ${militar.nome_completo || militarId} já está em outro curso de formação ativo.`,
@@ -196,7 +226,7 @@ export async function adicionarParticipantesCurso(cursoId, militares, usuario) {
     }
 
     proximaOrdem += 1;
-    const participante = await base44.entities[ENTITY_PARTICIPANTE].create({
+    const participante = await (await getClient()).entities[ENTITY_PARTICIPANTE].create({
       curso_id: cursoId,
       militar_id: militarId,
       nome_militar_snapshot: militar.nome_completo || militar.nome_guerra || '',
@@ -237,8 +267,8 @@ export async function alterarStatusParticipanteCurso(participanteId, novoStatus,
     throw new Error('Justificativa é obrigatória para reprovado, desligado ou aguardando nova etapa.');
   }
 
-  const anterior = await base44.entities[ENTITY_PARTICIPANTE].get(participanteId);
-  const atualizado = await base44.entities[ENTITY_PARTICIPANTE].update(participanteId, {
+  const anterior = await (await getClient()).entities[ENTITY_PARTICIPANTE].get(participanteId);
+  const atualizado = await (await getClient()).entities[ENTITY_PARTICIPANTE].update(participanteId, {
     status: novoStatus,
     data_status_atual: new Date().toISOString(),
     ...(justificativa?.trim() ? { observacoes: justificativa.trim() } : {}),
@@ -261,12 +291,12 @@ export async function alterarStatusParticipanteCurso(participanteId, novoStatus,
  * Remove participante apenas se ainda não houve movimentação (continua em_curso).
  */
 export async function removerParticipanteCurso(participanteId, usuario) {
-  const participante = await base44.entities[ENTITY_PARTICIPANTE].get(participanteId);
+  const participante = await (await getClient()).entities[ENTITY_PARTICIPANTE].get(participanteId);
   if (participante?.status !== 'em_curso') {
     throw new Error('Só é possível remover participantes que ainda estão em curso (sem movimentação de status).');
   }
 
-  await base44.entities[ENTITY_PARTICIPANTE].delete(participanteId);
+  await (await getClient()).entities[ENTITY_PARTICIPANTE].delete(participanteId);
 
   await registrarAuditoriaCursoFormacao({
     curso_id: participante?.curso_id,
@@ -281,4 +311,146 @@ export async function removerParticipanteCurso(participanteId, usuario) {
   }, usuario);
 
   return true;
+}
+
+// ============================================================
+// Fase 3 — Geração de promoção via módulo OFICIAL de Promoções
+// ------------------------------------------------------------
+// IMPORTANTE: gerar a promoção NÃO altera Militar.posto_graduacao nem o
+// Histórico de Promoções. Cria apenas:
+//   - Promocao (status 'rascunho')
+//   - PromocaoMilitar (status 'elegivel', publicado=false)
+// A mudança de cadastro/histórico/`promovido` só ocorre quando a promoção for
+// PUBLICADA pelo módulo oficial (publicarPromocaoOficial).
+// ============================================================
+
+export function destinoPromocaoDoCurso(tipoCurso) {
+  const destino = DESTINO_PROMOCAO_POR_TIPO[tipoCurso];
+  if (!destino) {
+    throw new Error(`Tipo de curso "${tipoCurso}" não possui destino de promoção configurado.`);
+  }
+  return destino;
+}
+
+/**
+ * Gera uma Promoção (rascunho) no módulo oficial a partir dos participantes
+ * elegíveis (aprovado/aguardando_nova_etapa). Vincula promocao_id em cada
+ * ParticipanteCursoFormacao. NÃO marca participante como 'promovido' e NÃO
+ * altera o cadastro Militar — isso só acontece na publicação oficial.
+ *
+ * @param {string} cursoId
+ * @param {object} dados - { quadro, data_promocao, data_publicacao, boletim_referencia, ato_referencia, doems_edicao_numero, observacoes }
+ * @param {object} usuario
+ */
+export async function gerarPromocaoDosAprovados(cursoId, dados = {}, usuario) {
+  const curso = await (await getClient()).entities[ENTITY_CURSO].get(cursoId);
+  if (!curso) throw new Error('Curso não encontrado.');
+
+  const destino = destinoPromocaoDoCurso(curso.tipo);
+
+  const participantes = await listarParticipantesCurso(cursoId);
+  const elegiveis = participantes.filter((p) => STATUS_ELEGIVEIS_PROMOCAO.includes(p.status));
+  if (elegiveis.length === 0) {
+    throw new Error('Não há participantes aprovados ou aguardando nova etapa para gerar a promoção.');
+  }
+
+  const jaVinculados = elegiveis.filter((p) => p.promocao_id);
+  if (jaVinculados.length > 0) {
+    throw new Error('Já existe promoção vinculada a um ou mais participantes. Sincronize ou trate os vínculos existentes antes de gerar novamente.');
+  }
+
+  const dataPromocao = (dados.data_promocao || '').split('T')[0];
+  if (!dataPromocao) throw new Error('Informe a data da promoção.');
+
+  // Cria a Promoção no módulo oficial como RASCUNHO (pendente de publicação).
+  const promocao = await (await getClient()).entities[ENTITY_PROMOCAO].create({
+    tipo: 'inicial',
+    natureza: 'coletiva',
+    posto_graduacao: destino,
+    quadro: dados.quadro || '',
+    data_promocao: dataPromocao,
+    data_publicacao: (dados.data_publicacao || '').split('T')[0] || '',
+    boletim_referencia: dados.boletim_referencia || '',
+    ato_referencia: dados.ato_referencia || dados.doems_edicao_numero || '',
+    status: 'rascunho',
+    origem: 'curso_formacao',
+    observacoes: dados.observacoes || `Promoção gerada a partir do curso de formação ${curso.nome}.`,
+    criado_por: usuario?.email || usuario?.full_name || '',
+    criado_em: new Date().toISOString(),
+  });
+
+  // Cria os PromocaoMilitar (elegíveis, NÃO publicados) e vincula no participante.
+  let ordem = 0;
+  for (const participante of elegiveis) {
+    ordem += 1;
+    await (await getClient()).entities[ENTITY_PROMOCAO_MILITAR].create({
+      promocao_id: promocao.id,
+      militar_id: participante.militar_id,
+      ordem: Number(participante.snapshot_antiguidade) || ordem,
+      status: 'elegivel',
+      selecionado: true,
+      publicado: false,
+      origem: 'curso_formacao',
+      data_vinculo: new Date().toISOString(),
+      usuario_vinculo: usuario?.email || usuario?.full_name || '',
+    });
+
+    await (await getClient()).entities[ENTITY_PARTICIPANTE].update(participante.id, {
+      promocao_id: promocao.id,
+    });
+  }
+
+  await registrarAuditoriaCursoFormacao({
+    curso_id: cursoId,
+    acao: 'gerar_promocao',
+    dados_novos: {
+      promocao_id: promocao.id,
+      destino,
+      total_participantes: elegiveis.length,
+      status_promocao: promocao.status,
+    },
+  }, usuario);
+
+  return { promocao, total: elegiveis.length };
+}
+
+/**
+ * Sincroniza o status dos participantes após PUBLICAÇÃO oficial da promoção.
+ * Um participante só vira 'promovido' quando o PromocaoMilitar correspondente
+ * estiver publicado (publicado=true ou status publicado) no módulo oficial.
+ */
+export async function sincronizarParticipantesPromovidos(cursoId, usuario) {
+  const participantes = await listarParticipantesCurso(cursoId);
+  const comPromocao = participantes.filter((p) => p.promocao_id && p.status !== 'promovido');
+  if (comPromocao.length === 0) return { promovidos: 0 };
+
+  let promovidos = 0;
+  for (const participante of comPromocao) {
+    const vinculos = await (await getClient()).entities[ENTITY_PROMOCAO_MILITAR].list({
+      query: { promocao_id: participante.promocao_id, militar_id: participante.militar_id },
+    });
+    const publicado = vinculos.some(
+      (v) => v.publicado === true || STATUS_PROMOCAO_PUBLICADA.has(String(v.status || '').toLowerCase()),
+    );
+    if (!publicado) continue;
+
+    await (await getClient()).entities[ENTITY_PARTICIPANTE].update(participante.id, {
+      status: 'promovido',
+      data_status_atual: new Date().toISOString(),
+    });
+
+    await registrarAuditoriaCursoFormacao({
+      curso_id: cursoId,
+      participante_id: participante.id,
+      militar_id: participante.militar_id,
+      acao: 'sincronizar_promovido',
+      status_anterior: participante.status,
+      status_novo: 'promovido',
+      dados_novos: { promocao_id: participante.promocao_id },
+    }, usuario);
+
+    promovidos += 1;
+  }
+
+  return { promovidos };
 }

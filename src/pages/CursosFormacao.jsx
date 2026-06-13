@@ -11,6 +11,7 @@ import AuditoriaTab from '@/components/cursos-formacao/AuditoriaTab';
 import CursoFormacaoFormModal from '@/components/cursos-formacao/CursoFormacaoFormModal';
 import AdicionarParticipanteModal from '@/components/cursos-formacao/AdicionarParticipanteModal';
 import AlterarStatusModal from '@/components/cursos-formacao/AlterarStatusModal';
+import GerarPromocaoModal from '@/components/cursos-formacao/GerarPromocaoModal';
 
 export default function CursosFormacao() {
   const { user, canAccessModule, canAccessAction } = useCurrentUser();
@@ -33,6 +34,7 @@ export default function CursosFormacao() {
   const [modalCurso, setModalCurso] = useState(false);
   const [modalParticipante, setModalParticipante] = useState(false);
   const [modalStatus, setModalStatus] = useState(null);
+  const [modalPromocao, setModalPromocao] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const erro = (e) => toast({ variant: 'destructive', title: 'Erro', description: e.message });
@@ -136,6 +138,27 @@ export default function CursosFormacao() {
     } catch (e) { erro(e); }
   };
 
+  const handleGerarPromocao = async (dados) => {
+    setSaving(true);
+    try {
+      const { promocao, total } = await cursoService.gerarPromocaoDosAprovados(cursoSelecionado.id, dados, user);
+      toast({ title: `Promoção (rascunho) criada para ${total} militar(es).`, description: 'Publique-a no módulo de Promoções para efetivar.' });
+      setModalPromocao(false);
+      await carregarParticipantes(cursoSelecionado.id);
+      await carregarAuditoria(cursoSelecionado.id);
+      return promocao;
+    } catch (e) { erro(e); } finally { setSaving(false); }
+  };
+
+  const handleSincronizarPromovidos = async () => {
+    try {
+      const { promovidos } = await cursoService.sincronizarParticipantesPromovidos(cursoSelecionado.id, user);
+      toast({ title: promovidos > 0 ? `${promovidos} participante(s) marcados como promovido.` : 'Nenhuma promoção publicada ainda.' });
+      await carregarParticipantes(cursoSelecionado.id);
+      await carregarAuditoria(cursoSelecionado.id);
+    } catch (e) { erro(e); }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -174,6 +197,8 @@ export default function CursosFormacao() {
             onAdicionar={() => setModalParticipante(true)}
             onAlterarStatus={(p) => setModalStatus(p)}
             onRemover={handleRemover}
+            onGerarPromocao={() => setModalPromocao(true)}
+            onSincronizarPromovidos={handleSincronizarPromovidos}
           />
         </TabsContent>
 
@@ -195,6 +220,14 @@ export default function CursosFormacao() {
         onOpenChange={(v) => !v && setModalStatus(null)}
         participante={modalStatus}
         onConfirmar={handleAlterarStatus}
+        saving={saving}
+      />
+      <GerarPromocaoModal
+        open={modalPromocao}
+        onOpenChange={setModalPromocao}
+        curso={cursoSelecionado}
+        participantes={participantes}
+        onConfirmar={handleGerarPromocao}
         saving={saving}
       />
     </div>

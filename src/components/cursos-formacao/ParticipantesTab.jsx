@@ -3,16 +3,19 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Pencil, Trash2 } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, Award, RefreshCw } from 'lucide-react';
 import { STATUS_PARTICIPANTE_LABEL, STATUS_PARTICIPANTE_CLASSE, ALUNO_LABEL } from './cursoFormacaoConfig';
 import { resolverStatusMilitarComCurso } from '@/services/militarStatusVirtual';
+import { STATUS_ELEGIVEIS_PROMOCAO } from '@/services/cursoFormacaoService';
 
-export default function ParticipantesTab({ curso, participantes, loading, podeGerir, onAdicionar, onAlterarStatus, onRemover }) {
+export default function ParticipantesTab({ curso, participantes, loading, podeGerir, onAdicionar, onAlterarStatus, onRemover, onGerarPromocao, onSincronizarPromovidos }) {
   if (!curso) {
     return <Card className="p-8 text-center text-slate-500">Selecione um curso na aba "Cursos" para ver os participantes.</Card>;
   }
 
   const cursoAtivo = ['aberto', 'em_andamento'].includes(curso.status);
+  const temElegiveisSemPromocao = participantes.some((p) => STATUS_ELEGIVEIS_PROMOCAO.includes(p.status) && !p.promocao_id);
+  const temPromocaoPendente = participantes.some((p) => p.promocao_id && p.status !== 'promovido');
 
   // Resolve o posto virtual (camada de exibição) por participante, sem mutar dados.
   const resolverVirtual = (p) => resolverStatusMilitarComCurso(
@@ -27,8 +30,18 @@ export default function ParticipantesTab({ curso, participantes, loading, podeGe
           <p className="font-semibold">{curso.nome}</p>
           <p className="text-xs text-slate-500">Tratamento durante o curso: <strong>{ALUNO_LABEL[curso.tipo]}</strong></p>
         </div>
-        {podeGerir && cursoAtivo && (
-          <Button onClick={onAdicionar} className="gap-2"><UserPlus className="w-4 h-4" /> Adicionar Participantes</Button>
+        {podeGerir && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {cursoAtivo && (
+              <Button onClick={onAdicionar} className="gap-2"><UserPlus className="w-4 h-4" /> Adicionar Participantes</Button>
+            )}
+            {temElegiveisSemPromocao && (
+              <Button variant="secondary" onClick={onGerarPromocao} className="gap-2"><Award className="w-4 h-4" /> Gerar promoção dos aprovados</Button>
+            )}
+            {temPromocaoPendente && (
+              <Button variant="outline" onClick={onSincronizarPromovidos} className="gap-2"><RefreshCw className="w-4 h-4" /> Sincronizar promovidos</Button>
+            )}
+          </div>
         )}
       </div>
 
