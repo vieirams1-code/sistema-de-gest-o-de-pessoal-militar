@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Medal } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
