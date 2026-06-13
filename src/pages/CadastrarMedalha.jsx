@@ -13,8 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
-import { deduplicarTiposMedalha, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
+import { deduplicarTiposMedalha, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha, indexarTipos, resolverTipoMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from 'lucide-react';
 
 const ORDEM_TIPOS_MEDALHA = ['DOM_PEDRO_II', 'TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
 
@@ -84,14 +86,18 @@ export default function CadastrarMedalha() {
 
   useEffect(() => {
     if (medalhaExistente) {
+      const tipoIndexado = indexarTipos(tiposMedalhaOrdenados);
+      const tipoResolvido = resolverTipoMedalha(medalhaExistente, tipoIndexado);
+
       setFormData((prev) => ({
         ...prev,
         ...medalhaExistente,
+        tipo_medalha_id: tipoResolvido?.id || medalhaExistente.tipo_medalha_id || '',
         status: normalizarStatusMedalha(medalhaExistente.status) || 'INDICADA',
         doems_numero: medalhaExistente.doems_numero || medalhaExistente.numero_publicacao || medalhaExistente.documento_referencia || '',
       }));
     }
-  }, [medalhaExistente]);
+  }, [medalhaExistente, tiposMedalhaOrdenados]);
 
   const handleChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -180,6 +186,15 @@ export default function CadastrarMedalha() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {medalhaId && !formData.tipo_medalha_id && (medalhaExistente?.tipo_medalha_nome || medalhaExistente?.tipo_medalha_codigo) && (
+            <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-800">
+              <AlertCircle className="h-4 w-4 stroke-amber-800" />
+              <AlertDescription>
+                O tipo de medalha original "{medalhaExistente?.tipo_medalha_nome || medalhaExistente?.tipo_medalha_codigo}" não foi reconhecido automaticamente. Por favor, selecione o tipo correspondente abaixo.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dados do Militar</h3>
             <MilitarSelector

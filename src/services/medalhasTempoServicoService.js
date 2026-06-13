@@ -149,7 +149,7 @@ function mapearCodigoTempoPorTexto(valor) {
   const porCatalogoLegado = CODIGO_POR_NOME_LEGADO.get(texto);
   if (porCatalogoLegado) return porCatalogoLegado;
 
-  if (texto.includes('dom pedro ii') || texto.includes('dom pedro 2')) return 'DOM_PEDRO_II';
+  if (texto.includes('dom pedro ii') || texto.includes('dom pedro 2') || texto.includes('dp ii')) return 'DOM_PEDRO_II';
   if (!texto.includes('tempo') || !texto.includes('servico')) return null;
 
   if (texto.includes('40')) return 'TEMPO_40';
@@ -237,7 +237,7 @@ export function criarIndicacaoAutomatica({ militar, medalhaDevida, tipoMedalha }
   };
 }
 
-function indexarTipos(tipos = []) {
+export function indexarTipos(tipos = []) {
   const porId = new Map();
   const porCodigo = new Map();
   const porNomeNormalizado = new Map();
@@ -263,23 +263,23 @@ function indexarTipos(tipos = []) {
   return { porId, porCodigo, porNomeNormalizado };
 }
 
-function resolverTipoMedalha(registro, tipoIndexado) {
+export function resolverTipoMedalha(registro, tipoIndexado) {
   if (!registro) return null;
   if (registro.tipo_medalha_id && tipoIndexado.porId.has(registro.tipo_medalha_id)) {
     return tipoIndexado.porId.get(registro.tipo_medalha_id);
   }
 
-  const codigoRegistro = normalizarCodigo(registro.tipo_medalha_codigo);
+  const codigoRegistro = normalizarCodigo(registro.tipo_medalha_codigo || registro.codigo);
   if (codigoRegistro && tipoIndexado.porCodigo.has(codigoRegistro)) {
     return tipoIndexado.porCodigo.get(codigoRegistro);
   }
 
-  const nomeNormalizado = normalizarTexto(registro.tipo_medalha_nome);
+  const nomeNormalizado = normalizarTexto(registro.tipo_medalha_nome || registro.tipo || registro.nome);
   if (nomeNormalizado && tipoIndexado.porNomeNormalizado.has(nomeNormalizado)) {
     return tipoIndexado.porNomeNormalizado.get(nomeNormalizado);
   }
 
-  const codigoLegado = mapearCodigoTempoPorTexto(registro.tipo_medalha_nome);
+  const codigoLegado = mapearCodigoTempoPorTexto(registro.tipo_medalha_nome || registro.tipo || registro.nome);
   if (codigoLegado && tipoIndexado.porCodigo.has(codigoLegado)) {
     return tipoIndexado.porCodigo.get(codigoLegado);
   }
