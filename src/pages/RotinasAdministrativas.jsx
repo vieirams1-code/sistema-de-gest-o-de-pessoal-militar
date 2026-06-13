@@ -10,7 +10,8 @@ import {
   Copy,
   Search,
   AlertCircle,
-  Trash2
+  Trash2,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -81,6 +82,7 @@ export default function RotinasAdministrativas() {
     observacoes: ''
   });
 
+  const [isConfirmConcludeOpen, setIsConfirmConcludeOpen] = useState(false);
   const [isViewExecucaoOpen, setIsViewExecucaoOpen] = useState(false);
   const [viewExecucao, setViewExecucao] = useState(null);
   const [viewItens, setViewItens] = useState([]);
@@ -109,7 +111,7 @@ export default function RotinasAdministrativas() {
 
   // Mutations
   const mutationSalvar = useMutation({
-    mutationFn: salvarRotina,
+    mutationFn: (vars) => salvarRotina(vars.rotina, vars.usuario),
     onSuccess: () => {
       queryClient.invalidateQueries(['rotinas-administrativas']);
       setIsEditModalOpen(false);
@@ -118,10 +120,10 @@ export default function RotinasAdministrativas() {
   });
 
   const mutationExcluir = useMutation({
-    mutationFn: excluirRotina,
+    mutationFn: (id) => excluirRotina(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['rotinas-administrativas']);
-      toast({ title: 'Sucesso', description: 'Rotina excluída.' });
+      toast({ title: 'Sucesso', description: 'A rotina foi inativada ou excluída.' });
     }
   });
 
@@ -162,6 +164,27 @@ export default function RotinasAdministrativas() {
 
     return { ativas, pendentes, concluidasMes };
   }, [rotinas, execucoes]);
+
+  const handleOpenExecutar = (rotina) => {
+    setSelectedRotina(rotina);
+
+    // Sugerir segunda a sexta da semana atual
+    const hoje = new Date();
+    const diaSemana = hoje.getDay(); // 0 (Dom) a 6 (Sab)
+    const diffSeg = diaSemana === 0 ? -6 : 1 - diaSemana;
+    const segunda = new Date(hoje);
+    segunda.setDate(hoje.getDate() + diffSeg);
+    const sexta = new Date(segunda);
+    sexta.setDate(segunda.getDate() + 4);
+
+    setExecParams({
+      data_inicio: segunda.toISOString().split('T')[0],
+      data_fim: sexta.toISOString().split('T')[0],
+      incluir_anexos: rotina.incluir_anexos,
+      observacoes: ''
+    });
+    setIsExecutarModalOpen(true);
+  };
 
   const handleOpenEdit = (rotina = null) => {
     if (rotina) {
@@ -206,7 +229,10 @@ export default function RotinasAdministrativas() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">Rotinas Administrativas</h1>
-        <p className="text-muted-foreground">Gestão e execução de tarefas administrativas recorrentes.</p>
+        <p className="text-muted-foreground font-medium text-blue-700 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          O SGP não envia dados ao TARS. A remessa final deve ser feita manualmente no sistema externo.
+        </p>
       </div>
 
       {/* Cards Superiores */}
@@ -248,9 +274,11 @@ export default function RotinasAdministrativas() {
           <TabsTrigger value="execucoes" className="flex gap-2">
             <History className="w-4 h-4" /> Execuções
           </TabsTrigger>
-          <TabsTrigger value="config" className="flex gap-2">
-            <Settings className="w-4 h-4" /> Configurações
-          </TabsTrigger>
+          {canAccessAction('perm_gerir_rotinas_administrativas') && (
+            <TabsTrigger value="config" className="flex gap-2">
+              <Settings className="w-4 h-4" /> Configurações
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="rotinas" className="space-y-4">
@@ -284,12 +312,11 @@ export default function RotinasAdministrativas() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button size="sm" variant="outline" onClick={() => {
-                            setSelectedRotina(rotina);
-                            setIsExecutarModalOpen(true);
-                          }}>
-                            <Play className="w-4 h-4 mr-2" /> Executar
-                          </Button>
+                          {canAccessAction('perm_executar_rotinas_administrativas') && (
+                            <Button size="sm" variant="outline" onClick={() => handleOpenExecutar(rotina)}>
+                              <Play className="w-4 h-4 mr-2" /> Executar
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -388,12 +415,20 @@ export default function RotinasAdministrativas() {
                         <TableCell className="capitalize">{rotina.periodicidade}</TableCell>
                         <TableCell>{rotina.ativo ? 'Sim' : 'Não'}</TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(rotina)}>
-                            Editar
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-500" onClick={() => mutationExcluir.mutate(rotina.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {canAccessAction('perm_gerir_rotinas_administrativas') && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(rotina)}>
+                                Editar
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-red-500" title="Inativar Rotina" onClick={() => {
+                                if (confirm('Deseja realmente inativar/excluir esta rotina?')) {
+                                  mutationExcluir.mutate(rotina.id);
+                                }
+                              }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -495,9 +530,16 @@ export default function RotinasAdministrativas() {
                         <TableCell className="text-xs">{item.data_inicio} a {item.data_fim}</TableCell>
                         <TableCell className="text-center">
                           {item.possui_anexo && (
-                            <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
-                              <Paperclip className="w-3 h-3 mr-1" /> Sim
-                            </Badge>
+                            <div className="flex justify-center gap-2">
+                              <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+                                <Paperclip className="w-3 h-3 mr-1" /> Sim
+                              </Badge>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                <a href={item.origem_id ? `#/VerAtestado?id=${item.origem_id}` : '#'} target="_blank" rel="noreferrer">
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -515,17 +557,38 @@ export default function RotinasAdministrativas() {
                     <Button variant="destructive" onClick={() => mutationStatus.mutate({ id: viewExecucao.id, status: 'cancelada' })}>
                       <XCircle className="w-4 h-4 mr-2" /> Cancelar
                     </Button>
-                    <Button variant="success" onClick={() => mutationStatus.mutate({
-                      id: viewExecucao.id,
-                      status: 'concluida',
-                      extra: { data_conclusao: new Date().toISOString() }
-                    })}>
+                    <Button variant="success" onClick={() => setIsConfirmConcludeOpen(true)}>
                       <CheckCircle className="w-4 h-4 mr-2" /> Marcar como Concluída
                     </Button>
                   </>
                 )}
              </div>
              <Button variant="outline" onClick={() => setIsViewExecucaoOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Confirmação Conclusão */}
+      <Dialog open={isConfirmConcludeOpen} onOpenChange={setIsConfirmConcludeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Conclusão</DialogTitle>
+            <DialogDescription>
+              Confirma que o envio dos dados foi realizado manualmente no sistema <strong>TARS</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmConcludeOpen(false)}>Ainda não enviei</Button>
+            <Button variant="success" onClick={() => {
+              mutationStatus.mutate({
+                id: viewExecucao.id,
+                status: 'concluida',
+                usuario: user
+              });
+              setIsConfirmConcludeOpen(false);
+            }}>
+              Sim, Confirmo o Envio
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -612,17 +675,16 @@ export default function RotinasAdministrativas() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
             <Button onClick={() => {
-              const payload = {
-                ...editFormData,
-                criado_por: user?.id,
-                criado_por_nome: user?.full_name,
+              const { destinatario, orgao_destino, assunto, ...rest } = editFormData;
+              const rotinaData = {
+                ...rest,
                 configuracao_json: {
-                  destinatario: editFormData.destinatario,
-                  orgao_destino: editFormData.orgao_destino,
-                  assunto: editFormData.assunto
+                  destinatario,
+                  orgao_destino,
+                  assunto
                 }
               };
-              mutationSalvar.mutate(payload);
+              mutationSalvar.mutate({ rotina: rotinaData, usuario: user });
             }}>Salvar Rotina</Button>
           </DialogFooter>
         </DialogContent>

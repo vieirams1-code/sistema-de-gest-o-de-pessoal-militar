@@ -37,19 +37,52 @@ export async function getExecucoesRotina(unidadeId, filters = {}, hasGlobalAcces
   });
 }
 
-export async function salvarRotina(rotina) {
-  if (rotina.id) {
-    return atualizarEscopado(ENTITY_ROTINA, rotina.id, rotina);
+export async function salvarRotina(rotina, usuario) {
+  const payload = {
+    ...rotina,
+    updated_date: new Date().toISOString()
+  };
+
+  if (!payload.id) {
+    payload.criado_por = usuario.id;
+    payload.criado_por_nome = usuario.full_name;
+    payload.created_date = payload.updated_date;
   }
-  return criarEscopado(ENTITY_ROTINA, rotina);
+
+  if (payload.id) {
+    return atualizarEscopado(ENTITY_ROTINA, payload.id, payload);
+  }
+  return criarEscopado(ENTITY_ROTINA, payload);
+}
+
+export async function inativarRotina(id) {
+  return atualizarEscopado(ENTITY_ROTINA, id, { ativo: false });
 }
 
 export async function excluirRotina(id) {
+  // Verificar se há execuções antes de excluir (proteção no service)
+  const execs = await base44.entities[ENTITY_EXECUCAO].list({
+    query: { rotina_id: id },
+    limit: 1
+  });
+
+  if (execs.length > 0) {
+    return inativarRotina(id);
+  }
+
   return excluirEscopado(ENTITY_ROTINA, id);
 }
 
-export async function atualizarStatusExecucao(id, status, extra = {}) {
-  return atualizarEscopado(ENTITY_EXECUCAO, id, { status, ...extra });
+export async function atualizarStatusExecucao(id, status, usuario, extra = {}) {
+  const payload = { status, ...extra };
+
+  if (status === 'concluida') {
+    payload.data_conclusao = new Date().toISOString();
+    payload.concluido_por = usuario.id;
+    payload.concluido_por_nome = usuario.full_name;
+  }
+
+  return atualizarEscopado(ENTITY_EXECUCAO, id, payload);
 }
 
 /**
@@ -58,7 +91,11 @@ export async function atualizarStatusExecucao(id, status, extra = {}) {
 export async function executarMemorandoTars(rotina, params, usuario) {
   const { data_inicio, data_fim, incluir_anexos, observacoes } = params;
 
-  // 1. Buscar atestados do período e unidade
+  if (!data_inicio || !data_fim) {
+    throw new Error('Período de início e fim é obrigatório.');
+  }
+
+  // 1. Buscar atestados do período e unidade DA ROTINA (Reforço de escopo)
   const atestados = await base44.entities.Atestado.list({
     query: {
       unidade_id: rotina.unidade_id,
@@ -117,7 +154,7 @@ export async function executarMemorandoTars(rotina, params, usuario) {
   return { ...execucao, texto_gerado: textoGerado, itens };
 }
 
-function renderizarTemplateMemorando(template, data) {
+export function renderizarTemplateMemorando(template, data) {
   let text = template || '';
 
   const tabela = data.atestados.length > 0
@@ -141,7 +178,15 @@ function renderizarTemplateMemorando(template, data) {
   return text;
 }
 
-export async function getItensExecucao(execucaoId) {
+export async function getItensExecucao(execucaoId, unidadeId, hasGlobalAccess = false) {
+  // Reforço de escopo para itens
+  if (!hasGlobalAccess && unidadeId) {
+    const exec = await base44.entities[ENTITY_EXECUCAO].get(execucaoId);
+    if (exec && exec.unidade_id !== unidadeId) {
+      throw new Error('Acesso negado aos itens desta execução.');
+    }
+  }
+
   return base44.entities[ENTITY_ITEM].list({
     query: { execucao_id: execucaoId }
   });
