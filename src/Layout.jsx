@@ -190,7 +190,7 @@ const menuGroups = [
           { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },
           { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
           { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp' },
-          { name: 'Repositórios Documentais', page: 'RepositoriosDocumentais', icon: Database, moduleKey: 'acesso_repositorios_documentais', actionKey: 'perm_gerir_repositorios_documentais' },
+          { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
           {
             name: 'Permissões',
             page: 'PermissoesUsuarios',
@@ -222,12 +222,6 @@ const menuGroups = [
               { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'classificar_legado' },
               { name: 'Classificações Históricas', page: 'ClassificacoesHistoricasAlteracoes', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'gerir_classificacoes_historicas' },
             ],
-          },
-          {
-            name: 'Repositórios',
-            page: 'RepositoriosDocumentais',
-            icon: Database,
-            actionKey: 'gerir_repositorios_documentais',
           },
           {
             name: 'Configurações',

@@ -112,7 +112,6 @@ import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import RP from './pages/RP';
 import RegistrosMilitar from './pages/RegistrosMilitar';
-import RepositoriosDocumentais from './pages/RepositoriosDocumentais';
 import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
 import RevisaoDuplicidadesMilitar from './pages/RevisaoDuplicidadesMilitar';
 import RastreamentoPromocoes from './pages/RastreamentoPromocoes';
@@ -120,6 +119,7 @@ import Promocoes from './pages/Promocoes';
 import DetalhePromocao from './pages/DetalhePromocao';
 import VisualizacaoGestorEfetivo from './pages/VisualizacaoGestorEfetivo';
 import Tags from './pages/Tags';
+import BackupSistema from './pages/BackupSistema';
 import __Layout from './Layout.jsx';
 
 
@@ -189,7 +189,6 @@ export const PAGES = {
     "PermissoesUsuarios": PermissoesUsuarios,
     "RP": RP,
     "RegistrosMilitar": RegistrosMilitar,
-    "RepositoriosDocumentais": RepositoriosDocumentais,
     "CadastrarRegistroRP": CadastrarRegistroRP,
     "RevisaoDuplicidadesMilitar": RevisaoDuplicidadesMilitar,
     "RastreamentoPromocoes": RastreamentoPromocoes,
@@ -197,6 +196,7 @@ export const PAGES = {
     "DetalhePromocao": DetalhePromocao,
     "VisualizacaoGestorEfetivo": VisualizacaoGestorEfetivo,
     "Tags": Tags,
+    "BackupSistema": BackupSistema,
 }
 
 export const pagesConfig = {
