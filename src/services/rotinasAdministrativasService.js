@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { criarEscopado, atualizarEscopado, excluirEscopado, bulkEscopado } from './cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, excluirEscopado, bulkEscopado } from './cudEscopadoClient.js';
 
 /**
  * Service para gestão de Rotinas Administrativas.
@@ -10,18 +10,25 @@ const ENTITY_EXECUCAO = 'ExecucaoRotinaAdministrativa';
 const ENTITY_ITEM = 'ItemExecucaoRotinaAdministrativa';
 
 export async function getRotinasAdministrativas(unidadeId, hasGlobalAccess = false) {
+  console.log('[RotinasAdministrativas] getRotinasAdministrativas params:', { unidadeId, hasGlobalAccess });
   const query = {
     ativo: true,
   };
 
-  if (!hasGlobalAccess && unidadeId) {
-    query.unidade_id = unidadeId;
+  if (!hasGlobalAccess) {
+    // Se não tem acesso global, FILTRA OBRIGATORIAMENTE por unidade_id.
+    // Se unidadeId for nulo/undefined, o filtro forçará zero resultados por segurança,
+    // a menos que o backend tenha regra de bypass (que no caso de RotinaAdministrativa não tem para usuários comuns).
+    query.unidade_id = unidadeId || 'SEM_UNIDADE_DEFINIDA';
   }
 
-  return base44.entities[ENTITY_ROTINA].list({
+  const results = await base44.entities[ENTITY_ROTINA].list({
     query,
     sort: 'nome',
   });
+
+  console.log('[RotinasAdministrativas] getRotinasAdministrativas result count:', results.length);
+  return results;
 }
 
 export async function getExecucoesRotina(unidadeId, filters = {}, hasGlobalAccess = false) {
@@ -38,16 +45,44 @@ export async function getExecucoesRotina(unidadeId, filters = {}, hasGlobalAcces
 }
 
 export async function salvarRotina(rotina, usuario) {
+  console.log('[RotinasAdministrativas] salvarRotina usuario:', {
+    id: usuario?.id,
+    full_name: usuario?.full_name,
+    unidade_id: usuario?.unidade_id,
+    unidade: usuario?.unidade
+  });
+
   const payload = {
     ...rotina,
     updated_date: new Date().toISOString()
   };
 
+  // Fallbacks para unidade e escopo
+  if (!payload.unidade_id) {
+    payload.unidade_id = usuario?.unidade_id || usuario?.unidade?.id || usuario?.subgrupamento_id;
+  }
+  if (!payload.unidade_nome) {
+    payload.unidade_nome = usuario?.unidade_nome || usuario?.unidade?.nome || usuario?.subgrupamento_nome;
+  }
+  if (!payload.escopo_tipo) {
+    payload.escopo_tipo = 'unidade';
+  }
+  if (payload.ativo === undefined) {
+    payload.ativo = true;
+  }
+
+  // Garantir metadados de criação
   if (!payload.id) {
-    payload.criado_por = usuario.id;
-    payload.criado_por_nome = usuario.full_name;
+    payload.criado_por = usuario?.id;
+    payload.criado_por_nome = usuario?.full_name;
     payload.created_date = payload.updated_date;
   }
+
+  if (!payload.unidade_id && payload.escopo_tipo === 'unidade') {
+    throw new Error('Não foi possível determinar a unidade para salvar a rotina. Por favor, verifique seu perfil.');
+  }
+
+  console.log('[RotinasAdministrativas] salvarRotina final payload:', payload);
 
   if (payload.id) {
     return atualizarEscopado(ENTITY_ROTINA, payload.id, payload);
