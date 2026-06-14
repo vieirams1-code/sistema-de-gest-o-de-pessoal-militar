@@ -13,14 +13,31 @@ function normalizarMatricula(valor) {
   return limparTexto(valor).replace(/\D/g, '');
 }
 
-function montarNomesMilitar(militar) {
+function hasNomeCompletoMinimo(nome) {
+  const texto = normalizarTextoComparacao(nome);
+  return texto.length >= 6 && texto.split(/\s+/).filter(Boolean).length >= 2;
+}
+
+function montarNomesCompletosMilitar(militar) {
   const nomes = [
     militar?.nome_completo,
-    militar?.nome_guerra,
+    militar?.militar_nome_completo,
     militar?.militar_nome,
   ]
     .map((item) => normalizarTextoComparacao(item))
-    .filter(Boolean);
+    .filter(hasNomeCompletoMinimo);
+
+  return Array.from(new Set(nomes));
+}
+
+function montarNomesCompletosRegistro(registro) {
+  const nomes = [
+    registro?.militar_nome_completo,
+    registro?.nome_completo_legado,
+    registro?.militar_nome,
+  ]
+    .map((item) => normalizarTextoComparacao(item))
+    .filter(hasNomeCompletoMinimo);
 
   return Array.from(new Set(nomes));
 }
@@ -66,17 +83,11 @@ export function vinculaRegistroAoMilitar(registro, militar) {
     return true;
   }
 
-  const nomeRegistro = normalizarTextoComparacao(
-    registro?.militar_nome || registro?.militar_nome_completo || registro?.nome_completo_legado || registro?.nome_guerra_legado,
-  );
+  const nomesRegistro = montarNomesCompletosRegistro(registro);
+  if (nomesRegistro.length === 0) return false;
 
-  if (!nomeRegistro || nomeRegistro.length < 6) return false;
+  const nomesMilitar = montarNomesCompletosMilitar(militar);
+  if (nomesMilitar.length === 0) return false;
 
-  const nomesMilitar = montarNomesMilitar(militar);
-
-  return nomesMilitar.some((nomeMilitar) => {
-    if (!nomeMilitar || nomeMilitar.length < 6) return false;
-    return nomeMilitar === nomeRegistro || nomeMilitar.includes(nomeRegistro) || nomeRegistro.includes(nomeMilitar);
-  });
+  return nomesRegistro.some((nomeRegistro) => nomesMilitar.includes(nomeRegistro));
 }
-
