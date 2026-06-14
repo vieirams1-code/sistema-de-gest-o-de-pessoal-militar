@@ -230,11 +230,25 @@ function efeitoCadastroVisualPorRegistro({ registro, militar, promocao }) {
 
 const SELECT_VAZIO = '__vazio__';
 
+const STATUS_PROMOCAO_PUBLICADA_UI = new Set(['publicada', 'publicado', 'consolidada', 'consolidado', 'publicada_parcial']);
+
+function ehPromocaoPublicada(promocao) {
+  return STATUS_PROMOCAO_PUBLICADA_UI.has(statusNormalizado(promocao?.status));
+}
+
+// Item novo/pendente (ainda não publicado e sem histórico oficial vinculado).
+function ehItemPendenteComplementar(registro) {
+  if (!registro) return false;
+  if (registro.publicado || statusNormalizado(registro.status) === 'publicado') return false;
+  return !texto(registro.historico_promocao_v2_id);
+}
+
 function MilitarCard({
   registro,
   original,
   promocao,
   promocaoContext,
+  promocaoPublicada,
   onAtualizar,
   onRemover,
   onExcluirDefinitivo,
@@ -298,6 +312,11 @@ function MilitarCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+          {promocaoPublicada && ehItemPendenteComplementar(registro) && (
+            <Badge variant="outline" className="border-purple-300 bg-purple-50 text-purple-700">
+              Inclusão complementar
+            </Badge>
+          )}
           <Badge variant="outline" className={situacaoClass(registro.status, registro.publicado)}>
             {rotuloSituacao(registro.status, registro.publicado)}
           </Badge>
@@ -849,6 +868,11 @@ export default function DetalhePromocao() {
         militar: item.militar,
         ordem: ordemAplicada,
       });
+      // Inclusão complementar: quando a promoção já está publicada, marca a origem
+      // para rastreabilidade. Mantém publicado=false e status=elegivel (definidos no payload).
+      if (ehPromocaoPublicada(promocao)) {
+        payload.origem = 'inclusao_complementar';
+      }
       await base44.entities.PromocaoMilitar.create(payload);
     },
     onSuccess: async () => {
@@ -1023,6 +1047,13 @@ export default function DetalhePromocao() {
     ? (isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
     : 'Pronto para publicar oficialmente.';
 
+  const promocaoPublicada = ehPromocaoPublicada(promocao);
+  const temPendentesComplementares = useMemo(
+    () => promocaoPublicada && turma.some((registro) => ehItemPendenteComplementar(registro)),
+    [promocaoPublicada, turma],
+  );
+  const rotuloBotaoPublicar = temPendentesComplementares ? 'Publicar complementares' : 'Publicar promoção';
+
   return (
     <div className="min-h-screen space-y-6 bg-slate-50 p-4 md:p-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -1062,7 +1093,7 @@ export default function DetalhePromocao() {
             className={publicarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}
           >
             <CheckCircle2 className="mr-2 h-4 w-4" />
-            Publicar promoção
+            {rotuloBotaoPublicar}
           </Button>
           {promocaoPermiteExclusao(promocao, { turma }) && (
             <Button variant="destructive" onClick={confirmarExclusaoPromocao} disabled={excluirPromocaoMutation.isPending}>
@@ -1091,6 +1122,15 @@ export default function DetalhePromocao() {
         <Alert variant="destructive">
           <AlertTitle>Promoção não encontrada</AlertTitle>
           <AlertDescription>Nenhuma promoção foi localizada para o endereço informado.</AlertDescription>
+        </Alert>
+      )}
+
+      {promocao && promocaoPublicada && (
+        <Alert className="border-purple-200 bg-purple-50">
+          <AlertTitle className="text-purple-800">Promoção já publicada</AlertTitle>
+          <AlertDescription className="text-purple-700">
+            Novos militares adicionados serão tratados como inclusão complementar e precisarão de publicação própria.
+          </AlertDescription>
         </Alert>
       )}
 
@@ -1214,6 +1254,7 @@ export default function DetalhePromocao() {
                         acaoEmAndamento={removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
                         promocao={promocaoContextoAtual}
                         promocaoContext={promocaoContext}
+                        promocaoPublicada={promocaoPublicada}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
                         onExcluirDefinitivo={setRegistroParaExcluirDefinitivo}
