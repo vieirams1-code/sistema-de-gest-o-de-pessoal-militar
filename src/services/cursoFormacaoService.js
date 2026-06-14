@@ -151,6 +151,17 @@ export async function cancelarCursoFormacao(cursoId, justificativa, usuario) {
 
 export async function encerrarCursoFormacao(cursoId, usuario) {
   const participantes = await listarParticipantesCurso(cursoId);
+
+  // Bloqueio específico: participantes com promoção revertida ficam pendentes de
+  // reanálise e exigem decisão administrativa manual antes do encerramento.
+  const pendentesReanalise = participantes.filter((p) => p.status === 'pendente_reanalise');
+  if (pendentesReanalise.length > 0) {
+    throw new Error(
+      `Não é possível encerrar o curso: existem ${pendentesReanalise.length} participante(s) pendente(s) de reanálise `
+      + '(promoção vinculada revertida). Resolva a situação desses militares antes de encerrar.',
+    );
+  }
+
   // Curso só encerra quando TODOS estão em status final: promovido, reprovado ou desligado.
   // 'aprovado' e 'aguardando_nova_etapa' não são finais: o aprovado precisa ter a promoção
   // publicada (virando 'promovido') antes do encerramento.

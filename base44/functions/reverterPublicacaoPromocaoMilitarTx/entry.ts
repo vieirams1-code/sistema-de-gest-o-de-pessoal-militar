@@ -5,9 +5,10 @@ const normalizar = (valor: unknown) => texto(valor).toLowerCase();
 
 // Status considerados "publicados" no PromocaoMilitar.
 const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
-// Fallback seguro para registros antigos sem status_pre_publicacao gravado.
-const STATUS_PARTICIPANTE_FALLBACK = 'aprovado';
-const STATUS_PRE_PUBLICACAO_VALIDOS = new Set(['aprovado', 'aguardando_nova_etapa']);
+// Reversão de promoção originada de curso NÃO restaura automaticamente o status
+// anterior do participante. O vínculo do curso passa a ficar pendente de
+// decisão administrativa manual, mantendo a rastreabilidade (promocao_id).
+const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
 
 function statusPromocaoPosReversao(itens: any[] = []) {
   const publicados = (itens || []).filter((item) => Boolean(item?.publicado) && normalizar(item?.status) === 'publicado').length;
@@ -110,15 +111,12 @@ Deno.serve(async (req) => {
       const vinculos = await ParticipanteCurso.filter({ promocao_id: promocaoId, militar_id: militarId }).catch(() => []);
       participante = (vinculos || []).find((p: any) => normalizar(p?.status) === 'promovido') || (vinculos || [])[0] || null;
     }
-    // Restauração DETERMINÍSTICA: o participante volta exatamente ao status que tinha
-    // antes de virar 'promovido' (status_pre_publicacao). Sem suposições.
+    // Regra de produção: ao reverter, o participante 'promovido' NÃO volta para
+    // aprovado/aguardando_nova_etapa. Passa para 'pendente_reanalise', mantendo
+    // promocao_id para rastreabilidade. Qualquer retorno ao curso é ação manual.
     const participanteEstaPromovido = participante ? normalizar(participante?.status) === 'promovido' : false;
     const statusPrePublicacao = texto(participante?.status_pre_publicacao);
-    const temStatusPrePublicacaoValido = STATUS_PRE_PUBLICACAO_VALIDOS.has(statusPrePublicacao);
-    const usouFallbackParticipante = participanteEstaPromovido && !temStatusPrePublicacaoValido;
-    const statusParticipantePosReversao = temStatusPrePublicacaoValido
-      ? statusPrePublicacao
-      : STATUS_PARTICIPANTE_FALLBACK;
+    const statusParticipantePosReversao = STATUS_PARTICIPANTE_PENDENTE_REANALISE;
 
     const trilhaAdmin = ['[REVERSAO_ADMINISTRATIVA]', `motivo=${motivo}`, observacoes ? `observacoes=${observacoes}` : '', texto(usuario?.email) ? `usuario=${texto(usuario.email)}` : '', `data=${new Date().toISOString()}`].filter(Boolean).join(' | ');
     const historicoSnapshot = { status_registro: historicoAtual?.status_registro, motivo_retificacao: historicoAtual?.motivo_retificacao, observacoes: historicoAtual?.observacoes };
@@ -141,8 +139,8 @@ Deno.serve(async (req) => {
 
       await PromocaoMilitar.update(itemId, { status: 'cancelado', publicado: false });
 
-      // Reverte o participante do curso de formação (promovido -> status_pre_publicacao).
-      // Só altera quando o participante está de fato 'promovido'.
+      // Reverte o participante do curso (promovido -> pendente_reanalise).
+      // promocao_id é PRESERVADO para rastreabilidade. status_pre_publicacao é limpo.
       if (participante?.id && participanteEstaPromovido) {
         await ParticipanteCurso.update(participante.id, {
           status: statusParticipantePosReversao,
@@ -150,13 +148,13 @@ Deno.serve(async (req) => {
           data_status_atual: new Date().toISOString(),
         });
 
-        // Auditoria da reversão (com warning explícito quando houve fallback).
+        // Auditoria da reversão: pendência de reanálise (decisão manual posterior).
         try {
           await AuditCurso.create({
             curso_id: texto(participante?.curso_id) || null,
             participante_id: participante.id,
             militar_id: militarId,
-            acao: usouFallbackParticipante ? 'reverter_promovido_fallback' : 'reverter_promovido',
+            acao: 'promocao_revertida_pendente_reanalise',
             status_anterior: 'promovido',
             status_novo: statusParticipantePosReversao,
             justificativa: motivo,
@@ -164,9 +162,6 @@ Deno.serve(async (req) => {
               promocao_id: promocaoId,
               promocao_militar_id: itemId,
               status_pre_publicacao_registrado: statusPrePublicacao || null,
-              warning: usouFallbackParticipante
-                ? 'Sem status_pre_publicacao no registro; aplicado fallback seguro = aprovado.'
-                : null,
             },
             usuario_id: usuario?.id || null,
             usuario_nome: usuario?.full_name || usuario?.email || null,
@@ -208,7 +203,7 @@ Deno.serve(async (req) => {
       participanteRevertido: Boolean(participante?.id && participanteEstaPromovido),
       participante_status_anterior: participanteSnapshot?.status || null,
       participante_status_novo: (participante?.id && participanteEstaPromovido) ? statusParticipantePosReversao : null,
-      participante_fallback_status_pre_publicacao: usouFallbackParticipante || false,
+      participante_pendente_reanalise: Boolean(participante?.id && participanteEstaPromovido),
     });
   } catch (error: any) {
     return erro({ status: 500, etapa: 'erro_interno', motivo: error?.message || 'erro_interno_reversao' });

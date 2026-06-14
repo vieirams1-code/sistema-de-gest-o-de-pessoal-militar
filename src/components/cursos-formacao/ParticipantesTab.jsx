@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Pencil, Trash2, Award, RefreshCw } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, Award, RefreshCw, AlertTriangle } from 'lucide-react';
 import { STATUS_PARTICIPANTE_LABEL, STATUS_PARTICIPANTE_CLASSE, ALUNO_LABEL } from './cursoFormacaoConfig';
 import { resolverStatusMilitarComCurso } from '@/services/militarStatusVirtual';
 import { STATUS_ELEGIVEIS_PROMOCAO } from '@/services/cursoFormacaoService';
@@ -85,6 +85,12 @@ export default function ParticipantesTab({ curso, participantes, loading, podeGe
                     <Badge className={STATUS_PARTICIPANTE_CLASSE[p.status] || ''}>
                       {STATUS_PARTICIPANTE_LABEL[p.status] || p.status}
                     </Badge>
+                    {p.status === 'pendente_reanalise' && (
+                      <div className="mt-1 flex items-start gap-1 text-xs text-orange-700">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>Promoção vinculada foi revertida. Ação administrativa necessária.</span>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-slate-500">
                     {virtual.possui_posto_virtual ? virtual.motivo_exibicao : '—'}

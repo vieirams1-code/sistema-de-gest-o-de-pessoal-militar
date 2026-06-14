@@ -44,10 +44,19 @@
         "reprovado",
         "desligado",
         "aguardando_nova_etapa",
-        "promovido"
+        "promovido",
+        "pendente_reanalise"
       ],
       "default": "em_curso",
-      "description": "Status do participante no curso"
+      "description": "Status do participante no curso. 'pendente_reanalise' indica que a promo\u00e7\u00e3o vinculada foi revertida e \u00e9 necess\u00e1ria decis\u00e3o administrativa manual."
+    },
+    "status_pre_publicacao": {
+      "type": "string",
+      "enum": [
+        "aprovado",
+        "aguardando_nova_etapa"
+      ],
+      "description": "Status que o participante tinha imediatamente antes de virar 'promovido' (gravado na sincroniza\u00e7\u00e3o). Usado para restaurar de forma determin\u00edstica na revers\u00e3o da publica\u00e7\u00e3o."
     },
     "data_status_atual": {
       "type": "string",

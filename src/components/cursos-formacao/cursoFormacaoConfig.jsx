@@ -29,6 +29,7 @@ export const STATUS_PARTICIPANTE_LABEL = {
   desligado: 'Desligado',
   aguardando_nova_etapa: 'Aguardando Nova Etapa',
   promovido: 'Promovido',
+  pendente_reanalise: 'Pendente de Reanálise',
 };
 
 export const STATUS_PARTICIPANTE_CLASSE = {
@@ -38,4 +39,5 @@ export const STATUS_PARTICIPANTE_CLASSE = {
   desligado: 'bg-slate-200 text-slate-600',
   aguardando_nova_etapa: 'bg-amber-100 text-amber-700',
   promovido: 'bg-violet-100 text-violet-700',
+  pendente_reanalise: 'bg-orange-100 text-orange-800 border border-orange-300',
 };

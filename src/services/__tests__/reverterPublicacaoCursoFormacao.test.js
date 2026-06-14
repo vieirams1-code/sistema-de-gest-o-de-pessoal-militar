@@ -9,6 +9,7 @@ import {
   gerarPromocaoDosAprovados,
   sincronizarParticipantesPromovidos,
   listarParticipantesCurso,
+  encerrarCursoFormacao,
 } from '../cursoFormacaoService.js';
 
 // ---------------------------------------------------------------------------
@@ -56,8 +57,7 @@ function criarFakeClient() {
 const texto = (v) => String(v ?? '').trim();
 const normalizar = (v) => texto(v).toLowerCase();
 const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
-const STATUS_PRE_PUBLICACAO_VALIDOS = new Set(['aprovado', 'aguardando_nova_etapa']);
-const STATUS_PARTICIPANTE_FALLBACK = 'aprovado';
+const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
 
 /**
  * Replica fielmente a lógica autoritativa da edge function
@@ -96,12 +96,9 @@ async function reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, i
   // Vínculo com curso de formação
   const vinculos = await ParticipanteCurso.filter({ promocao_id: promocaoId, militar_id: militarId });
   const participante = (vinculos || []).find((p) => normalizar(p?.status) === 'promovido') || (vinculos || [])[0] || null;
-  // Restauração DETERMINÍSTICA via status_pre_publicacao (com fallback seguro).
+  // Regra de produção: promovido -> pendente_reanalise (NÃO restaura automaticamente).
   const participanteEstaPromovido = participante ? normalizar(participante?.status) === 'promovido' : false;
-  const statusPrePublicacao = texto(participante?.status_pre_publicacao);
-  const temStatusPrePublicacaoValido = STATUS_PRE_PUBLICACAO_VALIDOS.has(statusPrePublicacao);
-  const usouFallback = participanteEstaPromovido && !temStatusPrePublicacaoValido;
-  const statusPosReversao = temStatusPrePublicacaoValido ? statusPrePublicacao : STATUS_PARTICIPANTE_FALLBACK;
+  const statusPosReversao = STATUS_PARTICIPANTE_PENDENTE_REANALISE;
 
   await Historico.update(historicoId, { status_registro: 'cancelado', motivo_retificacao: motivo });
   if (precisaRollbackCadastro) {
@@ -115,10 +112,10 @@ async function reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, i
     await ParticipanteCurso.update(participante.id, { status: statusPosReversao, status_pre_publicacao: null });
     await client.entities.AuditCursoFormacao.create({
       participante_id: participante.id,
-      acao: usouFallback ? 'reverter_promovido_fallback' : 'reverter_promovido',
+      acao: 'promocao_revertida_pendente_reanalise',
       status_anterior: 'promovido',
       status_novo: statusPosReversao,
-      dados_novos: { warning: usouFallback ? 'fallback aprovado' : null },
+      dados_novos: { promocao_id: promocaoId, promocao_militar_id: itemId },
     });
   }
   await Promocao.update(promocaoId, { status: 'rascunho' });
@@ -133,7 +130,7 @@ async function reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, i
     participante_curso_id: participante?.id || null,
     cadastroRestaurado: precisaRollbackCadastro,
     participante_status_novo: (participante?.id && participanteEstaPromovido) ? statusPosReversao : null,
-    participante_fallback_status_pre_publicacao: usouFallback,
+    participante_pendente_reanalise: Boolean(participante?.id && participanteEstaPromovido),
   };
 }
 
@@ -178,7 +175,7 @@ beforeEach(() => {
   __setCursoFormacaoClientForTests(client);
 });
 
-test('fluxo completo CFC: publicar promoção e reverter sem erro 400, restaurando tudo', async () => {
+test('fluxo completo CFC: publicar promoção e reverter -> participante fica pendente_reanalise (mantendo promocao_id)', async () => {
   // Militar de teste (Soldado)
   await client.entities.Militar.create({ id: 'm1', nome_completo: 'João Teste', matricula: '999', posto_graduacao: 'Soldado', quadro: 'QBMP-1.a', status_cadastro: 'Ativo' });
   const militarReg = client.__stores.Militar[0];
@@ -223,9 +220,10 @@ test('fluxo completo CFC: publicar promoção e reverter sem erro 400, restauran
   const pmDepois = await client.entities.PromocaoMilitar.get(itemPublicado.id);
   assert.equal(pmDepois.publicado, false);
   assert.equal(pmDepois.status, 'cancelado');
-  // ParticipanteCursoFormacao deixa de estar promovido e volta ao status pré-publicação
+  // ParticipanteCursoFormacao deixa de estar promovido e fica pendente de reanálise
   participantes = await listarParticipantesCurso(curso.id);
-  assert.equal(participantes[0].status, 'aprovado');
+  assert.equal(participantes[0].status, 'pendente_reanalise');
+  assert.equal(participantes[0].promocao_id, promocao.id, 'promocao_id deve ser mantido para rastreabilidade');
   assert.ok(!participantes[0].status_pre_publicacao, 'status_pre_publicacao deve ser limpo após reversão');
   // Histórico oficial cancelado
   const hist = client.__stores.HistoricoPromocaoMilitarV2[0];
@@ -273,7 +271,7 @@ test('reversão de promoção manual (sem curso) continua funcionando e não toc
   assert.equal((await client.entities.Militar.get(militarId)).posto_graduacao, 'Cabo');
 });
 
-test('aguardando_nova_etapa -> promovido -> reversão -> aguardando_nova_etapa (determinístico)', async () => {
+test('aguardando_nova_etapa -> promovido -> reversão -> pendente_reanalise (NÃO restaura)', async () => {
   await client.entities.Militar.create({ id: 'm1', nome_completo: 'Etapa', matricula: '7', posto_graduacao: 'Soldado', quadro: 'QBMP-1.a', status_cadastro: 'Ativo' });
   const militarId = client.__stores.Militar[0].id;
   const curso = await criarCursoFormacao({ nome: 'CFC ETAPA', tipo: 'CFC' }, usuario);
@@ -286,24 +284,22 @@ test('aguardando_nova_etapa -> promovido -> reversão -> aguardando_nova_etapa (
 
   let participantes = await listarParticipantesCurso(curso.id);
   assert.equal(participantes[0].status, 'promovido');
-  assert.equal(participantes[0].status_pre_publicacao, 'aguardando_nova_etapa');
 
   const item = client.__stores.PromocaoMilitar[0];
   const resultado = await reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, item: { id: item.id }, motivo: 'Erro' });
   assert.equal(resultado.status, 200);
-  assert.equal(resultado.participante_status_novo, 'aguardando_nova_etapa');
-  assert.equal(resultado.participante_fallback_status_pre_publicacao, false);
+  assert.equal(resultado.participante_status_novo, 'pendente_reanalise');
+  assert.equal(resultado.participante_pendente_reanalise, true);
 
   participantes = await listarParticipantesCurso(curso.id);
-  assert.equal(participantes[0].status, 'aguardando_nova_etapa');
+  assert.equal(participantes[0].status, 'pendente_reanalise');
   assert.ok(!participantes[0].status_pre_publicacao);
 });
 
-test('promovido SEM status_pre_publicacao -> reversão -> aprovado (fallback com auditoria/warning)', async () => {
-  await client.entities.Militar.create({ id: 'm1', nome_completo: 'Antigo', matricula: '8', posto_graduacao: 'Cabo', quadro: 'QBMP-1.a', status_cadastro: 'Ativo' });
+test('reversão registra auditoria promocao_revertida_pendente_reanalise', async () => {
+  await client.entities.Militar.create({ id: 'm1', nome_completo: 'Audit', matricula: '8', posto_graduacao: 'Cabo', quadro: 'QBMP-1.a', status_cadastro: 'Ativo' });
   const militarId = client.__stores.Militar[0].id;
-  const curso = await criarCursoFormacao({ nome: 'CFS LEGADO', tipo: 'CFS' }, usuario);
-  // Registro legado: participante promovido sem status_pre_publicacao gravado.
+  const curso = await criarCursoFormacao({ nome: 'CFS AUDIT', tipo: 'CFS' }, usuario);
   const promocao = await client.entities.Promocao.create({ posto_graduacao: '3º Sargento', quadro: 'QBMP-1.a', status: 'publicada', origem: 'curso_formacao' });
   const participante = await client.entities.ParticipanteCursoFormacao.create({
     curso_id: curso.id, militar_id: militarId, status: 'promovido', promocao_id: promocao.id,
@@ -312,17 +308,29 @@ test('promovido SEM status_pre_publicacao -> reversão -> aprovado (fallback com
   await publicarPromocaoSimulada(client, { promocao });
 
   const item = client.__stores.PromocaoMilitar[0];
-  const resultado = await reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, item: { id: item.id }, motivo: 'Reversão legado' });
+  const resultado = await reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, item: { id: item.id }, motivo: 'Reversão' });
   assert.equal(resultado.status, 200);
-  assert.equal(resultado.participante_status_novo, 'aprovado');
-  assert.equal(resultado.participante_fallback_status_pre_publicacao, true);
+  assert.equal(resultado.participante_status_novo, 'pendente_reanalise');
 
   const part = await client.entities.ParticipanteCursoFormacao.get(participante.id);
-  assert.equal(part.status, 'aprovado');
-  // Auditoria de fallback registrada com warning
-  const audit = client.__stores.AuditCursoFormacao.find((a) => a.acao === 'reverter_promovido_fallback');
-  assert.ok(audit, 'deve existir auditoria de fallback');
-  assert.ok(audit.dados_novos?.warning);
+  assert.equal(part.status, 'pendente_reanalise');
+  assert.equal(part.promocao_id, promocao.id, 'promocao_id mantido');
+  // Auditoria específica registrada
+  const audit = client.__stores.AuditCursoFormacao.find((a) => a.acao === 'promocao_revertida_pendente_reanalise');
+  assert.ok(audit, 'deve existir auditoria promocao_revertida_pendente_reanalise');
+  assert.equal(audit.status_anterior, 'promovido');
+  assert.equal(audit.status_novo, 'pendente_reanalise');
+});
+
+test('curso NÃO pode encerrar com participante pendente_reanalise', async () => {
+  const curso = await criarCursoFormacao({ nome: 'CFC ENC', tipo: 'CFC' }, usuario);
+  await client.entities.ParticipanteCursoFormacao.create({
+    curso_id: curso.id, militar_id: 'm9', status: 'pendente_reanalise', promocao_id: 'promo9', snapshot_antiguidade: 1,
+  });
+  await assert.rejects(
+    () => encerrarCursoFormacao(curso.id, usuario),
+    /pendente.*reanálise|reanalise/i,
+  );
 });
 
 test('reversão bloqueia quando motivo ausente', async () => {
