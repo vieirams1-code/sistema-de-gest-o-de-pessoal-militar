@@ -39,11 +39,37 @@ test('preserva fallback legado por matrícula do campo militar_matricula', () =>
   assert.equal(vinculaRegistroAoMilitar(registro, militar), true);
 });
 
-test('sem regressão: continua vinculando por nome quando não há matrícula', () => {
+test('vincula por nome completo exato quando não há matrícula', () => {
   const registro = { militar_nome: 'Fulano de Tal' };
   const militar = {
     nome_completo: 'Fulano de Tal',
   };
 
   assert.equal(vinculaRegistroAoMilitar(registro, militar), true);
+});
+
+test('não vincula por nome de guerra ou sobrenome parcial', () => {
+  const registro = {
+    militar_nome: 'Daniel dos Santos Vieira',
+  };
+  const militar = {
+    nome_guerra: 'Vieira',
+    matricula: '108.747-021',
+  };
+
+  assert.equal(vinculaRegistroAoMilitar(registro, militar), false);
+});
+
+test('não vincula registro de militar com mesmo sobrenome e matrícula diferente', () => {
+  const registro = {
+    militar_nome: 'Daniel dos Santos Vieira',
+    militar_matricula: '056.807-021',
+  };
+  const militar = {
+    nome_completo: 'Outro Militar Vieira',
+    nome_guerra: 'Vieira',
+    matricula: '108.747-021',
+  };
+
+  assert.equal(vinculaRegistroAoMilitar(registro, militar), false);
 });
