@@ -3,11 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import {
   ShieldCheck,
-  Search,
   Plus,
-  Calendar,
-  User,
-  Filter,
   MoreHorizontal,
   ExternalLink,
   ChevronRight,
@@ -17,11 +13,9 @@ import {
   AlertCircle,
   XCircle,
   Copy,
-  Trash2,
   RefreshCcw,
-  Check
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -55,12 +49,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -99,8 +87,10 @@ const TIPO_LABELS = {
 
 export default function ConferenciasMilitares() {
   const { toast } = useToast();
-  const { user } = useCurrentUser();
+  const { user, canAccessAction } = useCurrentUser();
   const queryClient = useQueryClient();
+
+  const canManage = canAccessAction('perm_gerir_conferencias_militares');
 
   const [filtros, setFiltros] = useState({
     militarId: '',
@@ -139,10 +129,12 @@ export default function ConferenciasMilitares() {
             Controle de saneamento cadastral de militares recém-cadastrados, reativados ou retornados.
           </p>
         </div>
-        <Button onClick={() => setIsNovaConferenciaOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nova Conferência
-        </Button>
+        {canManage && (
+          <Button onClick={() => setIsNovaConferenciaOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nova Conferência
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -373,8 +365,10 @@ export default function ConferenciasMilitares() {
 
 function ConferenciaDetalhesDrawer({ conferenciaId, onClose }) {
   const { toast } = useToast();
-  const { user } = useCurrentUser();
+  const { user, canAccessAction } = useCurrentUser();
   const queryClient = useQueryClient();
+
+  const canManage = canAccessAction('perm_gerir_conferencias_militares');
 
   const { data: conferencia, isLoading } = useQuery({
     queryKey: ['conferencia-detalhada', conferenciaId],
@@ -527,7 +521,7 @@ Checklist:
                           <Select
                             value={item.status}
                             onValueChange={(v) => mutationUpdateItem.mutate({ itemId: item.id, dados: { status: v } })}
-                            disabled={['concluida', 'concluida_com_pendencias', 'cancelada'].includes(conferencia.status)}
+                            disabled={!canManage || ['concluida', 'concluida_com_pendencias', 'cancelada'].includes(conferencia.status)}
                           >
                             <SelectTrigger className="h-8 text-xs">
                               <SelectValue />
@@ -543,7 +537,7 @@ Checklist:
                            <ItemObservacaoModal
                               item={item}
                               onSave={(obs) => mutationUpdateItem.mutate({ itemId: item.id, dados: { observacao: obs } })}
-                              disabled={['concluida', 'concluida_com_pendencias', 'cancelada'].includes(conferencia.status)}
+                              disabled={!canManage || ['concluida', 'concluida_com_pendencias', 'cancelada'].includes(conferencia.status)}
                            />
                         </TableCell>
                       </TableRow>
@@ -560,6 +554,7 @@ Checklist:
                   placeholder="URL do Card no Trello..."
                   value={conferencia.trello_card_url || ''}
                   onChange={(e) => mutationUpdateConferencia.mutate({ trello_card_url: e.target.value })}
+                  disabled={!canManage}
                 />
                 <Button variant="outline" size="icon" onClick={() => window.open(conferencia.trello_card_url, '_blank')} disabled={!conferencia.trello_card_url}>
                   <ExternalLink className="w-4 h-4" />
@@ -569,22 +564,24 @@ Checklist:
 
             <div className="flex flex-wrap justify-between gap-3 pt-6 border-t">
               <div className="flex gap-3">
-                {conferencia.status === 'em_andamento' || conferencia.status === 'pendente' ? (
-                  <>
-                    <Button onClick={() => mutationStatus.mutate('concluir')} className="gap-2 bg-green-600 hover:bg-green-700">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Concluir Conferência
+                {canManage && (
+                  conferencia.status === 'em_andamento' || conferencia.status === 'pendente' ? (
+                    <>
+                      <Button onClick={() => mutationStatus.mutate('concluir')} className="gap-2 bg-green-600 hover:bg-green-700">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Concluir Conferência
+                      </Button>
+                      <Button variant="destructive" onClick={() => mutationStatus.mutate('cancelar')} className="gap-2">
+                        <XCircle className="w-4 h-4" />
+                        Cancelar
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" onClick={() => mutationStatus.mutate('reabrir')} className="gap-2">
+                      <RefreshCcw className="w-4 h-4" />
+                      Reabrir Conferência
                     </Button>
-                    <Button variant="destructive" onClick={() => mutationStatus.mutate('cancelar')} className="gap-2">
-                      <XCircle className="w-4 h-4" />
-                      Cancelar
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" onClick={() => mutationStatus.mutate('reabrir')} className="gap-2">
-                    <RefreshCcw className="w-4 h-4" />
-                    Reabrir Conferência
-                  </Button>
+                  )
                 )}
               </div>
 

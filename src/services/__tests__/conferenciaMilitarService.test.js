@@ -70,9 +70,10 @@ describe('conferenciaMilitarService', () => {
 
   describe('concluirConferencia', () => {
     it('não deve concluir se houver item obrigatório pendente', async () => {
-      base44.entities.ConferenciaMilitar.get.mockResolvedValue({ data: { id: 'conf1', status: 'em_andamento' } });
-      base44.entities.ItemConferenciaMilitar.query().get.mockResolvedValue({
-        data: [
+      vi.spyOn(conferenciaMilitarService, 'obterConferenciaDetalhada').mockResolvedValue({
+        id: 'conf1',
+        status: 'em_andamento',
+        itens: [
           { id: 'item1', obrigatorio: true, status: 'pendente' }
         ]
       });
@@ -82,9 +83,10 @@ describe('conferenciaMilitarService', () => {
     });
 
     it('deve concluir como concluida se todos os itens estiverem conferidos', async () => {
-      base44.entities.ConferenciaMilitar.get.mockResolvedValue({ data: { id: 'conf1', status: 'em_andamento' } });
-      base44.entities.ItemConferenciaMilitar.query().get.mockResolvedValue({
-        data: [
+      vi.spyOn(conferenciaMilitarService, 'obterConferenciaDetalhada').mockResolvedValue({
+        id: 'conf1',
+        status: 'em_andamento',
+        itens: [
           { id: 'item1', obrigatorio: true, status: 'conferido' },
           { id: 'item2', obrigatorio: true, status: 'nao_possui' }
         ]
@@ -100,9 +102,10 @@ describe('conferenciaMilitarService', () => {
     });
 
     it('deve concluir como concluida_com_pendencias se houver itens para revisar ou não localizado', async () => {
-      base44.entities.ConferenciaMilitar.get.mockResolvedValue({ data: { id: 'conf1', status: 'em_andamento' } });
-      base44.entities.ItemConferenciaMilitar.query().get.mockResolvedValue({
-        data: [
+      vi.spyOn(conferenciaMilitarService, 'obterConferenciaDetalhada').mockResolvedValue({
+        id: 'conf1',
+        status: 'em_andamento',
+        itens: [
           { id: 'item1', obrigatorio: true, status: 'conferido' },
           { id: 'item2', obrigatorio: true, status: 'revisar' }
         ]
@@ -120,9 +123,10 @@ describe('conferenciaMilitarService', () => {
 
   describe('atualizarStatusConferencia', () => {
     it('deve calcular progresso corretamente', async () => {
-      base44.entities.ConferenciaMilitar.get.mockResolvedValue({ data: { id: 'conf1', status: 'pendente' } });
-      base44.entities.ItemConferenciaMilitar.query().get.mockResolvedValue({
-        data: [
+      vi.spyOn(conferenciaMilitarService, 'obterConferenciaDetalhada').mockResolvedValue({
+        id: 'conf1',
+        status: 'pendente',
+        itens: [
           { id: 'item1', status: 'conferido' },
           { id: 'item2', status: 'pendente' },
           { id: 'item3', status: 'pendente' },
