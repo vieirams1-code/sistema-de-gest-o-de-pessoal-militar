@@ -26,6 +26,7 @@ import {
   publicarPromocaoOficial,
   reverterPublicacaoPromocaoMilitar,
   detectarVinculoCursoPromocao,
+  MENSAGEM_BLOQUEIO_REVERSAO_CURSO,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
@@ -338,8 +339,7 @@ function MilitarCard({
 }
 
 export default function DetalhePromocao() {
-  const { isAdmin, user, canAccessAction } = useCurrentUser();
-  const podeReverterExcepcional = isAdmin === true || canAccessAction?.('perm_reverter_promocao_excepcional') === true;
+  const { isAdmin, user } = useCurrentUser();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -788,9 +788,11 @@ export default function DetalhePromocao() {
   });
 
   const reverterPublicacaoMutation = useMutation({
-    mutationFn: async ({ registro, motivo, observacao, modoAdmin, fraseConfirmacao }) => {
+    mutationFn: async ({ registro, motivo, observacao, fraseConfirmacao }) => {
       if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
       if (!canReverterItem(registro, { isAdmin })) throw new Error('Somente item publicado pode ser revertido.');
+      // Promoções originadas de curso não são revertidas pela UI (bloqueio institucional).
+      if (vinculoCurso.originadaDeCurso) throw new Error(MENSAGEM_BLOQUEIO_REVERSAO_CURSO);
       return reverterPublicacaoPromocaoMilitar({
         promocao,
         item: registro,
@@ -800,7 +802,6 @@ export default function DetalhePromocao() {
         observacoes: observacao,
         observacao,
         usuario: user,
-        modoAdmin,
         fraseConfirmacao,
       });
     },
@@ -1334,8 +1335,6 @@ export default function DetalhePromocao() {
         nomeMilitar={nomeMilitar(registroParaReverter?.militar)}
         originadaDeCurso={vinculoCurso.originadaDeCurso}
         detectando={detectandoVinculoCurso}
-        podeReverterExcepcional={podeReverterExcepcional}
-        pendente={normalizar(vinculoCurso.participante?.status) === 'pendente_reanalise'}
         submitting={reverterPublicacaoMutation.isPending}
         onConfirmar={(payload) => reverterPublicacaoMutation.mutate(payload)}
       />

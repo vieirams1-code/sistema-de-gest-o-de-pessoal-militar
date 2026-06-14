@@ -18,6 +18,7 @@ import {
   podeVincularProvavelAdministrativamente,
   publicarPromocaoOficial,
   reverterPublicacaoPromocaoMilitar,
+  MENSAGEM_BLOQUEIO_REVERSAO_CURSO,
   validarImutabilidadePosPublicacao,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
@@ -1353,6 +1354,83 @@ test('reversão sem motivo bloqueia com mensagem específica', async () => {
     () => reverterPublicacaoPromocaoMilitar({ promocao: { id: 'p1' }, item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'hist-1' }, motivo: '', entities }),
     /Motivo da reversão é obrigatório/,
   );
+});
+
+test('UI bloqueia reversão de promoção originada de curso ANTES de qualquer escrita/payload', async () => {
+  const chamadas = { historicoUpdate: 0, promocaoMilitarUpdate: 0, promocaoUpdate: 0, militarUpdate: 0, participanteFilter: 0 };
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'h1' }), update: async () => { chamadas.historicoUpdate += 1; } },
+    PromocaoMilitar: { update: async () => { chamadas.promocaoMilitarUpdate += 1; } },
+    Promocao: { update: async () => { chamadas.promocaoUpdate += 1; } },
+    Militar: { get: async () => ({ id: 'm1' }), update: async () => { chamadas.militarUpdate += 1; } },
+    ParticipanteCursoFormacao: {
+      filter: async () => {
+        chamadas.participanteFilter += 1;
+        return [{ id: 'part-1', status: 'promovido', promocao_id: 'p1', militar_id: 'm1' }];
+      },
+    },
+  };
+
+  await assert.rejects(
+    () => reverterPublicacaoPromocaoMilitar({
+      promocao: { id: 'p1' },
+      item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1' },
+      itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+      entities,
+      motivo: 'Erro material',
+    }),
+    new RegExp('originadas de Curso de Formação'),
+  );
+
+  // Nenhuma escrita pode ter ocorrido — apenas a detecção do vínculo.
+  assert.equal(chamadas.historicoUpdate, 0);
+  assert.equal(chamadas.promocaoMilitarUpdate, 0);
+  assert.equal(chamadas.promocaoUpdate, 0);
+  assert.equal(chamadas.militarUpdate, 0);
+  assert.equal(chamadas.participanteFilter, 1);
+});
+
+test('MENSAGEM_BLOQUEIO_REVERSAO_CURSO contém o texto institucional oficial', () => {
+  assert.match(MENSAGEM_BLOQUEIO_REVERSAO_CURSO, /não são revertidas pela interface/);
+  assert.match(MENSAGEM_BLOQUEIO_REVERSAO_CURSO, /administrador do sistema/);
+});
+
+test('reversão comum (sem ParticipanteCursoFormacao) NÃO é bloqueada pela guarda de curso', async () => {
+  const chamadas = { historicoUpdate: 0 };
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'h1' }), update: async () => { chamadas.historicoUpdate += 1; } },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+    // ParticipanteCursoFormacao ausente: detectarVinculoCursoPromocao retorna originadaDeCurso=false.
+  };
+  await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1' },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Erro material',
+  });
+  assert.equal(chamadas.historicoUpdate, 1);
+});
+
+test('UI: promoção comum com ParticipanteCursoFormacao apenas reprovado/desligado NÃO é tratada como originada de curso', async () => {
+  const chamadas = { historicoUpdate: 0 };
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'h1' }), update: async () => { chamadas.historicoUpdate += 1; } },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+    ParticipanteCursoFormacao: {
+      filter: async () => [{ id: 'part-x', status: 'reprovado', promocao_id: 'p1', militar_id: 'm1' }],
+    },
+  };
+  await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1' },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Erro material',
+  });
+  assert.equal(chamadas.historicoUpdate, 1);
 });
 
 test('exclusão com histórico ativo bloqueia', async () => {
