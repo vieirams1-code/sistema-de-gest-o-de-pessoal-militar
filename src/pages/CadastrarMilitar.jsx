@@ -4,8 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap } from 'lucide-react';
+import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, ClipboardCheck, AlertCircle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
+import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
@@ -160,6 +162,7 @@ export default function CadastrarMilitar() {
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
   const [avisoCompatibilidadeQuadro, setAvisoCompatibilidadeQuadro] = useState('');
+  const [conferenciaTrigger, setConferenciaTrigger] = useState(null);
   const [novaMatricula, setNovaMatricula] = useState('');
   const [novoTipoMatricula, setNovoTipoMatricula] = useState('Secundária');
   const [novoMotivoMatricula, setNovoMotivoMatricula] = useState('Atualização administrativa');
@@ -328,12 +331,16 @@ export default function CadastrarMilitar() {
     }
 
     let militarId = editId;
+    let isNewRegistration = !editId;
+    let isReactivation = editId && editingMilitar?.status_cadastro === 'Inativo' && dataToSave.status_cadastro === 'Ativo';
+
     try {
       if (editId) {
         await atualizarMilitarSemTrocarMatricula(editId, dataToSave, { resolvidoPor: user?.email || '' });
       } else {
         const criado = await criarMilitarComMatricula(dataToSave, { origemRegistro: 'cadastro_manual', criadoPor: user?.email || '' });
         militarId = criado.id;
+        dataToSave.id = criado.id; // Para snapshot
       }
     } catch (error) {
       setLoading(false);
@@ -371,6 +378,39 @@ export default function CadastrarMilitar() {
     }
 
     queryClient.invalidateQueries({ queryKey: ['militares'] });
+
+    if (isNewRegistration || isReactivation) {
+      const aberta = await conferenciaMilitarService.buscarConferenciaAberta(militarId);
+      if (!aberta) {
+        let dataInicioRef = '';
+        let observacaoAutomatica = '';
+
+        if (isReactivation) {
+          try {
+            const mats = await base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-data_inicio');
+            const ultimaInativa = mats.find(m => m.data_fim && (m.situacao === 'Inativa' || m.situacao === 'Transferida'));
+            if (ultimaInativa) {
+              dataInicioRef = ultimaInativa.data_fim;
+            } else {
+              observacaoAutomatica = 'Data de início da ausência não localizada automaticamente. Conferir manualmente.';
+            }
+          } catch (e) {
+             console.error('[CadastrarMilitar] Erro ao buscar histórico para reativação', e);
+          }
+        }
+
+        setConferenciaTrigger({
+          militar: { ...dataToSave, id: militarId },
+          tipo: isNewRegistration ? 'ingresso' : 'reativacao',
+          dataInicioRef,
+          dataFimRef: isReactivation ? new Date().toISOString().slice(0, 10) : '',
+          observacao: observacaoAutomatica
+        });
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(false);
     navigate(createPageUrl('Militares'));
   };
@@ -420,6 +460,28 @@ export default function CadastrarMilitar() {
       </div>
     );
   }
+
+  const handleCreateTriggeredConferencia = async () => {
+    if (!conferenciaTrigger) return;
+    setLoading(true);
+    try {
+      await conferenciaMilitarService.criarConferenciaMilitar({
+        militar: conferenciaTrigger.militar,
+        tipo_conferencia: conferenciaTrigger.tipo,
+        data_inicio_referencia: conferenciaTrigger.dataInicioRef,
+        data_fim_referencia: conferenciaTrigger.dataFimRef,
+        observacao_geral: conferenciaTrigger.observacao,
+        usuario: user
+      });
+      navigate(createPageUrl('ConferenciasMilitares'));
+    } catch (error) {
+      window.alert('Erro ao criar conferência: ' + error.message);
+      navigate(createPageUrl('Militares'));
+    } finally {
+      setLoading(false);
+      setConferenciaTrigger(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -891,6 +953,55 @@ export default function CadastrarMilitar() {
           </FormSection>
         </form>
       </div>
+
+      <Dialog open={!!conferenciaTrigger} onOpenChange={() => {
+        setConferenciaTrigger(null);
+        navigate(createPageUrl('Militares'));
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                <ClipboardCheck className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl">Conferência Cadastral Recomendada</DialogTitle>
+            </div>
+            <DialogDescription className="text-slate-600">
+              {conferenciaTrigger?.tipo === 'ingresso'
+                ? "Este é um novo cadastro. Deseja abrir uma conferência cadastral de ingresso agora para validar os dados?"
+                : "Este militar foi reativado. Deseja abrir uma conferência cadastral de reativação para validar o período de ausência?"
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {conferenciaTrigger?.observacao && (
+            <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <p>{conferenciaTrigger.observacao}</p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConferenciaTrigger(null);
+                navigate(createPageUrl('Militares'));
+              }}
+              disabled={loading}
+            >
+              Agora não
+            </Button>
+            <Button
+              onClick={handleCreateTriggeredConferencia}
+              disabled={loading}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+            >
+              {loading ? "Criando..." : "Abrir conferência agora"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -50,6 +50,7 @@ import {
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
+import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
 import { useToast } from '@/components/ui/use-toast';
 import {
   formatarTipoCreditoExtra } from
@@ -210,6 +211,15 @@ export default function VerMilitar() {
     data_fim: '',
     motivo: '',
     observacoes: ''
+  });
+
+  const { data: conferenciasAtivasMilitar = [] } = useQuery({
+    queryKey: ['conferencias-militar', id],
+    enabled: !!id && isAccessResolved && canAccessAction('perm_visualizar_conferencias_militares'),
+    queryFn: () => conferenciaMilitarService.listarConferencias({
+      militarId: id,
+      status: { '$in': ['pendente', 'em_andamento', 'concluida_com_pendencias'] }
+    }),
   });
 
   const { data: militar, isLoading } = useQuery({
@@ -623,6 +633,10 @@ export default function VerMilitar() {
       dataInclusaoMilitar: militar.data_inclusao
     });
   }, [militar, punicoesSistema]);
+
+  const conferenciaAbertaPrincipal = React.useMemo(() => {
+    return conferenciasAtivasMilitar.find(c => ['em_andamento', 'pendente'].includes(c.status)) || conferenciasAtivasMilitar[0];
+  }, [conferenciasAtivasMilitar]);
 
   const ultimaPunicaoPorMilitar = React.useMemo(() => {
     const ultima = punicoesSistema[0];
@@ -1585,6 +1599,50 @@ export default function VerMilitar() {
 
         {/* Alertas e tempo de serviço */}
         <div className="space-y-2 mb-4">
+          {conferenciaAbertaPrincipal && (
+            <Card className="border-blue-200 bg-blue-50/50 shadow-sm overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4">
+                <div className="p-3 bg-blue-100 rounded-xl text-blue-600">
+                  <ClipboardCheck className="w-6 h-6" />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                    <h3 className="font-bold text-blue-900">Conferência Cadastral Ativa</h3>
+                    <Badge variant="outline" className={`
+                      ${conferenciaAbertaPrincipal.status === 'pendente' ? 'bg-slate-100 text-slate-700' :
+                        conferenciaAbertaPrincipal.status === 'em_andamento' ? 'bg-blue-100 text-blue-700' :
+                        'bg-amber-100 text-amber-700'}
+                      border-none font-semibold text-[10px] uppercase
+                    `}>
+                      {conferenciaAbertaPrincipal.status === 'pendente' ? 'Pendente' :
+                       conferenciaAbertaPrincipal.status === 'em_andamento' ? 'Em Andamento' :
+                       'Com Pendências'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-blue-800/80">
+                    Tipo: <span className="font-medium text-blue-900">{
+                      conferenciaAbertaPrincipal.tipo_conferencia === 'ingresso' ? 'Ingresso' :
+                      conferenciaAbertaPrincipal.tipo_conferencia === 'reativacao' ? 'Reativação' :
+                      conferenciaAbertaPrincipal.tipo_conferencia === 'retorno_transferencia' ? 'Retorno de Transferência' :
+                      'Saneamento Manual'
+                    }</span> • Aberta em {formatDate(conferenciaAbertaPrincipal.data_abertura?.split('T')[0])}
+                  </p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="flex-1 max-w-[200px] h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-600" style={{ width: `${conferenciaAbertaPrincipal.progresso_percentual}%` }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-blue-700">{conferenciaAbertaPrincipal.progresso_percentual}%</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => navigate(createPageUrl('ConferenciasMilitares'))}
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-none h-9 px-4"
+                >
+                  Abrir conferência
+                </Button>
+              </div>
+            </Card>
+          )}
           <AlertasContrato militarId={id} />
           <TempoServico militar={{ ...militar, posto_graduacao: postoGraduacaoMilitar }} />
           {militarMesclado &&
