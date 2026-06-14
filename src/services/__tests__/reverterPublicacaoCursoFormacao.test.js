@@ -58,6 +58,9 @@ const texto = (v) => String(v ?? '').trim();
 const normalizar = (v) => texto(v).toLowerCase();
 const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
 const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
+const STATUS_PARTICIPANTE_VINCULADO = new Set(['promovido', 'pendente_reanalise']);
+const FRASE_CONFIRMACAO_EXCEPCIONAL = 'CONFIRMO REVERSÃO E CIÊNCIA DA PENDÊNCIA';
+const PERMISSAO_REVERSAO_EXCEPCIONAL = 'perm_reverter_promocao_excepcional';
 
 /**
  * Replica fielmente a lógica autoritativa da edge function
@@ -65,7 +68,7 @@ const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
  * desfazer vínculo com ParticipanteCursoFormacao). Mantida em sincronia com a
  * function para garantir o critério de aceite.
  */
-async function reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, item, motivo }) {
+async function reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, item, motivo, modoAdmin = false, fraseConfirmacao = '', usuarioExecutor = null }) {
   const Historico = client.entities.HistoricoPromocaoMilitarV2;
   const PromocaoMilitar = client.entities.PromocaoMilitar;
   const Promocao = client.entities.Promocao;
@@ -95,7 +98,20 @@ async function reverterPublicacaoPromocaoMilitarTxSimulado(client, { promocao, i
 
   // Vínculo com curso de formação
   const vinculos = await ParticipanteCurso.filter({ promocao_id: promocaoId, militar_id: militarId });
-  const participante = (vinculos || []).find((p) => normalizar(p?.status) === 'promovido') || (vinculos || [])[0] || null;
+  const participante = (vinculos || []).find((p) => STATUS_PARTICIPANTE_VINCULADO.has(normalizar(p?.status))) || (vinculos || [])[0] || null;
+
+  // FLUXO EXCEPCIONAL: promoção originada de curso exige permissão + modo admin + frase.
+  const ehReversaoOriginadaDeCurso = Boolean(participante?.id && STATUS_PARTICIPANTE_VINCULADO.has(normalizar(participante?.status)));
+  if (ehReversaoOriginadaDeCurso) {
+    const ehAdmin = normalizar(usuarioExecutor?.role) === 'admin';
+    const permissoes = usuarioExecutor?.permissions || {};
+    const temPermissao = ehAdmin || permissoes?.[PERMISSAO_REVERSAO_EXCEPCIONAL] === true;
+    if (!temPermissao) return { status: 403, motivo: 'permissao_ausente' };
+    if (!modoAdmin) return { status: 403, motivo: 'modo_admin_ausente' };
+    if (texto(fraseConfirmacao) !== FRASE_CONFIRMACAO_EXCEPCIONAL) return { status: 400, motivo: 'frase_confirmacao_invalida' };
+    if (!texto(motivo)) return { status: 400, motivo: 'motivo_obrigatorio' };
+  }
+
   // Regra de produção: promovido -> pendente_reanalise (NÃO restaura automaticamente).
   const participanteEstaPromovido = participante ? normalizar(participante?.status) === 'promovido' : false;
   const statusPosReversao = STATUS_PARTICIPANTE_PENDENTE_REANALISE;

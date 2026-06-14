@@ -25,6 +25,7 @@ import {
   mensagemBloqueioExclusaoPromocao,
   publicarPromocaoOficial,
   reverterPublicacaoPromocaoMilitar,
+  detectarVinculoCursoPromocao,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
@@ -54,6 +55,7 @@ import { isPromocaoHistorica, ordenarPorAntiguidadeAnterior } from '@/utils/prom
 import { buildPromocaoContext } from '@/utils/promocao/buildPromocaoContext';
 import { canEditarOrdem, canExcluirDefinitivo, canRemoverDaTurma, canReverterItem } from '@/utils/promocao/promocaoStateMachine';
 import { getPostoOrigemEsperado, isPromocaoSubtenenteParaSegundoTenenteQAOBM } from '@/utils/promocao/elegibilidadePromocao';
+import ReverterPublicacaoModal from '@/components/promocao/ReverterPublicacaoModal';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (_evento, _dados = {}) => {
@@ -336,7 +338,8 @@ function MilitarCard({
 }
 
 export default function DetalhePromocao() {
-  const { isAdmin, user } = useCurrentUser();
+  const { isAdmin, user, canAccessAction } = useCurrentUser();
+  const podeReverterExcepcional = isAdmin === true || canAccessAction?.('perm_reverter_promocao_excepcional') === true;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -350,9 +353,8 @@ export default function DetalhePromocao() {
   const [registroParaRemover, setRegistroParaRemover] = useState(null);
   const [registroParaExcluirDefinitivo, setRegistroParaExcluirDefinitivo] = useState(null);
   const [registroParaReverter, setRegistroParaReverter] = useState(null);
-  const [confirmacaoReversao, setConfirmacaoReversao] = useState('');
-  const [motivoReversao, setMotivoReversao] = useState('');
-  const [observacaoReversao, setObservacaoReversao] = useState('');
+  const [vinculoCurso, setVinculoCurso] = useState({ originadaDeCurso: false, participante: null });
+  const [detectandoVinculoCurso, setDetectandoVinculoCurso] = useState(false);
   const [modalAdicionarAberto, setModalAdicionarAberto] = useState(false);
   const [buscaAdicionar, setBuscaAdicionar] = useState('');
   const [ordemManualAdicionar, setOrdemManualAdicionar] = useState({});
@@ -527,6 +529,28 @@ export default function DetalhePromocao() {
   useEffect(() => {
     setRascunhoTurma(turma.map((registro) => montarRascunhoItemTurma(registro, promocao)));
   }, [promocao, turma]);
+
+  // Detecta vínculo com Curso de Formação ao abrir o modal de reversão (fluxo excepcional).
+  useEffect(() => {
+    let cancelado = false;
+    if (!registroParaReverter || !promocao) {
+      setVinculoCurso({ originadaDeCurso: false, participante: null });
+      setDetectandoVinculoCurso(false);
+      return undefined;
+    }
+    setDetectandoVinculoCurso(true);
+    detectarVinculoCursoPromocao({ promocao, item: registroParaReverter, entities: base44.entities })
+      .then((resultado) => {
+        if (!cancelado) setVinculoCurso(resultado || { originadaDeCurso: false, participante: null });
+      })
+      .catch(() => {
+        if (!cancelado) setVinculoCurso({ originadaDeCurso: false, participante: null });
+      })
+      .finally(() => {
+        if (!cancelado) setDetectandoVinculoCurso(false);
+      });
+    return () => { cancelado = true; };
+  }, [registroParaReverter, promocao]);
 
   const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(
     rascunhoTurma,
@@ -764,7 +788,7 @@ export default function DetalhePromocao() {
   });
 
   const reverterPublicacaoMutation = useMutation({
-    mutationFn: async (registro) => {
+    mutationFn: async ({ registro, motivo, observacao, modoAdmin, fraseConfirmacao }) => {
       if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
       if (!canReverterItem(registro, { isAdmin })) throw new Error('Somente item publicado pode ser revertido.');
       return reverterPublicacaoPromocaoMilitar({
@@ -772,20 +796,21 @@ export default function DetalhePromocao() {
         item: registro,
         itensPromocao: listaExibida,
         entities: base44.entities,
-        motivo: motivoReversao,
-        observacoes: observacaoReversao,
+        motivo,
+        observacoes: observacao,
         usuario: user,
+        modoAdmin,
+        fraseConfirmacao,
       });
     },
-    onSuccess: async (resultado, registroPromocao) => {
+    onSuccess: async (resultado, variaveis) => {
+      const registroPromocao = variaveis?.registro;
       const partes = ['Histórico cancelado'];
       if (resultado?.cadastroRestaurado) partes.push('Cadastro restaurado');
+      if (resultado?.participante_pendente_reanalise) partes.push('Participante em pendente_reanalise');
       partes.push('Promoção reaberta');
       toast({ title: 'Reversão concluída', description: partes.join(' • ') });
       setRegistroParaReverter(null);
-      setConfirmacaoReversao('');
-      setMotivoReversao('');
-      setObservacaoReversao('');
       await invalidarDados();
       if (registroPromocao?.militar_id) {
         await queryClient.invalidateQueries({ queryKey: ['militar', registroPromocao.militar_id] });
@@ -1301,42 +1326,18 @@ export default function DetalhePromocao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={Boolean(registroParaReverter)} onOpenChange={(open) => !open && setRegistroParaReverter(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>ATENÇÃO</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            <p>Você está revertendo uma promoção oficial.</p>
-            <p>Esta ação poderá cancelar histórico oficial, restaurar posto/quadro anterior, alterar Prévia Geral e reabrir esta promoção para edição.</p>
-            <Label>Digite: REVERTER PROMOÇÃO</Label>
-            <Input value={confirmacaoReversao} onChange={(event) => setConfirmacaoReversao(event.target.value)} />
-            <Label>Motivo obrigatório</Label>
-            <Select value={motivoReversao || SELECT_VAZIO} onValueChange={(value) => setMotivoReversao(value === SELECT_VAZIO ? '' : value)}>
-              <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SELECT_VAZIO}>Selecione...</SelectItem>
-                <SelectItem value="Erro material">Erro material</SelectItem>
-                <SelectItem value="Retificação administrativa">Retificação administrativa</SelectItem>
-                <SelectItem value="Publicação indevida">Publicação indevida</SelectItem>
-                <SelectItem value="Outro">Outro</SelectItem>
-              </SelectContent>
-            </Select>
-            <Label>Observações</Label>
-            <Textarea value={observacaoReversao} onChange={(event) => setObservacaoReversao(event.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRegistroParaReverter(null)}>Cancelar</Button>
-            <Button
-              variant="destructive"
-              disabled={confirmacaoReversao.trim() !== 'REVERTER PROMOÇÃO' || !motivoReversao || reverterPublicacaoMutation.isPending}
-              onClick={() => reverterPublicacaoMutation.mutate(registroParaReverter)}
-            >
-              Confirmar reversão
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReverterPublicacaoModal
+        open={Boolean(registroParaReverter)}
+        onOpenChange={(open) => !open && setRegistroParaReverter(null)}
+        registro={registroParaReverter}
+        nomeMilitar={nomeMilitar(registroParaReverter?.militar)}
+        originadaDeCurso={vinculoCurso.originadaDeCurso}
+        detectando={detectandoVinculoCurso}
+        podeReverterExcepcional={podeReverterExcepcional}
+        pendente={normalizar(vinculoCurso.participante?.status) === 'pendente_reanalise'}
+        submitting={reverterPublicacaoMutation.isPending}
+        onConfirmar={(payload) => reverterPublicacaoMutation.mutate(payload)}
+      />
       <Dialog open={Boolean(registroParaExcluirDefinitivo)} onOpenChange={(open) => !open && setRegistroParaExcluirDefinitivo(null)}>
         <DialogContent>
           <DialogHeader>

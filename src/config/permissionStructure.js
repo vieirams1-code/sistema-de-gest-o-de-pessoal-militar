@@ -66,7 +66,8 @@ export const permissionStructure = [
         key: 'acesso_antiguidade',
         label: 'Antiguidade',
         actions: [
-          { key: 'perm_visualizar_rastreamento_promocoes', label: 'Visualizar Rastreamento de Promoções' }
+          { key: 'perm_visualizar_rastreamento_promocoes', label: 'Visualizar Rastreamento de Promoções' },
+          { key: 'perm_reverter_promocao_excepcional', label: 'Reverter Promoção Excepcional (originada de Curso)', sensitive: true }
         ]
       },
       {

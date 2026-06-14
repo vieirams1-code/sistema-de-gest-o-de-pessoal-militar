@@ -427,6 +427,34 @@ async function restaurarCadastroMilitarDaPromocao({
   return { exigiaRollback: true, cadastroRestaurado: true };
 }
 
+// Status do participante que caracterizam vínculo "ativo" com a promoção (fluxo excepcional).
+const STATUS_PARTICIPANTE_VINCULADO_CURSO = new Set(['promovido', 'pendente_reanalise']);
+
+// Frase exata exigida para a reversão excepcional de promoção originada de curso.
+export const FRASE_CONFIRMACAO_REVERSAO_EXCEPCIONAL = 'CONFIRMO REVERSÃO E CIÊNCIA DA PENDÊNCIA';
+// Frase padrão (promoção comum).
+export const FRASE_CONFIRMACAO_REVERSAO_COMUM = 'REVERTER PROMOÇÃO';
+
+/**
+ * Detecta se a reversão é de promoção ORIGINADA DE CURSO DE FORMAÇÃO,
+ * verificando se existe ParticipanteCursoFormacao vinculado por promocao_id + militar_id.
+ * Retorna { originadaDeCurso, participante }.
+ */
+export async function detectarVinculoCursoPromocao({ promocao, item, entities } = {}) {
+  const ParticipanteCurso = entities?.ParticipanteCursoFormacao;
+  const promocaoId = texto(promocao?.id);
+  const militarId = texto(item?.militar_id);
+  if (!promocaoId || !militarId || !ParticipanteCurso || typeof ParticipanteCurso.filter !== 'function') {
+    return { originadaDeCurso: false, participante: null };
+  }
+  const vinculos = await ParticipanteCurso.filter({ promocao_id: promocaoId, militar_id: militarId }).catch(() => []);
+  const participante = (vinculos || []).find((p) => STATUS_PARTICIPANTE_VINCULADO_CURSO.has(normalizar(p?.status)))
+    || (vinculos || [])[0]
+    || null;
+  const originadaDeCurso = Boolean(participante?.id && STATUS_PARTICIPANTE_VINCULADO_CURSO.has(normalizar(participante?.status)));
+  return { originadaDeCurso, participante };
+}
+
 export async function reverterPublicacaoPromocaoMilitar({
   promocao,
   item,
@@ -435,6 +463,8 @@ export async function reverterPublicacaoPromocaoMilitar({
   motivo = '',
   observacoes = '',
   usuario = null,
+  modoAdmin = false,
+  fraseConfirmacao = '',
 } = {}) {
   const motivoNormalizado = texto(motivo);
   if (!promocao?.id) throw new Error('Promoção não carregada.');
@@ -480,6 +510,8 @@ export async function reverterPublicacaoPromocaoMilitar({
     motivo: motivoNormalizado,
     observacoes,
     usuario,
+    modo_admin: Boolean(modoAdmin),
+    frase_confirmacao: texto(fraseConfirmacao),
   };
 
   const response = await base44.functions.invoke('reverterPublicacaoPromocaoMilitarTx', {

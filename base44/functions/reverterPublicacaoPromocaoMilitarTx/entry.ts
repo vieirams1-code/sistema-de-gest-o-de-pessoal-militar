@@ -10,6 +10,13 @@ const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidad
 // decisão administrativa manual, mantendo a rastreabilidade (promocao_id).
 const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
 
+// Frase exigida para confirmar a reversão EXCEPCIONAL (promoção originada de curso).
+const FRASE_CONFIRMACAO_EXCEPCIONAL = 'CONFIRMO REVERSÃO E CIÊNCIA DA PENDÊNCIA';
+const PERMISSAO_REVERSAO_EXCEPCIONAL = 'perm_reverter_promocao_excepcional';
+
+// Status do participante que caracterizam vínculo "ativo" com a promoção a ser revertida.
+const STATUS_PARTICIPANTE_VINCULADO = new Set(['promovido', 'pendente_reanalise']);
+
 function statusPromocaoPosReversao(itens: any[] = []) {
   const publicados = (itens || []).filter((item) => Boolean(item?.publicado) && normalizar(item?.status) === 'publicado').length;
   if (publicados === 0) return 'rascunho';
@@ -52,6 +59,8 @@ Deno.serve(async (req) => {
     const motivo = texto(payload?.motivo);
     const observacoes = texto(payload?.observacoes);
     const usuario = payload?.usuario || null;
+    const modoAdmin = payload?.modo_admin === true || payload?.modoAdmin === true;
+    const fraseConfirmacao = texto(payload?.frase_confirmacao || payload?.fraseConfirmacao);
 
     const promocaoId = texto(promocao?.id);
     const itemId = texto(item?.id);
@@ -111,6 +120,46 @@ Deno.serve(async (req) => {
       const vinculos = await ParticipanteCurso.filter({ promocao_id: promocaoId, militar_id: militarId }).catch(() => []);
       participante = (vinculos || []).find((p: any) => normalizar(p?.status) === 'promovido') || (vinculos || [])[0] || null;
     }
+
+    // === FLUXO EXCEPCIONAL: promoção originada de Curso de Formação ===
+    // Detectado o vínculo, a reversão vira ação administrativa excepcional e exige:
+    // permissão específica + Modo Admin + frase de confirmação exata + motivo.
+    const ehReversaoOriginadaDeCurso = Boolean(
+      participante?.id && STATUS_PARTICIPANTE_VINCULADO.has(normalizar(participante?.status)),
+    );
+
+    if (ehReversaoOriginadaDeCurso) {
+      // O usuário autenticado real é a fonte de verdade para permissão (não o payload).
+      let usuarioAutenticado = null;
+      try { usuarioAutenticado = await base44.auth.me(); } catch (_) { usuarioAutenticado = null; }
+
+      const permissoes = usuarioAutenticado?.permissions || usuarioAutenticado?.permissoes || {};
+      const ehAdmin = normalizar(usuarioAutenticado?.role) === 'admin';
+      const temPermissaoExcepcional = ehAdmin
+        || permissoes?.[PERMISSAO_REVERSAO_EXCEPCIONAL] === true
+        || (Array.isArray(usuarioAutenticado?.actions) && usuarioAutenticado.actions.includes(PERMISSAO_REVERSAO_EXCEPCIONAL));
+
+      const contextoExcepcional = {
+        promocao_id: promocaoId,
+        promocao_militar_id: itemId,
+        militar_id: militarId,
+        participante_curso_id: participante?.id || null,
+      };
+
+      if (!temPermissaoExcepcional) {
+        return erro({ status: 403, etapa: 'autorizacao', motivo: 'permissao_ausente', contexto: { ...contextoExcepcional, campo_faltante: PERMISSAO_REVERSAO_EXCEPCIONAL, validacao_bloqueada: 'reversao_excepcional_sem_permissao' } });
+      }
+      if (!modoAdmin) {
+        return erro({ status: 403, etapa: 'autorizacao', motivo: 'modo_admin_ausente', contexto: { ...contextoExcepcional, campo_faltante: 'modo_admin', validacao_bloqueada: 'reversao_excepcional_sem_modo_admin' } });
+      }
+      if (fraseConfirmacao !== FRASE_CONFIRMACAO_EXCEPCIONAL) {
+        return erro({ status: 400, etapa: 'validacao', motivo: 'frase_confirmacao_invalida', contexto: { ...contextoExcepcional, campo_faltante: 'frase_confirmacao', validacao_bloqueada: 'frase_confirmacao_invalida' } });
+      }
+      if (!motivo) {
+        return erro({ status: 400, etapa: 'validacao', motivo: 'motivo_obrigatorio', contexto: { ...contextoExcepcional, campo_faltante: 'motivo' } });
+      }
+    }
+
     // Regra de produção: ao reverter, o participante 'promovido' NÃO volta para
     // aprovado/aguardando_nova_etapa. Passa para 'pendente_reanalise', mantendo
     // promocao_id para rastreabilidade. Qualquer retorno ao curso é ação manual.
@@ -162,6 +211,12 @@ Deno.serve(async (req) => {
               promocao_id: promocaoId,
               promocao_militar_id: itemId,
               status_pre_publicacao_registrado: statusPrePublicacao || null,
+              reversao_excepcional: ehReversaoOriginadaDeCurso,
+              modo_admin: ehReversaoOriginadaDeCurso ? true : null,
+              frase_confirmacao_validada: ehReversaoOriginadaDeCurso ? true : null,
+              motivo_reversao: motivo || null,
+              estrutura_id: usuario?.estrutura_id || null,
+              estrutura_nome: usuario?.estrutura_nome || null,
             },
             usuario_id: usuario?.id || null,
             usuario_nome: usuario?.full_name || usuario?.email || null,
@@ -204,6 +259,9 @@ Deno.serve(async (req) => {
       participante_status_anterior: participanteSnapshot?.status || null,
       participante_status_novo: (participante?.id && participanteEstaPromovido) ? statusParticipantePosReversao : null,
       participante_pendente_reanalise: Boolean(participante?.id && participanteEstaPromovido),
+      reversao_excepcional: ehReversaoOriginadaDeCurso,
+      modo_admin: ehReversaoOriginadaDeCurso ? modoAdmin : false,
+      frase_confirmacao_validada: ehReversaoOriginadaDeCurso ? (fraseConfirmacao === FRASE_CONFIRMACAO_EXCEPCIONAL) : null,
     });
   } catch (error: any) {
     return erro({ status: 500, etapa: 'erro_interno', motivo: error?.message || 'erro_interno_reversao' });
