@@ -437,8 +437,10 @@ export async function sincronizarParticipantesPromovidos(cursoId, usuario) {
     );
     if (!publicado) continue;
 
+    const statusPrePublicacao = STATUS_ELEGIVEIS_PROMOCAO.includes(participante.status) ? participante.status : undefined;
     await (await getClient()).entities[ENTITY_PARTICIPANTE].update(participante.id, {
       status: 'promovido',
+      ...(statusPrePublicacao ? { status_pre_publicacao: statusPrePublicacao } : {}),
       data_status_atual: new Date().toISOString(),
     });
 
@@ -449,7 +451,7 @@ export async function sincronizarParticipantesPromovidos(cursoId, usuario) {
       acao: 'sincronizar_promovido',
       status_anterior: participante.status,
       status_novo: 'promovido',
-      dados_novos: { promocao_id: participante.promocao_id },
+      dados_novos: { promocao_id: participante.promocao_id, status_pre_publicacao: statusPrePublicacao || null },
     }, usuario);
 
     promovidos += 1;
