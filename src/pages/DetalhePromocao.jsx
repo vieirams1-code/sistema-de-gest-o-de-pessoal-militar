@@ -798,6 +798,7 @@ export default function DetalhePromocao() {
         entities: base44.entities,
         motivo,
         observacoes: observacao,
+        observacao,
         usuario: user,
         modoAdmin,
         fraseConfirmacao,

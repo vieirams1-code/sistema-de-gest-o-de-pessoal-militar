@@ -462,11 +462,13 @@ export async function reverterPublicacaoPromocaoMilitar({
   entities,
   motivo = '',
   observacoes = '',
+  observacao = '',
   usuario = null,
   modoAdmin = false,
   fraseConfirmacao = '',
 } = {}) {
   const motivoNormalizado = texto(motivo);
+  const observacoesNormalizado = texto(observacoes) || texto(observacao);
   if (!promocao?.id) throw new Error('Promoção não carregada.');
   if (!item?.id) throw new Error('Item da promoção não carregado.');
 
@@ -508,10 +510,14 @@ export async function reverterPublicacaoPromocaoMilitar({
     item,
     itensPromocao,
     motivo: motivoNormalizado,
-    observacoes,
+    motivo_reversao: motivoNormalizado,
+    observacoes: observacoesNormalizado,
+    observacao: observacoesNormalizado,
     usuario,
     modo_admin: Boolean(modoAdmin),
+    modoAdmin: Boolean(modoAdmin),
     frase_confirmacao: texto(fraseConfirmacao),
+    fraseConfirmacao: texto(fraseConfirmacao),
   };
 
   const response = await base44.functions.invoke('reverterPublicacaoPromocaoMilitarTx', {

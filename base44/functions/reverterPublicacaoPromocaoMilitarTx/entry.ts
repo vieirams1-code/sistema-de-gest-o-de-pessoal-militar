@@ -56,8 +56,12 @@ Deno.serve(async (req) => {
     const promocao = payload?.promocao || {};
     const item = payload?.item || {};
     const itensPromocao = Array.isArray(payload?.itensPromocao) ? payload.itensPromocao : [];
-    const motivo = texto(payload?.motivo);
-    const observacoes = texto(payload?.observacoes);
+    const motivoRaw = payload?.motivo;
+    const motivoReversaoRaw = payload?.motivo_reversao;
+    const observacoesRaw = payload?.observacoes;
+    const observacaoRaw = payload?.observacao;
+    const motivo = texto(motivoRaw) || texto(motivoReversaoRaw);
+    const observacoes = texto(observacoesRaw) || texto(observacaoRaw);
     const usuario = payload?.usuario || null;
     const modoAdmin = payload?.modo_admin === true || payload?.modoAdmin === true;
     const fraseConfirmacao = texto(payload?.frase_confirmacao || payload?.fraseConfirmacao);
@@ -67,7 +71,24 @@ Deno.serve(async (req) => {
 
     if (!promocaoId) return erro({ status: 400, etapa: 'validacao', motivo: 'promocao_nao_carregada', contexto: { campo_faltante: 'promocao.id' } });
     if (!itemId) return erro({ status: 400, etapa: 'validacao', motivo: 'item_nao_carregado', contexto: { campo_faltante: 'item.id', promocao_id: promocaoId } });
-    if (!motivo) return erro({ status: 400, etapa: 'validacao', motivo: 'motivo_obrigatorio', contexto: { campo_faltante: 'motivo', promocao_id: promocaoId, promocao_militar_id: itemId } });
+    if (!motivo) {
+      return Response.json({
+        success: false,
+        etapa: 'validacao',
+        motivo: 'motivo_obrigatorio',
+        campo_faltante: 'motivo',
+        promocao_id: promocaoId,
+        promocao_militar_id: itemId,
+        debug: {
+          payload_keys_recebidas: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+          motivo_raw: motivoRaw ?? null,
+          motivo_reversao_raw: motivoReversaoRaw ?? null,
+          motivo_normalizado: motivo,
+          observacoes_raw: observacoesRaw ?? null,
+          observacao_raw: observacaoRaw ?? null,
+        },
+      }, { status: 400 });
+    }
 
     const Historico = base44.asServiceRole.entities.HistoricoPromocaoMilitarV2;
     const PromocaoMilitar = base44.asServiceRole.entities.PromocaoMilitar;
