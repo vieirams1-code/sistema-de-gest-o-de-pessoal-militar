@@ -129,23 +129,17 @@ export default function RegistrosMilitar() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const [buscaGeral, setBuscaGeral] = useState('');
-  const [buscaNomeMilitar, setBuscaNomeMilitar] = useState('');
-  const [buscaMatricula, setBuscaMatricula] = useState('');
   const [dataInicial, setDataInicial] = useState('');
   const [dataFinal, setDataFinal] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('all');
   const [filtroStatus, setFiltroStatus] = useState('all');
   const [filtroNumeroBg, setFiltroNumeroBg] = useState('');
   const [filtroOrigem, setFiltroOrigem] = useState('all');
-  const [filtroTipoBgLegado, setFiltroTipoBgLegado] = useState('all');
-  const [filtroMateriaLegado, setFiltroMateriaLegado] = useState('all');
   const [filtroTrechoLivre, setFiltroTrechoLivre] = useState('');
 
   const [somentePublicados, setSomentePublicados] = useState(false);
-  const [somenteComBg, setSomenteComBg] = useState(false);
   const [somenteClassificacaoPendente, setSomenteClassificacaoPendente] = useState(false);
   const [somenteLegadoNaoClassificado, setSomenteLegadoNaoClassificado] = useState(false);
-  const [somenteEditavelExcluivel, setSomenteEditavelExcluivel] = useState(false);
   const [somenteSistemaAdmin, setSomenteSistemaAdmin] = useState(false);
 
   const [expandedRegistroId, setExpandedRegistroId] = useState(null);
@@ -194,11 +188,11 @@ export default function RegistrosMilitar() {
   );
 
   const militaresPorId = useMemo(
-    () => militares.reduce((acc, militar) => {
+    () => militaresEnriquecidos.reduce((acc, militar) => {
       acc[militar.id] = militar;
       return acc;
     }, {}),
-    [militares],
+    [militaresEnriquecidos],
   );
 
   const militaresFiltradosBusca = useMemo(() => {
@@ -223,20 +217,10 @@ export default function RegistrosMilitar() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [registros]);
 
-  const tiposBgLegadoDisponiveis = useMemo(() => {
-    const set = new Set(registros.map((r) => String(r?.tipo_bg_legado || '').trim()).filter(Boolean));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [registros]);
-
-  const materiasLegadoDisponiveis = useMemo(() => {
-    const set = new Set(registros.map((r) => String(r?.materia_legado || '').trim()).filter(Boolean));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [registros]);
-
   const registrosOrdenados = useMemo(() => {
+    if (!militarSelecionado) return [];
+
     const buscaGeralNormalizada = toSearch(buscaGeral).trim();
-    const buscaNomeMilitarNormalizada = toSearch(buscaNomeMilitar).trim();
-    const buscaMatriculaNormalizada = toSearch(buscaMatricula).trim();
     const buscaNumeroBgNormalizada = toSearch(filtroNumeroBg).trim();
     const buscaTrechoNormalizada = toSearch(filtroTrechoLivre).trim();
 
@@ -260,15 +244,6 @@ export default function RegistrosMilitar() {
         const descricaoCompleta = extrairDescricao(registro);
 
         const textoBusca = toSearch([
-          militarNome,
-          militar?.nome_completo,
-          militar?.nome_guerra,
-          registro?.militar_nome,
-          registro?.militar_nome_completo,
-          registro?.nome_completo_legado,
-          registro?.nome_guerra_legado,
-          registro?.militar_matricula,
-          registro?.matricula_legado,
           tipoRegistro,
           registro?.materia_legado,
           numeroBgNormalizado,
@@ -278,23 +253,10 @@ export default function RegistrosMilitar() {
           origemRegistro,
         ].filter(Boolean).join(' '));
 
-        const matriculaBusca = toSearch(registro?.militar_matricula || registro?.matricula_legado || militar?.matricula);
-        const nomeMilitarBusca = toSearch([
-          registro?.militar_nome,
-          registro?.militar_nome_completo,
-          registro?.nome_completo_legado,
-          registro?.nome_guerra_legado,
-          militarNome,
-          militar?.nome_completo,
-          militar?.nome_guerra,
-        ].filter(Boolean).join(' '));
-        const numeroBgBusca = toSearch(numeroBgNormalizado);
         const tipoBgLegado = String(registro?.tipo_bg_legado || '').trim();
         const materiaLegado = String(registro?.materia_legado || '').trim();
         const classificacaoPendente = registro?.classificacao_pendente === true;
         const publicado = statusPublicacao === STATUS_PUBLICACAO.PUBLICADO;
-        const comBg = Boolean(numeroBgNormalizado);
-        const isEditavelExcluivel = canManageAdminActions;
         const isLegadoNaoClassificado = origemRegistro === 'legado' && (!tipoRegistro || classificacaoPendente);
 
         return {
@@ -309,20 +271,16 @@ export default function RegistrosMilitar() {
           origemRegistro,
           statusPublicacao,
           textoBusca,
-          matriculaBusca,
-          nomeMilitarBusca,
           numeroBgBusca: toSearch(numeroBgNormalizado),
           tipoBgLegado,
           materiaLegado,
           classificacaoPendente,
           publicado,
-          comBg,
-          isEditavelExcluivel,
           isLegadoNaoClassificado,
         };
       })
       .filter((registro) => {
-        if (militarSelecionado && !vinculaRegistroAoMilitar(registro, militarSelecionado)) return false;
+        if (!vinculaRegistroAoMilitar(registro, militarSelecionado)) return false;
 
         if (dataInicial && (!registro.dataEvento || registro.dataEvento < dataInicial)) return false;
         if (dataFinal && (!registro.dataEvento || registro.dataEvento > dataFinal)) return false;
@@ -331,20 +289,13 @@ export default function RegistrosMilitar() {
         if (filtroTipo !== 'all' && registro.tipoRegistro !== filtroTipo) return false;
         if (filtroStatus !== 'all' && registro.statusPublicacao !== filtroStatus) return false;
 
-        if (filtroTipoBgLegado !== 'all' && registro.tipoBgLegado !== filtroTipoBgLegado) return false;
-        if (filtroMateriaLegado !== 'all' && registro.materiaLegado !== filtroMateriaLegado) return false;
-
         if (buscaGeralNormalizada && !registro.textoBusca.includes(buscaGeralNormalizada)) return false;
-        if (buscaNomeMilitarNormalizada && !registro.nomeMilitarBusca.includes(buscaNomeMilitarNormalizada)) return false;
-        if (buscaMatriculaNormalizada && !registro.matriculaBusca.includes(buscaMatriculaNormalizada)) return false;
         if (buscaNumeroBgNormalizada && !registro.numeroBgBusca.includes(buscaNumeroBgNormalizada)) return false;
         if (buscaTrechoNormalizada && !toSearch(`${registro.descricao} ${registro.texto_publicacao || ''}`).includes(buscaTrechoNormalizada)) return false;
 
         if (somentePublicados && !registro.publicado) return false;
-        if (somenteComBg && !registro.comBg) return false;
         if (somenteClassificacaoPendente && !registro.classificacaoPendente) return false;
         if (somenteLegadoNaoClassificado && !registro.isLegadoNaoClassificado) return false;
-        if (canManageAdminActions && somenteEditavelExcluivel && !registro.isEditavelExcluivel) return false;
         if (canManageAdminActions && somenteSistemaAdmin && registro.origemRegistro !== 'sistema') return false;
 
         return true;
@@ -352,29 +303,24 @@ export default function RegistrosMilitar() {
       .sort((a, b) => (b.dataEvento || '').localeCompare(a.dataEvento || ''));
   }, [
     buscaGeral,
-    buscaNomeMilitar,
-    buscaMatricula,
     canManageAdminActions,
     dataFinal,
     dataInicial,
-    filtroMateriaLegado,
-    filtroMilitarId,
     filtroNumeroBg,
     filtroOrigem,
     filtroStatus,
     filtroTipo,
-    filtroTipoBgLegado,
     filtroTrechoLivre,
     militaresPorId,
     militarSelecionado,
     registros,
     somenteClassificacaoPendente,
-    somenteComBg,
-    somenteEditavelExcluivel,
     somenteLegadoNaoClassificado,
     somentePublicados,
     somenteSistemaAdmin,
   ]);
+
+  const aguardandoMilitarPreSelecionado = filtroMilitarId !== 'all' && loadingMilitares;
 
   const editarTipoMutation = useMutation({
     mutationFn: ({ registro, novoTipo }) => atualizarTipoRegistroMilitar(registro, novoTipo, { userEmail: user?.email }),
@@ -436,6 +382,10 @@ export default function RegistrosMilitar() {
   }
 
   useEffect(() => {
+    setExpandedRegistroId(null);
+  }, [filtroMilitarId]);
+
+  useEffect(() => {
     if (!import.meta.env.DEV) return;
     if (!militarSelecionado) return;
 
@@ -493,7 +443,7 @@ export default function RegistrosMilitar() {
                 <Button variant="outline" role="combobox" className="w-full justify-between">
                   {militarSelecionado
                     ? `${militarSelecionado.posto_graduacao ? `${militarSelecionado.posto_graduacao} ` : ''}${militarSelecionado.nome_guerra || militarSelecionado.nome_completo} • ${militarSelecionado.matricula || 'Sem matrícula'}`
-                    : 'Todos os militares'}
+                    : 'Selecione um militar'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -506,16 +456,19 @@ export default function RegistrosMilitar() {
                   />
                   <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
                   <CommandGroup className="max-h-64 overflow-auto">
-                    <CommandItem
-                      value="all"
-                      onSelect={() => {
-                        setFiltroMilitarId('all');
-                        setOpenMilitarPopover(false);
-                      }}
-                    >
-                      <Check className={`mr-2 h-4 w-4 ${filtroMilitarId === 'all' ? 'opacity-100' : 'opacity-0'}`} />
-                      Todos os militares
-                    </CommandItem>
+                    {militarSelecionado && (
+                      <CommandItem
+                        value="limpar-selecao"
+                        onSelect={() => {
+                          setFiltroMilitarId('all');
+                          setBuscaMilitar('');
+                          setOpenMilitarPopover(false);
+                        }}
+                      >
+                        <Check className="mr-2 h-4 w-4 opacity-0" />
+                        Limpar seleção
+                      </CommandItem>
+                    )}
                     {militaresFiltradosBusca.map((militar) => (
                       <CommandItem
                         key={militar.id}
@@ -545,25 +498,7 @@ export default function RegistrosMilitar() {
                 <Input
                   value={buscaGeral}
                   onChange={(event) => setBuscaGeral(event.target.value)}
-                  placeholder="Nome, matrícula, tipo, matéria, BG, trecho..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Busca por nome do militar</Label>
-                <Input
-                  value={buscaNomeMilitar}
-                  onChange={(event) => setBuscaNomeMilitar(event.target.value)}
-                  placeholder="Nome completo ou nome de guerra"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Matrícula</Label>
-                <Input
-                  value={buscaMatricula}
-                  onChange={(event) => setBuscaMatricula(event.target.value)}
-                  placeholder="Filtrar por matrícula"
+                  placeholder="Tipo, status, BG, conteúdo ou trecho..."
                 />
               </div>
 
@@ -631,36 +566,6 @@ export default function RegistrosMilitar() {
               </div>
 
               <div className="space-y-2">
-                <Label>Tipo BG legado</Label>
-                <Select value={filtroTipoBgLegado} onValueChange={setFiltroTipoBgLegado}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {tiposBgLegadoDisponiveis.map((tipo) => (
-                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Matéria legado</Label>
-                <Select value={filtroMateriaLegado} onValueChange={setFiltroMateriaLegado}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {materiasLegadoDisponiveis.map((materia) => (
-                      <SelectItem key={materia} value={materia}>{materia}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Busca no conteúdo/trecho</Label>
                 <Input
                   value={filtroTrechoLivre}
@@ -678,11 +583,6 @@ export default function RegistrosMilitar() {
                   </label>
 
                   <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <Checkbox checked={somenteComBg} onCheckedChange={(checked) => setSomenteComBg(Boolean(checked))} />
-                    Somente com BG preenchido
-                  </label>
-
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
                     <Checkbox checked={somenteClassificacaoPendente} onCheckedChange={(checked) => setSomenteClassificacaoPendente(Boolean(checked))} />
                     Somente classificação pendente
                   </label>
@@ -693,17 +593,10 @@ export default function RegistrosMilitar() {
                   </label>
 
                   {canManageAdminActions && (
-                    <>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <Checkbox checked={somenteEditavelExcluivel} onCheckedChange={(checked) => setSomenteEditavelExcluivel(Boolean(checked))} />
-                        Somente registros excluíveis/editáveis
-                      </label>
-
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <Checkbox checked={somenteSistemaAdmin} onCheckedChange={(checked) => setSomenteSistemaAdmin(Boolean(checked))} />
-                        Somente registros do sistema
-                      </label>
-                    </>
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <Checkbox checked={somenteSistemaAdmin} onCheckedChange={(checked) => setSomenteSistemaAdmin(Boolean(checked))} />
+                      Somente registros do sistema
+                    </label>
                   )}
                 </div>
               </div>
@@ -717,10 +610,14 @@ export default function RegistrosMilitar() {
           <CardTitle>Linha do tempo ({registrosOrdenados.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingMilitares || loadingRegistros ? (
+          {aguardandoMilitarPreSelecionado ? (
+            <p className="text-sm text-slate-500">Carregando militar selecionado...</p>
+          ) : !militarSelecionado ? (
+            <p className="text-sm text-slate-500">Selecione um militar para visualizar a linha do tempo de registros.</p>
+          ) : loadingRegistros ? (
             <p className="text-sm text-slate-500">Carregando registros...</p>
           ) : registrosOrdenados.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum registro encontrado para os filtros informados.</p>
+            <p className="text-sm text-slate-500">Nenhum registro encontrado para o militar selecionado e filtros informados.</p>
           ) : (
             <ul className="space-y-3">
               {registrosOrdenados.map((registro) => {
