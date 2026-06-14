@@ -42,7 +42,15 @@ function criarFakeClient() {
       stores[name] = tabela(name).filter((r) => r.id !== id);
       return true;
     },
-    async list({ query = {} } = {}) {
+    // Assinatura posicional usada pelo service: filter(query, sort).
+    async filter(query = {}) {
+      return tabela(name).filter((r) =>
+        Object.entries(query).every(([k, v]) => r[k] === v),
+      );
+    },
+    async list(arg = {}) {
+      // Aceita list() / list(sort) / list({ query }).
+      const query = (arg && typeof arg === 'object' && arg.query) ? arg.query : {};
       return tabela(name).filter((r) =>
         Object.entries(query).every(([k, v]) => r[k] === v),
       );

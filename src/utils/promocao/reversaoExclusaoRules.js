@@ -24,10 +24,10 @@ export function podeReverterPublicacaoPromocao({ promocao, item, historico, mili
   if (!item?.publicado || normalizar(item?.status) !== 'publicado') {
     return { permitido: false, motivo: 'Item ainda não está publicado.', codigo: 'ITEM_NAO_PUBLICADO' };
   }
-  if (!texto(item?.historico_promocao_v2_id)) {
-    return { permitido: false, motivo: 'Item publicado sem histórico vinculado.', codigo: 'SEM_HISTORICO_VINCULADO' };
-  }
-  if (!historico?.id) {
+  // O histórico vinculado é resolvido de forma autoritativa pelo backend (re-leitura do
+  // PromocaoMilitar). Aqui só bloqueamos quando temos certeza, pelo item E pelo histórico
+  // carregados, de que não há vínculo — evitando falso negativo por payload defasado.
+  if (!texto(item?.historico_promocao_v2_id) && !historico?.id) {
     return { permitido: false, motivo: 'Sem histórico vinculado para reversão.', codigo: 'SEM_HISTORICO_VINCULADO' };
   }
   if (!texto(motivo)) return { permitido: false, motivo: 'Motivo da reversão é obrigatório.', codigo: 'MOTIVO_AUSENTE' };
@@ -56,4 +56,3 @@ export function podeExcluirDefinitivamentePromocaoMilitar({ item, historico } = 
 
   return { permitido: true, codigo: 'OK' };
 }
-

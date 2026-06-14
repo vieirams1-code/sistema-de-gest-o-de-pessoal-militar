@@ -456,9 +456,10 @@ export async function reverterPublicacaoPromocaoMilitar({
     resultado_aplicacao_cadastro: item?.resultado_aplicacao_cadastro,
   });
 
+  // O histórico pode estar defasado no item (ex.: promoção recém-publicada via Curso de
+  // Formação). Tentamos resolvê-lo aqui; se ausente, o backend re-lê o PromocaoMilitar.
   const historicoId = texto(item?.historico_promocao_v2_id);
-  if (!historicoId) throw new Error('Sem histórico vinculado para reversão.');
-  const historicoRegistro = typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
+  const historicoRegistro = historicoId && typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
   diagLog('reversao:historico-carregado', { historicoId, historicoRegistro, postoAnterior: historicoRegistro?.posto_graduacao_anterior, quadroAnterior: historicoRegistro?.quadro_anterior, postoNovo: historicoRegistro?.posto_graduacao_novo, quadroNovo: historicoRegistro?.quadro_novo });
   const militarAtual = (entities?.Militar && typeof entities.Militar.get === 'function' && item?.militar_id)
     ? await entities.Militar.get(item.militar_id)
