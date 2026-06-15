@@ -43,6 +43,7 @@ import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
+import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import GerarDocumentoMilitarModal from '@/components/documentosMilitares/GerarDocumentoMilitarModal';
 import SelectionActionBar from '@/components/shared/SelectionActionBar';
@@ -486,6 +487,24 @@ export default function Militares() {
 
   // Posto Virtual (Fase 2B) — decora militares com curso de formação ativo.
   // Não altera o cadastro; apenas adiciona campos derivados de exibição.
+  const { data: conferenciasAbertasMap = new Map() } = useQuery({
+    queryKey: ['conferencias-abertas-scoped', effectiveEmail || 'self'],
+    enabled: isAccessResolved && canAccessAction('perm_visualizar_conferencias_militares'),
+    queryFn: async () => {
+      const lista = await conferenciaMilitarService.listarConferencias({
+        status: { '$in': ['pendente', 'em_andamento', 'concluida_com_pendencias'] }
+      });
+      const mapa = new Map();
+      lista.forEach(c => {
+        if (!mapa.has(c.militar_id) || c.status === 'em_andamento') {
+          mapa.set(c.militar_id, c);
+        }
+      });
+      return mapa;
+    },
+    staleTime: STALE_TIME_MS,
+  });
+
   const { data: participantesPostoVirtual } = useQuery({
     queryKey: ['posto-virtual-participantes-ativos', effectiveEmail || 'self'],
     staleTime: STALE_TIME_MS,
@@ -1576,6 +1595,7 @@ export default function Militares() {
                   emojisEfetivoByMilitar={emojisEfetivoByMilitar}
                   isSelected={selectedMilitarIds.has(String(militar.id))}
                   onToggleSelection={handleToggleRowSelection}
+                  conferenciaAberta={conferenciasAbertasMap.get(militar.id)}
                   isAdmin={isAdmin}
                   canAccessAction={canAccessAction}
                   onPromocaoAtual={handlePromocaoAtualRow}

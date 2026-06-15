@@ -58,6 +58,7 @@ import { ptBR } from 'date-fns/locale';
 import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
+import { differenceInDays } from 'date-fns';
 
 const STATUS_LABELS = {
   pendente: { label: 'Pendente', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: Clock },
@@ -109,11 +110,16 @@ export default function ConferenciasMilitares() {
   });
 
   const stats = useMemo(() => {
+    const hoje = new Date();
     return {
       pendentes: conferencias.filter(c => c.status === 'pendente').length,
       emAndamento: conferencias.filter(c => c.status === 'em_andamento').length,
       concluidas: conferencias.filter(c => c.status === 'concluida').length,
-      comPendencias: conferencias.filter(c => c.status === 'concluida_com_pendencias').length,
+      comPendencias: conferencias.filter(c => c.status === 'concluida_com_pendencias' || (c.status === 'em_andamento' && c.progresso_percentual > 0)).length,
+      criticas: conferencias.filter(c =>
+        ['pendente', 'em_andamento'].includes(c.status) &&
+        differenceInDays(hoje, new Date(c.data_abertura)) > 30
+      ).length,
     };
   }, [conferencias]);
 
@@ -191,6 +197,18 @@ export default function ConferenciasMilitares() {
           </CardContent>
         </Card>
       </div>
+
+      {stats.criticas > 0 && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-xl text-red-800 animate-pulse">
+          <div className="p-2 bg-red-100 rounded-full">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold">Atenção Gestor</p>
+            <p className="text-xs opacity-90">Existem <strong>{stats.criticas}</strong> conferências abertas há mais de 30 dias aguardando conclusão.</p>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3 border-b bg-slate-50/30">

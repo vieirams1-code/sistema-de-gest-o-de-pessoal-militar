@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Eye, Pencil, Trash2, CalendarClock, Car, HeartPulse, AlertTriangle } from 'lucide-react';
+import { Eye, Pencil, Trash2, CalendarClock, Car, HeartPulse, AlertTriangle, ClipboardCheck, Clock } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { isQuadroComDestaque } from '@/utils/postoQuadroCompatibilidade';
 import { getQuadroMilitar } from '@/utils/militarPostoGraduacao';
@@ -62,6 +62,7 @@ function MilitarConsultaRow({
   emojisEfetivoByMilitar,
   isSelected,
   onToggleSelection,
+  conferenciaAberta,
   isAdmin,
   canAccessAction,
   onPromocaoAtual,
@@ -103,6 +104,25 @@ function MilitarConsultaRow({
                     <span className="font-bold text-gray-900 truncate min-w-0 flex-1">
                       {militar.nome_guerra || militar.nome_completo}
                     </span>
+                  {conferenciaAberta && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border cursor-help ${
+                            conferenciaAberta.status === 'pendente' ? 'bg-slate-50 text-slate-500 border-slate-200' :
+                            conferenciaAberta.status === 'em_andamento' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                            'bg-amber-50 text-amber-600 border-amber-200'
+                          }`}
+                        >
+                          {conferenciaAberta.status === 'pendente' ? <Clock size={11} strokeWidth={3} /> : <ClipboardCheck size={11} strokeWidth={3} />}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-semibold">Conferência Cadastral {conferenciaAberta.status === 'pendente' ? 'Pendente' : conferenciaAberta.status === 'em_andamento' ? 'em Andamento' : 'com Pendências'}</p>
+                        <p className="text-xs text-slate-400">Tipo: {conferenciaAberta.tipo_conferencia}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                     {tagsVisiveis.length > 0 && (
                       <div className="flex gap-1 items-center overflow-hidden min-w-0 shrink">
                         {tagsVisiveis.map((item, idx) => {

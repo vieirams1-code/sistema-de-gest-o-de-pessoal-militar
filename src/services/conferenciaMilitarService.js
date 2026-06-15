@@ -16,7 +16,15 @@ export const conferenciaMilitarService = {
 
     if (militarId) query = query.where('militar_id', '==', militarId);
     if (tipoConferencia && tipoConferencia !== 'null') query = query.where('tipo_conferencia', '==', tipoConferencia);
-    if (status && status !== 'null') query = query.where('status', '==', status);
+    if (status && status !== 'null') {
+      if (Array.isArray(status)) {
+        query = query.where('status', 'in', status);
+      } else if (typeof status === 'object' && status['$in']) {
+        query = query.where('status', 'in', status['$in']);
+      } else {
+        query = query.where('status', '==', status);
+      }
+    }
     if (unidadeId) query = query.where('unidade_id', '==', unidadeId);
 
     if (dataInicio) query = query.where('created_date', '>=', `${dataInicio}T00:00:00Z`);
@@ -24,6 +32,26 @@ export const conferenciaMilitarService = {
 
     const resp = await query.orderBy('created_date', 'desc').get();
     return Array.isArray(resp) ? resp : (resp?.data || []);
+  },
+
+  /**
+   * Busca conferência aberta (pendente ou em_andamento) para evitar duplicidades de tipos específicos.
+   */
+  async buscarConferenciaAberta(militarId) {
+    if (!militarId) return null;
+
+    const tiposBloqueantes = ['ingresso', 'reativacao', 'retorno_transferencia'];
+
+    const conferencias = await base44.entities.ConferenciaMilitar.query()
+      .where('militar_id', '==', militarId)
+      .get();
+
+    const lista = Array.isArray(conferencias) ? conferencias : (conferencias?.data || []);
+
+    return lista.find(c =>
+      ['pendente', 'em_andamento'].includes(c.status) &&
+      tiposBloqueantes.includes(c.tipo_conferencia)
+    ) || null;
   },
 
   /**
