@@ -475,7 +475,7 @@ export default function CadastrarMilitar() {
       });
       navigate(createPageUrl('ConferenciasMilitares'));
     } catch (error) {
-      window.alert('Erro ao criar conferência: ' + error.message);
+      window.alert('Militar cadastrado com sucesso, mas não foi possível criar a conferência cadastral. Você pode criá-la manualmente pelo menu Conferência Cadastral.');
       navigate(createPageUrl('Militares'));
     } finally {
       setLoading(false);

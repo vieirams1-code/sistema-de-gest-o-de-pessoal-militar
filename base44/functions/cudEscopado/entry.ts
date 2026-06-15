@@ -52,6 +52,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RotinaAdministrativa',
   'ExecucaoRotinaAdministrativa',
   'ItemExecucaoRotinaAdministrativa',
+  'ConferenciaMilitar',
+  'ItemConferenciaMilitar',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -184,6 +186,17 @@ const PERMISSIONS_MAP = {
     update: 'executar_rotinas_administrativas',
     delete: 'executar_rotinas_administrativas',
     bulk: 'executar_rotinas_administrativas',
+  },
+  ConferenciaMilitar: {
+    create: 'gerir_conferencias_militares',
+    update: 'gerir_conferencias_militares',
+    delete: 'gerir_conferencias_militares',
+  },
+  ItemConferenciaMilitar: {
+    create: 'gerir_conferencias_militares',
+    update: 'gerir_conferencias_militares',
+    delete: 'gerir_conferencias_militares',
+    bulk: 'gerir_conferencias_militares',
   },
 };
 
