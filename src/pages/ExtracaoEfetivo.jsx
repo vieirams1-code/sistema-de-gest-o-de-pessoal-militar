@@ -42,6 +42,7 @@ import {
 } from '@/utils/postoQuadroCompatibilidade';
 import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
 import { base44 } from '@/api/base44Client';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { enriquecerMilitaresComFuncoesETags } from '@/utils/funcoesTags/enriquecimentoMilitarFuncoesTags';
 import { isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
@@ -482,7 +483,9 @@ function buildFetchMilitaresPayload(filtrosExecutados, lotacoesIds, offset) {
       : {}),
     ...(filtrosExecutados?.status && filtrosExecutados.status !== TODOS_VALUE
       ? { statusCadastro: filtrosExecutados.status }
-      : {}),
+      : !filtrosExecutados?.status || filtrosExecutados.status === TODOS_VALUE
+        ? { statusCadastro: 'Ativo' } // Default to Ativo if no explicit status filter
+        : {}),
     ...(filtrosExecutados?.situacaoMilitar && filtrosExecutados.situacaoMilitar !== TODOS_VALUE
       ? { situacaoMilitar: filtrosExecutados.situacaoMilitar }
       : {}),
@@ -932,6 +935,7 @@ export default function ExtracaoEfetivo() {
         return false;
       }
       if (filtrosExecutados.status !== TODOS_VALUE && status !== filtrosExecutados.status) return false;
+      if (filtrosExecutados.status === TODOS_VALUE && !isMilitarAtivo(militar)) return false;
       if (
         filtrosExecutados.situacaoMilitar !== TODOS_VALUE &&
         situacaoMilitar !== filtrosExecutados.situacaoMilitar

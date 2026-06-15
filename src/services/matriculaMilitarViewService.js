@@ -1,5 +1,6 @@
 import { formatarMatriculaPadrao, normalizarMatricula } from './militarIdentidadeService.js';
 import { normalizarTextoBusca, somenteDigitos } from '@/utils/normalizarBuscaMilitar';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 
 const STATUS_MESCLADO = 'mesclado';
 
@@ -122,7 +123,7 @@ export async function carregarMilitaresComMatriculas(militares = []) {
 export function filtrarMilitaresOperacionais(militares = [], { incluirInativos = false } = {}) {
   return (militares || []).filter((m) => {
     if (isMilitarMesclado(m)) return false;
-    if (!incluirInativos && String(m?.status_cadastro || '').toLowerCase() === 'inativo') return false;
+    if (!incluirInativos && !isMilitarAtivo(m)) return false;
     return true;
   });
 }

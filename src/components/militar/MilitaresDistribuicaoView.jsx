@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, ShieldCheck, User, Users } from 'lucide-react';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 
 const SEM_LOTACAO_LABEL = 'Sem lotação';
 const SEM_POSTO_LABEL = 'Sem Posto/Graduação';
@@ -26,7 +27,7 @@ const ORDEM_POSTOS = [
 ];
 
 const getStatusCounts = (militares = []) => {
-  const ativos = militares.filter((m) => m.status_cadastro === 'Ativo' || !m.status_cadastro).length;
+  const ativos = militares.filter((m) => isMilitarAtivo(m)).length;
   return {
     total: militares.length,
     ativos,
@@ -181,8 +182,8 @@ export default function MilitaresDistribuicaoView({
                                   </p>
                                   <p className="text-xs text-slate-500 truncate">Mat: {militar.matricula || '—'}</p>
                                 </div>
-                                <Badge variant={militar.status_cadastro === 'Inativo' ? 'destructive' : 'default'} className="text-[10px]">
-                                  {militar.status_cadastro || 'Ativo'}
+                                <Badge variant={!isMilitarAtivo(militar) ? 'destructive' : 'default'} className="text-[10px]">
+                                  {isMilitarAtivo(militar) ? (militar.status_cadastro || 'Ativo') : 'Inativo'}
                                 </Badge>
                               </div>
                               <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">

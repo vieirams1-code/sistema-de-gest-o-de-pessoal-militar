@@ -1,7 +1,8 @@
 import { filtrarMilitaresOperacionais, isMilitarMesclado } from './matriculaMilitarViewService.js';
 import { listarInconsistenciasCadastraisMilitar } from '../utils/inconsistenciasCadastrais.js';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 
-const STATUS_CADASTRO_INVALIDOS = new Set(['inativo', 'mesclado', 'excluido', 'excluído']);
+const STATUS_CADASTRO_INVALIDOS = new Set(['mesclado', 'excluido', 'excluído']);
 
 function normalizarId(valor) {
   return String(valor || '').trim();
@@ -11,6 +12,7 @@ function militarOperacionalmenteValido(militar = {}) {
   if (!militar || typeof militar !== 'object') return false;
   if (!normalizarId(militar.id)) return false;
   if (isMilitarMesclado(militar)) return false;
+  if (!isMilitarAtivo(militar)) return false;
 
   const statusCadastro = String(militar?.status_cadastro || militar?.situacao_militar || '').trim().toLowerCase();
   if (STATUS_CADASTRO_INVALIDOS.has(statusCadastro)) return false;

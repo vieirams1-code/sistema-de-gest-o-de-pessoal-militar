@@ -36,6 +36,7 @@ const postoAbreviado = {
 
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getPostoGraduacaoMilitar, getQuadroMilitar } from '@/utils/militarPostoGraduacao';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 
 export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
   const { hasAccess, hasSelfAccess } = useCurrentUser();
@@ -113,8 +114,8 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge className={`${statusColors[militar.status_cadastro] || statusColors['Ativo']} border`}>
-                {militar.status_cadastro || 'Ativo'}
+              <Badge className={`${isMilitarAtivo(militar) ? (statusColors[militar.status_cadastro] || statusColors['Ativo']) : statusColors.Inativo} border`}>
+                {isMilitarAtivo(militar) ? (militar.status_cadastro || 'Ativo') : 'Inativo'}
               </Badge>
               {lotacaoAtual && (
                 <Badge variant="outline" className="text-slate-600">

@@ -20,7 +20,7 @@ import {
   filtrarPendenciasComportamentoDashboard,
   listarInconsistenciasCadastraisDashboard,
 } from '@/services/dashboardMilitarPendenciasService';
-import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import { buildAfastamentosVigentes } from '@/services/afastamentosVigentesService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
@@ -147,7 +147,8 @@ export default function Home() {
     queryFn: async () => {
       if (isAdmin) {
         const lista = await base44.entities.Militar.list('-created_date');
-        return carregarMilitaresComMatriculas(lista);
+        const enriquecidos = await carregarMilitaresComMatriculas(lista);
+        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
       }
 
       if (modoAcesso === 'proprio') {
@@ -171,7 +172,8 @@ export default function Home() {
           ids.add(m.id);
           return true;
         });
-        return carregarMilitaresComMatriculas(vinculados);
+        const enriquecidos = await carregarMilitaresComMatriculas(vinculados);
+        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
       }
 
       const filters = getMilitarScopeFilters();
@@ -187,7 +189,8 @@ export default function Home() {
           merged.push(militar);
         }
       }
-      return carregarMilitaresComMatriculas(merged);
+      const enriquecidos = await carregarMilitaresComMatriculas(merged);
+      return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
     },
     enabled: isAccessResolved,
   });

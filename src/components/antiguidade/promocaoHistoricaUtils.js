@@ -3,6 +3,7 @@ import {
   QUADROS_OFICIAIS,
   isQuadroCompativel,
 } from '../../utils/postoQuadroCompatibilidade.js';
+import { isMilitarAtivo } from '../../utils/militarStatus.js';
 
 export const POSTOS_GRADUACOES = [
   'Coronel',
@@ -180,7 +181,7 @@ export const isQuadroQBMPT = (valor) => normalizar(valor) === 'qbmpt';
 
 const isStatusPrevisto = (registro) => normalizar(registro?.status_registro) === PROMOCAO_COLETIVA_STATUS_PREVISTO;
 const mesmoValor = (a, b) => normalizar(a) === normalizar(b);
-const statusCadastroAtivo = (militar) => normalizar(militar?.status_cadastro) === 'ativo';
+const statusCadastroAtivo = (militar) => isMilitarAtivo(militar);
 
 const getHistoricosDoMilitar = (historicos = [], militarId) => (historicos || []).filter((registro) => registro?.militar_id === militarId);
 
