@@ -22,7 +22,7 @@ import {
 import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList, Clock, Plus, Trash2, RotateCcw, Archive } from
+  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList, ClipboardCheck, Clock, Plus, Trash2, RotateCcw, Archive } from
 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
