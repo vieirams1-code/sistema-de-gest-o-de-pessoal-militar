@@ -8,6 +8,7 @@ vi.mock('@/api/base44Client', () => ({
     entities: {
       ConferenciaMilitar: {
         get: vi.fn(),
+        filter: vi.fn(),
         query: vi.fn(() => ({
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockReturnThis(),
@@ -15,6 +16,7 @@ vi.mock('@/api/base44Client', () => ({
         })),
       },
       ItemConferenciaMilitar: {
+        filter: vi.fn(),
         query: vi.fn(() => ({
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockReturnThis(),
@@ -29,6 +31,7 @@ vi.mock('../cudEscopadoClient', () => ({
   criarEscopado: vi.fn(),
   atualizarEscopado: vi.fn(),
   bulkEscopado: vi.fn(),
+  excluirEscopado: vi.fn(),
 }));
 
 describe('conferenciaMilitarService', () => {
@@ -118,6 +121,34 @@ describe('conferenciaMilitarService', () => {
         'conf1',
         expect.objectContaining({ status: 'concluida_com_pendencias' })
       );
+    });
+  });
+
+
+  describe('excluirConferencia', () => {
+    it('deve excluir itens vinculados antes de excluir a conferência', async () => {
+      base44.entities.ConferenciaMilitar.get.mockResolvedValue({ id: 'conf1', militar_id: 'mil1' });
+      base44.entities.ItemConferenciaMilitar.filter.mockResolvedValue([
+        { id: 'item1', conferencia_id: 'conf1' },
+        { id: 'item2', conferencia_id: 'conf1' },
+      ]);
+
+      await expect(conferenciaMilitarService.excluirConferencia('conf1')).resolves.toEqual({ success: true });
+
+      expect(base44.entities.ConferenciaMilitar.get).toHaveBeenCalledWith('conf1');
+      expect(base44.entities.ItemConferenciaMilitar.filter).toHaveBeenCalledWith({ conferencia_id: 'conf1' });
+      expect(cudEscopadoClient.excluirEscopado).toHaveBeenNthCalledWith(1, 'ItemConferenciaMilitar', 'item1');
+      expect(cudEscopadoClient.excluirEscopado).toHaveBeenNthCalledWith(2, 'ItemConferenciaMilitar', 'item2');
+      expect(cudEscopadoClient.excluirEscopado).toHaveBeenNthCalledWith(3, 'ConferenciaMilitar', 'conf1');
+    });
+
+    it('deve propagar erro de permissão do cudEscopado ao excluir', async () => {
+      base44.entities.ConferenciaMilitar.get.mockResolvedValue({ id: 'conf1', militar_id: 'mil1' });
+      base44.entities.ItemConferenciaMilitar.filter.mockResolvedValue([]);
+      cudEscopadoClient.excluirEscopado.mockRejectedValueOnce(new Error('Usuário sem permissão para gerir conferências militares.'));
+
+      await expect(conferenciaMilitarService.excluirConferencia('conf1'))
+        .rejects.toThrow(/sem permissão/);
     });
   });
 

@@ -1,19 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import {
   ShieldCheck,
   Plus,
   MoreHorizontal,
-  ExternalLink,
   ChevronRight,
   ClipboardCheck,
   Clock,
   CheckCircle2,
   AlertCircle,
   XCircle,
-  Copy,
   RefreshCcw,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -122,6 +120,24 @@ export default function ConferenciasMilitares() {
       ).length,
     };
   }, [conferencias]);
+
+  const mutationExcluirLista = useMutation({
+    mutationFn: (id) => conferenciaMilitarService.excluirConferencia(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['conferencias-militares']);
+      queryClient.invalidateQueries(['conferencias-abertas-scoped']);
+      toast({ title: "Sucesso", description: "Conferência cadastral excluída." });
+    },
+    onError: (err) => {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const confirmarExclusao = (id) => {
+    if (window.confirm('Deseja realmente excluir esta conferência cadastral? Os itens do checklist também serão excluídos.')) {
+      mutationExcluirLista.mutate(id);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -343,15 +359,29 @@ export default function ConferenciasMilitares() {
                       {conferencia.responsavel_nome || '—'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => setSelectedConferenciaId(conferencia.id)}
-                      >
-                        Abrir
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        {canManage && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => confirmarExclusao(conferencia.id)}
+                            disabled={mutationExcluirLista.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Excluir
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => setSelectedConferenciaId(conferencia.id)}
+                        >
+                          Abrir
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -402,13 +432,6 @@ function ConferenciaDetalhesDrawer({ conferenciaId, onClose }) {
     },
   });
 
-  const mutationUpdateConferencia = useMutation({
-    mutationFn: (dados) => atualizarEscopado('ConferenciaMilitar', conferenciaId, dados),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['conferencia-detalhada', conferenciaId]);
-    },
-  });
-
   const mutationStatus = useMutation({
     mutationFn: (action) => {
       if (action === 'concluir') return conferenciaMilitarService.concluirConferencia(conferenciaId);
@@ -424,34 +447,23 @@ function ConferenciaDetalhesDrawer({ conferenciaId, onClose }) {
     }
   });
 
-  const copiarMissaoTrello = (conf) => {
-    const dataInicio = conf.data_inicio_referencia ? format(new Date(conf.data_inicio_referencia), 'dd/MM/yyyy') : 'Não informada';
-    const dataFim = conf.data_fim_referencia ? format(new Date(conf.data_fim_referencia), 'dd/MM/yyyy') : 'Não informada';
+  const mutationExcluir = useMutation({
+    mutationFn: () => conferenciaMilitarService.excluirConferencia(conferenciaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['conferencias-militares']);
+      queryClient.invalidateQueries(['conferencias-abertas-scoped']);
+      toast({ title: "Sucesso", description: "Conferência cadastral excluída." });
+      onClose();
+    },
+    onError: (err) => {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    },
+  });
 
-    const texto = `Título:
-Conferência cadastral — ${conf.militar_posto_graduacao} ${conf.militar_nome}
-
-Descrição:
-Militar com conferência cadastral aberta no SGP.
-Tipo: ${TIPO_LABELS[conf.tipo_conferencia]}
-Período de referência: ${dataInicio} a ${dataFim}
-A conferência oficial deve ser registrada no SGP.
-Link da conferência: ${window.location.origin}/ConferenciasMilitares
-
-Checklist:
-- Conferir dados funcionais básicos
-- Conferir promoções
-- Conferir medalhas
-- Conferir punições/elogios
-- Conferir férias/períodos aquisitivos
-- Conferir afastamentos/JISO
-- Conferir cursos
-- Conferir funções/designações/gratificações
-- Conferir documentos
-- Encerrar conferência no SGP`;
-
-    navigator.clipboard.writeText(texto);
-    toast({ title: "Copiado", description: "Texto da missão copiado para a área de transferência." });
+  const confirmarExclusao = () => {
+    if (window.confirm('Deseja realmente excluir esta conferência cadastral? Os itens do checklist também serão excluídos.')) {
+      mutationExcluir.mutate();
+    }
   };
 
   if (!conferenciaId) return null;
@@ -565,20 +577,6 @@ Checklist:
               </div>
             </div>
 
-            <div className="space-y-2 border-t pt-6">
-              <Label>Vínculo Trello (Opcional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="URL do Card no Trello..."
-                  value={conferencia.trello_card_url || ''}
-                  onChange={(e) => mutationUpdateConferencia.mutate({ trello_card_url: e.target.value })}
-                  disabled={!canManage}
-                />
-                <Button variant="outline" size="icon" onClick={() => window.open(conferencia.trello_card_url, '_blank')} disabled={!conferencia.trello_card_url}>
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
 
             <div className="flex flex-wrap justify-between gap-3 pt-6 border-t">
               <div className="flex gap-3">
@@ -603,10 +601,12 @@ Checklist:
                 )}
               </div>
 
-              <Button variant="outline" onClick={() => copiarMissaoTrello(conferencia)} className="gap-2">
-                <Copy className="w-4 h-4" />
-                Copiar missão para Trello
-              </Button>
+              {canManage && (
+                <Button variant="destructive" onClick={confirmarExclusao} disabled={mutationExcluir.isPending} className="gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  Excluir Conferência
+                </Button>
+              )}
             </div>
           </div>
         )}
