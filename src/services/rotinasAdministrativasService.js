@@ -34,8 +34,8 @@ export async function getRotinasAdministrativas(unidadeId, hasGlobalAccess = fal
 export async function getExecucoesRotina(unidadeId, filters = {}, hasGlobalAccess = false) {
   const query = { ...filters };
 
-  if (!hasGlobalAccess && unidadeId) {
-    query.unidade_id = unidadeId;
+  if (!hasGlobalAccess) {
+    query.unidade_id = unidadeId || 'SEM_UNIDADE_DEFINIDA';
   }
 
   return base44.entities[ENTITY_EXECUCAO].list({
@@ -44,58 +44,25 @@ export async function getExecucoesRotina(unidadeId, filters = {}, hasGlobalAcces
   });
 }
 
-export async function salvarRotina(rotina, usuario) {
-  console.log('[RotinasAdministrativas] salvarRotina usuario:', {
-    id: usuario?.id,
-    full_name: usuario?.full_name,
-    unidade_id: usuario?.unidade_id,
-    unidade: usuario?.unidade
-  });
-
-  console.log('[RotinasAdministrativas] user completo', usuario);
-  console.log('[RotinasAdministrativas] chaves do usuário', Object.keys(usuario || {}));
+/**
+ * @param {Object} rotina
+ * @param {Object} context { unidade_id, unidade_nome, usuario_id, usuario_nome }
+ */
+export async function salvarRotina(rotina, context) {
+  console.log('[RotinasAdministrativas] salvarRotina context:', context);
 
   const payload = {
     ...rotina,
     updated_date: new Date().toISOString()
   };
 
-  // Fallbacks para unidade e escopo
+  // Prioriza o que vem no payload, depois no context
   if (!payload.unidade_id) {
-    const idFallbacks = [
-      { path: 'unidade_id', value: usuario?.unidade_id },
-      { path: 'unidade.id', value: usuario?.unidade?.id },
-      { path: 'unidade.entity_id', value: usuario?.unidade?.entity_id },
-      { path: 'subgrupamento_id', value: usuario?.subgrupamento_id },
-      { path: 'lotacao_id', value: usuario?.lotacao_id },
-      { path: 'estrutura_id', value: usuario?.estrutura_id },
-      { path: 'custom_data?.unidade_id', value: usuario?.custom_data?.unidade_id },
-      { path: 'metadata?.unidade_id', value: usuario?.metadata?.unidade_id },
-    ];
-
-    const resolved = idFallbacks.find(f => f.value);
-    if (resolved) {
-      payload.unidade_id = resolved.value;
-      console.log(`[RotinasAdministrativas] unidade resolvida via user.${resolved.path}`);
-    }
+    payload.unidade_id = context?.unidade_id;
   }
 
   if (!payload.unidade_nome) {
-    const nomeFallbacks = [
-      { path: 'unidade_nome', value: usuario?.unidade_nome },
-      { path: 'unidade.nome', value: usuario?.unidade?.nome },
-      { path: 'subgrupamento_nome', value: usuario?.subgrupamento_nome },
-      { path: 'lotacao_nome', value: usuario?.lotacao_nome },
-      { path: 'estrutura_nome', value: usuario?.estrutura_nome },
-      { path: 'custom_data?.unidade_nome', value: usuario?.custom_data?.unidade_nome },
-      { path: 'metadata?.unidade_nome', value: usuario?.metadata?.unidade_nome },
-    ];
-
-    const resolved = nomeFallbacks.find(f => f.value);
-    if (resolved) {
-      payload.unidade_nome = resolved.value;
-      console.log(`[RotinasAdministrativas] unidade_nome resolvida via user.${resolved.path}`);
-    }
+    payload.unidade_nome = context?.unidade_nome;
   }
 
   if (!payload.escopo_tipo) {
@@ -107,14 +74,14 @@ export async function salvarRotina(rotina, usuario) {
 
   // Garantir metadados de criação
   if (!payload.id) {
-    payload.criado_por = usuario?.id;
-    payload.criado_por_nome = usuario?.full_name;
+    payload.criado_por = context?.usuario_id;
+    payload.criado_por_nome = context?.usuario_nome;
     payload.created_date = payload.updated_date;
   }
 
   if (!payload.unidade_id && payload.escopo_tipo === 'unidade') {
-    console.log('[RotinasAdministrativas] unidade não encontrada para o usuário autenticado');
-    throw new Error('Não foi possível determinar a unidade para salvar a rotina. Por favor, verifique seu perfil.');
+    console.log('[RotinasAdministrativas] unidade não resolvida pelo contexto oficial');
+    throw new Error('Não foi possível determinar a unidade para salvar a rotina. Por favor, verifique suas permissões de acesso.');
   }
 
   console.log('[RotinasAdministrativas] salvarRotina final payload:', payload);
@@ -143,13 +110,13 @@ export async function excluirRotina(id) {
   return excluirEscopado(ENTITY_ROTINA, id);
 }
 
-export async function atualizarStatusExecucao(id, status, usuario, extra = {}) {
+export async function atualizarStatusExecucao(id, status, context, extra = {}) {
   const payload = { status, ...extra };
 
   if (status === 'concluida') {
     payload.data_conclusao = new Date().toISOString();
-    payload.concluido_por = usuario.id;
-    payload.concluido_por_nome = usuario.full_name;
+    payload.concluido_por = context?.usuario_id;
+    payload.concluido_por_nome = context?.usuario_nome;
   }
 
   return atualizarEscopado(ENTITY_EXECUCAO, id, payload);
@@ -158,7 +125,7 @@ export async function atualizarStatusExecucao(id, status, usuario, extra = {}) {
 /**
  * Lógica específica para Memorando TARS
  */
-export async function executarMemorandoTars(rotina, params, usuario) {
+export async function executarMemorandoTars(rotina, params, context) {
   const { data_inicio, data_fim, incluir_anexos, observacoes } = params;
 
   if (!data_inicio || !data_fim) {
@@ -182,8 +149,8 @@ export async function executarMemorandoTars(rotina, params, usuario) {
     competencia_inicio: data_inicio,
     competencia_fim: data_fim,
     data_geracao: new Date().toISOString(),
-    responsavel_id: usuario.id,
-    responsavel_nome: usuario.full_name,
+    responsavel_id: context?.usuario_id,
+    responsavel_nome: context?.usuario_nome,
     unidade_id: rotina.unidade_id,
     unidade_nome: rotina.unidade_nome,
     quantidade_itens: atestados.length,
@@ -214,8 +181,8 @@ export async function executarMemorandoTars(rotina, params, usuario) {
     data_inicio,
     data_fim,
     atestados,
-    usuario_nome: usuario.full_name,
-    usuario_funcao: usuario.funcao || 'Responsável Administrativo',
+    usuario_nome: context?.usuario_nome,
+    usuario_funcao: context?.funcao || 'Responsável Administrativo',
     unidade_nome: rotina.unidade_nome
   });
 

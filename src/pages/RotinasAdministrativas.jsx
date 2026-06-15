@@ -41,6 +41,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { useToast } from '@/components/ui/use-toast';
 import { Paperclip } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import {
   getRotinasAdministrativas,
   getExecucoesRotina,
@@ -66,11 +67,28 @@ Respeitosamente,
 {{unidade_nome}}`;
 
 export default function RotinasAdministrativas() {
-  const { user, isAdmin, canAccessAction } = useCurrentUser();
+  const { user, isAdmin, canAccessAction, subgrupamentoId, isAccessResolved } = useCurrentUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasGlobalAccess = isAdmin || canAccessAction('perm_visualizar_rotinas_globais_administrativas');
   const [activeTab, setActiveTab] = useState('rotinas');
+
+  // Busca o nome da unidade (Subgrupamento) pelo subgrupamentoId resolvido pelo useCurrentUser
+  const { data: unidadeData } = useQuery({
+    queryKey: ['subgrupamento', subgrupamentoId],
+    queryFn: () => base44.entities.Subgrupamento.get(subgrupamentoId),
+    enabled: !!subgrupamentoId
+  });
+
+  const unidadeNome = unidadeData?.nome || '';
+
+  // Contexto consolidado para ser passado aos services
+  const userContext = useMemo(() => ({
+    unidade_id: subgrupamentoId,
+    unidade_nome: unidadeNome,
+    usuario_id: user?.id,
+    usuario_nome: user?.full_name
+  }), [subgrupamentoId, unidadeNome, user]);
 
   // States para modais
   const [isExecutarModalOpen, setIsExecutarModalOpen] = useState(false);
@@ -98,20 +116,20 @@ export default function RotinasAdministrativas() {
 
   // Queries
   const { data: rotinas = [], isLoading: loadingRotinas } = useQuery({
-    queryKey: ['rotinas-administrativas', user?.unidade_id, hasGlobalAccess],
-    queryFn: () => getRotinasAdministrativas(user?.unidade_id, hasGlobalAccess),
-    enabled: !!user
+    queryKey: ['rotinas-administrativas', subgrupamentoId, hasGlobalAccess],
+    queryFn: () => getRotinasAdministrativas(subgrupamentoId, hasGlobalAccess),
+    enabled: isAccessResolved
   });
 
   const { data: execucoes = [], isLoading: loadingExecucoes } = useQuery({
-    queryKey: ['execucoes-rotinas', user?.unidade_id, hasGlobalAccess],
-    queryFn: () => getExecucoesRotina(user?.unidade_id, {}, hasGlobalAccess),
-    enabled: !!user
+    queryKey: ['execucoes-rotinas', subgrupamentoId, hasGlobalAccess],
+    queryFn: () => getExecucoesRotina(subgrupamentoId, {}, hasGlobalAccess),
+    enabled: isAccessResolved
   });
 
   // Mutations
   const mutationSalvar = useMutation({
-    mutationFn: (vars) => salvarRotina(vars.rotina, vars.usuario),
+    mutationFn: (vars) => salvarRotina(vars.rotina, vars.context),
     onSuccess: (data) => {
       console.log('[RotinasAdministrativas] mutationSalvar sucesso:', data);
       queryClient.invalidateQueries({ queryKey: ['rotinas-administrativas'] });
@@ -138,7 +156,7 @@ export default function RotinasAdministrativas() {
   });
 
   const mutationExecutar = useMutation({
-    mutationFn: (vars) => executarMemorandoTars(vars.rotina, vars.params, user),
+    mutationFn: (vars) => executarMemorandoTars(vars.rotina, vars.params, vars.context),
     onSuccess: (data) => {
       queryClient.invalidateQueries(['execucoes-rotinas']);
       setIsExecutarModalOpen(false);
@@ -153,7 +171,7 @@ export default function RotinasAdministrativas() {
   });
 
   const mutationStatus = useMutation({
-    mutationFn: (vars) => atualizarStatusExecucao(vars.id, vars.status, vars.extra),
+    mutationFn: (vars) => atualizarStatusExecucao(vars.id, vars.status, vars.context, vars.extra),
     onSuccess: () => {
       queryClient.invalidateQueries(['execucoes-rotinas']);
       setIsViewExecucaoOpen(false);
@@ -211,8 +229,8 @@ export default function RotinasAdministrativas() {
         periodicidade: 'semanal',
         template_texto: TEMPLATE_DEFAULT_TARS,
         ativo: true,
-        unidade_id: user?.unidade_id,
-        unidade_nome: user?.unidade_nome,
+        unidade_id: subgrupamentoId,
+        unidade_nome: unidadeNome,
         escopo_tipo: 'unidade',
         destinatario: 'Sr. Diretor de Inteligência',
         orgao_destino: 'DINTEL',
@@ -243,7 +261,7 @@ export default function RotinasAdministrativas() {
       };
 
       console.log('[RotinasAdministrativas] payload salvar rotina', payload);
-      mutationSalvar.mutate({ rotina: payload, usuario: user });
+      mutationSalvar.mutate({ rotina: payload, context: userContext });
     } catch (error) {
       console.error('[RotinasAdministrativas] erro ao montar payload:', error);
       toast({
@@ -256,7 +274,7 @@ export default function RotinasAdministrativas() {
 
   const handleViewExecucao = async (exec) => {
     setViewExecucao(exec);
-    const itens = await getItensExecucao(exec.id);
+    const itens = await getItensExecucao(exec.id, subgrupamentoId, hasGlobalAccess);
     setViewItens(itens);
     setIsViewExecucaoOpen(true);
   };
@@ -266,6 +284,8 @@ export default function RotinasAdministrativas() {
     navigator.clipboard.writeText(text);
     toast({ title: 'Copiado', description: 'Texto copiado para a área de transferência.' });
   };
+
+  if (!isAccessResolved) return null;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -508,7 +528,7 @@ export default function RotinasAdministrativas() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsExecutarModalOpen(false)}>Cancelar</Button>
-            <Button onClick={() => mutationExecutar.mutate({ rotina: selectedRotina, params: execParams })}>
+            <Button onClick={() => mutationExecutar.mutate({ rotina: selectedRotina, params: execParams, context: userContext })}>
               <Play className="w-4 h-4 mr-2" /> Gerar Agora
             </Button>
           </DialogFooter>
@@ -596,7 +616,7 @@ export default function RotinasAdministrativas() {
              <div className="flex gap-2">
                 {viewExecucao?.status !== 'concluida' && viewExecucao?.status !== 'cancelada' && (
                   <>
-                    <Button variant="destructive" onClick={() => mutationStatus.mutate({ id: viewExecucao.id, status: 'cancelada' })}>
+                    <Button variant="destructive" onClick={() => mutationStatus.mutate({ id: viewExecucao.id, status: 'cancelada', context: userContext })}>
                       <XCircle className="w-4 h-4 mr-2" /> Cancelar
                     </Button>
                     <Button variant="success" onClick={() => setIsConfirmConcludeOpen(true)}>
@@ -625,7 +645,7 @@ export default function RotinasAdministrativas() {
               mutationStatus.mutate({
                 id: viewExecucao.id,
                 status: 'concluida',
-                usuario: user
+                context: userContext
               });
               setIsConfirmConcludeOpen(false);
             }}>
