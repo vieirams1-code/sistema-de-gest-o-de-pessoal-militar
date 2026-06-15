@@ -29,9 +29,9 @@ const ORDEM_POSTOS = [
 const getStatusCounts = (militares = []) => {
   const ativos = militares.filter((m) => isMilitarAtivo(m)).length;
   return {
-    total: militares.length,
+    total: ativos,
     ativos,
-    inativos: militares.length - ativos,
+    inativos: 0,
   };
 };
 
@@ -57,8 +57,9 @@ export default function MilitaresDistribuicaoView({
 
   const distribuicao = useMemo(() => {
     const gruposPorLotacao = new Map();
+    const militaresOperacionais = (militares || []).filter(isMilitarAtivo);
 
-    for (const militar of militares) {
+    for (const militar of militaresOperacionais) {
       const lotacao = (militar.lotacao || '').trim() || SEM_LOTACAO_LABEL;
       const posto = (militar.posto_graduacao || '').trim() || SEM_POSTO_LABEL;
 
@@ -141,8 +142,7 @@ export default function MilitaresDistribuicaoView({
                 <Badge variant="secondary">{lotacao.status.total}</Badge>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500 shrink-0">
-                <Badge variant="outline">Ativos: {lotacao.status.ativos}</Badge>
-                <Badge variant="outline">Inativos: {lotacao.status.inativos}</Badge>
+                <Badge variant="outline">Efetivo: {lotacao.status.ativos}</Badge>
               </div>
             </button>
 
@@ -165,8 +165,7 @@ export default function MilitaresDistribuicaoView({
                           <Badge variant="secondary">{posto.status.total}</Badge>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500 shrink-0">
-                          <span>Ativos: {posto.status.ativos}</span>
-                          <span>Inativos: {posto.status.inativos}</span>
+                          <span>Efetivo: {posto.status.ativos}</span>
                         </div>
                       </button>
 

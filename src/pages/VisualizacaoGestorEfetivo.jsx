@@ -7,6 +7,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import VisualizacoesGestor from '@/components/efetivo-gestor/VisualizacoesGestor';
 import montarArvoreLotacaoMilitares, { normalizarTagsMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 import { filtrarMilitaresGestor, listarTagsDisponiveisGestor } from '@/utils/efetivo/visualizacaoGestor';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 import { getTagsCompactasMilitar } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
@@ -77,10 +78,12 @@ export default function VisualizacaoGestorEfetivo() {
     }),
   })), [militaresQuery.data, tagsAtivas, vinculosTagsAtivos]);
 
-  const tagsDisponiveis = useMemo(() => listarTagsDisponiveisGestor(militaresComTags), [militaresComTags]);
+  const militaresOperacionais = useMemo(() => militaresComTags.filter(isMilitarAtivo), [militaresComTags]);
+
+  const tagsDisponiveis = useMemo(() => listarTagsDisponiveisGestor(militaresOperacionais), [militaresOperacionais]);
   const militaresFiltrados = useMemo(
-    () => filtrarMilitaresGestor(militaresComTags, busca, tagsSelecionadas),
-    [militaresComTags, busca, tagsSelecionadas],
+    () => filtrarMilitaresGestor(militaresOperacionais, busca, tagsSelecionadas),
+    [militaresOperacionais, busca, tagsSelecionadas],
   );
   const cacheAntiguidade = getPosicaoOficialAntiguidadeFromCache(queryClient);
   const hasOrdemOficialAntiguidade = cacheAntiguidade.hasOrdemOficialAntiguidade;
@@ -98,11 +101,11 @@ export default function VisualizacaoGestorEfetivo() {
     const { posicaoOficialByMilitarId } = cacheAntiguidade;
     if (hasOrdemOficialAntiguidade) return posicaoOficialByMilitarId;
     const previaAntiguidade = calcularPreviaAntiguidadeGeral({
-      militares: militaresComTags,
+      militares: militaresOperacionais,
       historicoPromocoes: historicoPromocoesEfetivo,
     });
     return new Map((previaAntiguidade?.itens || []).map((item) => [String(item?.militar_id || ''), Number(item?.posicao)]));
-  }, [cacheAntiguidade, hasOrdemOficialAntiguidade, militaresComTags, historicoPromocoesEfetivo]);
+  }, [cacheAntiguidade, hasOrdemOficialAntiguidade, militaresOperacionais, historicoPromocoesEfetivo]);
 
   const estrutura = useMemo(
     () => montarArvoreLotacaoMilitares(militaresFiltrados, lotacoesQuery.data?.lotacoes || []),
