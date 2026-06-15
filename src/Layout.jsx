@@ -92,7 +92,6 @@ const menuGroups = [
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'perm_visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'perm_visualizar_registros_militar' },
           { name: 'Conferência Cadastral', page: 'ConferenciasMilitares', icon: ShieldCheck, moduleKey: 'acesso_conferencias_militares', actionKey: 'perm_visualizar_conferencias_militares' },
-          { name: 'Rotinas Adm.', page: 'RotinasAdministrativas', icon: ClipboardList, viewPermission: 'perm_visualizar_rotinas_administrativas' },
           { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'perm_visualizar_armamentos' },
         ],
       },
