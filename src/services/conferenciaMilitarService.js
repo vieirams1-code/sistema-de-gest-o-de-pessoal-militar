@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { criarEscopado, atualizarEscopado, bulkEscopado } from './cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, bulkEscopado, excluirEscopado } from './cudEscopadoClient';
 
 /**
  * Service para gestão do módulo "Conferência Cadastral de Militar".
@@ -250,5 +250,27 @@ export const conferenciaMilitarService = {
     return await atualizarEscopado('ConferenciaMilitar', conferenciaId, {
       status: 'cancelada'
     });
+  },
+
+  /**
+   * Exclui definitivamente uma conferência e todos os itens vinculados.
+   */
+  async excluirConferencia(conferenciaId) {
+    if (!conferenciaId) throw new Error('ID da conferência é obrigatório.');
+
+    const rawConferencia = await base44.entities.ConferenciaMilitar.get(conferenciaId);
+    const conferencia = rawConferencia?.data || rawConferencia;
+    if (!conferencia) throw new Error('Conferência não encontrada.');
+
+    const rawItens = await base44.entities.ItemConferenciaMilitar.filter({ conferencia_id: conferenciaId });
+    const itens = Array.isArray(rawItens) ? rawItens : (rawItens?.data || []);
+
+    for (const item of itens) {
+      await excluirEscopado('ItemConferenciaMilitar', item.id || item._id);
+    }
+
+    await excluirEscopado('ConferenciaMilitar', conferenciaId);
+
+    return { success: true };
   }
 };

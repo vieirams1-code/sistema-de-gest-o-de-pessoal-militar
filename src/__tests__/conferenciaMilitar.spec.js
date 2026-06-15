@@ -68,13 +68,11 @@ test.describe('Módulo Conferência Cadastral de Militar', () => {
     await expect(page.getByText('Concluída', { exact: true })).toBeVisible();
   });
 
-  test('deve permitir copiar missão para Trello', async ({ page }) => {
+  test('não deve exibir campos, botões ou textos de Trello', async ({ page }) => {
     await page.getByRole('button', { name: 'Abrir' }).first().click();
-    const btnCopiar = page.getByRole('button', { name: 'Copiar missão para Trello' });
-    await expect(btnCopiar).toBeVisible();
 
-    // O clique aciona navigator.clipboard.writeText
-    await btnCopiar.click();
-    await expect(page.getByText('Texto da missão copiado')).toBeVisible();
+    await expect(page.getByText(/Trello/i)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Copiar missão/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Abrir Trello/i })).toHaveCount(0);
   });
 });
