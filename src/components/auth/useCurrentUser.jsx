@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { clearImpersonation } from '@/utils/impersonation';
 
 /**
  * useCurrentUser — Lote 1A
@@ -46,18 +47,8 @@ const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'se
 //   sessionStorage.setItem('sgp_effective_user_email', 'alguem@dominio.com')
 // e em seguida recarrega/atualiza a query.
 // =====================================================================
-const EFFECTIVE_EMAIL_STORAGE_KEY = 'sgp_effective_user_email';
-
-function readEffectiveEmailFromStorage() {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  try {
-    const raw = window.sessionStorage.getItem(EFFECTIVE_EMAIL_STORAGE_KEY);
-    const trimmed = (raw || '').trim();
-    return trimmed ? trimmed.toLowerCase() : null;
-  } catch (_e) {
-    return null;
-  }
-}
+// Leitura do email efetivo agora respeita TTL/envelope (utils/impersonation).
+import { getEffectiveEmail as readEffectiveEmailFromStorage } from '@/utils/impersonation';
 
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
 
@@ -102,6 +93,7 @@ export function useCurrentUser() {
   // e invalidar a query (`queryClient.invalidateQueries(['current-user-permissions'])`)
   // ou recarregar a página.
   const effectiveEmailFromStorage = readEffectiveEmailFromStorage();
+  const queryClient = useQueryClient();
 
   const {
     data,
@@ -438,6 +430,17 @@ export function useCurrentUser() {
     await refetch();
   };
 
+  // Encerra a impersonação: limpa o sessionStorage (TTL/envelope) e invalida
+  // todo o cache de permissões/dados escopados para revalidar como o usuário
+  // real. Usado pelo banner persistente e pelo logout.
+  const endImpersonation = async () => {
+    clearImpersonation();
+    await queryClient.invalidateQueries({ queryKey: ['current-user-permissions'] });
+    await queryClient.invalidateQueries({ queryKey: ['global-search-militares'] });
+    await queryClient.invalidateQueries({ queryKey: ['global-search-acervo'] });
+    await refetch();
+  };
+
   const resolvedAccessContext = {
     isImpersonating,
     baseEmail: authUserEmail || userEmail,
@@ -487,6 +490,12 @@ export function useCurrentUser() {
     hasSelfAccess,
     getMilitarScopeFilters,
     getAccessModeFromUser,
+
+    // Impersonação
+    isImpersonating,
+    authUserEmail,
+    effectiveUserEmail,
+    endImpersonation,
 
     // Contexto consolidado
     resolvedAccessContext,

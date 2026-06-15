@@ -44,6 +44,8 @@ import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamen
 import useQuickAccessPreferences from '@/hooks/useQuickAccessPreferences';
 import { DEFAULT_WIDGET } from '@/services/quickAccessPreferencesService';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
+import ImpersonationBanner from '@/components/auth/ImpersonationBanner';
+import { clearImpersonation } from '@/utils/impersonation';
 import AlertasOperacionais from '@/components/quadro/AlertasOperacionais';
 import QuickAccessWidget from '@/components/layout/QuickAccessWidget';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
@@ -463,6 +465,7 @@ export default function Layout({ children, currentPageName }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <SgpThemeModeMount isBombeiroMode={isBombeiroMode} />
+      <ImpersonationBanner />
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#173764] text-white z-40 px-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3 min-w-0">
           <div className="rounded-2xl border border-white/20 p-2 bg-white/5">
@@ -609,7 +612,7 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         <div className="border-t border-white/10 p-4 shrink-0 bg-black/10">
-          <button onClick={() => base44.auth.logout()} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-red-300 transition-all hover:bg-red-500/10 hover:text-red-200">
+          <button onClick={() => { clearImpersonation(); base44.auth.logout(); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-red-300 transition-all hover:bg-red-500/10 hover:text-red-200">
             <LogOut className="w-5 h-5 shrink-0" />
             {!compactSidebar && <span>Sair do Sistema</span>}
           </button>
@@ -636,7 +639,7 @@ export default function Layout({ children, currentPageName }) {
                 <DropdownMenuLabel className="text-xs text-slate-500">Preferências</DropdownMenuLabel>
                 <SgpThemeProfileSelector themeMode={themeMode} setThemeMode={setThemeMode} />
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => base44.auth.logout()} className="text-red-600 focus:text-red-700">
+                <DropdownMenuItem onClick={() => { clearImpersonation(); base44.auth.logout(); }} className="text-red-600 focus:text-red-700">
                   <LogOut className="w-4 h-4 mr-2" />
                   Sair
                 </DropdownMenuItem>

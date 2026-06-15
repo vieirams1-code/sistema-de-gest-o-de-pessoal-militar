@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, UserRound, BadgeCheck, Hash, Building2, ArrowRight, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import { construirAtalhosMilitar } from '@/services/globalMilitarSearchService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { fetchScopedAcervoHistorico } from '@/services/getScopedAcervoHistoricoClient';
 
 const RESULT_LIMIT = 10;
 const BACKEND_LIMIT = 50;
@@ -103,23 +103,10 @@ export default function GlobalMilitarSearch({
 
       if (isSelectionMode || !canAccessAction('visualizar_acervo_historico')) return resultadosMilitares;
 
-      const termo = debouncedTerm.toLowerCase();
-      const [documentos, todosMilitares] = await Promise.all([
-        base44.entities.AcervoFuncionalHistorico.list(),
-        base44.entities.Militar.list(),
-      ]);
-      const militarPorId = new Map(todosMilitares.map((militar) => [militar.id, militar]));
-      const resultadosDocumentos = documentos
-        .filter((doc) => doc?.ativo !== false && doc?.status_documento === 'ATIVO')
-        .map((doc) => ({ ...doc, militar: militarPorId.get(doc.militar_id) }))
-        .filter((doc) => {
-          const militar = doc.militar || {};
-          const texto = [doc.titulo, doc.observacoes, doc.tipo_documento, militar.nome_guerra, militar.nome_completo, militar.matricula]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          return texto.includes(termo);
-        })
+      // (P0) Acervo histórico agora vem do backend escopado — sem carregar
+      // Militar.list()/AcervoFuncionalHistorico.list() no frontend.
+      const { documentos } = await fetchScopedAcervoHistorico({ search: debouncedTerm });
+      const resultadosDocumentos = (documentos || [])
         .slice(0, Math.max(0, RESULT_LIMIT - resultadosMilitares.length))
         .map((doc) => ({ type: 'documento', id: `documento-${doc.id}`, data: doc }));
 

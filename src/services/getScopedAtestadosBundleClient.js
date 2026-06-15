@@ -1,17 +1,5 @@
 import { base44 } from '@/api/base44Client';
-
-const EFFECTIVE_EMAIL_STORAGE_KEY = 'sgp_effective_user_email';
-
-function readEffectiveEmailFromStorage() {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  try {
-    const raw = window.sessionStorage.getItem(EFFECTIVE_EMAIL_STORAGE_KEY);
-    const trimmed = (raw || '').trim();
-    return trimmed ? trimmed.toLowerCase() : null;
-  } catch (_e) {
-    return null;
-  }
-}
+import { getEffectiveEmail as readEffectiveEmailFromStorage } from '@/utils/impersonation';
 
 export async function fetchScopedAtestadosBundle(payload = {}) {
   const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : readEffectiveEmailFromStorage();

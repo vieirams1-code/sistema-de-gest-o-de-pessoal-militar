@@ -16,21 +16,10 @@ import { fetchAllScopedMilitaresPages } from '@/services/getScopedMilitaresPagin
 // adotado em useCurrentUser).
 // =====================================================================
 
-const EFFECTIVE_EMAIL_STORAGE_KEY = 'sgp_effective_user_email';
-
-function readEffectiveEmailFromStorage() {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  try {
-    const raw = window.sessionStorage.getItem(EFFECTIVE_EMAIL_STORAGE_KEY);
-    const trimmed = (raw || '').trim();
-    return trimmed ? trimmed.toLowerCase() : null;
-  } catch (_e) {
-    return null;
-  }
-}
+import { getEffectiveEmail as readEffectiveEmailFromStorage } from '@/utils/impersonation';
 
 /**
- * Lê o effectiveEmail atual da sessão (ou null).
+ * Lê o effectiveEmail atual da sessão (ou null), respeitando TTL.
  * Útil para compor queryKey do React Query e payloads.
  */
 export function getEffectiveEmail() {

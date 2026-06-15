@@ -26,6 +26,8 @@ const adminOnlyPages = new Set([
   'AntiguidadePrevia',
   'Medicos',
   'SubtiposDOEMS',
+  // P0 Segurança: rota administrativa sensível sem guarda explícita anterior.
+  'BackupSistema',
 ]);
 
 

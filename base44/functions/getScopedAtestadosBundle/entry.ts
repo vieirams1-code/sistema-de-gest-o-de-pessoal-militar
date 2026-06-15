@@ -74,7 +74,26 @@ Deno.serve(async (req) => {
 
     const targetPerms = wantsImpersonation ? await resolverPermissoes(base44, effectiveEmailNorm) : authPerms;
     const targetEscopo = await resolverEscopoConsolidado(base44, targetPerms.acessos);
-    if (authIsAdmin || targetEscopo?.isAdmin) {
+
+    // SEGURANÇA (P0): durante impersonação, authIsAdmin NÃO pode ampliar o
+    // escopo de dados. authIsAdmin serve apenas para autorizar o direito de
+    // impersonar (validado acima). O escopo de retorno é SEMPRE o do usuário
+    // efetivo. Só retorna dados globais quando:
+    //   - não há impersonação E o usuário real é admin; OU
+    //   - o próprio usuário efetivo é admin.
+    const effectiveIsAdmin = Boolean(targetEscopo?.isAdmin);
+    const podeEscopoGlobal = wantsImpersonation ? effectiveIsAdmin : (authIsAdmin || effectiveIsAdmin);
+
+    console.info('[getScopedAtestadosBundle] impersonation_audit', {
+      authUserEmail: normalizeEmail(authUser.email),
+      effectiveUserEmail: wantsImpersonation ? effectiveEmailNorm : normalizeEmail(authUser.email),
+      isImpersonating: wantsImpersonation,
+      authIsAdmin,
+      effectiveIsAdmin,
+      escopoAplicado: podeEscopoGlobal ? 'global' : 'escopado',
+    });
+
+    if (podeEscopoGlobal) {
       const [atestados, jisos] = await Promise.all([
         fetchWithRetry(() => base44.asServiceRole.entities.Atestado.list('-created_date')),
         fetchWithRetry(() => base44.asServiceRole.entities.JISO.list('-created_date')),

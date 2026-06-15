@@ -96,11 +96,38 @@ Deno.serve(async (req) => {
     const atestadoId = String(payload?.atestado_id || '').trim();
     if (!atestadoId) return Response.json({ error: 'atestado_id é obrigatório.' }, { status: 400 });
 
+    // (P0) Validação de PERMISSÃO EXPLÍCITA do usuário efetivo (não apenas escopo).
+    // getUserPermissions consolida permissões do usuário efetivo quando há
+    // impersonação (admin real só autoriza impersonar, nunca amplia o escopo).
+    const permsResponse = await base44.functions.invoke('getUserPermissions', payload);
+    const perms = permsResponse?.data ?? permsResponse ?? {};
+    const permActions = perms?.actions || {};
+    const podeVerAtestados = Boolean(perms?.isAdmin) || permActions?.visualizar_atestados === true;
+
+    if (!podeVerAtestados) {
+      console.warn('[getAtestadoAnexoSignedUrl] permissao_negada', {
+        authUserEmail: String(perms?.authUserEmail || ''),
+        effectiveUserEmail: String(perms?.effectiveUserEmail || ''),
+        isImpersonating: Boolean(perms?.isImpersonating),
+        atestado_id: atestadoId,
+      });
+      return Response.json({ error: 'Sem permissão para visualizar atestados.', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // (P0) Validação de ESCOPO sobre o atestado, via bundle escopado já corrigido.
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const scopedData = scopedResponse?.data ?? scopedResponse ?? {};
     const atestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
-    const inScope = atestados.some((item: Record<string, unknown>) => String(item?.id || '') === atestadoId);
-    if (!inScope) return Response.json({ error: 'Atestado fora do escopo do usuário.', code: 'OUT_OF_SCOPE' }, { status: 403 });
+    const inScope = atestados.some((item) => String(item?.id || '') === atestadoId);
+    if (!inScope) {
+      console.warn('[getAtestadoAnexoSignedUrl] fora_do_escopo', {
+        authUserEmail: String(perms?.authUserEmail || ''),
+        effectiveUserEmail: String(perms?.effectiveUserEmail || ''),
+        isImpersonating: Boolean(perms?.isImpersonating),
+        atestado_id: atestadoId,
+      });
+      return Response.json({ error: 'Atestado fora do escopo do usuário.', code: 'OUT_OF_SCOPE' }, { status: 403 });
+    }
 
     const atestadoOriginal = await base44.entities.Atestado.get(atestadoId);
 
@@ -127,13 +154,18 @@ Deno.serve(async (req) => {
 
     if (!location) {
       if (pattern === 'https://' || pattern === 'http://') {
-        return Response.json({
-          url: arquivoAtestado,
-          expires_in: 0,
+        // (P0) Anexos médicos legados com URL pública direta NÃO são mais
+        // retornados automaticamente, pois bypassam TTL e controle de acesso.
+        // Bloqueamos o retorno até que haja migração para storage assinado.
+        console.warn('[getAtestadoAnexoSignedUrl] legacy_public_url_bloqueada', {
           atestado_id: atestadoId,
-          source: 'direct_public_url',
-          legacy_attachment: true,
+          file_uri_pattern: pattern,
         });
+        return Response.json({
+          error: 'Anexo legado com URL pública direta foi bloqueado por segurança. Requer migração para armazenamento assinado.',
+          code: 'LEGACY_PUBLIC_URL_BLOCKED',
+          legacy_attachment: true,
+        }, { status: 403 });
       }
       location = parseStorageLocation(arquivoAtestado);
       if (!location) {
