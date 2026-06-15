@@ -20,6 +20,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 import { adicionarNovaMatriculaMilitar, atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { normalizarDataParaCampoCanonico } from '@/services/tempoServicoService';
@@ -382,7 +383,7 @@ export default function CadastrarMilitar() {
       }
 
       let isNewRegistration = !editId;
-      let isReactivation = editId && editingMilitar?.status_cadastro === 'Inativo' && dataToSave.status_cadastro === 'Ativo';
+      let isReactivation = editId && !isMilitarAtivo(editingMilitar) && isMilitarAtivo(dataToSave);
 
       let militarSalvoBruto = null;
 
@@ -443,6 +444,22 @@ export default function CadastrarMilitar() {
       }
 
       queryClient.invalidateQueries({ queryKey: ['militares'] });
+      queryClient.invalidateQueries({ queryKey: ['efetivo'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-pendencias-comportamento'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-publicacoes-exofficio'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-jisos'] });
+      queryClient.invalidateQueries({ queryKey: ['alertas'] });
+      queryClient.invalidateQueries({ queryKey: ['auditoria'] });
+      queryClient.invalidateQueries({ queryKey: ['visão-de-gestor'] });
+      queryClient.invalidateQueries({ queryKey: ['busca-global'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['afastamentos'] });
+
       console.log('[CadastrarMilitar] fim do salvar militar');
       setLoading(false);
 

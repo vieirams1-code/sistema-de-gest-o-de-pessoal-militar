@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ClipboardCopy, Eye, MoreVertical, PlusCircle, RefreshCw, Search } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -192,7 +193,7 @@ function classificarConfianca({ totalMilitares, duplicidades, totalComReferencia
 }
 
 function montarRastreamento(militares, historicos) {
-  const militaresAtivos = (militares || []).filter((militar) => normalizar(militar?.status_cadastro || 'Ativo') === 'ativo');
+  const militaresAtivos = (militares || []).filter((militar) => isMilitarAtivo(militar));
   const militarPorId = new Map(militaresAtivos.map((militar) => [String(militar.id), militar]));
 
   const historicosPorMilitar = new Map();

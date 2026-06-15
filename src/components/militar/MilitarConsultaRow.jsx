@@ -10,6 +10,7 @@ import { getQuadroMilitar } from '@/utils/militarPostoGraduacao';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import CondicaoBadge from '@/components/militar/CondicaoBadge';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 
 // =====================================================================
 // MilitarConsultaRow
@@ -198,10 +199,14 @@ function MilitarConsultaRow({
             );
           }
           if (key === 'status_cadastro') {
+            const ativo = isMilitarAtivo(militar);
+            const statusLabel = ativo ? (militar.status_cadastro || 'Ativo') : 'Inativo';
+            const badgeClass = ativo ? (statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo) : statusBadgeClass.Inativo;
+
             return (
               <div key={key} className={`min-w-0 px-2 py-2 overflow-hidden ${getColumnClassName(column)}`}>
-                <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
-                  {militar.status_cadastro || 'Ativo'}
+                <Badge className={`${badgeClass} border`}>
+                  {statusLabel}
                 </Badge>
               </div>
             );

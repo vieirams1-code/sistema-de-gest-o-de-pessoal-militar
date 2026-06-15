@@ -43,6 +43,7 @@ import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import GerarDocumentoMilitarModal from '@/components/documentosMilitares/GerarDocumentoMilitarModal';
@@ -418,6 +419,8 @@ export default function Militares() {
         debugFields: debugFieldsEnabled,
       };
       if (!incluirInativos) {
+        // O backend do getScopedMilitares já trata statusCadastro = 'Ativo'
+        // mas vamos garantir que a semântica de 'não mostrar inativos' seja mantida.
         payload.statusCadastro = 'Ativo';
       }
       if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;

@@ -88,10 +88,10 @@ export function useScopedMilitarIds(options = {}) {
     refetchOnWindowFocus: false,
   });
 
-  const resolvedIds = isAdmin
-    ? null
-    : hasSeedIds
-      ? Array.from(new Set((seedIds || []).map(String)))
+  const resolvedIds = hasSeedIds
+    ? Array.from(new Set((seedIds || []).map(String)))
+    : isAdmin
+      ? null
       : query.data === undefined
         ? []
         : query.data;
