@@ -49,9 +49,6 @@ const ENTIDADES_PERMITIDAS = new Set([
   'Tag',
   'AcervoFuncionalHistorico',
   'RepositorioDocumental',
-  'RotinaAdministrativa',
-  'ExecucaoRotinaAdministrativa',
-  'ItemExecucaoRotinaAdministrativa',
   'ConferenciaMilitar',
   'ItemConferenciaMilitar',
 ]);
@@ -64,8 +61,6 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'TagGrupo',
   'Tag',
   'RepositorioDocumental',
-  'RotinaAdministrativa',
-  'ExecucaoRotinaAdministrativa',
 ]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
@@ -170,22 +165,6 @@ const PERMISSIONS_MAP = {
     create: 'gerir_repositorios_documentais',
     update: 'gerir_repositorios_documentais',
     delete: 'gerir_repositorios_documentais',
-  },
-  RotinaAdministrativa: {
-    create: 'gerir_rotinas_administrativas',
-    update: 'gerir_rotinas_administrativas',
-    delete: 'gerir_rotinas_administrativas',
-  },
-  ExecucaoRotinaAdministrativa: {
-    create: 'executar_rotinas_administrativas',
-    update: 'executar_rotinas_administrativas',
-    delete: 'executar_rotinas_administrativas',
-  },
-  ItemExecucaoRotinaAdministrativa: {
-    create: 'executar_rotinas_administrativas',
-    update: 'executar_rotinas_administrativas',
-    delete: 'executar_rotinas_administrativas',
-    bulk: 'executar_rotinas_administrativas',
   },
   ConferenciaMilitar: {
     create: 'gerir_conferencias_militares',

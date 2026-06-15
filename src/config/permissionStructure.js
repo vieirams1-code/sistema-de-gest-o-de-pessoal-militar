@@ -183,16 +183,6 @@ export const permissionStructure = [
         ]
       },
       {
-        key: 'acesso_rotinas_administrativas',
-        label: 'Rotinas Administrativas',
-        actions: [
-          { key: 'perm_visualizar_rotinas_administrativas', label: 'Visualizar Rotinas Administrativas' },
-          { key: 'perm_gerir_rotinas_administrativas', label: 'Gerir Rotinas Administrativas', sensitive: true },
-          { key: 'perm_executar_rotinas_administrativas', label: 'Executar Rotinas Administrativas', sensitive: true },
-          { key: 'perm_visualizar_rotinas_globais_administrativas', label: 'Visualizar Rotinas Globais' }
-        ]
-      },
-      {
         key: 'acesso_conferencias_militares',
         label: 'Conferência Cadastral de Militar',
         actions: [
