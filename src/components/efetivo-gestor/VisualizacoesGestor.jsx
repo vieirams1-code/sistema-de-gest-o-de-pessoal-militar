@@ -5,6 +5,7 @@ import { Building2, MapPin, Users, User, ChevronRight, Search, LayoutGrid, ListT
 import { ordenarMilitaresAntiguidade, resolvePostoGraduacao } from '@/utils/efetivo/gestorClassificacao';
 import { filtrarUnidadesCartoes } from '@/utils/efetivo/visualizacaoGestor';
 import { getPostoGraduacaoMilitar } from '@/utils/militarPostoGraduacao';
+import { isMilitarAtivo } from '@/utils/militarStatus';
 import { calcularResumoEfetivo, calcularResumoTags, obterGrupoHierarquicoMilitar, obterSexoMilitar } from '@/utils/efetivo/montarArvoreLotacaoMilitares';
 
 const montarNos = (estrutura = []) => estrutura.map((setor, sIdx) => ({
@@ -545,7 +546,12 @@ export default function VisualizacoesGestor({ estrutura, filtro, ordemAntiguidad
   const filtrada = useMemo(() => (estrutura || []).map((setor) => {
     const subsetores = (setor.subsetores || []).map((subsetor) => {
       const unidades = (subsetor.unidades || []).map((unidade) => {
-        const militares = ordenarMilitaresAntiguidade((unidade.militares || []).filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))), ordemAntiguidadeMap);
+        const militares = ordenarMilitaresAntiguidade(
+          (unidade.militares || [])
+            .filter(isMilitarAtivo)
+            .filter((m) => !q || [m.nome_completo, m.nome_guerra, m.matricula].some((v) => String(v || '').toLowerCase().includes(q))),
+          ordemAntiguidadeMap
+        );
         return { ...unidade, total: militares.length, militares, resumoEfetivo: calcularResumoEfetivo(militares), resumoTags: calcularResumoTags(militares), oficiais: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) === 'oficial'), pracas: militares.filter((militar) => obterGrupoHierarquicoMilitar(militar) !== 'oficial') };
       }).filter((unidade) => !q || unidade.militares.length > 0);
       const militares = unidades.flatMap((unidade) => unidade.militares);
