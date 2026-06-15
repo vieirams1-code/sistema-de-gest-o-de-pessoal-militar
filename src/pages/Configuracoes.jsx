@@ -1,114 +1,27 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Settings, Trash2, Plus, Sliders, ShieldAlert } from 'lucide-react';
+import { Settings, Sliders } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
 import FuncoesTagsManager from '@/components/funcoes-tags/FuncoesTagsManager';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { executarLimpezaPrePublicacao, previewLimpezaPrePublicacao, resetOperacionalConstants } from '@/services/resetOperacionalService';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
-
-const TAB_FUNCOES_TAGS_VALIDAS = ['funcoes', 'grupos', 'tags'];
+const TAB_TAGS_VALIDAS = ['grupos', 'tags'];
 
 const normalizarTabConfiguracoes = (valorTab) => {
-  if (typeof valorTab !== 'string') return 'funcoes';
+  if (typeof valorTab !== 'string') return 'grupos';
   const normalizada = valorTab.trim().toLowerCase();
-  if (TAB_FUNCOES_TAGS_VALIDAS.includes(normalizada)) return normalizada;
-  if (normalizada === 'adicoes') return 'funcoes';
-  return 'funcoes';
+  if (TAB_TAGS_VALIDAS.includes(normalizada)) return normalizada;
+  return 'grupos';
 };
 
 export default function Configuracoes() {
-  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { canAccessModule, canAccessAction, user, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasConfiguracoesAccess = canAccessModule('configuracoes');
-
-  const [novaLotacao, setNovaLotacao] = useState('');
-  const [novaFuncao, setNovaFuncao] = useState('');
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
-  const [previewReset, setPreviewReset] = useState(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [loadingReset, setLoadingReset] = useState(false);
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
-  const [confirmacaoReset, setConfirmacaoReset] = useState('');
-  const [erroReset, setErroReset] = useState('');
 
   const rawTab = searchParams?.get?.('tab');
   const selectedTab = useMemo(() => normalizarTabConfiguracoes(rawTab), [rawTab]);
-
-  const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
-  const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
-
-  const createLotacaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
-  const createFuncaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Funcao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });
-  const deleteLotacaoMutation = useMutation({ mutationFn: (id) => base44.entities.Lotacao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
-  const deleteFuncaoMutation = useMutation({ mutationFn: (id) => base44.entities.Funcao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
-
-  const podeExecutarReset = canAccessAction('reset_operacional') || canAccessAction('admin_mode');
-
-  const handleDelete = () => {
-    if (!canAccessAction('gerir_configuracoes')) return;
-    if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);
-    else deleteFuncaoMutation.mutate(deleteDialog.id);
-  };
-
-  const handleCreateLotacao = () => {
-    if (canAccessAction('gerir_configuracoes') && novaLotacao.trim()) {
-      createLotacaoMutation.mutate(novaLotacao.trim());
-    }
-  };
-
-  const handleCreateFuncao = () => {
-    if (canAccessAction('gerir_configuracoes') && novaFuncao.trim()) {
-      createFuncaoMutation.mutate(novaFuncao.trim());
-    }
-  };
-
-  const handlePreviewReset = async () => {
-    setLoadingPreview(true);
-    setErroReset('');
-    try {
-      const resumo = await previewLimpezaPrePublicacao({ executadoPor: user?.email || user?.name || 'desconhecido' });
-      setPreviewReset(resumo);
-    } catch {
-      setErroReset('Falha ao gerar preview da limpeza pré-publicação.');
-    } finally {
-      setLoadingPreview(false);
-    }
-  };
-
-  const handleExecutarReset = async () => {
-    setLoadingReset(true);
-    setErroReset('');
-    try {
-      const resultado = await executarLimpezaPrePublicacao({
-        confirmacao: confirmacaoReset,
-        executadoPor: user?.email || user?.name || 'desconhecido',
-      });
-      setPreviewReset(resultado);
-      setResetDialogOpen(false);
-      setConfirmacaoReset('');
-    } catch (error) {
-      setErroReset(error?.message || 'Falha ao executar reset operacional.');
-    } finally {
-      setLoadingReset(false);
-    }
-  };
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
@@ -124,7 +37,7 @@ export default function Configuracoes() {
           <Settings className="w-8 h-8 text-[#1e3a5f]" />
           <div>
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Configurações Gerais</h1>
-            <p className="text-slate-500">Gerencie lotações de trabalho, funções e personalizações avançadas do sistema</p>
+            <p className="text-slate-500">Gerencie personalizações gerais e parâmetros avançados do sistema</p>
           </div>
         </div>
 
@@ -136,145 +49,9 @@ export default function Configuracoes() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Lotações / Setores Operacionais</h2>
-            <div className="flex gap-2 mb-6">
-              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => { if (e.key === 'Enter' && canAccessAction('gerir_configuracoes')) handleCreateLotacao(); }} disabled={!canAccessAction('gerir_configuracoes')} />
-              <Button onClick={handleCreateLotacao} disabled={!novaLotacao.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-                <Plus className="w-4 h-4 mr-2" /> Adicionar
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {lotacoes.map((lot) => (
-                <div key={lot.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                  <span className="font-medium">{lot.nome}</span>
-                  {canAccessAction('gerir_configuracoes') && (
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'lotacao', id: lot.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
-                  )}
-                </div>
-              ))}
-              {lotacoes.length === 0 && <p className="text-center text-slate-500 py-8">Nenhuma lotação cadastrada</p>}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Funções</h2>
-            <div className="flex gap-2 mb-6">
-              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => { if (e.key === 'Enter' && canAccessAction('gerir_configuracoes')) handleCreateFuncao(); }} disabled={!canAccessAction('gerir_configuracoes')} />
-              <Button onClick={handleCreateFuncao} disabled={!novaFuncao.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-                <Plus className="w-4 h-4 mr-2" /> Adicionar
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {funcoes.map((func) => (
-                <div key={func.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                  <span className="font-medium">{func.nome}</span>
-                  {canAccessAction('gerir_configuracoes') && (
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'funcao', id: func.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
-                  )}
-                </div>
-              ))}
-              {funcoes.length === 0 && <p className="text-center text-slate-500 py-8">Nenhuma função cadastrada</p>}
-            </div>
-          </div>
-
           <TiposPublicacaoManager />
-          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} initialTab={selectedTab} />
-
-          {podeExecutarReset && (
-            <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
-              <div className="flex items-start gap-3">
-                <ShieldAlert className="w-5 h-5 text-red-600 mt-1" />
-                <div className="w-full">
-                  <h2 className="text-xl font-semibold text-red-800">Limpeza pré-publicação (Reset operacional)</h2>
-                  <p className="text-sm text-red-700 mt-1">
-                    Rotina destrutiva para remover dados operacionais/teste antes do go-live. Dados estruturais (usuários, permissões, perfis,
-                    estrutura organizacional, templates e configurações) são preservados.
-                  </p>
-
-                  <div className="flex gap-2 mt-4 flex-wrap">
-                    <Button onClick={handlePreviewReset} disabled={loadingPreview || loadingReset} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-                      {loadingPreview ? 'Gerando preview...' : 'Gerar preview da limpeza'}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => setResetDialogOpen(true)}
-                      disabled={!previewReset || loadingReset || loadingPreview}
-                    >
-                      {loadingReset ? 'Executando...' : 'Executar limpeza real'}
-                    </Button>
-                  </div>
-
-                  {erroReset && <p className="text-sm text-red-700 mt-3">{erroReset}</p>}
-
-                  {previewReset && (
-                    <div className="mt-4 border rounded-lg overflow-hidden">
-                      <div className="bg-slate-100 px-4 py-2 text-sm font-semibold">Preview / diagnóstico da limpeza</div>
-                      <div className="p-4 space-y-2 text-sm">
-                        {previewReset.modulos.map((modulo) => (
-                          <div key={modulo.chave} className="flex justify-between gap-3 border-b pb-1">
-                            <span>{modulo.label}</span>
-                            <span className="font-semibold">{modulo.subtotal}</span>
-                          </div>
-                        ))}
-                        <div className="flex justify-between gap-3 border-b pb-1">
-                          <span>Órfãos identificados</span>
-                          <span className="font-semibold">{previewReset.totalOrfaos}</span>
-                        </div>
-                        <div className="flex justify-between gap-3 font-bold text-base pt-1">
-                          <span>Total geral</span>
-                          <span>{previewReset.totalGeral}</span>
-                        </div>
-                        <div className="pt-2 text-xs text-slate-500">
-                          Preservados: {previewReset.preservar.join(', ')}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
+          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} initialTab={selectedTab} showFuncoesTab={false} />
         </div>
-
-        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tem certeza que deseja excluir esta {deleteDialog.type === 'lotacao' ? 'lotação' : 'função'}? Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">Excluir</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar limpeza pré-publicação</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta operação remove dados operacionais e de teste de forma destrutiva. Para confirmar, digite exatamente:
-                <span className="block mt-2 font-semibold text-red-700">{resetOperacionalConstants.CONFIRMACAO_FORTE}</span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <Input value={confirmacaoReset} onChange={(event) => setConfirmacaoReset(event.target.value)} placeholder="Digite a confirmação" />
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleExecutarReset}
-                disabled={loadingReset || confirmacaoReset !== resetOperacionalConstants.CONFIRMACAO_FORTE}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Executar limpeza
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </div>
   );

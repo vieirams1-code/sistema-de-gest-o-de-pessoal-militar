@@ -78,6 +78,7 @@ import ExtratoAtestadosMedicos from './pages/ExtratoAtestadosMedicos';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
 import FolhaAlteracoes from './pages/FolhaAlteracoes';
+import Funcoes from './pages/Funcoes';
 import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
 import DashboardAcervo from './pages/DashboardAcervo';
@@ -154,6 +155,7 @@ export const PAGES = {
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
     "FolhaAlteracoes": FolhaAlteracoes,
+    "Funcoes": Funcoes,
     "GratificacoesFuncao": GratificacoesFuncao,
     "Home": Home,
     "DashboardAcervo": DashboardAcervo,

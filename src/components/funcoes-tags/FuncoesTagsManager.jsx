@@ -42,7 +42,15 @@ function isTagInstitucionalLegada(tag) {
   return TERMOS_TAGS_INSTITUCIONAIS.some((termo) => nome.includes(termo));
 }
 
-export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupos', showFuncoesTab = true, isAdmin = false }) {
+export default function FuncoesTagsManager({
+  canEdit = true,
+  initialTab = 'grupos',
+  showFuncoesTab = true,
+  showTagsTabs = true,
+  isAdmin = false,
+  title,
+  subtitle,
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -69,12 +77,16 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
   const [confirmarArquivamentoInstitucionaisOpen, setConfirmarArquivamentoInstitucionaisOpen] = useState(false);
 
   useEffect(() => {
+    if (showFuncoesTab && !showTagsTabs) {
+      setActiveTab('funcoes');
+      return;
+    }
     if (showFuncoesTab) {
       setActiveTab(initialTab);
       return;
     }
     setActiveTab(initialTab === 'tags' ? 'tags' : 'grupos');
-  }, [initialTab, showFuncoesTab]);
+  }, [initialTab, showFuncoesTab, showTagsTabs]);
 
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes-tags', 'funcoes'], queryFn: () => base44.entities.FuncaoMilitar.list('prioridade_lista') });
   const { data: grupos = [] } = useQuery({ queryKey: ['funcoes-tags', 'grupos'], queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao') });
@@ -327,7 +339,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
 
 
   return (<div className="max-w-6xl mx-auto space-y-6">
-    <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">{showFuncoesTab ? 'Configurações de Funções e Tags' : 'Configurações de Tags'}</h1></div><p className="text-sm text-slate-500 mt-1">{showFuncoesTab ? 'Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.' : 'Gerencie grupos de tags e marcadores operacionais do sistema.'}</p></div>{showFuncoesTab && <Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button>}</header>
+    <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">{title || (showFuncoesTab ? 'Configurações de Funções e Tags' : 'Configurações de Tags')}</h1></div><p className="text-sm text-slate-500 mt-1">{subtitle || (showFuncoesTab ? 'Gerencie funções militares, grupos de tags e marcadores operacionais do sistema.' : 'Gerencie grupos de tags e marcadores operacionais do sistema.')}</p></div>{showFuncoesTab && <Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button>}</header>
     {activeTab === 'tags' && <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900"><p><strong>Tags no sistema:</strong> marcadores operacionais para filtros e organização. Não substituem funções institucionais.</p><p className="mt-1"><strong>Auditoria institucional:</strong> encontradas {tagsInstitucionaisEncontradas.length} tag(s) com nomes legados{tagsInstitucionaisArquivadas.length > 0 ? `; arquivadas nesta sessão: ${tagsInstitucionaisArquivadas.map((tag) => tag.nome).join(', ')}` : ''}.</p></div>}
     {activeTab === 'tags' && <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -366,7 +378,7 @@ export default function FuncoesTagsManager({ canEdit = true, initialTab = 'grupo
     </section>}
     
 
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex">{showFuncoesTab && <TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} />}<TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
+    {(showFuncoesTab || showTagsTabs) && <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex">{showFuncoesTab && <TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} />}{showTagsTabs && <TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} />}{showTagsTabs && <TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} />}</div>}
 
 
 
