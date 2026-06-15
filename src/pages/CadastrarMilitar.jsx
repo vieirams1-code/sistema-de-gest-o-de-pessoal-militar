@@ -162,7 +162,15 @@ export default function CadastrarMilitar() {
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
   const [avisoCompatibilidadeQuadro, setAvisoCompatibilidadeQuadro] = useState('');
-  const [conferenciaTrigger, setConferenciaTrigger] = useState(null);
+
+  // Estados para fluxo desacoplado de conferência
+  const [militarSalvoParaConferencia, setMilitarSalvoParaConferencia] = useState(null);
+  const [mostrarDialogoConferencia, setMostrarDialogoConferencia] = useState(false);
+  const [tipoConferenciaSugerida, setTipoConferenciaSugerida] = useState('');
+  const [conferenciaAbertaExistente, setConferenciaAbertaExistente] = useState(null);
+  const [loadingConferencia, setLoadingConferencia] = useState(false);
+  const conferenciaSugeridaRef = React.useRef({});
+
   const [novaMatricula, setNovaMatricula] = useState('');
   const [novoTipoMatricula, setNovoTipoMatricula] = useState('Secundária');
   const [novoMotivoMatricula, setNovoMotivoMatricula] = useState('Atualização administrativa');
@@ -190,6 +198,41 @@ export default function CadastrarMilitar() {
       setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
+
+  // Fluxo de conferência pós-salvamento (Regra 4, 5 e 6)
+  React.useEffect(() => {
+    const processarConferencia = async () => {
+      const militar = militarSalvoParaConferencia;
+      if (!militar || !militar.id) return;
+
+      // Guarda de execução única (Regra 6)
+      if (conferenciaSugeridaRef.current[militar.id]) return;
+      conferenciaSugeridaRef.current[militar.id] = true;
+
+      console.log('[CadastrarMilitar] Processando sugestão de conferência para militar:', militar.id);
+
+      try {
+        // Checagem de duplicidade (Regra 7 e 8)
+        const aberta = await conferenciaMilitarService.buscarConferenciaAberta(militar.id);
+
+        if (aberta) {
+          console.log('[CadastrarMilitar] Conferência aberta já existe:', aberta.id);
+          setConferenciaAbertaExistente(aberta);
+        } else {
+          setConferenciaAbertaExistente(null);
+        }
+
+        console.log('[CadastrarMilitar] abertura do diálogo de conferência');
+        setMostrarDialogoConferencia(true);
+      } catch (error) {
+        console.error('[CadastrarMilitar] Erro ao buscar conferência aberta:', error);
+        // Em caso de erro na checagem, ainda podemos oferecer a criação (o service de criar também valida)
+        setMostrarDialogoConferencia(true);
+      }
+    };
+
+    processarConferencia();
+  }, [militarSalvoParaConferencia]);
 
   const { data: matriculasMilitar = [] } = useQuery({
     queryKey: ['militar-matriculas-edicao', editId],
@@ -246,6 +289,12 @@ export default function CadastrarMilitar() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Regra 3: proteção contra duplo submit
+    if (loading) return;
+
+    console.log('[CadastrarMilitar] início do salvar militar');
+
     if (editId && militarMesclado) {
       window.alert('Cadastro mesclado: edição operacional bloqueada. Consulte o cadastro de destino.');
       return;
@@ -304,37 +353,37 @@ export default function CadastrarMilitar() {
 
     setLoading(true);
 
-    const dataToSave = {
-      ...formData,
-      quadro: normalizarQuadroLegado(formData.quadro),
-      data_inclusao: normalizarDataParaCampoCanonico(formData.data_inclusao),
-      matricula: formatarMatriculaPadrao(formData.matricula),
-      altura: formData.altura ? parseFloat(formData.altura) : null,
-      peso: formData.peso ? parseFloat(formData.peso) : null
-    };
-
-    // Quando condição não usa Movimento (Efetivo, LTIP, vazia), limpa campos relacionados
-    if (!condicaoNaoEfetiva) {
-      dataToSave.condicao_movimento = '';
-      dataToSave.condicao_origem_destino = '';
-    }
-    // Quando condição não é LTIP, limpa as datas da LTIP
-    if (!condicaoLtip) {
-      dataToSave.ltip_data_inicio = '';
-      dataToSave.ltip_data_fim = '';
-    }
-
-    // Preencher subgrupamento automaticamente para usuários não-admin
-    if (!editId && !isAdmin && subgrupamentoId) {
-      dataToSave.subgrupamento_id = subgrupamentoId;
-      dataToSave.subgrupamento_nome = user?.subgrupamento_nome || '';
-    }
-
-    let militarId = editId;
-    let isNewRegistration = !editId;
-    let isReactivation = editId && editingMilitar?.status_cadastro === 'Inativo' && dataToSave.status_cadastro === 'Ativo';
-
     try {
+      const dataToSave = {
+        ...formData,
+        quadro: normalizarQuadroLegado(formData.quadro),
+        data_inclusao: normalizarDataParaCampoCanonico(formData.data_inclusao),
+        matricula: formatarMatriculaPadrao(formData.matricula),
+        altura: formData.altura ? parseFloat(formData.altura) : null,
+        peso: formData.peso ? parseFloat(formData.peso) : null
+      };
+
+      // Quando condição não usa Movimento (Efetivo, LTIP, vazia), limpa campos relacionados
+      if (!condicaoNaoEfetiva) {
+        dataToSave.condicao_movimento = '';
+        dataToSave.condicao_origem_destino = '';
+      }
+      // Quando condição não é LTIP, limpa as datas da LTIP
+      if (!condicaoLtip) {
+        dataToSave.ltip_data_inicio = '';
+        dataToSave.ltip_data_fim = '';
+      }
+
+      // Preencher subgrupamento automaticamente para usuários não-admin
+      if (!editId && !isAdmin && subgrupamentoId) {
+        dataToSave.subgrupamento_id = subgrupamentoId;
+        dataToSave.subgrupamento_nome = user?.subgrupamento_nome || '';
+      }
+
+      let militarId = editId;
+      let isNewRegistration = !editId;
+      let isReactivation = editId && editingMilitar?.status_cadastro === 'Inativo' && dataToSave.status_cadastro === 'Ativo';
+
       if (editId) {
         await atualizarMilitarSemTrocarMatricula(editId, dataToSave, { resolvidoPor: user?.email || '' });
       } else {
@@ -342,77 +391,53 @@ export default function CadastrarMilitar() {
         militarId = criado.id;
         dataToSave.id = criado.id; // Para snapshot
       }
-    } catch (error) {
-      setLoading(false);
-      window.alert(error?.message || 'Falha ao salvar militar.');
-      return;
-    }
 
-    if (!editId && militarId) {
-      await garantirImplantacaoHistoricoComportamento({
-        militarId,
-        comportamentoAtual: formData.comportamento || 'Bom',
-        origemTipo: 'Militar',
-        origemId: militarId,
-        createdBy: user?.email || '',
-      });
-    } else if (editId && formData.comportamento !== comportamentoOriginal && militarId) {
-      await garantirImplantacaoHistoricoComportamento({
-        militarId,
-        comportamentoAtual: comportamentoOriginal || 'Bom',
-        origemTipo: 'Militar',
-        origemId: militarId,
-        createdBy: user?.email || '',
-      });
-      await registrarMarcoHistoricoComportamento({
-        militarId,
-        dataVigencia: new Date().toISOString().slice(0, 10),
-        comportamentoAnterior: comportamentoOriginal || 'Bom',
-        comportamento: formData.comportamento || 'Bom',
-        motivoMudanca: motivoComportamento || 'Revisão manual de comportamento no cadastro do militar.',
-        origemTipo: 'Militar',
-        origemId: militarId,
-        observacoes: motivoComportamento || '',
-        createdBy: user?.email || '',
-      });
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['militares'] });
-
-    if (isNewRegistration || isReactivation) {
-      const aberta = await conferenciaMilitarService.buscarConferenciaAberta(militarId);
-      if (!aberta) {
-        let dataInicioRef = '';
-        let observacaoAutomatica = '';
-
-        if (isReactivation) {
-          try {
-            const mats = await base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-data_inicio');
-            const ultimaInativa = mats.find(m => m.data_fim && (m.situacao === 'Inativa' || m.situacao === 'Transferida'));
-            if (ultimaInativa) {
-              dataInicioRef = ultimaInativa.data_fim;
-            } else {
-              observacaoAutomatica = 'Data de início da ausência não localizada automaticamente. Conferir manualmente.';
-            }
-          } catch (e) {
-             console.error('[CadastrarMilitar] Erro ao buscar histórico para reativação', e);
-          }
-        }
-
-        setConferenciaTrigger({
-          militar: { ...dataToSave, id: militarId },
-          tipo: isNewRegistration ? 'ingresso' : 'reativacao',
-          dataInicioRef,
-          dataFimRef: isReactivation ? new Date().toISOString().slice(0, 10) : '',
-          observacao: observacaoAutomatica
+      if (!editId && militarId) {
+        await garantirImplantacaoHistoricoComportamento({
+          militarId,
+          comportamentoAtual: formData.comportamento || 'Bom',
+          origemTipo: 'Militar',
+          origemId: militarId,
+          createdBy: user?.email || '',
         });
-        setLoading(false);
-        return;
+      } else if (editId && formData.comportamento !== comportamentoOriginal && militarId) {
+        await garantirImplantacaoHistoricoComportamento({
+          militarId,
+          comportamentoAtual: comportamentoOriginal || 'Bom',
+          origemTipo: 'Militar',
+          origemId: militarId,
+          createdBy: user?.email || '',
+        });
+        await registrarMarcoHistoricoComportamento({
+          militarId,
+          dataVigencia: new Date().toISOString().slice(0, 10),
+          comportamentoAnterior: comportamentoOriginal || 'Bom',
+          comportamento: formData.comportamento || 'Bom',
+          motivoMudanca: motivoComportamento || 'Revisão manual de comportamento no cadastro do militar.',
+          origemTipo: 'Militar',
+          origemId: militarId,
+          observacoes: motivoComportamento || '',
+          createdBy: user?.email || '',
+        });
       }
-    }
 
-    setLoading(false);
-    navigate(createPageUrl('Militares'));
+      queryClient.invalidateQueries({ queryKey: ['militares'] });
+      console.log('[CadastrarMilitar] fim do salvar militar');
+
+      // Regra 1 e 4: Desacoplar conferência do ciclo principal de salvar
+      if (isNewRegistration || isReactivation) {
+        setTipoConferenciaSugerida(isNewRegistration ? 'ingresso' : 'reativacao');
+        setMilitarSalvoParaConferencia({ ...dataToSave, id: militarId });
+        // O loading encerra aqui, e o useEffect cuidará da sugestão
+      } else {
+        navigate(createPageUrl('Militares'));
+      }
+    } catch (error) {
+      console.error('[CadastrarMilitar] Erro ao salvar:', error);
+      window.alert(error?.message || 'Falha ao salvar militar.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAdicionarNovaMatricula = async () => {
@@ -461,25 +486,53 @@ export default function CadastrarMilitar() {
     );
   }
 
-  const handleCreateTriggeredConferencia = async () => {
-    if (!conferenciaTrigger) return;
-    setLoading(true);
+  const handleConfirmConferencia = async () => {
+    const militar = militarSalvoParaConferencia;
+    if (!militar) return;
+
+    if (conferenciaAbertaExistente) {
+      console.log('[CadastrarMilitar] abrindo conferência existente');
+      navigate(createPageUrl('ConferenciasMilitares'));
+      return;
+    }
+
+    setLoadingConferencia(true);
+    console.log('[CadastrarMilitar] criando conferência');
+
     try {
+      let dataInicioRef = '';
+      let observacaoAutomatica = '';
+
+      if (tipoConferenciaSugerida === 'reativacao') {
+        try {
+          const mats = await base44.entities.MatriculaMilitar.filter({ militar_id: militar.id }, '-data_inicio');
+          const ultimaInativa = mats.find(m => m.data_fim && (m.situacao === 'Inativa' || m.situacao === 'Transferida'));
+          if (ultimaInativa) {
+            dataInicioRef = ultimaInativa.data_fim;
+          } else {
+            observacaoAutomatica = 'Data de início da ausência não localizada automaticamente. Conferir manualmente.';
+          }
+        } catch (e) {
+           console.error('[CadastrarMilitar] Erro ao buscar histórico para reativação', e);
+        }
+      }
+
       await conferenciaMilitarService.criarConferenciaMilitar({
-        militar: conferenciaTrigger.militar,
-        tipo_conferencia: conferenciaTrigger.tipo,
-        data_inicio_referencia: conferenciaTrigger.dataInicioRef,
-        data_fim_referencia: conferenciaTrigger.dataFimRef,
-        observacao_geral: conferenciaTrigger.observacao,
+        militar,
+        tipo_conferencia: tipoConferenciaSugerida,
+        data_inicio_referencia: dataInicioRef,
+        data_fim_referencia: tipoConferenciaSugerida === 'reativacao' ? new Date().toISOString().slice(0, 10) : '',
+        observacao_geral: observacaoAutomatica,
         usuario: user
       });
       navigate(createPageUrl('ConferenciasMilitares'));
     } catch (error) {
+      console.error('[CadastrarMilitar] Erro ao criar conferência:', error);
       window.alert('Erro ao criar conferência: ' + error.message);
       navigate(createPageUrl('Militares'));
     } finally {
-      setLoading(false);
-      setConferenciaTrigger(null);
+      setLoadingConferencia(false);
+      setMostrarDialogoConferencia(false);
     }
   };
 
@@ -954,9 +1007,11 @@ export default function CadastrarMilitar() {
         </form>
       </div>
 
-      <Dialog open={!!conferenciaTrigger} onOpenChange={() => {
-        setConferenciaTrigger(null);
-        navigate(createPageUrl('Militares'));
+      <Dialog open={mostrarDialogoConferencia} onOpenChange={(open) => {
+        if (!open) {
+          setMostrarDialogoConferencia(false);
+          navigate(createPageUrl('Militares'));
+        }
       }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -964,40 +1019,40 @@ export default function CadastrarMilitar() {
               <div className="p-2 bg-blue-100 rounded-full text-blue-600">
                 <ClipboardCheck className="w-6 h-6" />
               </div>
-              <DialogTitle className="text-xl">Conferência Cadastral Recomendada</DialogTitle>
+              <DialogTitle className="text-xl">
+                {conferenciaAbertaExistente ? 'Conferência em Aberto' : 'Conferência Recomendada'}
+              </DialogTitle>
             </div>
             <DialogDescription className="text-slate-600">
-              {conferenciaTrigger?.tipo === 'ingresso'
-                ? "Este é um novo cadastro. Deseja abrir uma conferência cadastral de ingresso agora para validar os dados?"
-                : "Este militar foi reativado. Deseja abrir uma conferência cadastral de reativação para validar o período de ausência?"
+              {conferenciaAbertaExistente
+                ? `Já existe uma conferência de ${conferenciaAbertaExistente.tipo_conferencia === 'ingresso' ? 'ingresso' : 'reativação'} aberta para este militar. Deseja visualizá-la?`
+                : tipoConferenciaSugerida === 'ingresso'
+                  ? "Este é um novo cadastro. Deseja abrir uma conferência cadastral de ingresso agora para validar os dados?"
+                  : "Este militar foi reativado. Deseja abrir uma conferência cadastral de reativação para validar o período de ausência?"
               }
             </DialogDescription>
           </DialogHeader>
-
-          {conferenciaTrigger?.observacao && (
-            <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <p>{conferenciaTrigger.observacao}</p>
-            </div>
-          )}
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="ghost"
               onClick={() => {
-                setConferenciaTrigger(null);
+                setMostrarDialogoConferencia(false);
                 navigate(createPageUrl('Militares'));
               }}
-              disabled={loading}
+              disabled={loadingConferencia}
             >
               Agora não
             </Button>
             <Button
-              onClick={handleCreateTriggeredConferencia}
-              disabled={loading}
+              onClick={handleConfirmConferencia}
+              disabled={loadingConferencia}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
             >
-              {loading ? "Criando..." : "Abrir conferência agora"}
+              {loadingConferencia
+                ? "Processando..."
+                : conferenciaAbertaExistente ? "Abrir existente" : "Abrir conferência agora"
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
