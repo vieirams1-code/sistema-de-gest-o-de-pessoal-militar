@@ -182,24 +182,32 @@ const menuGroups = [
         icon: Wrench,
         description: 'Governança técnica, segurança e manutenção',
         items: [
-          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },
-          { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
-          { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp' },
-          { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
+          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes', menuGroup: 'Cadastros' },
+          { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates', menuGroup: 'Cadastros' },
+          { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp', menuGroup: 'Cadastros' },
+          {
+            name: 'Funções',
+            page: 'Funcoes',
+            icon: ShieldCheck,
+            anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }],
+            menuGroup: 'Cadastros',
+          },
           {
             name: 'Permissões',
             page: 'PermissoesUsuarios',
             icon: Users,
             anyOf: [{ type: 'module', key: 'permissoes_usuarios' }, { type: 'action', key: 'gerir_permissoes_usuarios' }],
+            menuGroup: 'Administração',
           },
           {
             name: 'Perfis de Permissão',
             page: 'PerfisPermissao',
             icon: Shield,
             anyOf: [{ type: 'module', key: 'perfis_permissao' }, { type: 'action', key: 'gerir_perfis_permissao' }],
+            menuGroup: 'Administração',
           },
-          { name: 'Estrutura', page: 'EstruturaOrganizacional', icon: GitBranch, viewPermission: 'visualizar_estrutura_organizacional' },
-          { name: 'Lotação', page: 'LotacaoMilitares', icon: Building2, viewPermission: 'visualizar_lotacao_militares' },
+          { name: 'Estrutura', page: 'EstruturaOrganizacional', icon: GitBranch, viewPermission: 'visualizar_estrutura_organizacional', menuGroup: 'Administração' },
+          { name: 'Lotação', page: 'LotacaoMilitares', icon: Building2, viewPermission: 'visualizar_lotacao_militares', menuGroup: 'Administração' },
           {
             name: 'Migração',
             page: 'MigracaoMilitares',
@@ -209,13 +217,13 @@ const menuGroups = [
               { type: 'module', key: 'migracao_alteracoes_legado' },
             ],
             children: [
-              { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, moduleKey: 'migracao_militares', actionKey: 'visualizar_importacao_militares' },
-              { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, moduleKey: 'migracao_militares', actionKey: 'ver_historico_importacoes' },
-              { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, moduleKey: 'migracao_alteracoes_legado', actionKey: 'migrar_alteracoes_legado' },
-              { name: 'Importar Dom Pedro II', page: 'ImportarMedalhaDomPedroII', icon: Medal, moduleKey: 'migracao_alteracoes_legado' },
-              { name: 'Importar Medalhas Tempo Serviço', page: 'ImportarMedalhaTempoServico', icon: Medal, moduleKey: 'migracao_alteracoes_legado' },
-              { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'classificar_legado' },
-              { name: 'Classificações Históricas', page: 'ClassificacoesHistoricasAlteracoes', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'gerir_classificacoes_historicas' },
+              { name: 'Importar Dom Pedro II', page: 'ImportarMedalhaDomPedroII', icon: Medal, moduleKey: 'migracao_alteracoes_legado', menuGroup: 'Medalhas' },
+              { name: 'Importar Medalhas Tempo Serviço', page: 'ImportarMedalhaTempoServico', icon: Medal, moduleKey: 'migracao_alteracoes_legado', menuGroup: 'Medalhas' },
+              { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, moduleKey: 'migracao_militares', actionKey: 'visualizar_importacao_militares', menuGroup: 'Diversos' },
+              { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, moduleKey: 'migracao_militares', actionKey: 'ver_historico_importacoes', menuGroup: 'Diversos' },
+              { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, moduleKey: 'migracao_alteracoes_legado', actionKey: 'migrar_alteracoes_legado', menuGroup: 'Diversos' },
+              { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'classificar_legado', menuGroup: 'Diversos' },
+              { name: 'Classificações Históricas', page: 'ClassificacoesHistoricasAlteracoes', icon: Archive, moduleKey: 'migracao_alteracoes_legado', actionKey: 'gerir_classificacoes_historicas', menuGroup: 'Diversos' },
             ],
           },
           {
@@ -226,6 +234,7 @@ const menuGroups = [
             tab: 'adicoes',
             anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }],
           },
+          { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
         ],
       },
     ],
@@ -259,6 +268,14 @@ export default function Layout({ children, currentPageName }) {
 
   const toggleExpanded = (sectionTitle) => {
     setExpandedSection((prev) => (prev === sectionTitle ? '' : sectionTitle));
+  };
+  const [expandedMenuItems, setExpandedMenuItems] = useState({});
+
+  const toggleMenuItem = (itemName) => {
+    setExpandedMenuItems((prev) => ({
+      ...prev,
+      [itemName]: !prev[itemName],
+    }));
   };
 
   const hoverCloseTimeoutRef = useRef(null);
@@ -355,6 +372,93 @@ export default function Layout({ children, currentPageName }) {
     }
     return item.page === currentPageName;
   };
+
+  const groupItemsByMenuGroup = (items) => items.reduce((groups, item) => {
+    const lastGroup = groups[groups.length - 1];
+    const groupLabel = item.menuGroup || null;
+
+    if (lastGroup?.label === groupLabel) {
+      lastGroup.items.push(item);
+      return groups;
+    }
+
+    groups.push({ label: groupLabel, items: [item] });
+    return groups;
+  }, []);
+
+  const renderMenuSectionLabel = (label, nested = false) => (
+    <p className={`${nested ? 'ml-7 mt-2' : 'mt-2'} px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-200/60 first:mt-0`}>
+      {label}
+    </p>
+  );
+
+  const renderMenuItems = (items, { nested = false } = {}) => (
+    groupItemsByMenuGroup(items).map((group, groupIndex) => (
+      <React.Fragment key={`${nested ? 'nested' : 'root'}-${group.label || 'ungrouped'}-${groupIndex}`}>
+        {group.label && renderMenuSectionLabel(group.label, nested)}
+        {group.items.map((item) => {
+          const active = isItemActive(item);
+          const hasChildren = item.children?.length > 0;
+          const childrenExpanded = hasChildren && (expandedMenuItems[item.name] || active);
+          const baseHref = item.path || createPageUrl(item.page);
+          const href = item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
+          const itemTextSize = nested ? 'text-[12px]' : 'text-[13px]';
+          const itemIndent = nested ? 'ml-4' : '';
+
+          return (
+            <div key={item.name}>
+              <div className={`group flex items-center rounded-lg ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'} ${itemIndent}`}>
+                <Link
+                  to={href}
+                  onClick={() => {
+                    clearHoverCloseTimeout();
+                    setHoveredSection(null);
+                    setSidebarOpen(false);
+                  }}
+                  className={`flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 ${itemTextSize}`}
+                >
+                  <span className="truncate">{item.name}</span>
+                </Link>
+                <div className="flex items-center pr-2">
+                  <button
+                    type="button"
+                    aria-label={`Fixar ${item.name}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      togglePin(item);
+                    }}
+                    className={`transition-opacity ${isPinned(item) ? 'text-blue-300 opacity-100' : 'text-white/50 opacity-0 hover:text-white group-hover:opacity-100'}`}
+                  >
+                    <Pin className="w-3.5 h-3.5" />
+                  </button>
+                  {hasChildren && (
+                    <button
+                      type="button"
+                      aria-label={childrenExpanded ? `Recolher ${item.name}` : `Expandir ${item.name}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleMenuItem(item.name);
+                      }}
+                      className="ml-1 rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
+                    >
+                      {childrenExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {childrenExpanded && (
+                <div className="mt-1 space-y-1">
+                  {renderMenuItems(item.children, { nested: true })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </React.Fragment>
+    ))
+  );
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -491,69 +595,7 @@ export default function Layout({ children, currentPageName }) {
                               </>
                             )}
                             <div className="space-y-1">
-                              {section.items.map((item) => {
-                                const active = isItemActive(item);
-                                const hasChildren = item.children?.length > 0;
-                                const href = item.tab ? `${item.path || createPageUrl(item.page)}?tab=${item.tab}` : (item.path || createPageUrl(item.page));
-                                return (
-                                  <div key={item.name}>
-                                    <Link
-                                      to={href}
-                                      onClick={() => {
-                                        clearHoverCloseTimeout();
-                                        setHoveredSection(null);
-                                        setSidebarOpen(false);
-                                      }}
-                                      className={`group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
-                                    >
-                                      <span className="truncate">{item.name}</span>
-                                      <button
-                                        type="button"
-                                        aria-label={`Fixar ${item.name}`}
-                                        onClick={(event) => {
-                                          event.preventDefault();
-                                          event.stopPropagation();
-                                          togglePin(item);
-                                        }}
-                                        className={`opacity-0 group-hover:opacity-100 transition-opacity ${isPinned(item) ? 'text-blue-300 opacity-100' : 'text-white/50 hover:text-white'}`}
-                                      >
-                                        <Pin className="w-3.5 h-3.5" />
-                                      </button>
-                                    </Link>
-                                    {hasChildren && item.children.map((child) => {
-                                      const childActive = currentPageName === child.page && !child.tab;
-                                      const baseHref = child.path || createPageUrl(child.page);
-                                      const childHref = child.tab ? `${baseHref}?tab=${child.tab}` : baseHref;
-                                      return (
-                                        <Link
-                                          key={child.name}
-                                          to={childHref}
-                                          onClick={() => {
-                                        clearHoverCloseTimeout();
-                                        setHoveredSection(null);
-                                        setSidebarOpen(false);
-                                      }}
-                                          className={`group ml-4 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
-                                        >
-                                          <span className="truncate">{child.name}</span>
-                                          <button
-                                            type="button"
-                                            aria-label={`Fixar ${child.name}`}
-                                            onClick={(event) => {
-                                              event.preventDefault();
-                                              event.stopPropagation();
-                                              togglePin(child);
-                                            }}
-                                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${isPinned(child) ? 'text-blue-300 opacity-100' : 'text-white/50 hover:text-white'}`}
-                                          >
-                                            <Pin className="w-3.5 h-3.5" />
-                                          </button>
-                                        </Link>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })}
+                              {renderMenuItems(section.items)}
                             </div>
                           </div>
                         )}
