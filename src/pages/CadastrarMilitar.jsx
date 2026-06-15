@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, ClipboardCheck, AlertCircle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
+import { conferenciaMilitarService, getMilitarId } from '@/services/conferenciaMilitarService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 import FormSection from '@/components/militar/FormSection';
@@ -203,17 +203,18 @@ export default function CadastrarMilitar() {
   React.useEffect(() => {
     const processarConferencia = async () => {
       const militar = militarSalvoParaConferencia;
-      if (!militar || !militar.id) return;
+      const militarId = getMilitarId(militar);
+      if (!militar || !militarId) return;
 
       // Guarda de execução única (Regra 6)
-      if (conferenciaSugeridaRef.current[militar.id]) return;
-      conferenciaSugeridaRef.current[militar.id] = true;
+      if (conferenciaSugeridaRef.current[militarId]) return;
+      conferenciaSugeridaRef.current[militarId] = true;
 
-      console.log('[CadastrarMilitar] Processando sugestão de conferência para militar:', militar.id);
+      console.log('[CadastrarMilitar] Processando sugestão de conferência para militar:', militarId);
 
       try {
         // Checagem de duplicidade (Regra 7 e 8)
-        const aberta = await conferenciaMilitarService.buscarConferenciaAberta(militar.id);
+        const aberta = await conferenciaMilitarService.buscarConferenciaAberta(militarId);
 
         if (aberta) {
           console.log('[CadastrarMilitar] Conferência aberta já existe:', aberta.id);
@@ -380,19 +381,39 @@ export default function CadastrarMilitar() {
         dataToSave.subgrupamento_nome = user?.subgrupamento_nome || '';
       }
 
-      let militarId = editId;
       let isNewRegistration = !editId;
       let isReactivation = editId && editingMilitar?.status_cadastro === 'Inativo' && dataToSave.status_cadastro === 'Ativo';
 
+      let militarSalvoBruto = null;
+
       if (editId) {
-        await atualizarMilitarSemTrocarMatricula(editId, dataToSave, { resolvidoPor: user?.email || '' });
+        militarSalvoBruto = await atualizarMilitarSemTrocarMatricula(editId, dataToSave, { resolvidoPor: user?.email || '' });
       } else {
-        const criado = await criarMilitarComMatricula(dataToSave, { origemRegistro: 'cadastro_manual', criadoPor: user?.email || '' });
-        militarId = criado.id;
-        dataToSave.id = criado.id; // Para snapshot
+        militarSalvoBruto = await criarMilitarComMatricula(dataToSave, { origemRegistro: 'cadastro_manual', criadoPor: user?.email || '' });
       }
 
-      if (!editId && militarId) {
+      console.log('[CadastrarMilitar] militar salvo bruto:', militarSalvoBruto);
+      let militarId = getMilitarId(militarSalvoBruto) || editId;
+
+      // Fallback: se o save não retornou o militar completo com ID, buscar pela matrícula
+      if (!militarId && dataToSave.matricula) {
+        console.log('[CadastrarMilitar] ID não encontrado no retorno do save. Tentando fallback por matrícula...');
+        try {
+          const matriculaPadrao = formatarMatriculaPadrao(dataToSave.matricula);
+          const list = await base44.entities.Militar.filter({ matricula: matriculaPadrao });
+          if (list && list.length === 1) {
+            militarId = getMilitarId(list[0]);
+            militarSalvoBruto = list[0];
+            console.log('[CadastrarMilitar] Militar resolvido via fallback:', militarId);
+          }
+        } catch (fallbackError) {
+          console.error('[CadastrarMilitar] Erro no fallback de identificação:', fallbackError);
+        }
+      }
+
+      console.log('[CadastrarMilitar] militar_id resolvido:', militarId);
+
+      if (isNewRegistration && militarId) {
         await garantirImplantacaoHistoricoComportamento({
           militarId,
           comportamentoAtual: formData.comportamento || 'Bom',
@@ -423,11 +444,24 @@ export default function CadastrarMilitar() {
 
       queryClient.invalidateQueries({ queryKey: ['militares'] });
       console.log('[CadastrarMilitar] fim do salvar militar');
+      setLoading(false);
 
       // Regra 1 e 4: Desacoplar conferência do ciclo principal de salvar
-      if (isNewRegistration || isReactivation) {
+      if ((isNewRegistration || isReactivation) && militarId) {
         setTipoConferenciaSugerida(isNewRegistration ? 'ingresso' : 'reativacao');
-        setMilitarSalvoParaConferencia({ ...dataToSave, id: militarId });
+
+        // Garante objeto completo para snapshot da conferência
+        const militarParaSnapshot = {
+          ...dataToSave,
+          ...militarSalvoBruto,
+          id: militarId,
+          nome_completo: dataToSave.nome_completo || militarSalvoBruto?.nome_completo,
+          matricula: dataToSave.matricula || militarSalvoBruto?.matricula,
+          posto_graduacao: dataToSave.posto_graduacao || militarSalvoBruto?.posto_graduacao
+        };
+
+        console.log('[CadastrarMilitar] payload conferência:', militarParaSnapshot);
+        setMilitarSalvoParaConferencia(militarParaSnapshot);
         // O loading encerra aqui, e o useEffect cuidará da sugestão
       } else {
         navigate(createPageUrl('Militares'));
@@ -504,8 +538,9 @@ export default function CadastrarMilitar() {
       let observacaoAutomatica = '';
 
       if (tipoConferenciaSugerida === 'reativacao') {
+        const militarId = getMilitarId(militar);
         try {
-          const mats = await base44.entities.MatriculaMilitar.filter({ militar_id: militar.id }, '-data_inicio');
+          const mats = await base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-data_inicio');
           const ultimaInativa = mats.find(m => m.data_fim && (m.situacao === 'Inativa' || m.situacao === 'Transferida'));
           if (ultimaInativa) {
             dataInicioRef = ultimaInativa.data_fim;
