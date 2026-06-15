@@ -37,7 +37,12 @@ function getAvatarLabel(militar = {}) {
     .join('');
 }
 
-export default function GlobalMilitarSearch() {
+export default function GlobalMilitarSearch({
+  onSelect,
+  modo = 'navegacao',
+  disableNavigation = false,
+  placeholder = 'Buscar militar por nome, matrícula, CPF, lotação, posto...',
+} = {}) {
   const {
     canAccessAction,
     isAccessResolved,
@@ -50,6 +55,7 @@ export default function GlobalMilitarSearch() {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef(null);
   const navigate = useNavigate();
+  const isSelectionMode = disableNavigation || modo === 'selecao';
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedTerm(term.trim()), DEBOUNCE_MS);
@@ -58,7 +64,7 @@ export default function GlobalMilitarSearch() {
 
   useEffect(() => {
     const handleWindowKeyDown = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      if (!isSelectionMode && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setShowDropdown(true);
         setTimeout(() => inputRef.current?.focus(), 0);
@@ -70,7 +76,7 @@ export default function GlobalMilitarSearch() {
 
     window.addEventListener('keydown', handleWindowKeyDown);
     return () => window.removeEventListener('keydown', handleWindowKeyDown);
-  }, []);
+  }, [isSelectionMode]);
 
   const effectiveEmail = getEffectiveEmail();
 
@@ -83,7 +89,7 @@ export default function GlobalMilitarSearch() {
   );
 
   const { data: militaresAcessiveis = [], isLoading } = useQuery({
-    queryKey: ['global-search-militares', debouncedTerm, effectiveEmail || 'self'],
+    queryKey: ['global-search-militares', debouncedTerm, effectiveEmail || 'self', isSelectionMode ? 'selecao' : 'navegacao'],
     queryFn: async () => {
       const { militares } = await fetchScopedMilitares({
         search: debouncedTerm,
@@ -95,7 +101,7 @@ export default function GlobalMilitarSearch() {
       const militaresOperacionais = filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
       const resultadosMilitares = militaresOperacionais.map((militar) => ({ type: 'militar', id: `militar-${militar.id}`, data: militar }));
 
-      if (!canAccessAction('visualizar_acervo_historico')) return resultadosMilitares;
+      if (isSelectionMode || !canAccessAction('visualizar_acervo_historico')) return resultadosMilitares;
 
       const termo = debouncedTerm.toLowerCase();
       const [documentos, todosMilitares] = await Promise.all([
@@ -153,6 +159,17 @@ export default function GlobalMilitarSearch() {
 
     const militar = item?.type === 'militar' ? item.data : item;
     if (!militar?.id) return;
+
+    if (isSelectionMode) {
+      onSelect?.(militar);
+      setTerm([militar.posto_graduacao, militar.nome_guerra || militar.nome_completo, militar.matricula ? `Matr. ${militar.matricula}` : '']
+        .filter(Boolean)
+        .join(' - '));
+      setShowDropdown(false);
+      inputRef.current?.blur();
+      return;
+    }
+
     navigate(`${createPageUrl('VerMilitar')}?id=${militar.id}`);
     setShowDropdown(false);
   };
@@ -195,8 +212,37 @@ export default function GlobalMilitarSearch() {
 
     if (item.type === 'militar') {
       const militar = item.data;
-      const atalhos = construirAtalhosMilitar({ militarId: militar.id, canAccessAction });
+      const atalhos = isSelectionMode ? [] : construirAtalhosMilitar({ militarId: militar.id, canAccessAction });
       const status = getMilitarStatus(militar);
+
+      if (isSelectionMode) {
+        const lotacao = militar.subgrupamento_nome || militar.grupamento_nome || militar.lotacao_atual || militar.lotacao;
+
+        return (
+          <button
+            key={`militar-${militar.id}`}
+            type="button"
+            role="option"
+            aria-selected={selected}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => handleSelect(item)}
+            className={`w-full rounded-xl border p-3 text-left transition ${selected ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'} cursor-pointer`}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {militar.posto_graduacao && (
+                <Badge variant="outline" className="text-slate-700">
+                  {militar.posto_graduacao}
+                </Badge>
+              )}
+              <span className="font-semibold text-slate-900">{militar.nome_guerra || militar.nome_completo}</span>
+            </div>
+            <div className="mt-2 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">
+              <span>Matrícula: {militar.matricula || '-'}</span>
+              {lotacao && <span>Lotação: {lotacao}</span>}
+            </div>
+          </button>
+        );
+      }
 
       return (
         <div
@@ -311,7 +357,7 @@ export default function GlobalMilitarSearch() {
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 160)}
           onKeyDown={handleKeyDown}
-          placeholder="Buscar militar por nome, matrícula, CPF, lotação, posto..."
+          placeholder={placeholder}
           className="pl-9 bg-white"
         />
       </div>
@@ -322,7 +368,7 @@ export default function GlobalMilitarSearch() {
             {!isLoading && !temBusca && (
               <div className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500 text-center">
                 <p className="font-semibold text-slate-900">Digite para buscar militares</p>
-                <p className="mt-1 text-slate-500">Use Ctrl+K para abrir de qualquer tela</p>
+                {!isSelectionMode && <p className="mt-1 text-slate-500">Use Ctrl+K para abrir de qualquer tela</p>}
               </div>
             )}
 
@@ -351,7 +397,7 @@ export default function GlobalMilitarSearch() {
             )}
           </div>
 
-          {temBusca && resultados.length >= RESULT_LIMIT && (
+          {!isSelectionMode && temBusca && resultados.length >= RESULT_LIMIT && (
             <div className="border-t border-slate-100 p-2">
               <Button asChild variant="ghost" className="w-full justify-between text-slate-700">
                 <Link to={`${createPageUrl('Militares')}?q=${encodeURIComponent(debouncedTerm)}`}>

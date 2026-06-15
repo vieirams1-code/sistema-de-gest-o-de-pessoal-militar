@@ -697,7 +697,12 @@ function NovaConferenciaModal({ isOpen, onClose, onSuccess }) {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Militar</Label>
-            <GlobalMilitarSearch onSelect={(m) => setDados({ ...dados, militar: m })} />
+            <GlobalMilitarSearch
+              modo="selecao"
+              disableNavigation
+              onSelect={(m) => setDados((atual) => ({ ...atual, militar: m }))}
+              placeholder="Buscar militar por nome, matrícula, CPF, posto..."
+            />
           </div>
 
           <div className="space-y-2">
