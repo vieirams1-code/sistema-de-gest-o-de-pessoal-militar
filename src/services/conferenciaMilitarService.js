@@ -5,6 +5,15 @@ import { criarEscopado, atualizarEscopado, bulkEscopado } from './cudEscopadoCli
  * Service para gestão do módulo "Conferência Cadastral de Militar".
  */
 
+/**
+ * Helper seguro para extrair o ID do militar de diferentes possíveis campos.
+ */
+export const getMilitarId = (militar) => {
+  if (!militar) return null;
+  const id = militar.id || militar._id || militar.militar_id;
+  return id ? String(id) : null;
+};
+
 export const conferenciaMilitarService = {
   /**
    * Lista as conferências com base nos filtros fornecidos.
@@ -75,21 +84,33 @@ export const conferenciaMilitarService = {
    * Cria uma nova conferência militar.
    */
   async criarConferenciaMilitar({ militar, tipo_conferencia, data_inicio_referencia, data_fim_referencia, observacao_geral, usuario }) {
-    if (!militar?.id) throw new Error('Militar é obrigatório.');
+    const militar_id = getMilitarId(militar);
+    console.log('[conferenciaMilitarService] militar_id recebido:', militar_id);
+
+    if (!militar_id) throw new Error('ID do militar é obrigatório para criar conferência.');
     if (!tipo_conferencia) throw new Error('Tipo de conferência é obrigatório.');
 
+    // Validação de campos obrigatórios do militar para o snapshot da conferência
+    const militar_nome = militar.nome_completo || militar.nome;
+    const militar_matricula = militar.matricula;
+    const militar_posto_graduacao = militar.posto_graduacao;
+
+    if (!militar_nome) throw new Error('Nome do militar é obrigatório para o snapshot da conferência.');
+    if (!militar_matricula) throw new Error('Matrícula do militar é obrigatória para o snapshot da conferência.');
+    if (!militar_posto_graduacao) throw new Error('Posto/Graduação do militar é obrigatório para o snapshot da conferência.');
+
     const payload = {
-      militar_id: militar.id,
-      militar_nome: militar.nome_completo || militar.nome,
-      militar_matricula: militar.matricula,
-      militar_posto_graduacao: militar.posto_graduacao,
+      militar_id,
+      militar_nome,
+      militar_matricula,
+      militar_posto_graduacao,
       tipo_conferencia,
       status: 'pendente',
       data_inicio_referencia,
       data_fim_referencia,
       data_abertura: new Date().toISOString(),
-      unidade_id: usuario?.unidade_id || militar.estrutura_id,
-      unidade_nome: usuario?.unidade_nome || militar.estrutura_nome,
+      unidade_id: usuario?.unidade_id || militar.estrutura_id || militar.subgrupamento_id,
+      unidade_nome: usuario?.unidade_nome || militar.estrutura_nome || militar.subgrupamento_nome,
       responsavel_id: usuario?.id,
       responsavel_nome: usuario?.full_name,
       observacao_geral,
@@ -97,8 +118,9 @@ export const conferenciaMilitarService = {
     };
 
     const novaConferencia = await criarEscopado('ConferenciaMilitar', payload);
+    console.log('[conferenciaMilitarService] conferencia criada:', novaConferencia.id);
 
-    await this.gerarItensPadraoConferencia(novaConferencia.id, tipo_conferencia, militar.id);
+    await this.gerarItensPadraoConferencia(novaConferencia.id, tipo_conferencia, militar_id);
 
     return novaConferencia;
   },
@@ -157,7 +179,7 @@ export const conferenciaMilitarService = {
     const itensParaCriar = template.map((item, index) => ({
       ...item,
       conferencia_id: conferenciaId,
-      militar_id: militarId,
+      militar_id: String(militarId),
       status: 'pendente',
       ordem: (index + 1) * 10
     }));

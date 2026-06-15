@@ -960,7 +960,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (exigeEscopoMilitar && !militarAlvoId) {
+    // Operações 'bulk' não possuem um único militarAlvoId no topo;
+    // a validação de escopo é realizada individualmente por item no loop bulk.
+    if (exigeEscopoMilitar && !militarAlvoId && operation !== 'bulk') {
       return Response.json(
         { error: 'Não foi possível identificar o militar_id alvo desta operação.' },
         { status: 400 },
