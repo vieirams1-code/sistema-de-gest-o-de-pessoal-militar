@@ -14,7 +14,9 @@ const CAMPOS_USUARIO_ACESSO = [
     'ativo',
     'tipo_acesso',
     'grupamento_id',
+    'grupamento_nome',
     'subgrupamento_id',
+    'subgrupamento_nome',
     'militar_id',
     'perfil_id',
 ];

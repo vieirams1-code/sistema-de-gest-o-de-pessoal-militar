@@ -161,16 +161,20 @@ export function useCurrentUser() {
   const isSelfRestrictedScope = modoAcesso === 'proprio';
 
   let subgrupamentoId = null;
+  let subgrupamentoNome = null;
   let subgrupamentoTipo = null;
   if (!isSelfRestrictedScope && !isAdmin) {
     if (modoAcesso === 'setor') {
       subgrupamentoId = acesso?.grupamento_id || (Array.isArray(scope?.estruturaIds) ? scope.estruturaIds[0] : null) || null;
+      subgrupamentoNome = acesso?.grupamento_nome || null;
       subgrupamentoTipo = 'Grupamento';
     } else if (modoAcesso === 'subsetor') {
       subgrupamentoId = acesso?.subgrupamento_id || (Array.isArray(scope?.estruturaIds) ? scope.estruturaIds[0] : null) || null;
+      subgrupamentoNome = acesso?.subgrupamento_nome || null;
       subgrupamentoTipo = 'Subgrupamento';
     } else if (modoAcesso === 'unidade') {
       subgrupamentoId = acesso?.subgrupamento_id || (Array.isArray(scope?.estruturaIds) ? scope.estruturaIds[0] : null) || null;
+      subgrupamentoNome = acesso?.subgrupamento_nome || null;
       subgrupamentoTipo = 'Unidade';
     }
   }
@@ -469,6 +473,7 @@ export function useCurrentUser() {
     // Escopo organizacional
     modoAcesso,
     subgrupamentoId,
+    subgrupamentoNome,
     subgrupamentoTipo,
     userEmail,
     linkedMilitarId,
