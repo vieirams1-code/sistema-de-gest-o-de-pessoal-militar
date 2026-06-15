@@ -67,10 +67,36 @@ Respeitosamente,
 {{unidade_nome}}`;
 
 export default function RotinasAdministrativas() {
-  const { user, isAdmin, canAccessAction, subgrupamentoId, isAccessResolved } = useCurrentUser();
+  const {
+    user,
+    userEmail,
+    permissions,
+    isAdmin,
+    canAccessAll,
+    canAccessAction,
+    subgrupamentoId,
+    subgrupamentoNome,
+    unidadeId,
+    unidadeNome: curUnidadeNome,
+    isAccessResolved
+  } = useCurrentUser();
+
+  const hasGlobalAccess = isAdmin || canAccessAction('perm_visualizar_rotinas_globais_administrativas');
+
+  console.log('[RotinasAdministrativas] useCurrentUser completo', {
+    user,
+    userEmail,
+    permissions,
+    isAdmin,
+    canAccessAll,
+    subgrupamentoId,
+    subgrupamentoNome,
+    unidadeId,
+    unidadeNome: curUnidadeNome,
+  });
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const hasGlobalAccess = isAdmin || canAccessAction('perm_visualizar_rotinas_globais_administrativas');
   const [activeTab, setActiveTab] = useState('rotinas');
 
   // Busca o nome da unidade (Subgrupamento) pelo subgrupamentoId resolvido pelo useCurrentUser
@@ -80,15 +106,22 @@ export default function RotinasAdministrativas() {
     enabled: !!subgrupamentoId
   });
 
-  const unidadeNome = unidadeData?.nome || '';
+  const resolvedUnidadeNome = subgrupamentoNome || unidadeData?.nome || '';
+
+  // Busca lista de unidades para seleção (apenas admin/global)
+  const { data: todasUnidades = [] } = useQuery({
+    queryKey: ['todas-unidades-ativas'],
+    queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }),
+    enabled: !!hasGlobalAccess
+  });
 
   // Contexto consolidado para ser passado aos services
   const userContext = useMemo(() => ({
     unidade_id: subgrupamentoId,
-    unidade_nome: unidadeNome,
+    unidade_nome: resolvedUnidadeNome,
     usuario_id: user?.id,
     usuario_nome: user?.full_name
-  }), [subgrupamentoId, unidadeNome, user]);
+  }), [subgrupamentoId, resolvedUnidadeNome, user]);
 
   // States para modais
   const [isExecutarModalOpen, setIsExecutarModalOpen] = useState(false);
@@ -111,7 +144,10 @@ export default function RotinasAdministrativas() {
     tipo_rotina: 'memorando_tars',
     periodicidade: 'semanal',
     template_texto: TEMPLATE_DEFAULT_TARS,
-    ativo: true
+    ativo: true,
+    unidade_id: '',
+    unidade_nome: '',
+    escopo_tipo: 'unidade'
   });
 
   // Queries
@@ -229,8 +265,8 @@ export default function RotinasAdministrativas() {
         periodicidade: 'semanal',
         template_texto: TEMPLATE_DEFAULT_TARS,
         ativo: true,
-        unidade_id: subgrupamentoId,
-        unidade_nome: unidadeNome,
+        unidade_id: hasGlobalAccess ? '' : subgrupamentoId,
+        unidade_nome: hasGlobalAccess ? '' : resolvedUnidadeNome,
         escopo_tipo: 'unidade',
         destinatario: 'Sr. Diretor de Inteligência',
         orgao_destino: 'DINTEL',
@@ -242,6 +278,17 @@ export default function RotinasAdministrativas() {
 
   const handleSalvarRotina = () => {
     console.log('[RotinasAdministrativas] clique salvar rotina');
+
+    // Validação de Unidade (Crítica para o bug relatado)
+    if (!editFormData.unidade_id && !subgrupamentoId) {
+      toast({
+        title: 'Unidade Necessária',
+        description: 'Por favor, selecione uma unidade para esta rotina.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       const { destinatario, orgao_destino, assunto, ...rest } = editFormData;
 
@@ -251,8 +298,15 @@ export default function RotinasAdministrativas() {
         return acc;
       }, {});
 
+      // Garantir unidade no payload caso não tenha sido preenchida pelo seletor (usuário comum)
+      const finalUnidadeId = sanitizedData.unidade_id || subgrupamentoId;
+      const finalUnidadeNome = sanitizedData.unidade_nome || resolvedUnidadeNome;
+
       const payload = {
         ...sanitizedData,
+        unidade_id: finalUnidadeId,
+        unidade_nome: finalUnidadeNome,
+        escopo_tipo: 'unidade',
         configuracao_json: {
           destinatario: destinatario || '',
           orgao_destino: orgao_destino || '',
@@ -261,7 +315,15 @@ export default function RotinasAdministrativas() {
       };
 
       console.log('[RotinasAdministrativas] payload salvar rotina', payload);
-      mutationSalvar.mutate({ rotina: payload, context: userContext });
+
+      // Contexto atualizado para bater com a unidade da rotina se o admin estiver criando para outra unidade
+      const saveContext = {
+        ...userContext,
+        unidade_id: finalUnidadeId,
+        unidade_nome: finalUnidadeNome
+      };
+
+      mutationSalvar.mutate({ rotina: payload, context: saveContext });
     } catch (error) {
       console.error('[RotinasAdministrativas] erro ao montar payload:', error);
       toast({
@@ -662,6 +724,38 @@ export default function RotinasAdministrativas() {
             <DialogTitle>{editFormData.id ? 'Editar Rotina' : 'Nova Rotina'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Seletor de Unidade (Obrigatório) */}
+            <div className="space-y-2">
+              <Label>Unidade da Rotina {hasGlobalAccess && "*"}</Label>
+              {hasGlobalAccess ? (
+                <Select
+                  value={editFormData.unidade_id}
+                  onValueChange={(val) => {
+                    const uni = todasUnidades.find(u => u.id === val);
+                    setEditFormData({
+                      ...editFormData,
+                      unidade_id: val,
+                      unidade_nome: uni?.nome || ''
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a Unidade..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {todasUnidades.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={editFormData.unidade_nome || resolvedUnidadeNome} disabled className="bg-slate-50" />
+              )}
+              {hasGlobalAccess && !editFormData.unidade_id && (
+                <p className="text-[10px] text-red-500 font-medium">Seleção obrigatória para usuários globais.</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nome da Rotina</Label>
