@@ -12,25 +12,23 @@ export const conferenciaMilitarService = {
   async listarConferencias(filtros = {}) {
     const { militarId, tipoConferencia, status, unidadeId, dataInicio, dataFim } = filtros;
 
-    let query = base44.entities.ConferenciaMilitar.query();
-
-    if (militarId) query = query.where('militar_id', '==', militarId);
-    if (tipoConferencia && tipoConferencia !== 'null') query = query.where('tipo_conferencia', '==', tipoConferencia);
+    const where = {};
+    if (militarId) where.militar_id = militarId;
+    if (tipoConferencia && tipoConferencia !== 'null') where.tipo_conferencia = tipoConferencia;
     if (status && status !== 'null') {
       if (Array.isArray(status)) {
-        query = query.where('status', 'in', status);
+        where.status = { $in: status };
       } else if (typeof status === 'object' && status['$in']) {
-        query = query.where('status', 'in', status['$in']);
+        where.status = { $in: status['$in'] };
       } else {
-        query = query.where('status', '==', status);
+        where.status = status;
       }
     }
-    if (unidadeId) query = query.where('unidade_id', '==', unidadeId);
+    if (unidadeId) where.unidade_id = unidadeId;
+    if (dataInicio) where.created_date = { ...(where.created_date || {}), $gte: `${dataInicio}T00:00:00Z` };
+    if (dataFim) where.created_date = { ...(where.created_date || {}), $lte: `${dataFim}T23:59:59Z` };
 
-    if (dataInicio) query = query.where('created_date', '>=', `${dataInicio}T00:00:00Z`);
-    if (dataFim) query = query.where('created_date', '<=', `${dataFim}T23:59:59Z`);
-
-    const resp = await query.orderBy('created_date', 'desc').get();
+    const resp = await base44.entities.ConferenciaMilitar.filter(where, '-created_date');
     return Array.isArray(resp) ? resp : (resp?.data || []);
   },
 
@@ -42,9 +40,7 @@ export const conferenciaMilitarService = {
 
     const tiposBloqueantes = ['ingresso', 'reativacao', 'retorno_transferencia'];
 
-    const conferencias = await base44.entities.ConferenciaMilitar.query()
-      .where('militar_id', '==', militarId)
-      .get();
+    const conferencias = await base44.entities.ConferenciaMilitar.filter({ militar_id: militarId });
 
     const lista = Array.isArray(conferencias) ? conferencias : (conferencias?.data || []);
 
@@ -65,10 +61,7 @@ export const conferenciaMilitarService = {
 
     const conferencia = rawConferencia?.data || rawConferencia;
 
-    const rawItens = await base44.entities.ItemConferenciaMilitar.query()
-      .where('conferencia_id', '==', conferenciaId)
-      .orderBy('ordem', 'asc')
-      .get();
+    const rawItens = await base44.entities.ItemConferenciaMilitar.filter({ conferencia_id: conferenciaId }, 'ordem');
 
     const itens = Array.isArray(rawItens) ? rawItens : (rawItens?.data || []);
 
