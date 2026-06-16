@@ -56,17 +56,6 @@ function extractArquivoFileUri(raw: unknown): string {
   return '';
 }
 
-function safePreview(value: unknown) {
-  try {
-    return JSON.stringify(value, (_key, val) => {
-      if (typeof val === 'string' && val.length > 180) return `${val.slice(0, 180)}...[truncated]`;
-      return val;
-    }).slice(0, 360);
-  } catch (_e) {
-    return '[unserializable]';
-  }
-}
-
 function getStorageLocationFromAtestado(atestado: Record<string, unknown>) {
   const bucket = String(atestado?.storage_bucket || '').trim();
   const objectPath = String(atestado?.storage_object_path || '').trim();
@@ -137,14 +126,14 @@ Deno.serve(async (req) => {
     const arquivoAtestado = extractArquivoFileUri(arquivoAtestadoRaw);
     const pattern = uriPattern(arquivoAtestado);
 
+    // (P0.1) Diagnóstico SEM dados sensíveis de anexo médico: nenhuma URL,
+    // path, URI, preview ou nome de arquivo. Apenas identificador técnico,
+    // flags não reversíveis e padrão de origem (sem caminho).
     console.info('[getAtestadoAnexoSignedUrl] attachment_diagnostics', {
       atestado_id: atestadoId,
-      arquivo_atestado_typeof: Array.isArray(arquivoAtestadoRaw) ? 'array' : typeof arquivoAtestadoRaw,
-      arquivo_atestado_preview: safePreview(arquivoAtestadoRaw),
-      file_uri_resolvido_preview: arquivoAtestado ? arquivoAtestado.slice(0, 220) : '',
+      has_storage_location: Boolean(storageLocation),
+      has_arquivo_uri: Boolean(arquivoAtestado),
       file_uri_pattern: pattern,
-      storage_bucket: String(atestadoRecord?.storage_bucket || ''),
-      storage_object_path_preview: String(atestadoRecord?.storage_object_path || '').slice(0, 180),
     });
 
     if (!storageLocation && !arquivoAtestado) return Response.json({ error: 'Este atestado não possui arquivo anexo.', code: 'NO_ATTACHMENT' }, { status: 404 });
@@ -169,7 +158,7 @@ Deno.serve(async (req) => {
       }
       location = parseStorageLocation(arquivoAtestado);
       if (!location) {
-        return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT', detail: { file_uri_pattern: pattern, file_uri_preview: arquivoAtestado.slice(0, 100) }, legacy_attachment: true }, { status: 422 });
+        return Response.json({ error: 'Anexo em formato inválido.', code: 'INVALID_ATTACHMENT_FORMAT', detail: { file_uri_pattern: pattern }, legacy_attachment: true }, { status: 422 });
       }
     }
 
@@ -183,19 +172,19 @@ Deno.serve(async (req) => {
     const signedData = signed?.data as Record<string, unknown> | null;
     const resolvedSignedUrl = String(signedData?.signedUrl || signedData?.signed_url || signedData?.url || signedData?.file_url || signedData?.download_url || '').trim();
 
+    // (P0.1) Log SEM URL/path/preview: não registra `location` (bucket/path),
+    // nem `resolved_url_preview`. Mantém apenas status da geração da URL.
     console.info('[getAtestadoAnexoSignedUrl] signed_url_response', {
       atestado_id: atestadoId,
-      location,
       has_data: Boolean(signed?.data),
-      keys_data: signedData ? Object.keys(signedData) : [],
-      resolved_key: signedData?.signedUrl ? 'signedUrl' : signedData?.signed_url ? 'signed_url' : signedData?.url ? 'url' : signedData?.file_url ? 'file_url' : signedData?.download_url ? 'download_url' : '',
-      resolved_url_preview: resolvedSignedUrl ? resolvedSignedUrl.slice(0, 220) : '',
-      error_message: signed?.error?.message || '',
+      url_resolvida: Boolean(resolvedSignedUrl),
+      sucesso: Boolean(!signed.error && resolvedSignedUrl),
       error_status: (signed?.error as any)?.status || null,
     });
 
     if (signed.error || !resolvedSignedUrl) {
-      return Response.json({ error: signed.error?.message || 'Falha ao gerar URL temporária.', code: 'SIGNED_URL_FAILED', detail: { status: (signed.error as any)?.status || null, storage_error: signed.error?.message || null } }, { status: 500 });
+      // (P0.1) Não expõe storage_error (pode conter bucket/path). Apenas status.
+      return Response.json({ error: 'Falha ao gerar URL temporária.', code: 'SIGNED_URL_FAILED', detail: { status: (signed.error as any)?.status || null } }, { status: 500 });
     }
 
     return Response.json({ url: resolvedSignedUrl, expires_in: ttl, atestado_id: atestadoId, source: 'signed_url', legacy_attachment: legacyAttachment });

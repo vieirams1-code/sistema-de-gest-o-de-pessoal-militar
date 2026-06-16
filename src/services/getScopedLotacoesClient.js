@@ -1,11 +1,13 @@
 import { base44 } from '@/api/base44Client';
+import { getEffectiveEmail as getEffectiveEmailFromStorage } from '@/utils/impersonation';
 
 // =====================================================================
 // getScopedLotacoesClient — Lote 1C-A
 // ---------------------------------------------------------------------
 // Helper mínimo para invocar a Deno Function `getScopedLotacoes` a partir
 // do frontend. Encapsula:
-//   - leitura do effectiveEmail do sessionStorage (modo usuário efetivo);
+//   - leitura do effectiveEmail (modo usuário efetivo) via helper central
+//     de impersonação (utils/impersonation), que entende o envelope com TTL;
 //   - normalização do payload;
 //   - extração da resposta axios-like (response.data) com fallback seguro.
 //
@@ -14,21 +16,10 @@ import { base44 } from '@/api/base44Client';
 // getScopedMilitaresClient e do useCurrentUser).
 // =====================================================================
 
-const EFFECTIVE_EMAIL_STORAGE_KEY = 'sgp_effective_user_email';
-
-function readEffectiveEmailFromStorage() {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  try {
-    const raw = window.sessionStorage.getItem(EFFECTIVE_EMAIL_STORAGE_KEY);
-    const trimmed = (raw || '').trim();
-    return trimmed ? trimmed.toLowerCase() : null;
-  } catch (_e) {
-    return null;
-  }
-}
-
+// (P0.1) Reexporta o helper central para preservar a API pública deste módulo
+// sem ler o sessionStorage diretamente (evita enviar o envelope JSON inteiro).
 export function getEffectiveEmail() {
-  return readEffectiveEmailFromStorage();
+  return getEffectiveEmailFromStorage();
 }
 
 /**
@@ -40,7 +31,7 @@ export function getEffectiveEmail() {
 export async function fetchScopedLotacoes(payload = {}) {
   const effectiveEmail = payload.effectiveEmail !== undefined
     ? payload.effectiveEmail
-    : readEffectiveEmailFromStorage();
+    : getEffectiveEmailFromStorage();
 
   const finalPayload = { ...payload };
   if (effectiveEmail) {

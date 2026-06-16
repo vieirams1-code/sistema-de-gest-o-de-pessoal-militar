@@ -1,20 +1,10 @@
 import { base44 } from '@/api/base44Client';
-
-const EFFECTIVE_EMAIL_STORAGE_KEY = 'sgp_effective_user_email';
-
-function readEffectiveEmailFromStorage() {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  try {
-    const raw = window.sessionStorage.getItem(EFFECTIVE_EMAIL_STORAGE_KEY);
-    const trimmed = (raw || '').trim();
-    return trimmed ? trimmed.toLowerCase() : null;
-  } catch (_e) {
-    return null;
-  }
-}
+// (P0.1) Usa o helper central de impersonação (envelope com TTL) em vez de
+// ler sgp_effective_user_email diretamente do sessionStorage.
+import { getEffectiveEmail as getEffectiveEmailFromStorage } from '@/utils/impersonation';
 
 export async function alterarEncaminhamentoAtestado(payload = {}) {
-  const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : readEffectiveEmailFromStorage();
+  const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : getEffectiveEmailFromStorage();
   const finalPayload = { ...payload };
   if (effectiveEmail) finalPayload.effectiveEmail = effectiveEmail;
   else delete finalPayload.effectiveEmail;
