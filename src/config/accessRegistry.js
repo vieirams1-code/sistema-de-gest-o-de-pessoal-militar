@@ -220,8 +220,9 @@ const militares = {
       ruleMenu: 'n/a',
       ruleRoute: 'n/a',
       impact:
-        "Não foi localizada permissão 'acesso_dados_sensiveis' para Militares em permissionStructure.js. 'acesso_militares' existe como módulo. Confirmar se há controle de dados sensíveis de militar.",
-      status: 'pendente_validacao',
+        "VALIDADO P1.1-C: 'acesso_dados_sensiveis' NÃO foi encontrado em permissionStructure.js nem em useCurrentUser. Não há mapeamento explícito confirmado para esse item no módulo Militares. 'acesso_militares' existe apenas como módulo. Mantido como pendência documental/artefato legado, sem enforcement.",
+      status: 'nao_encontrado',
+      risco: 'baixo/documental',
     },
   ],
   recommendationFuture:
@@ -351,7 +352,9 @@ const ferias = {
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia ações fora do escopo' },
     ],
     'pages/CadastrarFerias.jsx': [
-      { check: "canAccessModule('ferias') (presumido)", effect: 'pendente_validacao — arquivo não lido nesta etapa' },
+      { check: "canAccessModule('ferias')", effect: 'VALIDADO P1.1-C: AccessDenied("Férias") se falso (linha 71/327)' },
+      { check: 'useUsuarioPodeAgirSobreMilitar().validar(militar_id)', effect: 'VALIDADO P1.1-C: bloqueia salvar fora do escopo do militar (handleSubmit)' },
+      { check: 'route guard', effect: 'VALIDADO P1.1-C: rota module-only por moduleKey "ferias"; NÃO há bloqueio por action específica além do módulo.' },
     ],
   },
   componentsInternalChecks: {
@@ -558,8 +561,10 @@ const atestados = {
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia salvar fora do escopo' },
     ],
     'pages/ExtratoAtestadosMedicos.jsx': [
-      { check: "canAccessModule('atestados') (presumido)", effect: 'pendente_validacao — arquivo não lido nesta etapa' },
-      { check: 'ver_dados_sensiveis_atestado (uso parcial/indireto)', effect: 'pendente_validacao' },
+      { check: "canAccessModule('atestados')", effect: 'VALIDADO P1.1-C: hasAccess; AccessDenied("Atestados") se falso (linha 157/534)' },
+      { check: "canAccessAction('gerar_relatorio_dp_dintel_atestados')", effect: 'VALIDADO P1.1-C: habilita botão PDF DP/DINTEL (action interna do extrato)' },
+      { check: "canAccessAction('gerir_encaminhamento_dp_dintel_atestado')", effect: 'VALIDADO P1.1-C: habilita marcar/desmarcar DP/DINTEL (action interna do extrato)' },
+      { check: 'ver_dados_sensiveis_atestado', effect: 'VALIDADO P1.1-C: NÃO encontrado enforcement no componente; permissão declarada/passiva.' },
     ],
   },
   componentsInternalChecks: {
@@ -650,8 +655,10 @@ const atestados = {
       location: 'ver_dados_sensiveis_atestado (uso real)',
       ruleMenu: 'n/a',
       ruleRoute: 'n/a',
-      impact: 'Uso parcial/indireto em extrato; não confirmado o ponto exato de enforcement no frontend.',
-      status: 'pendente_validacao',
+      impact:
+        'VALIDADO P1.1-C: pertence ao contexto do módulo Atestados, mas NÃO foi encontrado enforcement claro em rota ou nos componentes auditados (ExtratoAtestadosMedicos.jsx). Não bloqueia rota. Permissão declarada/passiva (uso indireto/legado). Relevante para futura revisão de dados sensíveis.',
+      status: 'nao_encontrado_em_enforcement',
+      risco: 'baixo (estado atual); relevante para revisão futura de dados sensíveis',
     },
   ],
   recommendationFuture:
