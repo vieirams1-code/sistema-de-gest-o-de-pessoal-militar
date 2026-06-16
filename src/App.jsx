@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
+import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 
 const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
@@ -184,6 +185,17 @@ const AuthenticatedApp = () => {
           />
         );
       })}
+      {/* P1.2-A2: rota administrativa de diagnóstico (mirror/read-only), fora do menu */}
+      <Route
+        path="/DiagnosticoAcesso"
+        element={
+          <LayoutWrapper currentPageName="DiagnosticoAcesso">
+            <RequireAdmin>
+              <DiagnosticoAcesso />
+            </RequireAdmin>
+          </LayoutWrapper>
+        }
+      />
       {/* Alias e redirecionamento para evitar 404 em acessos legados/manuais */}
       <Route path="/templates" element={<Navigate to="/TemplatesTexto" replace />} />
       <Route path="*" element={<PageNotFound />} />
