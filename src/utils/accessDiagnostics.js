@@ -72,8 +72,15 @@ export function resolveCanonicalModuleKey(moduleKey) {
     const legacy = (moduleDef.legacyModuleKeys || []).map(normalizePermissionKey);
     if (legacy.includes(normalized)) return moduleDef.canonicalModuleKey;
 
-    const aliases = (moduleDef.aliases || []).map((a) => normalizePermissionKey(a?.key));
-    if (aliases.includes(normalized)) return moduleDef.canonicalModuleKey;
+    // IMPORTANTE: aliases ambíguos NÃO são canonicalizados automaticamente.
+    // Ex.: 'efetivo' é registrado como relatedAlias ambíguo em Militares porque
+    // aparece em contexto relacionado a Tags/configurações (App.jsx usa
+    // { moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' } na rota Tags),
+    // e NÃO deve ser tratado como moduleKey canônico de Militares.
+    const canonicalAliases = (moduleDef.aliases || [])
+      .filter((a) => a && a.ambiguous !== true && a.type !== 'relatedAlias')
+      .map((a) => normalizePermissionKey(a?.key));
+    if (canonicalAliases.includes(normalized)) return moduleDef.canonicalModuleKey;
   }
   return normalized;
 }

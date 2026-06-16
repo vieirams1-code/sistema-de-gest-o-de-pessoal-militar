@@ -530,9 +530,9 @@ const atestados = {
       menuVisible: true,
       adminOnly: true,
       contextualOnly: false,
-      appGuard: { moduleKey: 'atestados', moduleName: 'Atestados' },
-      note: 'adminOnly no menu (layout) + moduleKey atestados na rota (App.jsx adminOnlyPages NÃO inclui Medicos; menu marca adminOnly).',
-      source: 'App.jsx.moduleGuardByPage + layout.menuGroups',
+      appGuard: { moduleKey: 'atestados', moduleName: 'Atestados', requireAdmin: true },
+      note: 'Rota adminOnly: App.jsx inclui Medicos em adminOnlyPages (RequireAdmin) E aplica moduleGuardByPage { moduleKey: "atestados" }. Menu (layout) também marca adminOnly: true. Não é rota comum apenas de módulo.',
+      source: 'App.jsx.adminOnlyPages + App.jsx.moduleGuardByPage + layout.menuGroups',
     },
   ],
   pageInternalChecks: {
