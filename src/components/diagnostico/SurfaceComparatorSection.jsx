@@ -173,60 +173,69 @@ export default function SurfaceComparatorSection({ moduleKey }) {
             Nenhuma página corresponde ao filtro selecionado.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>PageKey</TableHead>
-                  <TableHead>Label</TableHead>
-                  <TableHead>Menu</TableHead>
-                  <TableHead>Tipo menu</TableHead>
-                  <TableHead>viewPermission</TableHead>
-                  <TableHead>Rota / Path</TableHead>
-                  <TableHead>routeType</TableHead>
-                  <TableHead>Módulo (rota)</TableHead>
-                  <TableHead>actionKey (rota)</TableHead>
-                  <TableHead>Admin</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Severidade</TableHead>
-                  <TableHead>Achados</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((item) => {
-                  const attenuated = (item.findings || []).some((f) => f.knownDivergence);
-                  const adminOnly = item.menu?.adminOnly || item.route?.adminOnly;
-                  return (
-                    <TableRow key={item.pageKey}>
-                      <TableCell><Mono>{item.pageKey}</Mono></TableCell>
-                      <TableCell className="text-xs text-slate-600">{item.menu?.label || '—'}</TableCell>
-                      <TableCell className="text-xs text-slate-500">
-                        {item.menu?.exists ? (item.menu.appearsInMenu ? 'Sim' : 'Oculto') : '—'}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500">{item.menu?.menuType || '—'}</TableCell>
-                      <TableCell>{item.menu?.viewPermission ? <Mono>{item.menu.viewPermission}</Mono> : <span className="text-slate-400 text-xs">—</span>}</TableCell>
-                      <TableCell>{item.route?.path ? <Mono>{item.route.path}</Mono> : <span className="text-slate-400 text-xs">—</span>}</TableCell>
-                      <TableCell className="text-xs text-slate-500">{item.route?.routeType || '—'}</TableCell>
-                      <TableCell>{item.route?.moduleKey ? <Mono>{item.route.moduleKey}</Mono> : <span className="text-slate-400 text-xs">—</span>}</TableCell>
-                      <TableCell>{item.route?.actionKey ? <Mono>{item.route.actionKey}</Mono> : <span className="text-slate-400 text-xs">—</span>}</TableCell>
-                      <TableCell className="text-xs text-slate-500">{adminOnly ? 'Sim' : '—'}</TableCell>
-                      <TableCell><StatusBadge status={item.status} /></TableCell>
-                      <TableCell><SeverityBadge severity={item.severity} attenuated={attenuated} /></TableCell>
-                      <TableCell className="max-w-xs">
-                        <ul className="space-y-0.5">
-                          {(item.findings || []).map((f, idx) => (
-                            <li key={idx} className="text-[11px] text-slate-500 leading-tight">
-                              {f.message}
-                            </li>
-                          ))}
-                        </ul>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <Table className="table-fixed w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[18%]">Página</TableHead>
+                <TableHead className="w-[20%]">Menu</TableHead>
+                <TableHead className="w-[24%]">Rota</TableHead>
+                <TableHead className="w-[14%]">Resultado</TableHead>
+                <TableHead className="w-[24%]">Achados</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((item) => {
+                const attenuated = (item.findings || []).some((f) => f.knownDivergence);
+                const adminOnly = item.menu?.adminOnly || item.route?.adminOnly;
+                return (
+                  <TableRow key={item.pageKey} className="align-top">
+                    {/* Página: pageKey + label */}
+                    <TableCell className="align-top">
+                      <Mono>{item.pageKey}</Mono>
+                      {item.menu?.label && (
+                        <p className="text-[11px] text-slate-500 leading-tight mt-0.5 break-words">{item.menu.label}</p>
+                      )}
+                    </TableCell>
+
+                    {/* Menu: aparece + tipo + viewPermission */}
+                    <TableCell className="align-top text-[11px] text-slate-500 space-y-0.5">
+                      <div>{item.menu?.exists ? (item.menu.appearsInMenu ? 'Visível' : 'Oculto') : '— sem menu'}</div>
+                      {item.menu?.menuType && <div>tipo: {item.menu.menuType}</div>}
+                      {item.menu?.viewPermission && <div className="break-words"><Mono>{item.menu.viewPermission}</Mono></div>}
+                    </TableCell>
+
+                    {/* Rota: path + routeType + moduleKey + actionKey + adminOnly */}
+                    <TableCell className="align-top text-[11px] text-slate-500 space-y-0.5">
+                      {item.route?.path ? <div className="break-words"><Mono>{item.route.path}</Mono></div> : <div>— sem rota</div>}
+                      {item.route?.routeType && <div>tipo: {item.route.routeType}</div>}
+                      {item.route?.moduleKey && <div className="break-words">mód: <Mono>{item.route.moduleKey}</Mono></div>}
+                      {item.route?.actionKey && <div className="break-words">act: <Mono>{item.route.actionKey}</Mono></div>}
+                      {adminOnly && <div className="text-amber-600 font-medium">adminOnly</div>}
+                    </TableCell>
+
+                    {/* Resultado: status + severidade */}
+                    <TableCell className="align-top">
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge status={item.status} />
+                        <SeverityBadge severity={item.severity} attenuated={attenuated} />
+                      </div>
+                    </TableCell>
+
+                    {/* Achados: resumo dos findings */}
+                    <TableCell className="align-top">
+                      <ul className="space-y-0.5">
+                        {(item.findings || []).map((f, idx) => (
+                          <li key={idx} className="text-[11px] text-slate-500 leading-tight break-words">
+                            {f.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>
