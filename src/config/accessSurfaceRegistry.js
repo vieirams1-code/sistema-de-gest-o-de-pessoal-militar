@@ -213,6 +213,7 @@ export const menuSurfaceRegistry = {
     menuType: 'main',
     viewPermission: null,
     actionKey: null,
+    adminOnly: true,
     source: 'Layout.jsx mirror',
     notes: 'Item de menu marcado como adminOnly no Layout (visível apenas a admin).',
   },
