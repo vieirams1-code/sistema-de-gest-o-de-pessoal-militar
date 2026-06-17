@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/table';
 import { Info, ShieldAlert, UserCog, KeyRound, Route as RouteIcon, Server } from 'lucide-react';
 import SurfaceComparatorSection from '@/components/diagnostico/SurfaceComparatorSection';
+import AccessEvidenceMatrixSection from '@/components/diagnostico/AccessEvidenceMatrixSection';
 
 // ----------------------------------------------------------------------------
 // Mapeamento visual de estados (somente apresentação)
@@ -372,6 +373,9 @@ export default function AccessConsistencyReport({
 
       {/* 5.1 Comparador Menu x Rota x Registry (P1.2-B3, mirror/read-only) */}
       {showRoutes && <SurfaceComparatorSection moduleKey={moduleKey} />}
+
+      {/* 5.2 Mapa de Saneamento / Matriz de Evidências (P1.2-C2, documental/read-only) */}
+      <AccessEvidenceMatrixSection moduleKey={moduleKey} />
 
       {/* 6. Bloco Divergências Conhecidas */}
       {showKnownDivergences && divergences.length > 0 && (
