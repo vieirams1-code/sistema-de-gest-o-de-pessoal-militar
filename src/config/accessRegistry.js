@@ -209,6 +209,7 @@ const militares = {
   knownDivergences: [
     {
       location: 'pages/Militares.jsx (CTA) vs App.jsx (rota CadastrarMilitar)',
+      affectedPageKeys: ['CadastrarMilitar'],
       ruleMenu: 'CTA "Novo Militar" exige canAccessAction("adicionar_militares")',
       ruleRoute: 'Rota CadastrarMilitar exige apenas { moduleKey: "militares" }',
       impact:
@@ -623,6 +624,7 @@ const atestados = {
   knownDivergences: [
     {
       location: 'pages/Atestados.jsx (CTA/lista) vs App.jsx (rota CadastrarAtestado)',
+      affectedPageKeys: ['CadastrarAtestado'],
       ruleMenu: 'CTA/lista restringem adicionar_atestados / editar_atestados / excluir_atestado',
       ruleRoute: 'Rota CadastrarAtestado exige apenas { moduleKey: "atestados" }',
       impact:
@@ -631,6 +633,7 @@ const atestados = {
     },
     {
       location: 'pages/AgendarJISO.jsx vs App.jsx (rota AgendarJISO)',
+      affectedPageKeys: ['AgendarJISO'],
       ruleMenu: 'n/a (não está no menu principal)',
       ruleRoute: '{ moduleKey: "atestados" } (module-only)',
       impact:
@@ -647,6 +650,7 @@ const atestados = {
     },
     {
       location: 'pages/ExtratoAtestadosMedicos.jsx (guard de rota)',
+      affectedPageKeys: ['ExtratoAtestadosMedicos'],
       ruleMenu: 'menu exige visualizar_atestados',
       ruleRoute: 'Sem entrada explícita em moduleGuardByPage do App.jsx',
       impact:

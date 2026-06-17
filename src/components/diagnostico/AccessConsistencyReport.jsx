@@ -57,7 +57,7 @@ const RISK_STYLES = {
 
 const STATUS_LABELS = {
   ok: 'OK',
-  confirmado: 'Divergente',
+  confirmado: 'Confirmado',
   pendente_validacao: 'Pendente de validação',
   nao_encontrado: 'Não encontrado',
   nao_encontrado_em_enforcement: 'Não encontrado (enforcement)',
@@ -65,10 +65,18 @@ const STATUS_LABELS = {
   divergencia_modulo: 'Divergência do módulo',
 };
 
-function StatusBadge({ status }) {
+// Label específico para a célula de rota (uma divergência específica confirmada
+// é exibida como "Divergência confirmada", não como o genérico "Confirmado").
+const ROUTE_STATUS_LABELS = {
+  confirmado: 'Divergência confirmada',
+  pendente_validacao: 'Em atenção',
+  divergencia_modulo: 'Divergência do módulo',
+};
+
+function StatusBadge({ status, labelOverride }) {
   const key = String(status || 'default');
   const style = STATUS_STYLES[key] || STATUS_STYLES.default;
-  const label = STATUS_LABELS[key] || status || '—';
+  const label = labelOverride || STATUS_LABELS[key] || status || '—';
   return <Badge variant="outline" className={`font-medium ${style}`}>{label}</Badge>;
 }
 
@@ -311,16 +319,17 @@ export default function AccessConsistencyReport({
                   const menuAction = menu?.rule?.actionKey || menu?.rule?.viewPermission || null;
                   const routeAction = route.appGuard?.actionKey || null;
                   const moduleOnly = Boolean(route.appGuard?.moduleKey) && !routeAction;
-                  // Marca "Divergente" apenas se houver divergência conhecida que cite
-                  // EXPLICITAMENTE este pageKey no seu 'location'. Caso contrário, se a
-                  // divergência (menu x rota) for geral do módulo, marca "Divergência do módulo".
-                  const pageKeyLower = String(route.pageKey || '').toLowerCase();
-                  const citaPageKey = divergences.some((d) =>
-                    String(d.location || '').toLowerCase().includes(pageKeyLower),
-                  );
+                  // Associação ROBUSTA: usa apenas a lista estruturada `affectedPageKeys`
+                  // (ou `routePageKeys`) das divergências, com match EXATO por pageKey.
+                  // NÃO usa includes/substring/contains em location (evita falsos positivos,
+                  // ex.: "Atestados" casar com "ExtratoAtestadosMedicos").
+                  const divergenciaEspecifica = divergences.find((d) => {
+                    const lista = d.affectedPageKeys || d.routePageKeys || [];
+                    return Array.isArray(lista) && lista.includes(route.pageKey);
+                  });
                   const potencialDivergencia = Boolean(menuAction && moduleOnly);
-                  const rowStatus = citaPageKey
-                    ? 'confirmado'
+                  const rowStatus = divergenciaEspecifica
+                    ? (divergenciaEspecifica.status || 'confirmado')
                     : (potencialDivergencia ? 'divergencia_modulo' : null);
                   return (
                     <TableRow key={route.pageKey}>
@@ -336,7 +345,9 @@ export default function AccessConsistencyReport({
                           <span className="text-slate-400">{route.appGuard?.note || '—'}</span>
                         )}
                         {rowStatus && (
-                          <div className="mt-1"><StatusBadge status={rowStatus} /></div>
+                          <div className="mt-1">
+                            <StatusBadge status={rowStatus} labelOverride={ROUTE_STATUS_LABELS[rowStatus]} />
+                          </div>
                         )}
                         {rowStatus === 'divergencia_modulo' && (
                           <p className="text-[11px] text-amber-600 mt-0.5">
