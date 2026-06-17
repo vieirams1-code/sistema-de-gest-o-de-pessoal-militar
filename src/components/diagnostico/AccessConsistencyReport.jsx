@@ -44,6 +44,7 @@ const STATUS_STYLES = {
   nao_encontrado: 'bg-slate-100 text-slate-600 border-slate-300',
   nao_encontrado_em_enforcement: 'bg-slate-100 text-slate-600 border-slate-300',
   documental: 'bg-violet-50 text-violet-700 border-violet-200',
+  divergencia_modulo: 'bg-amber-50 text-amber-700 border-amber-200',
   default: 'bg-slate-100 text-slate-600 border-slate-300',
 };
 
@@ -61,6 +62,7 @@ const STATUS_LABELS = {
   nao_encontrado: 'Não encontrado',
   nao_encontrado_em_enforcement: 'Não encontrado (enforcement)',
   documental: 'Somente documental',
+  divergencia_modulo: 'Divergência do módulo',
 };
 
 function StatusBadge({ status }) {
@@ -189,24 +191,32 @@ export default function AccessConsistencyReport({
         <CardContent className="text-sm space-y-1">
           <div className="flex flex-wrap gap-x-6 gap-y-1">
             <span className="text-slate-600">
-              Autenticado:{' '}
-              <span className="font-medium text-slate-800">
-                {currentUser?.email || currentUser?.full_name || '—'}
-              </span>
+              Usuário autenticado:{' '}
+              <span className="font-medium text-slate-800">{currentUser?.hasUser ? 'Sim' : 'Não'}</span>
             </span>
             <span className="text-slate-600">
-              Efetivo:{' '}
-              <span className="font-medium text-slate-800">
-                {effectiveUser?.email || effectiveUser?.full_name || '—'}
-              </span>
+              Admin:{' '}
+              <span className="font-medium text-slate-800">{currentUser?.isAdmin ? 'Sim' : 'Não'}</span>
+            </span>
+            <span className="text-slate-600">
+              Modo de acesso:{' '}
+              <span className="font-medium text-slate-800">{currentUser?.modoAcesso || '—'}</span>
+            </span>
+            <span className="text-slate-600">
+              Impersonação:{' '}
+              <span className="font-medium text-slate-800">{isImpersonating ? 'Ativa' : 'Inativa'}</span>
+            </span>
+            <span className="text-slate-600">
+              Usuário efetivo:{' '}
+              <span className="font-medium text-slate-800">{effectiveUser?.hasEffectiveUser ? 'Sim' : 'Não'}</span>
             </span>
             {isImpersonating && (
               <Badge variant="outline" className={STATUS_STYLES.confirmado}>Impersonação ativa</Badge>
             )}
           </div>
           <p className="text-xs text-slate-400">
-            Exibição limitada a identificadores de acesso. Nenhum dado operacional sensível é
-            apresentado por este painel.
+            Exibição limitada a metadados neutros de acesso. Nenhum dado pessoal ou operacional
+            sensível é apresentado por este painel.
           </p>
         </CardContent>
       </Card>
@@ -301,7 +311,17 @@ export default function AccessConsistencyReport({
                   const menuAction = menu?.rule?.actionKey || menu?.rule?.viewPermission || null;
                   const routeAction = route.appGuard?.actionKey || null;
                   const moduleOnly = Boolean(route.appGuard?.moduleKey) && !routeAction;
-                  const divergent = Boolean(menuAction && moduleOnly);
+                  // Marca "Divergente" apenas se houver divergência conhecida que cite
+                  // EXPLICITAMENTE este pageKey no seu 'location'. Caso contrário, se a
+                  // divergência (menu x rota) for geral do módulo, marca "Divergência do módulo".
+                  const pageKeyLower = String(route.pageKey || '').toLowerCase();
+                  const citaPageKey = divergences.some((d) =>
+                    String(d.location || '').toLowerCase().includes(pageKeyLower),
+                  );
+                  const potencialDivergencia = Boolean(menuAction && moduleOnly);
+                  const rowStatus = citaPageKey
+                    ? 'confirmado'
+                    : (potencialDivergencia ? 'divergencia_modulo' : null);
                   return (
                     <TableRow key={route.pageKey}>
                       <TableCell><Mono>{route.pageKey}</Mono></TableCell>
@@ -315,8 +335,13 @@ export default function AccessConsistencyReport({
                         {!route.appGuard?.moduleKey && !routeAction && (
                           <span className="text-slate-400">{route.appGuard?.note || '—'}</span>
                         )}
-                        {divergent && (
-                          <div className="mt-1"><StatusBadge status="confirmado" /></div>
+                        {rowStatus && (
+                          <div className="mt-1"><StatusBadge status={rowStatus} /></div>
+                        )}
+                        {rowStatus === 'divergencia_modulo' && (
+                          <p className="text-[11px] text-amber-600 mt-0.5">
+                            Há divergência no módulo (menu x rota). Detalhes em “Divergências Conhecidas”.
+                          </p>
                         )}
                       </TableCell>
                       <TableCell>

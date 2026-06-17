@@ -407,9 +407,10 @@ const ferias = {
     {
       location: 'pages/CadastrarFerias.jsx',
       ruleMenu: 'n/a',
-      ruleRoute: '{ moduleKey: "ferias" }',
-      impact: 'Validações internas do formulário de cadastro não confirmadas (arquivo não lido nesta etapa).',
-      status: 'pendente_validacao',
+      ruleRoute: '{ moduleKey: "ferias" } (module-only)',
+      impact:
+        'VALIDADO P1.1-C/P1.1-D: rota module-only por moduleKey "ferias"; validação interna usa canAccessModule("ferias"); escopo do militar validado via useUsuarioPodeAgirSobreMilitar; não há bloqueio de rota por action específica além do módulo.',
+      status: 'confirmado',
     },
   ],
   recommendationFuture:
@@ -524,7 +525,7 @@ const atestados = {
       type: 'main',
       menuVisible: true,
       contextualOnly: false,
-      appGuard: { note: 'Sem entrada explícita em moduleGuardByPage; menu exige visualizar_ferias→(visualizar_atestados). Confirmar guard de rota.' },
+      appGuard: { note: 'Guard de rota: sem entrada explícita em moduleGuardByPage do App.jsx (pendente). Menu exige visualizar_atestados. Uso interno da página validado com canAccessModule("atestados").' },
       source: 'layout.menuGroups (path /ExtratoAtestadosMedicos)',
     },
     {
@@ -646,9 +647,10 @@ const atestados = {
     },
     {
       location: 'pages/ExtratoAtestadosMedicos.jsx (guard de rota)',
-      ruleMenu: 'viewPermission: visualizar_atestados',
+      ruleMenu: 'menu exige visualizar_atestados',
       ruleRoute: 'Sem entrada explícita em moduleGuardByPage do App.jsx',
-      impact: 'Rota /ExtratoAtestadosMedicos pode não ter guard de módulo no App.jsx; confirmar.',
+      impact:
+        'Separar dois pontos: (1) USO INTERNO da página — VALIDADO P1.1-C: canAccessModule("atestados") e ações gerar_relatorio_dp_dintel_atestados / gerir_encaminhamento_dp_dintel_atestado; (2) GUARD DA ROTA no App.jsx — pendente/sem entrada explícita em moduleGuardByPage. O uso interno estar validado não implica que a rota tenha guard de módulo declarado.',
       status: 'pendente_validacao',
     },
     {
