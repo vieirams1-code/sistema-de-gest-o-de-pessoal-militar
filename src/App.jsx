@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
+import RequireAction from '@/components/auth/RequireAction';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 
 const { Pages, Layout } = pagesConfig;
@@ -112,6 +113,27 @@ const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((ac
 
 const getModuleGuardByPage = (pageKey) => moduleGuardByPageNormalized[pageKey.toLowerCase()] || null;
 
+// P1.3-A: Enforcement REAL e MÍNIMO — guard combinado (AND) de módulo + actionKey.
+// Aplicado SOMENTE às 7 rotas prioritárias abaixo, via RequireAction.
+// Quando uma página consta aqui, ela usa RequireAction (AND) em vez do
+// RequireModuleAccess (OR), garantindo que a action seja realmente exigida.
+const actionGuardByPage = {
+  Militares: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
+  CadastrarMilitar: { moduleKey: 'militares', actionKey: 'adicionar_militares', moduleName: 'Efetivo' },
+  Ferias: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
+  CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
+  Atestados: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
+  CadastrarAtestado: { moduleKey: 'atestados', actionKey: 'adicionar_atestados', moduleName: 'Atestados' },
+  ExtratoAtestadosMedicos: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
+};
+
+const actionGuardByPageNormalized = Object.entries(actionGuardByPage).reduce((acc, [pageKey, guard]) => {
+  acc[pageKey.toLowerCase()] = guard;
+  return acc;
+}, {});
+
+const getActionGuardByPage = (pageKey) => actionGuardByPageNormalized[pageKey.toLowerCase()] || null;
+
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
@@ -156,21 +178,37 @@ const AuthenticatedApp = () => {
           );
         }
 
-        const pageModuleGuard = getModuleGuardByPage(path);
+        // P1.3-A: rotas prioritárias usam RequireAction (AND: módulo + actionKey).
+        const pageActionGuard = getActionGuardByPage(path);
 
-        if (pageModuleGuard) {
-          const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageModuleGuard;
+        if (pageActionGuard) {
+          const { moduleKey, actionKey, moduleName } = pageActionGuard;
           pageContent = (
-            <RequireModuleAccess
+            <RequireAction
               moduleKey={moduleKey}
-              moduleKeys={moduleKeys}
               actionKey={actionKey}
-              actionKeys={actionKeys}
               moduleName={moduleName}
             >
               {pageContent}
-            </RequireModuleAccess>
+            </RequireAction>
           );
+        } else {
+          const pageModuleGuard = getModuleGuardByPage(path);
+
+          if (pageModuleGuard) {
+            const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageModuleGuard;
+            pageContent = (
+              <RequireModuleAccess
+                moduleKey={moduleKey}
+                moduleKeys={moduleKeys}
+                actionKey={actionKey}
+                actionKeys={actionKeys}
+                moduleName={moduleName}
+              >
+                {pageContent}
+              </RequireModuleAccess>
+            );
+          }
         }
 
         return (
