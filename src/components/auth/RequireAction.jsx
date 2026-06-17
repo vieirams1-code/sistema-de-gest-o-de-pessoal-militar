@@ -23,7 +23,6 @@ import React from 'react';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 export default function RequireAction({ children, moduleKey, actionKey, moduleName }) {
   const {
@@ -33,16 +32,15 @@ export default function RequireAction({ children, moduleKey, actionKey, moduleNa
     isAccessError,
     isAccessResolved,
     shouldBlockAccessByPermissionError,
-    permissionErrorMessage,
     permissions,
     canAccessAll,
-    refetchAccess,
   } = useCurrentUser();
 
   if (isLoading || !isAccessResolved) {
     return null;
   }
 
+  // Erro de permissões: negação genérica, sem PII e sem ação que acione backend.
   if (isAccessError || shouldBlockAccessByPermissionError) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -50,30 +48,25 @@ export default function RequireAction({ children, moduleKey, actionKey, moduleNa
           <div className="w-20 h-20 mx-auto rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
             <AlertTriangle className="w-10 h-10 text-amber-500" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Erro de Permissões</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Acesso restrito</h1>
           <p className="text-slate-500 text-sm leading-relaxed">
-            {permissionErrorMessage || 'Não foi possível carregar o perfil de permissões.'}
+            Você não possui permissão para acessar esta funcionalidade.
           </p>
-          <Button
-            type="button"
-            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white mt-2"
-            onClick={() => refetchAccess()}
-          >
-            Tentar novamente
-          </Button>
         </div>
       </div>
     );
   }
 
-  if (canAccessAll || permissions === 'ALL') {
-    return children;
-  }
+  // Bypass administrativo preservado.
+  const isAdminBypass = canAccessAll || permissions === 'ALL';
 
-  const hasModuleAccess = moduleKey ? canAccessModule(moduleKey) : true;
-  const hasActionAccess = actionKey ? canAccessAction(actionKey) : true;
+  // Fail-closed: ambas as chaves são obrigatórias; ausência de qualquer uma bloqueia.
+  const hasRequiredKeys = Boolean(moduleKey) && Boolean(actionKey);
+  const hasModuleAccess = hasRequiredKeys && canAccessModule(moduleKey);
+  const hasActionAccess = hasRequiredKeys && canAccessAction(actionKey);
+  const canAccess = isAdminBypass || (hasRequiredKeys && hasModuleAccess && hasActionAccess);
 
-  if (!hasModuleAccess || !hasActionAccess) {
+  if (!canAccess) {
     return <AccessDenied modulo={moduleName} />;
   }
 
