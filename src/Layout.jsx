@@ -102,8 +102,8 @@ const menuGroups = [
         icon: CalendarDays,
         description: 'Gestão de períodos e dias adicionais',
         items: [
-          { name: 'Férias', page: 'Ferias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
-          { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
+          { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
+          { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
         ],
       },
       {
@@ -127,8 +127,8 @@ const menuGroups = [
         icon: HeartPulse,
         description: 'Atestados e controle de vínculos temporários',
         items: [
-          { name: 'Atestados', page: 'Atestados', icon: HeartPulse, viewPermission: 'visualizar_atestados' },
-          { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, viewPermission: 'visualizar_atestados' },
+          { name: 'Atestados', page: 'Atestados', icon: HeartPulse, moduleKey: 'atestados', actionKey: 'visualizar_atestados' },
+          { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, moduleKey: 'atestados', actionKey: 'visualizar_atestados' },
           { name: 'Cadastro de Médicos', page: 'Medicos', icon: Stethoscope, adminOnly: true, moduleKey: 'atestados' },
           { name: 'Atestados - T', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
         ],
