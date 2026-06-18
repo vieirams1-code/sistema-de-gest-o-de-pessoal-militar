@@ -186,7 +186,7 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
     };
   }
 
-  if (podeSerOtimo && j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
+  if (podeSerOtimo && j4.detencao_equivalente <= 1) {
     return {
       comportamento: 'Ótimo',
       fundamento: 'Art. 52, alínea b: até 1 detenção equivalente no período de 4 anos.',
