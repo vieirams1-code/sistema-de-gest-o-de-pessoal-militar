@@ -91,10 +91,10 @@ const menuGroups = [
             ],
           },
           { name: 'Gratificação de Função', page: 'GratificacoesFuncao', icon: Medal, viewPermission: 'visualizar_gratificacoes_funcao' },
-          { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'perm_visualizar_folha_alteracoes' },
-          { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'perm_visualizar_registros_militar' },
+          { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes', actionKey: 'perm_visualizar_folha_alteracoes' },
+          { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, moduleKey: 'registros_militar', actionKey: 'perm_visualizar_registros_militar' },
           { name: 'Conferência Cadastral', page: 'ConferenciasMilitares', icon: ShieldCheck, moduleKey: 'acesso_conferencias_militares', actionKey: 'perm_visualizar_conferencias_militares' },
-          { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'perm_visualizar_armamentos' },
+          { name: 'Armamentos', page: 'Armamentos', icon: Sword, moduleKey: 'armamentos', actionKey: 'perm_visualizar_armamentos' },
         ],
       },
       {
@@ -111,9 +111,9 @@ const menuGroups = [
         icon: BookMarked,
         description: 'Registros e conciliações administrativas',
         items: [
-          { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_rp' },
-          { name: 'Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
-          { name: 'Conciliação', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
+          { name: 'RP', page: 'RP', icon: BookMarked, moduleKey: 'rp', actionKey: 'visualizar_rp' },
+          { name: 'Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'controle_publicacoes', actionKey: 'visualizar_controle_publicacoes' },
+          { name: 'Conciliação', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'conciliacao_boletim', actionKey: 'visualizar_conciliacao_boletim' },
           {
             name: 'Documentos Históricos',
             page: 'DashboardAcervo',
@@ -160,7 +160,7 @@ const menuGroups = [
         icon: Shield,
         description: 'Conduta e comportamento funcional',
         items: [
-          { name: 'Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_controle_comportamento' },
+          { name: 'Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, moduleKey: 'controle_comportamento', actionKey: 'visualizar_controle_comportamento' },
           { name: 'Punições', page: 'Punicoes', icon: Shield, moduleKey: 'punicoes', actionKey: 'visualizar_punicoes' },
           { name: 'Auditar Comportamento', page: 'AuditoriaComportamento', icon: ShieldCheck, adminOnly: true },
         ],
@@ -170,8 +170,8 @@ const menuGroups = [
         icon: FolderKanban,
         description: 'Emprego operacional e controle de recursos',
         items: [
-          { name: 'Quadros', page: 'QuadroOperacional', icon: FolderKanban, viewPermission: 'visualizar_quadro_operacional' },
-          { name: 'Tarefas', page: 'AgendaAcoesOperacionais', icon: CalendarClock, viewPermission: 'visualizar_quadro_operacional' },
+          { name: 'Quadros', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional', actionKey: 'visualizar_quadro_operacional' },
+          { name: 'Tarefas', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional', actionKey: 'visualizar_quadro_operacional' },
         ],
       },
     ],
