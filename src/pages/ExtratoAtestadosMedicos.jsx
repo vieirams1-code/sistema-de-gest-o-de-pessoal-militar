@@ -155,6 +155,7 @@ export default function ExtratoAtestadosMedicos() {
   const { canAccessModule, canAccessAction, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const queryClient = useQueryClient();
   const hasAccess = canAccessModule('atestados');
+  const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const [filtros, setFiltros] = useState({
     periodoInicio: '',
     periodoFim: '',
@@ -771,18 +772,25 @@ export default function ExtratoAtestadosMedicos() {
                         )}
                         {columns.anexo && (
                           <td className="p-3 align-top">
-                            <div className="space-y-1">
-                              <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
-                                {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-                                {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
-                              </Button>
-                              {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
-                              {linkAnexoById[row.id] && (
-                                <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
-                                  Abrir anexo
-                                </a>
-                              )}
-                            </div>
+                            {canViewSensitive ? (
+                              <div className="space-y-1">
+                                <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
+                                  {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                                  {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
+                                </Button>
+                                {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
+                                {linkAnexoById[row.id] && (
+                                  <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
+                                    Abrir anexo
+                                  </a>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <ShieldAlert className="h-4 w-4" />
+                                <span className="text-xs font-medium">Anexo restrito</span>
+                              </div>
+                            )}
                           </td>
                         )}
                       </tr>
