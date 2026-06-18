@@ -57,18 +57,22 @@ const initialFormData = {
 export default function CadastrarFerias() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get('id');
+  const editId = searchParams.get('id') || searchParams.get('editId');
   const queryClient = useQueryClient();
   const {
     isAdmin,
     modoAcesso,
     userEmail,
     canAccessModule,
+    canAccessAction,
     isLoading: loadingUser,
     isAccessResolved,
   } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasFeriasAccess = canAccessModule('ferias');
+  const isEditing = Boolean(editId);
+  const requiredActionKey = isEditing ? 'editar_ferias' : 'criar_ferias';
+  const hasRequiredFeriasAction = canAccessAction(requiredActionKey);
   const effectiveEmail = getEffectiveEmail();
 
   const [formData, setFormData] = useState(initialFormData);
@@ -87,7 +91,7 @@ export default function CadastrarFerias() {
       formData.militar_id || null
     ],
     queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
-    enabled: isAccessResolved && hasFeriasAccess && !!formData.militar_id,
+    enabled: isAccessResolved && hasFeriasAccess && hasRequiredFeriasAction && !!formData.militar_id,
     refetchOnMount: 'always',
     staleTime: 0,
     placeholderData: undefined
@@ -110,7 +114,7 @@ export default function CadastrarFerias() {
       const list = await base44.entities.Ferias.filter({ id: editId });
       return list[0] || null;
     },
-    enabled: !!editId && isAccessResolved && hasFeriasAccess
+    enabled: !!editId && isAccessResolved && hasFeriasAccess && hasRequiredFeriasAction
   });
 
   useEffect(() => {
@@ -192,6 +196,7 @@ export default function CadastrarFerias() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!hasRequiredFeriasAction) return;
     if (!formData.militar_id || !formData.periodo_aquisitivo_ref) return;
 
     // Lote Trava Emergencial — escopo de escrita
@@ -324,7 +329,7 @@ export default function CadastrarFerias() {
   };
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!hasFeriasAccess) return <AccessDenied modulo="Férias" />;
+  if (!hasFeriasAccess || !hasRequiredFeriasAction) return <AccessDenied modulo="Férias" />;
 
   if (loadingEdit) {
     return (

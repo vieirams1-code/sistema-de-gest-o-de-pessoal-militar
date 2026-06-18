@@ -317,8 +317,8 @@ const ferias = {
       menuVisible: false,
       contextualOnly: true,
       appGuard: { moduleKey: 'ferias', moduleName: 'Férias' },
-      note: 'Rota module-only no App.jsx.',
-      source: 'App.jsx.moduleGuardByPage',
+      note: 'Rota module-only no App.jsx para não quebrar a decisão contextual; CadastrarFerias.jsx exige criar_ferias sem id e editar_ferias com id/editId.',
+      source: 'App.jsx.moduleGuardByPage + pages/CadastrarFerias.jsx',
     },
     {
       pageKey: 'PlanoAnualFerias',
@@ -376,9 +376,11 @@ const ferias = {
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia ações fora do escopo' },
     ],
     'pages/CadastrarFerias.jsx': [
-      { check: "canAccessModule('ferias')", effect: 'VALIDADO P1.1-C: AccessDenied("Férias") se falso (linha 71/327)' },
-      { check: 'useUsuarioPodeAgirSobreMilitar().validar(militar_id)', effect: 'VALIDADO P1.1-C: bloqueia salvar fora do escopo do militar (handleSubmit)' },
-      { check: 'route guard', effect: 'VALIDADO P1.1-C: rota module-only por moduleKey "ferias"; NÃO há bloqueio por action específica além do módulo.' },
+      { check: "canAccessModule('ferias')", effect: 'AccessDenied("Férias") se falso' },
+      { check: "sem id/editId: canAccessAction('criar_ferias')", effect: 'P1.3-B.4: bloqueia entrada/salvamento de criação sem action criar_ferias' },
+      { check: "com id/editId: canAccessAction('editar_ferias')", effect: 'P1.3-B.4: bloqueia entrada/salvamento de edição sem action editar_ferias' },
+      { check: 'useUsuarioPodeAgirSobreMilitar().validar(militar_id)', effect: 'bloqueia salvar fora do escopo do militar (handleSubmit)' },
+      { check: 'route guard', effect: 'App.jsx mantém rota module-only para permitir que a página decida a action conforme modo criação/edição.' },
     ],
   },
   componentsInternalChecks: {
@@ -415,10 +417,10 @@ const ferias = {
     {
       location: 'layout.menuGroups (Férias) vs App.jsx (rotas Férias)',
       ruleMenu: 'Menu "Férias" exige visualizar_ferias; menu "Dias Adicionais" exige visualizar_creditos_ferias.',
-      ruleRoute: 'Rotas PlanoAnualFerias, PeriodosAquisitivos e CreditosExtraordinariosFerias exigem actions granulares; Ferias/CadastrarFerias preservam comportamento anterior.',
+      ruleRoute: 'Rotas PlanoAnualFerias, PeriodosAquisitivos e CreditosExtraordinariosFerias exigem actions granulares; CadastrarFerias mantém route guard por módulo e aplica action contextual internamente.',
       impact:
-        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; mitigado em P1.3-B.3 para visibilidade dos CTAs internos de Ferias.jsx; CadastrarFerias permanece sem action granular de escrita por decisão de escopo.',
-      status: 'mitigado_p1_3_b_3',
+        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; mitigado em P1.3-B.3 para visibilidade dos CTAs internos de Ferias.jsx; mitigado em P1.3-B.4 para entrada direta em CadastrarFerias por criar_ferias/editar_ferias conforme modo.',
+      status: 'mitigado_p1_3_b_4',
     },
     {
       location: 'pages/Ferias.jsx (admin_mode)',
@@ -431,10 +433,10 @@ const ferias = {
     {
       location: 'pages/CadastrarFerias.jsx',
       ruleMenu: 'n/a',
-      ruleRoute: '{ moduleKey: "ferias" } (module-only)',
+      ruleRoute: '{ moduleKey: "ferias" } (module-only) + enforcement interno contextual',
       impact:
-        'VALIDADO P1.1-C/P1.1-D: rota module-only por moduleKey "ferias"; validação interna usa canAccessModule("ferias"); escopo do militar validado via useUsuarioPodeAgirSobreMilitar; não há bloqueio de rota por action específica além do módulo.',
-      status: 'confirmado',
+        'P1.3-B.4: rota permanece module-only para não aplicar RequireAction único e cego; CadastrarFerias exige criar_ferias em criação e editar_ferias em edição, além do escopo do militar.',
+      status: 'mitigado_p1_3_b_4',
     },
   ],
   recommendationFuture:
