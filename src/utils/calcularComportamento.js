@@ -14,7 +14,7 @@ const TIPOS_PUNICAO_VALIDOS = new Set([
   'PRISAO EM SEPARADO',
 ]);
 
-const COMPORTAMENTO_ORDEM = ['Mau', 'Insuficiente', 'Bom', 'Ótimo', 'Excepcional'];
+export const COMPORTAMENTO_ORDEM = ['Mau', 'Insuficiente', 'Bom', 'Ótimo', 'Excepcional'];
 
 const TIPO_PESO_PRISAO = {
   'PRISAO': 1,
@@ -33,29 +33,29 @@ function normalizeText(texto = '') {
     .toUpperCase();
 }
 
-function toDate(dateLike) {
+export function toDate(dateLike) {
   if (!dateLike) return null;
   if (dateLike instanceof Date) return Number.isNaN(dateLike.getTime()) ? null : dateLike;
   const date = new Date(`${String(dateLike).slice(0, 10)}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatDateISO(date) {
+export function formatDateISO(date) {
   if (!date) return null;
   return date.toISOString().slice(0, 10);
 }
 
-function addYears(baseDate, years) {
+export function addYears(baseDate, years) {
   const date = new Date(baseDate);
   date.setFullYear(date.getFullYear() + years);
   return date;
 }
 
-function subtractYears(baseDate, years) {
+export function subtractYears(baseDate, years) {
   return addYears(baseDate, -years);
 }
 
-function addDays(baseDate, days) {
+export function addDays(baseDate, days) {
   const date = new Date(baseDate);
   date.setDate(date.getDate() + days);
   return date;
@@ -79,7 +79,7 @@ function getDataBasePunicao(punicao = {}) {
   );
 }
 
-function normalizePunicao(punicao = {}) {
+export function normalizePunicao(punicao = {}) {
   const tipo = getTipoPunicao(punicao);
   const tipoNormalizado = normalizeText(tipo);
   const pesoPrisao = TIPO_PESO_PRISAO[tipoNormalizado] ?? 0;
@@ -96,11 +96,11 @@ function normalizePunicao(punicao = {}) {
   };
 }
 
-function isPraca(postoGraduacao) {
+export function isPraca(postoGraduacao) {
   return PRACAS.has(postoGraduacao);
 }
 
-function isPunicaoValida(punicao, { incluirReabilitadas = false } = {}) {
+export function isPunicaoValida(punicao, { incluirReabilitadas = false } = {}) {
   const status = normalizeText(getStatusPunicao(punicao));
   const tipo = normalizeText(getTipoPunicao(punicao));
   if (!TIPOS_PUNICAO_VALIDOS.has(tipo)) return false;
