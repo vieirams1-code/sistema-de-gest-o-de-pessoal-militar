@@ -20,7 +20,7 @@ const alertaClasses = {
   success: 'bg-emerald-50 border-emerald-200 text-emerald-700',
 };
 
-export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias }) {
+export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias, canManage = false }) {
   const diasBase = obterDiasBase(periodo);
   const diasTotal = Number(periodo.dias_total ?? calcularDiasTotal(periodo));
   const diasGozados = Number(periodo.dias_gozados || 0);
@@ -98,9 +98,11 @@ export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias 
           <ExternalLink className="w-3.5 h-3.5 mr-1" />
           Abrir férias
         </Button>
-        <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => onManage?.(periodo)}>
-          Gerenciar período
-        </Button>
+        {canManage && (
+          <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => onManage?.(periodo)}>
+            Gerenciar período
+          </Button>
+        )}
       </div>
     </article>
   );

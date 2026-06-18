@@ -166,6 +166,9 @@ export default function GerenciarPeriodoModal({
   onChangeStatus,
   onConfirmDelete,
   onOpenFerias,
+  canEdit = false,
+  canChangeStatus = false,
+  canDelete = false,
 }) {
   const [form, setForm] = useState({
     inicio_aquisitivo: '',
@@ -195,7 +198,8 @@ export default function GerenciarPeriodoModal({
     [periodo, registrosLivro, publicacoes]
   );
 
-  const exclusaoPermitida = vinculos.estado === ESTADO_SEGURANCA.SEGURO;
+  const hasManagementPermission = canEdit || canChangeStatus || canDelete;
+  const exclusaoPermitida = canDelete && vinculos.estado === ESTADO_SEGURANCA.SEGURO;
   const confirmacaoEsperada = `EXCLUIR ${periodo?.referencia || ''}`.trim();
   const confirmacaoValida = normalizarTexto(confirmacaoExclusao).toUpperCase() === confirmacaoEsperada.toUpperCase();
 
@@ -238,6 +242,11 @@ export default function GerenciarPeriodoModal({
   const handleSalvarEdicao = async () => {
     setFeedback(null);
 
+    if (!canEdit) {
+      setFeedback({ type: 'error', message: 'Ação negada: você não tem permissão para editar período aquisitivo.' });
+      return;
+    }
+
     if (!form.inicio_aquisitivo || !form.fim_aquisitivo || !form.data_limite_gozo) {
       setFeedback({ type: 'error', message: 'Preencha início, fim e limite de gozo para salvar a edição.' });
       return;
@@ -257,6 +266,11 @@ export default function GerenciarPeriodoModal({
 
   const handleAlterarStatus = async () => {
     setFeedback(null);
+    if (!canChangeStatus) {
+      setFeedback({ type: 'error', message: 'Ação negada: você não tem permissão para alterar status do período aquisitivo.' });
+      return;
+    }
+
     try {
       await onChangeStatus?.(form.status);
       setFeedback({ type: 'success', message: `Status alterado para ${form.status}.` });
@@ -270,6 +284,7 @@ export default function GerenciarPeriodoModal({
     setShowConfirmDelete(false);
 
     try {
+      if (!canDelete) throw new Error('Ação negada: você não tem permissão para excluir período aquisitivo.');
       if (!exclusaoPermitida) throw new Error('Exclusão bloqueada por vínculo operacional/administrativo.');
       if (!confirmacaoValida) throw new Error(`Digite ${confirmacaoEsperada} para confirmar a exclusão física.`);
       await onConfirmDelete?.();
@@ -289,7 +304,7 @@ export default function GerenciarPeriodoModal({
           <DialogHeader>
             <DialogTitle>Gerenciar período aquisitivo</DialogTitle>
             <DialogDescription>
-              Referência {periodo?.referencia || '-'} • Gerencie edição, status e remoção com segurança.
+              Referência {periodo?.referencia || '-'} • {hasManagementPermission ? 'Gerencie edição, status e remoção com segurança.' : 'Consulta em modo somente leitura.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -302,31 +317,42 @@ export default function GerenciarPeriodoModal({
           )}
 
           <div className="space-y-4 py-1">
+            {!hasManagementPermission && (
+              <Alert className="border-slate-200 bg-slate-50">
+                <AlertDescription className="text-slate-700">
+                  Você pode consultar este período, mas não possui permissão para editar, alterar status ou excluir.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <p className="text-xs text-slate-500 mb-1">Início aquisitivo</p>
-                <Input type="date" value={form.inicio_aquisitivo} onChange={(e) => setForm((prev) => ({ ...prev, inicio_aquisitivo: e.target.value }))} />
+                <Input type="date" value={form.inicio_aquisitivo} onChange={(e) => setForm((prev) => ({ ...prev, inicio_aquisitivo: e.target.value }))} disabled={!canEdit || saving || deleting} />
               </div>
               <div>
                 <p className="text-xs text-slate-500 mb-1">Fim aquisitivo</p>
-                <Input type="date" value={form.fim_aquisitivo} onChange={(e) => setForm((prev) => ({ ...prev, fim_aquisitivo: e.target.value }))} />
+                <Input type="date" value={form.fim_aquisitivo} onChange={(e) => setForm((prev) => ({ ...prev, fim_aquisitivo: e.target.value }))} disabled={!canEdit || saving || deleting} />
               </div>
               <div>
                 <p className="text-xs text-slate-500 mb-1">Limite gozo</p>
-                <Input type="date" value={form.data_limite_gozo} onChange={(e) => setForm((prev) => ({ ...prev, data_limite_gozo: e.target.value }))} />
+                <Input type="date" value={form.data_limite_gozo} onChange={(e) => setForm((prev) => ({ ...prev, data_limite_gozo: e.target.value }))} disabled={!canEdit || saving || deleting} />
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <Button onClick={handleSalvarEdicao} disabled={saving || deleting} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
-                {saving ? 'Salvando...' : 'Salvar edição'}
-              </Button>
-            </div>
+            {canEdit && (
+              <div className="flex justify-end">
+                <Button onClick={handleSalvarEdicao} disabled={saving || deleting} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
+                  {saving ? 'Salvando...' : 'Salvar edição'}
+                </Button>
+              </div>
+            )}
 
-            <div className="border-t pt-4">
+            {canChangeStatus && (
+              <div className="border-t pt-4">
               <p className="text-xs text-slate-500 mb-1">Status operacional</p>
               <div className="flex gap-2">
-                <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value }))}>
+                <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value }))} disabled={!canChangeStatus || saving || deleting}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -340,9 +366,11 @@ export default function GerenciarPeriodoModal({
                   Aplicar status
                 </Button>
               </div>
-            </div>
+              </div>
+            )}
 
-            <div className="border-t pt-4 space-y-2">
+            {canDelete && (
+              <div className="border-t pt-4 space-y-2">
               <p className="text-sm font-medium text-slate-700">Exclusão segura</p>
               <Alert className={estadoSegurancaUi.className}>
                 <AlertDescription className={estadoSegurancaUi.textClassName}>
@@ -365,7 +393,8 @@ export default function GerenciarPeriodoModal({
                   Excluir período
                 </Button>
               </div>
-            </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

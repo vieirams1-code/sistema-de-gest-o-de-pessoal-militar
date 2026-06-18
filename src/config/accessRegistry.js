@@ -243,6 +243,10 @@ const ferias = {
       view: 'visualizar_ferias',
       visualizar_plano: 'visualizar_plano_ferias',
       visualizar_periodos_aquisitivos: 'visualizar_periodos_aquisitivos',
+      gerar_periodos_aquisitivos: 'gerar_periodos_aquisitivos',
+      editar_periodo_aquisitivo: 'editar_periodo_aquisitivo',
+      alterar_status_periodo_aquisitivo: 'alterar_status_periodo_aquisitivo',
+      excluir_periodo_aquisitivo: 'excluir_periodo_aquisitivo',
       visualizar_creditos: 'visualizar_creditos_ferias',
       adicionar: 'adicionar_ferias',
       criar: 'criar_ferias',
@@ -260,6 +264,10 @@ const ferias = {
       view: 'perm_visualizar_ferias',
       visualizar_plano: 'perm_visualizar_plano_ferias',
       visualizar_periodos_aquisitivos: 'perm_visualizar_periodos_aquisitivos',
+      gerar_periodos_aquisitivos: 'perm_gerar_periodos_aquisitivos',
+      editar_periodo_aquisitivo: 'perm_editar_periodo_aquisitivo',
+      alterar_status_periodo_aquisitivo: 'perm_alterar_status_periodo_aquisitivo',
+      excluir_periodo_aquisitivo: 'perm_excluir_periodo_aquisitivo',
       visualizar_creditos: 'perm_visualizar_creditos_ferias',
       adicionar: 'perm_adicionar_ferias',
       criar: 'perm_criar_ferias',
@@ -375,6 +383,13 @@ const ferias = {
       { check: "canAccessAction('excluir_ferias') && canAccessAction('admin_mode') && modoAdmin", effect: 'Permite exclusão' },
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia ações fora do escopo' },
     ],
+    'pages/PeriodosAquisitivos.jsx': [
+      { check: "canAccessAction('visualizar_periodos_aquisitivos')", effect: 'A rota/tela permite consulta de períodos aquisitivos via guard granular existente' },
+      { check: "canAccessAction('gerar_periodos_aquisitivos')", effect: 'Exibe geração automática e protege handler de geração' },
+      { check: "canAccessAction('editar_periodo_aquisitivo')", effect: 'Exibe edição de datas e protege handler de salvamento' },
+      { check: "canAccessAction('alterar_status_periodo_aquisitivo')", effect: 'Exibe alteração de status e protege handler de status' },
+      { check: "canAccessAction('excluir_periodo_aquisitivo')", effect: 'Exibe exclusão e protege handler de exclusão, preservando bloqueios internos' },
+    ],
     'pages/CadastrarFerias.jsx': [
       { check: "canAccessModule('ferias')", effect: 'AccessDenied("Férias") se falso' },
       { check: "sem id/editId: canAccessAction('criar_ferias')", effect: 'P1.3-B.4: bloqueia entrada/salvamento de criação sem action criar_ferias' },
@@ -386,6 +401,15 @@ const ferias = {
   componentsInternalChecks: {
     'components/ferias/FamiliaFeriasPanel': [
       { check: 'modoAdmin (prop)', effect: 'Habilita administração da cadeia operacional' },
+    ],
+    'components/ferias/PeriodoAquisitivoGenerator': [
+      { check: 'canGenerate (prop)', effect: 'Oculta geração automática e bloqueia handleGenerate quando falso' },
+    ],
+    'components/ferias/PeriodoAquisitivoCard': [
+      { check: 'canManage (prop)', effect: 'Exibe botão Gerenciar período apenas com alguma action de gestão granular' },
+    ],
+    'components/ferias/GerenciarPeriodoModal': [
+      { check: 'canEdit / canChangeStatus / canDelete (props)', effect: 'Renderiza edição, status e exclusão de forma independente; sem permissões, fica somente leitura' },
     ],
   },
   services: [
@@ -419,8 +443,8 @@ const ferias = {
       ruleMenu: 'Menu "Férias" exige visualizar_ferias; menu "Dias Adicionais" exige visualizar_creditos_ferias.',
       ruleRoute: 'Rotas PlanoAnualFerias, PeriodosAquisitivos e CreditosExtraordinariosFerias exigem actions granulares; CadastrarFerias mantém route guard por módulo e aplica action contextual internamente.',
       impact:
-        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; mitigado em P1.3-B.3 para visibilidade dos CTAs internos de Ferias.jsx; mitigado em P1.3-B.4 para entrada direta em CadastrarFerias por criar_ferias/editar_ferias conforme modo.',
-      status: 'mitigado_p1_3_b_4',
+        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; mitigado em P1.3-B.3 para visibilidade dos CTAs internos de Ferias.jsx; mitigado em P1.3-B.4 para entrada direta em CadastrarFerias por criar_ferias/editar_ferias conforme modo; mitigado em P1.3-B.5 para ações internas granulares de períodos aquisitivos.',
+      status: 'mitigado_p1_3_b_5',
     },
     {
       location: 'pages/Ferias.jsx (admin_mode)',
