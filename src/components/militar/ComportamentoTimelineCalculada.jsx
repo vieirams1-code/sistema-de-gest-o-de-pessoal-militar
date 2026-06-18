@@ -24,11 +24,19 @@ const STATUS_COLORS = {
 };
 
 const EVENT_TRACKS = [
-  { side: 'top', y: -104 },
-  { side: 'top', y: -58 },
-  { side: 'bottom', y: 58 },
-  { side: 'bottom', y: 104 },
+  { side: 'top', y: -118 },
+  { side: 'top', y: -66 },
+  { side: 'bottom', y: 66 },
+  { side: 'bottom', y: 118 },
 ];
+
+const STATUS_RANK = {
+  Mau: 1,
+  Insuficiente: 2,
+  Bom: 3,
+  'Ótimo': 4,
+  Excepcional: 5,
+};
 
 function parseDate(value) {
   if (!value || String(value).toUpperCase() === 'HOJE') return new Date();
@@ -142,31 +150,160 @@ function buildTimelineScale(segmentos = [], eventos = []) {
     return clamp(((date.getTime() - min.getTime()) / total) * 100, 0, 100);
   };
 
-  return { min, max, toPercent };
+  const totalYears = Math.max(1, (max.getTime() - min.getTime()) / (365.25 * 86400000));
+  const tickStep = totalYears <= 10 ? 1 : 2;
+  const firstYear = Math.ceil(min.getFullYear() / tickStep) * tickStep;
+  const ticks = [];
+
+  for (let year = firstYear; year <= max.getFullYear(); year += tickStep) {
+    const date = new Date(`${year}-01-01T00:00:00`);
+    ticks.push({ year, left: toPercent(date.toISOString().slice(0, 10)) });
+  }
+
+  return { min, max, ticks, toPercent };
 }
 
-function assignEventTracks(eventos = [], toPercent) {
+function criarTimelineEventGroups(eventos = [], toPercent, segmentos = []) {
   const sorted = [...eventos]
-    .map((evento) => ({ ...evento, left: toPercent(evento?.data) }))
+    .map((evento, originalIndex) => ({
+      ...evento,
+      originalIndex,
+      left: toPercent(evento?.data),
+      kind: getEventKind(evento),
+    }))
     .sort((a, b) => a.left - b.left);
 
-  const lastByTrack = new Array(EVENT_TRACKS.length).fill(-999);
-  const minGap = 8;
+  const groupGapPercent = 3;
+  const groups = [];
 
-  return sorted.map((evento) => {
+  sorted.forEach((evento) => {
+    const currentGroup = groups[groups.length - 1];
+    if (currentGroup && evento.left - currentGroup.maxLeft <= groupGapPercent) {
+      currentGroup.eventos.push(evento);
+      currentGroup.maxLeft = Math.max(currentGroup.maxLeft, evento.left);
+      currentGroup.left = currentGroup.eventos.reduce((sum, item) => sum + item.left, 0) / currentGroup.eventos.length;
+      return;
+    }
+
+    groups.push({
+      id: `timelineEventGroup-${groups.length}`,
+      eventos: [evento],
+      left: evento.left,
+      maxLeft: evento.left,
+    });
+  });
+
+  return groups.map((group) => ({
+    ...group,
+    mainKind: getGroupMainKind(group.eventos),
+    dataLabel: getGroupDateLabel(group.eventos),
+    eventos: group.eventos.map((evento) => ({
+      ...evento,
+      impactoVisual: getImpactoVisualEvento(evento, segmentos),
+    })),
+  }));
+}
+
+function assignEventTracks(groups = []) {
+  const sorted = [...groups].sort((a, b) => a.left - b.left);
+  const lastByTrack = new Array(EVENT_TRACKS.length).fill(-999);
+  const minGap = 8.5;
+
+  return sorted.map((group) => {
     let trackIndex = 0;
     for (let i = 0; i < EVENT_TRACKS.length; i += 1) {
-      if (evento.left - lastByTrack[i] >= minGap) {
+      if (group.left - lastByTrack[i] >= minGap) {
         trackIndex = i;
         break;
       }
     }
 
-    lastByTrack[trackIndex] = evento.left;
-    return { ...evento, track: EVENT_TRACKS[trackIndex], trackIndex };
+    lastByTrack[trackIndex] = group.left;
+    return { ...group, track: EVENT_TRACKS[trackIndex], trackIndex };
   });
 }
 
+function getGroupMainKind(eventos = []) {
+  const priority = ['hoje', 'punicao', 'projecao', 'mudanca', 'advertencia', 'inclusao', 'evento'];
+  return priority.find((kind) => eventos.some((evento) => evento.kind === kind)) || 'evento';
+}
+
+function getGroupDateLabel(eventos = []) {
+  const uniqueDates = [...new Set(eventos.map((evento) => formatarData(evento.data)))];
+  if (uniqueDates.length === 1) return uniqueDates[0];
+  return `${uniqueDates[0]} +${uniqueDates.length - 1}`;
+}
+
+function getEventIcon(kind, label = '') {
+  if (kind === 'punicao' || kind === 'advertencia') return '📌';
+  if (kind === 'mudanca') return label.toLowerCase().includes('cai') ? '⬇' : '⬆';
+  if (kind === 'projecao') return '🔮';
+  if (kind === 'hoje') return 'HOJE';
+  if (kind === 'inclusao') return '⚑';
+  return '•';
+}
+
+function getSegmentoAnteriorPosterior(evento, segmentos = []) {
+  const data = parseDate(evento?.data);
+  if (!data) return { anterior: null, posterior: null };
+  const time = data.getTime();
+
+  const sorted = [...segmentos]
+    .map((segmento) => ({
+      ...segmento,
+      inicioDate: parseDate(segmento?.inicio),
+      fimDate: parseDate(segmento?.fim || 'Hoje'),
+    }))
+    .filter((segmento) => segmento.inicioDate)
+    .sort((a, b) => a.inicioDate.getTime() - b.inicioDate.getTime());
+
+  let anterior = null;
+  let posterior = null;
+
+  sorted.forEach((segmento) => {
+    const inicioTime = segmento.inicioDate.getTime();
+    const fimTime = segmento.fimDate?.getTime() ?? inicioTime;
+    if (fimTime <= time) anterior = segmento;
+    if (!posterior && inicioTime >= time) posterior = segmento;
+    if (inicioTime <= time && fimTime >= time) {
+      anterior = anterior || segmento;
+      posterior = posterior || segmento;
+    }
+  });
+
+  return { anterior, posterior };
+}
+
+function getImpactoVisualEvento(evento, segmentos = []) {
+  const kind = getEventKind(evento);
+  if (kind === 'advertencia') return 'Sem impacto';
+  if (kind !== 'punicao' && kind !== 'mudanca') return null;
+
+  const { anterior, posterior } = getSegmentoAnteriorPosterior(evento, segmentos);
+  const statusAnterior = anterior ? normalizeStatus(anterior.comportamento) : null;
+  const statusPosterior = posterior ? normalizeStatus(posterior.comportamento) : null;
+  if (!statusAnterior || !statusPosterior) return kind === 'punicao' ? 'Mantém comportamento' : null;
+
+  const rankAnterior = STATUS_RANK[statusAnterior] || 0;
+  const rankPosterior = STATUS_RANK[statusPosterior] || 0;
+
+  if (rankPosterior > rankAnterior) return `⬆ Sobe para ${statusPosterior}`;
+  if (rankPosterior < rankAnterior) return `⬇ Cai para ${statusPosterior}`;
+  return kind === 'punicao' ? (evento?.impacto_comportamento === false ? 'Sem impacto' : `Permaneceu ${statusPosterior}`) : `Mantém ${statusPosterior}`;
+}
+
+function getSegmentTooltip(segmento) {
+  const punicoes = segmento?.punicoesConsideradas?.length ?? 0;
+  const advertencias = segmento?.advertenciasInformativas?.length ?? 0;
+  return [
+    `Comportamento: ${segmento?.comportamento || '—'}`,
+    `Período: ${formatarPeriodo(segmento?.inicio)} → ${formatarPeriodo(segmento?.fim)}`,
+    `Duração: ${calcularDuracaoAproximada(segmento?.inicio, segmento?.fim)}`,
+    `Punições impactantes: ${punicoes}`,
+    `Advertências: ${advertencias}`,
+    `Fundamento: ${segmento?.fundamento || '—'}`,
+  ].join('\n');
+}
 
 function calcularDuracaoAproximada(inicioValue, fimValue) {
   const inicio = parseDate(inicioValue);
@@ -216,7 +353,8 @@ function JanelasResumo({ janelas = {} }) {
 
 function TimelineHorizontal({ eventos = [], segmentos = [] }) {
   const scale = useMemo(() => buildTimelineScale(segmentos, eventos), [segmentos, eventos]);
-  const eventosComTrilha = useMemo(() => assignEventTracks(eventos, scale.toPercent), [eventos, scale]);
+  const timelineEventGroups = useMemo(() => criarTimelineEventGroups(eventos, scale.toPercent, segmentos), [eventos, scale, segmentos]);
+  const gruposComTrilha = useMemo(() => assignEventTracks(timelineEventGroups), [timelineEventGroups]);
 
   if (!segmentos.length) {
     return <p className="text-sm text-slate-500">Nenhum segmento calculado para exibição.</p>;
@@ -225,7 +363,18 @@ function TimelineHorizontal({ eventos = [], segmentos = [] }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="overflow-x-auto pb-2">
-        <div className="relative h-[340px] min-w-[980px]">
+        <div className="relative h-[390px] min-w-[980px]">
+          {scale.ticks.map((tick) => (
+            <div
+              key={tick.year}
+              className="absolute bottom-8 top-10 border-l border-slate-200/80"
+              style={{ left: `${tick.left}%` }}
+            >
+              <span className="absolute -left-5 top-full mt-2 w-10 text-center text-[11px] font-semibold text-slate-500">{tick.year}</span>
+            </div>
+          ))}
+          <div className="absolute bottom-8 left-0 right-0 border-t border-slate-300" />
+
           <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200 shadow-inner" />
 
           {segmentos.map((segmento, index) => {
@@ -247,17 +396,16 @@ function TimelineHorizontal({ eventos = [], segmentos = [] }) {
                     ? `repeating-linear-gradient(135deg, ${color}, ${color} 8px, rgba(139, 92, 246, 0.55) 8px, rgba(139, 92, 246, 0.55) 16px)`
                     : undefined,
                 }}
-                title={`${segmento.comportamento || '—'} — ${formatarPeriodo(segmento.inicio)} até ${formatarPeriodo(segmento.fim)}`}
+                title={getSegmentTooltip(segmento)}
               >
                 <span className="truncate px-2">{segmento.isProjetado ? 'Projeção' : segmento.comportamento}</span>
               </div>
             );
           })}
 
-          {eventosComTrilha.map((evento, index) => {
-            const kind = getEventKind(evento);
-            const label = getEventLabel(evento, kind);
-            const isTop = evento.track.side === 'top';
+          {gruposComTrilha.map((group, index) => {
+            const kind = group.mainKind;
+            const isTop = group.track.side === 'top';
             const labelOrder = isTop ? 'order-1' : 'order-3';
             const markerOrder = isTop ? 'order-3' : 'order-1';
             const markerClass = {
@@ -272,22 +420,34 @@ function TimelineHorizontal({ eventos = [], segmentos = [] }) {
 
             return (
               <div
-                key={`${evento.data}-${evento.tipo}-${index}`}
-                className="absolute z-10 flex -translate-x-1/2 flex-col items-center"
-                style={{ left: `${evento.left}%`, top: `calc(50% + ${evento.track.y}px)` }}
-                title={`${formatarData(evento.data)} — ${label}`}
+                key={`${group.id}-${index}`}
+                className={`absolute flex -translate-x-1/2 flex-col items-center ${kind === 'hoje' ? 'z-30' : 'z-10'}`}
+                style={{ left: `${group.left}%`, top: `calc(50% + ${group.track.y}px)` }}
+                title={group.eventos.map((evento) => `${formatarData(evento.data)} — ${getEventLabel(evento, evento.kind)}`).join('\n')}
               >
                 {kind === 'hoje' && (
-                  <div className="pointer-events-none absolute left-1/2 top-1/2 h-[170px] -translate-x-1/2 -translate-y-1/2 border-l-2 border-dotted border-blue-700/70" />
+                  <>
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 h-[250px] -translate-x-1/2 -translate-y-1/2 border-l-2 border-dotted border-blue-700/80" />
+                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 rounded-full bg-blue-700 px-2 py-0.5 text-[10px] font-black tracking-wide text-white shadow-lg">HOJE</div>
+                  </>
                 )}
-                <div className={`${labelOrder} min-w-[118px] max-w-[160px] rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-center text-[11px] leading-tight text-slate-600 shadow-lg`}>
-                  <strong className="block text-slate-700">{formatarData(evento.data)}</strong>
-                  <span className="block font-bold text-slate-900">{label}</span>
-                  {kind === 'advertencia' && <small className="block text-slate-500">Sem impacto</small>}
+                <div className={`${labelOrder} w-[112px] rounded-xl border bg-white px-2 py-1.5 text-left text-[10.5px] leading-tight text-slate-600 shadow-lg ${kind === 'hoje' ? 'border-blue-300 ring-2 ring-blue-100' : kind === 'projecao' ? 'border-violet-300' : 'border-slate-200'}`}>
+                  <strong className="mb-1 block text-center text-[11px] text-slate-700">{group.dataLabel}</strong>
+                  <div className="space-y-1">
+                    {group.eventos.map((evento) => {
+                      const label = getEventLabel(evento, evento.kind);
+                      return (
+                        <div key={`${evento.data}-${evento.tipo}-${evento.originalIndex}`} className="border-t border-slate-100 pt-1 first:border-t-0 first:pt-0">
+                          <span className="block font-bold text-slate-900">{getEventIcon(evento.kind, label)} {label.replace(/^Sobe para /, '').replace(/^Projeção para /, 'Projeção para ')}</span>
+                          {evento.impactoVisual && <small className="block text-slate-500">{evento.impactoVisual}</small>}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="order-2 h-9 border-l border-dashed border-slate-400" />
                 <div className={`${markerOrder} grid h-7 w-7 place-items-center rounded-full border-[3px] text-sm shadow-lg ${markerClass}`}>
-                  {kind === 'punicao' ? '📌' : kind === 'inclusao' ? '⚑' : ''}
+                  {kind === 'hoje' ? '' : getEventIcon(kind)}
                 </div>
               </div>
             );
