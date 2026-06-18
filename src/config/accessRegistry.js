@@ -644,12 +644,16 @@ const atestados = {
       { check: "canAccessModule('atestados')", effect: 'VALIDADO P1.1-C: hasAccess; AccessDenied("Atestados") se falso (linha 157/534)' },
       { check: "canAccessAction('gerar_relatorio_dp_dintel_atestados')", effect: 'VALIDADO P1.1-C: habilita botão PDF DP/DINTEL (action interna do extrato)' },
       { check: "canAccessAction('gerir_encaminhamento_dp_dintel_atestado')", effect: 'VALIDADO P1.1-C: habilita marcar/desmarcar DP/DINTEL (action interna do extrato)' },
-      { check: 'ver_dados_sensiveis_atestado', effect: 'VALIDADO P1.1-C: NÃO encontrado enforcement no componente; permissão declarada/passiva.' },
+      { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Enforcement visual da coluna de Anexos (oculta botões/links se falso).' },
     ],
   },
   componentsInternalChecks: {
     'components/atestado/AtestadoCard': [
       { check: 'canEdit / canDelete (props vindas de Atestados.jsx)', effect: 'Botões editar/excluir no card' },
+      { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Mascaramento de CID-10, Observações e conteúdos clínicos nos modais de Homologação e Ata JISO.' },
+    ],
+    'pages/VerAtestado.jsx': [
+      { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Mascaramento completo de CID-10, diagnóstico, pareceres, histórico clínico, notas e anexos.' },
     ],
   },
   services: [

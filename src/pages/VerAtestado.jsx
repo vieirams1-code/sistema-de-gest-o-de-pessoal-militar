@@ -75,8 +75,9 @@ export default function VerAtestado() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
+  const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
 
   const { data: atestado, isLoading } = useQuery({
     queryKey: ['atestado', id],
@@ -306,10 +307,10 @@ export default function VerAtestado() {
             <Section title="CID-10" icon={FileSearch}>
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 {atestado.cid_10 && (
-                  <p className="font-bold text-blue-900 mb-2">CID-10: {atestado.cid_10}</p>
+                  <p className="font-bold text-blue-900 mb-2">CID-10: {canViewSensitive ? atestado.cid_10 : "Dado sensível restrito"}</p>
                 )}
                 {atestado.cid_descricao && (
-                  <p className="text-sm text-blue-700">{atestado.cid_descricao}</p>
+                  <p className="text-sm text-blue-700">{canViewSensitive ? atestado.cid_descricao : "Dado sensível restrito"}</p>
                 )}
               </div>
             </Section>
@@ -318,20 +319,32 @@ export default function VerAtestado() {
           {/* Arquivo */}
           {atestado.arquivo_atestado && (
             <Section title="Documento" icon={FileText}>
-              <a
-                href={atestado.arquivo_atestado}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-              >
-                <div className="w-12 h-12 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
-                  <Download className="w-6 h-6 text-[#1e3a5f]" />
+              {canViewSensitive ? (
+                <a
+                  href={atestado.arquivo_atestado}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
+                    <Download className="w-6 h-6 text-[#1e3a5f]" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-900">Ver Atestado</p>
+                    <p className="text-xs text-slate-500">Clique para abrir o arquivo</p>
+                  </div>
+                </a>
+              ) : (
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200 opacity-60">
+                  <div className="w-12 h-12 rounded-lg bg-slate-200 flex items-center justify-center">
+                    <AlertCircle className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-900">Anexo restrito</p>
+                    <p className="text-xs text-slate-500">Acesso negado aos dados sensíveis</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-slate-900">Ver Atestado</p>
-                  <p className="text-xs text-slate-500">Clique para abrir o arquivo</p>
-                </div>
-              </a>
+              )}
             </Section>
           )}
 
@@ -358,7 +371,7 @@ export default function VerAtestado() {
                   <div className="mt-3">
                     <p className="text-xs text-slate-500 mb-1">Parecer</p>
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-slate-700">{atestado.parecer_jiso}</p>
+                      <p className="text-sm text-slate-700">{canViewSensitive ? atestado.parecer_jiso : "Dado sensível restrito"}</p>
                     </div>
                   </div>
                 )}
@@ -396,7 +409,7 @@ export default function VerAtestado() {
                       </span>
                       <span className="text-slate-500 text-xs">{formatShortDate(h.data_registro)}</span>
                     </div>
-                    <p className="text-slate-700">{h.motivo}</p>
+                    <p className="text-slate-700">{canViewSensitive ? h.motivo : "Dado sensível restrito"}</p>
                     <p className="text-slate-500 text-xs mt-1">
                       Novo término: <span className="font-medium">{formatShortDate(h.nova_data_termino)}</span>
                       {' · '}Novo retorno: <span className="font-medium">{formatShortDate(h.nova_data_retorno)}</span>
@@ -414,7 +427,7 @@ export default function VerAtestado() {
             {atestado.nota_para_bg && (
               <Section title="Nota para BG">
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{atestado.nota_para_bg}</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{canViewSensitive ? atestado.nota_para_bg : "Dado sensível restrito"}</p>
                 </div>
               </Section>
             )}
@@ -422,7 +435,7 @@ export default function VerAtestado() {
             {atestado.texto_publicacao && (
               <Section title="Texto para Publicação">
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{atestado.texto_publicacao}</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{canViewSensitive ? atestado.texto_publicacao : "Dado sensível restrito"}</p>
                 </div>
               </Section>
             )}
@@ -431,7 +444,7 @@ export default function VerAtestado() {
               {atestado.das_escusas && (
                 <Section title="Das Escusas">
                   <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{atestado.das_escusas}</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{canViewSensitive ? atestado.das_escusas : "Dado sensível restrito"}</p>
                   </div>
                 </Section>
               )}
@@ -439,7 +452,7 @@ export default function VerAtestado() {
               {atestado.retorno && (
                 <Section title="Informações de Retorno">
                   <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{atestado.retorno}</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{canViewSensitive ? atestado.retorno : "Dado sensível restrito"}</p>
                   </div>
                 </Section>
               )}
@@ -448,7 +461,7 @@ export default function VerAtestado() {
             {atestado.observacoes && (
               <Section title="Observações">
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{atestado.observacoes}</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{canViewSensitive ? atestado.observacoes : "Dado sensível restrito"}</p>
                 </div>
               </Section>
             )}

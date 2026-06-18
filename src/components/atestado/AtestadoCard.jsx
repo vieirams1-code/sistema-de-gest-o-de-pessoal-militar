@@ -59,6 +59,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   };
   const queryClient = useQueryClient();
   const { canAccessAction, user } = useCurrentUser();
+  const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
@@ -580,7 +581,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           </div>
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>{atestado.dias || 0} dias de afastamento</span>
-            {atestado.cid_10 && <span>CID-10: {atestado.cid_10}</span>}
+            {atestado.cid_10 && <span>CID-10: {canViewSensitive ? atestado.cid_10 : "Restrito"}</span>}
           </div>
         </div>
 
@@ -644,7 +645,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
               <p className="text-slate-700"><span className="text-slate-500">CRM:</span> {atestado.medico_crm_snapshot || atestado.crm_medico}</p>
             )}
             {atestado.observacoes && (
-              <p className="text-slate-700 whitespace-pre-wrap"><span className="text-slate-500">Observações:</span> {atestado.observacoes}</p>
+              <p className="text-slate-700 whitespace-pre-wrap"><span className="text-slate-500">Observações:</span> {canViewSensitive ? atestado.observacoes : "Dado sensível restrito"}</p>
             )}
           </div>
         )}
@@ -725,7 +726,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                     </span>
                   </div>
                   <textarea
-                    value={homologacaoForm.texto_publicacao || ''}
+                    value={canViewSensitive ? (homologacaoForm.texto_publicacao || '') : "Conteúdo restrito"}
+                    readOnly={!canViewSensitive}
                     onChange={(e) => setHomologacaoForm(p => ({ ...p, texto_publicacao: e.target.value }))}
                     className="w-full min-h-[300px] lg:min-h-[420px] rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20"
                     placeholder="Nenhum texto gerado."
@@ -786,7 +788,13 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                   </div>
                   <div className="col-span-2">
                     <Label className="text-sm">Parecer</Label>
-                    <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="Apto" />
+                    <Input
+                      value={canViewSensitive ? ataJisoForm.parecer_jiso : "Dado sensível restrito"}
+                      readOnly={!canViewSensitive}
+                      onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }}
+                      className="mt-1.5"
+                      placeholder="Apto"
+                    />
                   </div>
                 </div>
 
@@ -809,7 +817,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                   </div>
                   <div className="w-full flex-1 min-h-[200px] border border-gray-300 rounded-md px-4 py-4 text-sm text-gray-700 bg-gray-50 outline-none">
                     <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {ataJisoForm.texto_publicacao || 'Nenhum texto gerado.'}
+                      {canViewSensitive ? (ataJisoForm.texto_publicacao || 'Nenhum texto gerado.') : "Conteúdo restrito"}
                     </p>
                   </div>
                 </div>
