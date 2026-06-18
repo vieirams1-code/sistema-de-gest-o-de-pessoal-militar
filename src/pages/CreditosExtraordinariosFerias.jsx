@@ -96,7 +96,7 @@ export default function CreditosExtraordinariosFerias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   const [filtros, setFiltros] = useState({
     militar_id: 'all',
@@ -114,6 +114,14 @@ export default function CreditosExtraordinariosFerias() {
   const [gozoSelecionadoId, setGozoSelecionadoId] = useState('');
   const [militarPopoverOpen, setMilitarPopoverOpen] = useState(false);
   const [buscaMilitar, setBuscaMilitar] = useState('');
+
+  const canVisualizarCreditosFerias = canAccessAction('visualizar_creditos_ferias');
+  const canCriarCreditoExtraFerias = canAccessAction('criar_credito_extra_ferias');
+  const canEditarCreditoExtraFerias = canAccessAction('editar_credito_extra_ferias');
+  const canVincularCreditoExtraFerias = canAccessAction('vincular_credito_extra_ferias');
+  const canRemoverVinculoCreditoExtraFerias = canAccessAction('remover_vinculo_credito_extra_ferias');
+  const canCancelarCreditoExtraFerias = canAccessAction('cancelar_credito_extra_ferias');
+  const canExcluirCreditoExtraFerias = canAccessAction('excluir_credito_extra_ferias');
 
   const { data: militares = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-militares'],
@@ -209,6 +217,14 @@ export default function CreditosExtraordinariosFerias() {
 
   const salvarMutation = useMutation({
     mutationFn: async () => {
+      const isEdicao = Boolean(form.id);
+      if (isEdicao && !canEditarCreditoExtraFerias) {
+        throw new Error('Você não tem permissão para editar crédito extraordinário de férias.');
+      }
+      if (!isEdicao && !canCriarCreditoExtraFerias) {
+        throw new Error('Você não tem permissão para criar crédito extraordinário de férias.');
+      }
+
       const militar = militarById.get(form.militar_id);
       if (!militar) throw new Error('Selecione um militar para salvar o crédito extraordinário.');
       if (form.id) {
@@ -244,6 +260,9 @@ export default function CreditosExtraordinariosFerias() {
 
   const cancelarMutation = useMutation({
     mutationFn: async (credito) => {
+      if (!canCancelarCreditoExtraFerias) {
+        throw new Error('Você não tem permissão para cancelar crédito extraordinário de férias.');
+      }
       if (isCreditoBloqueadoPorUso(credito, gozoById)) {
         throw new Error('Crédito já utilizado não pode ser cancelado.');
       }
@@ -265,6 +284,9 @@ export default function CreditosExtraordinariosFerias() {
 
   const excluirMutation = useMutation({
     mutationFn: async (credito) => {
+      if (!canExcluirCreditoExtraFerias) {
+        throw new Error('Você não tem permissão para excluir crédito extraordinário de férias.');
+      }
       if (isCreditoBloqueadoPorUso(credito, gozoById)) {
         throw new Error('Crédito já utilizado não pode ser excluído.');
       }
@@ -284,6 +306,9 @@ export default function CreditosExtraordinariosFerias() {
 
   const vincularGozoMutation = useMutation({
     mutationFn: async ({ credito, gozoFeriasId }) => {
+      if (!canVincularCreditoExtraFerias) {
+        throw new Error('Você não tem permissão para vincular crédito extraordinário de férias.');
+      }
       if (isCreditoBloqueadoPorUso(credito, gozoById)) {
         throw new Error('Crédito já utilizado não pode ser alterado.');
       }
@@ -315,6 +340,9 @@ export default function CreditosExtraordinariosFerias() {
 
   const removerVinculoMutation = useMutation({
     mutationFn: async (credito) => {
+      if (!canRemoverVinculoCreditoExtraFerias) {
+        throw new Error('Você não tem permissão para remover vínculo de crédito extraordinário de férias.');
+      }
       if (isCreditoBloqueadoPorUso(credito, gozoById)) {
         throw new Error('Crédito utilizado não pode ter vínculo removido por esta tela.');
       }
@@ -339,7 +367,7 @@ export default function CreditosExtraordinariosFerias() {
     setExpandedMilitares((prev) => ({ ...prev, [militarId]: !prev[militarId] }));
   };
 
-  if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
+  if (!loadingUser && isAccessResolved && (!canAccessModule('ferias') || !canVisualizarCreditosFerias)) return <AccessDenied modulo="Férias" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -463,6 +491,7 @@ export default function CreditosExtraordinariosFerias() {
           </CardContent>
         </Card>
 
+        {canCriarCreditoExtraFerias && (
         <div className="flex justify-end">
           <Button
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
@@ -475,6 +504,7 @@ export default function CreditosExtraordinariosFerias() {
             Novo crédito extraordinário
           </Button>
         </div>
+        )}
 
         <Card className="rounded-xl border border-slate-100 shadow-sm">
           <CardHeader>
@@ -548,6 +578,7 @@ export default function CreditosExtraordinariosFerias() {
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2">
+                            {canEditarCreditoExtraFerias && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -559,7 +590,9 @@ export default function CreditosExtraordinariosFerias() {
                             >
                               Editar
                             </Button>
+                            )}
 
+                            {canVincularCreditoExtraFerias && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -572,7 +605,9 @@ export default function CreditosExtraordinariosFerias() {
                               <Link2 className="w-4 h-4 mr-2" />
                               Vincular gozo
                             </Button>
+                            )}
 
+                            {canRemoverVinculoCreditoExtraFerias && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -582,7 +617,9 @@ export default function CreditosExtraordinariosFerias() {
                               <Unlink2 className="w-4 h-4 mr-2" />
                               Remover vínculo
                             </Button>
+                            )}
 
+                            {canCancelarCreditoExtraFerias && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -591,7 +628,9 @@ export default function CreditosExtraordinariosFerias() {
                             >
                               Cancelar
                             </Button>
+                            )}
 
+                            {canExcluirCreditoExtraFerias && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -607,6 +646,7 @@ export default function CreditosExtraordinariosFerias() {
                               <Trash2 className="w-4 h-4 mr-2" />
                               Excluir
                             </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -737,7 +777,7 @@ export default function CreditosExtraordinariosFerias() {
               <Button variant="outline" onClick={() => { setForm(initialForm); setModalEdicaoAberto(false); }}>
                 Cancelar
               </Button>
-              <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={salvarMutation.isPending || !form.militar_id || Number(form.quantidade_dias || 0) <= 0} onClick={() => salvarMutation.mutate()}>
+              <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={salvarMutation.isPending || !form.militar_id || Number(form.quantidade_dias || 0) <= 0 || (form.id ? !canEditarCreditoExtraFerias : !canCriarCreditoExtraFerias)} onClick={() => salvarMutation.mutate()}>
                 {form.id ? 'Salvar alterações' : 'Cadastrar crédito'}
               </Button>
             </DialogFooter>
@@ -800,7 +840,7 @@ export default function CreditosExtraordinariosFerias() {
             </Button>
             <Button
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-              disabled={!gozoSelecionadoId || vincularGozoMutation.isPending}
+              disabled={!gozoSelecionadoId || vincularGozoMutation.isPending || !canVincularCreditoExtraFerias}
               onClick={() => vincularGozoMutation.mutate({ credito: creditoVinculoModal, gozoFeriasId: gozoSelecionadoId })}
             >
               Confirmar vínculo
