@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Gavel } from 'lucide-react';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
+import ComportamentoTimelineCalculada from '@/components/militar/ComportamentoTimelineCalculada';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
@@ -175,85 +176,7 @@ export default function DetalheComportamento() {
 
         <div className="bg-white rounded-xl border p-4">
           <h3 className="font-semibold mb-3">Linha do Tempo Calculada</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <p className="text-sm text-slate-700"><strong>Comportamento calculado hoje:</strong> {timelineCalculada?.comportamentoCalculadoHoje || '—'}</p>
-            <p className="text-sm text-slate-700"><strong>Divergente?</strong> {timelineCalculada?.divergente ? 'Sim' : 'Não'}</p>
-            <p className="text-sm text-slate-700"><strong>Segmento atual:</strong> {timelineCalculada?.segmentoAtual?.comportamento || '—'}</p>
-            <p className="text-sm text-slate-700"><strong>Vigora desde:</strong> {timelineCalculada?.segmentoAtual?.inicio || '—'}</p>
-            <p className="text-sm text-slate-700 sm:col-span-2">
-              <strong>Próxima melhoria:</strong> {timelineCalculada?.proximaMelhoria?.data
-                ? `${timelineCalculada.proximaMelhoria.data} → ${timelineCalculada.proximaMelhoria.comportamento_futuro}`
-                : 'Sem melhoria prevista'}
-            </p>
-          </div>
-
-          <div className="mt-4">
-            <h4 className="font-medium mb-2">Inconsistências</h4>
-            {timelineCalculada?.inconsistencias?.length > 0 ? (
-              <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
-                {timelineCalculada.inconsistencias.map((inconsistencia, index) => (
-                  <li key={`${inconsistencia}-${index}`}>{inconsistencia}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-slate-500">Nenhuma inconsistência identificada.</p>
-            )}
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
-            <h4 className="font-medium mb-2">Segmentos</h4>
-            <table className="min-w-full border text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="border px-3 py-2 text-left">Início</th>
-                  <th className="border px-3 py-2 text-left">Fim</th>
-                  <th className="border px-3 py-2 text-left">Comportamento</th>
-                  <th className="border px-3 py-2 text-left">Atual?</th>
-                  <th className="border px-3 py-2 text-left">Projetado?</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(timelineCalculada?.segmentos || []).map((segmento) => (
-                  <tr key={`${segmento.inicio}-${segmento.fim}-${segmento.comportamento}`} className={segmento.isAtual ? 'bg-blue-50' : ''}>
-                    <td className="border px-3 py-2">{segmento.inicio || '—'}</td>
-                    <td className="border px-3 py-2">{segmento.fim || '—'}</td>
-                    <td className="border px-3 py-2">{segmento.comportamento || '—'}</td>
-                    <td className="border px-3 py-2">{segmento.isAtual ? 'Sim' : 'Não'}</td>
-                    <td className="border px-3 py-2">{segmento.isProjetado ? 'Sim' : 'Não'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
-            <h4 className="font-medium mb-2">Eventos</h4>
-            <table className="min-w-full border text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="border px-3 py-2 text-left">Data</th>
-                  <th className="border px-3 py-2 text-left">Tipo</th>
-                  <th className="border px-3 py-2 text-left">Descrição</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(timelineCalculada?.eventos || []).map((evento, index) => (
-                  <tr key={`${evento.data}-${evento.tipo}-${index}`}>
-                    <td className="border px-3 py-2">{evento.data || '—'}</td>
-                    <td className="border px-3 py-2">{evento.tipo || '—'}</td>
-                    <td className="border px-3 py-2">{evento.descricao || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <details className="mt-4 rounded border p-3">
-            <summary className="cursor-pointer font-medium">Memória de cálculo</summary>
-            <pre className="mt-3 max-h-96 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">
-              {JSON.stringify(timelineCalculada?.memoriaCalculo || [], null, 2)}
-            </pre>
-          </details>
+          <ComportamentoTimelineCalculada timelineCalculada={timelineCalculada} />
         </div>
       </div>
     </div>
