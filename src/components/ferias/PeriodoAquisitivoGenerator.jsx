@@ -82,7 +82,7 @@ function montarResumoOrigens(origemMilitarDataInclusao, origemContratoDesignacao
   return `Origem das datas-base: ${origemMilitarDataInclusao} por data de inclusão do militar; ${origemContratoDesignacao} por contrato de designação ativo.`;
 }
 
-export default function PeriodoAquisitivoGenerator() {
+export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -177,6 +177,14 @@ export default function PeriodoAquisitivoGenerator() {
   };
 
   const handleGenerate = async () => {
+    if (!canGenerate) {
+      setResult({
+        success: false,
+        message: 'Ação negada: você não tem permissão para gerar períodos aquisitivos.',
+      });
+      return;
+    }
+
     setGenerating(true);
     setResult(null);
 
@@ -353,6 +361,8 @@ export default function PeriodoAquisitivoGenerator() {
     }
   };
 
+  if (!canGenerate) return null;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -468,7 +478,7 @@ export default function PeriodoAquisitivoGenerator() {
 
             <Button
               onClick={handleGenerate}
-              disabled={generating || (escopo === 'individual' && !militarSelecionadoId)}
+              disabled={!canGenerate || generating || (escopo === 'individual' && !militarSelecionadoId)}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
             >
               {generating ? (

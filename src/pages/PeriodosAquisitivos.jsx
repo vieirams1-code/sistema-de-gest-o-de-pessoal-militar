@@ -48,8 +48,13 @@ export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved, isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
   const hasFeriasAccess = canAccessModule('ferias');
+  const canGerarPeriodosAquisitivos = canAccessAction('gerar_periodos_aquisitivos');
+  const canEditarPeriodoAquisitivo = canAccessAction('editar_periodo_aquisitivo');
+  const canAlterarStatusPeriodoAquisitivo = canAccessAction('alterar_status_periodo_aquisitivo');
+  const canExcluirPeriodoAquisitivo = canAccessAction('excluir_periodo_aquisitivo');
+  const canGerenciarPeriodoAquisitivo = canEditarPeriodoAquisitivo || canAlterarStatusPeriodoAquisitivo || canExcluirPeriodoAquisitivo;
   const isPaBundleQueryEnabled = isAccessResolved === true && !loadingUser && hasFeriasAccess;
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -271,6 +276,7 @@ export default function PeriodosAquisitivos() {
   };
 
   const handleSubmitEdicao = async (payload) => {
+    if (!canEditarPeriodoAquisitivo) throw new Error('Ação negada: você não tem permissão para editar período aquisitivo.');
     if (!periodoGerenciado?.id) throw new Error('Período inválido para edição.');
 
     await updatePeriodoMutation.mutateAsync({
@@ -280,6 +286,7 @@ export default function PeriodosAquisitivos() {
   };
 
   const handleChangeStatus = async (status) => {
+    if (!canAlterarStatusPeriodoAquisitivo) throw new Error('Ação negada: você não tem permissão para alterar status do período aquisitivo.');
     if (!periodoGerenciado?.id) throw new Error('Período inválido para alteração de status.');
 
     await updatePeriodoMutation.mutateAsync({
@@ -289,6 +296,7 @@ export default function PeriodosAquisitivos() {
   };
 
   const handleConfirmDelete = async () => {
+    if (!canExcluirPeriodoAquisitivo) throw new Error('Ação negada: você não tem permissão para excluir período aquisitivo.');
     if (!periodoGerenciado?.id) throw new Error('Período inválido para exclusão.');
 
     await deletePeriodoMutation.mutateAsync({
@@ -324,7 +332,7 @@ export default function PeriodosAquisitivos() {
             </div>
           </div>
           <div className="flex gap-3">
-            <PeriodoAquisitivoGenerator />
+            <PeriodoAquisitivoGenerator canGenerate={canGerarPeriodosAquisitivos} />
           </div>
         </div>
 
@@ -524,7 +532,11 @@ export default function PeriodosAquisitivos() {
                           <PeriodoAquisitivoCard
                             key={periodo.id}
                             periodo={periodo}
-                            onManage={() => setPeriodoGerenciado(periodo)}
+                            canManage={canGerenciarPeriodoAquisitivo}
+                            onManage={() => {
+                              if (!canGerenciarPeriodoAquisitivo) return;
+                              setPeriodoGerenciado(periodo);
+                            }}
                             onOpenFerias={abrirFeriasVinculadas}
                           />
                         ))}
@@ -548,6 +560,9 @@ export default function PeriodosAquisitivos() {
         onOpenChange={(open) => {
           if (!open) setPeriodoGerenciado(null);
         }}
+        canEdit={canEditarPeriodoAquisitivo}
+        canChangeStatus={canAlterarStatusPeriodoAquisitivo}
+        canDelete={canExcluirPeriodoAquisitivo}
         onSubmitEdicao={handleSubmitEdicao}
         onChangeStatus={handleChangeStatus}
         onConfirmDelete={handleConfirmDelete}
