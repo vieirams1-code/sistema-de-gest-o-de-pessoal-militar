@@ -130,7 +130,7 @@ const menuGroups = [
           { name: 'Atestados', page: 'Atestados', icon: HeartPulse, moduleKey: 'atestados', actionKey: 'visualizar_atestados' },
           { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, moduleKey: 'atestados', actionKey: 'visualizar_atestados' },
           { name: 'Cadastro de Médicos', page: 'Medicos', icon: Stethoscope, adminOnly: true, moduleKey: 'atestados' },
-          { name: 'Atestados - T', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
+          { name: 'Atestados - T', page: 'ControleAtestadosTemporarios', icon: HeartPulse, moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios' },
         ],
       },
       {
@@ -150,7 +150,7 @@ const menuGroups = [
               { type: 'action', key: 'visualizar_rastreamento_promocoes' },
             ],
           },
-          { name: 'Medalhas', page: 'Medalhas', icon: Medal, viewPermission: 'visualizar_medalhas' },
+          { name: 'Medalhas', page: 'Medalhas', icon: Medal, moduleKey: 'medalhas', actionKey: 'visualizar_medalhas' },
           { name: 'Cursos de Formação', page: 'CursosFormacao', icon: GraduationCap, moduleKey: 'cursos_formacao', actionKey: 'visualizar_cursos_formacao' },
           { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
         ],
@@ -161,7 +161,7 @@ const menuGroups = [
         description: 'Conduta e comportamento funcional',
         items: [
           { name: 'Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_controle_comportamento' },
-          { name: 'Punições', page: 'Punicoes', icon: Shield, viewPermission: 'visualizar_punicoes' },
+          { name: 'Punições', page: 'Punicoes', icon: Shield, moduleKey: 'punicoes', actionKey: 'visualizar_punicoes' },
           { name: 'Auditar Comportamento', page: 'AuditoriaComportamento', icon: ShieldCheck, adminOnly: true },
         ],
       },
@@ -208,8 +208,8 @@ const menuGroups = [
             anyOf: [{ type: 'module', key: 'perfis_permissao' }, { type: 'action', key: 'gerir_perfis_permissao' }],
             menuGroup: 'Administração',
           },
-          { name: 'Estrutura', page: 'EstruturaOrganizacional', icon: GitBranch, viewPermission: 'visualizar_estrutura_organizacional', menuGroup: 'Administração' },
-          { name: 'Lotação', page: 'LotacaoMilitares', icon: Building2, viewPermission: 'visualizar_lotacao_militares', menuGroup: 'Administração' },
+          { name: 'Estrutura', page: 'EstruturaOrganizacional', icon: GitBranch, moduleKey: 'estrutura_organizacional', actionKey: 'visualizar_estrutura_organizacional', menuGroup: 'Administração' },
+          { name: 'Lotação', page: 'LotacaoMilitares', icon: Building2, moduleKey: 'lotacao_militares', actionKey: 'visualizar_lotacao_militares', menuGroup: 'Administração' },
           {
             name: 'Migração',
             page: 'MigracaoMilitares',
