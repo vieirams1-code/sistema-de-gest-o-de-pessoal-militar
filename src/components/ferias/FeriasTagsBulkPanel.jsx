@@ -20,6 +20,7 @@ export default function FeriasTagsBulkPanel({
   loading = false,
   saving = false,
   resultadoOperacao = null,
+  canManageTags = false,
 }) {
   const [busca, setBusca] = useState('');
   const [selecionadas, setSelecionadas] = useState([]);
@@ -104,7 +105,7 @@ export default function FeriasTagsBulkPanel({
 
   if (!open) return null;
 
-  const isLocked = loading || saving;
+  const isLocked = loading || saving || !canManageTags;
   const toggleTag = (tagId) => {
     setSelecionadas((prev) => (prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]));
     setTagsEditadas((prev) => (prev.includes(tagId) ? prev : [...prev, tagId]));
@@ -199,7 +200,10 @@ export default function FeriasTagsBulkPanel({
           <p className="text-sm font-medium text-slate-700">Motivo da atribuição (opcional)</p>
           <Input placeholder="Descreva o motivo da ação" value={motivo} onChange={(e) => setMotivo(e.target.value)} disabled={isLocked} />
           <p className="text-xs text-slate-500">{selectedFerias.length} férias × {selecionadas.length} tags definidas = {selectedFerias.length * selecionadas.length} alvo(s) de atualização</p>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading || saving} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, motivo })}>
+          {!canManageTags && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Usuário sem permissão para gerenciar tags de férias.</p>
+          )}
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isLocked} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, motivo })}>
             {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : 'Salvar alterações'}
           </Button>
         </div>

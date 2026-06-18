@@ -139,6 +139,7 @@ export const permissionStructure = [
           { key: 'perm_criar_ferias', label: 'Criar Férias' },
           { key: 'perm_editar_ferias', label: 'Editar Férias' },
           { key: 'perm_alterar_data_inicio_ferias', label: 'Alterar Data de Início de Férias' },
+          { key: 'perm_gerenciar_tags_ferias', label: 'Gerenciar Tags de Férias', sensitive: true },
           { key: 'perm_lancar_inicio_ferias', label: 'Lançar Início de Férias' },
           { key: 'perm_interromper_ferias', label: 'Interromper Férias' },
           { key: 'perm_continuar_ferias', label: 'Continuar Férias' },
