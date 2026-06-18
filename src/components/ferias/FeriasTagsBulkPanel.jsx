@@ -5,23 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
 import { AlertCircle, Check, Loader2, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
-import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
+import { normalizarTexto } from '@/utils/funcoesTags/normalizacao';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
+import { isRegistroAtivo } from '@/utils/funcoesTags/contratoCampos';
+import { isTagAplicavelEmFerias } from '@/utils/funcoesTags/feriasTags';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
-
-function isAtivo(item) {
-  return resolveTagVisual(item).ativo;
-}
-
-function normalizar(valor) {
-  return String(valor || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-
-function isAplicavelEmFerias(tag) {
-  const valor = normalizarAplicabilidade(tag?.aplicabilidade);
-  return valor === 'ferias' || valor === 'todos';
-}
 
 export default function FeriasTagsBulkPanel({
   open,
@@ -53,14 +41,14 @@ export default function FeriasTagsBulkPanel({
   const gruposPorId = useMemo(() => new Map(grupos.map((g) => [String(g.id), g])), [grupos]);
 
   const tagsFiltradas = useMemo(() => {
-    const termo = normalizar(busca.trim());
+    const termo = normalizarTexto(busca.trim());
     return tags.filter((tag) => {
-      if (!isAtivo(tag) || !isAplicavelEmFerias(tag)) return false;
+      if (!isTagAplicavelEmFerias(tag)) return false;
       const grupoId = resolveTagVisual(tag).grupoId;
       const grupo = grupoId ? gruposPorId.get(String(grupoId)) : null;
-      if (grupo && !isAtivo(grupo)) return false;
+      if (grupo && !isRegistroAtivo(grupo)) return false;
       if (!termo) return true;
-      const texto = normalizar(`${resolveTagVisual(tag).nome} ${resolveTagVisual(tag).emoji} ${grupo?.nome || 'Sem grupo'}`);
+      const texto = normalizarTexto(`${resolveTagVisual(tag).nome} ${resolveTagVisual(tag).emoji} ${grupo?.nome || 'Sem grupo'}`);
       return texto.includes(termo);
     });
   }, [tags, gruposPorId, busca]);

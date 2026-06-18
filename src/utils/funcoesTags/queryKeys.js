@@ -17,7 +17,7 @@ export function buildFuncoesTagsScopeKey(userContext = {}) {
 export const funcoesTagsKeys = {
   feriasTagsPrefix: () => ['ferias-tags'],
   feriasTagsBulk: (scopeKey, feriasIds = []) => ['ferias-tags', 'bulk', scopeKey, [...new Set((feriasIds || []).map(String).filter(Boolean))].sort().join(',')],
-  catalogo: (scopeKey, tipo) => ['funcoes-tags', scopeKey, tipo],
+  catalogo: (scopeKey, tipo) => (scopeKey === 'local' ? ['funcoes-tags', tipo] : ['funcoes-tags', scopeKey, tipo]),
   militarFuncoes: (scopeKey, militarId) => ['militar-funcoes', scopeKey, militarId],
   militarTags: (scopeKey, militarId) => ['militar-tags', scopeKey, militarId],
   feriasTags: (scopeKey, feriasId) => ['ferias-tags', 'by-ferias', scopeKey, String(feriasId || '')],
