@@ -122,3 +122,67 @@ test('C1.10: Art 53: Soldado punido com prisão em separado superior a 20 dias d
   assert.strictEqual(resultado.comportamento, 'Mau');
   assert.match(resultado.fundamento, /Art. 53/);
 });
+
+test('C5.1: mais de 8 anos e apenas Advertência deve ser Excepcional sem punição considerada', () => {
+  const resultado = calcularComportamento(
+    [{ tipo: 'ADVERTENCIA', data_punicao: '2024-01-01', status: 'Ativa' }],
+    'Soldado',
+    HOJE,
+    { dataInclusaoMilitar: '2010-01-01' }
+  );
+
+  assert.strictEqual(resultado.comportamento, 'Excepcional');
+  assert.strictEqual(resultado.detalhes.total_punicoes_consideradas, 0);
+  assert.strictEqual(resultado.detalhes.janela_8_anos.quantidade, 0);
+});
+
+test('C5.1: mais de 8 anos e apenas Advertência verbal deve ser Excepcional', () => {
+  const resultado = calcularComportamento(
+    [{ tipo: 'ADVERTENCIA VERBAL', data_punicao: '2024-01-01', status: 'Ativa' }],
+    'Soldado',
+    HOJE,
+    { dataInclusaoMilitar: '2010-01-01' }
+  );
+
+  assert.strictEqual(resultado.comportamento, 'Excepcional');
+  assert.strictEqual(resultado.detalhes.janela_8_anos.quantidade, 0);
+});
+
+test('C5.1: Advertência não impede Ótimo quando Repreensão está dentro de 8 anos e fora de 4 anos', () => {
+  const resultado = calcularComportamento(
+    [
+      { tipo: 'ADVERTENCIA', data_punicao: '2024-01-01', status: 'Ativa' },
+      { tipo: 'REPREENSAO', data_punicao: '2019-05-01', status: 'Ativa' }
+    ],
+    'Soldado',
+    HOJE,
+    { dataInclusaoMilitar: '2010-01-01' }
+  );
+
+  assert.strictEqual(resultado.comportamento, 'Ótimo');
+  assert.strictEqual(resultado.detalhes.janela_8_anos.quantidade, 1);
+  assert.strictEqual(resultado.detalhes.janela_4_anos.quantidade, 0);
+});
+
+test('C5.1: Repreensão, Detenção, Prisão e Prisão em separado continuam impactando', () => {
+  const dataInclusaoMilitar = '2010-01-01';
+
+  const repreensao = calcularComportamento([{ tipo: 'REPREENSAO', data_punicao: '2024-01-01', status: 'Ativa' }], 'Soldado', HOJE, { dataInclusaoMilitar });
+  assert.strictEqual(repreensao.detalhes.janela_8_anos.quantidade, 1);
+  assert.strictEqual(repreensao.comportamento, 'Ótimo');
+
+  const detencoes = calcularComportamento([
+    { tipo: 'DETENCAO', data_punicao: '2024-01-01', status: 'Ativa' },
+    { tipo: 'DETENCAO', data_punicao: '2024-02-01', status: 'Ativa' }
+  ], 'Soldado', HOJE, { dataInclusaoMilitar });
+  assert.strictEqual(detencoes.comportamento, 'Bom');
+
+  const prisoes = calcularComportamento([
+    { tipo: 'PRISAO', data_punicao: '2024-01-01', status: 'Ativa' },
+    { tipo: 'PRISAO', data_punicao: '2024-02-01', status: 'Ativa' }
+  ], 'Soldado', HOJE, { dataInclusaoMilitar });
+  assert.strictEqual(prisoes.comportamento, 'Insuficiente');
+
+  const prisaoEmSeparado = calcularComportamento([{ tipo: 'PRISAO EM SEPARADO', data_punicao: '2015-01-01', status: 'Ativa', dias: 21, em_separado: true }], 'Soldado', HOJE, { dataInclusaoMilitar });
+  assert.strictEqual(prisaoEmSeparado.comportamento, 'Mau');
+});
