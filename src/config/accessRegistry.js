@@ -241,6 +241,9 @@ const ferias = {
   permissions: {
     canonical: {
       view: 'visualizar_ferias',
+      visualizar_plano: 'visualizar_plano_ferias',
+      visualizar_periodos_aquisitivos: 'visualizar_periodos_aquisitivos',
+      visualizar_creditos: 'visualizar_creditos_ferias',
       adicionar: 'adicionar_ferias',
       editar: 'editar_ferias',
       excluir: 'excluir_ferias',
@@ -249,6 +252,9 @@ const ferias = {
     },
     legacyPerm: {
       view: 'perm_visualizar_ferias',
+      visualizar_plano: 'perm_visualizar_plano_ferias',
+      visualizar_periodos_aquisitivos: 'perm_visualizar_periodos_aquisitivos',
+      visualizar_creditos: 'perm_visualizar_creditos_ferias',
       adicionar: 'perm_adicionar_ferias',
       editar: 'perm_editar_ferias',
       excluir: 'perm_excluir_ferias',
@@ -280,7 +286,7 @@ const ferias = {
       label: 'Dias Adicionais',
       pageKey: 'CreditosExtraordinariosFerias',
       source: 'layout.menuGroups',
-      rule: { viewPermission: 'visualizar_ferias' },
+      rule: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
     },
   ],
   routeRules: [
@@ -307,26 +313,24 @@ const ferias = {
       type: 'contextual',
       menuVisible: false,
       contextualOnly: true,
-      appGuard: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
-      source: 'App.jsx.moduleGuardByPage',
+      appGuard: { moduleKey: 'ferias', actionKey: 'visualizar_plano_ferias', moduleName: 'Férias' },
+      source: 'App.jsx.moduleGuardByPage/actionGuardByPage',
     },
     {
       pageKey: 'PeriodosAquisitivos',
       type: 'contextual',
       menuVisible: false,
       contextualOnly: true,
-      appGuard: { moduleKey: 'ferias', moduleName: 'Férias' },
-      note: 'Rota module-only no App.jsx.',
-      source: 'App.jsx.moduleGuardByPage',
+      appGuard: { moduleKey: 'ferias', actionKey: 'visualizar_periodos_aquisitivos', moduleName: 'Férias' },
+      source: 'App.jsx.moduleGuardByPage/actionGuardByPage',
     },
     {
       pageKey: 'CreditosExtraordinariosFerias',
       type: 'main',
       menuVisible: true,
       contextualOnly: false,
-      appGuard: { moduleKey: 'ferias', moduleName: 'Férias' },
-      note: 'Rota module-only no App.jsx; menu exige visualizar_ferias.',
-      source: 'App.jsx.moduleGuardByPage',
+      appGuard: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias', moduleName: 'Férias' },
+      source: 'App.jsx.moduleGuardByPage/actionGuardByPage',
     },
   ],
   // Ações sensíveis modeladas como allOf incorporando runtimeState e escopo.
@@ -391,11 +395,11 @@ const ferias = {
   knownDivergences: [
     {
       location: 'layout.menuGroups (Férias) vs App.jsx (rotas Férias)',
-      ruleMenu: 'Menu "Férias" e "Dias Adicionais" exigem viewPermission: visualizar_ferias',
-      ruleRoute: 'Rotas Ferias/CadastrarFerias/PeriodosAquisitivos/CreditosExtraordinariosFerias usam apenas { moduleKey: "ferias" }',
+      ruleMenu: 'Menu "Férias" exige visualizar_ferias; menu "Dias Adicionais" exige visualizar_creditos_ferias.',
+      ruleRoute: 'Rotas PlanoAnualFerias, PeriodosAquisitivos e CreditosExtraordinariosFerias exigem actions granulares; Ferias/CadastrarFerias preservam comportamento anterior.',
       impact:
-        'Usuário com módulo ferias mas sem visualizar_ferias não vê item no menu, porém pode acessar as rotas module-only diretamente.',
-      status: 'confirmado',
+        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; CadastrarFerias permanece sem action granular de escrita por decisão de escopo.',
+      status: 'mitigado_p1_3_b_1',
     },
     {
       location: 'pages/Ferias.jsx (admin_mode)',

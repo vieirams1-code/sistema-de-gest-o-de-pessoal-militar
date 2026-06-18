@@ -103,7 +103,7 @@ const menuGroups = [
         description: 'Gestão de períodos e dias adicionais',
         items: [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
-          { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
+          { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
         ],
       },
       {

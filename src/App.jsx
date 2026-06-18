@@ -70,9 +70,9 @@ const moduleGuardByPage = {
   VerMilitar: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   FichaMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
-  PlanoAnualFerias: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
-  PeriodosAquisitivos: { moduleKey: 'ferias', moduleName: 'Férias' },
-  CreditosExtraordinariosFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
+  PlanoAnualFerias: { moduleKey: 'ferias', actionKey: 'visualizar_plano_ferias', moduleName: 'Férias' },
+  PeriodosAquisitivos: { moduleKey: 'ferias', actionKey: 'visualizar_periodos_aquisitivos', moduleName: 'Férias' },
+  CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias', moduleName: 'Férias' },
   CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   Livro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   RP: { moduleKey: 'rp', moduleName: 'Registro de Publicações' },
@@ -114,14 +114,16 @@ const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((ac
 const getModuleGuardByPage = (pageKey) => moduleGuardByPageNormalized[pageKey.toLowerCase()] || null;
 
 // P1.3-A: Enforcement REAL e MÍNIMO — guard combinado (AND) de módulo + actionKey.
-// Aplicado SOMENTE às 7 rotas prioritárias abaixo, via RequireAction.
+// Aplicado SOMENTE às rotas prioritárias abaixo, via RequireAction.
 // Quando uma página consta aqui, ela usa RequireAction (AND) em vez do
 // RequireModuleAccess (OR), garantindo que a action seja realmente exigida.
 const actionGuardByPage = {
   Militares: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   CadastrarMilitar: { moduleKey: 'militares', actionKey: 'adicionar_militares', moduleName: 'Efetivo' },
   Ferias: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
-  CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
+  PlanoAnualFerias: { moduleKey: 'ferias', actionKey: 'visualizar_plano_ferias', moduleName: 'Férias' },
+  PeriodosAquisitivos: { moduleKey: 'ferias', actionKey: 'visualizar_periodos_aquisitivos', moduleName: 'Férias' },
+  CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias', moduleName: 'Férias' },
   Atestados: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
   CadastrarAtestado: { moduleKey: 'atestados', actionKey: 'adicionar_atestados', moduleName: 'Atestados' },
   ExtratoAtestadosMedicos: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
