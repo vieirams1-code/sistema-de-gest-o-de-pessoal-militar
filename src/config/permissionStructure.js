@@ -126,7 +126,13 @@ export const permissionStructure = [
           { key: 'perm_visualizar_periodos_aquisitivos', label: 'Visualizar Períodos Aquisitivos' },
           { key: 'perm_visualizar_creditos_ferias', label: 'Visualizar Créditos de Férias' },
           { key: 'perm_adicionar_ferias', label: 'Adicionar Férias' },
+          { key: 'perm_criar_ferias', label: 'Criar Férias' },
           { key: 'perm_editar_ferias', label: 'Editar Férias' },
+          { key: 'perm_alterar_data_inicio_ferias', label: 'Alterar Data de Início de Férias' },
+          { key: 'perm_lancar_inicio_ferias', label: 'Lançar Início de Férias' },
+          { key: 'perm_interromper_ferias', label: 'Interromper Férias' },
+          { key: 'perm_continuar_ferias', label: 'Continuar Férias' },
+          { key: 'perm_lancar_retorno_ferias', label: 'Lançar Retorno de Férias' },
           { key: 'perm_gerir_cadeia_ferias', label: 'Gerir Cadeia de Férias', sensitive: true },
           { key: 'perm_excluir_ferias', label: 'Excluir Férias', sensitive: true },
           { key: 'perm_recalcular_ferias', label: 'Recalcular Férias', sensitive: true }

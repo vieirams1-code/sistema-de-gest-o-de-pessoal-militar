@@ -428,6 +428,14 @@ export default function Ferias() {
   const [feriasTagsBulkOpen, setFeriasTagsBulkOpen] = useState(false);
   const [feriasTagsBulkResultado, setFeriasTagsBulkResultado] = useState(null);
 
+  const canCriarFerias = canAccessAction('criar_ferias');
+  const canEditarFerias = canAccessAction('editar_ferias');
+  const canAlterarDataInicioFerias = canAccessAction('alterar_data_inicio_ferias');
+  const canLancarInicioFerias = canAccessAction('lancar_inicio_ferias');
+  const canInterromperFerias = canAccessAction('interromper_ferias');
+  const canContinuarFerias = canAccessAction('continuar_ferias');
+  const canLancarRetornoFerias = canAccessAction('lancar_retorno_ferias');
+
   const {
     data: feriasData,
     isLoading,
@@ -1048,13 +1056,15 @@ export default function Ferias() {
               Períodos Aquisitivos
             </Button>
 
-            <Button
-              onClick={() => navigate(createPageUrl('CadastrarFerias'))}
-              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Nova Férias
-            </Button>
+            {canCriarFerias && (
+              <Button
+                onClick={() => navigate(createPageUrl('CadastrarFerias'))}
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Nova Férias
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1310,7 +1320,7 @@ export default function Ferias() {
                 : 'Comece cadastrando as primeiras férias'}
             </p>
 
-            {!searchTerm && statusFilter === 'all' && !situacaoPeriodoFilter.length && !anoAquisitivoFilter.length && !statusGozoFilter.length && !tagsFilter.length && (
+            {!searchTerm && statusFilter === 'all' && !situacaoPeriodoFilter.length && !anoAquisitivoFilter.length && !statusGozoFilter.length && !tagsFilter.length && canCriarFerias && (
               <Button
                 onClick={() => navigate(createPageUrl('CadastrarFerias'))}
                 className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
@@ -1387,6 +1397,11 @@ export default function Ferias() {
                         const tagsVisuais = feriasTagsVisuaisMap.get(String(f.id)) || [];
                         const tagsPreview = tagsVisuais.slice(0, 3);
                         const tagsOverflow = Math.max(0, tagsVisuais.length - 3);
+                        const hasDropdownActions =
+                          (canLancarInicioFerias && (f.status === 'Prevista' || f.status === 'Autorizada')) ||
+                          (canContinuarFerias && f.status === 'Interrompida') ||
+                          ((canLancarRetornoFerias || canInterromperFerias) && f.status === 'Em Curso') ||
+                          (f.status !== 'Gozada' && (canAlterarDataInicioFerias || canEditarFerias || canAccessAction('excluir_ferias')));
 
                         return (
                           <tr
@@ -1466,7 +1481,7 @@ export default function Ferias() {
                             <td className="px-4 py-3 text-slate-700">
                               <div className="flex items-center gap-1 group">
                                 <span>{formatDate(f.data_inicio)}</span>
-                                {f.status !== 'Gozada' && (
+                                {f.status !== 'Gozada' && canAlterarDataInicioFerias && (
                                   <button
                                     className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-[#1e3a5f]"
                                     title="Alterar data de início"
@@ -1560,6 +1575,7 @@ export default function Ferias() {
 
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end">
+                                {hasDropdownActions ? (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -1568,7 +1584,7 @@ export default function Ferias() {
                                   </DropdownMenuTrigger>
 
                                   <DropdownMenuContent align="end" className="w-56">
-                                    {(f.status === 'Prevista' || f.status === 'Autorizada') && (
+                                    {canLancarInicioFerias && (f.status === 'Prevista' || f.status === 'Autorizada') && (
                                       <DropdownMenuItem
                                         disabled={inicioBlocked}
                                         title={inicioBlockedReason || ''}
@@ -1583,7 +1599,7 @@ export default function Ferias() {
                                       </DropdownMenuItem>
                                     )}
 
-                                    {f.status === 'Interrompida' && (
+                                    {canContinuarFerias && f.status === 'Interrompida' && (
                                       <DropdownMenuItem
                                         onClick={() => abrirRegistroLivroModal(f, 'Nova Saída / Retomada')}
                                       >
@@ -1592,41 +1608,49 @@ export default function Ferias() {
                                       </DropdownMenuItem>
                                     )}
 
-                                    {f.status === 'Em Curso' && (
+                                    {(canLancarRetornoFerias || canInterromperFerias) && f.status === 'Em Curso' && (
                                       <>
-                                        <DropdownMenuItem
-                                          onClick={() => abrirRegistroLivroModal(f, 'Retorno Férias')}
-                                        >
-                                          <LogIn className="w-4 h-4 mr-2 text-blue-600" />
-                                          <span>Término</span>
-                                        </DropdownMenuItem>
+                                        {canLancarRetornoFerias && (
+                                          <DropdownMenuItem
+                                            onClick={() => abrirRegistroLivroModal(f, 'Retorno Férias')}
+                                          >
+                                            <LogIn className="w-4 h-4 mr-2 text-blue-600" />
+                                            <span>Término</span>
+                                          </DropdownMenuItem>
+                                        )}
 
-                                        <DropdownMenuItem
-                                          onClick={() => abrirRegistroLivroModal(f, 'Interrupção de Férias')}
-                                        >
-                                          <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
-                                          <span>Interrupção</span>
-                                        </DropdownMenuItem>
+                                        {canInterromperFerias && (
+                                          <DropdownMenuItem
+                                            onClick={() => abrirRegistroLivroModal(f, 'Interrupção de Férias')}
+                                          >
+                                            <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
+                                            <span>Interrupção</span>
+                                          </DropdownMenuItem>
+                                        )}
                                       </>
                                     )}
 
-                                    {f.status !== 'Gozada' && (
+                                    {f.status !== 'Gozada' && (canAlterarDataInicioFerias || canEditarFerias || canAccessAction('excluir_ferias')) && (
                                       <>
                                         <DropdownMenuSeparator />
 
-                                        <DropdownMenuItem
-                                          onClick={() => abrirEditDataModal(f)}
-                                        >
-                                          <Pencil className="w-4 h-4 mr-2 text-slate-500" />
-                                          <span>Alterar Data de Início</span>
-                                        </DropdownMenuItem>
+                                        {canAlterarDataInicioFerias && (
+                                          <DropdownMenuItem
+                                            onClick={() => abrirEditDataModal(f)}
+                                          >
+                                            <Pencil className="w-4 h-4 mr-2 text-slate-500" />
+                                            <span>Alterar Data de Início</span>
+                                          </DropdownMenuItem>
+                                        )}
 
-                                        <DropdownMenuItem
-                                          onClick={() => abrirEdicaoFerias(f)}
-                                        >
-                                          <Pencil className="w-4 h-4 mr-2 text-slate-500" />
-                                          <span>Editar Férias</span>
-                                        </DropdownMenuItem>
+                                        {canEditarFerias && (
+                                          <DropdownMenuItem
+                                            onClick={() => abrirEdicaoFerias(f)}
+                                          >
+                                            <Pencil className="w-4 h-4 mr-2 text-slate-500" />
+                                            <span>Editar Férias</span>
+                                          </DropdownMenuItem>
+                                        )}
 
                                         {(canAccessAction('excluir_ferias')) && (() => {
                                           const temCadeia = registrosLivro.some(
@@ -1678,6 +1702,9 @@ export default function Ferias() {
                                     )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                                ) : (
+                                  <span className="text-slate-300">—</span>
+                                )}
                               </div>
                             </td>
                           </tr>
