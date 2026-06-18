@@ -306,7 +306,6 @@ function calcularProximaMelhoria(punicoes, postoGraduacao, hoje = new Date(), co
     addDays(addYears(p.data_base, 8), 1),
   ]).filter((d) => d > referencia);
 
-  // Também considerar marcos de tempo de serviço se dataInclusao disponível
   const dataInclusao = toDate(config.dataInclusaoMilitar || config.data_inclusao || null);
   if (dataInclusao) {
     [2, 4, 8].forEach(anos => {
@@ -332,6 +331,70 @@ function calcularProximaMelhoria(punicoes, postoGraduacao, hoje = new Date(), co
 }
 
 // ============================================================================
+// PROJEÇÃO DA DATA DE INÍCIO DO COMPORTAMENTO ATUAL
+// ============================================================================
+
+function estimarDataInicioComportamentoAtual(punicoes, postoGraduacao, dataInclusaoMilitar, hoje, comportamentoCalculado) {
+    const referencia = toDate(hoje) || new Date();
+    const dataInclusao = toDate(dataInclusaoMilitar);
+    if (!dataInclusao) return null;
+
+    const punicoesValidas = (Array.isArray(punicoes) ? punicoes : [])
+        .filter((p) => isPunicaoValida(p))
+        .map(normalizePunicao)
+        .filter((p) => p.data_base);
+
+    const datasCandidadasSet = new Set();
+
+    // 1. Data de inclusão e marcos de tempo de serviço
+    datasCandidadasSet.add(dataInclusao.getTime());
+    [2, 4, 8].forEach(anos => {
+        const d = addDays(addYears(dataInclusao, anos), 1);
+        if (d <= referencia) datasCandidadasSet.add(d.getTime());
+    });
+
+    // 2. Datas baseadas em punições
+    punicoesValidas.forEach(p => {
+        if (p.data_base <= referencia) datasCandidadasSet.add(p.data_base.getTime());
+        [1, 2, 4, 8].forEach(anos => {
+            const d = addDays(addYears(p.data_base, anos), 1);
+            if (d <= referencia) datasCandidadasSet.add(d.getTime());
+        });
+    });
+
+    // 3. Hoje
+    datasCandidadasSet.add(referencia.getTime());
+
+    const datasOrdenadas = Array.from(datasCandidadasSet)
+        .map(ts => new Date(ts))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+    let dataInicioEstimada = null;
+    let fundamentoEstimado = null;
+
+    // Percorre do presente para o passado
+    for (let i = datasOrdenadas.length - 1; i >= 0; i--) {
+        const dataTeste = datasOrdenadas[i];
+        const res = calcularComportamento(punicoes, postoGraduacao, dataTeste, { data_inclusao: dataInclusaoMilitar });
+
+        if (res && res.comportamento === comportamentoCalculado) {
+            dataInicioEstimada = dataTeste;
+            fundamentoEstimado = res.fundamento;
+        } else {
+            // Se mudou o comportamento voltando no tempo, a última data que era igual é o início
+            break;
+        }
+    }
+
+    if (!dataInicioEstimada) return null;
+
+    return {
+        data: formatDateISO(dataInicioEstimada),
+        fundamento: fundamentoEstimado
+    };
+}
+
+// ============================================================================
 // HANDLER DA DENO FUNCTION
 // ============================================================================
 
@@ -350,9 +413,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    // Opcional: restringir a admins se necessário, mas o pedido não foi explícito sobre isso,
-    // embora seja boa prática para auditoria massiva.
-    // if (user.role !== 'admin') return Response.json({ error: 'Acesso negado' }, { status: 403 });
+    // RESTRIÇÃO OBRIGATÓRIA: apenas admin
+    if (user.role !== 'admin') {
+        return Response.json({ error: 'Acesso negado: Requer privilégios de administrador.' }, { status: 403 });
+    }
 
     // 2) CARREGAMENTO DE DADOS (asServiceRole para auditoria global)
     const [militares, punicoes] = await Promise.all([
@@ -388,11 +452,9 @@ Deno.serve(async (req) => {
     });
 
     for (const militar of militares) {
-      // Filtrar apenas praças
       if (!isPraca(militar.posto_graduacao)) continue;
       summary.totalElegiveis++;
 
-      // Validar data de inclusão (exigência para cálculo)
       if (!militar.data_inclusao) {
         summary.totalInconsistencias++;
         inconsistencias.push({
@@ -410,7 +472,7 @@ Deno.serve(async (req) => {
         data_inclusao: militar.data_inclusao,
       });
 
-      if (!calc) continue; // Não deve acontecer para praças com data_inclusao
+      if (!calc) continue;
 
       const comportamentoCadastrado = militar.comportamento || 'Bom';
       const comportamentoCalculado = calc.comportamento;
@@ -421,6 +483,8 @@ Deno.serve(async (req) => {
         const proximaMelhoria = calcularProximaMelhoria(mPunicoes, militar.posto_graduacao, hoje, {
           data_inclusao: militar.data_inclusao,
         });
+
+        const inicioComportamento = estimarDataInicioComportamentoAtual(mPunicoes, militar.posto_graduacao, militar.data_inclusao, hoje, comportamentoCalculado);
 
         const div = {
           militar_id: militar.id,
@@ -434,13 +498,12 @@ Deno.serve(async (req) => {
           total_punicoes_consideradas: calc.detalhes.total_punicoes_consideradas,
           tempo_servico_anos: calc.detalhes.tempo_servico_anos,
           elegibilidade: calc.detalhes.elegibilidade,
-          data_estimada_mudanca: proximaMelhoria?.data || null,
+          data_estimada_mudanca: inicioComportamento?.data || null,
           proxima_melhoria: proximaMelhoria,
         };
 
         divergencias.push(div);
 
-        // Agrupamento específico solicitado
         const chaveAgrupamento = `${comportamentoCadastrado} → ${comportamentoCalculado}`;
         if (agrupamento[chaveAgrupamento] !== undefined) {
           agrupamento[chaveAgrupamento]++;

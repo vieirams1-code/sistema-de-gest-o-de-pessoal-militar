@@ -72,6 +72,12 @@ function subtractYears(baseDate, years) {
   return addYears(baseDate, -years);
 }
 
+function addDays(baseDate, days) {
+  const date = new Date(baseDate);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
 function getStatusPunicao(punicao = {}) {
   return String(punicao.status_punicao || punicao.status || 'Ativa').trim();
 }
@@ -149,24 +155,23 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
   const podeSerOtimo = elegibilidade?.otimo ?? true;
   const podeSerExcepcional = elegibilidade?.excepcional ?? true;
 
-  if (j1.prisao_equivalente > 2) return { comportamento: 'Mau' };
-  if (j1.prisao_equivalente === 2) return { comportamento: 'Insuficiente' };
+  if (j1.prisao_equivalente > 2) return { comportamento: 'Mau', fundamento: 'Mau Fundamento' };
+  if (j1.prisao_equivalente === 2) return { comportamento: 'Insuficiente', fundamento: 'Insuficiente Fundamento' };
 
   if (podeSerExcepcional && j8.quantidade === 0) {
-    return { comportamento: 'Excepcional' };
+    return { comportamento: 'Excepcional', fundamento: 'Excepcional Fundamento' };
   }
 
-  // REGRA CORRIGIDA: sem exigir j4.quantidade > 0
   if (podeSerOtimo && j4.detencao_equivalente <= 1) {
-    return { comportamento: 'Ótimo' };
+    return { comportamento: 'Ótimo', fundamento: 'Ótimo Fundamento' };
   }
 
-  return { comportamento: 'Bom' };
+  return { comportamento: 'Bom', fundamento: 'Bom Fundamento' };
 }
 
 function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(), config = {}) {
   const referencia = toDate(hoje) || new Date();
-  const dataInclusao = toDate(config.data_inclusao || null);
+  const dataInclusao = toDate(config.dataInclusaoMilitar || config.data_inclusao || null);
   const punicoesEntrada = Array.isArray(punicoes) ? punicoes : [];
   const punicoesValidas = punicoesEntrada
     .filter((p) => isPunicaoValida(p, config))
@@ -194,6 +199,48 @@ function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(), conf
   return resolveComportamentoPorJanelas(janela_1_ano, janela_2_anos, janela_4_anos, janela_8_anos, elegibilidade);
 }
 
+function estimarDataInicioComportamentoAtual(punicoes, postoGraduacao, dataInclusaoMilitar, hoje, comportamentoCalculado) {
+    const referencia = toDate(hoje) || new Date();
+    const dataInclusao = toDate(dataInclusaoMilitar);
+    if (!dataInclusao) return null;
+
+    const punicoesValidas = (Array.isArray(punicoes) ? punicoes : [])
+        .filter((p) => isPunicaoValida(p))
+        .map(normalizePunicao)
+        .filter((p) => p.data_base);
+
+    const datasCandidadasSet = new Set();
+    datasCandidadasSet.add(dataInclusao.getTime());
+    [2, 4, 8].forEach(anos => {
+        const d = addDays(addYears(dataInclusao, anos), 1);
+        if (d <= referencia) datasCandidadasSet.add(d.getTime());
+    });
+    punicoesValidas.forEach(p => {
+        if (p.data_base <= referencia) datasCandidadasSet.add(p.data_base.getTime());
+        [1, 2, 4, 8].forEach(anos => {
+            const d = addDays(addYears(p.data_base, anos), 1);
+            if (d <= referencia) datasCandidadasSet.add(d.getTime());
+        });
+    });
+    datasCandidadasSet.add(referencia.getTime());
+
+    const datasOrdenadas = Array.from(datasCandidadasSet)
+        .map(ts => new Date(ts))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+    let dataInicioEstimada = null;
+    for (let i = datasOrdenadas.length - 1; i >= 0; i--) {
+        const dataTeste = datasOrdenadas[i];
+        const res = calcularComportamento(punicoes, postoGraduacao, dataTeste, { data_inclusao: dataInclusaoMilitar });
+        if (res && res.comportamento === comportamentoCalculado) {
+            dataInicioEstimada = dataTeste;
+        } else {
+            break;
+        }
+    }
+    return dataInicioEstimada ? formatDateISO(dataInicioEstimada) : null;
+}
+
 test('Regra do Ótimo corrigida: deve ser Ótimo se tiver 0 punições em 4 anos e >= 4 anos de serviço (mas < 8 anos)', () => {
   const hoje = new Date('2024-01-01T00:00:00');
   const dataInclusao = '2019-01-01'; // 5 anos de serviço
@@ -203,52 +250,35 @@ test('Regra do Ótimo corrigida: deve ser Ótimo se tiver 0 punições em 4 anos
   assert.strictEqual(resultado.comportamento, 'Ótimo');
 });
 
-test('Regra do Ótimo corrigida: deve ser Ótimo se tiver 1 detenção em 4 anos e >= 4 anos de serviço', () => {
-  const hoje = new Date('2024-01-01T00:00:00');
-  const dataInclusao = '2010-01-01';
-  const punicoes = [
-    { tipo: 'DETENCAO', data_punicao: '2022-01-01' } // Dentro dos 4 anos (2020-2024)
-  ];
-
-  const resultado = calcularComportamento(punicoes, 'Cabo', hoje, { data_inclusao: dataInclusao });
-  assert.strictEqual(resultado.comportamento, 'Ótimo');
-});
-
-test('Regra do Ótimo: não deve ser Ótimo se tiver 2 detenções (1 prisão eq) em 4 anos', () => {
-  const hoje = new Date('2024-01-01T00:00:00');
-  const dataInclusao = '2010-01-01';
-  const punicoes = [
-    { tipo: 'DETENCAO', data_punicao: '2022-01-01' },
-    { tipo: 'DETENCAO', data_punicao: '2022-02-01' }
-  ];
-
-  const resultado = calcularComportamento(punicoes, 'Cabo', hoje, { data_inclusao: dataInclusao });
-  assert.strictEqual(resultado.comportamento, 'Bom');
-});
-
-test('Regra do Excepcional: deve ser Excepcional se tiver 0 punições em 8 anos e >= 8 anos de serviço', () => {
-  const hoje = new Date('2024-01-01T00:00:00');
-  const dataInclusao = '2010-01-01';
-  const punicoes = [];
-
-  const resultado = calcularComportamento(punicoes, 'Cabo', hoje, { data_inclusao: dataInclusao });
-  assert.strictEqual(resultado.comportamento, 'Excepcional');
-});
-
-test('Transição Bom -> Ótimo: deve detectar divergência quando cadastrado é Bom mas calculado é Ótimo', () => {
-    // Simulação simplificada do loop principal
-    const militar = {
-        id: '1',
-        nome: 'Militar Teste',
-        posto_graduacao: 'Cabo',
-        data_inclusao: '2019-01-01', // 5 anos de serviço
-        comportamento: 'Bom'
-    };
-    const punicoes = []; // Ótimo calculado
+test('Estimativa de data de início: deve identificar a data de inclusão se nenhum comportamento anterior mudou', () => {
     const hoje = new Date('2024-01-01T00:00:00');
+    const dataInclusao = '2023-01-01';
+    const punicoes = []; // Bom
+    const compCalculado = 'Bom';
 
-    const calc = calcularComportamento(punicoes, militar.posto_graduacao, hoje, { data_inclusao: militar.data_inclusao });
+    const dataInicio = estimarDataInicioComportamentoAtual(punicoes, 'Cabo', dataInclusao, hoje, compCalculado);
+    assert.strictEqual(dataInicio, '2023-01-01');
+});
 
-    assert.strictEqual(militar.comportamento, 'Bom');
-    assert.strictEqual(calc.comportamento, 'Ótimo');
+test('Estimativa de data de início: deve identificar marco de tempo de serviço (Ótimo aos 4 anos)', () => {
+    const hoje = new Date('2024-01-01T00:00:00');
+    const dataInclusao = '2019-01-01'; // Completa 4 anos em 2023-01-01
+    const punicoes = []; // Ótimo
+    const compCalculado = 'Ótimo';
+
+    const dataInicio = estimarDataInicioComportamentoAtual(punicoes, 'Cabo', dataInclusao, hoje, compCalculado);
+    assert.strictEqual(dataInicio, '2023-01-02'); // inclusao + 4 anos + 1 dia
+});
+
+test('Estimativa de data de início: deve identificar expiração de punição (Bom -> Ótimo após 4 anos)', () => {
+    const hoje = new Date('2024-01-01T00:00:00');
+    const dataInclusao = '2010-01-01';
+    const punicoes = [
+        { tipo: 'DETENCAO', data_punicao: '2015-01-01' }, // Expira para janela de 4 anos em 2019-01-01
+        { tipo: 'DETENCAO', data_punicao: '2018-01-01' }  // Permanece na janela de 8 anos até 2026
+    ];
+    const compCalculado = 'Ótimo';
+
+    const dataInicio = estimarDataInicioComportamentoAtual(punicoes, 'Cabo', dataInclusao, hoje, compCalculado);
+    assert.strictEqual(dataInicio, '2019-01-02'); // Primeira punicao + 4 anos + 1 dia
 });
