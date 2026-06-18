@@ -7,6 +7,7 @@ import {
   addDays,
   normalizePunicao,
   isPunicaoValida,
+  isPunicaoImpactanteComportamento,
 } from './calcularComportamento.js';
 
 /**
@@ -47,10 +48,12 @@ export function gerarLinhaTempoComportamento({
 
   punicoesValidas.forEach((p) => {
     addDate(p.data_base);
-    addDate(addDays(addYears(p.data_base, 1), 1));
-    addDate(addDays(addYears(p.data_base, 2), 1));
-    addDate(addDays(addYears(p.data_base, 4), 1));
-    addDate(addDays(addYears(p.data_base, 8), 1));
+    if (isPunicaoImpactanteComportamento(p)) {
+      addDate(addDays(addYears(p.data_base, 1), 1));
+      addDate(addDays(addYears(p.data_base, 2), 1));
+      addDate(addDays(addYears(p.data_base, 4), 1));
+      addDate(addDays(addYears(p.data_base, 8), 1));
+    }
   });
 
   addDate(dataHoje);
@@ -121,6 +124,20 @@ export function gerarLinhaTempoComportamento({
       ...seg,
       origem: isProjetado ? 'PROJECAO' : 'HISTORICO',
       punicoesConsideradas: seg.detalhes?.janela_8_anos?.punicoes || [],
+      advertenciasInformativas: punicoesValidas.filter((p) => (
+        !isPunicaoImpactanteComportamento(p)
+        && p.data_base_iso >= seg.inicio
+        && p.data_base_iso <= seg.fim
+      )).map((p) => ({
+        id: p.id,
+        tipo: p.tipo_resolvido,
+        status: p.status_resolvido,
+        data_fim_cumprimento: p.data_base_iso,
+        prisao_equivalente: 0,
+        detencao_equivalente: 0,
+        impacto_comportamento: false,
+        descricao: `${p.tipo_resolvido} (${p.status_resolvido}) — Sem impacto no comportamento`,
+      })),
       janelas: {
         j1: seg.detalhes?.janela_1_ano,
         j2: seg.detalhes?.janela_2_anos,
@@ -151,11 +168,17 @@ export function gerarLinhaTempoComportamento({
   }
 
   punicoesValidas.forEach((p) => {
+    const impactante = isPunicaoImpactanteComportamento(p);
     eventos.push({
       data: p.data_base_iso,
-      tipo: 'PUNICAO',
-      descricao: `${p.tipo_resolvido} (${p.status_resolvido})`,
+      tipo: impactante ? 'PUNICAO' : 'ADVERTENCIA_INFORMATIVA',
+      descricao: impactante
+        ? `${p.tipo_resolvido} (${p.status_resolvido})`
+        : `${p.tipo_resolvido} (${p.status_resolvido}) — Sem impacto no comportamento`,
       punicao_id: p.id,
+      prisao_equivalente: impactante ? p.prisao_equivalente : 0,
+      detencao_equivalente: impactante ? p.detencao_equivalente : 0,
+      impacto_comportamento: impactante,
     });
   });
 
@@ -183,7 +206,7 @@ export function gerarLinhaTempoComportamento({
 
   eventos.sort((a, b) => {
     if (a.data !== b.data) return a.data.localeCompare(b.data);
-    const ordem = { INCLUSAO: 1, PUNICAO: 2, MUDANCA_COMPORTAMENTO: 3, HOJE: 4, PROJECAO_FUTURA: 5 };
+    const ordem = { INCLUSAO: 1, PUNICAO: 2, ADVERTENCIA_INFORMATIVA: 2, MUDANCA_COMPORTAMENTO: 3, HOJE: 4, PROJECAO_FUTURA: 5 };
     return (ordem[a.tipo] || 99) - (ordem[b.tipo] || 99);
   });
 

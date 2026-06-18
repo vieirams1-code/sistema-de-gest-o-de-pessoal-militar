@@ -6,15 +6,26 @@ const comportamentoClasses = {
   Excepcional: 'bg-blue-100 text-blue-800 border-blue-200',
   Ótimo: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   Otimo: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  Bom: 'bg-slate-100 text-slate-800 border-slate-200',
-  Insuficiente: 'bg-amber-100 text-amber-800 border-amber-200',
+  Bom: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  Insuficiente: 'bg-orange-100 text-orange-800 border-orange-200',
   Mau: 'bg-red-100 text-red-800 border-red-200',
   MAU: 'bg-red-100 text-red-800 border-red-200',
+};
+
+const comportamentoBarClasses = {
+  Excepcional: 'bg-blue-500',
+  Ótimo: 'bg-emerald-500',
+  Otimo: 'bg-emerald-500',
+  Bom: 'bg-yellow-400',
+  Insuficiente: 'bg-orange-500',
+  Mau: 'bg-red-500',
+  MAU: 'bg-red-500',
 };
 
 const eventoClasses = {
   INCLUSAO: 'bg-sky-600 border-sky-100',
   PUNICAO: 'bg-red-600 border-red-100',
+  ADVERTENCIA_INFORMATIVA: 'bg-white border-slate-500 ring-2 ring-slate-300',
   MUDANCA_COMPORTAMENTO: 'bg-indigo-600 border-indigo-100',
   HOJE: 'bg-emerald-600 border-emerald-100',
   PROJECAO_FUTURA: 'bg-violet-600 border-violet-100',
@@ -59,6 +70,19 @@ function getEventoPosition(evento, range) {
   return Math.min(98, Math.max(2, percent));
 }
 
+
+function calcularDuracaoAproximada(inicioValue, fimValue) {
+  const inicio = parseDate(inicioValue);
+  const fim = parseDate(fimValue);
+  if (!inicio || !fim) return '—';
+  const dias = Math.max(0, Math.round((fim.getTime() - inicio.getTime()) / 86400000) + 1);
+  const anos = Math.floor(dias / 365);
+  const meses = Math.floor((dias % 365) / 30);
+  if (anos > 0) return `${anos} ano(s) e ${meses} mês(es)`;
+  if (meses > 0) return `${meses} mês(es)`;
+  return `${dias} dia(s)`;
+}
+
 function resumirMemoria(timelineCalculada, segmento) {
   const memoria = timelineCalculada?.memoriaCalculo || [];
   return memoria.find((item) => item?.dataReferencia === segmento?.inicio) || null;
@@ -93,37 +117,70 @@ function JanelasResumo({ janelas = {} }) {
   );
 }
 
-function EventosLinha({ eventos = [], segmentos = [] }) {
+function getSegmentWidth(segmento, range) {
+  const inicio = parseDate(segmento?.inicio);
+  const fim = parseDate(segmento?.fim);
+  if (!inicio || !fim || !range) return 0;
+  const width = ((fim.getTime() - inicio.getTime()) / (range.max - range.min)) * 100;
+  return Math.max(4, width);
+}
+
+function TimelineHorizontal({ eventos = [], segmentos = [] }) {
   const range = getRange(eventos, segmentos);
 
-  if (!eventos.length) {
-    return <p className="text-sm text-slate-500">Nenhum evento calculado para exibição.</p>;
+  if (!segmentos.length) {
+    return <p className="text-sm text-slate-500">Nenhum segmento calculado para exibição.</p>;
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="relative h-16">
-        <div className="absolute left-0 right-0 top-8 h-1 rounded-full bg-slate-300" />
-        {eventos.map((evento, index) => (
-          <div
-            key={`${evento.data}-${evento.tipo}-${index}`}
-            className="group absolute top-5 -translate-x-1/2"
-            style={{ left: `${getEventoPosition(evento, range)}%` }}
-          >
-            <div className={`h-7 w-7 rounded-full border-4 shadow ${eventoClasses[evento.tipo] || 'bg-slate-600 border-slate-100'}`} />
-            <div className="pointer-events-none absolute bottom-10 left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg group-hover:block">
-              <p className="font-semibold text-slate-900">{formatarData(evento.data)}</p>
-              <p><strong>Tipo:</strong> {evento.tipo || '—'}</p>
-              <p><strong>Descrição:</strong> {evento.descricao || '—'}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="relative pb-16 pt-8">
+        <div className="flex h-9 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner">
+          {segmentos.map((segmento, index) => (
+            <div
+              key={`${segmento.inicio}-${segmento.fim}-${segmento.comportamento}-${index}`}
+              className={`${comportamentoBarClasses[segmento.comportamento] || 'bg-slate-400'} relative flex items-center justify-center text-[11px] font-semibold text-white ${segmento.isProjetado ? 'bg-[repeating-linear-gradient(135deg,#8b5cf6,#8b5cf6_8px,#a78bfa_8px,#a78bfa_16px)]' : ''} ${segmento.isAtual ? 'ring-4 ring-inset ring-slate-900/20' : ''}`}
+              style={{ width: `${getSegmentWidth(segmento, range)}%` }}
+              title={`${segmento.comportamento || '—'}: ${formatarPeriodo(segmento.inicio)} até ${formatarPeriodo(segmento.fim)}`}
+            >
+              <span className="truncate px-2">{segmento.isProjetado ? 'Projeção' : segmento.comportamento}</span>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {eventos.map((evento, index) => {
+          const isHoje = evento.tipo === 'HOJE';
+          const isAdvertencia = evento.tipo === 'ADVERTENCIA_INFORMATIVA';
+          return (
+            <div
+              key={`${evento.data}-${evento.tipo}-${index}`}
+              className="group absolute top-3 -translate-x-1/2"
+              style={{ left: `${getEventoPosition(evento, range)}%` }}
+            >
+              <div className={`mx-auto h-5 w-5 rounded-full border-4 shadow ${eventoClasses[evento.tipo] || 'bg-slate-600 border-slate-100'} ${isHoje ? 'h-7 w-7' : ''}`} />
+              <div className="mt-1 max-w-[90px] truncate text-center text-[10px] font-semibold text-slate-600">
+                {isHoje ? 'HOJE' : isAdvertencia ? 'Advertência' : evento.comportamento ? `Sobe para ${evento.comportamento}` : evento.tipo === 'INCLUSAO' ? 'Início' : evento.tipo === 'PUNICAO' ? 'Punição' : evento.tipo === 'PROJECAO_FUTURA' ? 'Projeção' : 'Marco'}
+              </div>
+              <div className="pointer-events-none absolute bottom-10 left-1/2 z-20 hidden w-72 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg group-hover:block">
+                <p className="font-semibold text-slate-900">{formatarData(evento.data)}</p>
+                <p><strong>Tipo:</strong> {evento.tipo || '—'}</p>
+                <p><strong>Descrição:</strong> {evento.descricao || '—'}</p>
+                <p><strong>Equivalência:</strong> prisão {evento.prisao_equivalente ?? 0} / detenção {evento.detencao_equivalente ?? 0}</p>
+                <p><strong>Impacto no comportamento:</strong> {evento.impacto_comportamento ? 'Sim' : 'Não'}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600">
-        <span><span className="inline-block h-2 w-2 rounded-full bg-sky-600" /> inclusão</span>
-        <span><span className="inline-block h-2 w-2 rounded-full bg-red-600" /> punições</span>
-        <span><span className="inline-block h-2 w-2 rounded-full bg-indigo-600" /> mudanças</span>
-        <span><span className="inline-block h-2 w-2 rounded-full bg-violet-600" /> projeção futura</span>
+
+      <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
+        <span><span className="inline-block h-3 w-3 rounded bg-blue-500" /> Excepcional</span>
+        <span><span className="inline-block h-3 w-3 rounded bg-emerald-500" /> Ótimo</span>
+        <span><span className="inline-block h-3 w-3 rounded bg-yellow-400" /> Bom</span>
+        <span><span className="inline-block h-3 w-3 rounded bg-orange-500" /> Insuficiente</span>
+        <span><span className="inline-block h-3 w-3 rounded bg-red-500" /> Mau</span>
+        <span><span className="inline-block h-3 w-3 rounded bg-violet-500" /> Projeção futura</span>
+        <span><span className="inline-block h-3 w-3 rounded-full border-2 border-slate-500 bg-white" /> Advertência sem impacto</span>
       </div>
     </div>
   );
@@ -184,7 +241,7 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
         </div>
       </div>
 
-      <EventosLinha eventos={eventos} segmentos={segmentos} />
+      <TimelineHorizontal eventos={eventos} segmentos={segmentos} />
 
       <div className="space-y-4">
         {segmentos.length ? segmentos.map((segmento, index) => {
@@ -222,6 +279,7 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
                   <p><strong>Indicador Atual:</strong> {segmento.isAtual ? 'Sim' : 'Não'}</p>
                   <p><strong>Indicador Projetado:</strong> {segmento.isProjetado ? 'Sim' : 'Não'}</p>
                   <p><strong>Período:</strong> {formatarPeriodo(segmento.inicio)} até {formatarPeriodo(segmento.fim)}</p>
+                  <p><strong>Duração aproximada:</strong> {calcularDuracaoAproximada(segmento.inicio, segmento.fim)}</p>
                 </div>
 
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
@@ -244,6 +302,24 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
                     </div>
                   ) : (
                     <p className="text-sm text-slate-500">Nenhuma punição considerada neste segmento.</p>
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  <p className="mb-2 font-semibold text-slate-900">Advertências informativas do período</p>
+                  {segmento.advertenciasInformativas?.length ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {segmento.advertenciasInformativas.map((advertencia, advertenciaIndex) => (
+                        <div key={`${advertencia.id || advertencia.data_fim_cumprimento}-${advertenciaIndex}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                          <p className="font-semibold text-slate-800">{advertencia.tipo}</p>
+                          <p>Data base: {formatarData(advertencia.data_fim_cumprimento)}</p>
+                          <p>Impacto no comportamento: Não</p>
+                          <p>Equivalência: 0</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Nenhuma advertência informativa neste segmento.</p>
                   )}
                 </div>
 

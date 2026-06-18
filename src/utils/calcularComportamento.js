@@ -79,10 +79,15 @@ function getDataBasePunicao(punicao = {}) {
   );
 }
 
+export function isPunicaoImpactanteComportamento(punicaoNormalizada = {}) {
+  const tipo = normalizeText(punicaoNormalizada.tipo_normalizado || getTipoPunicao(punicaoNormalizada));
+  return !['ADVERTENCIA', 'ADVERTENCIA VERBAL'].includes(tipo);
+}
+
 export function normalizePunicao(punicao = {}) {
   const tipo = getTipoPunicao(punicao);
   const tipoNormalizado = normalizeText(tipo);
-  const pesoPrisao = TIPO_PESO_PRISAO[tipoNormalizado] ?? 0;
+  const pesoPrisao = isPunicaoImpactanteComportamento({ tipo_normalizado: tipoNormalizado }) ? (TIPO_PESO_PRISAO[tipoNormalizado] ?? 0) : 0;
   const dataBase = toDate(getDataBasePunicao(punicao));
   return {
     ...punicao,
@@ -93,6 +98,7 @@ export function normalizePunicao(punicao = {}) {
     data_base_iso: formatDateISO(dataBase),
     prisao_equivalente: pesoPrisao,
     detencao_equivalente: pesoPrisao * 2,
+    impacto_comportamento: isPunicaoImpactanteComportamento({ tipo_normalizado: tipoNormalizado }),
   };
 }
 
@@ -115,7 +121,9 @@ function isInWindow(date, start, end) {
 }
 
 function summarizeWindowWithStart(punicoesNormalizadas, inicio, fim, anos) {
-  const dentroJanela = punicoesNormalizadas.filter((p) => isInWindow(p.data_base, inicio, fim));
+  const dentroJanela = punicoesNormalizadas
+    .filter(isPunicaoImpactanteComportamento)
+    .filter((p) => isInWindow(p.data_base, inicio, fim));
 
   const prisao_equivalente = dentroJanela.reduce((acc, p) => acc + p.prisao_equivalente, 0);
   const detencao_equivalente = dentroJanela.reduce((acc, p) => acc + p.detencao_equivalente, 0);
@@ -136,6 +144,7 @@ function summarizeWindowWithStart(punicoesNormalizadas, inicio, fim, anos) {
       detencao_equivalente: p.detencao_equivalente,
       dias: Number(p.dias || p.dias_punicao || 0),
       em_separado: Boolean(p.prisao_em_separado || p.em_separado || p.agravada_prisao_em_separado),
+      impacto_comportamento: true,
     })),
   };
 }
@@ -230,12 +239,14 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
     .filter((p) => p.data_base)
     .sort((a, b) => new Date(a.data_base) - new Date(b.data_base));
 
-  const art53 = temRegraArt53(punicoesValidas, postoGraduacao);
+  const punicoesImpactantes = punicoesValidas.filter(isPunicaoImpactanteComportamento);
+
+  const art53 = temRegraArt53(punicoesImpactantes, postoGraduacao);
 
   const construirJanela = (anos) => {
     const inicioLegal = subtractYears(referencia, anos);
     const inicio = dataInclusao && dataInclusao > inicioLegal ? dataInclusao : inicioLegal;
-    return summarizeWindowWithStart(punicoesValidas, inicio, referencia, anos);
+    return summarizeWindowWithStart(punicoesImpactantes, inicio, referencia, anos);
   };
 
   const janela_1_ano = construirJanela(1);
@@ -249,7 +260,7 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
     excepcional: !dataInclusao || tempoServicoAnos >= 8,
   };
 
-  const ultimaPunicao = punicoesValidas.at(-1);
+  const ultimaPunicao = punicoesImpactantes.at(-1);
 
   if (art53) {
     return {
@@ -260,7 +271,7 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
         janela_2_anos,
         janela_4_anos,
         janela_8_anos,
-        total_punicoes_consideradas: punicoesValidas.length,
+        total_punicoes_consideradas: punicoesImpactantes.length,
         ultima_punicao_data: ultimaPunicao?.data_base_iso || null,
         regra_critica_art53: {
           aplicada: true,
@@ -281,7 +292,7 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
       janela_2_anos,
       janela_4_anos,
       janela_8_anos,
-      total_punicoes_consideradas: punicoesValidas.length,
+      total_punicoes_consideradas: punicoesImpactantes.length,
       ultima_punicao_data: ultimaPunicao?.data_base_iso || null,
       data_inclusao_militar: formatDateISO(dataInclusao),
       tempo_servico_anos: tempoServicoAnos,
@@ -311,7 +322,8 @@ export function calcularProximaMelhoria(punicoes, postoGraduacao, hoje = new Dat
   const punicoesValidas = (Array.isArray(punicoes) ? punicoes : [])
     .filter((p) => isPunicaoValida(p, config))
     .map(normalizePunicao)
-    .filter((p) => p.data_base);
+    .filter((p) => p.data_base)
+    .filter(isPunicaoImpactanteComportamento);
 
   const datasCandidadas = punicoesValidas.flatMap((p) => [
     addDays(addYears(p.data_base, 1), 1),

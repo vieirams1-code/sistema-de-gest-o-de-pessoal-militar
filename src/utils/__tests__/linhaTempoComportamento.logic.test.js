@@ -183,3 +183,25 @@ test('Caso 9: Punição reabilitada (respeitar config)', () => {
   // 1 PRISAO em 1 ano e serviço > 2 anos -> Bom
   assert.strictEqual(resComReab.comportamentoCalculadoHoje, 'Bom');
 });
+
+test('C5.1: Advertência aparece na linha do tempo como evento informativo e fora das janelas legais', () => {
+  const resultado = gerarLinhaTempoComportamento({
+    punicoes: [{ id: 'adv-1', tipo: 'ADVERTENCIA', data_punicao: '2024-01-01', status: 'Ativa' }],
+    postoGraduacao: 'Soldado',
+    dataInclusaoMilitar: '2010-01-01',
+    hoje: HOJE
+  });
+
+  assert.strictEqual(resultado.comportamentoCalculadoHoje, 'Excepcional');
+
+  const eventoAdvertencia = resultado.eventos.find(e => e.tipo === 'ADVERTENCIA_INFORMATIVA');
+  assert.ok(eventoAdvertencia);
+  assert.strictEqual(eventoAdvertencia.impacto_comportamento, false);
+  assert.strictEqual(eventoAdvertencia.prisao_equivalente, 0);
+  assert.strictEqual(eventoAdvertencia.detencao_equivalente, 0);
+  assert.match(eventoAdvertencia.descricao, /Sem impacto no comportamento/);
+
+  assert.strictEqual(resultado.segmentoAtual.janelas.j8.quantidade, 0);
+  assert.deepStrictEqual(resultado.segmentoAtual.punicoesConsideradas, []);
+  assert.strictEqual(resultado.segmentoAtual.advertenciasInformativas.length, 1);
+});
