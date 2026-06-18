@@ -431,6 +431,8 @@ export default function Ferias() {
   const canCriarFerias = canAccessAction('criar_ferias');
   const canEditarFerias = canAccessAction('editar_ferias');
   const canAlterarDataInicioFerias = canAccessAction('alterar_data_inicio_ferias');
+  const canGerenciarTagsFerias = canAccessAction('gerenciar_tags_ferias');
+  const canVisualizarPeriodosAquisitivos = canAccessAction('visualizar_periodos_aquisitivos');
   const canLancarInicioFerias = canAccessAction('lancar_inicio_ferias');
   const canInterromperFerias = canAccessAction('interromper_ferias');
   const canContinuarFerias = canAccessAction('continuar_ferias');
@@ -672,6 +674,15 @@ export default function Ferias() {
   }, [feriasTagsAtivasMap, tagCatalogoById]);
 
   const salvarTagsBulk = async ({ finalSelectedTagIds }) => {
+    if (!canGerenciarTagsFerias) {
+      setFeriasTagsBulkResultado({
+        aplicadas: 0,
+        removidas: 0,
+        semAlteracao: 0,
+        falhas: [{ motivo: 'Usuário sem permissão para gerenciar tags de férias.' }],
+      });
+      return;
+    }
     const targetIds = new Set((finalSelectedTagIds || []).map(String));
     const now = new Date().toISOString().slice(0, 10);
     const operacoes = [];
@@ -931,6 +942,10 @@ export default function Ferias() {
 
   const handleSalvarEditData = async () => {
     if (!editDataModal.ferias || !editDataModal.novaData || editDataError) return;
+    if (!canAlterarDataInicioFerias) {
+      alert('Usuário sem permissão para alterar data de início das férias.');
+      return;
+    }
     const escopo = validarEscopoMilitar(editDataModal.ferias?.militar_id);
     if (!escopo.permitido) {
       alert(escopo.motivo);
@@ -1047,14 +1062,16 @@ export default function Ferias() {
               </Button>
             )}
 
-            <Button
-              variant="outline"
-              onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
-              className="border-slate-300"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Períodos Aquisitivos
-            </Button>
+            {canVisualizarPeriodosAquisitivos && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
+                className="border-slate-300"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Períodos Aquisitivos
+              </Button>
+            )}
 
             {canCriarFerias && (
               <Button
@@ -1266,7 +1283,7 @@ export default function Ferias() {
         <div className="mb-4 text-sm text-slate-500">
           {hasFeriasLoadError ? 'Falha ao carregar dados.' : `${filteredFerias.length} férias encontrada(s)`}
         </div>
-        {selectedFeriasIds.length > 0 && (
+        {selectedFeriasIds.length > 0 && canGerenciarTagsFerias && (
           <div className="mb-4 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
             <SelectionActionBar
               count={selectedFeriasIds.length}
@@ -1922,12 +1939,13 @@ export default function Ferias() {
         </>
       )}
       <FeriasTagsBulkPanel
-        open={feriasTagsBulkOpen}
+        open={feriasTagsBulkOpen && canGerenciarTagsFerias}
         onClose={() => setFeriasTagsBulkOpen(false)}
         selectedFerias={selectedFerias}
         tagsStatusById={tagsStatusById}
         onConfirm={salvarTagsBulk}
         resultadoOperacao={feriasTagsBulkResultado}
+        canManageTags={canGerenciarTagsFerias}
       />
     </div>
   );

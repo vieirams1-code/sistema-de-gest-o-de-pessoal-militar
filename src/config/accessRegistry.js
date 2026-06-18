@@ -258,6 +258,7 @@ const ferias = {
       criar: 'criar_ferias',
       editar: 'editar_ferias',
       alterar_data_inicio: 'alterar_data_inicio_ferias',
+      gerenciar_tags: 'gerenciar_tags_ferias',
       lancar_inicio: 'lancar_inicio_ferias',
       interromper: 'interromper_ferias',
       continuar: 'continuar_ferias',
@@ -285,6 +286,7 @@ const ferias = {
       criar: 'perm_criar_ferias',
       editar: 'perm_editar_ferias',
       alterar_data_inicio: 'perm_alterar_data_inicio_ferias',
+      gerenciar_tags: 'perm_gerenciar_tags_ferias',
       lancar_inicio: 'perm_lancar_inicio_ferias',
       interromper: 'perm_interromper_ferias',
       continuar: 'perm_continuar_ferias',
@@ -387,7 +389,9 @@ const ferias = {
       { check: "canAccessAction('admin_mode')", effect: 'Exibe toggle "Modo Admin"' },
       { check: "canAccessAction('criar_ferias')", effect: 'Exibe CTA "Nova Férias" / "Cadastrar Férias"' },
       { check: "canAccessAction('editar_ferias')", effect: 'Exibe ação "Editar Férias"' },
-      { check: "canAccessAction('alterar_data_inicio_ferias')", effect: 'Exibe ação "Alterar Data de Início"' },
+      { check: "canAccessAction('alterar_data_inicio_ferias')", effect: 'Exibe ação "Alterar Data de Início" e protege handler de salvamento' },
+      { check: "canAccessAction('gerenciar_tags_ferias')", effect: 'Exibe gerenciamento bulk de tags e protege salvarTagsBulk' },
+      { check: "canAccessAction('visualizar_periodos_aquisitivos')", effect: 'Exibe CTA "Períodos Aquisitivos"' },
       { check: "canAccessAction('lancar_inicio_ferias')", effect: 'Exibe ação "Início" / saída de férias' },
       { check: "canAccessAction('interromper_ferias')", effect: 'Exibe ação "Interrupção"' },
       { check: "canAccessAction('continuar_ferias')", effect: 'Exibe ação "Continuação" / nova saída / retomada' },
@@ -421,6 +425,9 @@ const ferias = {
     ],
   },
   componentsInternalChecks: {
+    'components/ferias/FeriasTagsBulkPanel': [
+      { check: 'canManageTags (prop derivada de gerenciar_tags_ferias)', effect: 'Bloqueia seleção e botão de salvar/aplicar quando falso' },
+    ],
     'components/ferias/FamiliaFeriasPanel': [
       { check: 'modoAdmin (prop)', effect: 'Habilita administração da cadeia operacional' },
     ],
@@ -465,8 +472,8 @@ const ferias = {
       ruleMenu: 'Menu "Férias" exige visualizar_ferias; menu "Dias Adicionais" exige visualizar_creditos_ferias.',
       ruleRoute: 'Rotas PlanoAnualFerias, PeriodosAquisitivos e CreditosExtraordinariosFerias exigem actions granulares; CadastrarFerias mantém route guard por módulo e aplica action contextual internamente.',
       impact:
-        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; mitigado em P1.3-B.3 para visibilidade dos CTAs internos de Ferias.jsx; mitigado em P1.3-B.4 para entrada direta em CadastrarFerias por criar_ferias/editar_ferias conforme modo; mitigado em P1.3-B.5 para ações internas granulares de períodos aquisitivos; mitigado em P1.3-B.6 para ações internas granulares de créditos extraordinários de férias.',
-      status: 'mitigado_p1_3_b_6',
+        'Mitigado em P1.3-B.1 para visualizações granulares de plano, períodos aquisitivos e créditos; mitigado em P1.3-B.3 para visibilidade dos CTAs internos de Ferias.jsx; mitigado em P1.3-B.4 para entrada direta em CadastrarFerias por criar_ferias/editar_ferias conforme modo; mitigado em P1.3-B.5 para ações internas granulares de períodos aquisitivos; mitigado em P1.3-B.6 para ações internas granulares de créditos extraordinários de férias; mitigado em P1.3-B.8 para bulk de tags, CTA de períodos aquisitivos e rechecagem defensiva de alteração de data.',
+      status: 'mitigado_p1_3_b_8',
     },
     {
       location: 'pages/Ferias.jsx (admin_mode)',
