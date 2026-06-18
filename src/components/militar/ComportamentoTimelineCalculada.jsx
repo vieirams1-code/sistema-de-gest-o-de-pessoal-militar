@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AlertTriangle, CalendarClock, ChevronDown, Flag, Info, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -12,27 +12,26 @@ const comportamentoClasses = {
   MAU: 'bg-red-100 text-red-800 border-red-200',
 };
 
-const comportamentoBarClasses = {
-  Excepcional: 'bg-blue-500',
-  Ótimo: 'bg-emerald-500',
-  Otimo: 'bg-emerald-500',
-  Bom: 'bg-yellow-400',
-  Insuficiente: 'bg-orange-500',
-  Mau: 'bg-red-500',
-  MAU: 'bg-red-500',
+const STATUS_COLORS = {
+  Excepcional: '#3b82f6',
+  'Ótimo': '#22c55e',
+  Otimo: '#22c55e',
+  Bom: '#facc15',
+  Insuficiente: '#f97316',
+  Mau: '#ef4444',
+  MAU: '#ef4444',
+  Projecao: '#8b5cf6',
 };
 
-const eventoClasses = {
-  INCLUSAO: 'bg-sky-600 border-sky-100',
-  PUNICAO: 'bg-red-600 border-red-100',
-  ADVERTENCIA_INFORMATIVA: 'bg-white border-slate-500 ring-2 ring-slate-300',
-  MUDANCA_COMPORTAMENTO: 'bg-indigo-600 border-indigo-100',
-  HOJE: 'bg-emerald-600 border-emerald-100',
-  PROJECAO_FUTURA: 'bg-violet-600 border-violet-100',
-};
+const EVENT_TRACKS = [
+  { side: 'top', y: -104 },
+  { side: 'top', y: -58 },
+  { side: 'bottom', y: 58 },
+  { side: 'bottom', y: 104 },
+];
 
 function parseDate(value) {
-  if (!value) return null;
+  if (!value || String(value).toUpperCase() === 'HOJE') return new Date();
   const text = String(value).slice(0, 10);
   const date = new Date(`${text}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -40,9 +39,10 @@ function parseDate(value) {
 
 function formatarData(value) {
   if (!value) return '—';
-  const [year, month, day] = String(value).slice(0, 10).split('-');
-  if (!year || !month || !day) return String(value);
-  return `${day}/${month}/${year}`;
+  if (String(value).toUpperCase() === 'HOJE') return 'Hoje';
+  const date = parseDate(value);
+  if (!date) return String(value);
+  return date.toLocaleDateString('pt-BR');
 }
 
 function formatarPeriodo(value) {
@@ -51,23 +51,120 @@ function formatarPeriodo(value) {
   return formatarData(value);
 }
 
-function getRange(eventos = [], segmentos = []) {
-  const datas = [
-    ...eventos.map((evento) => parseDate(evento?.data)),
-    ...segmentos.flatMap((segmento) => [parseDate(segmento?.inicio), parseDate(segmento?.fim)]),
-  ].filter(Boolean);
-
-  if (!datas.length) return null;
-  const min = Math.min(...datas.map((date) => date.getTime()));
-  const max = Math.max(...datas.map((date) => date.getTime()));
-  return { min, max: min === max ? min + 1 : max };
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
-function getEventoPosition(evento, range) {
-  const date = parseDate(evento?.data);
-  if (!date || !range) return 0;
-  const percent = ((date.getTime() - range.min) / (range.max - range.min)) * 100;
-  return Math.min(98, Math.max(2, percent));
+function normalizeStatus(value) {
+  const text = String(value || '').trim().toLowerCase();
+  if (text.includes('ótimo') || text.includes('otimo')) return 'Ótimo';
+  if (text.includes('excepcional')) return 'Excepcional';
+  if (text.includes('insuficiente')) return 'Insuficiente';
+  if (text.includes('mau')) return 'Mau';
+  return 'Bom';
+}
+
+function getSegmentColor(segmento) {
+  if (segmento?.isProjetado) return STATUS_COLORS.Projecao;
+  return STATUS_COLORS[normalizeStatus(segmento?.comportamento)] || '#94a3b8';
+}
+
+function removeAccents(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+}
+
+function getEventKind(evento) {
+  const tipo = removeAccents(evento?.tipo);
+  const subtipo = removeAccents(evento?.subtipo || evento?.tipo_punicao || evento?.descricao);
+
+  if (tipo.includes('INCLUSAO')) return 'inclusao';
+  if (tipo.includes('HOJE')) return 'hoje';
+  if (tipo.includes('PROJECAO')) return 'projecao';
+  if (tipo.includes('MUDANCA')) return 'mudanca';
+  if (tipo.includes('ADVERTENCIA') || subtipo.includes('ADVERTENCIA')) return 'advertencia';
+
+  if (tipo.includes('PUNICAO') || subtipo.includes('PRISAO') || subtipo.includes('DETENCAO') || subtipo.includes('REPREENSAO')) {
+    if (evento?.impacto_comportamento === false) return 'advertencia';
+    return 'punicao';
+  }
+
+  return 'evento';
+}
+
+function getPunicaoLabel(evento) {
+  const raw = String(evento?.subtipo || evento?.tipo_punicao || evento?.descricao || evento?.tipo || '').toLowerCase();
+
+  if (raw.includes('prisao em separado') || raw.includes('prisão em separado')) return 'Prisão em separado';
+  if (raw.includes('prisao') || raw.includes('prisão')) return 'Prisão';
+  if (raw.includes('detencao') || raw.includes('detenção')) return 'Detenção';
+  if (raw.includes('repreensao') || raw.includes('repreensão')) return 'Repreensão';
+  if (raw.includes('advertencia verbal') || raw.includes('advertência verbal')) return 'Advertência verbal';
+  if (raw.includes('advertencia') || raw.includes('advertência')) return 'Advertência';
+
+  return evento?.descricao || evento?.tipo || 'Evento';
+}
+
+function getEventLabel(evento, kind) {
+  if (kind === 'punicao' || kind === 'advertencia') return getPunicaoLabel(evento);
+  if (kind === 'inclusao') return 'Inclusão';
+  if (kind === 'hoje') return 'Hoje';
+  if (kind === 'projecao') return evento?.comportamento ? `Projeção para ${evento.comportamento}` : 'Projeção futura';
+  if (kind === 'mudanca') return evento?.comportamento ? `Sobe para ${evento.comportamento}` : 'Mudança de comportamento';
+  return evento?.descricao || evento?.tipo || 'Evento';
+}
+
+function buildTimelineScale(segmentos = [], eventos = []) {
+  const dates = [];
+
+  segmentos.forEach((segmento) => {
+    const start = parseDate(segmento?.inicio);
+    const end = parseDate(segmento?.fim);
+    if (start) dates.push(start);
+    if (end) dates.push(end);
+  });
+
+  eventos.forEach((evento) => {
+    const date = parseDate(evento?.data);
+    if (date) dates.push(date);
+  });
+
+  dates.push(new Date());
+
+  const min = new Date(Math.min(...dates.map((date) => date.getTime())));
+  const max = new Date(Math.max(...dates.map((date) => date.getTime())));
+  min.setDate(min.getDate() - 30);
+  max.setDate(max.getDate() + 30);
+
+  const total = max.getTime() - min.getTime();
+  const toPercent = (value) => {
+    const date = parseDate(value);
+    if (!date || total <= 0) return 0;
+    return clamp(((date.getTime() - min.getTime()) / total) * 100, 0, 100);
+  };
+
+  return { min, max, toPercent };
+}
+
+function assignEventTracks(eventos = [], toPercent) {
+  const sorted = [...eventos]
+    .map((evento) => ({ ...evento, left: toPercent(evento?.data) }))
+    .sort((a, b) => a.left - b.left);
+
+  const lastByTrack = new Array(EVENT_TRACKS.length).fill(-999);
+  const minGap = 8;
+
+  return sorted.map((evento) => {
+    let trackIndex = 0;
+    for (let i = 0; i < EVENT_TRACKS.length; i += 1) {
+      if (evento.left - lastByTrack[i] >= minGap) {
+        trackIndex = i;
+        break;
+      }
+    }
+
+    lastByTrack[trackIndex] = evento.left;
+    return { ...evento, track: EVENT_TRACKS[trackIndex], trackIndex };
+  });
 }
 
 
@@ -117,60 +214,85 @@ function JanelasResumo({ janelas = {} }) {
   );
 }
 
-function getSegmentWidth(segmento, range) {
-  const inicio = parseDate(segmento?.inicio);
-  const fim = parseDate(segmento?.fim);
-  if (!inicio || !fim || !range) return 0;
-  const width = ((fim.getTime() - inicio.getTime()) / (range.max - range.min)) * 100;
-  return Math.max(4, width);
-}
-
 function TimelineHorizontal({ eventos = [], segmentos = [] }) {
-  const range = getRange(eventos, segmentos);
+  const scale = useMemo(() => buildTimelineScale(segmentos, eventos), [segmentos, eventos]);
+  const eventosComTrilha = useMemo(() => assignEventTracks(eventos, scale.toPercent), [eventos, scale]);
 
   if (!segmentos.length) {
     return <p className="text-sm text-slate-500">Nenhum segmento calculado para exibição.</p>;
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="relative pb-16 pt-8">
-        <div className="flex h-9 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner">
-          {segmentos.map((segmento, index) => (
-            <div
-              key={`${segmento.inicio}-${segmento.fim}-${segmento.comportamento}-${index}`}
-              className={`${comportamentoBarClasses[segmento.comportamento] || 'bg-slate-400'} relative flex items-center justify-center text-[11px] font-semibold text-white ${segmento.isProjetado ? 'bg-[repeating-linear-gradient(135deg,#8b5cf6,#8b5cf6_8px,#a78bfa_8px,#a78bfa_16px)]' : ''} ${segmento.isAtual ? 'ring-4 ring-inset ring-slate-900/20' : ''}`}
-              style={{ width: `${getSegmentWidth(segmento, range)}%` }}
-              title={`${segmento.comportamento || '—'}: ${formatarPeriodo(segmento.inicio)} até ${formatarPeriodo(segmento.fim)}`}
-            >
-              <span className="truncate px-2">{segmento.isProjetado ? 'Projeção' : segmento.comportamento}</span>
-            </div>
-          ))}
-        </div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="overflow-x-auto pb-2">
+        <div className="relative h-[340px] min-w-[980px]">
+          <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200 shadow-inner" />
 
-        {eventos.map((evento, index) => {
-          const isHoje = evento.tipo === 'HOJE';
-          const isAdvertencia = evento.tipo === 'ADVERTENCIA_INFORMATIVA';
-          return (
-            <div
-              key={`${evento.data}-${evento.tipo}-${index}`}
-              className="group absolute top-3 -translate-x-1/2"
-              style={{ left: `${getEventoPosition(evento, range)}%` }}
-            >
-              <div className={`mx-auto h-5 w-5 rounded-full border-4 shadow ${eventoClasses[evento.tipo] || 'bg-slate-600 border-slate-100'} ${isHoje ? 'h-7 w-7' : ''}`} />
-              <div className="mt-1 max-w-[90px] truncate text-center text-[10px] font-semibold text-slate-600">
-                {isHoje ? 'HOJE' : isAdvertencia ? 'Advertência' : evento.comportamento ? `Sobe para ${evento.comportamento}` : evento.tipo === 'INCLUSAO' ? 'Início' : evento.tipo === 'PUNICAO' ? 'Punição' : evento.tipo === 'PROJECAO_FUTURA' ? 'Projeção' : 'Marco'}
+          {segmentos.map((segmento, index) => {
+            const left = scale.toPercent(segmento?.inicio);
+            const right = scale.toPercent(segmento?.fim || 'Hoje');
+            const width = Math.max(right - left, 2);
+            const color = getSegmentColor(segmento);
+
+            return (
+              <div
+                key={`${segmento.inicio}-${segmento.fim}-${segmento.comportamento}-${index}`}
+                className={`absolute top-1/2 flex h-6 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow-md ${segmento.isAtual ? 'ring-4 ring-inset ring-slate-900/20' : ''}`}
+                style={{
+                  left: `${left}%`,
+                  width: `${width}%`,
+                  minWidth: '32px',
+                  backgroundColor: segmento.isProjetado ? undefined : color,
+                  backgroundImage: segmento.isProjetado
+                    ? `repeating-linear-gradient(135deg, ${color}, ${color} 8px, rgba(139, 92, 246, 0.55) 8px, rgba(139, 92, 246, 0.55) 16px)`
+                    : undefined,
+                }}
+                title={`${segmento.comportamento || '—'} — ${formatarPeriodo(segmento.inicio)} até ${formatarPeriodo(segmento.fim)}`}
+              >
+                <span className="truncate px-2">{segmento.isProjetado ? 'Projeção' : segmento.comportamento}</span>
               </div>
-              <div className="pointer-events-none absolute bottom-10 left-1/2 z-20 hidden w-72 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-lg group-hover:block">
-                <p className="font-semibold text-slate-900">{formatarData(evento.data)}</p>
-                <p><strong>Tipo:</strong> {evento.tipo || '—'}</p>
-                <p><strong>Descrição:</strong> {evento.descricao || '—'}</p>
-                <p><strong>Equivalência:</strong> prisão {evento.prisao_equivalente ?? 0} / detenção {evento.detencao_equivalente ?? 0}</p>
-                <p><strong>Impacto no comportamento:</strong> {evento.impacto_comportamento ? 'Sim' : 'Não'}</p>
+            );
+          })}
+
+          {eventosComTrilha.map((evento, index) => {
+            const kind = getEventKind(evento);
+            const label = getEventLabel(evento, kind);
+            const isTop = evento.track.side === 'top';
+            const labelOrder = isTop ? 'order-1' : 'order-3';
+            const markerOrder = isTop ? 'order-3' : 'order-1';
+            const markerClass = {
+              punicao: 'bg-red-600 text-white border-white',
+              advertencia: 'bg-white border-slate-500 ring-2 ring-slate-300',
+              mudanca: 'bg-emerald-500 border-white',
+              inclusao: 'bg-sky-600 border-white',
+              hoje: 'bg-blue-700 border-white',
+              projecao: 'bg-white border-violet-500 border-dashed',
+              evento: 'bg-slate-600 border-white',
+            }[kind];
+
+            return (
+              <div
+                key={`${evento.data}-${evento.tipo}-${index}`}
+                className="absolute z-10 flex -translate-x-1/2 flex-col items-center"
+                style={{ left: `${evento.left}%`, top: `calc(50% + ${evento.track.y}px)` }}
+                title={`${formatarData(evento.data)} — ${label}`}
+              >
+                {kind === 'hoje' && (
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 h-[170px] -translate-x-1/2 -translate-y-1/2 border-l-2 border-dotted border-blue-700/70" />
+                )}
+                <div className={`${labelOrder} min-w-[118px] max-w-[160px] rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-center text-[11px] leading-tight text-slate-600 shadow-lg`}>
+                  <strong className="block text-slate-700">{formatarData(evento.data)}</strong>
+                  <span className="block font-bold text-slate-900">{label}</span>
+                  {kind === 'advertencia' && <small className="block text-slate-500">Sem impacto</small>}
+                </div>
+                <div className="order-2 h-9 border-l border-dashed border-slate-400" />
+                <div className={`${markerOrder} grid h-7 w-7 place-items-center rounded-full border-[3px] text-sm shadow-lg ${markerClass}`}>
+                  {kind === 'punicao' ? '📌' : kind === 'inclusao' ? '⚑' : ''}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
@@ -179,7 +301,8 @@ function TimelineHorizontal({ eventos = [], segmentos = [] }) {
         <span><span className="inline-block h-3 w-3 rounded bg-yellow-400" /> Bom</span>
         <span><span className="inline-block h-3 w-3 rounded bg-orange-500" /> Insuficiente</span>
         <span><span className="inline-block h-3 w-3 rounded bg-red-500" /> Mau</span>
-        <span><span className="inline-block h-3 w-3 rounded bg-violet-500" /> Projeção futura</span>
+        <span><span className="inline-block h-3 w-3 rounded bg-violet-500" style={{ backgroundImage: 'repeating-linear-gradient(135deg, #8b5cf6, #8b5cf6 4px, #c4b5fd 4px, #c4b5fd 8px)' }} /> Projeção futura</span>
+        <span><span className="inline-block h-3 w-3 rounded-full bg-red-600" /> Punição impactante</span>
         <span><span className="inline-block h-3 w-3 rounded-full border-2 border-slate-500 bg-white" /> Advertência sem impacto</span>
       </div>
     </div>
@@ -212,7 +335,7 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-500">Calculado hoje</p>
           <p className="mt-1 text-lg font-semibold text-slate-900">{timelineCalculada.comportamentoCalculadoHoje || '—'}</p>
@@ -225,18 +348,17 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
           <p className="text-xs uppercase tracking-wide text-slate-500">Divergência cadastral</p>
           <p className="mt-1 text-lg font-semibold text-slate-900">{timelineCalculada.divergente ? 'Sim' : 'Não'}</p>
         </div>
-      </div>
-
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-        <div className="flex items-start gap-3">
-          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <p className="font-semibold">Próxima melhoria prevista</p>
-            <p className="text-sm">
-              {proximaMelhoria?.data
-                ? `${formatarData(proximaMelhoria.data)} → ${proximaMelhoria.comportamento_futuro || 'comportamento não informado'}`
-                : 'Sem melhoria prevista pelo motor histórico.'}
-            </p>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+          <div className="flex items-start gap-3">
+            <CalendarClock className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Próxima melhoria prevista</p>
+              <p className="mt-1 text-sm font-semibold">
+                {proximaMelhoria?.data
+                  ? `${formatarData(proximaMelhoria.data)} → ${proximaMelhoria.comportamento_futuro || 'comportamento não informado'}`
+                  : 'Sem melhoria prevista pelo motor histórico.'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
