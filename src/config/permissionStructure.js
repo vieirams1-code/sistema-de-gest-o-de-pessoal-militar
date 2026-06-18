@@ -122,6 +122,9 @@ export const permissionStructure = [
         label: 'Férias',
         actions: [
           { key: 'perm_visualizar_ferias', label: 'Visualizar Férias' },
+          { key: 'perm_visualizar_plano_ferias', label: 'Visualizar Plano de Férias' },
+          { key: 'perm_visualizar_periodos_aquisitivos', label: 'Visualizar Períodos Aquisitivos' },
+          { key: 'perm_visualizar_creditos_ferias', label: 'Visualizar Créditos de Férias' },
           { key: 'perm_adicionar_ferias', label: 'Adicionar Férias' },
           { key: 'perm_editar_ferias', label: 'Editar Férias' },
           { key: 'perm_gerir_cadeia_ferias', label: 'Gerir Cadeia de Férias', sensitive: true },
