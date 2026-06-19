@@ -514,6 +514,8 @@ const atestados = {
       ver_dados_sensiveis: 'ver_dados_sensiveis_atestado',
       gerar_relatorio_dp_dintel: 'gerar_relatorio_dp_dintel_atestados',
       gerir_encaminhamento_dp_dintel: 'gerir_encaminhamento_dp_dintel_atestado',
+      baixar_anexos: 'baixar_anexos_atestados',
+      baixar_zip: 'baixar_zip_atestados',
     },
     legacyPerm: {
       view: 'perm_visualizar_atestados',
@@ -645,12 +647,15 @@ const atestados = {
       { check: "canAccessAction('gerar_relatorio_dp_dintel_atestados')", effect: 'VALIDADO P1.1-C: habilita botão PDF DP/DINTEL (action interna do extrato)' },
       { check: "canAccessAction('gerir_encaminhamento_dp_dintel_atestado')", effect: 'VALIDADO P1.1-C: habilita marcar/desmarcar DP/DINTEL (action interna do extrato)' },
       { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Enforcement visual da coluna de Anexos (oculta botões/links se falso).' },
+      { check: "canAccessAction('baixar_anexos_atestados') && canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.6: Proteção de download individual de anexo médico.' },
+      { check: "canAccessAction('baixar_zip_atestados') && canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.6: Proteção de download ZIP de anexos médicos.' },
     ],
   },
   componentsInternalChecks: {
     'components/atestado/AtestadoCard': [
       { check: 'canEdit / canDelete (props vindas de Atestados.jsx)', effect: 'Botões editar/excluir no card' },
       { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Mascaramento de CID-10, Observações e conteúdos clínicos nos modais de Homologação e Ata JISO.' },
+      { check: "canAccessAction('baixar_anexos_atestados') && canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.6: Proteção de download no menu de ações do card (individual/ata jiso).' },
     ],
     'pages/VerAtestado.jsx': [
       { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Mascaramento completo de CID-10, diagnóstico, pareceres, histórico clínico, notas e anexos.' },

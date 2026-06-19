@@ -1,5 +1,7 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,6 +20,10 @@ export default function AtestadoActionsMenu({
   estados,
   publicacoesVinculadas = [],
 }) {
+  const { canAccessAction } = useCurrentUser();
+  const canDownloadAttachments = canAccessAction('baixar_anexos_atestados');
+  const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
+
   const {
     onView,
     onEdit,
@@ -66,13 +72,25 @@ export default function AtestadoActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {atestado?.arquivo_atestado && (
-          <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
+        {atestado?.arquivo_atestado && canDownloadAttachments && canViewSensitive && (
+          <DropdownMenuItem onClick={() => {
+            if (!canDownloadAttachments || !canViewSensitive) {
+              toast.error('Você não tem permissão para baixar anexos médicos.');
+              return;
+            }
+            window.open(atestado.arquivo_atestado, '_blank');
+          }}>
             <Download className="w-4 h-4 mr-2 text-slate-600" />Baixar atestado anexado
           </DropdownMenuItem>
         )}
-        {atestado?.arquivo_ata_jiso && (
-          <DropdownMenuItem onClick={() => window.open(atestado.arquivo_ata_jiso, '_blank')}>
+        {atestado?.arquivo_ata_jiso && canDownloadAttachments && canViewSensitive && (
+          <DropdownMenuItem onClick={() => {
+            if (!canDownloadAttachments || !canViewSensitive) {
+              toast.error('Você não tem permissão para baixar anexos médicos.');
+              return;
+            }
+            window.open(atestado.arquivo_ata_jiso, '_blank');
+          }}>
             <Download className="w-4 h-4 mr-2 text-purple-600" />Baixar Ata JISO
           </DropdownMenuItem>
         )}
