@@ -33,7 +33,7 @@ Comandante`,
   [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO]: `Fica registrado que o militar {{posto_graduacao}} {{nome_completo}},
 matrícula {{matricula}},
 passou a integrar o comportamento {{comportamento}}
-a contar de {{data_inicio}},
+a contar de {{data_inicio_comportamento}},
 nos termos do Decreto nº 1.260/1981.`,
   [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `Para fins de assentamento e registro funcional,
 fica consignado que o militar
@@ -41,7 +41,7 @@ fica consignado que o militar
 matrícula {{matricula}},
 passou a integrar o comportamento
 {{comportamento}}
-a contar de {{data_inicio}},
+a contar de {{data_inicio_comportamento}},
 conforme apuração realizada com base nos
 assentamentos disciplinares constantes em seus
 registros funcionais e nos critérios previstos

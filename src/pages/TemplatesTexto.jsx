@@ -47,8 +47,13 @@ import {
   VARIAVEIS_TEMPLATE_DOCUMENTO_MILITAR,
 } from '@/services/documentosMilitares/documentoMilitarTemplateService';
 import { normalizarTextoDocumentoMilitar } from '@/services/documentosMilitares/normalizarTextoDocumentoMilitar';
+import { TIPO_TEMPLATE_COMPORTAMENTO } from '@/utils/comportamentoTemplateUtils';
 
 const FERIAS_CANONICAL_TYPES = Object.values(FERIAS_TIPO_CANONICO);
+const TIPOS_TEMPLATE_COMPORTAMENTO_CALCULADO = [
+  TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO,
+  TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO,
+];
 
 const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
@@ -61,6 +66,16 @@ const TIPOS_TEMPLATE_ADICIONAIS = [
   {
     value: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
     label: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
+    modulo: MODULO_EX_OFFICIO,
+  },
+  {
+    value: TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO,
+    label: 'Melhoria de Comportamento Calculado',
+    modulo: MODULO_EX_OFFICIO,
+  },
+  {
+    value: TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO,
+    label: 'Registro Funcional de Comportamento Calculado',
     modulo: MODULO_EX_OFFICIO,
   },
 ];
@@ -99,7 +114,7 @@ const TIPO_REGISTRO_CATEGORIAS = [
   {
     key: 'comportamento',
     label: 'Comportamento',
-    tipos: ['Melhoria de Comportamento', 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR', 'Punição'],
+    tipos: ['Melhoria de Comportamento', ...TIPOS_TEMPLATE_COMPORTAMENTO_CALCULADO, 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR', 'Punição'],
   },
   {
     key: 'livro_administrativo',
@@ -564,6 +579,42 @@ const VARS_POR_TIPO = {
       { v: '{{data_inclusao}}', desc: 'Data de inclusão do militar' },
     ]
   },
+  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO]: {
+    grupo: 'Comportamento Calculado',
+    cor: 'green',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
+      { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{comportamento}}', desc: 'Comportamento final/calculado que será publicado' },
+      { v: '{{comportamento_calculado}}', desc: 'Alias de {{comportamento}}' },
+      { v: '{{comportamento_anterior}}', desc: 'Comportamento cadastrado antes da alteração' },
+      { v: '{{comportamento_cadastrado}}', desc: 'Alias de {{comportamento_anterior}}' },
+      { v: '{{data_inicio_comportamento}}', desc: 'Data em que o militar passou a integrar o comportamento calculado' },
+      { v: '{{data_vigencia}}', desc: 'Alias de {{data_inicio_comportamento}}' },
+      { v: '{{tipo_publicacao_comportamento}}', desc: 'Tipo da publicação de comportamento: melhoria_comportamento ou registro_funcional_comportamento' },
+      { v: '{{data_publicacao}}', desc: 'Data em que a publicação está sendo registrada/publicada' },
+    ],
+  },
+  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: {
+    grupo: 'Comportamento Calculado',
+    cor: 'green',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
+      { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{comportamento}}', desc: 'Comportamento final/calculado que será publicado' },
+      { v: '{{comportamento_calculado}}', desc: 'Alias de {{comportamento}}' },
+      { v: '{{comportamento_anterior}}', desc: 'Comportamento cadastrado antes da alteração' },
+      { v: '{{comportamento_cadastrado}}', desc: 'Alias de {{comportamento_anterior}}' },
+      { v: '{{data_inicio_comportamento}}', desc: 'Data em que o militar passou a integrar o comportamento calculado' },
+      { v: '{{data_vigencia}}', desc: 'Alias de {{data_inicio_comportamento}}' },
+      { v: '{{tipo_publicacao_comportamento}}', desc: 'Tipo da publicação de comportamento: melhoria_comportamento ou registro_funcional_comportamento' },
+      { v: '{{data_publicacao}}', desc: 'Data em que a publicação está sendo registrada/publicada' },
+    ],
+  },
   'ELEVACAO_COMPORTAMENTO_DISCIPLINAR': {
     grupo: 'Elevação de Comportamento Disciplinar',
     cor: 'red',
@@ -693,7 +744,7 @@ const GRUPOS_GENERICOS_EXOFFICIO = [
     { v: '{{posto}}', desc: 'Posto/Graduação Abreviado' },
     { v: '{{nome_completo}}', desc: 'Nome completo' },
     { v: '{{matricula}}', desc: 'Matrícula' },
-    { v: '{{data_publicacao}}', desc: 'Data da publicação' },
+    { v: '{{data_publicacao}}', desc: 'Data em que a publicação está sendo registrada/publicada' },
   ]},
 ];
 
@@ -884,6 +935,7 @@ export default function TemplatesTexto() {
   }, [estrutura, editingTemplate?.subsetor_id]);
 
   const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
+  const isTipoComportamentoCalculado = TIPOS_TEMPLATE_COMPORTAMENTO_CALCULADO.includes(editingTemplate?.tipo_registro);
   const estruturaById = useMemo(
     () => new Map((estrutura || []).map((item) => [item.id, item])),
     [estrutura]
@@ -1344,6 +1396,11 @@ export default function TemplatesTexto() {
                     <p className="text-xs font-semibold text-slate-600">
                       {selectedTipoVars ? `Variáveis para "${getTipoDisplay(editingTemplate.tipo_registro)}" (clique para inserir):` : 'Selecione um tipo para ver as variáveis específicas:'}
                     </p>
+                    {isTipoComportamentoCalculado && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                        Use <code className="font-mono">{'{{data_inicio_comportamento}}'}</code> ou <code className="font-mono">{'{{data_vigencia}}'}</code> para a data em que o militar passou a integrar o comportamento. Use <code className="font-mono">{'{{data_publicacao}}'}</code> apenas para a data do ato/publicação.
+                      </div>
+                    )}
                     {gruposParaMostrar.map(g => {
                       const cores = COR_GRUPO[g.cor] || COR_GRUPO['blue'];
                       return (
