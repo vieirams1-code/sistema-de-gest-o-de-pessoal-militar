@@ -48,6 +48,45 @@ function formatarData(data) {
   return new Intl.DateTimeFormat('pt-BR').format(date);
 }
 
+function normalizarDataISO(data) {
+  if (!data) return '';
+  const texto = String(data).slice(0, 10);
+  const date = new Date(`${texto}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? '' : texto;
+}
+
+function obterDataInicioComportamentoAtual(linha = {}) {
+  const comportamentoAtual = normalizarComportamento(
+    linha.calculado?.comportamento
+      || linha.timeline?.segmentoAtual?.comportamento
+      || linha.militar?.comportamento,
+  );
+  const inicioSegmentoAtual = normalizarDataISO(linha.timeline?.segmentoAtual?.inicio);
+
+  if (inicioSegmentoAtual && (!comportamentoAtual || normalizarComportamento(linha.timeline?.segmentoAtual?.comportamento) === comportamentoAtual)) {
+    return inicioSegmentoAtual;
+  }
+
+  const inicioSegmentoCorrespondente = (linha.timeline?.segmentos || [])
+    .filter((segmento) => normalizarComportamento(segmento?.comportamento) === comportamentoAtual)
+    .filter((segmento) => normalizarDataISO(segmento?.inicio))
+    .sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)))[0]?.inicio;
+
+  if (normalizarDataISO(inicioSegmentoCorrespondente)) {
+    return normalizarDataISO(inicioSegmentoCorrespondente);
+  }
+
+  const ultimoEventoMudanca = (linha.timeline?.eventos || [])
+    .filter((evento) => evento?.tipo === 'MUDANCA_COMPORTAMENTO')
+    .filter((evento) => normalizarComportamento(evento?.comportamento) === comportamentoAtual)
+    .filter((evento) => normalizarDataISO(evento?.data))
+    .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]?.data;
+
+  return normalizarDataISO(ultimoEventoMudanca)
+    || normalizarDataISO(linha.militar?.data_inclusao)
+    || '';
+}
+
 function obterMatricula(militar = {}) {
   return militar.matricula || militar.matricula_formatada || militar.numero_matricula || '—';
 }
@@ -589,7 +628,10 @@ export default function AvaliacaoComportamento() {
   };
 
   const prepararPublicacaoComportamento = async (linha, tipoPublicacao) => {
-    const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
+    const dataInicioCalculada = obterDataInicioComportamentoAtual(linha);
+    if (!dataInicioCalculada) {
+      throw new Error('Não foi possível identificar a data de ingresso no comportamento atual.');
+    }
     const dataPublicacao = new Date().toISOString().slice(0, 10);
     const renderizacao = await renderizarTemplatePublicacaoComportamento({ linha, tipoPublicacao, dataInicioCalculada, dataPublicacao });
     setPublicacaoModal({
@@ -646,7 +688,10 @@ export default function AvaliacaoComportamento() {
       throw new Error('Não foi possível identificar a pendência de comportamento para aprovação.');
     }
 
-    const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
+    const dataInicioCalculada = obterDataInicioComportamentoAtual(linha);
+    if (!dataInicioCalculada) {
+      throw new Error('Não foi possível identificar a data de ingresso no comportamento atual.');
+    }
     const resultadoAplicacao = await aplicarPendenciasComportamentoEmLote({
       pendencias: [pendenciaParaAplicacao.id],
       usuarioAtual: { canAccessAction },
