@@ -149,12 +149,16 @@ test('montarVariaveisComportamentoTemplate', () => {
   assert.equal(vars.comportamento_anterior, 'BOM');
   assert.equal(vars.comportamento_novo, 'ÓTIMO');
   assert.equal(vars.data_alteracao, '01/01/2023');
+  assert.equal(vars.comportamento_calculado, 'ÓTIMO');
+  assert.equal(vars.comportamento_cadastrado, 'BOM');
+  assert.equal(vars.data_inicio_comportamento, '01/01/2023');
+  assert.equal(vars.data_vigencia, '01/01/2023');
   assert.equal(vars.motivo_mudanca, 'Tempo de serviço');
   assert.equal(vars.fundamento_legal, 'Regulamento X');
 });
 
 test('gerarTextoRPComportamento - sucesso', () => {
-  const template = 'Militar {{militar_nome}} passou para {{comportamento_novo}} em {{data_alteracao}}.';
+  const template = 'Militar {{nome_completo}} / Comportamento {{comportamento}} / Vigente desde {{data_inicio_comportamento}}';
   const militar = { nome_completo: 'JOÃO', posto_graduacao: 'SD', matricula: '1', quadro: 'Q' };
   const marco = {
     comportamento_anterior: 'A',
@@ -167,8 +171,7 @@ test('gerarTextoRPComportamento - sucesso', () => {
   const resultado = gerarTextoRPComportamento({ template, militar, marco });
 
   assert.strictEqual(resultado.ok, true);
-  assert.match(resultado.texto, /JOÃO/);
-  assert.match(resultado.texto, /01\/05\/2023/);
+  assert.equal(resultado.texto, 'Militar JOÃO / Comportamento B / Vigente desde 01/05/2023');
 });
 
 test('gerarTextoRPComportamento - erro por campos ausentes', () => {

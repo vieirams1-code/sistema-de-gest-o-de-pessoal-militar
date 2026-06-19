@@ -237,6 +237,11 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, {
     nome_completo: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
     data_inicio: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
     data_alteracao: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
+    comportamento_calculado: marco?.comportamento_novo || marco?.comportamento || 'Não informado',
+    comportamento_cadastrado: marco?.comportamento_anterior || militar?.comportamento || 'Não informado',
+    data_inicio_comportamento: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
+    data_vigencia: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
+    tipo_publicacao_comportamento: marco?.tipo_publicacao_comportamento || '',
     motivo_mudanca: marco?.motivo_mudanca || 'Não informado',
     fundamento_legal: marco?.fundamento_legal || 'Não informado',
   };
@@ -266,7 +271,6 @@ export function gerarTextoRPComportamento({ template, militar, marco, tipoTempla
     };
   }
 
-  const apply = utils.aplicarTemplate || aplicarTemplate;
   return {
     ok: true,
     texto: deps.aplicarTemplate(template, vars),

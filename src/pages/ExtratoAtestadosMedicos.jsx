@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet, Archive, Download } from 'lucide-react';
+import { CalendarDays, FileText, Filter, Loader2, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet, Archive, Download } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';

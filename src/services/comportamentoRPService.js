@@ -6,7 +6,6 @@ import {
   escolherTipoTemplateComportamento,
   gerarTextoRPComportamento,
   marcoEhValidoParaGeracaoRP,
-  obterTemplatePadraoComportamento,
 } from '@/utils/comportamentoTemplateUtils';
 import { formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
@@ -38,27 +37,7 @@ function coletarCamposObrigatoriosAusentes({ militar = {}, marco = {} }) {
 
 async function obterOuSemearTemplateAtivo(tipoTemplate) {
   const templatesAtivos = await serviceClient.entities.TemplateTexto.filter({ ativo: true });
-  let templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
-
-  if (!templateAtivo?.template) {
-    const templatePadrao = obterTemplatePadraoComportamento(tipoTemplate);
-    if (templatePadrao) {
-      templateAtivo = await serviceClient.entities.TemplateTexto.create({
-        modulo: MODULO_EX_OFFICIO,
-        tipo_registro: tipoTemplate,
-        nome: `Template padrão — ${tipoTemplate}`,
-        template: templatePadrao,
-        observacoes: 'Template padrão semeado automaticamente para comportamento disciplinar.',
-        escopo: 'GLOBAL',
-        setor_id: '',
-        subsetor_id: '',
-        unidade_id: '',
-        ativo: true,
-      });
-    }
-  }
-
-  return templateAtivo || null;
+  return getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos) || null;
 }
 
 async function buscarPublicacaoExistentePorHistorico(historicoId) {
