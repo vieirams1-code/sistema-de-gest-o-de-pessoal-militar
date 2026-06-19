@@ -222,25 +222,30 @@ export function escolherTipoTemplateComportamento(marco = {}) {
   return TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO;
 }
 
-export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, { _formatDateBR } = {}) {
-  const format = _formatDateBR || formatDateBR;
+export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, { _formatDateBR, dataPublicacao } = {}) {
+  const format = _formatDateBR || deps.formatDateBR;
+  const dataVigencia = marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio;
+  const dataPublicacaoTemplate = dataPublicacao || marco?.data_publicacao || marco?.dataPublicacao;
+  const comportamentoCalculado = marco?.comportamento_novo || marco?.comportamento || militar?.comportamento || 'Não informado';
+  const comportamentoAnterior = marco?.comportamento_anterior || militar?.comportamento || 'Não informado';
   const vars = {
     militar_nome: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
     posto_graduacao: militar?.posto_graduacao || 'Não informado',
     matricula: militar?.matricula || 'Não informado',
     quadro: militar?.quadro || '',
     unidade: militar?.lotacao || militar?.unidade || 'Não informado',
-    comportamento_anterior: marco?.comportamento_anterior || 'Não informado',
-    comportamento_novo: marco?.comportamento_novo || militar?.comportamento || 'Não informado',
+    comportamento_anterior: comportamentoAnterior,
+    comportamento_novo: comportamentoCalculado,
     comportamento_atual: militar?.comportamento || marco?.comportamento_novo || 'Não informado',
-    comportamento: marco?.comportamento_novo || marco?.comportamento || militar?.comportamento || 'Não informado',
+    comportamento: comportamentoCalculado,
     nome_completo: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
-    data_inicio: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
-    data_alteracao: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
-    comportamento_calculado: marco?.comportamento_novo || marco?.comportamento || 'Não informado',
-    comportamento_cadastrado: marco?.comportamento_anterior || militar?.comportamento || 'Não informado',
-    data_inicio_comportamento: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
-    data_vigencia: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
+    data_inicio: format(dataVigencia),
+    data_alteracao: format(dataVigencia),
+    data_publicacao: format(dataPublicacaoTemplate),
+    comportamento_calculado: comportamentoCalculado,
+    comportamento_cadastrado: comportamentoAnterior,
+    data_inicio_comportamento: format(dataVigencia),
+    data_vigencia: format(dataVigencia),
     tipo_publicacao_comportamento: marco?.tipo_publicacao_comportamento || '',
     motivo_mudanca: marco?.motivo_mudanca || 'Não informado',
     fundamento_legal: marco?.fundamento_legal || 'Não informado',
@@ -260,8 +265,8 @@ export function validarCamposEssenciaisComportamento(tipoTemplate, vars) {
   return faltantes.map((campo) => LABELS_CAMPOS[campo] || campo);
 }
 
-export function gerarTextoRPComportamento({ template, militar, marco, tipoTemplate, utils = {} }) {
-  const vars = montarVariaveisComportamentoTemplate(militar, marco, { _formatDateBR: utils.formatDateBR });
+export function gerarTextoRPComportamento({ template, militar, marco, tipoTemplate, dataPublicacao, utils = {} }) {
+  const vars = montarVariaveisComportamentoTemplate(militar, marco, { _formatDateBR: utils.formatDateBR, dataPublicacao });
   const camposEssenciaisAusentes = validarCamposEssenciaisComportamento(tipoTemplate, vars);
 
   if (camposEssenciaisAusentes.length > 0) {

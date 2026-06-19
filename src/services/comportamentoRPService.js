@@ -124,7 +124,7 @@ async function validarElegibilidadeParaGeracao({ militar, marco }) {
   return { exito: true, tipoTemplate };
 }
 
-async function resolverERenderizarTemplate({ tipoTemplate, militar, marco }) {
+async function resolverERenderizarTemplate({ tipoTemplate, militar, marco, dataPublicacao }) {
   const templateAtivo = await obterOuSemearTemplateAtivo(tipoTemplate);
   if (!templateAtivo?.template) {
     return {
@@ -144,6 +144,7 @@ async function resolverERenderizarTemplate({ tipoTemplate, militar, marco }) {
     militar,
     marco,
     tipoTemplate,
+    dataPublicacao,
   });
 
   if (!renderizacao?.ok || !renderizacao?.texto) {
@@ -223,7 +224,7 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
   }
 
   const { tipoTemplate } = elegibilidade;
-  const templateResult = await resolverERenderizarTemplate({ tipoTemplate, militar, marco });
+  const templateResult = await resolverERenderizarTemplate({ tipoTemplate, militar, marco, dataPublicacao });
   if (!templateResult.exito) {
     return templateResult.payload;
   }
@@ -292,7 +293,7 @@ export async function gerarPublicacaoComportamento({
   let templateAtivo = { id: '' };
 
   if (!renderizacao) {
-    const templateResult = await resolverERenderizarTemplate({ tipoTemplate, militar, marco });
+    const templateResult = await resolverERenderizarTemplate({ tipoTemplate, militar, marco, dataPublicacao });
     if (!templateResult.exito) return templateResult.payload;
     renderizacao = templateResult.renderizacao;
     templateAtivo = templateResult.templateAtivo;
