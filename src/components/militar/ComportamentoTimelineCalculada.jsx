@@ -23,11 +23,22 @@ const STATUS_COLORS = {
   Projecao: '#8b5cf6',
 };
 
+const BAR_Y = 225;
 const EVENT_TRACKS = [
-  { side: 'top', y: -118 },
-  { side: 'top', y: -66 },
-  { side: 'bottom', y: 66 },
-  { side: 'bottom', y: 118 },
+  { side: 'top', y: 24 },
+  { side: 'top', y: 92 },
+  { side: 'bottom', y: 304 },
+  { side: 'bottom', y: 330 },
+];
+const TIMELINE_HEIGHT = 460;
+const AXIS_BOTTOM = 42;
+
+const ZOOM_OPTIONS = [
+  { mode: '1y', label: '1 ano', years: 1, minWidth: 900 },
+  { mode: '2y', label: '2 anos', years: 2, minWidth: 1000 },
+  { mode: '4y', label: '4 anos', years: 4, minWidth: 1100 },
+  { mode: '8y', label: '8 anos', years: 8, minWidth: 1200 },
+  { mode: 'full', label: 'Completa', minWidth: 1400 },
 ];
 
 const STATUS_RANK = {
@@ -146,28 +157,24 @@ function addYears(date, amount) {
   return next;
 }
 
-function getTimelineBounds(segmentos = [], eventos = [], zoomMode = 'full', selectedYear) {
+function getTimelineBounds(segmentos = [], eventos = [], zoomMode = 'full') {
   const dates = collectTimelineDates(segmentos, eventos);
   const fullStart = new Date(Math.min(...dates.map((date) => date.getTime())));
   const fullEnd = new Date(Math.max(...dates.map((date) => date.getTime())));
   fullStart.setDate(fullStart.getDate() - 30);
   fullEnd.setDate(fullEnd.getDate() + 30);
 
-  if (zoomMode === 'year' && selectedYear) {
-    return {
-      min: new Date(`${selectedYear}-01-01T00:00:00`),
-      max: new Date(`${selectedYear}-12-31T23:59:59`),
-      fullStart,
-      fullEnd,
-    };
-  }
+  const zoomOption = ZOOM_OPTIONS.find((option) => option.mode === zoomMode);
 
-  if (zoomMode === '10y' || zoomMode === '5y') {
-    const years = zoomMode === '10y' ? 10 : 5;
+  if (zoomOption?.years) {
     const today = new Date();
-    const min = addYears(today, -years);
+    const min = addYears(today, -zoomOption.years);
+    const futureLimit = addYears(today, 2);
+    const boundedFutureEnd = new Date(Math.min(fullEnd.getTime(), futureLimit.getTime()));
+    const max = new Date(Math.max(today.getTime(), boundedFutureEnd.getTime()));
     min.setHours(0, 0, 0, 0);
-    return { min, max: new Date(Math.max(fullEnd.getTime(), today.getTime())), fullStart, fullEnd };
+    max.setHours(23, 59, 59, 999);
+    return { min, max, fullStart, fullEnd };
   }
 
   return { min: fullStart, max: fullEnd, fullStart, fullEnd };
@@ -194,24 +201,29 @@ function isEventInsideBounds(evento, startDate, endDate) {
 function buildTicks(startDate, endDate, zoomMode) {
   const totalYears = Math.max(1, (endDate.getTime() - startDate.getTime()) / (365.25 * 86400000));
 
-  if (zoomMode === 'year') {
+  if (zoomMode === '1y') {
     const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
-    return Array.from({ length: 12 }, (_, index) => {
-      const date = new Date(startDate.getFullYear(), index, 1);
-      return { label: formatter.format(date).replace('.', ''), date };
-    });
-  }
-
-  if (zoomMode === '5y') {
     const ticks = [];
-    for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year += 1) {
-      ticks.push({ label: String(year), date: new Date(`${year}-01-01T00:00:00`) });
-      ticks.push({ label: 'Jul', date: new Date(`${year}-07-01T00:00:00`), muted: true });
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    while (cursor <= endDate) {
+      ticks.push({ label: formatter.format(cursor).replace('.', ''), date: new Date(cursor) });
+      cursor.setMonth(cursor.getMonth() + 1);
     }
     return ticks;
   }
 
-  const tickStep = zoomMode === '10y' || totalYears <= 10 ? 1 : totalYears > 25 ? 5 : 2;
+  if (zoomMode === '2y') {
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit' });
+    const ticks = [];
+    const cursor = new Date(startDate.getFullYear(), Math.floor(startDate.getMonth() / 3) * 3, 1);
+    while (cursor <= endDate) {
+      ticks.push({ label: formatter.format(cursor).replace('.', ''), date: new Date(cursor) });
+      cursor.setMonth(cursor.getMonth() + 3);
+    }
+    return ticks;
+  }
+
+  const tickStep = zoomMode === 'full' && totalYears > 25 ? 5 : zoomMode === 'full' && totalYears > 10 ? 2 : 1;
   const firstYear = Math.ceil(startDate.getFullYear() / tickStep) * tickStep;
   const ticks = [];
 
@@ -222,8 +234,8 @@ function buildTicks(startDate, endDate, zoomMode) {
   return ticks;
 }
 
-function buildTimelineScale(segmentos = [], eventos = [], zoomMode = 'full', selectedYear) {
-  const { min, max, fullStart, fullEnd } = getTimelineBounds(segmentos, eventos, zoomMode, selectedYear);
+function buildTimelineScale(segmentos = [], eventos = [], zoomMode = 'full') {
+  const { min, max, fullStart, fullEnd } = getTimelineBounds(segmentos, eventos, zoomMode);
   const total = max.getTime() - min.getTime();
   const toPercent = (value) => {
     const date = value instanceof Date ? value : parseDate(value);
@@ -276,22 +288,32 @@ function criarTimelineEventGroups(eventos = [], toPercent, segmentos = []) {
   }));
 }
 
+function getSafeTrack(evento, index = 0) {
+  const preferredOffset = evento?.mainKind === 'hoje' ? 2 : 0;
+  return EVENT_TRACKS[(index + preferredOffset) % EVENT_TRACKS.length];
+}
+
 function assignEventTracks(groups = []) {
   const sorted = [...groups].sort((a, b) => a.left - b.left);
   const lastByTrack = new Array(EVENT_TRACKS.length).fill(-999);
   const minGap = 8.5;
 
   return sorted.map((group) => {
-    let trackIndex = 0;
+    let track = getSafeTrack(group, 0);
+    let trackIndex = EVENT_TRACKS.indexOf(track);
+
     for (let i = 0; i < EVENT_TRACKS.length; i += 1) {
-      if (group.left - lastByTrack[i] >= minGap) {
-        trackIndex = i;
+      const candidateTrack = getSafeTrack(group, i);
+      const candidateIndex = EVENT_TRACKS.indexOf(candidateTrack);
+      if (group.left - lastByTrack[candidateIndex] >= minGap) {
+        track = candidateTrack;
+        trackIndex = candidateIndex;
         break;
       }
     }
 
     lastByTrack[trackIndex] = group.left;
-    return { ...group, track: EVENT_TRACKS[trackIndex], trackIndex };
+    return { ...group, track, trackIndex };
   });
 }
 
@@ -307,9 +329,10 @@ function getGroupDateLabel(eventos = []) {
 }
 
 function getEventIcon(kind, label = '') {
-  if (kind === 'punicao' || kind === 'advertencia') return '📌';
+  if (kind === 'punicao') return '📌';
+  if (kind === 'advertencia') return '○';
   if (kind === 'mudanca') return label.toLowerCase().includes('cai') ? '⬇' : '⬆';
-  if (kind === 'projecao') return '🔮';
+  if (kind === 'projecao') return '◌';
   if (kind === 'hoje') return 'HOJE';
   if (kind === 'inclusao') return '⚑';
   return '•';
@@ -423,8 +446,14 @@ function JanelasResumo({ janelas = {} }) {
   );
 }
 
-function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMode, selectedYear, setSelectedYear, availableYears = [] }) {
-  const scale = useMemo(() => buildTimelineScale(segmentos, eventos, zoomMode, selectedYear), [segmentos, eventos, zoomMode, selectedYear]);
+function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMode }) {
+  const scale = useMemo(() => buildTimelineScale(segmentos, eventos, zoomMode), [segmentos, eventos, zoomMode]);
+  const minWidth = useMemo(() => {
+    const option = ZOOM_OPTIONS.find((item) => item.mode === zoomMode);
+    if (zoomMode !== 'full') return option?.minWidth || 1200;
+    const years = Math.max(1, (scale.max.getTime() - scale.min.getTime()) / (365.25 * 86400000));
+    return Math.max(option?.minWidth || 1400, Math.round(years * 110));
+  }, [scale, zoomMode]);
   const visibleEventos = useMemo(() => eventos.filter((evento) => isEventInsideBounds(evento, scale.min, scale.max)), [eventos, scale]);
   const visibleSegmentos = useMemo(() => segmentos
     .map((segmento) => clipSegmentToBounds(segmento, scale.min, scale.max))
@@ -440,12 +469,7 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {[
-          ['full', 'Completa'],
-          ['10y', '10 anos'],
-          ['5y', '5 anos'],
-          ['year', 'Ano'],
-        ].map(([mode, label]) => (
+        {ZOOM_OPTIONS.map(({ mode, label }) => (
           <button
             key={mode}
             type="button"
@@ -456,38 +480,25 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
           </button>
         ))}
 
-        {zoomMode === 'year' && (
-          <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-            Ano:
-            <select
-              value={selectedYear}
-              onChange={(event) => setSelectedYear(Number(event.target.value))}
-              className="bg-transparent text-xs font-bold text-slate-900 outline-none"
-            >
-              {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
-            </select>
-          </label>
-        )}
-
         {hasHiddenItems && (
           <span className="ml-auto rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">Existem eventos fora do período visualizado.</span>
         )}
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className="relative h-[390px] min-w-[980px]">
+        <div className="relative" style={{ height: `${TIMELINE_HEIGHT}px`, minWidth: `${minWidth}px` }}>
           {scale.ticks.map((tick) => (
             <div
               key={`${tick.label}-${tick.left}`}
-              className="absolute bottom-8 top-10 border-l border-slate-200/80"
-              style={{ left: `${tick.left}%` }}
+              className="absolute top-4 border-l border-slate-200/80"
+              style={{ left: `${tick.left}%`, bottom: `${AXIS_BOTTOM}px` }}
             >
               <span className={`absolute -left-5 top-full mt-2 w-10 text-center text-[11px] font-semibold ${tick.muted ? 'text-slate-400' : 'text-slate-500'}`}>{tick.label}</span>
             </div>
           ))}
-          <div className="absolute bottom-8 left-0 right-0 border-t border-slate-300" />
+          <div className="absolute left-0 right-0 border-t border-slate-300" style={{ bottom: `${AXIS_BOTTOM}px` }} />
 
-          <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-slate-200 shadow-inner" />
+          <div className="absolute left-0 right-0 h-2 -translate-y-1/2 rounded-full bg-slate-200 shadow-inner" style={{ top: `${BAR_Y}px` }} />
 
           {visibleSegmentos.map((segmento, index) => {
             const left = scale.toPercent(segmento.clippedInicio);
@@ -498,9 +509,10 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
             return (
               <div
                 key={`${segmento.inicio}-${segmento.fim}-${segmento.comportamento}-${index}`}
-                className={`absolute top-1/2 flex h-6 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow-md ${segmento.isAtual ? 'ring-4 ring-inset ring-slate-900/20' : ''}`}
+                className={`absolute flex h-6 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow-md ${segmento.isAtual ? 'ring-4 ring-inset ring-slate-900/20' : ''}`}
                 style={{
                   left: `${left}%`,
+                  top: `${BAR_Y}px`,
                   width: `${width}%`,
                   minWidth: '32px',
                   backgroundColor: segmento.isProjetado ? undefined : color,
@@ -534,7 +546,7 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
               <div
                 key={`${group.id}-${index}`}
                 className={`absolute flex -translate-x-1/2 flex-col items-center ${kind === 'hoje' ? 'z-30' : 'z-10'}`}
-                style={{ left: `${group.left}%`, top: `calc(50% + ${group.track.y}px)` }}
+                style={{ left: `${group.left}%`, top: `${group.track.y}px` }}
                 title={group.eventos.map((evento) => `${formatarData(evento.data)} — ${getEventLabel(evento, evento.kind)}`).join('\n')}
               >
                 {kind === 'hoje' && (
@@ -543,21 +555,22 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
                     <div className="absolute -top-9 left-1/2 -translate-x-1/2 rounded-full bg-blue-700 px-2 py-0.5 text-[10px] font-black tracking-wide text-white shadow-lg">HOJE</div>
                   </>
                 )}
-                <div className={`${labelOrder} w-[112px] rounded-xl border bg-white px-2 py-1.5 text-left text-[10.5px] leading-tight text-slate-600 shadow-lg ${kind === 'hoje' ? 'border-blue-300 ring-2 ring-blue-100' : kind === 'projecao' ? 'border-violet-300' : 'border-slate-200'}`}>
+                <div className={`${labelOrder} w-[128px] rounded-xl border bg-white px-2 py-1.5 text-left text-[10px] leading-tight text-slate-600 shadow-lg ${kind === 'hoje' ? 'border-blue-300 ring-2 ring-blue-100' : kind === 'projecao' ? 'border-violet-300' : 'border-slate-200'}`}>
                   <strong className="mb-1 block text-center text-[11px] text-slate-700">{group.dataLabel}</strong>
                   <div className="space-y-1">
                     {group.eventos.map((evento) => {
                       const label = getEventLabel(evento, evento.kind);
                       return (
                         <div key={`${evento.data}-${evento.tipo}-${evento.originalIndex}`} className="border-t border-slate-100 pt-1 first:border-t-0 first:pt-0">
-                          <span className="block font-bold text-slate-900">{getEventIcon(evento.kind, label)} {label.replace(/^Sobe para /, '').replace(/^Projeção para /, 'Projeção para ')}</span>
+                          <span className="line-clamp-2 block font-bold text-slate-900">{getEventIcon(evento.kind, label)} {label.replace(/^Sobe para /, '').replace(/^Projeção para /, 'Projeção para ')}</span>
+                          <small className="block text-slate-500">{formatarData(evento.data)}</small>
                           {evento.impactoVisual && <small className="block text-slate-500">{evento.impactoVisual}</small>}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-                <div className="order-2 h-9 border-l border-dashed border-slate-400" />
+                <div className="order-2 h-8 border-l border-dashed border-slate-400" />
                 <div className={`${markerOrder} grid h-7 w-7 place-items-center rounded-full border-[3px] text-sm shadow-lg ${markerClass}`}>
                   {kind === 'hoje' ? '' : getEventIcon(kind)}
                 </div>
@@ -586,14 +599,8 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
   const eventos = timelineCalculada?.eventos || [];
   const proximaMelhoria = timelineCalculada?.proximaMelhoria;
   const inconsistencias = timelineCalculada?.inconsistencias || [];
-  const availableYears = useMemo(() => {
-    const years = collectTimelineDates(segmentos, eventos).map((date) => date.getFullYear());
-    return [...new Set(years)].sort((a, b) => b - a);
-  }, [segmentos, eventos]);
-  const [zoomMode, setZoomMode] = useState('full');
-  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
-  const activeSelectedYear = availableYears.includes(selectedYear) ? selectedYear : availableYears[0];
-  const cardBounds = useMemo(() => getTimelineBounds(segmentos, eventos, zoomMode, activeSelectedYear), [segmentos, eventos, zoomMode, activeSelectedYear]);
+  const [zoomMode, setZoomMode] = useState('8y');
+  const cardBounds = useMemo(() => getTimelineBounds(segmentos, eventos, zoomMode), [segmentos, eventos, zoomMode]);
   const segmentosVisiveis = useMemo(() => segmentos.filter((segmento) => clipSegmentToBounds(segmento, cardBounds.min, cardBounds.max)), [segmentos, cardBounds]);
 
   if (!timelineCalculada) {
@@ -649,9 +656,6 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
         segmentos={segmentos}
         zoomMode={zoomMode}
         setZoomMode={setZoomMode}
-        selectedYear={activeSelectedYear}
-        setSelectedYear={setSelectedYear}
-        availableYears={availableYears}
       />
 
       <div className="space-y-4">
