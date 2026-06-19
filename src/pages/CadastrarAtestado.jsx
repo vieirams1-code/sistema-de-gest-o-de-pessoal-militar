@@ -122,9 +122,13 @@ export default function CadastrarAtestado() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
+
+  const canAdicionar = canAccessAction('adicionar_atestados');
+  const canEditar = canAccessAction('editar_atestados');
+  const hasActionPermission = editId ? canEditar : canAdicionar;
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
@@ -240,6 +244,11 @@ export default function CadastrarAtestado() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!hasActionPermission) {
+      alert('Ação negada: você não possui permissão para ' + (editId ? 'editar' : 'adicionar') + ' atestados.');
+      return;
+    }
+
     // Lote Trava Emergencial — escopo de escrita
     const militarAlvoId = editingAtestado?.militar_id || formData.militar_id;
     const escopo = validarEscopoMilitar(militarAlvoId);
@@ -303,6 +312,7 @@ export default function CadastrarAtestado() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
+  if (!hasActionPermission) return <AccessDenied modulo="Atestados (Ação restrita)" />;
 
   if (loadingEdit) {
     return (

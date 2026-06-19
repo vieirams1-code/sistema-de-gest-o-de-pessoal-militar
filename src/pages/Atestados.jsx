@@ -65,7 +65,7 @@ export default function Atestados() {
   const hasAtestadosAccess = canAccessModule('atestados');
   const canAdicionarAtestado = canAccessAction('adicionar_atestados');
   const canEditarAtestado = canAccessAction('editar_atestados');
-  const canExcluirAtestado = canAccessAction('excluir_atestado');
+  const canExcluirAtestado = canAccessAction('excluir_atestados') || canAccessAction('excluir_atestado');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoAfastamentoFilter, setTipoAfastamentoFilter] = useState('all');

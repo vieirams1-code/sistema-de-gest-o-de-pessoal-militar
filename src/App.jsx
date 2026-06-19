@@ -125,7 +125,6 @@ const actionGuardByPage = {
   PeriodosAquisitivos: { moduleKey: 'ferias', actionKey: 'visualizar_periodos_aquisitivos', moduleName: 'Férias' },
   CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias', moduleName: 'Férias' },
   Atestados: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
-  CadastrarAtestado: { moduleKey: 'atestados', actionKey: 'adicionar_atestados', moduleName: 'Atestados' },
   ExtratoAtestadosMedicos: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
 };
 
