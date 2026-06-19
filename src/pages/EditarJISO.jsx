@@ -20,7 +20,7 @@ import {
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
-import { atualizarEscopado } from '@/services/cudEscopadoClient';
+import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/jisoObservacoesUtils';
@@ -164,6 +164,12 @@ export default function EditarJISO() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Rechecagem defensiva de permissão
+    if (!canGerirJiso) {
+      alert('Acesso negado: permissão insuficiente para registrar decisão JISO.');
+      return;
+    }
+
     if (militarMesclado) {
       alert('Registro bloqueado: militar mesclado é permitido apenas para consulta histórica.');
       return;
@@ -209,10 +215,11 @@ export default function EditarJISO() {
     });
     if (renderMetadata) jisoData.render_metadata = renderMetadata;
 
+    let jisoSalva;
     if (jiso) {
-      await base44.entities.JISO.update(jiso.id, jisoData);
+      jisoSalva = await atualizarEscopado('JISO', jiso.id, jisoData);
     } else {
-      await base44.entities.JISO.create(jisoData);
+      jisoSalva = await criarEscopado('JISO', jisoData);
     }
 
     // Atualizar atestado com novos dados da JISO
@@ -227,7 +234,7 @@ export default function EditarJISO() {
         dias_jiso: diasJiso,
         data_termino_jiso: formatDate(dataTerminoJiso, 'yyyy-MM-dd'),
         data_retorno_jiso: formatDate(dataRetornoJiso, 'yyyy-MM-dd'),
-        jiso_id: jiso?.id
+        jiso_id: jiso?.id || jisoSalva?.id || jisoSalva?.data?.id
       });
     }
 
