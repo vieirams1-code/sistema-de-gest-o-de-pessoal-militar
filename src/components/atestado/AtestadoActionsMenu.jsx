@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Eye, Pencil, Download, CheckCircle, BookOpen, FileText, History, Trash2 } from 'lucide-react';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcStatusPublicacao, isPublicacaoAtestadoAtiva } from './atestadoPublicacaoHelpers';
 
 export default function AtestadoActionsMenu({
@@ -28,6 +29,8 @@ export default function AtestadoActionsMenu({
   } = handlers;
 
   const { canEdit, canDelete } = permissoes;
+  const { canAccessAction } = useCurrentUser();
+  const canDownloadAnexo = canAccessAction('baixar_anexos_atestados');
 
   const {
     hasPublicacaoVinculada,
@@ -66,12 +69,12 @@ export default function AtestadoActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {atestado?.arquivo_atestado && (
+        {atestado?.arquivo_atestado && canDownloadAnexo && (
           <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
             <Download className="w-4 h-4 mr-2 text-slate-600" />Baixar atestado anexado
           </DropdownMenuItem>
         )}
-        {atestado?.arquivo_ata_jiso && (
+        {atestado?.arquivo_ata_jiso && canDownloadAnexo && (
           <DropdownMenuItem onClick={() => window.open(atestado.arquivo_ata_jiso, '_blank')}>
             <Download className="w-4 h-4 mr-2 text-purple-600" />Baixar Ata JISO
           </DropdownMenuItem>
