@@ -4,7 +4,7 @@ import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Chev
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -15,7 +15,7 @@ import {
   getPunicaoEntity,
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
-import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services/comportamentoRPService';
+import { gerarPublicacaoComportamento } from '@/services/comportamentoRPService';
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
@@ -131,10 +131,45 @@ function normalizarEventosDoSegmento(segmento = {}, eventos = []) {
   };
 }
 
-function gerarTextoPublicacaoComportamento({ militar = {}, comportamento, dataInicio }) {
+const TIPO_PUBLICACAO_COMPORTAMENTO = {
+  MELHORIA: 'melhoria_comportamento',
+  REGISTRO_FUNCIONAL: 'registro_funcional_comportamento',
+};
+
+const MODOS_APROVACAO = {
+  CORRIGIR_SEM_PUBLICACAO: 'corrigir_sem_publicacao',
+  APROVAR_COM_PUBLICACAO_MELHORIA: 'aprovar_com_publicacao_melhoria',
+  APROVAR_COM_PUBLICACAO_REGISTRO_FUNCIONAL: 'aprovar_com_publicacao_registro_funcional',
+};
+
+function calcularDiasDesde(dataInicio) {
+  if (!dataInicio) return 0;
+  const inicio = new Date(`${String(dataInicio).slice(0, 10)}T00:00:00`);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  if (Number.isNaN(inicio.getTime())) return 0;
+  return Math.floor((hoje.getTime() - inicio.getTime()) / 86400000);
+}
+
+function obterTipoPublicacaoSugerido(segmentoAtual) {
+  return calcularDiasDesde(segmentoAtual?.inicio) > 30
+    ? TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL
+    : TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA;
+}
+
+function obterTemplateLabel(tipoPublicacao) {
+  return tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL
+    ? 'registro_funcional_comportamento'
+    : 'melhoria_comportamento';
+}
+
+function gerarTextoPublicacaoComportamento({ militar = {}, comportamento, dataInicio, tipoPublicacao = TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL }) {
   const postoGraduacao = militar.posto_graduacao || '—';
   const nomeCompleto = militar.nome_completo || '—';
   const matricula = obterMatricula(militar);
+  if (tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA) {
+    return `Passa a integrar o comportamento ${comportamento || '—'}, a contar de ${formatarData(dataInicio)}, o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, conforme apuração dos assentamentos disciplinares e critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`;
+  }
   return `Para fins de assentamento e registro funcional, fica consignado que o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, passou a integrar o comportamento ${comportamento || '—'} a contar de ${formatarData(dataInicio)}, conforme apuração realizada com base nos assentamentos disciplinares constantes em seus registros funcionais e nos critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`;
 }
 
@@ -224,10 +259,12 @@ function DetalhesAuditoria({ linha }) {
   const punicoesConsideradas = detalhes.janela_8_anos?.punicoes || [];
   const advertencias = linha.timeline?.segmentoAtual?.advertenciasInformativas || [];
   const inconsistencias = linha.calculado?.inconsistencias || [];
+  const tipoPublicacaoSugerido = obterTipoPublicacaoSugerido(segmentoAtual);
   const textoPublicacaoPreview = gerarTextoPublicacaoComportamento({
     militar: linha.militar,
     comportamento: linha.calculado?.comportamento || segmentoAtual?.comportamento,
     dataInicio: segmentoAtual?.inicio,
+    tipoPublicacao: tipoPublicacaoSugerido,
   });
   const comportamentoCalculado = linha.calculado?.comportamento || segmentoAtual?.comportamento;
   const comportamentoCadastrado = linha.militar.comportamento || 'Bom';
@@ -237,7 +274,7 @@ function DetalhesAuditoria({ linha }) {
     : !segmentoAtual
       ? 'Não foi possível identificar o período vigente do comportamento.'
       : comportamentoCalculado
-        ? 'Ação sugerida: gerar publicação de registro funcional.'
+        ? `Ação sugerida: gerar publicação de ${tipoPublicacaoSugerido === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL ? 'registro funcional' : 'melhoria de comportamento'}.`
         : 'Não foi possível identificar o comportamento calculado atual.';
 
   const copiarTextoPublicacao = async () => {
@@ -374,7 +411,7 @@ function DetalhesAuditoria({ linha }) {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Texto de publicação — prévia</p>
                 <p className="mt-2 text-sm leading-relaxed text-slate-800">{textoPublicacaoPreview}</p>
-                <p className="mt-3 text-xs font-semibold text-amber-800">Nenhuma publicação será criada nesta etapa.</p>
+                <p className="mt-3 text-xs font-semibold text-amber-800">Template sugerido: {obterTemplateLabel(tipoPublicacaoSugerido)}. Confirme se já não existe publicação anterior para este fato.</p>
               </div>
               <Button type="button" variant="outline" onClick={copiarTextoPublicacao}>
                 <FileText className="mr-2 h-4 w-4" />
@@ -509,7 +546,7 @@ export default function AvaliacaoComportamento() {
     inconsistencias: avaliacao.filter((a) => a.situacao === 'Inconsistente').length,
   }), [avaliacao]);
 
-  const aplicarSugestao = async (linha, { gerarPublicacao = false } = {}) => {
+  const aplicarSugestao = async (linha, { modoAprovacao = MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO } = {}) => {
     if (!canAprovarMudanca) return;
     if (!linha.calculado?.comportamento) return;
 
@@ -541,9 +578,11 @@ export default function AvaliacaoComportamento() {
         throw new Error('Não foi possível identificar a pendência de comportamento para aprovação.');
       }
 
+      const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
       const resultadoAplicacao = await aplicarPendenciasComportamentoEmLote({
         pendencias: [pendenciaParaAplicacao.id],
         usuarioAtual: { canAccessAction },
+        options: { dataReferencia: dataInicioCalculada },
       });
 
       if (resultadoAplicacao.totalAplicadas !== 1) {
@@ -555,29 +594,46 @@ export default function AvaliacaoComportamento() {
       }
 
       let resultadoRPAutomatico = null;
-      if (gerarPublicacao) {
-        const historicoMilitar = await obterHistoricoComportamentoMilitar(linha.militar.id, { ordem: 'desc' });
-        const marcoParaPublicacao = historicoMilitar.find((marco) => marco?.comportamento_novo === linha.calculado.comportamento) || null;
+      const deveGerarPublicacao = modoAprovacao !== MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO;
+      let falhaPublicacao = null;
+      if (deveGerarPublicacao) {
+        try {
+          const historicoMilitar = await obterHistoricoComportamentoMilitar(linha.militar.id, { ordem: 'desc' });
+          const marcoAplicado = resultadoAplicacao.aplicadas?.[0]?.marco || null;
+          const marcoParaPublicacao = marcoAplicado?.id
+            ? marcoAplicado
+            : historicoMilitar.find((marco) => (
+              marco?.comportamento_novo === linha.calculado.comportamento
+              && String(marco?.data_alteracao || '').slice(0, 10) === String(dataInicioCalculada).slice(0, 10)
+            )) || null;
+          const tipoPublicacao = modoAprovacao === MODOS_APROVACAO.APROVAR_COM_PUBLICACAO_REGISTRO_FUNCIONAL
+            ? TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL
+            : TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA;
+          const texto = gerarTextoPublicacaoComportamento({
+            militar: linha.militar,
+            comportamento: linha.calculado.comportamento,
+            dataInicio: dataInicioCalculada,
+            tipoPublicacao,
+          });
 
-        if (!marcoParaPublicacao?.id) {
-          throw new Error('Não foi possível localizar o marco histórico para vincular a publicação.');
-        }
+          resultadoRPAutomatico = await gerarPublicacaoComportamento({
+            militar: linha.militar,
+            comportamento: linha.calculado.comportamento,
+            dataInicio: dataInicioCalculada,
+            fundamento: linha.calculado.fundamento,
+            tipoPublicacao,
+            texto,
+            marcoHistorico: marcoParaPublicacao,
+            geradoPor: userEmail || '',
+          });
 
-        resultadoRPAutomatico = await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
-          militar: linha.militar,
-          marco: {
-            ...marcoParaPublicacao,
-            motivo_mudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
-            fundamento_legal: linha.calculado.fundamento,
-          },
-          geradoPor: '',
-        });
-
-
-        const houveFalhaPublicacao = !resultadoRPAutomatico?.ok
-          && resultadoRPAutomatico?.motivo !== 'publicacao_ja_existente';
-        if (houveFalhaPublicacao) {
-          throw new Error(resultadoRPAutomatico?.motivo || 'Falha ao gerar publicação automática.');
+          const houveFalhaPublicacao = !resultadoRPAutomatico?.ok
+            && resultadoRPAutomatico?.motivo !== 'publicacao_ja_existente';
+          if (houveFalhaPublicacao) {
+            falhaPublicacao = resultadoRPAutomatico?.motivo || 'Falha ao gerar publicação automática.';
+          }
+        } catch (error) {
+          falhaPublicacao = error?.message || 'Falha ao gerar publicação automática.';
         }
       }
 
@@ -588,14 +644,17 @@ export default function AvaliacaoComportamento() {
         queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
       ]);
 
-      const descricaoPublicacao = !gerarPublicacao
+      const descricaoPublicacao = !deveGerarPublicacao
         ? 'Comportamento aplicado com sucesso.'
-        : resultadoRPAutomatico?.motivo === 'publicacao_ja_existente'
-          ? 'Comportamento aplicado e publicação já existente foi reaproveitada (sem duplicidade).'
-          : 'Comportamento aplicado e publicação gerada com sucesso.';
+        : falhaPublicacao
+          ? `Comportamento aplicado, mas houve falha ao gerar publicação: ${falhaPublicacao}.`
+          : resultadoRPAutomatico?.motivo === 'publicacao_ja_existente'
+            ? 'Comportamento aplicado e publicação já existente foi reaproveitada (sem duplicidade).'
+            : 'Comportamento aplicado e publicação gerada com sucesso.';
 
       toast({
-        title: 'Operação concluída',
+        variant: falhaPublicacao ? 'destructive' : undefined,
+        title: falhaPublicacao ? 'Comportamento aplicado com alerta' : 'Operação concluída',
         description: descricaoPublicacao,
       });
     } catch (error) {
@@ -655,10 +714,10 @@ export default function AvaliacaoComportamento() {
     });
   };
 
-  const confirmarAprovacao = async ({ gerarPublicacao = false } = {}) => {
+  const confirmarAprovacao = async ({ modoAprovacao = MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO } = {}) => {
     if (!canAprovarMudanca) return;
     if (!aprovacaoModal.linha) return;
-    await aplicarSugestao(aprovacaoModal.linha, { gerarPublicacao });
+    await aplicarSugestao(aprovacaoModal.linha, { modoAprovacao });
     fecharModalAprovacao();
   };
 
@@ -775,31 +834,74 @@ export default function AvaliacaoComportamento() {
       </main>
 
       <Dialog open={aprovacaoModal.open} onOpenChange={(open) => (!open ? fecharModalAprovacao() : null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Aprovar mudança de comportamento</DialogTitle>
             <DialogDescription>
-              Escolha como deseja concluir a aprovação para {aprovacaoModal.linha?.militar?.nome_completo || 'o militar selecionado'}.
+              Escolha o tratamento administrativo para {aprovacaoModal.linha?.militar?.nome_completo || 'o militar selecionado'}.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg border bg-slate-50 p-3 text-sm text-slate-700">
-            <strong>Mudança:</strong>{' '}
-            {aprovacaoModal.linha
-              ? `${aprovacaoModal.linha.militar.comportamento || 'Bom'} → ${aprovacaoModal.linha.calculado?.comportamento || '—'}`
-              : '—'}
-          </div>
+          {aprovacaoModal.linha ? (() => {
+            const linha = aprovacaoModal.linha;
+            const segmentoAtual = linha.timeline?.segmentoAtual;
+            const tipoSugerido = obterTipoPublicacaoSugerido(segmentoAtual);
+            const opcoes = [
+              {
+                modo: MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO,
+                titulo: 'Corrigir cadastro sem publicação',
+                descricao: 'Use quando a publicação já existe e o sistema apenas precisa refletir o comportamento correto.',
+                tipoPublicacao: null,
+              },
+              {
+                modo: MODOS_APROVACAO.APROVAR_COM_PUBLICACAO_MELHORIA,
+                titulo: 'Aprovar e gerar publicação de melhoria',
+                descricao: 'Use quando o militar atingiu agora o tempo para melhoria de comportamento.',
+                tipoPublicacao: TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA,
+              },
+              {
+                modo: MODOS_APROVACAO.APROVAR_COM_PUBLICACAO_REGISTRO_FUNCIONAL,
+                titulo: 'Aprovar e gerar publicação de registro funcional',
+                descricao: 'Use quando a correção é retroativa ou não há publicação anterior localizada.',
+                tipoPublicacao: TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL,
+              },
+            ];
 
-          <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => confirmarAprovacao({ gerarPublicacao: false })} disabled={!canAprovarMudanca}>
-              <CheckCircle2 className="w-4 h-4 mr-1" />
-              Aprovar sem publicação
-            </Button>
-            <Button onClick={() => confirmarAprovacao({ gerarPublicacao: true })} disabled={!canAprovarMudanca}>
-              <FileText className="w-4 h-4 mr-1" />
-              Aprovar e gerar publicação
-            </Button>
-          </DialogFooter>
+            return (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                  Confirme se já não existe publicação anterior para este fato.
+                </div>
+                {opcoes.map((opcao) => {
+                  const template = opcao.tipoPublicacao ? obterTemplateLabel(opcao.tipoPublicacao) : 'sem publicação';
+                  const sugerida = opcao.tipoPublicacao === tipoSugerido || (!opcao.tipoPublicacao && !tipoSugerido);
+                  return (
+                    <div key={opcao.modo} className={`rounded-xl border p-4 ${sugerida && opcao.tipoPublicacao ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-bold text-slate-900">{opcao.titulo}</h3>
+                            {sugerida && opcao.tipoPublicacao ? <Badge className="border-blue-200 bg-white text-blue-700">Sugerido</Badge> : null}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{opcao.descricao}</p>
+                          <div className="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-2">
+                            <p><strong>Comportamento atual cadastrado:</strong> {linha.militar.comportamento || 'Bom'}</p>
+                            <p><strong>Comportamento calculado:</strong> {linha.calculado?.comportamento || '—'}</p>
+                            <p><strong>Data de vigência calculada:</strong> {formatarData(segmentoAtual?.inicio)}</p>
+                            <p><strong>Template:</strong> {template}</p>
+                          </div>
+                        </div>
+                        <Button onClick={() => confirmarAprovacao({ modoAprovacao: opcao.modo })} disabled={!canAprovarMudanca} variant={opcao.tipoPublicacao ? 'default' : 'outline'}>
+                          {opcao.tipoPublicacao ? <FileText className="w-4 h-4 mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+                          Selecionar
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })() : null}
         </DialogContent>
       </Dialog>
     </div>

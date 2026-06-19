@@ -2,6 +2,7 @@ import { base44 as base44Client } from '@/api/base44Client';
 import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import {
+  TIPO_TEMPLATE_COMPORTAMENTO,
   escolherTipoTemplateComportamento,
   gerarTextoRPComportamento,
   marcoEhValidoParaGeracaoRP,
@@ -273,6 +274,75 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
     templateId: templateAtivo.id || '',
     publicacao: registroCriado,
   };
+}
+
+export async function gerarPublicacaoComportamento({
+  militar,
+  comportamento,
+  dataInicio,
+  fundamento = '',
+  tipoPublicacao = TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO,
+  texto = '',
+  marcoHistorico = null,
+  geradoPor = '',
+  dataPublicacao = new Date().toISOString().slice(0, 10),
+}) {
+  const tipoTemplate = tipoPublicacao || TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO;
+  const marco = marcoHistorico?.id
+    ? marcoHistorico
+    : {
+        id: '',
+        comportamento_anterior: militar?.comportamento || '',
+        comportamento_novo: comportamento,
+        comportamento,
+        data_alteracao: dataInicio,
+        motivo_mudanca: tipoTemplate === TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO
+          ? 'Registro funcional retroativo de comportamento aprovado na Avaliação de Comportamento.'
+          : 'Melhoria de comportamento aprovada na Avaliação de Comportamento.',
+        fundamento_legal: fundamento,
+      };
+
+  const textoPublicacao = normalizarTexto(texto);
+  let renderizacao = textoPublicacao ? { ok: true, texto: textoPublicacao, vars: {} } : null;
+  let templateAtivo = { id: '' };
+
+  if (!renderizacao) {
+    const templateResult = await resolverERenderizarTemplate({ tipoTemplate, militar, marco });
+    if (!templateResult.exito) return templateResult.payload;
+    renderizacao = templateResult.renderizacao;
+    templateAtivo = templateResult.templateAtivo;
+  } else {
+    templateAtivo = await obterOuSemearTemplateAtivo(tipoTemplate) || { id: '' };
+  }
+
+  const matriculaAtual = await obterMatriculaAtualMilitar(militar);
+  const geradoEm = new Date().toISOString();
+  const origemId = marco?.id || `${militar?.id || 'militar'}:${tipoTemplate}:${dataInicio || dataPublicacao}:${comportamento || ''}`;
+  const payloadPublicacao = {
+    militar_id: militar.id,
+    militar_nome: militar.nome_completo || militar.nome_guerra || '',
+    militar_posto: militar.posto_graduacao || '',
+    militar_matricula: matriculaAtual || formatarMatriculaPadrao(militar.matricula || ''),
+    tipo: tipoTemplate,
+    data_publicacao: dataPublicacao,
+    status: 'Aguardando Nota',
+    texto_publicacao: renderizacao.texto,
+    origem_tipo: marco?.id ? 'historico_comportamento' : 'comportamento_calculado',
+    origem_id: origemId,
+    historico_comportamento_id: marco?.id || '',
+    tipo_template: tipoTemplate,
+    template_texto_id: templateAtivo?.id || '',
+    texto_renderizado: renderizacao.texto,
+    gerado_por: geradoPor,
+    gerado_em: geradoEm,
+  };
+
+  try {
+    const registroCriado = await serviceDeps.criarEscopado('PublicacaoExOfficio', payloadPublicacao);
+    return { ok: true, publicado: true, etapa: 'create', motivo: 'publicacao_criada', tipoTemplate, templateId: templateAtivo?.id || '', publicacao: registroCriado };
+  } catch (error) {
+    return { ok: false, publicado: false, etapa: 'create', motivo: error?.message || 'erro_ao_criar_publicacao', tipoTemplate };
+  }
 }
 
 export function __setComportamentoRPServiceClientForTests(client) {
