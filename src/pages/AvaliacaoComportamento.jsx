@@ -273,7 +273,6 @@ function TimelineCards({ segmentos, eventos = [] }) {
 function DetalhesAuditoria({ linha }) {
   const [viewMode, setViewMode] = useState('bar');
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
-  const { toast } = useToast();
   const detalhes = linha.calculado?.detalhes || {};
   const segmentos = linha.timeline?.segmentos || [];
   const segmentoAtual = linha.timeline?.segmentoAtual;
@@ -549,11 +548,7 @@ export default function AvaliacaoComportamento() {
     return getTemplateAtivoPorTipo(tipoPublicacao, MODULO_EX_OFFICIO, templatesDisponiveis);
   };
 
-  const renderizarTemplatePublicacaoComportamento = async ({ linha, tipoPublicacao, dataInicioCalculada }) => {
-    const templateAtivo = await localizarTemplatePublicacaoComportamento(tipoPublicacao);
-    if (!templateAtivo?.template) {
-      throw new Error(`Template obrigatório não encontrado para ${tipoPublicacao}. Cadastre um template ativo antes de gerar a publicação.`);
-    }
+  const montarVariaveisPublicacaoComportamento = ({ linha, tipoPublicacao, dataInicioCalculada, dataPublicacao }) => {
     const comportamentoAnterior = linha.militar?.comportamento || 'Bom';
     const marcoTemplate = {
       comportamento_anterior: comportamentoAnterior,
@@ -567,17 +562,26 @@ export default function AvaliacaoComportamento() {
         ? 'Registro funcional retroativo de comportamento aprovado na Avaliação de Comportamento.'
         : 'Melhoria de comportamento aprovada na Avaliação de Comportamento.',
     };
-    const vars = montarVariaveisComportamentoTemplate(linha.militar, marcoTemplate);
-    const varsComportamento = {
+    const vars = montarVariaveisComportamentoTemplate(linha.militar, marcoTemplate, { dataPublicacao });
+    return {
       ...vars,
+      data_publicacao: formatarData(dataPublicacao),
       comportamento: linha.calculado?.comportamento || vars.comportamento,
       comportamento_anterior: comportamentoAnterior,
-      comportamento_calculado: linha.calculado?.comportamento || '',
+      comportamento_calculado: linha.calculado?.comportamento || vars.comportamento_calculado || '',
       comportamento_cadastrado: comportamentoAnterior,
       data_inicio_comportamento: formatarData(dataInicioCalculada),
       data_vigencia: formatarData(dataInicioCalculada),
       tipo_publicacao_comportamento: tipoPublicacao,
     };
+  };
+
+  const renderizarTemplatePublicacaoComportamento = async ({ linha, tipoPublicacao, dataInicioCalculada, dataPublicacao }) => {
+    const templateAtivo = await localizarTemplatePublicacaoComportamento(tipoPublicacao);
+    if (!templateAtivo?.template) {
+      throw new Error(`Template obrigatório não encontrado para ${tipoPublicacao}. Cadastre um template ativo antes de gerar a publicação.`);
+    }
+    const varsComportamento = montarVariaveisPublicacaoComportamento({ linha, tipoPublicacao, dataInicioCalculada, dataPublicacao });
     return {
       templateAtivo,
       texto: aplicarTemplate(templateAtivo.template, varsComportamento),
@@ -586,13 +590,14 @@ export default function AvaliacaoComportamento() {
 
   const prepararPublicacaoComportamento = async (linha, tipoPublicacao) => {
     const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
-    const renderizacao = await renderizarTemplatePublicacaoComportamento({ linha, tipoPublicacao, dataInicioCalculada });
+    const dataPublicacao = new Date().toISOString().slice(0, 10);
+    const renderizacao = await renderizarTemplatePublicacaoComportamento({ linha, tipoPublicacao, dataInicioCalculada, dataPublicacao });
     setPublicacaoModal({
       open: true,
       linha: { ...linha, militar: { ...linha.militar, comportamento_anterior_snapshot: linha.militar.comportamento || 'Bom' } },
       marcoHistorico: null,
       form: {
-        data_publicacao: new Date().toISOString().slice(0, 10),
+        data_publicacao: dataPublicacao,
         finalidade: tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL ? 'Registro funcional' : 'Melhoria de comportamento',
         texto_publicacao: renderizacao.texto,
         nota_para_bg: '',
@@ -601,6 +606,7 @@ export default function AvaliacaoComportamento() {
         tipoPublicacao,
         dataInicioCalculada,
         template_texto_id: renderizacao.templateAtivo?.id || '',
+        template_publicacao: renderizacao.templateAtivo?.template || '',
       },
     });
     toast({
@@ -745,10 +751,22 @@ export default function AvaliacaoComportamento() {
 
 
   const atualizarFormPublicacao = (campo, valor) => {
-    setPublicacaoModal((atual) => ({
-      ...atual,
-      form: { ...(atual.form || {}), [campo]: valor },
-    }));
+    setPublicacaoModal((atual) => {
+      const formAtualizado = { ...(atual.form || {}), [campo]: valor };
+      if (campo === 'data_publicacao' && atual.linha && formAtualizado.template_publicacao) {
+        const varsComportamento = montarVariaveisPublicacaoComportamento({
+          linha: atual.linha,
+          tipoPublicacao: formAtualizado.tipoPublicacao,
+          dataInicioCalculada: formAtualizado.dataInicioCalculada,
+          dataPublicacao: valor,
+        });
+        formAtualizado.texto_publicacao = aplicarTemplate(formAtualizado.template_publicacao, varsComportamento);
+      }
+      return {
+        ...atual,
+        form: formAtualizado,
+      };
+    });
   };
 
   const copiarTextoModalPublicacao = async () => {
