@@ -78,6 +78,7 @@ export default function VerAtestado() {
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
+  const canEditar = canAccessAction('editar_atestados');
 
   const { data: atestado, isLoading } = useQuery({
     queryKey: ['atestado', id],
@@ -198,13 +199,15 @@ export default function VerAtestado() {
               <p className="text-slate-500 text-sm">Visualização completa do atestado médico</p>
             </div>
           </div>
-          <Button
-            onClick={() => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`)}
-            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-          >
-            <Pencil className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
+          {canEditar && (
+            <Button
+              onClick={() => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`)}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+          )}
         </div>
 
           {militarAtestado && isMilitarMesclado(militarAtestado) && (

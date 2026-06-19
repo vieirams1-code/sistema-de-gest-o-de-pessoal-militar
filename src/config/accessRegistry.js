@@ -625,11 +625,12 @@ const atestados = {
       { check: "canAccessModule('atestados')", effect: 'AccessDenied se falso' },
       { check: "canAccessAction('adicionar_atestados')", effect: 'Exibe CTA "Novo Atestado"' },
       { check: "canAccessAction('editar_atestados')", effect: 'Habilita edição' },
-      { check: "canAccessAction('excluir_atestado')", effect: 'Habilita exclusão (SINGULAR)' },
+      { check: "canAccessAction('excluir_atestados') || canAccessAction('excluir_atestado')", effect: 'Habilita exclusão (PADRONIZADO)' },
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia ações fora do escopo' },
     ],
     'pages/CadastrarAtestado.jsx': [
-      { check: "canAccessModule('atestados')", effect: 'AccessDenied se falso (não valida adicionar/editar)' },
+      { check: "canAccessModule('atestados')", effect: 'AccessDenied se falso' },
+      { check: "editId ? canAccessAction('editar_atestados') : canAccessAction('adicionar_atestados')", effect: 'Enforcement contextual de action' },
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia salvar fora do escopo' },
     ],
     'pages/AgendarJISO.jsx': [
@@ -660,6 +661,7 @@ const atestados = {
     ],
     'pages/VerAtestado.jsx': [
       { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Mascaramento completo de CID-10, diagnóstico, pareceres, histórico clínico, notas e anexos.' },
+      { check: "canAccessAction('editar_atestados')", effect: 'Exibe botão Editar' },
     ],
   },
   services: [
@@ -713,11 +715,11 @@ const atestados = {
     {
       location: 'pages/Atestados.jsx (CTA/lista) vs App.jsx (rota CadastrarAtestado)',
       affectedPageKeys: ['CadastrarAtestado'],
-      ruleMenu: 'CTA/lista restringem adicionar_atestados / editar_atestados / excluir_atestado',
-      ruleRoute: 'Rota CadastrarAtestado exige apenas { moduleKey: "atestados" }',
+      ruleMenu: 'CTA/lista restringem adicionar_atestados / editar_atestados / excluir_atestados',
+      ruleRoute: 'Rota CadastrarAtestado exige { moduleKey: "atestados" } (module-only) + enforcement interno contextual',
       impact:
-        'Usuário sem adicionar/editar não vê os CTAs, mas pode acessar /CadastrarAtestado diretamente (form só valida o módulo + escopo).',
-      status: 'confirmado',
+        'Mitigado em P1.4-B.8: Rota permite entrada para ambos os modos; CadastrarAtestado.jsx exige action contextual (adicionar ou editar) e bloqueia visualização/salvamento se faltar.',
+      status: 'mitigado_p1_4_b_8',
     },
     {
       location: 'pages/AgendarJISO.jsx vs App.jsx (rota AgendarJISO)',
@@ -733,8 +735,8 @@ const atestados = {
       ruleMenu: 'n/a',
       ruleRoute: 'n/a',
       impact:
-        'Existem ambas: perm_excluir_atestado (singular) e perm_excluir_atestados (plural). Runtime usa o singular; o plural é legacy/declared extra.',
-      status: 'confirmado',
+        'Padronizado em P1.4-B.8: Runtime usa excluir_atestados com fallback para excluir_atestado (singular) para compatibilidade.',
+      status: 'mitigado_p1_4_b_8',
     },
     {
       location: 'pages/ExtratoAtestadosMedicos.jsx (guard de rota)',
