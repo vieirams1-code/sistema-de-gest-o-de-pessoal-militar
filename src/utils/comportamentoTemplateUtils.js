@@ -1,4 +1,10 @@
-import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils.js';
+import {
+  abreviarPosto,
+  aplicarTemplate,
+  formatDateBR,
+  montarPostoNomeTemplate,
+  resolveQuadroTemplate,
+} from '@/components/utils/templateUtils.js';
 
 let deps = { aplicarTemplate, formatDateBR };
 
@@ -35,17 +41,7 @@ matrícula {{matricula}},
 passou a integrar o comportamento {{comportamento}}
 a contar de {{data_inicio_comportamento}},
 nos termos do Decreto nº 1.260/1981.`,
-  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `Para fins de assentamento e registro funcional,
-fica consignado que o militar
-{{posto_graduacao}} {{nome_completo}},
-matrícula {{matricula}},
-passou a integrar o comportamento
-{{comportamento}}
-a contar de {{data_inicio_comportamento}},
-conforme apuração realizada com base nos
-assentamentos disciplinares constantes em seus
-registros funcionais e nos critérios previstos
-no Decreto nº 1.260/1981.`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `A Comandante do 1º Grupamento de Bombeiros Militar, com base no Art. 51, §1º e Art. 52 do Decreto nº 1.260, de 02 de outubro de 1981, resolve tornar público, para fins de registro funcional, que o(a) {{posto_nome}}, matrícula n. {{matricula}}, encontra-se no comportamento {{comportamento}} a contar de {{data_inicio_comportamento}}.`,
 };
 
 const CAMPOS_ESSENCIAIS_POR_TIPO = {
@@ -228,17 +224,28 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, {
   const dataPublicacaoTemplate = dataPublicacao || marco?.data_publicacao || marco?.dataPublicacao;
   const comportamentoCalculado = marco?.comportamento_novo || marco?.comportamento || militar?.comportamento || 'Não informado';
   const comportamentoAnterior = marco?.comportamento_anterior || militar?.comportamento || 'Não informado';
+  const nomeCompleto = militar?.nome_completo || militar?.nome_guerra || 'Não informado';
+  const postoAbreviado = abreviarPosto(militar?.posto_graduacao || marco?.posto_graduacao || '');
+  const quadro = resolveQuadroTemplate({ militar, marco, ...militar, ...marco });
+  const postoQuadro = montarPostoNomeTemplate({
+    abreviatura: postoAbreviado,
+    quadro,
+    source: { militar, marco, ...militar, ...marco },
+  });
+  const postoNomeInstitucional = [postoQuadro, nomeCompleto].filter(Boolean).join(' ');
+
   const vars = {
-    militar_nome: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
-    posto_graduacao: militar?.posto_graduacao || 'Não informado',
+    militar_nome: nomeCompleto,
+    posto_graduacao: postoAbreviado || militar?.posto_graduacao || 'Não informado',
     matricula: militar?.matricula || 'Não informado',
-    quadro: militar?.quadro || '',
+    quadro,
     unidade: militar?.lotacao || militar?.unidade || 'Não informado',
     comportamento_anterior: comportamentoAnterior,
     comportamento_novo: comportamentoCalculado,
     comportamento_atual: militar?.comportamento || marco?.comportamento_novo || 'Não informado',
     comportamento: comportamentoCalculado,
-    nome_completo: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
+    nome_completo: nomeCompleto,
+    posto_nome: postoNomeInstitucional,
     data_inicio: format(dataVigencia),
     data_alteracao: format(dataVigencia),
     data_publicacao: format(dataPublicacaoTemplate),

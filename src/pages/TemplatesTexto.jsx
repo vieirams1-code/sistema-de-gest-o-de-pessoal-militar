@@ -583,7 +583,7 @@ const VARS_POR_TIPO = {
     grupo: 'Comportamento Calculado',
     cor: 'green',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
+      { v: '{{posto_nome}}', desc: 'Posto/graduação abreviado + quadro + nome do militar, no mesmo padrão institucional já utilizado nos demais templates' },
       { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
@@ -601,7 +601,7 @@ const VARS_POR_TIPO = {
     grupo: 'Comportamento Calculado',
     cor: 'green',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
+      { v: '{{posto_nome}}', desc: 'Posto/graduação abreviado + quadro + nome do militar, no mesmo padrão institucional já utilizado nos demais templates' },
       { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
