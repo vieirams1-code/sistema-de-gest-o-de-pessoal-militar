@@ -639,7 +639,7 @@ const atestados = {
       { check: "canAccessModule('atestados')", effect: 'Parte do AccessDenied' },
       { check: "canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso')", effect: 'canGerirJiso; AccessDenied se falso' },
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia salvar fora do escopo' },
-      { check: 'HARDENING P1.4-B.7', effect: 'Substituição de chamadas diretas a JISO por criarEscopado/atualizarEscopado; adição de rechecagem defensiva de canGerirJiso no handleSubmit.' },
+      { check: 'HARDENING P1.4-B.7', effect: 'Substituição de chamadas diretas a JISO por criarEscopado/atualizarEscopado (pioneiro no uso de cudEscopado para esta entidade); adição de rechecagem defensiva de canGerirJiso no handleSubmit; mapeamento preventivo de exclusão por gerir_jiso no backend.' },
     ],
     'pages/ExtratoAtestadosMedicos.jsx': [
       { check: "canAccessModule('atestados')", effect: 'VALIDADO P1.1-C: hasAccess; AccessDenied("Atestados") se falso (linha 157/534)' },
