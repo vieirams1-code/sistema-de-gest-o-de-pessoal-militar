@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FileText, Search, Scale, ShieldAlert, Wand2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, FileText, History, Search, Scale, ShieldAlert, Wand2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,11 +22,11 @@ import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/use
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 
 const COMPORTAMENTO_STYLES = {
-  Excepcional: 'border-blue-200 bg-blue-50 text-blue-700',
-  Ótimo: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  Bom: 'border-amber-200 bg-amber-50 text-amber-700',
-  Insuficiente: 'border-orange-200 bg-orange-50 text-orange-700',
-  Mau: 'border-red-200 bg-red-50 text-red-700',
+  Excepcional: 'border-blue-300 bg-blue-100 text-blue-800',
+  Ótimo: 'border-green-300 bg-green-100 text-green-800',
+  Bom: 'border-yellow-300 bg-yellow-100 text-yellow-800',
+  Insuficiente: 'border-orange-300 bg-orange-100 text-orange-800',
+  Mau: 'border-red-300 bg-red-100 text-red-800',
 };
 
 const SITUACAO_STYLES = {
@@ -52,25 +50,27 @@ function Badge({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>{children}</span>;
 }
 
-function ComportamentoBadge({ valor }) {
-  return <Badge className={COMPORTAMENTO_STYLES[valor] || 'border-slate-200 bg-slate-50 text-slate-600'}>{valor || '—'}</Badge>;
+function ComportamentoBadge({ valor, destaque = false }) {
+  return <Badge className={`${COMPORTAMENTO_STYLES[valor] || 'border-slate-200 bg-slate-50 text-slate-600'} ${destaque ? 'ring-2 ring-blue-200 ring-offset-1' : ''}`}>{valor || '—'}</Badge>;
 }
 
 function SituacaoBadge({ situacao }) {
   return <Badge className={SITUACAO_STYLES[situacao] || SITUACAO_STYLES.Regular}>{situacao}</Badge>;
 }
 
-function ResumoAuditoriaCard({ titulo, valor, icon: Icon, className = '' }) {
+function ResumoAuditoriaCard({ titulo, valor, icon: Icon, className = '', destaque = false }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+    <div className={`rounded-lg border p-4 shadow-sm ${destaque ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-white'}`}>
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-500">{titulo}</p>
-          <p className={`mt-1 text-2xl font-bold ${className}`}>{valor}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{titulo}</p>
+          <p className={`mt-2 text-2xl font-bold ${className}`}>{valor}</p>
         </div>
-        <div className="rounded-xl bg-slate-100 p-3 text-slate-600">
-          <Icon className="h-5 w-5" />
-        </div>
+        {Icon ? (
+          <div className="rounded-xl bg-slate-100 p-3 text-slate-600">
+            <Icon className="h-5 w-5" />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -81,7 +81,7 @@ function JanelaResumo({ titulo, janela }) {
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titulo}</p>
       <p className="mt-1 text-xs text-slate-500">{formatarData(janela?.inicio)} a {formatarData(janela?.fim)}</p>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
         <div><p className="font-bold text-slate-800">{janela?.quantidade ?? 0}</p><p className="text-slate-500">punições</p></div>
         <div><p className="font-bold text-slate-800">{janela?.prisao_equivalente ?? 0}</p><p className="text-slate-500">prisão eq.</p></div>
         <div><p className="font-bold text-slate-800">{janela?.detencao_equivalente ?? 0}</p><p className="text-slate-500">detenção eq.</p></div>
@@ -90,7 +90,61 @@ function JanelaResumo({ titulo, janela }) {
   );
 }
 
+function TimelineBarra({ segmentos }) {
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className="flex min-w-max items-center gap-3 py-3">
+        {segmentos.map((seg, index) => (
+          <div key={`${seg.inicio}-${index}`} className="flex items-center gap-3">
+            <div className="min-w-48 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+              <ComportamentoBadge valor={seg.comportamento} destaque={seg.isAtual} />
+              <p className="mt-2 text-slate-600">{formatarData(seg.inicio)} até {formatarData(seg.fim)}</p>
+              {seg.isAtual ? <p className="mt-1 font-semibold text-blue-700">Período atual</p> : null}
+            </div>
+            {index < segmentos.length - 1 ? <div className="h-0.5 w-12 bg-slate-200" /> : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimelineCards({ segmentos }) {
+  return (
+    <div className="overflow-x-auto pb-3">
+      <div className="relative flex min-w-max gap-5 pt-8">
+        <div className="absolute left-8 right-8 top-4 h-0.5 bg-slate-200" />
+        {segmentos.map((seg, index) => (
+          <div key={`${seg.inicio}-${index}`} className="relative w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className={`absolute -top-6 left-6 h-4 w-4 rounded-full border-4 border-white shadow ${seg.isAtual ? 'bg-blue-700' : 'bg-slate-300'}`} />
+            <ComportamentoBadge valor={seg.comportamento} destaque={seg.isAtual} />
+            <p className="mt-3 text-sm font-semibold text-slate-800">{formatarData(seg.inicio)} — {formatarData(seg.fim)}</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">{seg.fundamento || 'Período calculado conforme histórico disciplinar.'}</p>
+            {(seg.punicoes || []).length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {seg.punicoes.map((punicao, punicaoIndex) => (
+                  <button
+                    key={punicao.id || punicaoIndex}
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <AlertCircle className="h-3 w-3" />
+                    {punicao.tipo || 'Punição'}
+                  </button>
+                ))}
+              </div>
+            ) : <p className="mt-3 text-xs text-slate-400">Sem punições vinculadas ao período.</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DetalhesAuditoria({ linha }) {
+  const [viewMode, setViewMode] = useState('bar');
+  const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const detalhes = linha.calculado?.detalhes || {};
   const segmentos = linha.timeline?.segmentos || [];
   const punicoesConsideradas = detalhes.janela_8_anos?.punicoes || [];
@@ -98,76 +152,78 @@ function DetalhesAuditoria({ linha }) {
   const inconsistencias = linha.calculado?.inconsistencias || [];
 
   return (
-    <tr className="bg-slate-50">
-      <td colSpan={8} className="px-4 pb-5 pt-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-4">
-            <ResumoAuditoriaCard titulo="Calculado" valor={linha.calculado?.comportamento || '—'} icon={Scale} className="text-[#1e3a5f]" />
-            <ResumoAuditoriaCard titulo="Cadastrado" valor={linha.militar.comportamento || 'Bom'} icon={FileText} className="text-slate-800" />
-            <ResumoAuditoriaCard titulo="Divergência" valor={linha.divergente ? 'Sim' : 'Não'} icon={AlertTriangle} className={linha.divergente ? 'text-amber-700' : 'text-emerald-700'} />
-            <ResumoAuditoriaCard titulo="Próxima melhoria" valor={linha.proxima?.data ? formatarData(linha.proxima.data) : '—'} icon={Wand2} className="text-blue-700" />
-          </div>
+    <div className="border-t border-blue-100 bg-slate-50 p-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-8">
+        <ResumoAuditoriaCard titulo="Comportamento Calculado" valor={linha.calculado?.comportamento || '—'} icon={Scale} className="text-blue-900" />
+        <ResumoAuditoriaCard titulo="Comportamento Atual" valor={linha.militar.comportamento || 'Bom'} icon={FileText} className="text-slate-800" />
+        <ResumoAuditoriaCard titulo="Divergência Cadastral" valor={linha.divergente ? 'Sim' : 'Não'} icon={AlertTriangle} className={linha.divergente ? 'text-amber-700' : 'text-emerald-700'} />
+        <ResumoAuditoriaCard titulo="Próxima Melhoria Prevista" valor={linha.proxima?.data ? `${formatarData(linha.proxima.data)} • ${linha.proxima.comportamento_futuro}` : '—'} icon={Wand2} className="text-green-800" destaque={Boolean(linha.proxima?.data)} />
+      </div>
 
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fundamento legal</p>
-            <p className="mt-1 text-sm text-slate-700">{linha.calculado?.fundamento || '—'}</p>
-          </div>
-
-          <div className="mt-4 grid gap-3 lg:grid-cols-4">
-            <JanelaResumo titulo="Janela de 1 ano" janela={detalhes.janela_1_ano} />
-            <JanelaResumo titulo="Janela de 2 anos" janela={detalhes.janela_2_anos} />
-            <JanelaResumo titulo="Janela de 4 anos" janela={detalhes.janela_4_anos} />
-            <JanelaResumo titulo="Janela de 8 anos" janela={detalhes.janela_8_anos} />
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 p-3">
-              <p className="font-semibold text-slate-800">Punições consideradas</p>
-              {punicoesConsideradas.length ? (
-                <div className="mt-2 space-y-2">
-                  {punicoesConsideradas.map((p, index) => (
-                    <div key={p.id || index} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <span>{p.tipo || 'Punição'} • {formatarData(p.data_fim_cumprimento)}</span>
-                      <span className="text-slate-500">P.eq {p.prisao_equivalente} / D.eq {p.detencao_equivalente}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="mt-2 text-sm text-slate-500">Nenhuma punição impactante na janela principal.</p>}
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-3">
-              <p className="font-semibold text-slate-800">Advertências sem impacto e inconsistências</p>
-              {advertencias.length ? advertencias.map((a) => (
-                <p key={a.id || a.data_fim_cumprimento} className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{a.descricao}</p>
-              )) : <p className="mt-2 text-sm text-slate-500">Nenhuma advertência informativa disponível.</p>}
-              {inconsistencias.length ? inconsistencias.map((i, index) => (
-                <p key={`${i.campo || i.labelCampo}-${index}`} className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{i.labelCampo || i.campo || 'Inconsistência cadastral'}</p>
-              )) : <p className="mt-2 text-sm text-emerald-600">Sem inconsistências de cálculo.</p>}
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-blue-50 p-3 text-blue-800"><History className="h-5 w-5" /></div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Linha do Tempo Calculada</h2>
+              <p className="text-sm text-slate-500">Histórico horizontal de punições e mudança de status.</p>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <Button type="button" size="sm" variant={viewMode === 'bar' ? 'default' : 'ghost'} onClick={() => setViewMode('bar')}>Barra Contínua</Button>
+              <Button type="button" size="sm" variant={viewMode === 'cards' ? 'default' : 'ghost'} onClick={() => setViewMode('cards')}>Trilha de Cards</Button>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setMostrarDetalhes((atual) => !atual)}>Detalhes do Cálculo</Button>
+          </div>
+        </div>
 
-          {segmentos.length ? (
-            <div className="mt-4 rounded-lg border border-slate-200 p-3">
-              <p className="font-semibold text-slate-800">Linha do tempo calculada (compacta)</p>
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                {segmentos.map((seg, index) => (
-                  <div key={`${seg.inicio}-${index}`} className="min-w-44 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
-                    <ComportamentoBadge valor={seg.comportamento} />
-                    <p className="mt-2 text-slate-600">{formatarData(seg.inicio)} até {formatarData(seg.fim)}</p>
-                    {seg.isAtual ? <p className="mt-1 font-semibold text-[#1e3a5f]">Período atual</p> : null}
+        <div className="mt-6">
+          {segmentos.length ? (viewMode === 'bar' ? <TimelineBarra segmentos={segmentos} /> : <TimelineCards segmentos={segmentos} />) : (
+            <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Linha do tempo indisponível para este militar.</p>
+          )}
+        </div>
+
+        {mostrarDetalhes ? (
+          <div className="mt-6 space-y-4 border-t border-slate-100 pt-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fundamento legal</p>
+              <p className="mt-1 text-sm text-slate-700">{linha.calculado?.fundamento || '—'}</p>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-4">
+              <JanelaResumo titulo="Janela de 1 ano" janela={detalhes.janela_1_ano} />
+              <JanelaResumo titulo="Janela de 2 anos" janela={detalhes.janela_2_anos} />
+              <JanelaResumo titulo="Janela de 4 anos" janela={detalhes.janela_4_anos} />
+              <JanelaResumo titulo="Janela de 8 anos" janela={detalhes.janela_8_anos} />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="font-semibold text-slate-800">Punições consideradas</p>
+                {punicoesConsideradas.length ? (
+                  <div className="mt-2 space-y-2">
+                    {punicoesConsideradas.map((p, index) => (
+                      <div key={p.id || index} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <span>{p.tipo || 'Punição'} • {formatarData(p.data_fim_cumprimento)}</span>
+                        <span className="text-slate-500">P.eq {p.prisao_equivalente} / D.eq {p.detencao_equivalente}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : <p className="mt-2 text-sm text-slate-500">Nenhuma punição impactante na janela principal.</p>}
+              </div>
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="font-semibold text-slate-800">Advertências e inconsistências</p>
+                {advertencias.length ? advertencias.map((a) => <p key={a.id || a.data_fim_cumprimento} className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{a.descricao}</p>) : <p className="mt-2 text-sm text-slate-500">Nenhuma advertência informativa disponível.</p>}
+                {inconsistencias.length ? inconsistencias.map((i, index) => <p key={`${i.campo || i.labelCampo}-${index}`} className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{i.labelCampo || i.campo || 'Inconsistência cadastral'}</p>) : <p className="mt-2 text-sm text-emerald-600">Sem inconsistências de cálculo.</p>}
               </div>
             </div>
-          ) : null}
-        </div>
-      </td>
-    </tr>
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
 export default function AvaliacaoComportamento() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const {
@@ -447,133 +503,111 @@ export default function AvaliacaoComportamento() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Scale className="w-8 h-8 text-[#1e3a5f]" />
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white px-8 py-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="rounded-2xl bg-blue-950 p-3 text-white shadow-sm">
+              <Scale className="h-8 w-8" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-[#1e3a5f]">Avaliação de Comportamento</h1>
-              <p className="text-sm text-slate-500">Verificação automática conforme regras disciplinares vigentes.</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Avaliação de Comportamento</h1>
+              <p className="mt-1 text-sm text-slate-500">Verificação automática conforme Decreto nº 1.260/1981</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={gerarPendencias} disabled={!canGerarPendencias}>
-              <Wand2 className="w-4 h-4 mr-2" />
-              Gerar pendências
-            </Button>
-          </div>
+          <Button className="bg-slate-900 text-white hover:bg-slate-800" onClick={gerarPendencias} disabled={!canGerarPendencias}>
+            <Wand2 className="mr-2 h-4 w-4" />
+            Gerar pendências
+          </Button>
         </div>
+      </header>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 mb-4 shadow-sm">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input className="pl-9" placeholder="Buscar por nome, matrícula ou posto/graduação..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Input className="h-12 rounded-lg border-slate-200 pl-12 text-base" placeholder="Buscar por nome ou matrícula..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
           </div>
         </div>
 
-        <div className="mb-4 grid gap-3 md:grid-cols-4">
-          <ResumoAuditoriaCard titulo="Total avaliados" valor={resumoAuditoria.total} icon={Scale} className="text-[#1e3a5f]" />
+        <div className="grid gap-3 md:grid-cols-4">
+          <ResumoAuditoriaCard titulo="Total avaliados" valor={resumoAuditoria.total} icon={Scale} className="text-blue-900" />
           <ResumoAuditoriaCard titulo="Divergências" valor={resumoAuditoria.divergencias} icon={AlertTriangle} className="text-amber-700" />
           <ResumoAuditoriaCard titulo="Regulares" valor={resumoAuditoria.regulares} icon={CheckCircle2} className="text-emerald-700" />
           <ResumoAuditoriaCard titulo="Inconsistências" valor={resumoAuditoria.inconsistencias} icon={ShieldAlert} className="text-red-700" />
         </div>
 
         {!isLoading && !loadingPunicoes && resumoAuditoria.divergencias === 0 ? (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
             <CheckCircle2 className="h-4 w-4" /> Nenhuma divergência encontrada no conjunto filtrado.
           </div>
         ) : null}
 
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid min-w-[1040px] grid-cols-12 items-center bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <div className="col-span-4">Militar</div>
+            <div className="col-span-2 text-center">Status Atual</div>
+            <div className="col-span-2 text-center">Status Calculado</div>
+            <div className="col-span-1 text-center">Melhoria</div>
+            <div className="col-span-3 text-right">Ações</div>
+          </div>
+
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className="p-3 text-left">Militar</th>
-                <th className="p-3 text-left">Comportamento cadastrado</th>
-                <th className="p-3 text-left">Comportamento calculado</th>
-                <th className="p-3 text-left">Mudança sugerida</th>
-                <th className="p-3 text-left">Fundamento</th>
-                <th className="p-3 text-left">Próxima melhoria</th>
-                <th className="p-3 text-left">Situação</th>
-                <th className="p-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
+            <div className="min-w-[1040px] divide-y divide-slate-100">
               {isLoading || loadingPunicoes ? (
-                <tr><td className="p-4" colSpan={8}>Carregando...</td></tr>
+                <div className="p-6 text-sm text-slate-500">Carregando...</div>
               ) : avaliacao.length === 0 ? (
-                <tr><td className="p-4 text-slate-500" colSpan={8}>Nenhum militar encontrado para os filtros informados.</td></tr>
+                <div className="p-6 text-sm text-slate-500">Nenhum militar encontrado para os filtros informados.</div>
               ) : avaliacao.map((linha) => {
                 const expandida = linhaExpandidaId === linha.militar.id;
                 return (
-                  <React.Fragment key={linha.militar.id}>
-                    <tr className={`border-t border-slate-100 ${linha.divergente ? 'bg-amber-50/70' : 'bg-white'} hover:bg-slate-50`}>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-3 text-left"
-                          onClick={() => setLinhaExpandidaId(expandida ? null : linha.militar.id)}
-                        >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1e3a5f] font-bold text-white">
-                            {String(linha.militar.nome_completo || '?').charAt(0)}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1 font-semibold text-slate-800">
-                              {expandida ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              {linha.militar.nome_completo}
-                            </div>
-                            <p className="text-xs text-slate-500">{linha.militar.posto_graduacao} • Matrícula {obterMatricula(linha.militar)}</p>
-                          </div>
-                        </button>
-                      </td>
-                      <td className="p-3"><ComportamentoBadge valor={linha.militar.comportamento || 'Bom'} /></td>
-                      <td className="p-3"><ComportamentoBadge valor={linha.calculado?.comportamento} /></td>
-                      <td className="p-3">
-                        {linha.inconsistenteCalculo
-                          ? 'Bloqueado por inconsistência cadastral'
-                          : linha.divergente
-                          ? `${linha.militar.comportamento || 'Bom'} → ${linha.calculado?.comportamento || '—'}`
-                          : 'Sem mudança'}
-                      </td>
-                      <td className="p-3">
-                        {linha.inconsistenteCalculo
-                          ? (linha.calculado?.inconsistencias || []).map((item) => item.labelCampo).join(', ')
-                          : (linha.calculado?.fundamento || '—')}
-                      </td>
-                      <td className="p-3">{linha.proxima?.data ? `${formatarData(linha.proxima.data)} (${linha.proxima.comportamento_futuro})` : '—'}</td>
-                      <td className="p-3"><SituacaoBadge situacao={linha.situacao} /></td>
-                      <td className="p-3">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setLinhaExpandidaId(expandida ? null : linha.militar.id)}>
-                            {expandida ? 'Ocultar cálculo' : 'Detalhes do cálculo'}
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => navigate(createPageUrl('DetalheComportamento') + `?id=${linha.militar.id}`)}>
-                            Detalhar
-                          </Button>
-                          {linha.divergente && !linha.inconsistenteCalculo ? (
-                            <>
-                              <Button size="sm" onClick={() => abrirModalAprovacao(linha)} disabled={!canAprovarMudanca}>
-                                <CheckCircle2 className="w-4 h-4 mr-1" />
-                                Aprovar mudança
-                              </Button>
-                            </>
-                          ) : (
-                            <span className="text-slate-400 inline-flex items-center"><AlertTriangle className="w-4 h-4 mr-1" />Sem divergência</span>
-                          )}
+                  <div key={linha.militar.id}>
+                    <button
+                      type="button"
+                      className={`grid w-full grid-cols-12 items-center gap-3 p-4 text-left transition hover:bg-blue-50/50 ${expandida ? 'bg-blue-50/30' : 'bg-white'}`}
+                      onClick={() => setLinhaExpandidaId(expandida ? null : linha.militar.id)}
+                    >
+                      <div className="col-span-4 flex items-center gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-lg font-bold text-slate-600">
+                          {String(linha.militar.nome_completo || '?').charAt(0)}
                         </div>
-                      </td>
-                    </tr>
+                        <div className="min-w-0">
+                          <p className="truncate font-bold text-slate-900">{linha.militar.posto_graduacao} {linha.militar.nome_completo}</p>
+                          <p className="mt-1 text-xs text-slate-500">Matrícula {obterMatricula(linha.militar)}</p>
+                        </div>
+                      </div>
+                      <div className="col-span-2 flex justify-center"><ComportamentoBadge valor={linha.militar.comportamento || 'Bom'} /></div>
+                      <div className="col-span-2 flex items-center justify-center gap-2">
+                        {linha.divergente ? <ArrowRight className="h-4 w-4 text-blue-600" /> : null}
+                        <ComportamentoBadge valor={linha.calculado?.comportamento} destaque={linha.divergente && !linha.inconsistenteCalculo} />
+                      </div>
+                      <div className="col-span-1 text-center text-xs font-semibold text-slate-600">
+                        {linha.proxima?.data ? formatarData(linha.proxima.data) : '—'}
+                      </div>
+                      <div className="col-span-3 flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                        {linha.divergente && !linha.inconsistenteCalculo ? (
+                          <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => abrirModalAprovacao(linha)} disabled={!canAprovarMudanca}>
+                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                            Aprovar Mudança
+                          </Button>
+                        ) : linha.inconsistenteCalculo ? (
+                          <SituacaoBadge situacao="Inconsistente" />
+                        ) : (
+                          <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Regular</Badge>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => setLinhaExpandidaId(expandida ? null : linha.militar.id)} aria-label={expandida ? 'Recolher detalhes' : 'Expandir detalhes'}>
+                          {expandida ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    </button>
                     {expandida ? <DetalhesAuditoria linha={linha} /> : null}
-                  </React.Fragment>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
 
       <Dialog open={aprovacaoModal.open} onOpenChange={(open) => (!open ? fecharModalAprovacao() : null)}>
         <DialogContent>
