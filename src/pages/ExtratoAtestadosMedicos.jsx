@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet, Archive, Download } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 import { gerarRelatorioDpDintelAtestados } from '@/services/gerarRelatorioDpDintelAtestadosClient';
+import { gerarZipAnexosAtestadosClient } from '@/services/gerarZipAnexosAtestadosClient';
 import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 import { alterarEncaminhamentoAtestado } from '@/services/alterarEncaminhamentoAtestadoClient';
@@ -173,6 +174,7 @@ export default function ExtratoAtestadosMedicos() {
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isGeneratingZip, setIsGeneratingZip] = useState(false);
   const [reportError, setReportError] = useState('');
   const [loadingEncaminhamentoByKey, setLoadingEncaminhamentoByKey] = useState({});
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
@@ -186,6 +188,8 @@ export default function ExtratoAtestadosMedicos() {
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
   const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
   const canManageEncaminhamento = canAccessAction('gerir_encaminhamento_dp_dintel_atestado');
+  const canDownloadAttachments = canAccessAction('baixar_anexos_atestados');
+  const canDownloadZip = canAccessAction('baixar_zip_atestados');
 
   const normalizeActionError = (error, context = {}) => ({
     code: String(error?.code || ''),
@@ -319,6 +323,51 @@ export default function ExtratoAtestadosMedicos() {
         : message);
     } finally {
       setIsGeneratingReport(false);
+    }
+  };
+
+  const handleBaixarZip = async () => {
+    if (selectedIds.size === 0) return;
+    if (!canDownloadZip || !canViewSensitive) {
+      toast.error('Você não tem permissão para baixar ZIP de anexos médicos.');
+      return;
+    }
+    setIsGeneratingZip(true);
+
+    setDiagnosticos((prev) => ({
+      ...prev,
+      ultimaAcaoExecutada: {
+        action: 'baixar_zip',
+        timestamp: new Date().toISOString(),
+        selectedIds: Array.from(selectedIds)
+      },
+      ultimoErroAcao: null
+    }));
+
+    try {
+      const response = await gerarZipAnexosAtestadosClient(Array.from(selectedIds));
+      downloadBlob(response.blob, response.fileName);
+
+      await registrarAuditoria({
+        acao: 'baixar_zip_anexos',
+        quantidade_registros: selectedIds.size,
+        atestado_ids: Array.from(selectedIds),
+        incluiu_sensiveis: true,
+        sensiveis_bloqueados: false,
+        modo_acesso: 'zip_bulk',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: response.meta?.extrato_parcial,
+      });
+
+      toast.success('Arquivo ZIP gerado com sucesso!');
+    } catch (e) {
+      setDiagnosticos((prev) => ({
+        ...prev,
+        ultimoErroAcao: normalizeActionError(e, { action: 'baixar_zip', selectedIds: Array.from(selectedIds) })
+      }));
+      toast.error(e?.message || 'Falha ao gerar ZIP de anexos.');
+    } finally {
+      setIsGeneratingZip(false);
     }
   };
 
@@ -493,6 +542,12 @@ export default function ExtratoAtestadosMedicos() {
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
 
+    if (!canDownloadAttachments || !canViewSensitive) {
+      toast.error('Você não tem permissão para baixar anexos médicos.');
+      setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
+      return;
+    }
+
     setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'abrir_anexo', timestamp: new Date().toISOString(), atestado_id: rowId }, ultimoErroAcao: null }));
 
     try {
@@ -555,6 +610,12 @@ export default function ExtratoAtestadosMedicos() {
                 {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 PDF DP/DINTEL
               </Button>
+              {canDownloadZip && canViewSensitive && (
+                <Button variant="outline" className="gap-2 bg-white border-purple-200 text-purple-700 hover:bg-purple-50" disabled={selectedIds.size === 0 || isGeneratingZip} onClick={handleBaixarZip}>
+                  {isGeneratingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                  Baixar ZIP
+                </Button>
+              )}
             </div>
           </div>
           {!canGenerateDpDintelReport && (
@@ -772,11 +833,11 @@ export default function ExtratoAtestadosMedicos() {
                         )}
                         {columns.anexo && (
                           <td className="p-3 align-top">
-                            {canViewSensitive ? (
+                            {(canViewSensitive && canDownloadAttachments) ? (
                               <div className="space-y-1">
                                 <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
-                                  {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-                                  {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
+                                  {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                                  {loadingAnexoById[row.id] ? 'Gerando link...' : 'Baixar'}
                                 </Button>
                                 {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
                                 {linkAnexoById[row.id] && (
