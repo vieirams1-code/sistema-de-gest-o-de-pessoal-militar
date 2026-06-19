@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, FileText, History, Search, Scale, ShieldAlert, Wand2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, FileText, History, Pin, Search, Scale, ShieldAlert, Wand2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,34 +91,124 @@ function JanelaResumo({ titulo, janela }) {
   );
 }
 
-function TimelineCards({ segmentos }) {
+function obterDataPunicao(punicao = {}) {
+  return punicao.data_base_iso || punicao.data_fim_cumprimento || punicao.data_base || punicao.data || punicao.created_date;
+}
+
+function obterImpactoPunicao(punicao = {}, comportamentoSegmento) {
+  if (punicao.impacto_visual || punicao.impacto_texto || punicao.impacto_comportamento_texto) {
+    return punicao.impacto_visual || punicao.impacto_texto || punicao.impacto_comportamento_texto;
+  }
+  if (punicao.impacto_comportamento === false) return 'Mantém comportamento';
+  if (comportamentoSegmento && ['Bom', 'Ótimo'].includes(comportamentoSegmento)) return `Permanece ${comportamentoSegmento}`;
+  if (comportamentoSegmento) return `Cai para ${comportamentoSegmento}`;
+  return 'Impacta comportamento';
+}
+
+function obterDescricaoPunicao(punicao = {}) {
+  return punicao.observacao || punicao.motivo || punicao.descricao || punicao.fundamento || punicao.justificativa || '';
+}
+
+function normalizarEventosDoSegmento(segmento = {}, eventos = []) {
+  const inicio = segmento.inicio;
+  const fim = segmento.fim;
+  const eventosPeriodo = eventos.filter((evento) => {
+    const data = evento.data || evento.data_base_iso || evento.data_fim_cumprimento;
+    const tipo = evento.tipo;
+    const tipoPunicao = tipo === 'PUNICAO';
+    const tipoAdvertencia = tipo === 'ADVERTENCIA' || tipo === 'ADVERTENCIA_INFORMATIVA';
+    return data && inicio && fim && data >= inicio && data <= fim && (tipoPunicao || tipoAdvertencia);
+  });
+
+  const punicoesDiretas = segmento.punicoesConsideradas || segmento.punicoes || [];
+  const advertenciasDiretas = segmento.advertenciasInformativas || [];
+  const punicoesPorEvento = eventosPeriodo.filter((evento) => evento.tipo === 'PUNICAO' || evento.impacto_comportamento === true);
+  const advertenciasPorEvento = eventosPeriodo.filter((evento) => evento.tipo !== 'PUNICAO' || evento.impacto_comportamento === false);
+
+  return {
+    punicoes: punicoesDiretas.length ? punicoesDiretas : punicoesPorEvento,
+    advertencias: advertenciasDiretas.length ? advertenciasDiretas : advertenciasPorEvento,
+  };
+}
+
+function gerarTextoPublicacaoComportamento({ militar = {}, comportamento, dataInicio, fundamento }) {
+  const postoGraduacao = militar.posto_graduacao || '—';
+  const nomeCompleto = militar.nome_completo || '—';
+  const matricula = obterMatricula(militar);
+  return `Para fins de registro funcional, registra-se que o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, ingressou no comportamento ${comportamento || '—'} a contar de ${formatarData(dataInicio)}, nos termos do fundamento apurado no cálculo disciplinar: ${fundamento || '—'}.`;
+}
+
+function PunicaoApensa({ punicao, comportamentoSegmento }) {
+  const [aberta, setAberta] = useState(false);
+  const data = obterDataPunicao(punicao);
+  const impacto = obterImpactoPunicao(punicao, comportamentoSegmento);
+  const descricao = obterDescricaoPunicao(punicao);
+
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50 text-red-800 shadow-sm">
+      <button
+        type="button"
+        className="flex w-full items-start gap-2 px-3 py-2 text-left text-xs"
+        onClick={() => setAberta((atual) => !atual)}
+      >
+        <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold">{punicao.tipo_resolvido || punicao.tipo || 'Punição'} • {formatarData(data)}</span>
+          <span className="block text-red-700">{impacto}</span>
+        </span>
+        {aberta ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
+      </button>
+      {aberta ? (
+        <div className="space-y-1 border-t border-red-200 px-3 py-2 text-xs text-red-900">
+          <p><strong>Data-base:</strong> {formatarData(data)}</p>
+          <p><strong>Prisão equivalente:</strong> {punicao.prisao_equivalente ?? 0}</p>
+          <p><strong>Detenção equivalente:</strong> {punicao.detencao_equivalente ?? 0}</p>
+          <p><strong>Status:</strong> {punicao.status_resolvido || punicao.status_punicao || punicao.status || '—'}</p>
+          <p><strong>Impacto no comportamento:</strong> {impacto}</p>
+          {descricao ? <p><strong>Descrição/motivo:</strong> {descricao}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TimelineCards({ segmentos, eventos = [] }) {
   return (
     <div className="overflow-x-auto pb-3">
       <div className="relative flex min-w-max gap-5 pt-8">
         <div className="absolute left-8 right-8 top-4 h-0.5 bg-slate-200" />
-        {segmentos.map((seg, index) => (
-          <div key={`${seg.inicio}-${index}`} className="relative w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className={`absolute -top-6 left-6 h-4 w-4 rounded-full border-4 border-white shadow ${seg.isAtual ? 'bg-blue-700' : 'bg-slate-300'}`} />
-            <ComportamentoBadge valor={seg.comportamento} destaque={seg.isAtual} />
-            <p className="mt-3 text-sm font-semibold text-slate-800">{formatarData(seg.inicio)} — {formatarData(seg.fim)}</p>
-            <p className="mt-2 text-xs leading-relaxed text-slate-500">{seg.fundamento || 'Período calculado conforme histórico disciplinar.'}</p>
-            {(seg.punicoes || []).length ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {seg.punicoes.map((punicao, punicaoIndex) => (
-                  <button
-                    key={punicao.id || punicaoIndex}
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <AlertCircle className="h-3 w-3" />
-                    {punicao.tipo || 'Punição'}
-                  </button>
-                ))}
+        {segmentos.map((seg, index) => {
+          const { punicoes: punicoesSegmento, advertencias } = normalizarEventosDoSegmento(seg, eventos);
+          const semApensos = !punicoesSegmento.length && !advertencias.length;
+          return (
+            <div key={`${seg.inicio}-${index}`} className="relative w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className={`absolute -top-6 left-6 h-4 w-4 rounded-full border-4 border-white shadow ${seg.isAtual ? 'bg-blue-700' : 'bg-slate-300'}`} />
+              <div className="flex flex-wrap items-center gap-2">
+                <ComportamentoBadge valor={seg.comportamento} destaque={seg.isAtual} />
+                {seg.isAtual ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">ATUAL</Badge> : null}
+                {seg.isProjetado ? <Badge className="border-violet-200 bg-violet-50 text-violet-700">PROJEÇÃO</Badge> : null}
               </div>
-            ) : <p className="mt-3 text-xs text-slate-400">Sem punições vinculadas ao período.</p>}
-          </div>
-        ))}
+              <p className="mt-3 text-sm font-semibold text-slate-800">{formatarData(seg.inicio)} — {formatarData(seg.fim)}</p>
+              <p className="mt-2 text-xs leading-relaxed text-slate-500">{seg.fundamento || 'Período calculado conforme histórico disciplinar.'}</p>
+              <div className="mt-4 space-y-2">
+                {punicoesSegmento.map((punicao, punicaoIndex) => (
+                  <PunicaoApensa
+                    key={`${punicao.id || punicao.punicao_id || obterDataPunicao(punicao)}-${punicaoIndex}`}
+                    punicao={punicao}
+                    comportamentoSegmento={seg.comportamento}
+                  />
+                ))}
+                {advertencias.map((advertencia, advertenciaIndex) => (
+                  <div key={`${advertencia.id || advertencia.punicao_id || obterDataPunicao(advertencia)}-${advertenciaIndex}`} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                    <div className="flex items-center gap-2 font-semibold"><AlertCircle className="h-3.5 w-3.5" /> Advertência — sem impacto no comportamento</div>
+                    <p className="mt-1 text-blue-600">{formatarData(obterDataPunicao(advertencia))} • {advertencia.status_resolvido || advertencia.status || 'Informativa'}</p>
+                  </div>
+                ))}
+                {semApensos ? <p className="text-xs text-slate-400">Sem punições vinculadas ao período.</p> : null}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -127,11 +217,19 @@ function TimelineCards({ segmentos }) {
 function DetalhesAuditoria({ linha }) {
   const [viewMode, setViewMode] = useState('bar');
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+  const [mostrarPreviewPublicacao, setMostrarPreviewPublicacao] = useState(false);
   const detalhes = linha.calculado?.detalhes || {};
   const segmentos = linha.timeline?.segmentos || [];
+  const segmentoAtual = linha.timeline?.segmentoAtual;
   const punicoesConsideradas = detalhes.janela_8_anos?.punicoes || [];
   const advertencias = linha.timeline?.segmentoAtual?.advertenciasInformativas || [];
   const inconsistencias = linha.calculado?.inconsistencias || [];
+  const textoPublicacaoPreview = gerarTextoPublicacaoComportamento({
+    militar: linha.militar,
+    comportamento: linha.calculado?.comportamento || segmentoAtual?.comportamento,
+    dataInicio: segmentoAtual?.inicio,
+    fundamento: segmentoAtual?.fundamento || linha.calculado?.fundamento,
+  });
 
   return (
     <div className="border-t border-blue-100 bg-slate-50 p-6">
@@ -165,7 +263,7 @@ function DetalhesAuditoria({ linha }) {
             <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
               <ComportamentoTimelineCalculada timelineCalculada={linha.timeline} compacto />
             </div>
-          ) : <TimelineCards segmentos={segmentos} />) : (
+          ) : <TimelineCards segmentos={segmentos} eventos={linha.timeline?.eventos || []} />) : (
             <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Linha do tempo indisponível para este militar.</p>
           )}
         </div>
@@ -202,6 +300,51 @@ function DetalhesAuditoria({ linha }) {
                 {inconsistencias.length ? inconsistencias.map((i, index) => <p key={`${i.campo || i.labelCampo}-${index}`} className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{i.labelCampo || i.campo || 'Inconsistência cadastral'}</p>) : <p className="mt-2 text-sm text-emerald-600">Sem inconsistências de cálculo.</p>}
               </div>
             </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-slate-100 p-3 text-slate-700"><FileText className="h-5 w-5" /></div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Registro funcional do comportamento</h2>
+              <p className="mt-1 text-sm text-slate-500">Prévia textual — nenhuma publicação será gerada nesta etapa.</p>
+            </div>
+          </div>
+          <Badge className="border-slate-200 bg-slate-50 text-slate-600">Verificação pendente</Badge>
+        </div>
+
+        {linha.calculado?.comportamento && segmentoAtual ? (
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <div className="grid gap-3 md:grid-cols-3">
+                <p><strong>Comportamento calculado:</strong> {linha.calculado.comportamento}</p>
+                <p><strong>Início do segmento atual:</strong> {formatarData(segmentoAtual.inicio)}</p>
+                <p><strong>Status da publicação:</strong> verificação futura</p>
+              </div>
+              <p className="mt-3"><strong>Fundamento:</strong> {segmentoAtual.fundamento || linha.calculado?.fundamento || '—'}</p>
+              <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                Verificação de publicação existente será habilitada em etapa futura.
+              </p>
+            </div>
+            <div className="flex items-start justify-end">
+              <Button type="button" variant="outline" onClick={() => setMostrarPreviewPublicacao((atual) => !atual)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Pré-visualizar publicação
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Prévia indisponível sem comportamento calculado atual e segmento vigente.</p>
+        )}
+
+        {mostrarPreviewPublicacao && linha.calculado?.comportamento && segmentoAtual ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Preview informativo</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-800">{textoPublicacaoPreview}</p>
+            <p className="mt-3 text-xs font-semibold text-amber-800">Nenhuma Publicacao, RegistroPublicacao ou HistóricoComportamento será criado por esta prévia.</p>
           </div>
         ) : null}
       </section>
