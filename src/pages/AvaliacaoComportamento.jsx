@@ -131,11 +131,11 @@ function normalizarEventosDoSegmento(segmento = {}, eventos = []) {
   };
 }
 
-function gerarTextoPublicacaoComportamento({ militar = {}, comportamento, dataInicio, fundamento }) {
+function gerarTextoPublicacaoComportamento({ militar = {}, comportamento, dataInicio }) {
   const postoGraduacao = militar.posto_graduacao || '—';
   const nomeCompleto = militar.nome_completo || '—';
   const matricula = obterMatricula(militar);
-  return `Para fins de registro funcional, registra-se que o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, ingressou no comportamento ${comportamento || '—'} a contar de ${formatarData(dataInicio)}, nos termos do fundamento apurado no cálculo disciplinar: ${fundamento || '—'}.`;
+  return `Para fins de assentamento e registro funcional, fica consignado que o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, passou a integrar o comportamento ${comportamento || '—'} a contar de ${formatarData(dataInicio)}, conforme apuração realizada com base nos assentamentos disciplinares constantes em seus registros funcionais e nos critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`;
 }
 
 function PunicaoApensa({ punicao, comportamentoSegmento }) {
@@ -217,7 +217,7 @@ function TimelineCards({ segmentos, eventos = [] }) {
 function DetalhesAuditoria({ linha }) {
   const [viewMode, setViewMode] = useState('bar');
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
-  const [mostrarPreviewPublicacao, setMostrarPreviewPublicacao] = useState(false);
+  const { toast } = useToast();
   const detalhes = linha.calculado?.detalhes || {};
   const segmentos = linha.timeline?.segmentos || [];
   const segmentoAtual = linha.timeline?.segmentoAtual;
@@ -228,8 +228,41 @@ function DetalhesAuditoria({ linha }) {
     militar: linha.militar,
     comportamento: linha.calculado?.comportamento || segmentoAtual?.comportamento,
     dataInicio: segmentoAtual?.inicio,
-    fundamento: segmentoAtual?.fundamento || linha.calculado?.fundamento,
   });
+  const comportamentoCalculado = linha.calculado?.comportamento || segmentoAtual?.comportamento;
+  const comportamentoCadastrado = linha.militar.comportamento || 'Bom';
+  const temInconsistencia = linha.inconsistenteCalculo || inconsistencias.length > 0;
+  const mensagemAcaoSugerida = temInconsistencia
+    ? 'Ação indisponível até correção das inconsistências cadastrais.'
+    : !segmentoAtual
+      ? 'Não foi possível identificar o período vigente do comportamento.'
+      : comportamentoCalculado
+        ? 'Ação sugerida: gerar publicação de registro funcional.'
+        : 'Não foi possível identificar o comportamento calculado atual.';
+
+  const copiarTextoPublicacao = async () => {
+    const clipboardDisponivel = typeof navigator !== 'undefined' && navigator?.clipboard?.writeText;
+    if (!clipboardDisponivel) {
+      toast({
+        title: 'Copie manualmente',
+        description: 'A área de transferência não está disponível neste navegador. Selecione o texto da prévia e copie manualmente.',
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(textoPublicacaoPreview);
+      toast({
+        title: 'Texto copiado',
+        description: 'A prévia de publicação foi copiada para a área de transferência.',
+      });
+    } catch {
+      toast({
+        title: 'Copie manualmente',
+        description: 'Não foi possível copiar automaticamente. Selecione o texto da prévia e copie manualmente.',
+      });
+    }
+  };
 
   return (
     <div className="border-t border-blue-100 bg-slate-50 p-6">
@@ -309,42 +342,45 @@ function DetalhesAuditoria({ linha }) {
           <div className="flex items-start gap-3">
             <div className="rounded-xl bg-slate-100 p-3 text-slate-700"><FileText className="h-5 w-5" /></div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Registro funcional do comportamento</h2>
-              <p className="mt-1 text-sm text-slate-500">Prévia textual — nenhuma publicação será gerada nesta etapa.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">Regularização funcional</h2>
+                <Badge className="border-blue-200 bg-blue-50 text-blue-700">Prévia</Badge>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">Diagnóstico operacional para preparar o fluxo administrativo de publicação.</p>
             </div>
           </div>
-          <Badge className="border-slate-200 bg-slate-50 text-slate-600">Verificação pendente</Badge>
+          <Badge className="border-amber-200 bg-amber-50 text-amber-800">Verificação pendente</Badge>
         </div>
 
-        {linha.calculado?.comportamento && segmentoAtual ? (
-          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <div className="grid gap-3 md:grid-cols-3">
-                <p><strong>Comportamento calculado:</strong> {linha.calculado.comportamento}</p>
-                <p><strong>Início do segmento atual:</strong> {formatarData(segmentoAtual.inicio)}</p>
-                <p><strong>Status da publicação:</strong> verificação futura</p>
+        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <p><strong>Comportamento calculado atual:</strong> {comportamentoCalculado || '—'}</p>
+            <p><strong>Vigente desde:</strong> {formatarData(segmentoAtual?.inicio)}</p>
+            <p><strong>Comportamento cadastrado:</strong> {comportamentoCadastrado}</p>
+            <p><strong>Divergência cadastral:</strong> {linha.divergente ? 'Sim' : 'Não'}</p>
+            <p><strong>Situação da publicação funcional:</strong> Verificação pendente</p>
+          </div>
+          <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            A verificação automática de publicação existente será habilitada em etapa futura.
+          </p>
+          <p className={`mt-3 rounded-lg border px-3 py-2 text-sm font-semibold ${temInconsistencia || !segmentoAtual ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+            {mensagemAcaoSugerida}
+          </p>
+        </div>
+
+        {comportamentoCalculado && segmentoAtual ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Texto de publicação — prévia</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-800">{textoPublicacaoPreview}</p>
+                <p className="mt-3 text-xs font-semibold text-amber-800">Nenhuma publicação será criada nesta etapa.</p>
               </div>
-              <p className="mt-3"><strong>Fundamento:</strong> {segmentoAtual.fundamento || linha.calculado?.fundamento || '—'}</p>
-              <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                Verificação de publicação existente será habilitada em etapa futura.
-              </p>
-            </div>
-            <div className="flex items-start justify-end">
-              <Button type="button" variant="outline" onClick={() => setMostrarPreviewPublicacao((atual) => !atual)}>
+              <Button type="button" variant="outline" onClick={copiarTextoPublicacao}>
                 <FileText className="mr-2 h-4 w-4" />
-                Pré-visualizar publicação
+                Copiar texto
               </Button>
             </div>
-          </div>
-        ) : (
-          <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Prévia indisponível sem comportamento calculado atual e segmento vigente.</p>
-        )}
-
-        {mostrarPreviewPublicacao && linha.calculado?.comportamento && segmentoAtual ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Preview informativo</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-800">{textoPublicacaoPreview}</p>
-            <p className="mt-3 text-xs font-semibold text-amber-800">Nenhuma Publicacao, RegistroPublicacao ou HistóricoComportamento será criado por esta prévia.</p>
           </div>
         ) : null}
       </section>
