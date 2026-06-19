@@ -30,8 +30,22 @@ Campo Grande/MS, ____ de __________ de ______.
 
 __________________________________
 Comandante`,
-  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO]: `Passa a integrar o comportamento {{comportamento}}, a contar de {{data_inicio}}, o militar {{posto_graduacao}} {{nome_completo}}, matrícula {{matricula}}, conforme apuração dos assentamentos disciplinares e critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`,
-  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `Para fins de assentamento e registro funcional, fica consignado que o militar {{posto_graduacao}} {{nome_completo}}, matrícula {{matricula}}, passou a integrar o comportamento {{comportamento}} a contar de {{data_inicio}}, conforme apuração realizada com base nos assentamentos disciplinares constantes em seus registros funcionais e nos critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO]: `Fica registrado que o militar {{posto_graduacao}} {{nome_completo}},
+matrícula {{matricula}},
+passou a integrar o comportamento {{comportamento}}
+a contar de {{data_inicio}},
+nos termos do Decreto nº 1.260/1981.`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `Para fins de assentamento e registro funcional,
+fica consignado que o militar
+{{posto_graduacao}} {{nome_completo}},
+matrícula {{matricula}},
+passou a integrar o comportamento
+{{comportamento}}
+a contar de {{data_inicio}},
+conforme apuração realizada com base nos
+assentamentos disciplinares constantes em seus
+registros funcionais e nos critérios previstos
+no Decreto nº 1.260/1981.`,
 };
 
 const CAMPOS_ESSENCIAIS_POR_TIPO = {
