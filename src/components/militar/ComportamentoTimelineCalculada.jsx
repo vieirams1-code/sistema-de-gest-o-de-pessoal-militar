@@ -446,7 +446,7 @@ function JanelasResumo({ janelas = {} }) {
   );
 }
 
-function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMode }) {
+function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMode, compacto = false }) {
   const scale = useMemo(() => buildTimelineScale(segmentos, eventos, zoomMode), [segmentos, eventos, zoomMode]);
   const minWidth = useMemo(() => {
     const option = ZOOM_OPTIONS.find((item) => item.mode === zoomMode);
@@ -467,7 +467,7 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${compacto ? 'p-3 sm:p-4' : 'p-5'}`}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {ZOOM_OPTIONS.map(({ mode, label }) => (
           <button
@@ -594,7 +594,7 @@ function TimelineHorizontal({ eventos = [], segmentos = [], zoomMode, setZoomMod
   );
 }
 
-export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
+export default function ComportamentoTimelineCalculada({ timelineCalculada, compacto = false }) {
   const segmentos = timelineCalculada?.segmentos || [];
   const eventos = timelineCalculada?.eventos || [];
   const proximaMelhoria = timelineCalculada?.proximaMelhoria;
@@ -608,7 +608,7 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className={compacto ? 'space-y-3' : 'space-y-5'}>
       {inconsistencias.length > 0 && (
         <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -623,7 +623,7 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {!compacto && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-500">Calculado hoje</p>
           <p className="mt-1 text-lg font-semibold text-slate-900">{timelineCalculada.comportamentoCalculadoHoje || '—'}</p>
@@ -649,16 +649,17 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       <TimelineHorizontal
         eventos={eventos}
         segmentos={segmentos}
         zoomMode={zoomMode}
         setZoomMode={setZoomMode}
+        compacto={compacto}
       />
 
-      <div className="space-y-4">
+      {!compacto && <div className="space-y-4">
         {segmentosVisiveis.length ? segmentosVisiveis.map((segmento, index) => {
           const memoria = resumirMemoria(timelineCalculada, segmento);
           return (
@@ -762,7 +763,7 @@ export default function ComportamentoTimelineCalculada({ timelineCalculada }) {
         }) : (
           <p className="text-sm text-slate-500">Nenhum segmento calculado para exibição neste período.</p>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

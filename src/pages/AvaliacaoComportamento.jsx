@@ -20,6 +20,7 @@ import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoSe
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
+import ComportamentoTimelineCalculada from '@/components/militar/ComportamentoTimelineCalculada';
 
 const COMPORTAMENTO_STYLES = {
   Excepcional: 'border-blue-300 bg-blue-100 text-blue-800',
@@ -85,25 +86,6 @@ function JanelaResumo({ titulo, janela }) {
         <div><p className="font-bold text-slate-800">{janela?.quantidade ?? 0}</p><p className="text-slate-500">punições</p></div>
         <div><p className="font-bold text-slate-800">{janela?.prisao_equivalente ?? 0}</p><p className="text-slate-500">prisão eq.</p></div>
         <div><p className="font-bold text-slate-800">{janela?.detencao_equivalente ?? 0}</p><p className="text-slate-500">detenção eq.</p></div>
-      </div>
-    </div>
-  );
-}
-
-function TimelineBarra({ segmentos }) {
-  return (
-    <div className="overflow-x-auto pb-2">
-      <div className="flex min-w-max items-center gap-3 py-3">
-        {segmentos.map((seg, index) => (
-          <div key={`${seg.inicio}-${index}`} className="flex items-center gap-3">
-            <div className="min-w-48 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
-              <ComportamentoBadge valor={seg.comportamento} destaque={seg.isAtual} />
-              <p className="mt-2 text-slate-600">{formatarData(seg.inicio)} até {formatarData(seg.fim)}</p>
-              {seg.isAtual ? <p className="mt-1 font-semibold text-blue-700">Período atual</p> : null}
-            </div>
-            {index < segmentos.length - 1 ? <div className="h-0.5 w-12 bg-slate-200" /> : null}
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -179,7 +161,11 @@ function DetalhesAuditoria({ linha }) {
         </div>
 
         <div className="mt-6">
-          {segmentos.length ? (viewMode === 'bar' ? <TimelineBarra segmentos={segmentos} /> : <TimelineCards segmentos={segmentos} />) : (
+          {segmentos.length ? (viewMode === 'bar' ? (
+            <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
+              <ComportamentoTimelineCalculada timelineCalculada={linha.timeline} compacto />
+            </div>
+          ) : <TimelineCards segmentos={segmentos} />) : (
             <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Linha do tempo indisponível para este militar.</p>
           )}
         </div>
