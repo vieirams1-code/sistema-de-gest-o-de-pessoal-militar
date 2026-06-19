@@ -15,9 +15,12 @@ import { gerarLinhaTempoComportamento } from '@/utils/linhaTempoComportamento';
 import {
   criarPendenciaComportamentoSemDuplicidade,
   getPunicaoEntity,
-  obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
 import { gerarPublicacaoComportamento } from '@/services/comportamentoRPService';
+import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { aplicarTemplate } from '@/components/utils/templateUtils.js';
+import { montarVariaveisComportamentoTemplate } from '@/utils/comportamentoTemplateUtils';
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
@@ -191,16 +194,6 @@ function obterTemplateLabel(tipoPublicacao) {
     : 'melhoria_comportamento';
 }
 
-function gerarTextoPublicacaoComportamento({ militar = {}, comportamento, dataInicio, tipoPublicacao = TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL }) {
-  const postoGraduacao = militar.posto_graduacao || '—';
-  const nomeCompleto = militar.nome_completo || '—';
-  const matricula = obterMatricula(militar);
-  if (tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA) {
-    return `Fica registrado que o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, passou a integrar o comportamento ${comportamento || '—'} a contar de ${formatarData(dataInicio)}, nos termos do Decreto nº 1.260/1981.`;
-  }
-  return `Para fins de assentamento e registro funcional, fica consignado que o militar ${postoGraduacao} ${nomeCompleto}, matrícula ${matricula}, passou a integrar o comportamento ${comportamento || '—'} a contar de ${formatarData(dataInicio)}, conforme apuração realizada com base nos assentamentos disciplinares constantes em seus registros funcionais e nos critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`;
-}
-
 function PunicaoApensa({ punicao, comportamentoSegmento }) {
   const [aberta, setAberta] = useState(false);
   const data = obterDataPunicao(punicao);
@@ -288,12 +281,6 @@ function DetalhesAuditoria({ linha }) {
   const advertencias = linha.timeline?.segmentoAtual?.advertenciasInformativas || [];
   const inconsistencias = linha.calculado?.inconsistencias || [];
   const tipoPublicacaoSugerido = obterTipoPublicacaoSugerido(segmentoAtual);
-  const textoPublicacaoPreview = gerarTextoPublicacaoComportamento({
-    militar: linha.militar,
-    comportamento: linha.calculado?.comportamento || segmentoAtual?.comportamento,
-    dataInicio: segmentoAtual?.inicio,
-    tipoPublicacao: tipoPublicacaoSugerido,
-  });
   const comportamentoCalculado = linha.calculado?.comportamento || segmentoAtual?.comportamento;
   const comportamentoCadastrado = linha.militar.comportamento || 'Bom';
   const temInconsistencia = linha.inconsistenteCalculo || inconsistencias.length > 0;
@@ -312,30 +299,6 @@ function DetalhesAuditoria({ linha }) {
           ? 'Ação recomendada: Aplicar alteração decorrente de punição.'
           : `Ação recomendada: Gerar publicação de ${tipoPublicacaoSugerido === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL ? 'regularização funcional' : 'melhoria'}.`
         : 'Não foi possível identificar o comportamento calculado atual.';
-
-  const copiarTextoPublicacao = async () => {
-    const clipboardDisponivel = typeof navigator !== 'undefined' && navigator?.clipboard?.writeText;
-    if (!clipboardDisponivel) {
-      toast({
-        title: 'Copie manualmente',
-        description: 'A área de transferência não está disponível neste navegador. Selecione o texto da prévia e copie manualmente.',
-      });
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(textoPublicacaoPreview);
-      toast({
-        title: 'Texto copiado',
-        description: 'A prévia de publicação foi copiada para a área de transferência.',
-      });
-    } catch {
-      toast({
-        title: 'Copie manualmente',
-        description: 'Não foi possível copiar automaticamente. Selecione o texto da prévia e copie manualmente.',
-      });
-    }
-  };
 
   return (
     <div className="border-t border-blue-100 bg-slate-50 p-6">
@@ -442,21 +405,6 @@ function DetalhesAuditoria({ linha }) {
           </p>
         </div>
 
-        {comportamentoCalculado && segmentoAtual && comparacaoComportamento !== RESULTADO_COMPARACAO_COMPORTAMENTO.REGRESSAO ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Texto de publicação — prévia</p>
-                <p className="mt-2 text-sm leading-relaxed text-slate-800">{textoPublicacaoPreview}</p>
-                <p className="mt-3 text-xs font-semibold text-amber-800">Template sugerido: {obterTemplateLabel(tipoPublicacaoSugerido)}. Ao selecionar uma opção com publicação, o comportamento será aplicado primeiro e o modal de Publicação de Comportamento será aberto para revisão, cópia, nota e BG antes de salvar.</p>
-              </div>
-              <Button type="button" variant="outline" onClick={copiarTextoPublicacao}>
-                <FileText className="mr-2 h-4 w-4" />
-                Copiar texto
-              </Button>
-            </div>
-          </div>
-        ) : null}
       </section>
     </div>
   );
@@ -536,6 +484,12 @@ export default function AvaliacaoComportamento() {
     enabled: scopedReady,
   });
 
+  const { data: templatesTexto = [] } = useQuery({
+    queryKey: ['templates-texto-comportamento'],
+    queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
+    enabled: isAccessResolved,
+  });
+
   const avaliacao = useMemo(() => {
     return militares
       .filter((m) => PRACAS.has(m.posto_graduacao))
@@ -585,110 +539,136 @@ export default function AvaliacaoComportamento() {
     inconsistencias: avaliacao.filter((a) => a.situacao === 'Inconsistente').length,
   }), [avaliacao]);
 
+  const localizarTemplatePublicacaoComportamento = async (tipoPublicacao) => {
+    const templatesDisponiveis = templatesTexto.length
+      ? templatesTexto
+      : await queryClient.fetchQuery({
+          queryKey: ['templates-texto-comportamento'],
+          queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
+        });
+    return getTemplateAtivoPorTipo(tipoPublicacao, MODULO_EX_OFFICIO, templatesDisponiveis);
+  };
+
+  const renderizarTemplatePublicacaoComportamento = async ({ linha, tipoPublicacao, dataInicioCalculada }) => {
+    const templateAtivo = await localizarTemplatePublicacaoComportamento(tipoPublicacao);
+    if (!templateAtivo?.template) {
+      throw new Error(`Template obrigatório não encontrado para ${tipoPublicacao}. Cadastre um template ativo antes de gerar a publicação.`);
+    }
+    const comportamentoAnterior = linha.militar?.comportamento || 'Bom';
+    const marcoTemplate = {
+      comportamento_anterior: comportamentoAnterior,
+      comportamento_novo: linha.calculado?.comportamento,
+      comportamento: linha.calculado?.comportamento,
+      data_alteracao: dataInicioCalculada,
+      dataInicio: dataInicioCalculada,
+      data_inicio: dataInicioCalculada,
+      fundamento_legal: linha.calculado?.fundamento,
+      motivo_mudanca: tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL
+        ? 'Registro funcional retroativo de comportamento aprovado na Avaliação de Comportamento.'
+        : 'Melhoria de comportamento aprovada na Avaliação de Comportamento.',
+    };
+    const vars = montarVariaveisComportamentoTemplate(linha.militar, marcoTemplate);
+    const varsComportamento = {
+      ...vars,
+      comportamento: linha.calculado?.comportamento || vars.comportamento,
+      comportamento_anterior: comportamentoAnterior,
+      comportamento_calculado: linha.calculado?.comportamento || '',
+      comportamento_cadastrado: comportamentoAnterior,
+      data_inicio_comportamento: formatarData(dataInicioCalculada),
+      data_vigencia: formatarData(dataInicioCalculada),
+      tipo_publicacao_comportamento: tipoPublicacao,
+    };
+    return {
+      templateAtivo,
+      texto: aplicarTemplate(templateAtivo.template, varsComportamento),
+    };
+  };
+
+  const prepararPublicacaoComportamento = async (linha, tipoPublicacao) => {
+    const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
+    const renderizacao = await renderizarTemplatePublicacaoComportamento({ linha, tipoPublicacao, dataInicioCalculada });
+    setPublicacaoModal({
+      open: true,
+      linha: { ...linha, militar: { ...linha.militar, comportamento_anterior_snapshot: linha.militar.comportamento || 'Bom' } },
+      marcoHistorico: null,
+      form: {
+        data_publicacao: new Date().toISOString().slice(0, 10),
+        finalidade: tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL ? 'Registro funcional' : 'Melhoria de comportamento',
+        texto_publicacao: renderizacao.texto,
+        nota_para_bg: '',
+        numero_bg: '',
+        data_bg: '',
+        tipoPublicacao,
+        dataInicioCalculada,
+        template_texto_id: renderizacao.templateAtivo?.id || '',
+      },
+    });
+    toast({
+      title: 'Publicação pronta para revisão',
+      description: 'Revise o texto renderizado do template. Cancelar publicação = nenhuma alteração aplicada.',
+    });
+  };
+
   const aplicarSugestao = async (linha, { modoAprovacao = MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO } = {}) => {
-    if (!canAprovarMudanca) return;
-    if (!linha.calculado?.comportamento) return;
+    if (!canAprovarMudanca) return null;
+    if (!linha.calculado?.comportamento) return null;
 
     const escopo = validarEscopoMilitar(linha?.militar?.id);
     if (!escopo.permitido) {
       toast({ variant: 'destructive', title: 'Acesso negado', description: escopo.motivo });
-      return;
+      return null;
     }
 
-    try {
-      let pendenciaParaAplicacao = linha.pendenciaExistente;
-      if (!pendenciaParaAplicacao?.id) {
-        const { registro } = await criarPendenciaComportamentoSemDuplicidade({
-          militar_id: linha.militar.id,
-          militar_nome: linha.militar.nome_completo,
-          comportamento_atual: linha.militar.comportamento || 'Bom',
-          comportamento_sugerido: linha.calculado.comportamento,
-          fundamento_legal: linha.calculado.fundamento,
-          detalhes_calculo: JSON.stringify(linha.calculado.detalhes || {}),
-          data_detectada: new Date().toISOString().slice(0, 10),
-          status_pendencia: 'Pendente',
-          confirmado_por: null,
-          data_confirmacao: null,
-        });
-        pendenciaParaAplicacao = registro;
-      }
-
-      if (!pendenciaParaAplicacao?.id) {
-        throw new Error('Não foi possível identificar a pendência de comportamento para aprovação.');
-      }
-
-      const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
-      const resultadoAplicacao = await aplicarPendenciasComportamentoEmLote({
-        pendencias: [pendenciaParaAplicacao.id],
-        usuarioAtual: { canAccessAction },
-        options: { dataReferencia: dataInicioCalculada },
+    let pendenciaParaAplicacao = linha.pendenciaExistente;
+    if (!pendenciaParaAplicacao?.id) {
+      const { registro } = await criarPendenciaComportamentoSemDuplicidade({
+        militar_id: linha.militar.id,
+        militar_nome: linha.militar.nome_completo,
+        comportamento_atual: linha.militar.comportamento || 'Bom',
+        comportamento_sugerido: linha.calculado.comportamento,
+        fundamento_legal: linha.calculado.fundamento,
+        detalhes_calculo: JSON.stringify(linha.calculado.detalhes || {}),
+        data_detectada: new Date().toISOString().slice(0, 10),
+        status_pendencia: 'Pendente',
+        confirmado_por: null,
+        data_confirmacao: null,
       });
-
-      if (resultadoAplicacao.totalAplicadas !== 1) {
-        const motivoFalha = resultadoAplicacao.falhas?.[0]?.erro
-          || resultadoAplicacao.falhas?.[0]?.motivo
-          || resultadoAplicacao.ignoradas?.[0]?.motivo
-          || 'Falha ao aplicar pendência de comportamento.';
-        throw new Error(motivoFalha);
-      }
-
-      const deveAbrirPublicacao = modoAprovacao !== MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO
-        && modoAprovacao !== MODOS_APROVACAO.APLICAR_REGRESSAO;
-      let marcoParaPublicacao = null;
-      if (deveAbrirPublicacao) {
-        const historicoMilitar = await obterHistoricoComportamentoMilitar(linha.militar.id, { ordem: 'desc' });
-        const marcoAplicado = resultadoAplicacao.aplicadas?.[0]?.marco || null;
-        marcoParaPublicacao = marcoAplicado?.id
-          ? marcoAplicado
-          : historicoMilitar.find((marco) => (
-            marco?.comportamento_novo === linha.calculado.comportamento
-            && String(marco?.data_alteracao || '').slice(0, 10) === String(dataInicioCalculada).slice(0, 10)
-          )) || null;
-        const tipoPublicacao = modoAprovacao === MODOS_APROVACAO.APROVAR_COM_PUBLICACAO_REGISTRO_FUNCIONAL
-          ? TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL
-          : TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA;
-        setPublicacaoModal({
-          open: true,
-          linha: { ...linha, militar: { ...linha.militar, comportamento_anterior_snapshot: linha.militar.comportamento || 'Bom' } },
-          marcoHistorico: marcoParaPublicacao,
-          form: {
-            data_publicacao: new Date().toISOString().slice(0, 10),
-            finalidade: tipoPublicacao === TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL ? 'Registro funcional' : 'Melhoria de comportamento',
-            texto_publicacao: gerarTextoPublicacaoComportamento({
-              militar: linha.militar,
-              comportamento: linha.calculado.comportamento,
-              dataInicio: dataInicioCalculada,
-              tipoPublicacao,
-            }),
-            nota_para_bg: '',
-            numero_bg: '',
-            data_bg: '',
-            tipoPublicacao,
-            dataInicioCalculada,
-          },
-        });
-      }
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] }),
-        queryClient.invalidateQueries({ queryKey: ['militares'] }),
-        queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] }),
-      ]);
-
-      toast({
-        title: 'Comportamento aplicado',
-        description: deveAbrirPublicacao
-          ? 'Revise o texto e complete os dados no modal de Publicação de Comportamento.'
-          : 'Alteração cadastral aplicada. Regressões não geram publicação própria de comportamento.',
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Falha ao aplicar alteração',
-        description: error?.message || 'Não foi possível concluir a operação.',
-      });
-      throw error;
+      pendenciaParaAplicacao = registro;
     }
+
+    if (!pendenciaParaAplicacao?.id) {
+      throw new Error('Não foi possível identificar a pendência de comportamento para aprovação.');
+    }
+
+    const dataInicioCalculada = linha.timeline?.segmentoAtual?.inicio || new Date().toISOString().slice(0, 10);
+    const resultadoAplicacao = await aplicarPendenciasComportamentoEmLote({
+      pendencias: [pendenciaParaAplicacao.id],
+      usuarioAtual: { canAccessAction },
+      options: { dataReferencia: dataInicioCalculada },
+    });
+
+    if (resultadoAplicacao.totalAplicadas !== 1) {
+      const motivoFalha = resultadoAplicacao.falhas?.[0]?.erro
+        || resultadoAplicacao.falhas?.[0]?.motivo
+        || resultadoAplicacao.ignoradas?.[0]?.motivo
+        || 'Falha ao aplicar pendência de comportamento.';
+      throw new Error(motivoFalha);
+    }
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] }),
+      queryClient.invalidateQueries({ queryKey: ['militares'] }),
+      queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] }),
+    ]);
+
+    toast({
+      title: 'Comportamento aplicado',
+      description: modoAprovacao === MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO
+        ? 'Alteração cadastral aplicada sem abrir publicação.'
+        : 'Alteração cadastral aplicada. Regressões não geram publicação própria de comportamento.',
+    });
+
+    return resultadoAplicacao;
   };
 
   const gerarPendencia = async (linha) => {
@@ -741,8 +721,26 @@ export default function AvaliacaoComportamento() {
   const confirmarAprovacao = async ({ modoAprovacao = MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO } = {}) => {
     if (!canAprovarMudanca) return;
     if (!aprovacaoModal.linha) return;
-    await aplicarSugestao(aprovacaoModal.linha, { modoAprovacao });
-    fecharModalAprovacao();
+    const linha = aprovacaoModal.linha;
+    const deveAbrirPublicacao = modoAprovacao !== MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO
+      && modoAprovacao !== MODOS_APROVACAO.APLICAR_REGRESSAO;
+    try {
+      if (deveAbrirPublicacao) {
+        const tipoPublicacao = modoAprovacao === MODOS_APROVACAO.APROVAR_COM_PUBLICACAO_REGISTRO_FUNCIONAL
+          ? TIPO_PUBLICACAO_COMPORTAMENTO.REGISTRO_FUNCIONAL
+          : TIPO_PUBLICACAO_COMPORTAMENTO.MELHORIA;
+        await prepararPublicacaoComportamento(linha, tipoPublicacao);
+      } else {
+        await aplicarSugestao(linha, { modoAprovacao });
+      }
+      fecharModalAprovacao();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: deveAbrirPublicacao ? 'Falha ao renderizar template' : 'Falha ao aplicar alteração',
+        description: error?.message || 'Não foi possível concluir a operação.',
+      });
+    }
   };
 
 
@@ -770,6 +768,8 @@ export default function AvaliacaoComportamento() {
     try {
       const linha = publicacaoModal.linha;
       const form = publicacaoModal.form;
+      const resultadoAplicacao = await aplicarSugestao(linha, { modoAprovacao: MODOS_APROVACAO.CORRIGIR_SEM_PUBLICACAO });
+      const marcoAplicado = resultadoAplicacao?.aplicadas?.[0]?.marco || null;
       const resultado = await gerarPublicacaoComportamento({
         militar: linha.militar,
         comportamento: linha.calculado?.comportamento,
@@ -777,7 +777,7 @@ export default function AvaliacaoComportamento() {
         fundamento: linha.calculado?.fundamento,
         tipoPublicacao: form.tipoPublicacao,
         texto: form.texto_publicacao,
-        marcoHistorico: publicacaoModal.marcoHistorico,
+        marcoHistorico: marcoAplicado,
         geradoPor: userEmail || '',
         dataPublicacao: form.data_publicacao,
         finalidade: form.finalidade,
@@ -791,7 +791,7 @@ export default function AvaliacaoComportamento() {
       }
       await queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       setPublicacaoModal({ open: false, linha: null, form: null, marcoHistorico: null });
-      toast({ title: 'Publicação salva', description: 'A publicação de comportamento foi registrada para o fluxo de Publicações.' });
+      toast({ title: 'Publicação salva', description: 'A alteração de comportamento foi aplicada e a publicação foi registrada.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Falha ao salvar publicação', description: error?.message || 'Não foi possível salvar a publicação.' });
     } finally {
@@ -968,7 +968,7 @@ export default function AvaliacaoComportamento() {
             return (
               <div className="space-y-3">
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                  Ao selecionar uma opção com publicação, o comportamento será aplicado primeiro e o modal de Publicação de Comportamento será aberto para revisão, cópia, nota e BG antes de salvar.
+                  Ao selecionar uma opção com publicação, o template será renderizado e o modal de Publicação de Comportamento será aberto para revisão. A alteração de comportamento só será aplicada ao salvar a publicação; cancelar não aplica nenhuma alteração.
                 </div>
                 {opcoes.map((opcao) => {
                   const template = opcao.tipoPublicacao ? obterTemplateLabel(opcao.tipoPublicacao) : 'sem publicação';

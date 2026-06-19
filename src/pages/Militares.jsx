@@ -43,7 +43,6 @@ import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
-import { isMilitarAtivo } from '@/utils/militarStatus';
 import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import GerarDocumentoMilitarModal from '@/components/documentosMilitares/GerarDocumentoMilitarModal';
