@@ -157,6 +157,21 @@ test('montarVariaveisComportamentoTemplate', () => {
   assert.equal(vars.fundamento_legal, 'Regulamento X');
 });
 
+test('montarVariaveisComportamentoTemplate mantém posto_nome sem duplicar nome completo', () => {
+  const vars = montarVariaveisComportamentoTemplate({
+    nome_completo: 'Alan Pereira da Rocha',
+    posto_graduacao: 'Cabo',
+    quadro: 'QBMP-1.a',
+    matricula: '423.614-021',
+  }, {
+    comportamento_novo: 'Excepcional',
+    data_alteracao: '2026-06-19',
+  });
+
+  assert.equal(vars.posto_nome, 'CB QBMP-1.a');
+  assert.equal(vars.nome_completo, 'Alan Pereira da Rocha');
+});
+
 test('gerarTextoRPComportamento - sucesso', () => {
   const template = 'Militar {{nome_completo}} / Comportamento {{comportamento}} / Vigente desde {{data_inicio_comportamento}}';
   const militar = { nome_completo: 'JOÃO', posto_graduacao: 'SD', matricula: '1', quadro: 'Q' };

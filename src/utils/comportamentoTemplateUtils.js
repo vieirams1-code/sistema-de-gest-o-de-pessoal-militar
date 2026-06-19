@@ -232,7 +232,6 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, {
     quadro,
     source: { militar, marco, ...militar, ...marco },
   });
-  const postoNomeInstitucional = [postoQuadro, nomeCompleto].filter(Boolean).join(' ');
 
   const vars = {
     militar_nome: nomeCompleto,
@@ -245,7 +244,7 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, {
     comportamento_atual: militar?.comportamento || marco?.comportamento_novo || 'Não informado',
     comportamento: comportamentoCalculado,
     nome_completo: nomeCompleto,
-    posto_nome: postoNomeInstitucional,
+    posto_nome: postoQuadro,
     data_inicio: format(dataVigencia),
     data_alteracao: format(dataVigencia),
     data_publicacao: format(dataPublicacaoTemplate),
