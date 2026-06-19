@@ -171,7 +171,7 @@ async function executarEfetivacaoMudancaComportamento({
   });
 
   const dataReferencia = options?.dataReferencia || new Date().toISOString().slice(0, 10);
-  await deps.registrarMarcoHistoricoComportamento({
+  const marcoCriado = await deps.registrarMarcoHistoricoComportamento({
     militarId,
     dataVigencia: dataReferencia,
     comportamentoAnterior: comportamentoAtual,
@@ -189,7 +189,7 @@ async function executarEfetivacaoMudancaComportamento({
     confirmado_por: String(usuarioAtual?.email || usuarioAtual?.login || '').trim() || null,
   });
 
-  return { exito: true };
+  return { exito: true, marco: marcoCriado || null };
 }
 
 export async function aplicarPendenciasComportamentoEmLote({
@@ -265,7 +265,7 @@ export async function aplicarPendenciasComportamentoEmLote({
 
       const { militar, comportamentoAtual } = elegibilidadeMilitar;
 
-      await executarEfetivacaoMudancaComportamento({
+      const efetivacao = await executarEfetivacaoMudancaComportamento({
         militarEntity,
         pendenciaEntity,
         deps,
@@ -279,7 +279,10 @@ export async function aplicarPendenciasComportamentoEmLote({
         options,
       });
 
-      resultado.aplicadas.push(montarItemRelatorio({ pendencia, militar, motivo: 'aplicada' }));
+      resultado.aplicadas.push({
+        ...montarItemRelatorio({ pendencia, militar, motivo: 'aplicada' }),
+        marco: efetivacao?.marco || null,
+      });
     } catch (erro) {
       resultado.falhas.push(montarItemRelatorio({
         pendencia,

@@ -17,6 +17,8 @@ export const __setComportamentoTemplateUtilsDepsForTests = (newDeps) => {
 
 export const TIPO_TEMPLATE_COMPORTAMENTO = {
   ELEVACAO: 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR',
+  MELHORIA_COMPORTAMENTO: 'melhoria_comportamento',
+  REGISTRO_FUNCIONAL_COMPORTAMENTO: 'registro_funcional_comportamento',
 };
 
 export const TEMPLATE_PADRAO_COMPORTAMENTO_POR_TIPO = {
@@ -28,6 +30,8 @@ Campo Grande/MS, ____ de __________ de ______.
 
 __________________________________
 Comandante`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO]: `Passa a integrar o comportamento {{comportamento}}, a contar de {{data_inicio}}, o militar {{posto_graduacao}} {{nome_completo}}, matrícula {{matricula}}, conforme apuração dos assentamentos disciplinares e critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `Para fins de assentamento e registro funcional, fica consignado que o militar {{posto_graduacao}} {{nome_completo}}, matrícula {{matricula}}, passou a integrar o comportamento {{comportamento}} a contar de {{data_inicio}}, conforme apuração realizada com base nos assentamentos disciplinares constantes em seus registros funcionais e nos critérios previstos no Decreto nº 1.260, de 02 de outubro de 1981.`,
 };
 
 const CAMPOS_ESSENCIAIS_POR_TIPO = {
@@ -41,6 +45,20 @@ const CAMPOS_ESSENCIAIS_POR_TIPO = {
     'motivo_mudanca',
     'fundamento_legal',
   ],
+  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO]: [
+    'comportamento',
+    'data_inicio',
+    'posto_graduacao',
+    'nome_completo',
+    'matricula',
+  ],
+  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: [
+    'comportamento',
+    'data_inicio',
+    'posto_graduacao',
+    'nome_completo',
+    'matricula',
+  ],
 };
 
 const LABELS_CAMPOS = {
@@ -53,6 +71,9 @@ const LABELS_CAMPOS = {
   data_alteracao: 'Data da alteração',
   motivo_mudanca: 'Motivo da mudança',
   fundamento_legal: 'Fundamento legal',
+  comportamento: 'Comportamento',
+  data_inicio: 'Data de início',
+  nome_completo: 'Nome completo',
 };
 
 /** @internal */
@@ -198,7 +219,10 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}, {
     comportamento_anterior: marco?.comportamento_anterior || 'Não informado',
     comportamento_novo: marco?.comportamento_novo || militar?.comportamento || 'Não informado',
     comportamento_atual: militar?.comportamento || marco?.comportamento_novo || 'Não informado',
-    data_alteracao: deps.formatDateBR(marco?.data_alteracao),
+    comportamento: marco?.comportamento_novo || marco?.comportamento || militar?.comportamento || 'Não informado',
+    nome_completo: militar?.nome_completo || militar?.nome_guerra || 'Não informado',
+    data_inicio: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
+    data_alteracao: deps.formatDateBR(marco?.data_alteracao || marco?.dataInicio || marco?.data_inicio),
     motivo_mudanca: marco?.motivo_mudanca || 'Não informado',
     fundamento_legal: marco?.fundamento_legal || 'Não informado',
   };
