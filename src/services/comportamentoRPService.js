@@ -231,6 +231,7 @@ async function executarCriacaoPublicacao({
   }
 }
 
+
 export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
   militar,
   marco,
@@ -286,6 +287,11 @@ export async function gerarPublicacaoComportamento({
   marcoHistorico = null,
   geradoPor = '',
   dataPublicacao = new Date().toISOString().slice(0, 10),
+  finalidade = '',
+  notaParaBg = '',
+  numeroBg = '',
+  dataBg = '',
+  comportamentoAnterior = '',
 }) {
   const tipoTemplate = tipoPublicacao || TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA_COMPORTAMENTO;
   const marco = marcoHistorico?.id
@@ -325,9 +331,13 @@ export async function gerarPublicacaoComportamento({
     militar_matricula: matriculaAtual || formatarMatriculaPadrao(militar.matricula || ''),
     tipo: tipoTemplate,
     data_publicacao: dataPublicacao,
-    status: 'Aguardando Nota',
+    status: numeroBg || dataBg ? 'Publicado' : notaParaBg ? 'Aguardando Publicação' : 'Aguardando Nota',
     texto_publicacao: renderizacao.texto,
-    origem_tipo: marco?.id ? 'historico_comportamento' : 'comportamento_calculado',
+    finalidade,
+    nota_para_bg: notaParaBg,
+    numero_bg: numeroBg,
+    data_bg: dataBg,
+    origem_tipo: 'auditoria_comportamento',
     origem_id: origemId,
     historico_comportamento_id: marco?.id || '',
     tipo_template: tipoTemplate,
@@ -335,6 +345,20 @@ export async function gerarPublicacaoComportamento({
     texto_renderizado: renderizacao.texto,
     gerado_por: geradoPor,
     gerado_em: geradoEm,
+    militar_id_metadado: militar.id,
+    comportamento_anterior: comportamentoAnterior || marco?.comportamento_anterior || militar?.comportamento || '',
+    comportamento_novo: comportamento,
+    data_vigencia: dataInicio,
+    tipo_publicacao_comportamento: tipoTemplate,
+    origem: 'auditoria_comportamento',
+    metadados: {
+      militar_id: militar.id,
+      comportamento_anterior: comportamentoAnterior || marco?.comportamento_anterior || militar?.comportamento || '',
+      comportamento_novo: comportamento,
+      data_vigencia: dataInicio,
+      tipo_publicacao_comportamento: tipoTemplate,
+      origem: 'auditoria_comportamento',
+    },
   };
 
   try {
