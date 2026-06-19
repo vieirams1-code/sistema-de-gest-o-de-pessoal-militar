@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { CalendarDays, FileText, Filter, Loader2, Paperclip, ShieldAlert, Stethoscope, Users, ChevronDown, ChevronRight, FileSpreadsheet, Download } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { gerarExtratoAtestados } from '@/services/gerarExtratoAtestadosClient';
 import { gerarRelatorioDpDintelAtestados } from '@/services/gerarRelatorioDpDintelAtestadosClient';
+import { gerarZipAnexosAtestadosClient } from '@/services/gerarZipAnexosAtestadosClient';
 import { obterLinkAnexoAtestado } from '@/services/getAtestadoAnexoSignedUrlClient';
 import { registrarAuditoriaExtratoAtestadosClient } from '@/services/registrarAuditoriaExtratoAtestadosClient';
 import { alterarEncaminhamentoAtestado } from '@/services/alterarEncaminhamentoAtestadoClient';
@@ -172,8 +173,10 @@ export default function ExtratoAtestadosMedicos() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingZip, setIsExportingZip] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState('');
+  const [zipError, setZipError] = useState('');
   const [loadingEncaminhamentoByKey, setLoadingEncaminhamentoByKey] = useState({});
   const [loadingAnexoById, setLoadingAnexoById] = useState({});
   const [erroAnexoById, setErroAnexoById] = useState({});
@@ -186,6 +189,9 @@ export default function ExtratoAtestadosMedicos() {
   const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
   const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
   const canManageEncaminhamento = canAccessAction('gerir_encaminhamento_dp_dintel_atestado');
+  const canExportCsv = canAccessAction('exportar_atestados_csv');
+  const canDownloadAnexo = canAccessAction('baixar_anexos_atestados');
+  const canDownloadZip = canAccessAction('baixar_zip_atestados');
 
   const normalizeActionError = (error, context = {}) => ({
     code: String(error?.code || ''),
@@ -235,6 +241,10 @@ export default function ExtratoAtestadosMedicos() {
 
   const handleExportarExcel = async () => {
     if (selectedIds.size === 0) return;
+    if (!canExportCsv) {
+      toast.error('Você não tem permissão para exportar dados (CSV/Excel).');
+      return;
+    }
     setIsExporting(true);
     
     setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'exportar_excel', timestamp: new Date().toISOString(), selectedIds: Array.from(selectedIds) }, ultimoErroAcao: null }));
@@ -282,6 +292,42 @@ export default function ExtratoAtestadosMedicos() {
     }
   };
 
+
+  const handleExportarZipAnexos = async () => {
+    setZipError('');
+    if (selectedIds.size === 0) {
+      setZipError('Selecione ao menos um atestado para baixar o ZIP de anexos.');
+      return;
+    }
+    if (!canDownloadZip) {
+      setZipError('Você não tem permissão para baixar o ZIP de anexos.');
+      return;
+    }
+    setIsExportingZip(true);
+    setDiagnosticos((prev) => ({ ...prev, ultimaAcaoExecutada: { action: 'exportar_zip', timestamp: new Date().toISOString(), selectedIds: Array.from(selectedIds) }, ultimoErroAcao: null }));
+
+    try {
+      const response = await gerarZipAnexosAtestadosClient(Array.from(selectedIds));
+      downloadBlob(response.blob, response.fileName);
+      await registrarAuditoria({
+        acao: 'export_zip_anexos',
+        quantidade_registros: selectedIds.size,
+        atestado_ids: Array.from(selectedIds),
+        incluiu_sensiveis: true,
+        sensiveis_bloqueados: false,
+        modo_acesso: 'zip_anexos',
+        escopo: 'scoped_atestados_bundle',
+        extrato_parcial: response.meta?.extrato_parcial,
+      });
+      toast.success('ZIP de anexos gerado com sucesso!');
+    } catch (e) {
+      setDiagnosticos((prev) => ({ ...prev, ultimoErroAcao: normalizeActionError(e, { action: 'exportar_zip', selectedIds: Array.from(selectedIds) }) }));
+      setZipError(e?.message || 'Falha ao gerar o ZIP de anexos.');
+      toast.error('Falha ao exportar ZIP de anexos.');
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
 
   const handleGerarRelatorioDpDintel = async () => {
     setReportError('');
@@ -489,6 +535,10 @@ export default function ExtratoAtestadosMedicos() {
   const handleAbrirAnexo = async (row) => {
     const rowId = String(row?.id || '');
     if (!rowId) return;
+    if (!canDownloadAnexo) {
+      toast.error('Você não tem permissão para baixar anexos.');
+      return;
+    }
     setLoadingAnexoById((prev) => ({ ...prev, [rowId]: true }));
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
@@ -547,10 +597,18 @@ export default function ExtratoAtestadosMedicos() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-              <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarExcel}>
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-                Exportar Excel
-              </Button>
+              {canExportCsv && (
+                <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#16304f]" disabled={selectedIds.size === 0 || isExporting} onClick={handleExportarExcel}>
+                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                  Exportar Excel
+                </Button>
+              )}
+              {canDownloadZip && (
+                <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isExportingZip} onClick={handleExportarZipAnexos}>
+                  {isExportingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Download ZIP
+                </Button>
+              )}
               <Button variant="outline" className="gap-2 bg-white" disabled={selectedIds.size === 0 || isGeneratingReport || !canGenerateDpDintelReport} onClick={handleGerarRelatorioDpDintel}>
                 {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 PDF DP/DINTEL
@@ -565,6 +623,11 @@ export default function ExtratoAtestadosMedicos() {
           {reportError && (
             <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
               {reportError}
+            </p>
+          )}
+          {zipError && (
+            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {zipError}
             </p>
           )}
           {!canManageEncaminhamento && (
@@ -774,15 +837,24 @@ export default function ExtratoAtestadosMedicos() {
                           <td className="p-3 align-top">
                             {canViewSensitive ? (
                               <div className="space-y-1">
-                                <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
-                                  {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-                                  {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
-                                </Button>
-                                {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
-                                {linkAnexoById[row.id] && (
-                                  <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
-                                    Abrir anexo
-                                  </a>
+                                {canDownloadAnexo ? (
+                                  <>
+                                    <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
+                                      {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                                      {loadingAnexoById[row.id] ? 'Gerando link...' : 'Abrir'}
+                                    </Button>
+                                    {erroAnexoById[row.id] && <div className="max-w-xs text-xs text-rose-600">{erroAnexoById[row.id]}</div>}
+                                    {linkAnexoById[row.id] && (
+                                      <a className="block text-xs text-blue-700 underline" href={linkAnexoById[row.id]} target="_blank" rel="noopener noreferrer">
+                                        Abrir anexo
+                                      </a>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 text-slate-400">
+                                    <ShieldAlert className="h-4 w-4" />
+                                    <span className="text-xs font-medium">Download restrito</span>
+                                  </div>
                                 )}
                               </div>
                             ) : (

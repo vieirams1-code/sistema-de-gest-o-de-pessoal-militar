@@ -512,6 +512,9 @@ const atestados = {
       // Canonical atual de runtime: SINGULAR (Atestados.jsx usa 'excluir_atestado').
       excluir: 'excluir_atestado',
       ver_dados_sensiveis: 'ver_dados_sensiveis_atestado',
+      exportar_csv: 'exportar_atestados_csv',
+      baixar_anexos: 'baixar_anexos_atestados',
+      baixar_zip: 'baixar_zip_atestados',
       gerar_relatorio_dp_dintel: 'gerar_relatorio_dp_dintel_atestados',
       gerir_encaminhamento_dp_dintel: 'gerir_encaminhamento_dp_dintel_atestado',
     },
@@ -523,6 +526,9 @@ const atestados = {
       // Plural mantido como legacy/declared extra (existe em permissionStructure.js).
       excluir_plural: 'perm_excluir_atestados',
       ver_dados_sensiveis: 'perm_ver_dados_sensiveis_atestado',
+      exportar_csv: 'perm_exportar_atestados_csv',
+      baixar_anexos: 'perm_baixar_anexos_atestados',
+      baixar_zip: 'perm_baixar_zip_atestados',
       gerar_relatorio_dp_dintel: 'perm_gerar_relatorio_dp_dintel_atestados',
       gerir_encaminhamento_dp_dintel: 'perm_gerir_encaminhamento_dp_dintel_atestado',
     },
