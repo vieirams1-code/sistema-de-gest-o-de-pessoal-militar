@@ -51,6 +51,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RepositorioDocumental',
   'ConferenciaMilitar',
   'ItemConferenciaMilitar',
+  'JISO',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -176,6 +177,11 @@ const PERMISSIONS_MAP = {
     update: 'gerir_conferencias_militares',
     delete: 'gerir_conferencias_militares',
     bulk: 'gerir_conferencias_militares',
+  },
+  JISO: {
+    create: 'registrar_decisao_jiso',
+    update: 'registrar_decisao_jiso',
+    delete: 'gerir_jiso',
   },
 };
 
@@ -1003,6 +1009,22 @@ Deno.serve(async (req) => {
         } else if (operation === 'delete') {
           requiredPermission = 'excluir_contrato_designacao';
           allowed = possuiActionContratoDesignacao(targetPerms.actions, 'excluir_contrato_designacao');
+        }
+        if (!allowed) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'JISO' && operation !== 'bulk') {
+        let allowed = false;
+        let requiredPermission = null;
+        if (operation === 'create' || operation === 'update') {
+          requiredPermission = 'registrar_decisao_jiso ou gerir_jiso';
+          allowed = targetPerms.actions?.['registrar_decisao_jiso'] === true || targetPerms.actions?.['gerir_jiso'] === true;
+        } else if (operation === 'delete') {
+          requiredPermission = 'gerir_jiso';
+          allowed = targetPerms.actions?.['gerir_jiso'] === true;
         }
         if (!allowed) {
           return Response.json(

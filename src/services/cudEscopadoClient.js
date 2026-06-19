@@ -50,10 +50,14 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RepositorioDocumental',
   'ConferenciaMilitar',
   'ItemConferenciaMilitar',
+  'JISO',
 ]);
 
 
 const CAMPOS_DATA_ISO_POR_ENTIDADE = {
+  JISO: [
+    'data_jiso',
+  ],
   MilitarTag: [
     'data_aplicacao',
     'data_remocao',
