@@ -35,6 +35,7 @@ import {
   MODULO_EX_OFFICIO,
 } from '@/components/rp/rpTiposConfig';
 import { getLivroOperacaoFerias } from '@/components/livro/feriasOperacaoUtils';
+import { efetivarDescontoPorPublicacao, listarDescontosFerias, montarTextoDispensaDescontoFerias, TIPO_RP_DISPENSA_DESCONTO_FERIAS, validarNovoDesconto, getPeriodoRef } from '@/services/diasDescontadosFeriasService';
 
 const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
 
@@ -56,6 +57,11 @@ const initialState = {
   data_bg: '',
   texto_publicacao: '',
   observacoes: '',
+  periodo_aquisitivo_id: '',
+  periodo_aquisitivo_ref: '',
+  dias_descontados: '',
+  data_dispensa: new Date().toISOString().split('T')[0],
+  fundamentacao: '',
   ferias_id: '',
   data_inicio: '',
   data_termino: '',
@@ -264,6 +270,20 @@ export default function CadastrarRegistroRP() {
     enabled: !!formData.militar_id,
   });
 
+  const { data: periodosAquisitivosMilitar = [] } = useQuery({
+    queryKey: ['periodos-aquisitivos-rp-desconto', formData.militar_id],
+    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }, '-inicio_aquisitivo'),
+    enabled: !!formData.militar_id && formData.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS,
+  });
+
+  const { data: descontosFeriasMilitar = [] } = useQuery({
+    queryKey: ['dias-descontados-ferias-rp', formData.militar_id],
+    queryFn: () => listarDescontosFerias({ militar_id: formData.militar_id }),
+    enabled: !!formData.militar_id && formData.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS,
+  });
+
+  const periodoDescontoSelecionado = useMemo(() => periodosAquisitivosMilitar.find((p) => String(p.id) === String(formData.periodo_aquisitivo_id)) || null, [periodosAquisitivosMilitar, formData.periodo_aquisitivo_id]);
+
   const { data: publicacoesMilitar = [] } = useQuery({
     queryKey: ['publicacoes-militar-rp', formData.militar_id],
     queryFn: async () => {
@@ -383,6 +403,23 @@ export default function CadastrarRegistroRP() {
     setErrosStep((prev) => ({ ...prev, tipo: null }));
   };
 
+  useEffect(() => {
+    if (formData.tipo_registro !== TIPO_RP_DISPENSA_DESCONTO_FERIAS || !periodoDescontoSelecionado) return;
+    const dias = Number(formData.dias_descontados || 0);
+    const periodoLabel = getPeriodoRef(periodoDescontoSelecionado);
+    setFormData((prev) => ({
+      ...prev,
+      periodo_aquisitivo_ref: periodoLabel,
+      texto_publicacao: montarTextoDispensaDescontoFerias({
+        militar: { ...militarSelecionado, militar_posto: prev.militar_posto, militar_nome: prev.militar_nome, militar_matricula: prev.militar_matricula },
+        periodoLabel,
+        dias,
+        dataDispensa: formatarDataCurta(prev.data_dispensa),
+        fundamentacao: prev.fundamentacao,
+      }),
+    }));
+  }, [formData.tipo_registro, formData.periodo_aquisitivo_id, formData.dias_descontados, formData.data_dispensa, formData.fundamentacao, periodoDescontoSelecionado, militarSelecionado]);
+
   const validateCurrentStep = () => {
     if (currentStep === STEP_TIPO) {
       if (!formData.tipo_registro || !selectedTipo) {
@@ -406,6 +443,17 @@ export default function CadastrarRegistroRP() {
       if (!formData.data_registro) {
         setErrosStep({ dados: 'Informe a data do registro.' });
         return false;
+      }
+      if (formData.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS) {
+        if (!formData.periodo_aquisitivo_id) {
+          setErrosStep({ dados: 'Selecione o período aquisitivo afetado.' });
+          return false;
+        }
+        const validacao = validarNovoDesconto({ periodo: periodoDescontoSelecionado, descontos: descontosFeriasMilitar, dias: formData.dias_descontados });
+        if (!validacao.ok) {
+          setErrosStep({ dados: validacao.message });
+          return false;
+        }
       }
       setErrosStep({});
       return true;
@@ -443,10 +491,15 @@ export default function CadastrarRegistroRP() {
         return base44.entities.RegistroLivro.create(data);
       }
 
-      return base44.entities.PublicacaoExOfficio.create({
+      const criada = await base44.entities.PublicacaoExOfficio.create({
         ...data,
         tipo: data.tipo_registro,
       });
+      if (data.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS) {
+        const periodo = periodosAquisitivosMilitar.find((p) => String(p.id) === String(data.periodo_aquisitivo_id));
+        await efetivarDescontoPorPublicacao({ publicacao: criada, periodo, descontosPeriodo: descontosFeriasMilitar, usuario: '' });
+      }
+      return criada;
     },
     onSuccess: async () => {
       await Promise.all([
@@ -454,6 +507,8 @@ export default function CadastrarRegistroRP() {
         queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
         queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
         queryClient.invalidateQueries({ queryKey: ['publicacoes-militar-rp'] }),
+        queryClient.invalidateQueries({ queryKey: ['dias-descontados-ferias-rp'] }),
+        queryClient.invalidateQueries({ queryKey: ['ferias'] }),
       ]);
       navigate(createPageUrl('RP'));
     },
@@ -711,6 +766,8 @@ export default function CadastrarRegistroRP() {
                     todasPublicacoesFormatadas={publicacoesMilitar}
                     publicacoesElegiveis={publicacoesMilitar}
                     formatarDataExtenso={formatarDataExtenso}
+                    periodosAquisitivosMilitar={periodosAquisitivosMilitar}
+                    descontosFeriasMilitar={descontosFeriasMilitar}
                   />
                 )}
 

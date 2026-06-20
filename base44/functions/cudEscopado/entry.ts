@@ -38,6 +38,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RegistroLivro',
   'PublicacaoExOfficio',
   'CreditoExtraFerias',
+  'DiasDescontadosFerias',
   'ContratoDesignacaoMilitar',
   'PerfilPermissao',
   'UsuarioAcesso',
@@ -87,6 +88,11 @@ const PERMISSIONS_MAP = {
     delete: 'excluir_ferias',
   },
   CreditoExtraFerias: {
+    create: 'adicionar_ferias',
+    update: 'editar_ferias',
+    delete: 'excluir_ferias',
+  },
+  DiasDescontadosFerias: {
     create: 'adicionar_ferias',
     update: 'editar_ferias',
     delete: 'excluir_ferias',
