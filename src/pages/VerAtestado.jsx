@@ -24,6 +24,7 @@ import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
 
@@ -76,6 +77,7 @@ export default function VerAtestado() {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { podeAgirSobre, isReady: isScopeReady } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const canEditar = canAccessAction('editar_atestados');
@@ -107,7 +109,7 @@ export default function VerAtestado() {
     [atestado, militarAtestado],
   );
 
-  if (loadingUser || !isAccessResolved) return null;
+  if (loadingUser || !isAccessResolved || !isScopeReady) return null;
   if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
 
   if (isLoading) {
@@ -116,6 +118,11 @@ export default function VerAtestado() {
         <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // Validação de escopo organizacional (Hardening P1.4-C.4)
+  if (!podeAgirSobre(atestado.militar_id)) {
+    return <AccessDenied modulo="Atestados" />;
   }
 
 
