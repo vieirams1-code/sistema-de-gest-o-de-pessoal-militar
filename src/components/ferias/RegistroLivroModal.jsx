@@ -33,6 +33,7 @@ import {
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
+import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais, obterDiasDescontados } from '@/components/ferias/periodoSaldoUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import FeriasTagsSection from '@/components/ferias/FeriasTagsSection';
@@ -361,16 +362,18 @@ export default function RegistroLivroModal({
     enabled: open && !!ferias?.militar_id,
   });
 
-  const dataLimiteGozo = useMemo(() => {
+  const periodoAquisitivoFerias = useMemo(() => {
     if (!ferias) return null;
 
-    const periodo = (periodosDoMilitar || []).find((item) =>
+    return (periodosDoMilitar || []).find((item) =>
       (ferias.periodo_aquisitivo_id && item.id === ferias.periodo_aquisitivo_id) ||
       ((item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || ''))
-    );
-
-    return periodo?.data_limite_gozo || ferias.data_limite_gozo || null;
+    ) || null;
   }, [periodosDoMilitar, ferias]);
+
+  const dataLimiteGozo = useMemo(() => {
+    return periodoAquisitivoFerias?.data_limite_gozo || ferias?.data_limite_gozo || null;
+  }, [periodoAquisitivoFerias, ferias]);
 
   useEffect(() => {
     if (!open || !ferias) return;
@@ -418,7 +421,14 @@ export default function RegistroLivroModal({
   const resumo = useMemo(() => {
     if (!ferias || !dataRegistro) return null;
 
-    const baseDias = Number(ferias.dias_base ?? ferias.dias ?? 0);
+    const baseDiasOriginal = Number(ferias.dias_base ?? ferias.dias ?? 0);
+    const periodoSaldo = periodoAquisitivoFerias || ferias;
+    const diasAdicionaisPeriodo = obterDiasAdicionais(periodoSaldo);
+    const diasDescontadosPeriodo = obterDiasDescontados(periodoSaldo);
+    const saldoUtilizavelPeriodo = periodoAquisitivoFerias
+      ? calcularSaldoUtilizavelPeriodo(periodoAquisitivoFerias)
+      : Math.max(0, baseDiasOriginal + diasAdicionaisPeriodo - diasDescontadosPeriodo);
+    const baseDias = tipoRegistro === 'Saída Férias' ? saldoUtilizavelPeriodo : baseDiasOriginal;
     const creditosSelecionados = (creditosExtra || []).filter((credito) => creditosSelecionadosIds.includes(credito.id));
     const totaisGozo = calcularTotaisGozoComCreditos({
       diasBase: baseDias,
@@ -434,7 +444,10 @@ export default function RegistroLivroModal({
         titulo: 'Resumo do Início',
         inicio: dataRegistro,
         dias: totaisGozo.dias_totais_gozo,
-        diasBase: totaisGozo.dias_base_gozo,
+        diasBase: baseDiasOriginal,
+        diasAdicionaisPeriodo,
+        diasDescontadosPeriodo,
+        saldoUtilizavel: saldoUtilizavelPeriodo,
         diasExtras: totaisGozo.dias_extras_creditos,
         creditosSelecionados,
         fim: novoFim,
@@ -488,7 +501,7 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias]);
 
   const erroCronologia = useMemo(() => {
     return validarCronologia({
@@ -810,8 +823,11 @@ export default function RegistroLivroModal({
                     <div className="font-semibold">{formatDateBR(resumo.inicio)}</div>
                   </div>
                   <div>
-                    <div className="text-cyan-700">Dias (base + extra)</div>
-                    <div className="font-semibold">{resumo.diasBase}d + {resumo.diasExtras}d = {resumo.dias}d</div>
+                    <div className="text-cyan-700">Dias disponíveis</div>
+                    <div className="font-semibold">{resumo.diasBase}d + {resumo.diasAdicionaisPeriodo}d - {resumo.diasDescontadosPeriodo}d = {resumo.saldoUtilizavel}d</div>
+                    {resumo.diasExtras > 0 && (
+                      <div className="text-xs text-cyan-700 mt-1">Créditos vinculados ao gozo: +{resumo.diasExtras}d (total projetado {resumo.dias}d)</div>
+                    )}
                   </div>
                   <div>
                     <div className="text-cyan-700">Novo fim</div>

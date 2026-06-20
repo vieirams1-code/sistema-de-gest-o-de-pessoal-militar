@@ -47,23 +47,44 @@ export function filtrarFeriasDoPeriodo(periodo = {}, ferias = []) {
 }
 
 export function obterDiasBase(periodo = {}) {
+  if (hasNumericValue(periodo?.dias_adquiridos)) {
+    return toNumber(periodo.dias_adquiridos, DIAS_BASE_PADRAO);
+  }
+
   if (hasNumericValue(periodo?.dias_base)) {
     return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
   }
 
+  if (hasNumericValue(periodo?.dias_direito)) {
+    return toNumber(periodo.dias_direito, DIAS_BASE_PADRAO);
+  }
+
   return DIAS_BASE_PADRAO;
+}
+
+export function obterDiasAdicionais(periodo = {}) {
+  return Math.max(0, toNumber(periodo?.dias_adicionais ?? periodo?.dias_credito_extra ?? periodo?.creditos_extra, 0));
+}
+
+export function obterDiasDescontados(periodo = {}) {
+  return Math.max(0, toNumber(periodo?.dias_descontados, 0));
+}
+
+export function calcularSaldoUtilizavelPeriodo(periodo = {}) {
+  const base = obterDiasBase(periodo);
+  const adicionais = obterDiasAdicionais(periodo);
+  const descontados = obterDiasDescontados(periodo);
+
+  return Math.max(0, base + adicionais - descontados);
 }
 
 export function calcularDiasTotal(periodo = {}) {
-  if (hasNumericValue(periodo?.dias_base)) {
-    return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
-  }
-
-  return DIAS_BASE_PADRAO;
+  return calcularSaldoUtilizavelPeriodo(periodo);
 }
 
-export function calcularDiasGozados(periodo = {}, ferias = []) {
-  const feriasPeriodo = filtrarFeriasDoPeriodo(periodo, ferias);
+export function calcularDiasGozados(periodo = {}, ferias = [], { ignorarFeriasId = null } = {}) {
+  const feriasPeriodo = filtrarFeriasDoPeriodo(periodo, ferias)
+    .filter((item) => !ignorarFeriasId || normalizarId(item?.id) !== normalizarId(ignorarFeriasId));
 
   return feriasPeriodo.reduce((acc, item) => {
     const dias = Math.max(0, toNumber(item?.dias, 0));
@@ -74,8 +95,9 @@ export function calcularDiasGozados(periodo = {}, ferias = []) {
   }, 0);
 }
 
-export function calcularDiasPrevistos(periodo = {}, ferias = []) {
-  const feriasPeriodo = filtrarFeriasDoPeriodo(periodo, ferias);
+export function calcularDiasPrevistos(periodo = {}, ferias = [], { ignorarFeriasId = null } = {}) {
+  const feriasPeriodo = filtrarFeriasDoPeriodo(periodo, ferias)
+    .filter((item) => !ignorarFeriasId || normalizarId(item?.id) !== normalizarId(ignorarFeriasId));
 
   return feriasPeriodo.reduce((acc, item) => {
     const dias = Math.max(0, toNumber(item?.dias, 0));
@@ -86,24 +108,28 @@ export function calcularDiasPrevistos(periodo = {}, ferias = []) {
   }, 0);
 }
 
-export function calcularDiasSaldo(periodo = {}, ferias = []) {
+export function calcularDiasSaldo(periodo = {}, ferias = [], options = {}) {
   return (
     calcularDiasTotal(periodo) -
-    calcularDiasGozados(periodo, ferias) -
-    calcularDiasPrevistos(periodo, ferias)
+    calcularDiasGozados(periodo, ferias, options) -
+    calcularDiasPrevistos(periodo, ferias, options)
   );
 }
 
-export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
+export function recalcularSaldoPeriodo(periodo = {}, ferias = [], options = {}) {
   const dias_base = obterDiasBase(periodo);
   const dias_total = calcularDiasTotal(periodo);
-  const dias_gozados = calcularDiasGozados(periodo, ferias);
-  const dias_previstos = calcularDiasPrevistos(periodo, ferias);
-  const dias_saldo = calcularDiasSaldo(periodo, ferias);
+  const dias_adicionais = obterDiasAdicionais(periodo);
+  const dias_descontados = obterDiasDescontados(periodo);
+  const dias_gozados = calcularDiasGozados(periodo, ferias, options);
+  const dias_previstos = calcularDiasPrevistos(periodo, ferias, options);
+  const dias_saldo = calcularDiasSaldo(periodo, ferias, options);
 
   return {
     dias_base,
     dias_total,
+    dias_adicionais,
+    dias_descontados,
     dias_gozados,
     dias_previstos,
     dias_saldo,
@@ -120,18 +146,19 @@ export function getSaldoConsolidadoPeriodo({ periodo, ferias = [] }) {
   };
 }
 
-export function validarDiasNoSaldoPeriodo({ periodo = {}, ferias = [], quantidade }) {
+export function validarDiasNoSaldoPeriodo({ periodo = {}, ferias = [], quantidade, ignorarFeriasId = null }) {
   const qtd = Math.max(0, toNumber(quantidade, 0));
+  const options = { ignorarFeriasId };
   const dias_total_projetado = calcularDiasTotal(periodo);
-  const dias_gozados = calcularDiasGozados(periodo, ferias);
-  const dias_previstos = calcularDiasPrevistos(periodo, ferias);
+  const dias_gozados = calcularDiasGozados(periodo, ferias, options);
+  const dias_previstos = calcularDiasPrevistos(periodo, ferias, options);
   const dias_saldo_projetado = dias_total_projetado - dias_gozados - dias_previstos - qtd;
 
   if (dias_saldo_projetado < 0) {
     return {
       ok: false,
       mensagem:
-        'Quantidade de dias informada deixa o período com saldo inconsistente em relação aos dias já gozados/previstos.',
+        `Quantidade de dias informada (${qtd}d) ultrapassa o saldo utilizável do período (${Math.max(0, dias_total_projetado - dias_gozados - dias_previstos)}d), já considerando dias adicionais e dias descontados.`,
     };
   }
 
