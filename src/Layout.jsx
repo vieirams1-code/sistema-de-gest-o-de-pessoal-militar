@@ -104,6 +104,7 @@ const menuGroups = [
         items: [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
           { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
+          { name: 'Dias Descontados', page: 'DiasDescontadosFerias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
         ],
       },
       {

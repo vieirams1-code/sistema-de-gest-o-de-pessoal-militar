@@ -62,6 +62,18 @@ export const RP_TIPOS_BASE = [
     destaque: false,
   },
 
+
+  {
+    value: 'Dispensa com Desconto em Férias',
+    label: 'Dispensa com Desconto em Férias',
+    grupo: 'Férias',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Publicação RP que gera automaticamente desconto no período aquisitivo de férias.',
+    palavrasChave: ['dispensa', 'desconto', 'ferias'],
+    destaque: true,
+  },
+
   // LICENÇAS
   {
     value: 'Licença Maternidade',
