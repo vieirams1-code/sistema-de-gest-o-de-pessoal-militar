@@ -16,7 +16,6 @@
     "publicacao_status": { "type": "string", "default": "" },
     "dias_descontados": { "type": "integer", "default": 0 },
     "motivo": { "type": "string", "default": "" },
-    "fundamentacao": { "type": "string", "default": "" },
     "data_desconto": { "type": "date", "default": "" },
     "data_dispensa": { "type": "date", "default": "" },
     "status": { "type": "string", "default": "ativo" },

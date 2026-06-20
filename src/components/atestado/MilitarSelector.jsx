@@ -26,6 +26,31 @@ const SEARCH_DEBOUNCE_MS = 350;
 const ELEGIBILIDADE_FERIAS_BUNDLE_DISPONIVEL = false;
 const FERIAS_ELEGIBILIDADE_INDISPONIVEL = Object.freeze({ status: 'unavailable', militares: [] });
 
+function getNomeGuerra(militar = {}) {
+  return militar.nome_guerra || militar.nome_guerra_formatado || militar.nome_guerra_atual || militar.nome_completo || 'Militar';
+}
+
+function getLotacaoQuadro(militar = {}) {
+  const lotacao = militar.lotacao || militar.unidade || militar.subunidade || militar.grupamento_nome || '';
+  const quadro = militar.quadro || militar.quadro_bombeiro_militar || militar.qbmp || '';
+  return [lotacao, quadro].filter(Boolean).join(' / ');
+}
+
+function MilitarResumo({ militar, matricula }) {
+  const lotacaoQuadro = getLotacaoQuadro(militar);
+  return (
+    <div className="space-y-0.5 min-w-0">
+      <p className="font-semibold text-sm text-slate-900 truncate">
+        {[militar?.posto_graduacao, getNomeGuerra(militar)].filter(Boolean).join(' ')}
+      </p>
+      <p className="text-xs text-slate-600 truncate">
+        {militar?.nome_completo || getNomeGuerra(militar)} — Mat: {matricula || '—'}
+      </p>
+      {lotacaoQuadro && <p className="text-xs text-slate-500 truncate">{lotacaoQuadro}</p>}
+    </div>
+  );
+}
+
 export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -175,8 +200,11 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
         militar_matricula_atual: matriculaAtual,
         militar_matricula_vinculo: matriculaAtual,
         nome_completo: militar.nome_completo,
+        nome_guerra: militar.nome_guerra,
         posto_graduacao: militar.posto_graduacao,
-        matricula: matriculaAtual
+        matricula: matriculaAtual,
+        lotacao: militar.lotacao || militar.unidade || militar.subunidade || '',
+        quadro: militar.quadro || militar.quadro_bombeiro_militar || militar.qbmp || ''
       });
     }
     setOpen(false);
@@ -213,13 +241,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-slate-900 truncate">
-              {selectedMilitar.posto_graduacao && `${selectedMilitar.posto_graduacao} `}
-              {selectedMilitar.nome_guerra || selectedMilitar.nome_completo}
-            </p>
-            <p className="text-xs text-slate-500 truncate">
-              Mat: {resolverMatriculaAtual(selectedMilitar, selectedMilitar?.matriculas_historico || []) || '—'}
-            </p>
+            <MilitarResumo militar={selectedMilitar} matricula={resolverMatriculaAtual(selectedMilitar, selectedMilitar?.matriculas_historico || [])} />
             {isMilitarMesclado(selectedMilitar) && <p className="text-[11px] text-amber-700">Militar mesclado (apenas histórico).</p>}
           </div>
           <Button
@@ -298,13 +320,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {militar.posto_graduacao && `${militar.posto_graduacao} `}
-                        {militar.nome_guerra || militar.nome_completo}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate">
-                        Mat: {resolverMatriculaAtual(militar, militar?.matriculas_historico || []) || '—'}
-                      </p>
+                      <MilitarResumo militar={militar} matricula={resolverMatriculaAtual(militar, militar?.matriculas_historico || [])} />
                     </div>
                   </CommandItem>
                     ))}

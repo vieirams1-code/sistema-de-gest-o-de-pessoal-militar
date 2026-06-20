@@ -71,7 +71,7 @@ async function buscarPublicacaoVinculada(desconto) {
   return publicacao || null;
 }
 
-export async function criarDescontoFeriasAutomatico({ militar, periodo, dias, dataDispensa, observacoes = '', usuario = '', textoPublicacao = '' }) {
+export async function criarDescontoFeriasAutomatico({ militar, periodo, dias, dataDispensa, observacoes = '', usuario = '', textoPublicacao = '', notaParaBg = '', numeroBg = '', dataBg = '' }) {
   const existentesPeriodo = await listarDescontosFerias({ militar_id: militar.id });
   const descontosPeriodo = existentesPeriodo.filter((d) => id(d.periodo_aquisitivo_id) === id(periodo.id));
   const idempotente = descontosPeriodo.find((d) => (
@@ -98,7 +98,10 @@ export async function criarDescontoFeriasAutomatico({ militar, periodo, dias, da
     tipo: TIPO_RP_DISPENSA_DESCONTO_FERIAS,
     data_publicacao: dataDispensa,
     data_registro: dataDispensa,
-    status: 'Aguardando Nota',
+    status: numeroBg || dataBg ? 'Publicado' : 'Aguardando Nota',
+    nota_para_bg: notaParaBg,
+    numero_bg: numeroBg,
+    data_bg: dataBg,
     texto_publicacao: textoPublicacao || texto,
     observacoes,
     periodo_aquisitivo_id: periodo.id,
@@ -117,6 +120,8 @@ export async function criarDescontoFeriasAutomatico({ militar, periodo, dias, da
     periodo_aquisitivo_ref: getPeriodoRef(periodo),
     publicacao_id: publicacao.id,
     publicacao_status: publicacao.status || 'Aguardando Nota',
+    publicacao_numero_bg: publicacao.numero_bg || '',
+    publicacao_data_bg: publicacao.data_bg || '',
     dias_descontados: n(dias),
     motivo: observacoes || TIPO_RP_DISPENSA_DESCONTO_FERIAS,
     observacoes,
@@ -225,5 +230,6 @@ export async function reverterDescontoPorPublicacao({ publicacaoId, motivo = 'Re
 
 export function montarTextoDispensaDescontoFerias({ militar = {}, periodoLabel = '', dias = 0, dataDispensa = '', dataFinalDispensa = '' }) {
   const periodoDispensa = dataFinalDispensa && dataFinalDispensa !== dataDispensa ? `, no período de ${dataDispensa} a ${dataFinalDispensa}` : (dataDispensa ? `, em ${dataDispensa}` : '');
-  return `Fica concedida dispensa ao ${militar.posto_graduacao || militar.militar_posto || ''} ${militar.nome_completo || militar.militar_nome || militar.nome_guerra || ''}, matrícula ${militar.matricula || militar.militar_matricula || ''}, com desconto de ${dias} dia(s) em seu período aquisitivo de férias ${periodoLabel}${periodoDispensa}.`.replace(/\s+/g, ' ').trim();
+  const nomeMilitar = militar.nome_guerra || militar.nome_completo || militar.militar_nome || '';
+  return `Fica concedida dispensa ao ${militar.posto_graduacao || militar.militar_posto || ''} ${nomeMilitar}, matrícula ${militar.matricula || militar.militar_matricula || ''}, com desconto de ${dias} dia(s) em seu período aquisitivo de férias ${periodoLabel}${periodoDispensa}.`.replace(/\s+/g, ' ').trim();
 }
