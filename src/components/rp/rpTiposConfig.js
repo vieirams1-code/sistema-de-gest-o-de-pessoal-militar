@@ -396,6 +396,7 @@ function cloneMeta(tipo = {}) {
     destaque: Boolean(tipo.destaque),
     origem: tipo.origem || 'base',
     legacy: Boolean(tipo.legacy),
+    geracaoAutomatica: Boolean(tipo.geracaoAutomatica),
   };
 }
 
@@ -452,7 +453,7 @@ export function getTiposRPFiltrados({
 
   // 2. Tipos customizados (ambos os módulos)
   tiposCustom.forEach((t) => {
-    if (!t?.nome) return;
+    if (!t?.nome || t.nome === 'Dispensa com Desconto em Férias' || t.nome === 'Dispensa Desconto Férias') return;
     mergeTipoMaps(map, {
       value: t.nome,
       label: t.nome,
@@ -468,7 +469,7 @@ export function getTiposRPFiltrados({
   // 3. Templates ativos de ambos os módulos
   templatesAtivos
     .forEach((tmpl) => {
-      if (!tmpl?.tipo_registro) return;
+      if (!tmpl?.tipo_registro || tmpl.tipo_registro === 'Dispensa com Desconto em Férias' || tmpl.tipo_registro === 'Dispensa Desconto Férias') return;
       const moduloTemplate = getTemplateAtivoPorTipo(tmpl.tipo_registro, tmpl.modulo, templatesAtivos)?.modulo;
       if (!moduloTemplate) return;
       mergeTipoMaps(map, {

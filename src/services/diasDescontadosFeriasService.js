@@ -1,10 +1,14 @@
 import { base44 } from '@/api/base44Client';
-import { criarEscopado, atualizarEscopado } from './cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from './cudEscopadoClient';
 
 export const LIMITE_DIAS_DESCONTADOS_FERIAS = 8;
 export const STATUS_DESCONTO_FERIAS = { ATIVO: 'ativo', REVERTIDO: 'revertido', CANCELADO: 'cancelado' };
 export const TIPO_RP_DISPENSA_DESCONTO_FERIAS = 'Dispensa com Desconto em Férias';
 export const TIPO_RP_TORNAR_SEM_EFEITO = 'Tornar sem Efeito';
+
+function auditString(evento = {}) {
+  return JSON.stringify({ ...evento, data_hora: evento.data_hora || new Date().toISOString() });
+}
 
 const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
 const id = (v) => String(v || '').trim();
@@ -90,54 +94,64 @@ export async function criarDescontoFeriasAutomatico({ militar, periodo, dias, da
     dias,
     dataDispensa,
   });
-  const publicacao = await criarEscopado('PublicacaoExOfficio', {
-    militar_id: militar.id,
-    militar_nome: militar.nome_completo || militar.nome_guerra || '',
-    militar_posto: militar.posto_graduacao || militar.posto || '',
-    militar_matricula: militar.matricula || '',
-    tipo: TIPO_RP_DISPENSA_DESCONTO_FERIAS,
-    data_publicacao: dataDispensa,
-    data_registro: dataDispensa,
-    status: numeroBg || dataBg ? 'Publicado' : 'Aguardando Nota',
-    nota_para_bg: notaParaBg,
-    numero_bg: numeroBg,
-    data_bg: dataBg,
-    texto_publicacao: textoPublicacao || texto,
-    observacoes,
-    periodo_aquisitivo_id: periodo.id,
-    periodo_aquisitivo_ref: getPeriodoRef(periodo),
-    dias_descontados: n(dias),
-    data_dispensa: dataDispensa,
-    origem_operacional: 'DiasDescontadosFerias',
-  });
   const saldoAtualAntes = getSaldoPeriodo(periodo);
-  const desconto = await criarEscopado('DiasDescontadosFerias', {
-    militar_id: militar.id,
-    militar_nome: militar.nome_completo || militar.nome_guerra || '',
-    militar_posto: militar.posto_graduacao || militar.posto || '',
-    militar_matricula: militar.matricula || '',
-    periodo_aquisitivo_id: periodo.id,
-    periodo_aquisitivo_ref: getPeriodoRef(periodo),
-    publicacao_id: publicacao.id,
-    publicacao_status: publicacao.status || 'Aguardando Nota',
-    publicacao_numero_bg: publicacao.numero_bg || '',
-    publicacao_data_bg: publicacao.data_bg || '',
-    dias_descontados: n(dias),
-    motivo: observacoes || TIPO_RP_DISPENSA_DESCONTO_FERIAS,
-    observacoes,
-    data_desconto: dataDispensa,
-    data_dispensa: dataDispensa,
-    status: STATUS_DESCONTO_FERIAS.ATIVO,
-    usuario_criacao: usuario,
-    auditoria: [{ acao: 'criacao_dias_descontados', usuario, data_hora: new Date().toISOString(), publicacao_id: publicacao.id, dias_descontados: n(dias) }],
-  });
-  await atualizarEscopado('PublicacaoExOfficio', publicacao.id, { dias_descontados_ferias_id: desconto.id });
-  if (periodo?.id) {
-    await atualizarEscopado('PeriodoAquisitivo', periodo.id, {
-      dias_descontados: validacao.resumo.diasDescontados + n(dias),
-      saldo_disponivel: Math.max(0, saldoAtualAntes - n(dias)),
-      ultima_movimentacao_saldo: new Date().toISOString(),
+  let publicacao = null;
+  let desconto = null;
+  try {
+    publicacao = await criarEscopado('PublicacaoExOfficio', {
+      militar_id: militar.id,
+      militar_nome: militar.nome_completo || militar.nome_guerra || '',
+      militar_posto: militar.posto_graduacao || militar.posto || '',
+      militar_matricula: militar.matricula || '',
+      tipo: TIPO_RP_DISPENSA_DESCONTO_FERIAS,
+      data_publicacao: dataDispensa,
+      data_registro: dataDispensa,
+      status: numeroBg || dataBg ? 'Publicado' : 'Aguardando Nota',
+      nota_para_bg: notaParaBg,
+      numero_bg: numeroBg,
+      data_bg: dataBg,
+      texto_publicacao: textoPublicacao || texto,
+      observacoes,
+      periodo_aquisitivo_id: periodo.id,
+      periodo_aquisitivo_ref: getPeriodoRef(periodo),
+      dias_descontados: n(dias),
+      data_dispensa: dataDispensa,
+      origem_operacional: 'DiasDescontadosFerias',
     });
+
+    desconto = await criarEscopado('DiasDescontadosFerias', {
+      militar_id: militar.id,
+      militar_nome: militar.nome_completo || militar.nome_guerra || '',
+      militar_posto: militar.posto_graduacao || militar.posto || '',
+      militar_matricula: militar.matricula || '',
+      periodo_aquisitivo_id: periodo.id,
+      periodo_aquisitivo_ref: getPeriodoRef(periodo),
+      publicacao_id: publicacao.id,
+      publicacao_status: publicacao.status || 'Aguardando Nota',
+      publicacao_numero_bg: publicacao.numero_bg || '',
+      publicacao_data_bg: publicacao.data_bg || '',
+      dias_descontados: n(dias),
+      motivo: observacoes || TIPO_RP_DISPENSA_DESCONTO_FERIAS,
+      observacoes,
+      data_desconto: dataDispensa,
+      data_dispensa: dataDispensa,
+      status: STATUS_DESCONTO_FERIAS.ATIVO,
+      usuario_criacao: usuario,
+      auditoria: [auditString({ acao: 'criacao_dias_descontados', usuario, publicacao_id: publicacao.id, dias_descontados: n(dias) })],
+    });
+
+    await atualizarEscopado('PublicacaoExOfficio', publicacao.id, { dias_descontados_ferias_id: desconto.id });
+    if (periodo?.id) {
+      await atualizarEscopado('PeriodoAquisitivo', periodo.id, {
+        dias_descontados: validacao.resumo.diasDescontados + n(dias),
+        saldo_disponivel: Math.max(0, saldoAtualAntes - n(dias)),
+        ultima_movimentacao_saldo: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    if (desconto?.id) await excluirEscopado('DiasDescontadosFerias', desconto.id).catch(() => null);
+    if (publicacao?.id) await excluirEscopado('PublicacaoExOfficio', publicacao.id).catch(() => null);
+    throw error;
   }
   return { desconto, publicacao, idempotente: false };
 }
@@ -181,7 +195,7 @@ export async function cancelarOuReverterDescontoFerias({ desconto, motivo = 'Can
     motivo_reversao: motivo,
     usuario_reversao: usuario,
     publicacao_reversao_id: publicacaoReversao?.id || '',
-    auditoria: [...(desconto.auditoria || []), { acao: publicada ? 'reversao_com_tornar_sem_efeito' : 'cancelamento_publicacao_nao_publicada', usuario, data_hora: new Date().toISOString(), publicacao_id: desconto.publicacao_id, publicacao_reversao_id: publicacaoReversao?.id || '', motivo }],
+    auditoria: [...(desconto.auditoria || []), auditString({ acao: publicada ? 'reversao_com_tornar_sem_efeito' : 'cancelamento_publicacao_nao_publicada', usuario, publicacao_id: desconto.publicacao_id, publicacao_reversao_id: publicacaoReversao?.id || '', motivo })],
   });
 }
 
@@ -198,7 +212,7 @@ export async function efetivarDescontoPorPublicacao({ publicacao, periodo, desco
     periodo_aquisitivo_id: periodo.id, periodo_aquisitivo_ref: getPeriodoRef(periodo), publicacao_id: publicacao.id,
     publicacao_numero_bg: publicacao.numero_bg || '', publicacao_data_bg: publicacao.data_bg || '', dias_descontados: dias,
     motivo: publicacao.motivo || publicacao.observacoes || TIPO_RP_DISPENSA_DESCONTO_FERIAS, data_desconto: publicacao.data_dispensa || publicacao.data_registro,
-    status: STATUS_DESCONTO_FERIAS.ATIVO, usuario_criacao: usuario, auditoria: [{ acao: 'criacao', usuario, data_hora: new Date().toISOString(), publicacao_id: publicacao.id, dias_descontados: dias }]
+    status: STATUS_DESCONTO_FERIAS.ATIVO, usuario_criacao: usuario, auditoria: [auditString({ acao: 'criacao', usuario, publicacao_id: publicacao.id, dias_descontados: dias })]
   });
   if (periodo?.id) {
     await atualizarEscopado('PeriodoAquisitivo', periodo.id, {
@@ -214,7 +228,7 @@ export async function reverterDescontoPorPublicacao({ publicacaoId, motivo = 'Re
   const descontos = await listarDescontosFerias({ publicacao_id: publicacaoId });
   const ativo = descontos.find(isDescontoAtivo);
   if (!ativo) return null;
-  const revertido = await atualizarEscopado('DiasDescontadosFerias', ativo.id, { status: STATUS_DESCONTO_FERIAS.REVERTIDO, data_reversao: new Date().toISOString().slice(0, 10), motivo_reversao: motivo, usuario_reversao: usuario, auditoria: [...(ativo.auditoria || []), { acao: 'reversao', usuario, data_hora: new Date().toISOString(), publicacao_id: publicacaoId, dias_descontados: ativo.dias_descontados, motivo }] });
+  const revertido = await atualizarEscopado('DiasDescontadosFerias', ativo.id, { status: STATUS_DESCONTO_FERIAS.REVERTIDO, data_reversao: new Date().toISOString().slice(0, 10), motivo_reversao: motivo, usuario_reversao: usuario, auditoria: [...(ativo.auditoria || []), auditString({ acao: 'reversao', usuario, publicacao_id: publicacaoId, dias_descontados: ativo.dias_descontados, motivo })] });
   if (ativo.periodo_aquisitivo_id) {
     const [periodo] = await base44.entities.PeriodoAquisitivo.filter({ id: ativo.periodo_aquisitivo_id });
     if (periodo?.id) {
