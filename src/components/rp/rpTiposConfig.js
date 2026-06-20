@@ -443,6 +443,7 @@ export function getTiposRPFiltrados({
   tiposCustom = [],
   templatesAtivos = [],
   tipoAtualEdicao = null,
+  incluirGeracaoAutomatica = false,
 } = {}) {
   const map = new Map();
 
@@ -503,7 +504,7 @@ export function getTiposRPFiltrados({
   return Array.from(map.values())
     .filter((t) => {
       if (t.value === tipoAtualEdicao) return true;
-      if (t.geracaoAutomatica) return false;
+      if (t.geracaoAutomatica && !incluirGeracaoAutomatica) return false;
       if (!t.sexo || !sexoNormalizado) return true;
       return normalizeSexo(t.sexo) === sexoNormalizado;
     })

@@ -1,0 +1,31 @@
+{
+  "name": "DiasDescontadosFerias",
+  "type": "object",
+  "title": "Dias Descontados de Férias",
+  "description": "Histórico de descontos automáticos de dias em períodos aquisitivos de férias originados pela tela Dias Descontados.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "militar_nome": { "type": "string", "default": "" },
+    "militar_posto": { "type": "string", "default": "" },
+    "militar_matricula": { "type": "string", "default": "" },
+    "periodo_aquisitivo_id": { "type": "string", "default": "" },
+    "periodo_aquisitivo_ref": { "type": "string", "default": "" },
+    "publicacao_id": { "type": "string", "default": "" },
+    "publicacao_numero_bg": { "type": "string", "default": "" },
+    "publicacao_data_bg": { "type": "date", "default": "" },
+    "publicacao_status": { "type": "string", "default": "" },
+    "dias_descontados": { "type": "integer", "default": 0 },
+    "motivo": { "type": "string", "default": "" },
+    "fundamentacao": { "type": "string", "default": "" },
+    "data_desconto": { "type": "date", "default": "" },
+    "data_dispensa": { "type": "date", "default": "" },
+    "status": { "type": "string", "default": "ativo" },
+    "publicacao_reversao_id": { "type": "string", "default": "" },
+    "data_reversao": { "type": "date", "default": "" },
+    "motivo_reversao": { "type": "string", "default": "" },
+    "usuario_criacao": { "type": "string", "default": "" },
+    "usuario_reversao": { "type": "string", "default": "" },
+    "auditoria": { "type": "array", "default": [] },
+    "observacoes": { "type": "string", "default": "" }
+  }
+}
