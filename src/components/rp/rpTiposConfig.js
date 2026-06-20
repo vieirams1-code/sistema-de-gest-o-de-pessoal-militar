@@ -72,6 +72,7 @@ export const RP_TIPOS_BASE = [
     descricao: 'Publicação RP que gera automaticamente desconto no período aquisitivo de férias.',
     palavrasChave: ['dispensa', 'desconto', 'ferias'],
     destaque: true,
+    geracaoAutomatica: true,
   },
 
   // LICENÇAS
@@ -502,6 +503,7 @@ export function getTiposRPFiltrados({
   return Array.from(map.values())
     .filter((t) => {
       if (t.value === tipoAtualEdicao) return true;
+      if (t.geracaoAutomatica) return false;
       if (!t.sexo || !sexoNormalizado) return true;
       return normalizeSexo(t.sexo) === sexoNormalizado;
     })
