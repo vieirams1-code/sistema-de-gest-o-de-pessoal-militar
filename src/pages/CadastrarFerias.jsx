@@ -21,7 +21,7 @@ import {
   validarInicioNoPeriodoConcessivo,
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
-import { validarDiasNoSaldoPeriodo, DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
+import { validarDiasNoSaldoPeriodo, calcularDiasTotal, DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
@@ -30,7 +30,7 @@ import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 // Fracoes válidas: combinações fixas com soma = 30
 const OPCOES_FRACOES = [
-  { label: '1 fração de 30 dias', fracoes: [30] },
+  { label: '1 fração integral', fracoes: [30] },
   { label: '2 frações: 15 + 15', fracoes: [15, 15] },
   { label: '2 frações: 20 + 10', fracoes: [20, 10] },
   { label: '2 frações: 10 + 20', fracoes: [10, 20] },
@@ -137,7 +137,9 @@ export default function CadastrarFerias() {
 
   const handleOpcaoFracao = (idx) => {
     setOpcaoFracao(idx);
-    const novasFracoes = OPCOES_FRACOES[idx].fracoes.map(d => ({ dias: d, data_inicio: '', data_fim: '', data_retorno: '' }));
+    const saldoUtilizavel = periodoSelecionado ? calcularDiasTotal(periodoSelecionado) : DIAS_BASE_PADRAO;
+    const diasOpcao = idx === 0 ? [saldoUtilizavel] : OPCOES_FRACOES[idx].fracoes;
+    const novasFracoes = diasOpcao.map(d => ({ dias: d, data_inicio: '', data_fim: '', data_retorno: '' }));
     setFracoes(novasFracoes);
   };
 
@@ -173,11 +175,16 @@ export default function CadastrarFerias() {
 
   const handlePeriodoChange = (ref) => {
     const periodoExistente = periodosAtivos.find(p => p.ano_referencia === ref);
+    const saldoUtilizavel = periodoExistente ? calcularDiasTotal(periodoExistente) : DIAS_BASE_PADRAO;
     setFormData(prev => ({
       ...prev,
       periodo_aquisitivo_ref: ref,
       periodo_aquisitivo_id: periodoExistente?.id || ''
     }));
+
+    if (!editId && opcaoFracao === 0) {
+      setFracoes([{ dias: saldoUtilizavel, data_inicio: '', data_fim: '', data_retorno: '' }]);
+    }
   };
 
   // Verificar duplicidade de período
@@ -429,6 +436,13 @@ export default function CadastrarFerias() {
                     ))}
                   </div>
                 </FormSection>
+              )}
+
+              {periodoSelecionado && (
+                <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-800">
+                  Saldo utilizável do período: <strong>{calcularDiasTotal(periodoSelecionado)} dias</strong>
+                  <span className="text-xs ml-2">(adquiridos + adicionais - descontados)</span>
+                </div>
               )}
 
               {fracoes.map((f, i) => (
