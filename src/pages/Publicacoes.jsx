@@ -14,6 +14,7 @@ import { buildPublicacoesScopeKey, publicacoesQueryKeys } from '@/lib/publicacoe
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { efetivarDescontoPorPublicacao, TIPO_RP_DISPENSA_DESCONTO_FERIAS, listarDescontosFerias } from '@/services/diasDescontadosFeriasService';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -469,7 +470,30 @@ export default function Publicacoes() {
         return atualizarEscopado('Atestado', id, payloadComAuditoria);
       }
 
-      return atualizarEscopado('PublicacaoExOfficio', id, payloadComAuditoria);
+      const resultado = await atualizarEscopado('PublicacaoExOfficio', id, payloadComAuditoria);
+
+      // Efetivação controlada de Dias Descontados quando a publicação é finalizada
+      if (registroAtual?.tipo === TIPO_RP_DISPENSA_DESCONTO_FERIAS && statusDepois === 'Publicado') {
+        try {
+          const periodoId = registroAtual.periodo_aquisitivo_id || payloadComAuditoria.periodo_aquisitivo_id;
+          if (periodoId) {
+            const [periodo] = await base44.entities.PeriodoAquisitivo.filter({ id: periodoId });
+            if (periodo) {
+              const descontosMilitar = await listarDescontosFerias({ militar_id: registroAtual.militar_id });
+              await efetivarDescontoPorPublicacao({
+                publicacao: { ...registroAtual, ...payloadComAuditoria },
+                periodo,
+                descontosPeriodo: descontosMilitar,
+                usuario: user?.email || user?.full_name || ''
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Falha ao efetivar desconto de férias após publicação:', error);
+        }
+      }
+
+      return resultado;
     },
     onSuccess: refrescarDadosPublicacoes,
     onError: (error) => {

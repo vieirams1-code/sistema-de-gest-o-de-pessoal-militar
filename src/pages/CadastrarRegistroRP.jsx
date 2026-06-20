@@ -1056,8 +1056,17 @@ export default function CadastrarRegistroRP() {
       if ((resultado?.tipo || payload?.tipo_registro || payload?.tipo) === TIPO_RP_DISPENSA_DESCONTO_FERIAS && resultado?.status === 'Publicado') {
         const periodo = periodosAquisitivosMilitar.find((p) => String(p.id) === String(resultado.periodo_aquisitivo_id || payload.periodo_aquisitivo_id));
         if (periodo) {
-          await efetivarDescontoPorPublicacao({ publicacao: resultado, periodo, descontosPeriodo: descontosFeriasMilitar, usuario: user?.email || user?.full_name || '' });
-          sessionStorage.removeItem('sgp:dias-descontados:draft');
+          try {
+            await efetivarDescontoPorPublicacao({
+              publicacao: { ...payload, ...resultado },
+              periodo,
+              descontosPeriodo: descontosFeriasMilitar,
+              usuario: user?.email || user?.full_name || ''
+            });
+            sessionStorage.removeItem('sgp:dias-descontados:draft');
+          } catch (error) {
+            console.error('Falha ao efetivar desconto em férias após salvar RP:', error);
+          }
         }
       }
       await Promise.all([

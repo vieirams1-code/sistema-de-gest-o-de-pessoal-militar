@@ -79,6 +79,7 @@ export default function PeriodosAquisitivos() {
   const registrosLivro = paBundle?.registrosLivro || [];
   const publicacoesExOfficio = paBundle?.publicacoesExOfficio || [];
   const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
+  const diasDescontadosFerias = paBundle?.diasDescontadosFerias || [];
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
 
@@ -555,6 +556,7 @@ export default function PeriodosAquisitivos() {
         periodo={periodoGerenciado}
         registrosLivro={registrosLivro}
         publicacoes={publicacoesExOfficio}
+        diasDescontados={diasDescontadosFerias}
         saving={updatePeriodoMutation.isPending}
         deleting={deletePeriodoMutation.isPending}
         onOpenChange={(open) => {
