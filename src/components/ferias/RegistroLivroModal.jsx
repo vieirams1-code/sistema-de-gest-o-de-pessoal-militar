@@ -33,7 +33,7 @@ import {
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
-import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais, obterDiasDescontados } from '@/components/ferias/periodoSaldoUtils';
+import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais } from '@/components/ferias/periodoSaldoUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import FeriasTagsSection from '@/components/ferias/FeriasTagsSection';
@@ -424,10 +424,9 @@ export default function RegistroLivroModal({
     const baseDiasOriginal = Number(ferias.dias_base ?? ferias.dias ?? 0);
     const periodoSaldo = periodoAquisitivoFerias || ferias;
     const diasAdicionaisPeriodo = obterDiasAdicionais(periodoSaldo);
-    const diasDescontadosPeriodo = obterDiasDescontados(periodoSaldo);
     const saldoUtilizavelPeriodo = periodoAquisitivoFerias
       ? calcularSaldoUtilizavelPeriodo(periodoAquisitivoFerias)
-      : Math.max(0, baseDiasOriginal + diasAdicionaisPeriodo - diasDescontadosPeriodo);
+      : Math.max(0, baseDiasOriginal + diasAdicionaisPeriodo);
     const baseDias = tipoRegistro === 'Saída Férias' ? saldoUtilizavelPeriodo : baseDiasOriginal;
     const creditosSelecionados = (creditosExtra || []).filter((credito) => creditosSelecionadosIds.includes(credito.id));
     const totaisGozo = calcularTotaisGozoComCreditos({
@@ -824,7 +823,7 @@ export default function RegistroLivroModal({
                   </div>
                   <div>
                     <div className="text-cyan-700">Dias disponíveis</div>
-                    <div className="font-semibold">{resumo.diasBase}d + {resumo.diasAdicionaisPeriodo}d - {resumo.diasDescontadosPeriodo}d = {resumo.saldoUtilizavel}d</div>
+                    <div className="font-semibold">{resumo.diasBase}d + {resumo.diasAdicionaisPeriodo}d = {resumo.saldoUtilizavel}d</div>
                     {resumo.diasExtras > 0 && (
                       <div className="text-xs text-cyan-700 mt-1">Créditos vinculados ao gozo: +{resumo.diasExtras}d (total projetado {resumo.dias}d)</div>
                     )}

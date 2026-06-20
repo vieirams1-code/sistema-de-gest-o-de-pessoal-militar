@@ -48,7 +48,6 @@ import {
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata, parseTemplateRenderMetadata, warnIfMissingRenderMetadata } from '@/services/templateRenderMetadata';
-import { efetivarDescontoPorPublicacao, montarTextoDispensaDescontoFerias, TIPO_RP_DISPENSA_DESCONTO_FERIAS } from '@/services/diasDescontadosFeriasService';
 import { getTipoTemplatePublicacaoAtestado } from '@/components/atestado/atestadoTemplateVars';
 import { montarVariaveisTemplateRP } from '@/utils/rp/rpVarsService';
 
@@ -199,7 +198,6 @@ export default function CadastrarRegistroRP() {
   const queryClient = useQueryClient();
   const registroId = searchParams.get('id');
   const isEditing = !!registroId;
-  const isFluxoDiasDescontados = searchParams.get('fluxo') === 'dias_descontados';
 
   const {
     canAccessModule,
@@ -541,26 +539,8 @@ export default function CadastrarRegistroRP() {
       tiposCustom,
       templatesAtivos,
       tipoAtualEdicao: isEditing ? registroEdicao?.tipo_registro || registroEdicao?.tipo : null,
-      incluirGeracaoAutomatica: isFluxoDiasDescontados,
-    }).filter((tipo) => (
-      tipo.value !== TIPO_RP_DISPENSA_DESCONTO_FERIAS
-      || isFluxoDiasDescontados
-      || (isEditing && (registroEdicao?.tipo_registro || registroEdicao?.tipo) === TIPO_RP_DISPENSA_DESCONTO_FERIAS)
-    ));
-  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao, isFluxoDiasDescontados]);
-
-
-
-  const { data: periodosAquisitivosMilitar = [] } = useQuery({
-    queryKey: ['rp-periodos-aquisitivos-militar', formData.militar_id],
-    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
-    enabled: canRunScopedQueries && !!formData.militar_id && formData.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS,
-  });
-  const { data: descontosFeriasMilitar = [] } = useQuery({
-    queryKey: ['rp-dias-descontados-ferias-militar', formData.militar_id],
-    queryFn: () => base44.entities.DiasDescontadosFerias.filter({ militar_id: formData.militar_id }),
-    enabled: canRunScopedQueries && !!formData.militar_id && formData.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS && Boolean(base44?.entities?.DiasDescontadosFerias),
-  });
+    });
+  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao]);
 
   const tiposFiltradosBusca = useMemo(() => {
     return tiposFiltrados.filter(t => matchesTipoRPSearch(t, tipoSearch));
@@ -593,38 +573,6 @@ export default function CadastrarRegistroRP() {
     setSelectedTipo(tipoEncontrado);
     setFormData(prev => ({ ...prev, tipo_registro: tipoEncontrado.value }));
   }, [searchParams, isEditing, selectedTipo, formData.tipo_registro, step, tiposFiltrados]);
-  useEffect(() => {
-    if (!isFluxoDiasDescontados || isEditing) return;
-    const raw = sessionStorage.getItem('sgp:dias-descontados:draft');
-    if (!raw) return;
-    try {
-      const draft = JSON.parse(raw);
-      setFormData((prev) => ({
-        ...prev,
-        militar_id: draft.militar_id || prev.militar_id,
-        militar_nome: draft.militar_nome || prev.militar_nome,
-        militar_posto: draft.militar_posto || prev.militar_posto,
-        militar_matricula: draft.militar_matricula || prev.militar_matricula,
-        tipo_registro: TIPO_RP_DISPENSA_DESCONTO_FERIAS,
-        periodo_aquisitivo_id: draft.periodo_aquisitivo_id || '',
-        periodo_aquisitivo_ref: draft.periodo_aquisitivo_ref || '',
-        dias_descontados: draft.dias_descontados || draft.dias || '',
-        dias: draft.dias || draft.dias_descontados || '',
-        data_dispensa: draft.data_dispensa || '',
-        data_final_dispensa: draft.data_final_dispensa || '',
-        observacoes: draft.observacoes || '',
-        origem_operacional: 'DiasDescontadosFerias',
-        texto_publicacao: montarTextoDispensaDescontoFerias({
-          militar: { posto_graduacao: draft.militar_posto, nome_completo: draft.militar_nome, matricula: draft.militar_matricula },
-          periodoLabel: draft.periodo_aquisitivo_ref,
-          dias: draft.dias || draft.dias_descontados,
-          dataDispensa: draft.data_dispensa,
-        }),
-      }));
-    } catch (error) {
-      console.error('Falha ao carregar rascunho de dias descontados:', error);
-    }
-  }, [isFluxoDiasDescontados, isEditing]);
 
 
   const contextoTemplate = useMemo(() => ({
@@ -809,7 +757,6 @@ export default function CadastrarRegistroRP() {
     if (!templateAtivoSelecionado?.template) return;
     if (!formData.tipo_registro || !moduloAtual) return;
 
-    if (isFluxoDiasDescontados && formData.tipo_registro === TIPO_RP_DISPENSA_DESCONTO_FERIAS && formData.texto_publicacao) return;
     if (textoEditadoManualmente && formData.texto_publicacao) return;
 
     // Se for DOEMS, não aplicar template (o texto é manual ou colado)
@@ -1053,22 +1000,6 @@ export default function CadastrarRegistroRP() {
     },
     onSuccess: async (resultado, payload) => {
       const refIdApostila = String(resultado?.publicacao_referencia_id || payload?.publicacao_referencia_id || '').trim();
-      if ((resultado?.tipo || payload?.tipo_registro || payload?.tipo) === TIPO_RP_DISPENSA_DESCONTO_FERIAS && resultado?.status === 'Publicado') {
-        const periodo = periodosAquisitivosMilitar.find((p) => String(p.id) === String(resultado.periodo_aquisitivo_id || payload.periodo_aquisitivo_id));
-        if (periodo) {
-          try {
-            await efetivarDescontoPorPublicacao({
-              publicacao: { ...payload, ...resultado },
-              periodo,
-              descontosPeriodo: descontosFeriasMilitar,
-              usuario: user?.email || user?.full_name || ''
-            });
-            sessionStorage.removeItem('sgp:dias-descontados:draft');
-          } catch (error) {
-            console.error('Falha ao efetivar desconto em férias após salvar RP:', error);
-          }
-        }
-      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] }),
         queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
@@ -1503,8 +1434,6 @@ export default function CadastrarRegistroRP() {
                   todasPublicacoesFormatadas={publicacoesMilitar}
                   publicacoesElegiveis={publicacoesMilitar}
                   formatarDataExtenso={formatarDataExtenso}
-                  periodosAquisitivosMilitar={periodosAquisitivosMilitar}
-                  descontosFeriasMilitar={descontosFeriasMilitar}
                 />
               )}
 
