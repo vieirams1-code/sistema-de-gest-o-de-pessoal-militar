@@ -67,6 +67,8 @@ export function obterDiasAdicionais(periodo = {}) {
 }
 
 export function obterDiasDescontados(periodo = {}) {
+  // Somente descontos ativos/publicados devem reduzir saldo.
+  // Assume-se que o campo dias_descontados no PeriodoAquisitivo já é atualizado somente para descontos ativos pelo service.
   return Math.max(0, toNumber(periodo?.dias_descontados, 0));
 }
 

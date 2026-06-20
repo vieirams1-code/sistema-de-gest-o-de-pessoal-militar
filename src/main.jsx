@@ -28,6 +28,7 @@ import {
   Tag,
   MilitarTag,
   FeriasTag,
+  DiasDescontadosFerias,
   ConferenciaMilitar,
   ItemConferenciaMilitar,
 } from '@/api/entities'
@@ -39,6 +40,7 @@ void ImportacaoAlteracoesLegado;
 void PunicaoDisciplinar;
 void ImpedimentoMedalha;
 void CreditoExtraFerias;
+void DiasDescontadosFerias;
 void HistoricoPromocaoMilitarV2;
 void Promocao;
 void PromocaoMilitar;

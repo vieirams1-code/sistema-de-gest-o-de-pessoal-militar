@@ -14,6 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { AlertCircle } from 'lucide-react';
+import { isDescontoAtivo } from '@/services/diasDescontadosFeriasService';
 
 const STATUS_OPTIONS = [
   'Pendente',
@@ -107,7 +109,7 @@ function publicacaoDoPeriodo(publicacao = {}, { periodoId, periodoRef, militarId
   return Boolean(matchPeriodo || matchFerias || matchRegistro || matchRef);
 }
 
-function getVinculosResumo(periodo, registrosLivro = [], publicacoes = []) {
+function getVinculosResumo(periodo, registrosLivro = [], publicacoes = [], diasDescontados = []) {
   const periodoId = normalizarTexto(periodo?.id);
   const periodoRef = normalizarTexto(periodo?.referencia);
   const militarId = normalizarTexto(periodo?.militar_id || periodo?.raw?.militar_id);
@@ -127,6 +129,10 @@ function getVinculosResumo(periodo, registrosLivro = [], publicacoes = []) {
     publicacaoDoPeriodo(publicacao, { periodoId, periodoRef, militarId, feriasIds, registroLivroIds })
   );
   const publicacaoVinculada = publicacoesDoPeriodo.length > 0;
+
+  const descontosAtivos = (diasDescontados || []).filter((d) => normalizarTexto(d.periodo_aquisitivo_id) === periodoId && isDescontoAtivo(d));
+  const possuiDescontosAtivos = descontosAtivos.length > 0;
+
   const vinculoAdministrativo = Boolean(
     periodo?.raw?.transicao_designacao_lote_id ||
     periodo?.raw?.transicao_designacao_contrato_id ||
@@ -135,7 +141,7 @@ function getVinculosResumo(periodo, registrosLivro = [], publicacoes = []) {
     periodo?.raw?.excluido_da_cadeia_designacao
   );
 
-  const bloqueioAdministrativo = livroVinculado || publicacaoVinculada || cadeiaAdministrativa || vinculoAdministrativo;
+  const bloqueioAdministrativo = livroVinculado || publicacaoVinculada || cadeiaAdministrativa || vinculoAdministrativo || possuiDescontosAtivos;
   const estado = bloqueioAdministrativo
     ? ESTADO_SEGURANCA.BLOQUEIO_TOTAL
     : feriasVinculadas || usoOperacional
@@ -150,6 +156,7 @@ function getVinculosResumo(periodo, registrosLivro = [], publicacoes = []) {
     publicacaoVinculada,
     cadeiaAdministrativa,
     vinculoAdministrativo,
+    possuiDescontosAtivos,
     registrosLivroCount: registrosDoPeriodo.length,
     publicacoesCount: publicacoesDoPeriodo.length,
   };
@@ -159,6 +166,7 @@ export default function GerenciarPeriodoModal({
   periodo,
   registrosLivro,
   publicacoes,
+  diasDescontados = [],
   saving,
   deleting,
   onOpenChange,
@@ -194,8 +202,8 @@ export default function GerenciarPeriodoModal({
   }, [periodo]);
 
   const vinculos = useMemo(
-    () => getVinculosResumo(periodo, registrosLivro, publicacoes),
-    [periodo, registrosLivro, publicacoes]
+    () => getVinculosResumo(periodo, registrosLivro, publicacoes, diasDescontados),
+    [periodo, registrosLivro, publicacoes, diasDescontados]
   );
 
   const hasManagementPermission = canEdit || canChangeStatus || canDelete;
@@ -211,6 +219,7 @@ export default function GerenciarPeriodoModal({
     if (vinculos.cadeiaAdministrativa) motivos.push('cadeia administrativa de férias');
     if (vinculos.vinculoAdministrativo) motivos.push('vínculo administrativo');
     if (vinculos.usoOperacional) motivos.push('uso operacional do período');
+    if (vinculos.possuiDescontosAtivos) motivos.push('descontos em férias ativos');
     return motivos;
   }, [vinculos]);
 
@@ -321,6 +330,15 @@ export default function GerenciarPeriodoModal({
               <Alert className="border-slate-200 bg-slate-50">
                 <AlertDescription className="text-slate-700">
                   Você pode consultar este período, mas não possui permissão para editar, alterar status ou excluir.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {periodo?.raw?.dias_descontados > 0 && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  Este período possui <strong>{periodo.raw.dias_descontados} dia(s) descontados</strong> ativos, que reduzem o saldo total.
                 </AlertDescription>
               </Alert>
             )}

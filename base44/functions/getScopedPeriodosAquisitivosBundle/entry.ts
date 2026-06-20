@@ -138,10 +138,10 @@ Deno.serve(async (req) => {
     const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
     const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
     const criteriosAplicados = new Set(); const warnings = [];
-    let periodosAquisitivos = []; let militares = []; let matriculasMilitar = []; let ferias = []; let registrosLivro = []; let publicacoesExOfficio = []; let contratosDesignacaoMilitar = []; let partialFailures = 0; let totalMilitaresEscopo = null;
+    let periodosAquisitivos = []; let militares = []; let matriculasMilitar = []; let ferias = []; let registrosLivro = []; let publicacoesExOfficio = []; let contratosDesignacaoMilitar = []; let diasDescontadosFerias = []; let partialFailures = 0; let totalMilitaresEscopo = null;
     if (targetIsAdmin) {
       criteriosAplicados.add('admin');
-      const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]=await Promise.allSettled([
+      const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ddfRes]=await Promise.allSettled([
         fetchWithRetry(() => base44.asServiceRole.entities.PeriodoAquisitivo.list('-inicio_aquisitivo'),'periodos.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.Militar.list(),'militares.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.MatriculaMilitar.list('-created_date'),'matriculas.admin'),
@@ -149,8 +149,9 @@ Deno.serve(async (req) => {
         fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(),'registros.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.PublicacaoExOfficio.list('-created_date'),'publicacoesExOfficio.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.ContratoDesignacaoMilitar.list('-data_inicio_contrato'),'contratosDesignacaoMilitar.admin'),
+        fetchWithRetry(() => base44.asServiceRole.entities.DiasDescontadosFerias.list('-data_desconto'),'diasDescontados.admin'),
       ]);
-      for (const r of [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]) if (r.status === 'rejected') partialFailures += 1;
+      for (const r of [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ddfRes]) if (r.status === 'rejected') partialFailures += 1;
       periodosAquisitivos = paRes.status === 'fulfilled' ? (paRes.value || []) : [];
       militares = mRes.status === 'fulfilled' ? (mRes.value || []) : [];
       matriculasMilitar = matRes.status === 'fulfilled' ? (matRes.value || []) : [];
@@ -158,17 +159,18 @@ Deno.serve(async (req) => {
       registrosLivro = rRes.status === 'fulfilled' ? (rRes.value || []) : [];
       publicacoesExOfficio = pubRes.status === 'fulfilled' ? (pubRes.value || []) : [];
       contratosDesignacaoMilitar = cdmRes.status === 'fulfilled' ? (cdmRes.value || []) : [];
+      diasDescontadosFerias = ddfRes.status === 'fulfilled' ? (ddfRes.value || []) : [];
     } else {
       const militarIds = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos, criteriosAplicados);
       if (!militarIds || militarIds.length === 0) { warnings.push('SEM_ESCOPO'); totalMilitaresEscopo = 0; }
       else {
         totalMilitaresEscopo = militarIds.length;
-        const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]=await Promise.all([
-          listarPorEscopoIds(base44,'PeriodoAquisitivo',militarIds,'-inicio_aquisitivo'), listarMilitaresPorIds(base44,militarIds), listarPorEscopoIds(base44,'MatriculaMilitar',militarIds,'-created_date'), listarPorEscopoIds(base44,'Ferias',militarIds,'-data_inicio'), listarPorEscopoIds(base44,'RegistroLivro',militarIds,undefined), listarPorEscopoIds(base44,'PublicacaoExOfficio',militarIds,'-created_date'), listarPorEscopoIds(base44,'ContratoDesignacaoMilitar',militarIds,'-data_inicio_contrato')
+        const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ddfRes]=await Promise.all([
+          listarPorEscopoIds(base44,'PeriodoAquisitivo',militarIds,'-inicio_aquisitivo'), listarMilitaresPorIds(base44,militarIds), listarPorEscopoIds(base44,'MatriculaMilitar',militarIds,'-created_date'), listarPorEscopoIds(base44,'Ferias',militarIds,'-data_inicio'), listarPorEscopoIds(base44,'RegistroLivro',militarIds,undefined), listarPorEscopoIds(base44,'PublicacaoExOfficio',militarIds,'-created_date'), listarPorEscopoIds(base44,'ContratoDesignacaoMilitar',militarIds,'-data_inicio_contrato'), listarPorEscopoIds(base44,'DiasDescontadosFerias',militarIds,'-data_desconto')
         ]);
-        periodosAquisitivos=paRes.rows; militares=mRes.rows; matriculasMilitar=matRes.rows; ferias=fRes.rows; registrosLivro=rRes.rows; publicacoesExOfficio=pubRes.rows; contratosDesignacaoMilitar=cdmRes.rows;
+        periodosAquisitivos=paRes.rows; militares=mRes.rows; matriculasMilitar=matRes.rows; ferias=fRes.rows; registrosLivro=rRes.rows; publicacoesExOfficio=pubRes.rows; contratosDesignacaoMilitar=cdmRes.rows; diasDescontadosFerias=ddfRes.rows;
         if (militarIds.length > 0 && periodosAquisitivos.length > 0 && militares.length === 0) warnings.push('MILITARES_ESCOPO_NAO_CARREGADOS');
-        partialFailures = paRes.partialFailures+mRes.partialFailures+matRes.partialFailures+fRes.partialFailures+rRes.partialFailures+pubRes.partialFailures+cdmRes.partialFailures;
+        partialFailures = paRes.partialFailures+mRes.partialFailures+matRes.partialFailures+fRes.partialFailures+rRes.partialFailures+pubRes.partialFailures+cdmRes.partialFailures+ddfRes.partialFailures;
       }
     }
     const militaresIdsSet = new Set((militares||[]).map((m)=>String(m?.id||'')));
@@ -177,7 +179,7 @@ Deno.serve(async (req) => {
     if (partialFailures>0) warnings.push('PARTIAL_FAILURES');
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const counters = (periodosAquisitivos||[]).reduce((acc,periodo)=>{ const r=getPeriodoResumoStatus(periodo,hoje); acc.total+=1; if(r.isDisponivel)acc.disponiveis+=1; if(r.isVencendo)acc.vencendo90d+=1; if(r.isVencido)acc.vencidos+=1; return acc; }, { total:0, disponiveis:0, vencendo90d:0, vencidos:0 });
-    return Response.json({ periodosAquisitivos,militares,matriculasMilitar,ferias,registrosLivro,publicacoesExOfficio,contratosDesignacaoMilitar,counters,meta:{ isAdmin: targetIsAdmin, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings }});
+    return Response.json({ periodosAquisitivos,militares,matriculasMilitar,ferias,registrosLivro,publicacoesExOfficio,contratosDesignacaoMilitar,diasDescontadosFerias,counters,meta:{ isAdmin: targetIsAdmin, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings }});
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     return Response.json({ error: error?.message || 'Erro ao carregar bundle de períodos aquisitivos.', meta: { status } }, { status });
