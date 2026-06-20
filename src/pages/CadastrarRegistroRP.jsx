@@ -48,6 +48,7 @@ import {
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata, parseTemplateRenderMetadata, warnIfMissingRenderMetadata } from '@/services/templateRenderMetadata';
+import { TIPO_RP_DISPENSA_DESCONTO_FERIAS } from '@/services/diasDescontadosFeriasService';
 import { getTipoTemplatePublicacaoAtestado } from '@/components/atestado/atestadoTemplateVars';
 import { montarVariaveisTemplateRP } from '@/utils/rp/rpVarsService';
 
@@ -539,7 +540,10 @@ export default function CadastrarRegistroRP() {
       tiposCustom,
       templatesAtivos,
       tipoAtualEdicao: isEditing ? registroEdicao?.tipo_registro || registroEdicao?.tipo : null,
-    });
+    }).filter((tipo) => (
+      tipo.value !== TIPO_RP_DISPENSA_DESCONTO_FERIAS
+      || (isEditing && (registroEdicao?.tipo_registro || registroEdicao?.tipo) === TIPO_RP_DISPENSA_DESCONTO_FERIAS)
+    ));
   }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao]);
 
   const tiposFiltradosBusca = useMemo(() => {
