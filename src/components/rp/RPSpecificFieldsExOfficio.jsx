@@ -53,14 +53,10 @@ export default function RPSpecificFieldsExOfficio({
               </Select>
             </div>
             <FormField label="Quantidade de dias descontados" name="dias_descontados" value={formData.dias_descontados} onChange={handleChange} type="number" required />
-            <FormField label="Data da dispensa" name="data_dispensa" value={formData.data_dispensa} onChange={handleChange} type="date" required />
+            <FormField label="Data inicial da dispensa" name="data_dispensa" value={formData.data_dispensa} onChange={handleChange} type="date" required />
             <div>
-              <Label>Data final calculada</Label>
+              <Label>Data final da dispensa</Label>
               <Input className="mt-1.5 bg-slate-50" readOnly value={calcularDataFinalDispensa(formData.data_dispensa, formData.dias_descontados || formData.dias) || '—'} />
-            </div>
-            <div>
-              <Label>Fundamentação</Label>
-              <Textarea value={formData.fundamentacao || ''} onChange={(e) => handleChange('fundamentacao', e.target.value)} className="mt-1.5" rows={3} placeholder="Processo administrativo, norma ou despacho de referência" />
             </div>
           </div>
           {formData.periodo_aquisitivo_id && (() => {

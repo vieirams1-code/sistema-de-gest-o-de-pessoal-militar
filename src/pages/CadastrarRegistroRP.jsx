@@ -612,7 +612,6 @@ export default function CadastrarRegistroRP() {
         dias: draft.dias || draft.dias_descontados || '',
         data_dispensa: draft.data_dispensa || '',
         data_final_dispensa: draft.data_final_dispensa || '',
-        fundamentacao: draft.fundamentacao || '',
         observacoes: draft.observacoes || '',
         origem_operacional: 'DiasDescontadosFerias',
         texto_publicacao: montarTextoDispensaDescontoFerias({
@@ -620,7 +619,6 @@ export default function CadastrarRegistroRP() {
           periodoLabel: draft.periodo_aquisitivo_ref,
           dias: draft.dias || draft.dias_descontados,
           dataDispensa: draft.data_dispensa,
-          fundamentacao: draft.fundamentacao,
         }),
       }));
     } catch (error) {
