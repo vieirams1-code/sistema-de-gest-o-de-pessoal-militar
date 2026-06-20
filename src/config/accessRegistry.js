@@ -643,6 +643,7 @@ const atestados = {
       { check: "canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso')", effect: 'canGerirJiso; AccessDenied se falso' },
       { check: 'validarEscopoMilitar(militar_id)', effect: 'Bloqueia salvar fora do escopo' },
       { check: 'HARDENING P1.4-B.7', effect: 'Substituição de chamadas diretas a JISO por criarEscopado/atualizarEscopado (pioneiro no uso de cudEscopado para esta entidade); adição de rechecagem defensiva de canGerirJiso no handleSubmit; mapeamento preventivo de exclusão por gerir_jiso no backend.' },
+      { check: 'HARDENING P1.4-C.4', effect: 'Validação de escopo organizacional (podeAgirSobre) pré-renderização para impedir acesso direto por ID (IDOR) a registros de militares fora do escopo.' },
     ],
     'pages/ExtratoAtestadosMedicos.jsx': [
       { check: "canAccessModule('atestados')", effect: 'VALIDADO P1.1-C: hasAccess; AccessDenied("Atestados") se falso (linha 157/534)' },
@@ -662,6 +663,7 @@ const atestados = {
     'pages/VerAtestado.jsx': [
       { check: "canAccessAction('ver_dados_sensiveis_atestado')", effect: 'APLICADO P1.4-B.2: Mascaramento completo de CID-10, diagnóstico, pareceres, histórico clínico, notas e anexos.' },
       { check: "canAccessAction('editar_atestados')", effect: 'Exibe botão Editar' },
+      { check: 'HARDENING P1.4-C.4', effect: 'Validação de escopo organizacional (podeAgirSobre) pós-carregamento para impedir acesso direto por ID (IDOR) a registros de militares fora do escopo.' },
     ],
   },
   services: [
