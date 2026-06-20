@@ -16,7 +16,27 @@ export function getPeriodoRef(periodo = {}) {
 
 export function getDiasAdquiridos(periodo = {}) { return n(periodo.dias_adquiridos ?? periodo.dias_direito ?? periodo.dias ?? 30); }
 export function getDiasAdicionais(periodo = {}) { return n(periodo.dias_adicionais ?? periodo.dias_credito_extra ?? periodo.creditos_extra ?? 0); }
-export function getSaldoPeriodo(periodo = {}) { return n(periodo.saldo_disponivel ?? periodo.saldo_atual ?? periodo.saldo ?? (getDiasAdquiridos(periodo) + getDiasAdicionais(periodo))); }
+export function getSaldoPeriodo(periodo = {}) { return n(periodo.saldo_disponivel ?? periodo.saldo_atual ?? periodo.saldo ?? periodo.dias_saldo ?? (getDiasAdquiridos(periodo) + getDiasAdicionais(periodo))); }
+
+export function calcularDataFinalDispensa(dataInicial = '', dias = 0) {
+  if (!dataInicial || n(dias) <= 0) return '';
+  const data = new Date(`${dataInicial}T00:00:00`);
+  if (Number.isNaN(data.getTime())) return '';
+  data.setDate(data.getDate() + n(dias) - 1);
+  return data.toISOString().slice(0, 10);
+}
+
+export function periodoDisponivelParaDesconto(periodo = {}, descontos = []) {
+  const status = String(periodo.status || periodo.situacao || '').toLowerCase();
+  if (['encerrado', 'encerrada', 'cancelado', 'cancelada', 'totalmente_usufruido', 'totalmente usufruído', 'usufruido', 'usufruído'].includes(status)) return false;
+  return calcularResumoDescontoPeriodo(periodo, descontos).disponivelParaDesconto > 0;
+}
+
+function getDiasDescontadosEntity() {
+  const entity = base44?.entities?.DiasDescontadosFerias;
+  if (!entity) throw new Error('Entidade DiasDescontadosFerias indisponível. Publique/sincronize o schema no Base44 antes de usar este fluxo.');
+  return entity;
+}
 
 export function somarDescontosAtivos(descontos = [], periodoId) {
   return (descontos || []).filter((d) => isDescontoAtivo(d) && (!periodoId || id(d.periodo_aquisitivo_id) === id(periodoId))).reduce((t, d) => t + n(d.dias_descontados), 0);
@@ -39,9 +59,10 @@ export function validarNovoDesconto({ periodo, descontos = [], dias }) {
 }
 
 export async function listarDescontosFerias(filtros = {}) {
-  if (filtros.publicacao_id) return base44.entities.DiasDescontadosFerias.filter({ publicacao_id: filtros.publicacao_id });
-  if (filtros.militar_id) return base44.entities.DiasDescontadosFerias.filter({ militar_id: filtros.militar_id });
-  return base44.entities.DiasDescontadosFerias.list('-data_desconto');
+  const entity = getDiasDescontadosEntity();
+  if (filtros.publicacao_id) return entity.filter({ publicacao_id: filtros.publicacao_id });
+  if (filtros.militar_id) return entity.filter({ militar_id: filtros.militar_id });
+  return entity.list('-data_desconto');
 }
 
 async function buscarPublicacaoVinculada(desconto) {

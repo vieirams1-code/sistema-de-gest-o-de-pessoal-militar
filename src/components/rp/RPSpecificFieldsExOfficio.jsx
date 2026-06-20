@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import FormField from '@/components/militar/FormField';
-import { calcularResumoDescontoPeriodo, getPeriodoRef, TIPO_RP_DISPENSA_DESCONTO_FERIAS } from '@/services/diasDescontadosFeriasService';
+import { calcularDataFinalDispensa, calcularResumoDescontoPeriodo, getPeriodoRef, periodoDisponivelParaDesconto, TIPO_RP_DISPENSA_DESCONTO_FERIAS } from '@/services/diasDescontadosFeriasService';
 
 export default function RPSpecificFieldsExOfficio({
   tipoRegistro,
@@ -41,7 +41,7 @@ export default function RPSpecificFieldsExOfficio({
               >
                 <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o período" /></SelectTrigger>
                 <SelectContent>
-                  {periodosAquisitivosMilitar.map((periodo) => {
+                  {periodosAquisitivosMilitar.filter((periodo) => periodoDisponivelParaDesconto(periodo, descontosFeriasMilitar) || String(periodo.id) === String(formData.periodo_aquisitivo_id)).map((periodo) => {
                     const resumo = calcularResumoDescontoPeriodo(periodo, descontosFeriasMilitar);
                     return (
                       <SelectItem key={periodo.id} value={periodo.id}>
@@ -54,6 +54,10 @@ export default function RPSpecificFieldsExOfficio({
             </div>
             <FormField label="Quantidade de dias descontados" name="dias_descontados" value={formData.dias_descontados} onChange={handleChange} type="number" required />
             <FormField label="Data da dispensa" name="data_dispensa" value={formData.data_dispensa} onChange={handleChange} type="date" required />
+            <div>
+              <Label>Data final calculada</Label>
+              <Input className="mt-1.5 bg-slate-50" readOnly value={calcularDataFinalDispensa(formData.data_dispensa, formData.dias_descontados || formData.dias) || '—'} />
+            </div>
             <div>
               <Label>Fundamentação</Label>
               <Textarea value={formData.fundamentacao || ''} onChange={(e) => handleChange('fundamentacao', e.target.value)} className="mt-1.5" rows={3} placeholder="Processo administrativo, norma ou despacho de referência" />
