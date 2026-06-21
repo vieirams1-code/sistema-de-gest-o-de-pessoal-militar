@@ -4,8 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import FormField from '@/components/militar/FormField';
-import { calcularDataFinalDispensa, calcularResumoDescontoPeriodo, getPeriodoRef, periodoDisponivelParaDesconto, TIPO_RP_DISPENSA_DESCONTO_FERIAS } from '@/services/diasDescontadosFeriasService';
-
 export default function RPSpecificFieldsExOfficio({
   tipoRegistro,
   formData,
@@ -23,53 +21,6 @@ export default function RPSpecificFieldsExOfficio({
   const publicacoesDisponiveis = publicacoesElegiveis || todasPublicacoesFormatadas.filter(p => p.numero_bg && p.data_bg);
 
   switch (tipoRegistro) {
-
-    case TIPO_RP_DISPENSA_DESCONTO_FERIAS:
-      return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Período aquisitivo afetado</Label>
-              <Select
-                value={formData.periodo_aquisitivo_id || ''}
-                onValueChange={(value) => {
-                  const periodo = periodosAquisitivosMilitar.find((p) => String(p.id) === String(value));
-                  handleChange('periodo_aquisitivo_id', value);
-                  handleChange('periodo_aquisitivo_ref', getPeriodoRef(periodo));
-                }}
-              >
-                <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o período" /></SelectTrigger>
-                <SelectContent>
-                  {periodosAquisitivosMilitar.filter((periodo) => periodoDisponivelParaDesconto(periodo, descontosFeriasMilitar) || String(periodo.id) === String(formData.periodo_aquisitivo_id)).map((periodo) => {
-                    const resumo = calcularResumoDescontoPeriodo(periodo, descontosFeriasMilitar);
-                    return (
-                      <SelectItem key={periodo.id} value={periodo.id}>
-                        {resumo.periodo} • Saldo {resumo.saldoAtual} • Descontados {resumo.diasDescontados} • Disponível {resumo.disponivelParaDesconto}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            <FormField label="Quantidade de dias descontados" name="dias_descontados" value={formData.dias_descontados} onChange={handleChange} type="number" required />
-            <FormField label="Data inicial da dispensa" name="data_dispensa" value={formData.data_dispensa} onChange={handleChange} type="date" required />
-            <div>
-              <Label>Data final da dispensa</Label>
-              <Input className="mt-1.5 bg-slate-50" readOnly value={calcularDataFinalDispensa(formData.data_dispensa, formData.dias_descontados || formData.dias) || '—'} />
-            </div>
-          </div>
-          {formData.periodo_aquisitivo_id && (() => {
-            const periodo = periodosAquisitivosMilitar.find((p) => String(p.id) === String(formData.periodo_aquisitivo_id));
-            const resumo = calcularResumoDescontoPeriodo(periodo, descontosFeriasMilitar);
-            return (
-              <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-                Período: <b>{resumo.periodo}</b> • Saldo atual: <b>{resumo.saldoAtual}</b> • Dias já descontados: <b>{resumo.diasDescontados}</b> • Ainda disponível para desconto: <b>{resumo.disponivelParaDesconto}</b>
-              </div>
-            );
-          })()}
-        </div>
-      );
 
     case 'Elogio Individual':
       return (

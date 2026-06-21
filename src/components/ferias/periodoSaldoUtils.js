@@ -66,18 +66,11 @@ export function obterDiasAdicionais(periodo = {}) {
   return Math.max(0, toNumber(periodo?.dias_adicionais ?? periodo?.dias_credito_extra ?? periodo?.creditos_extra, 0));
 }
 
-export function obterDiasDescontados(periodo = {}) {
-  // Somente descontos ativos/publicados devem reduzir saldo.
-  // Assume-se que o campo dias_descontados no PeriodoAquisitivo já é atualizado somente para descontos ativos pelo service.
-  return Math.max(0, toNumber(periodo?.dias_descontados, 0));
-}
-
 export function calcularSaldoUtilizavelPeriodo(periodo = {}) {
   const base = obterDiasBase(periodo);
   const adicionais = obterDiasAdicionais(periodo);
-  const descontados = obterDiasDescontados(periodo);
 
-  return Math.max(0, base + adicionais - descontados);
+  return Math.max(0, base + adicionais);
 }
 
 export function calcularDiasTotal(periodo = {}) {
@@ -122,7 +115,6 @@ export function recalcularSaldoPeriodo(periodo = {}, ferias = [], options = {}) 
   const dias_base = obterDiasBase(periodo);
   const dias_total = calcularDiasTotal(periodo);
   const dias_adicionais = obterDiasAdicionais(periodo);
-  const dias_descontados = obterDiasDescontados(periodo);
   const dias_gozados = calcularDiasGozados(periodo, ferias, options);
   const dias_previstos = calcularDiasPrevistos(periodo, ferias, options);
   const dias_saldo = calcularDiasSaldo(periodo, ferias, options);
@@ -131,7 +123,6 @@ export function recalcularSaldoPeriodo(periodo = {}, ferias = [], options = {}) 
     dias_base,
     dias_total,
     dias_adicionais,
-    dias_descontados,
     dias_gozados,
     dias_previstos,
     dias_saldo,
@@ -160,7 +151,7 @@ export function validarDiasNoSaldoPeriodo({ periodo = {}, ferias = [], quantidad
     return {
       ok: false,
       mensagem:
-        `Quantidade de dias informada (${qtd}d) ultrapassa o saldo utilizável do período (${Math.max(0, dias_total_projetado - dias_gozados - dias_previstos)}d), já considerando dias adicionais e dias descontados.`,
+        `Quantidade de dias informada (${qtd}d) ultrapassa o saldo utilizável do período (${Math.max(0, dias_total_projetado - dias_gozados - dias_previstos)}d), já considerando dias adicionais.`,
     };
   }
 

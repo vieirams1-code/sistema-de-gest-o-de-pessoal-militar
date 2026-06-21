@@ -63,18 +63,6 @@ export const RP_TIPOS_BASE = [
   },
 
 
-  {
-    value: 'Dispensa com Desconto em Férias',
-    label: 'Dispensa com Desconto em Férias',
-    grupo: 'Férias',
-    modulo: MODULO_EX_OFFICIO,
-    sexo: null,
-    descricao: 'Publicação RP que gera automaticamente desconto no período aquisitivo de férias.',
-    palavrasChave: ['dispensa', 'desconto', 'ferias'],
-    destaque: true,
-    geracaoAutomatica: true,
-  },
-
   // LICENÇAS
   {
     value: 'Licença Maternidade',
@@ -453,7 +441,7 @@ export function getTiposRPFiltrados({
 
   // 2. Tipos customizados (ambos os módulos)
   tiposCustom.forEach((t) => {
-    if (!t?.nome || t.nome === 'Dispensa com Desconto em Férias' || t.nome === 'Dispensa Desconto Férias') return;
+    if (!t?.nome) return;
     mergeTipoMaps(map, {
       value: t.nome,
       label: t.nome,
@@ -469,7 +457,7 @@ export function getTiposRPFiltrados({
   // 3. Templates ativos de ambos os módulos
   templatesAtivos
     .forEach((tmpl) => {
-      if (!tmpl?.tipo_registro || tmpl.tipo_registro === 'Dispensa com Desconto em Férias' || tmpl.tipo_registro === 'Dispensa Desconto Férias') return;
+      if (!tmpl?.tipo_registro) return;
       const moduloTemplate = getTemplateAtivoPorTipo(tmpl.tipo_registro, tmpl.modulo, templatesAtivos)?.modulo;
       if (!moduloTemplate) return;
       mergeTipoMaps(map, {
