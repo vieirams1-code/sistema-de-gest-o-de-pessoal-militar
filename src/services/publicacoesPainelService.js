@@ -58,19 +58,29 @@ export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }
   return expandirMilitarIdsComMesclados(militarIdsEscopo);
 }
 
-export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }) {
+export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail }) {
   if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
 
   const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
-  if (!militarIds?.length) return [];
 
-  const registros = await listarPorMilitarIdsComFallbackInOperator({
-    entidade: base44.entities.PublicacaoExOfficio,
-    militarIds,
-    ordem: '-created_date',
-  });
+  const registrosEscopo = militarIds?.length
+    ? await listarPorMilitarIdsComFallbackInOperator({
+        entidade: base44.entities.PublicacaoExOfficio,
+        militarIds,
+        ordem: '-created_date',
+      })
+    : [];
 
-  return deduplicarOrdenarPorCreatedDate(registros);
+  // Publicações originadas por fluxo operacional/gateway pertencem ao autor,
+  // mesmo que o militar esteja fora do escopo: o criador deve sempre enxergá-las.
+  const emailNormalizado = String(effectiveEmail || '').trim().toLowerCase();
+  const registrosDoAutor = emailNormalizado
+    ? await base44.entities.PublicacaoExOfficio
+        .filter({ criado_por_email: emailNormalizado }, '-created_date')
+        .catch(() => [])
+    : [];
+
+  return deduplicarOrdenarPorCreatedDate([...registrosEscopo, ...registrosDoAutor]);
 }
 
 export async function listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }) {

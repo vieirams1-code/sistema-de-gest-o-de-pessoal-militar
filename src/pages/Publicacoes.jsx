@@ -394,7 +394,7 @@ export default function Publicacoes() {
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
     queryKey: publicacoesExOfficioQueryKey,
-    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
+    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 

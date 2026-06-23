@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
       data_bg: dataBg,
       status: statusPublicacao,
       observacoes,
+      criado_por_email: normalizeEmail(authUser.email),
     });
 
     // ---- 2) Criar DescontoFerias vinculado (idempotente por publicacao_id) ----
