@@ -955,6 +955,139 @@ function obterResumo(linhas) {
   return resumo;
 }
 
+async function carregarMatriculasExistentes(militaresExistentes) {
+  const matriculasLegadas = new Set((militaresExistentes || []).map((m) => normalizarMatricula(m?.matricula)).filter(Boolean));
+  const matriculaEntity = getMigracaoClient().entities.MatriculaMilitar;
+  const matriculasHistoricas = matriculaEntity?.list
+    ? new Set((await matriculaEntity.list()).map((m) => normalizarMatricula(m?.matricula_normalizada || m?.matricula)).filter(Boolean))
+    : new Set();
+
+  return new Set([...matriculasLegadas, ...matriculasHistoricas]);
+}
+
+function mapearMilitarPayload(cells, headerMap, alertas, erros) {
+  const matricula = formatarMatricula(valorLinha(cells, headerMap, 'matricula'), alertas, erros);
+  const posto_graduacao = mapPostoGraduacao(valorLinha(cells, headerMap, 'posto_graduacao'), erros);
+  const quadro = mapQuadro(valorLinha(cells, headerMap, 'quadro'), posto_graduacao, alertas);
+  const data_inclusao = formatarData(valorLinha(cells, headerMap, 'data_inclusao'), {
+    obrigatoria: true,
+    mensagemErro: 'Data de inclusão inválida ou ausente. Linha bloqueada para importação.',
+    alertas,
+    erros,
+  });
+
+  return {
+    nome_completo: valorLinha(cells, headerMap, 'nome_completo'),
+    nome_guerra: valorLinha(cells, headerMap, 'nome_guerra'),
+    status_cadastro: 'Ativo',
+    situacao_militar: 'Ativa',
+    funcao: '',
+    lotacao: '',
+    condicao: '',
+    destino: '',
+    matricula,
+    subgrupamento_id: '',
+    subgrupamento_nome: '',
+    posto_graduacao,
+    quadro,
+    data_inclusao,
+    comportamento: 'Bom',
+    data_nascimento: formatarData(valorLinha(cells, headerMap, 'data_nascimento'), { alertas, erros, mensagemAlerta: 'Data de nascimento inválida no sistema antigo. Campo deixado em branco para revisão.' }),
+    sexo: valorLinha(cells, headerMap, 'sexo'),
+    estado_civil: valorLinha(cells, headerMap, 'estado_civil'),
+    tipo_sanguineo: valorLinha(cells, headerMap, 'tipo_sanguineo'),
+    religiao: valorLinha(cells, headerMap, 'religiao'),
+    escolaridade: mapEscolaridade(valorLinha(cells, headerMap, 'escolaridade'), alertas),
+    curso_superior: valorLinha(cells, headerMap, 'curso_superior'),
+    pos_graduacao: [],
+    mestrado: valorLinha(cells, headerMap, 'mestrado'),
+    doutorado: valorLinha(cells, headerMap, 'doutorado'),
+    naturalidade: valorLinha(cells, headerMap, 'naturalidade'),
+    naturalidade_uf: formatarUF(valorLinha(cells, headerMap, 'naturalidade_uf'), alertas, 'UF inválida no sistema antigo. Campo deixado em branco para revisão.'),
+    nome_pai: valorLinha(cells, headerMap, 'nome_pai'),
+    nome_mae: valorLinha(cells, headerMap, 'nome_mae'),
+    rg: valorLinha(cells, headerMap, 'rg'),
+    orgao_expedidor_rg: valorLinha(cells, headerMap, 'orgao_expedidor_rg'),
+    uf_rg: formatarUF(valorLinha(cells, headerMap, 'uf_rg'), alertas, 'UF inválida no sistema antigo. Campo deixado em branco para revisão.'),
+    cnh_categoria: normalizarCNHCategoria(valorLinha(cells, headerMap, 'cnh_categoria'), alertas),
+    cnh_validade: formatarData(valorLinha(cells, headerMap, 'cnh_validade'), { alertas, erros, mensagemAlerta: 'Validade da CNH inválida no sistema antigo. Campo deixado em branco para revisão.' }),
+    cnh_numero: valorLinha(cells, headerMap, 'cnh_numero'),
+    cpf: normalizarCPF(valorLinha(cells, headerMap, 'cpf'), alertas),
+    banco: valorLinha(cells, headerMap, 'banco'),
+    agencia: valorLinha(cells, headerMap, 'agencia'),
+    conta: valorLinha(cells, headerMap, 'conta'),
+    email_particular: normalizarEmail(valorLinha(cells, headerMap, 'email_particular'), alertas),
+    telefone: formatarTelefone(valorLinha(cells, headerMap, 'telefone'), alertas),
+    email_funcional: normalizarEmail(valorLinha(cells, headerMap, 'email_funcional'), alertas),
+    altura: normalizarNumeroLivre(valorLinha(cells, headerMap, 'altura'), 'Altura inválida no sistema antigo. Campo deixado em branco para revisão.', alertas),
+    peso: normalizarNumeroLivre(valorLinha(cells, headerMap, 'peso'), 'Peso inválido no sistema antigo. Campo deixado em branco para revisão.', alertas),
+    etnia: mapEtnia(valorLinha(cells, headerMap, 'etnia'), alertas),
+    logradouro: valorLinha(cells, headerMap, 'logradouro'),
+    numero_endereco: valorLinha(cells, headerMap, 'numero_endereco'),
+    cep: formatarCEP(valorLinha(cells, headerMap, 'cep'), alertas),
+    bairro: valorLinha(cells, headerMap, 'bairro'),
+    cidade: valorLinha(cells, headerMap, 'cidade'),
+    uf: formatarUF(valorLinha(cells, headerMap, 'uf'), alertas),
+    complemento: valorLinha(cells, headerMap, 'complemento'),
+    habilidades: [],
+    link_alteracoes_anteriores: '',
+    foto: '',
+  };
+}
+
+function detectarDuplicidadeForteLocal(militarPayload, militaresExistentes) {
+  const { cpf, nome_completo, data_nascimento } = militarPayload;
+
+  return (militaresExistentes || []).find((existente) => {
+    const cpfMatch = cpf && limparTexto(existente?.cpf) && limparTexto(existente?.cpf) === cpf;
+    const nomeDataMatch = limparTexto(existente?.nome_canonico || existente?.nome_completo).toUpperCase()
+      === limparTexto(nome_completo).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+      && limparTexto(existente?.data_nascimento)
+      && limparTexto(existente?.data_nascimento) === limparTexto(data_nascimento);
+
+    return cpfMatch || nomeDataMatch;
+  });
+}
+
+function processarLinhaMigracao({
+  cells,
+  idx,
+  headerMap,
+  cabecalho,
+  matriculasExistentes,
+  militaresExistentes,
+}) {
+  const alertas = [];
+  const erros = [];
+
+  const transformado = mapearMilitarPayload(cells, headerMap, alertas, erros);
+  const matriculaNormalizada = normalizarMatricula(transformado.matricula);
+  const duplicadoMatricula = matriculaNormalizada ? matriculasExistentes.has(matriculaNormalizada) : false;
+
+  if (duplicadoMatricula) {
+    alertas.push('Matrícula já cadastrada no sistema. Importação automática bloqueada.');
+  }
+
+  const duplicidadeForte = (transformado.matricula && !duplicadoMatricula && !erros.length)
+    ? detectarDuplicidadeForteLocal(transformado, militaresExistentes)
+    : null;
+
+  if (duplicidadeForte) {
+    alertas.push('Possível duplicidade identificada por CPF e/ou nome + data de nascimento. Encaminhar para revisão.');
+  }
+
+  const status = definirStatusLinha(erros, alertas, duplicadoMatricula || Boolean(duplicidadeForte));
+
+  return {
+    linhaNumero: idx + 2,
+    original: Object.fromEntries(cabecalho.map((h, hIdx) => [h, cells[hIdx] || ''])),
+    transformado,
+    status,
+    alertas,
+    erros,
+  };
+}
+
 export async function analisarArquivoMigracao(file) {
   const dadosCsv = await lerArquivoComoTabela(file);
   if (dadosCsv.length < 2) {
@@ -964,118 +1097,16 @@ export async function analisarArquivoMigracao(file) {
   const cabecalho = dadosCsv[0];
   const headerMap = mapHeaders(cabecalho);
   const militaresExistentes = await getMigracaoClient().entities.Militar.list();
-  const matriculasLegadas = new Set((militaresExistentes || []).map((m) => normalizarMatricula(m?.matricula)).filter(Boolean));
-  const matriculaEntity = getMigracaoClient().entities.MatriculaMilitar;
-  const matriculasHistoricas = matriculaEntity?.list
-    ? new Set((await matriculaEntity.list()).map((m) => normalizarMatricula(m?.matricula_normalizada || m?.matricula)).filter(Boolean))
-    : new Set();
-  const matriculasExistentes = new Set([...matriculasLegadas, ...matriculasHistoricas]);
+  const matriculasExistentes = await carregarMatriculasExistentes(militaresExistentes);
 
-  const linhas = dadosCsv.slice(1).map((cells, idx) => {
-    const alertas = [];
-    const erros = [];
-
-    const matricula = formatarMatricula(valorLinha(cells, headerMap, 'matricula'), alertas, erros);
-    const posto_graduacao = mapPostoGraduacao(valorLinha(cells, headerMap, 'posto_graduacao'), erros);
-    const quadro = mapQuadro(valorLinha(cells, headerMap, 'quadro'), posto_graduacao, alertas);
-    const data_inclusao = formatarData(valorLinha(cells, headerMap, 'data_inclusao'), {
-      obrigatoria: true,
-      mensagemErro: 'Data de inclusão inválida ou ausente. Linha bloqueada para importação.',
-      alertas,
-      erros,
-    });
-
-    const matriculaNormalizada = normalizarMatricula(matricula);
-    const duplicado = matriculaNormalizada ? matriculasExistentes.has(matriculaNormalizada) : false;
-    if (duplicado) {
-      alertas.push('Matrícula já cadastrada no sistema. Importação automática bloqueada.');
-    }
-
-    const militarPayload = {
-      nome_completo: valorLinha(cells, headerMap, 'nome_completo'),
-      nome_guerra: valorLinha(cells, headerMap, 'nome_guerra'),
-      status_cadastro: 'Ativo',
-      situacao_militar: 'Ativa',
-      funcao: '',
-      lotacao: '',
-      condicao: '',
-      destino: '',
-      matricula,
-      subgrupamento_id: '',
-      subgrupamento_nome: '',
-      posto_graduacao,
-      quadro,
-      data_inclusao,
-      comportamento: 'Bom',
-      data_nascimento: formatarData(valorLinha(cells, headerMap, 'data_nascimento'), { alertas, erros, mensagemAlerta: 'Data de nascimento inválida no sistema antigo. Campo deixado em branco para revisão.' }),
-      sexo: valorLinha(cells, headerMap, 'sexo'),
-      estado_civil: valorLinha(cells, headerMap, 'estado_civil'),
-      tipo_sanguineo: valorLinha(cells, headerMap, 'tipo_sanguineo'),
-      religiao: valorLinha(cells, headerMap, 'religiao'),
-      escolaridade: mapEscolaridade(valorLinha(cells, headerMap, 'escolaridade'), alertas),
-      curso_superior: valorLinha(cells, headerMap, 'curso_superior'),
-      pos_graduacao: [],
-      mestrado: valorLinha(cells, headerMap, 'mestrado'),
-      doutorado: valorLinha(cells, headerMap, 'doutorado'),
-      naturalidade: valorLinha(cells, headerMap, 'naturalidade'),
-      naturalidade_uf: formatarUF(valorLinha(cells, headerMap, 'naturalidade_uf'), alertas, 'UF inválida no sistema antigo. Campo deixado em branco para revisão.'),
-      nome_pai: valorLinha(cells, headerMap, 'nome_pai'),
-      nome_mae: valorLinha(cells, headerMap, 'nome_mae'),
-      rg: valorLinha(cells, headerMap, 'rg'),
-      orgao_expedidor_rg: valorLinha(cells, headerMap, 'orgao_expedidor_rg'),
-      uf_rg: formatarUF(valorLinha(cells, headerMap, 'uf_rg'), alertas, 'UF inválida no sistema antigo. Campo deixado em branco para revisão.'),
-      cnh_categoria: normalizarCNHCategoria(valorLinha(cells, headerMap, 'cnh_categoria'), alertas),
-      cnh_validade: formatarData(valorLinha(cells, headerMap, 'cnh_validade'), { alertas, erros, mensagemAlerta: 'Validade da CNH inválida no sistema antigo. Campo deixado em branco para revisão.' }),
-      cnh_numero: valorLinha(cells, headerMap, 'cnh_numero'),
-      cpf: normalizarCPF(valorLinha(cells, headerMap, 'cpf'), alertas),
-      banco: valorLinha(cells, headerMap, 'banco'),
-      agencia: valorLinha(cells, headerMap, 'agencia'),
-      conta: valorLinha(cells, headerMap, 'conta'),
-      email_particular: normalizarEmail(valorLinha(cells, headerMap, 'email_particular'), alertas),
-      telefone: formatarTelefone(valorLinha(cells, headerMap, 'telefone'), alertas),
-      email_funcional: normalizarEmail(valorLinha(cells, headerMap, 'email_funcional'), alertas),
-      altura: normalizarNumeroLivre(valorLinha(cells, headerMap, 'altura'), 'Altura inválida no sistema antigo. Campo deixado em branco para revisão.', alertas),
-      peso: normalizarNumeroLivre(valorLinha(cells, headerMap, 'peso'), 'Peso inválido no sistema antigo. Campo deixado em branco para revisão.', alertas),
-      etnia: mapEtnia(valorLinha(cells, headerMap, 'etnia'), alertas),
-      logradouro: valorLinha(cells, headerMap, 'logradouro'),
-      numero_endereco: valorLinha(cells, headerMap, 'numero_endereco'),
-      cep: formatarCEP(valorLinha(cells, headerMap, 'cep'), alertas),
-      bairro: valorLinha(cells, headerMap, 'bairro'),
-      cidade: valorLinha(cells, headerMap, 'cidade'),
-      uf: formatarUF(valorLinha(cells, headerMap, 'uf'), alertas),
-      complemento: valorLinha(cells, headerMap, 'complemento'),
-      habilidades: [],
-      link_alteracoes_anteriores: '',
-      foto: '',
-    };
-
-    const cpf = militarPayload.cpf;
-    const duplicidadeForte = (matricula && !duplicado && !erros.length)
-      ? militaresExistentes.find((existente) => {
-        const cpfMatch = cpf && limparTexto(existente?.cpf) && limparTexto(existente?.cpf) === cpf;
-        const nomeDataMatch = limparTexto(existente?.nome_canonico || existente?.nome_completo).toUpperCase()
-          === limparTexto(militarPayload.nome_completo).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
-          && limparTexto(existente?.data_nascimento)
-          && limparTexto(existente?.data_nascimento) === limparTexto(militarPayload.data_nascimento);
-        return cpfMatch || nomeDataMatch;
-      })
-      : null;
-
-    if (duplicidadeForte) {
-      alertas.push('Possível duplicidade identificada por CPF e/ou nome + data de nascimento. Encaminhar para revisão.');
-    }
-
-    const status = definirStatusLinha(erros, alertas, duplicado || Boolean(duplicidadeForte));
-
-    return {
-      linhaNumero: idx + 2,
-      original: Object.fromEntries(cabecalho.map((h, hIdx) => [h, cells[hIdx] || ''])),
-      transformado: militarPayload,
-      status,
-      alertas,
-      erros,
-    };
-  });
+  const linhas = dadosCsv.slice(1).map((cells, idx) => processarLinhaMigracao({
+    cells,
+    idx,
+    headerMap,
+    cabecalho,
+    matriculasExistentes,
+    militaresExistentes,
+  }));
 
   const resumo = obterResumo(linhas);
 
