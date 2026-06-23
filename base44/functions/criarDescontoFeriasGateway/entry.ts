@@ -112,12 +112,6 @@ Deno.serve(async (req) => {
       data_bg: dataBg,
       status: statusPublicacao,
       observacoes,
-      // Metadados úteis para a automação de saldo (fase futura)
-      origem_operacional: 'desconto_ferias',
-      periodo_aquisitivo_id: periodoAquisitivoId,
-      dias_desconto: dias,
-      data_inicio_desconto: dataInicio,
-      data_fim_desconto: dataFim,
     });
 
     // ---- 2) Criar DescontoFerias vinculado (idempotente por publicacao_id) ----
@@ -144,10 +138,6 @@ Deno.serve(async (req) => {
       criado_por_email: authUser.email,
       criado_em: new Date().toISOString(),
     });
-
-    // Grava o desconto_ferias_id de volta na publicação (rastreabilidade reversa).
-    await base44.asServiceRole.entities.PublicacaoExOfficio
-      .update(publicacao.id, { desconto_ferias_id: descontoFerias.id }).catch(() => null);
 
     return Response.json({ ok: true, publicacao, descontoFerias });
   } catch (error) {
