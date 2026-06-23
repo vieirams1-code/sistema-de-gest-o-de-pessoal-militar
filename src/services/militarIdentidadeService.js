@@ -547,7 +547,7 @@ async function buscarDadosMerge(militarOrigemId, militarDestinoId, matriculaEnti
   return { origem, destino, matriculasOrigem, matriculasDestino, vinculosOrigem };
 }
 
-async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId, matriculaEntity) {
+function montarPayloadsReatribuicaoMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId) {
   const hoje = new Date().toISOString().slice(0, 10);
   const destinoPorNorm = new Map(
     (matriculasDestino || [])
@@ -555,7 +555,7 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       .filter(([k]) => !!k),
   );
 
-  const payloads = matriculasOrigem.map((matOrigem) => {
+  return (matriculasOrigem || []).map((matOrigem) => {
     const norm = normalizarMatricula(matOrigem.matricula_normalizada || matOrigem.matricula);
     if (norm && destinoPorNorm.has(norm)) {
       return {
@@ -574,28 +574,14 @@ async function reatribuirMatriculas(matriculasOrigem, matriculasDestino, militar
       motivo: `${matOrigem.motivo || ''} Reatribuída por merge manual a partir do militar ${matOrigem.militar_id}.`.trim(),
     };
   });
-
-  if (payloads.length === 0) return [];
-
-  if (matriculaEntity.bulkUpdate) {
-    return matriculaEntity.bulkUpdate(payloads);
-  }
-
-  return Promise.all(payloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
 }
 
-async function reatribuirVinculos(vinculosOrigem, militarDestinoId) {
-  const promises = vinculosOrigem.map(async (v) => {
-    const payloads = (v.items || []).map((row) => ({ id: row.id, militar_id: militarDestinoId }));
-    if (payloads.length === 0) return;
-
-    if (typeof v.entity.bulkUpdate === 'function') {
-      return v.entity.bulkUpdate(payloads);
-    }
-    return Promise.all(payloads.map((p) => v.entity.update(p.id, p)));
-  });
-
-  return Promise.all(promises);
+function montarPayloadsReatribuicaoVinculos(vinculosOrigem, militarDestinoId) {
+  return (vinculosOrigem || []).map((v) => ({
+    name: v.name,
+    entity: v.entity,
+    payloads: (v.items || []).map((row) => ({ id: row.id, militar_id: militarDestinoId })),
+  })).filter((v) => v.payloads.length > 0);
 }
 
 function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOriginal) {
@@ -604,9 +590,8 @@ function determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOrigin
     || matriculasDestinoPos[0];
 }
 
-async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOriginal, matriculaEntity, militarEntity) {
+function montarPayloadsConsolidacaoMatriculaDestino(destinoOriginal, matriculasDestinoPos) {
   const hoje = new Date().toISOString().slice(0, 10);
-  const matriculasDestinoPos = await buscarMatriculasMilitar(militarDestinoId, matriculaEntity);
   const atualDestino = determinarMatriculaPrincipalDestino(matriculasDestinoPos, destinoOriginal);
 
   if (!atualDestino) {
@@ -615,7 +600,7 @@ async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOrig
 
   const atualDestinoId = atualDestino.id;
   const updatePayloads = [];
-  for (const mat of matriculasDestinoPos) {
+  for (const mat of (matriculasDestinoPos || [])) {
     const deveSerAtual = String(mat.id) === String(atualDestinoId);
     const needsUpdate = (Boolean(mat.is_atual) !== deveSerAtual);
 
@@ -630,18 +615,12 @@ async function consolidarMatriculaPrincipalDestino(militarDestinoId, destinoOrig
     }
   }
 
-  if (updatePayloads.length > 0) {
-    if (matriculaEntity.bulkUpdate) {
-      await matriculaEntity.bulkUpdate(updatePayloads);
-    } else {
-      await Promise.all(updatePayloads.map(({ id, ...rest }) => matriculaEntity.update(id, rest)));
-    }
-  }
-
   const destinoMatriculaFinal = atualDestino.matricula || formatarMatriculaPadrao(atualDestino.matricula_normalizada || '');
-  await militarEntity.update(militarDestinoId, { matricula: destinoMatriculaFinal });
 
-  return destinoMatriculaFinal;
+  return {
+    matriculaPayloads: updatePayloads,
+    militarMatriculaFinal: destinoMatriculaFinal,
+  };
 }
 
 async function marcarMilitarOrigemComoMesclado(militarEntity, militarOrigemId, militarDestinoId) {
@@ -687,32 +666,12 @@ async function registrarLogAuditoriaMerge({
   });
 }
 
-async function finalizarMergeAuditoria({
-  militarOrigemId,
-  militarDestinoId,
-  snapshotOrigem,
-  snapshotDestinoAntes,
-  motivo,
-  executadoPor,
-  pendenciaId,
-  militarEntity,
-  pendenciaEntity,
-  mergeLogEntity,
-}) {
-  await Promise.all([
-    marcarMilitarOrigemComoMesclado(militarEntity, militarOrigemId, militarDestinoId),
-    atualizarPendenciaMerge(pendenciaEntity, pendenciaId, { militarDestinoId, militarOrigemId, executadoPor }),
-  ]);
-
-  return registrarLogAuditoriaMerge({
-    mergeLogEntity,
-    militarOrigemId,
-    militarDestinoId,
-    snapshotOrigem,
-    snapshotDestinoAntes,
-    motivo,
-    executadoPor,
-  });
+async function executeBulk(entity, payloads) {
+  if (!payloads || payloads.length === 0) return;
+  if (typeof entity.bulkUpdate === 'function') {
+    return entity.bulkUpdate(payloads);
+  }
+  return Promise.all(payloads.map((p) => entity.update(p.id, p)));
 }
 
 export async function executarMergeManualMilitares({
@@ -731,21 +690,44 @@ export async function executarMergeManualMilitares({
   const snapshotOrigem = { ...origem };
   const snapshotDestinoAntes = { ...destino };
 
-  await reatribuirMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId, matriculaEntity);
-  await reatribuirVinculos(vinculosOrigem, militarDestinoId);
-  await consolidarMatriculaPrincipalDestino(militarDestinoId, destino, matriculaEntity, militarEntity);
+  const payloadsMatriculasReatribuicao = montarPayloadsReatribuicaoMatriculas(matriculasOrigem, matriculasDestino, militarDestinoId);
+  const payloadsVinculos = montarPayloadsReatribuicaoVinculos(vinculosOrigem, militarDestinoId);
 
-  const log = await finalizarMergeAuditoria({
+  const matriculasDestinoAposReatribuicao = [
+    ...matriculasDestino,
+    ...payloadsMatriculasReatribuicao
+      .filter((p) => String(p.militar_id) === String(militarDestinoId))
+      .map((p) => {
+        const original = matriculasOrigem.find((m) => m.id === p.id);
+        return { ...original, ...p };
+      }),
+  ];
+
+  const { matriculaPayloads: payloadsConsolidacao, militarMatriculaFinal } =
+    montarPayloadsConsolidacaoMatriculaDestino(destino, matriculasDestinoAposReatribuicao);
+
+  const mapMatriculas = new Map();
+  [...payloadsMatriculasReatribuicao, ...payloadsConsolidacao].forEach((p) => {
+    mapMatriculas.set(p.id, { ...(mapMatriculas.get(p.id) || {}), ...p });
+  });
+  const payloadsMatriculasFinal = Array.from(mapMatriculas.values());
+
+  await Promise.all([
+    executeBulk(matriculaEntity, payloadsMatriculasFinal),
+    ...payloadsVinculos.map((v) => executeBulk(v.entity, v.payloads)),
+    militarEntity.update(militarDestinoId, { matricula: militarMatriculaFinal }),
+    marcarMilitarOrigemComoMesclado(militarEntity, militarOrigemId, militarDestinoId),
+    atualizarPendenciaMerge(pendenciaEntity, pendenciaId, { militarDestinoId, militarOrigemId, executadoPor }),
+  ]);
+
+  const log = await registrarLogAuditoriaMerge({
+    mergeLogEntity,
     militarOrigemId,
     militarDestinoId,
     snapshotOrigem,
     snapshotDestinoAntes,
     motivo,
     executadoPor,
-    pendenciaId,
-    militarEntity,
-    pendenciaEntity,
-    mergeLogEntity,
   });
 
   return {
