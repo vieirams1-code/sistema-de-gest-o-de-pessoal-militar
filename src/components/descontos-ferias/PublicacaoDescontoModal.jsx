@@ -1,36 +1,66 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, FileText } from 'lucide-react';
+import { aplicarTemplate } from '@/components/utils/templateUtils.js';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
+import {
+  TIPO_DESCONTO_FERIAS,
+  buildVarsDescontoFerias,
+  gerarTextoFallbackDesconto,
+} from '@/components/descontos-ferias/descontoFeriasTemplateVars';
 
 function formatarData(data) {
   if (!data) return '—';
   return String(data).slice(0, 10).split('-').reverse().join('/');
 }
 
-function gerarTextoPadrao(dados) {
-  const posto = dados.militar_posto || '';
-  const nome = dados.militar_nome || '';
-  const matricula = dados.militar_matricula || '';
-  return `Dispensa com desconto em férias do(a) ${posto} ${nome} (Mat. ${matricula}), `
-    + `no total de ${dados.dias} dia(s), no período de ${formatarData(dados.data_inicio)} a ${formatarData(dados.data_fim)}.`;
-}
-
 /**
  * Modal de publicação no padrão visual da Ata JISO:
  * dados administrativos à esquerda, texto editável à direita,
  * campos Nota para BG, Número BG e Data BG.
+ *
+ * O texto é gerado pelo template oficial do módulo Templates de Texto
+ * (tipo "Dispensa com Desconto em Férias"). Sem template cadastrado,
+ * usa um fallback simples.
  */
 export default function PublicacaoDescontoModal({ open, onClose, dadosDesconto, onConfirmar }) {
-  const [textoPublicacao, setTextoPublicacao] = useState(() => gerarTextoPadrao(dadosDesconto));
+  const [textoPublicacao, setTextoPublicacao] = useState('');
+  const [textoEditadoManualmente, setTextoEditadoManualmente] = useState(false);
   const [notaParaBg, setNotaParaBg] = useState('');
   const [numeroBg, setNumeroBg] = useState('');
   const [dataBg, setDataBg] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const templateAtivo = useMemo(
+    () => getTemplateAtivoPorTipo(TIPO_DESCONTO_FERIAS, MODULO_EX_OFFICIO, templates),
+    [templates],
+  );
+
+  // Recalcula o texto de forma determinística a partir do template oficial
+  // (ou fallback), enquanto o usuário não editar manualmente.
+  useEffect(() => {
+    if (textoEditadoManualmente) return;
+    const vars = buildVarsDescontoFerias({ ...dadosDesconto, nota_para_bg: notaParaBg, numero_bg: numeroBg, data_bg: dataBg });
+    const texto = templateAtivo?.template
+      ? aplicarTemplate(templateAtivo.template, vars)
+      : gerarTextoFallbackDesconto(dadosDesconto);
+    setTextoPublicacao(texto);
+  }, [templateAtivo, dadosDesconto, notaParaBg, numeroBg, dataBg, textoEditadoManualmente]);
 
   const statusPrevisto = useMemo(() => {
     if (numeroBg || dataBg) return 'Publicado';
@@ -103,10 +133,15 @@ export default function PublicacaoDescontoModal({ open, onClose, dadosDesconto, 
 
           {/* DIREITA — texto editável */}
           <div className="lg:col-span-7 flex flex-col">
-            <Label className="text-sm font-semibold text-slate-900 mb-2">Texto da Publicação</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-sm font-semibold text-slate-900">Texto da Publicação</Label>
+              <span className="text-xs text-slate-500">
+                {templateAtivo ? `Template: ${templateAtivo.nome || 'oficial'}` : 'Sem template — texto padrão'}
+              </span>
+            </div>
             <Textarea
               value={textoPublicacao}
-              onChange={(e) => setTextoPublicacao(e.target.value)}
+              onChange={(e) => { setTextoEditadoManualmente(true); setTextoPublicacao(e.target.value); }}
               rows={16}
               className="flex-1 min-h-[300px] text-sm"
               placeholder="Digite o texto completo da publicação..."

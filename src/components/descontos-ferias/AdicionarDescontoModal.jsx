@@ -92,6 +92,7 @@ export default function AdicionarDescontoModal({
     onGerarPublicacao({
       militar_id: militarId,
       militar_nome: militarSnapshot?.nome_completo || militarSnapshot?.militar_nome || '',
+      militar_nome_guerra: militarSnapshot?.nome_guerra || '',
       militar_posto: militarSnapshot?.posto_graduacao || militarSnapshot?.militar_posto || '',
       militar_matricula: militarSnapshot?.matricula || militarSnapshot?.militar_matricula || '',
       periodo_aquisitivo_id: periodoId,
@@ -120,6 +121,7 @@ export default function AdicionarDescontoModal({
           {militarId && (
             <PeriodoAquisitivoSelector
               periodos={periodos}
+              descontosExistentes={descontosExistentes}
               value={periodoId}
               onChange={setPeriodoId}
             />

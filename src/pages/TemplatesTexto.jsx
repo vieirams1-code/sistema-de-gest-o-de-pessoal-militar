@@ -104,7 +104,7 @@ const TIPO_REGISTRO_CATEGORIAS = [
   {
     key: 'ferias',
     label: 'Férias',
-    tipos: ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'],
+    tipos: ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias', 'Dispensa com Desconto em Férias'],
   },
   {
     key: 'atestados_saude',
@@ -344,6 +344,23 @@ const VARS_POR_TIPO = {
       { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
       { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias' },
+    ]
+  },
+  'Dispensa com Desconto em Férias': {
+    grupo: 'Dispensa com Desconto em Férias',
+    cor: 'teal',
+    variaveis: [
+      { v: '{{militar_posto}}', desc: 'Posto/graduação do militar' },
+      { v: '{{militar_nome_guerra}}', desc: 'Nome de guerra do militar' },
+      { v: '{{militar_nome_completo}}', desc: 'Nome completo do militar' },
+      { v: '{{militar_matricula}}', desc: 'Matrícula funcional' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo (ex: 2023/2024)' },
+      { v: '{{dias_descontados}}', desc: 'Quantidade de dias descontados' },
+      { v: '{{data_inicio}}', desc: 'Data inicial do desconto' },
+      { v: '{{data_fim}}', desc: 'Data final do desconto' },
+      { v: '{{nota_bg}}', desc: 'Nota para o BG' },
+      { v: '{{numero_bg}}', desc: 'Número do BG' },
+      { v: '{{data_bg}}', desc: 'Data do BG' },
     ]
   },
   'Licença Maternidade': {
