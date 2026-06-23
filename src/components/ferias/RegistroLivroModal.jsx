@@ -445,7 +445,6 @@ export default function RegistroLivroModal({
         dias: totaisGozo.dias_totais_gozo,
         diasBase: baseDiasOriginal,
         diasAdicionaisPeriodo,
-        diasDescontadosPeriodo,
         saldoUtilizavel: saldoUtilizavelPeriodo,
         diasExtras: totaisGozo.dias_extras_creditos,
         creditosSelecionados,

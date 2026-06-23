@@ -13,6 +13,7 @@ import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
+import DescontosFerias from '@/pages/DescontosFerias';
 
 const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
@@ -224,6 +225,17 @@ const AuthenticatedApp = () => {
           />
         );
       })}
+      {/* Fase 1 — Descontos em Férias (gateway). Rota explícita garantida (admin-only). */}
+      <Route
+        path="/DescontosFerias"
+        element={
+          <LayoutWrapper currentPageName="DescontosFerias">
+            <RequireAdmin>
+              <DescontosFerias />
+            </RequireAdmin>
+          </LayoutWrapper>
+        }
+      />
       {/* P1.2-A2: rota administrativa de diagnóstico (mirror/read-only), fora do menu */}
       <Route
         path="/DiagnosticoAcesso"
