@@ -14,6 +14,7 @@ import { buildPublicacoesScopeKey, publicacoesQueryKeys } from '@/lib/publicacoe
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { ativarDescontoFeriasPublicado } from '@/services/ativarDescontoFeriasPublicadoClient';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -469,9 +470,27 @@ export default function Publicacoes() {
         return atualizarEscopado('Atestado', id, payloadComAuditoria);
       }
 
-      return atualizarEscopado('PublicacaoExOfficio', id, payloadComAuditoria);
+      const resultadoPublicacao = await atualizarEscopado('PublicacaoExOfficio', id, payloadComAuditoria);
+
+      // Fase 2 — ativação do Desconto em Férias: quando a publicação interna
+      // "Dispensa com Desconto em Férias" passa a Publicado, aplica o abatimento
+      // no período aquisitivo. Idempotente e seguro (no-op para demais tipos).
+      if (
+        registroAtual?.tipo === 'Dispensa com Desconto em Férias' &&
+        statusDepois === STATUS_PUBLICACAO.PUBLICADO
+      ) {
+        await ativarDescontoFeriasPublicado(id);
+      }
+
+      return resultadoPublicacao;
     },
-    onSuccess: refrescarDadosPublicacoes,
+    onSuccess: async () => {
+      await Promise.all([
+        refrescarDadosPublicacoes(),
+        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+        queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
+      ]);
+    },
     onError: (error) => {
       alert(error?.message || 'Falha ao atualizar publicação.');
     },
