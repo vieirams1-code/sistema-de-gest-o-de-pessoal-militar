@@ -1,0 +1,724 @@
+src/services/militarFichaTabsVisibility.js:6:  canAccessModule = () => false,
+src/services/militarFichaTabsVisibility.js:7:  canAccessAction = () => false,
+src/services/militarFichaTabsVisibility.js:13:    canAccessModule('atestados')
+src/services/militarFichaTabsVisibility.js:14:    || canAccessAction('visualizar_atestados')
+src/services/militarFichaTabsVisibility.js:15:    || canAccessAction('adicionar_atestados')
+src/services/militarFichaTabsVisibility.js:16:    || canAccessAction('editar_atestados')
+src/services/militarFichaTabsVisibility.js:17:    || canAccessAction('excluir_atestados')
+src/services/militarFichaTabsVisibility.js:18:    || canAccessAction('excluir_atestado')
+src/services/militarFichaTabsVisibility.js:19:    || canAccessAction('ver_dados_sensiveis_atestado')
+src/services/militarFichaTabsVisibility.js:20:    || canAccessAction('gerar_relatorio_dp_dintel_atestados')
+src/services/militarFichaTabsVisibility.js:21:    || canAccessAction('gerir_encaminhamento_dp_dintel_atestado')
+src/services/militarFichaTabsVisibility.js:28:  canAccessModule = () => false,
+src/services/militarFichaTabsVisibility.js:29:  canAccessAction = () => false,
+src/services/militarFichaTabsVisibility.js:35:    canAccessModule('armamentos')
+src/services/militarFichaTabsVisibility.js:36:    || canAccessAction('visualizar_armamentos')
+src/services/militarFichaTabsVisibility.js:37:    || canAccessAction('adicionar_armamentos')
+src/services/militarFichaTabsVisibility.js:38:    || canAccessAction('editar_armamentos')
+src/services/militarFichaTabsVisibility.js:39:    || canAccessAction('excluir_armamentos')
+src/services/medalhasAcessoService.js:21:export function temAlgumaPermissaoMedalhas(canAccessAction, acoes = []) {
+src/services/medalhasAcessoService.js:22:  return acoes.some((acao) => canAccessAction(acao));
+src/services/medalhasAcessoService.js:25:export function validarPermissaoAcaoMedalhas({ canAccessAction, acao, mensagem }) {
+src/services/medalhasAcessoService.js:26:  if (!canAccessAction(acao)) {
+src/services/medalhasAcessoService.js:31:export function validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo, mensagem }) {
+src/services/medalhasAcessoService.js:32:  if (isAdmin) return;
+src/services/medalhasAcessoService.js:54:export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarScopeFilters }) {
+src/services/medalhasAcessoService.js:55:  if (isAdmin) {
+src/services/medalhasAcessoService.js:60:  const scopeFilters = getMilitarScopeFilters();
+src/services/medalhasAcessoService.js:80:export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds = [] }) {
+src/services/medalhasAcessoService.js:81:  if (isAdmin) return base44Client.entities.Medalha.list('-created_date');
+src/services/medalhasAcessoService.js:127:export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarIds = [] }) {
+src/services/medalhasAcessoService.js:128:  if (isAdmin) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
+src/services/globalMilitarSearchService.js:29:export function construirAtalhosMilitar({ militarId, canAccessAction }) {
+src/services/globalMilitarSearchService.js:32:  if (canAccessAction('visualizar_militares')) {
+src/services/globalMilitarSearchService.js:41:  if (canAccessAction('visualizar_ferias')) {
+src/services/globalMilitarSearchService.js:50:  if (canAccessAction('visualizar_medalhas')) {
+src/services/globalMilitarSearchService.js:59:  if (canAccessAction('visualizar_registros_militar')) {
+src/services/globalMilitarSearchService.js:71:export function filtrarMilitaresPorEscopo(militares = [], { hasAccess, hasSelfAccess }) {
+src/services/globalMilitarSearchService.js:72:  return militares.filter((militar) => hasAccess?.(militar) || hasSelfAccess?.(militar));
+src/services/comportamentoService.js:37:  if (typeof usuarioAtual.canAccessAction === 'function') {
+src/services/comportamentoService.js:38:    return Boolean(usuarioAtual.canAccessAction(ACAO_APROVAR_MUDANCA_COMPORTAMENTO));
+src/services/permissionMatrixService.js:409:export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
+src/services/__tests__/medalhasAcessoBulk.test.js:19:  const result = await listarMedalhasEscopo({ base44Client, isAdmin: false, militarIds });
+src/services/__tests__/medalhasAcessoBulk.test.js:39:  const result = await listarImpedimentosEscopo({ base44Client, isAdmin: false, militarIds });
+src/services/__tests__/comportamentoService.test.js:69:    usuarioAtual: { canAccessAction: (acao) => acao === 'aprovar_mudanca_comportamento' },
+src/services/__tests__/comportamentoService.test.js:96:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/comportamentoService.test.js:117:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/comportamentoService.test.js:145:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/comportamentoService.test.js:168:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/comportamentoService.test.js:182:      usuarioAtual: { canAccessAction: () => false },
+src/services/__tests__/comportamentoService.test.js:206:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/comportamentoService.test.js:228:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/comportamentoService.test.js:263:    usuarioAtual: { canAccessAction: () => true },
+src/services/__tests__/globalMilitarSearchService.test.js:74:    canAccessAction: (acao) => permissoes.has(acao),
+src/services/__tests__/globalMilitarSearchService.test.js:85:    hasAccess: (militar) => militar.id === 'm2',
+src/services/__tests__/globalMilitarSearchService.test.js:86:    hasSelfAccess: () => false,
+src/services/__tests__/militarFichaTabsVisibility.test.js:11:  assert.equal(canShowAtestadosTab({ atestados: [{ id: 'a1' }], canAccessModule: denyModule, canAccessAction: denyAction }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:15:  assert.equal(canShowAtestadosTab({ canAccessModule: allowModule('atestados'), canAccessAction: denyAction }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:16:  assert.equal(canShowAtestadosTab({ canAccessModule: denyModule, canAccessAction: allowAction('ver_dados_sensiveis_atestado') }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:17:  assert.equal(canShowAtestadosTab({ canAccessModule: denyModule, canAccessAction: allowAction('gerir_encaminhamento_dp_dintel_atestado') }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:21:  assert.equal(canShowAtestadosTab({ atestados: [], canAccessModule: denyModule, canAccessAction: denyAction }), false);
+src/services/__tests__/militarFichaTabsVisibility.test.js:25:  assert.equal(canShowArmamentosTab({ armamentos: [{ id: 'ar1' }], canAccessModule: denyModule, canAccessAction: denyAction }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:29:  assert.equal(canShowArmamentosTab({ canAccessModule: allowModule('armamentos'), canAccessAction: denyAction }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:30:  assert.equal(canShowArmamentosTab({ canAccessModule: denyModule, canAccessAction: allowAction('visualizar_armamentos') }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:31:  assert.equal(canShowArmamentosTab({ canAccessModule: denyModule, canAccessAction: allowAction('editar_armamentos') }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:35:  assert.equal(canShowArmamentosTab({ armamentos: [], canAccessModule: denyModule, canAccessAction: denyAction }), false);
+src/services/__tests__/militarFichaTabsVisibility.test.js:39:  assert.equal(canShowAtestadosTab({ isLoadingAtestados: true, canAccessModule: denyModule, canAccessAction: denyAction }), true);
+src/services/__tests__/militarFichaTabsVisibility.test.js:40:  assert.equal(canShowArmamentosTab({ isLoadingArmamentos: true, canAccessModule: denyModule, canAccessAction: denyAction }), true);
+src/services/__tests__/permissionMatrixService.test.js:5:  isAdminRecoveryPermission,
+src/services/__tests__/permissionMatrixService.test.js:311:  assert.equal(isAdminRecoveryPermission('acesso_militares', 'module'), true);
+src/services/__tests__/permissionMatrixService.test.js:312:  assert.equal(isAdminRecoveryPermission('militares', 'module'), true);
+src/services/__tests__/permissionMatrixService.test.js:313:  assert.equal(isAdminRecoveryPermission('perm_gerir_permissoes', 'action'), true);
+src/services/__tests__/permissionMatrixService.test.js:314:  assert.equal(isAdminRecoveryPermission('gerir_permissoes', 'action'), true);
+src/services/__tests__/permissionMatrixService.test.js:315:  assert.equal(isAdminRecoveryPermission('perm_gerir_templates', 'action'), false);
+src/services/__tests__/medalhasAcessoService.test.js:15:  const canAccessAction = (acao) => permitidas.has(acao);
+src/services/__tests__/medalhasAcessoService.test.js:17:  assert.equal(temAlgumaPermissaoMedalhas(canAccessAction, ACOES_APURACAO), true);
+src/services/__tests__/medalhasAcessoService.test.js:23:    () => validarPermissaoAcaoMedalhas({ canAccessAction: () => false, acao: ACOES_MEDALHAS.INDICAR }),
+src/services/__tests__/medalhasAcessoService.test.js:28:    canAccessAction: (acao) => acao === ACOES_MEDALHAS.INDICAR,
+src/services/__tests__/medalhasAcessoService.test.js:36:  assert.doesNotThrow(() => validarMilitarDentroEscopo({ isAdmin: false, militarId: 'militar-1', militarIdsEscopo: escopo }));
+src/services/__tests__/medalhasAcessoService.test.js:39:    () => validarMilitarDentroEscopo({ isAdmin: false, militarId: 'militar-9', militarIdsEscopo: escopo }),
+src/services/__tests__/medalhasAcessoService.test.js:43:  assert.doesNotThrow(() => validarMilitarDentroEscopo({ isAdmin: true, militarId: 'militar-9', militarIdsEscopo: escopo }));
+src/services/publicacoesPainelService.js:50:export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }) {
+src/services/publicacoesPainelService.js:51:  if (isAdmin) return null;
+src/services/publicacoesPainelService.js:53:  const scopeFilters = getMilitarScopeFilters();
+src/services/publicacoesPainelService.js:61:export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }) {
+src/services/publicacoesPainelService.js:62:  if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
+src/services/publicacoesPainelService.js:64:  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+src/services/publicacoesPainelService.js:76:export async function listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }) {
+src/services/publicacoesPainelService.js:77:  if (isAdmin) return (await base44.entities.Atestado.list('-created_date')).filter((a) => a.nota_para_bg || a.numero_bg);
+src/services/publicacoesPainelService.js:79:  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+src/components/medalhas/MedalhasTabNavigation.jsx:12:export default function MedalhasTabNavigation({ activeTab, actions, canAccessAction }) {
+src/components/medalhas/MedalhasTabNavigation.jsx:17:    if (tab.id === 'dompedro' && canAccessAction) {
+src/components/medalhas/MedalhasTabNavigation.jsx:18:      return canAccessAction('perm_visualizar_dom_pedro');
+src/components/dashboard/AuditoriaComportamentoAlert.jsx:17: *   - Só roda se isAdmin === true (enabled controlado).
+src/components/dashboard/AuditoriaComportamentoAlert.jsx:24:export default function AuditoriaComportamentoAlert({ isAdmin }) {
+src/components/dashboard/AuditoriaComportamentoAlert.jsx:33:    enabled: Boolean(isAdmin),
+src/components/dashboard/AuditoriaComportamentoAlert.jsx:40:  if (!isAdmin) return null;
+src/components/dashboard/AfastamentosVigentesPanel.jsx:73:  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+src/components/militar/MilitarCard.jsx:42:  const { hasAccess, hasSelfAccess } = useCurrentUser();
+src/components/militar/MilitarCard.jsx:43:  const canAccess = hasAccess(militar) || hasSelfAccess(militar);
+src/components/militar/MilitarConsultaVirtualList.jsx:64:        isAdmin={data.isAdmin}
+src/components/militar/MilitarConsultaVirtualList.jsx:65:        canAccessAction={data.canAccessAction}
+src/components/militar/MilitarConsultaRow.jsx:67:  isAdmin,
+src/components/militar/MilitarConsultaRow.jsx:68:  canAccessAction,
+src/components/militar/MilitarConsultaRow.jsx:262:          {canAccessAction('editar_militares') && (
+src/components/militar/MilitarConsultaRow.jsx:279:          {isAdmin && (
+src/components/militar/MilitarConsultaRow.jsx:296:          {canAccessAction('excluir_militares') && (
+src/components/militar/GlobalMilitarSearch.jsx:47:    canAccessAction,
+src/components/militar/GlobalMilitarSearch.jsx:84:    canAccessAction('visualizar_militares')
+src/components/militar/GlobalMilitarSearch.jsx:85:    || canAccessAction('visualizar_ferias')
+src/components/militar/GlobalMilitarSearch.jsx:86:    || canAccessAction('visualizar_medalhas')
+src/components/militar/GlobalMilitarSearch.jsx:87:    || canAccessAction('visualizar_registros_militar')
+src/components/militar/GlobalMilitarSearch.jsx:88:    || canAccessAction('visualizar_acervo_historico')
+src/components/militar/GlobalMilitarSearch.jsx:104:      if (isSelectionMode || !canAccessAction('visualizar_acervo_historico')) return resultadosMilitares;
+src/components/militar/GlobalMilitarSearch.jsx:215:      const atalhos = isSelectionMode ? [] : construirAtalhosMilitar({ militarId: militar.id, canAccessAction });
+src/components/publicacao/PublicacaoCard.jsx:77:export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false, isAdmin = false }) {
+src/components/publicacao/PublicacaoCard.jsx:97:  const podePublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
+src/components/publicacao/PublicacaoCard.jsx:98:  const adminPodeEditarBgPublicado = isAdmin && canAccessAction('admin_mode') && modoAdmin;
+src/components/publicacao/PublicacaoCard.jsx:104:  const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
+src/components/publicacao/PublicacaoCard.jsx:105:  const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
+src/components/ferias/AdminCadeiaPanel.jsx:43:  const { isAdmin, canAccessAction } = useCurrentUser();
+src/components/ferias/AdminCadeiaPanel.jsx:52:    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('recalcular_ferias')) {
+src/components/ferias/AdminCadeiaPanel.jsx:81:    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
+src/components/ferias/AdminCadeiaPanel.jsx:102:    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
+src/components/ferias/PeriodoAquisitivoGenerator.jsx:94:  const { isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
+src/components/ferias/PeriodoAquisitivoGenerator.jsx:97:  const paBundleQueryKey = ['pa-bundle', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null];
+src/components/ferias/RegistroLivroModal.jsx:296:  const { canAccessAction, user } = useCurrentUser();
+src/components/ferias/RegistroLivroModal.jsx:297:  const canGerirCadeia = canAccessAction('gerir_cadeia_ferias');
+src/components/ferias/FamiliaFeriasPanel.jsx:225:  const { isAdmin } = useCurrentUser();
+src/components/ferias/FamiliaFeriasPanel.jsx:722:        {isAdmin && <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} modoAdmin={modoAdmin} />}
+src/components/livro/livroService.js:23:async function listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters } = {}) {
+src/components/livro/livroService.js:24:  const scopeFilters = getMilitarScopeFilters?.();
+src/components/livro/livroService.js:41:export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters } = {}) {
+src/components/livro/livroService.js:42:  if (!isAdmin && !getMilitarScopeFilters) {
+src/components/livro/livroService.js:46:  if (isAdmin) {
+src/components/livro/livroService.js:54:  const scopeFilters = getMilitarScopeFilters();
+src/components/livro/livroService.js:116:export async function getLivroMetricasRPContrato({ isAdmin, getMilitarScopeFilters } = {}) {
+src/components/livro/livroService.js:117:  if (!isAdmin && !getMilitarScopeFilters) {
+src/components/livro/livroService.js:121:  if (isAdmin) {
+src/components/livro/livroService.js:126:  const militarIds = await listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters });
+src/components/livro/FeriasSelector.jsx:71:    isAdmin: resolvedAccessContext?.isAdmin === true,
+src/components/livro/FeriasSelector.jsx:78:    resolvedAccessContext?.isAdmin,
+src/components/atestado/AtestadoCard.jsx:61:  const { canAccessAction, user } = useCurrentUser();
+src/components/atestado/AtestadoCard.jsx:202:    if (!canAccessAction('publicar_homologacao')) {
+src/components/atestado/AtestadoCard.jsx:279:    if (!canAccessAction('publicar_ata_jiso')) {
+src/components/atestado/AtestadoCard.jsx:428:    if (!canAccessAction('registrar_decisao_jiso')) {
+src/components/atestado/MilitarSelector.jsx:54:    isAdmin: resolvedAccessContext?.isAdmin === true,
+src/components/admin/SaneamentoPromocaoDivergenteDialog.jsx:20:export default function SaneamentoPromocaoDivergenteDialog({ isAdmin = false }) {
+src/components/admin/SaneamentoPromocaoDivergenteDialog.jsx:30:    enabled: isAdmin && open,
+src/components/admin/SaneamentoPromocaoDivergenteDialog.jsx:54:  if (!isAdmin) return null;
+src/components/admin/SaneamentoQbmptQptbmDialog.jsx:45:export default function SaneamentoQbmptQptbmDialog({ isAdmin = false }) {
+src/components/admin/SaneamentoQbmptQptbmDialog.jsx:55:    enabled: isAdmin && open,
+src/components/admin/SaneamentoQbmptQptbmDialog.jsx:84:  if (!isAdmin) return null;
+src/components/central-pendencias/CentralPendenciaAtestadoModal.jsx:31:  const { canAccessAction } = useCurrentUser();
+src/components/central-pendencias/CentralPendenciaAtestadoModal.jsx:89:    && (canAccessAction('registrar_decisao_jiso') || canAccessAction('gerir_jiso'))
+src/components/central-pendencias/CentralPendenciaAtestadoModal.jsx:99:    && (canAccessAction('editar_atestados') || canAccessAction('registrar_decisao_jiso') || canAccessAction('gerir_jiso'))
+src/components/funcoes-tags/FuncoesTagsManager.jsx:35:  isAdmin = false,
+src/components/quadro/CardDetalheModal.jsx:176:  const { canAccessAction } = useCurrentUser();
+src/components/quadro/CardDetalheModal.jsx:177:  const canManage = canAccessAction('gerir_acoes_operacionais');
+src/components/quadro/CardDetalheModal.jsx:345:  const { canAccessAction } = useCurrentUser();
+src/components/quadro/CardDetalheModal.jsx:346:  const canManage = canAccessAction('gerir_acoes_operacionais');
+src/components/quadro/CardDetalheModal.jsx:664:  const { userEmail, user, canAccessAction } = useCurrentUser();
+src/components/quadro/CardDetalheModal.jsx:758:    // usar canAccessAction('gerir_acoes_operacionais').
+src/components/quadro/CardDetalheModal.jsx:794:    if (!canAccessAction('gerir_jiso') && !canAccessAction('registrar_decisao_jiso')) {
+src/components/quadro/CardDetalheModal.jsx:822:    if (!canAccessAction('gerir_quadro')) {
+src/components/quadro/CardDetalheModal.jsx:847:    if (!canAccessAction('arquivar_card')) {
+src/components/quadro/AlertasOperacionais.jsx:19:  const { isAdmin, getMilitarScopeFilters, isAccessResolved } = useCurrentUser();
+src/components/quadro/AlertasOperacionais.jsx:23:    if (isAdmin) return null;
+src/components/quadro/AlertasOperacionais.jsx:24:    const filters = getMilitarScopeFilters();
+src/components/quadro/AlertasOperacionais.jsx:38:      if (!isAdmin) {
+src/components/auth/RequireAdmin.jsx:6:export default function RequireAdmin({ children }) {
+src/components/auth/RequireAdmin.jsx:7:  const { isLoading, isAdmin } = useCurrentUser();
+src/components/auth/RequireAdmin.jsx:13:  if (!isAdmin) {
+src/components/auth/RequireModuleAccess.jsx:8:export default function RequireModuleAccess({
+src/components/auth/RequireModuleAccess.jsx:17:    canAccessModule,
+src/components/auth/RequireModuleAccess.jsx:18:    canAccessAction,
+src/components/auth/RequireModuleAccess.jsx:34:    console.warn('[RequireModuleAccess] Erro parcial de permissões detectado (não bloqueante).', accessErrorDetails);
+src/components/auth/RequireModuleAccess.jsx:106:  const hasModuleAccess = normalizedModuleKeys.some((key) => canAccessModule(key));
+src/components/auth/RequireModuleAccess.jsx:107:  const hasActionAccess = normalizedActionKeys.some((key) => canAccessAction(key));
+src/components/auth/useCurrentUser.jsx:20: * e MilitarSelector via getMilitarScopeFilters). Esta é uma chamada leve por
+src/components/auth/useCurrentUser.jsx:138:  const isAdminByRole = Boolean(data?.isAdminByRole);
+src/components/auth/useCurrentUser.jsx:139:  const isAdminByAccess = Boolean(data?.isAdminByAccess);
+src/components/auth/useCurrentUser.jsx:140:  const isAdmin = Boolean(data?.isAdmin);
+src/components/auth/useCurrentUser.jsx:141:  const accessMode = data?.accessMode || (isAdmin ? 'admin' : 'restricted');
+src/components/auth/useCurrentUser.jsx:142:  const permissionsResolvedAs = data?.permissionsResolvedAs || (isAdmin ? 'admin' : 'profiles');
+src/components/auth/useCurrentUser.jsx:145:  // No backend, isAdmin engloba role admin + acesso admin. Não temos mais um
+src/components/auth/useCurrentUser.jsx:146:  // "superadmin" separado: para fins de UI, isAdmin é o nível máximo.
+src/components/auth/useCurrentUser.jsx:147:  const superAdmin = isAdmin;
+src/components/auth/useCurrentUser.jsx:148:  const hasAbsoluteAccess = isAdmin;
+src/components/auth/useCurrentUser.jsx:152:  const resolvedTipoAcesso = isAdmin
+src/components/auth/useCurrentUser.jsx:166:  if (!isSelfRestrictedScope && !isAdmin) {
+src/components/auth/useCurrentUser.jsx:189:  // Mantido por compatibilidade com getMilitarScopeFilters quando o usuário
+src/components/auth/useCurrentUser.jsx:214:    && !isAdmin
+src/components/auth/useCurrentUser.jsx:241:  // afeta apenas escopo organizacional (getMilitarScopeFilters/hasAccess).
+src/components/auth/useCurrentUser.jsx:253:  const canAccessModule = (modulo) => {
+src/components/auth/useCurrentUser.jsx:260:  const canAccessAction = (acao) => {
+src/components/auth/useCurrentUser.jsx:268:  const hasAccess = (registro) => {
+src/components/auth/useCurrentUser.jsx:270:    if (isAdmin) return true;
+src/components/auth/useCurrentUser.jsx:299:  const hasSelfAccess = (registro) => {
+src/components/auth/useCurrentUser.jsx:301:    if (isAdmin) return true;
+src/components/auth/useCurrentUser.jsx:323:  const getMilitarScopeFilters = () => {
+src/components/auth/useCurrentUser.jsx:324:    if (isAdmin) return [];
+src/components/auth/useCurrentUser.jsx:351:    if (targetUser.role === 'admin' || targetUser.isAdmin === true) return 'admin';
+src/components/auth/useCurrentUser.jsx:359:  // RequireModuleAccess que checa `permissions === 'ALL'`).
+src/components/auth/useCurrentUser.jsx:421:    isAuthAdminUser: isAdminByRole,
+src/components/auth/useCurrentUser.jsx:447:    isAdmin,
+src/components/auth/useCurrentUser.jsx:458:    isAdmin,
+src/components/auth/useCurrentUser.jsx:484:    canAccessModule,
+src/components/auth/useCurrentUser.jsx:485:    canAccessAction,
+src/components/auth/useCurrentUser.jsx:486:    hasAccess,
+src/components/auth/useCurrentUser.jsx:487:    hasSelfAccess,
+src/components/auth/useCurrentUser.jsx:488:    getMilitarScopeFilters,
+src/hooks/useScopedMilitarIds.js:15: *  - admin                         → retorna `{ ids: null, isAdmin: true }`
+src/hooks/useScopedMilitarIds.js:20: *                                    `getMilitarScopeFilters()` e devolve
+src/hooks/useScopedMilitarIds.js:21: *                                    `{ ids: string[], isAdmin: false }`.
+src/hooks/useScopedMilitarIds.js:23: *  - sem escopo                    → `{ ids: [], isAdmin: false }`.
+src/hooks/useScopedMilitarIds.js:31:    isAdmin,
+src/hooks/useScopedMilitarIds.js:36:    getMilitarScopeFilters,
+src/hooks/useScopedMilitarIds.js:42:    isAdmin ? 'admin' : modoAcesso || 'sem-escopo',
+src/hooks/useScopedMilitarIds.js:52:      if (isAdmin) return null; // admin: null = sem restrição
+src/hooks/useScopedMilitarIds.js:74:      const filters = getMilitarScopeFilters();
+src/hooks/useScopedMilitarIds.js:93:    : isAdmin
+src/hooks/useScopedMilitarIds.js:100:  const isReady = isAccessResolved && (isAdmin || hasSeedIds || query.data !== undefined) && !isLoading;
+src/hooks/useScopedMilitarIds.js:104:    isAdmin,
+src/hooks/central-pendencias/useCentralPendencias.js:98:async function listarPorEscopo({ entidade, isAdmin, getMilitarScopeFilters, ordem = '-created_date' }) {
+src/hooks/central-pendencias/useCentralPendencias.js:100:  if (isAdmin) {
+src/hooks/central-pendencias/useCentralPendencias.js:105:  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+src/hooks/central-pendencias/useCentralPendencias.js:116:async function listarPublicacoesCentral({ isAdmin, getMilitarScopeFilters }) {
+src/hooks/central-pendencias/useCentralPendencias.js:117:  if (isAdmin) {
+src/hooks/central-pendencias/useCentralPendencias.js:121:  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+src/hooks/central-pendencias/useCentralPendencias.js:549:    isAdmin,
+src/hooks/central-pendencias/useCentralPendencias.js:551:    getMilitarScopeFilters,
+src/hooks/central-pendencias/useCentralPendencias.js:553:    canAccessAction,
+src/hooks/central-pendencias/useCentralPendencias.js:558:    queryKey: ['central-pendencias', isAdmin],
+src/hooks/central-pendencias/useCentralPendencias.js:561:      const podeVerLegadoDuplicidade = Boolean(isAdmin || canAccessAll);
+src/hooks/central-pendencias/useCentralPendencias.js:563:        listarPublicacoesCentral({ isAdmin, getMilitarScopeFilters }),
+src/hooks/central-pendencias/useCentralPendencias.js:564:        listarPorEscopo({ entidade: base44?.entities?.Atestado, isAdmin, getMilitarScopeFilters }),
+src/hooks/central-pendencias/useCentralPendencias.js:565:        listarPorEscopo({ entidade: base44?.entities?.Ferias, isAdmin, getMilitarScopeFilters, ordem: '-data_inicio' }),
+src/hooks/central-pendencias/useCentralPendencias.js:566:        listarPorEscopo({ entidade: base44?.entities?.RegistroLivro, isAdmin, getMilitarScopeFilters }),
+src/hooks/central-pendencias/useCentralPendencias.js:567:        listarPorEscopo({ entidade: base44?.entities?.PendenciaComportamento, isAdmin, getMilitarScopeFilters }),
+src/hooks/central-pendencias/useCentralPendencias.js:568:        listarPorEscopo({ entidade: base44?.entities?.HistoricoPromocaoMilitarV2, isAdmin, getMilitarScopeFilters }),
+src/hooks/central-pendencias/useCentralPendencias.js:569:        listarPorEscopo({ entidade: base44?.entities?.Militar, isAdmin, getMilitarScopeFilters }),
+src/hooks/central-pendencias/useCentralPendencias.js:602:    if (!canAccessAction('aprovar_mudanca_comportamento')) {
+src/hooks/central-pendencias/useCentralPendencias.js:614:        canAccessAction,
+src/hooks/central-pendencias/useCentralPendencias.js:634:        podeAplicarComportamentoIndividual: canAccessAction('aprovar_mudanca_comportamento'),
+src/hooks/central-pendencias/useCentralPendencias.js:638:  }, [query.data?.pendencias, filtros, canAccessAction]);
+src/hooks/useUsuarioPodeAgirSobreMilitar.js:28:  const { ids: scopedIds, isAdmin, isReady } = useScopedMilitarIds();
+src/hooks/useUsuarioPodeAgirSobreMilitar.js:37:    if (isAdmin) return { permitido: true, motivo: null };
+src/hooks/useUsuarioPodeAgirSobreMilitar.js:54:  }, [isAdmin, isReady, scopedIds]);
+src/hooks/useUsuarioPodeAgirSobreMilitar.js:62:    isAdmin,
+src/utils/promocao/promocaoStateMachine.js:66:  if (!contexto?.isAdmin) return false;
+src/utils/promocao/promocaoStateMachine.js:71:  if (!contexto?.isAdmin) return false;
+src/utils/promocao/__tests__/promocaoStateMachine.test.js:19:  assert.equal(canReverterItem({ status: 'publicado', publicado: true }, { isAdmin: true }), true);
+src/utils/promocao/__tests__/promocaoStateMachine.test.js:23:  assert.equal(canExcluirDefinitivo({ status: 'cancelado', publicado: false }, { isAdmin: true }), true);
+src/utils/buildScopeKey.js:22:  isAdmin = false,
+src/utils/buildScopeKey.js:31:    isAdmin: Boolean(isAdmin),
+src/pages/CadastrarArmamento.jsx:20:  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/CadastrarArmamento.jsx:22:  const hasArmamentosAccess = canAccessModule('armamentos');
+src/pages/CursosFormacao.jsx:17:  const { user, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/CursosFormacao.jsx:20:  const podeVer = canAccessModule('cursos_formacao') || canAccessAction('visualizar_cursos_formacao');
+src/pages/CursosFormacao.jsx:21:  const podeGerir = canAccessAction('gerir_cursos_formacao');
+src/pages/ExtracaoEfetivo.jsx:500:    isAdmin,
+src/pages/ExtracaoEfetivo.jsx:506:    canAccessModule,
+src/pages/ExtracaoEfetivo.jsx:507:    canAccessAction,
+src/pages/ExtracaoEfetivo.jsx:519:  const shouldShowLotacaoFilter = isAdmin || ['setor', 'subsetor', 'unidade'].includes(modoAcesso);
+src/pages/ExtracaoEfetivo.jsx:576:  const podeVisualizarExtracao = canAccessAction('visualizar_extracao_efetivo');
+src/pages/ExtracaoEfetivo.jsx:577:  const podeExportarExtracao = canAccessAction('exportar_extracao_efetivo');
+src/pages/ExtracaoEfetivo.jsx:581:    isAdmin,
+src/pages/ExtracaoEfetivo.jsx:1201:    (!canAccessModule('extracao_efetivo') || !podeVisualizarExtracao)
+src/pages/Ferias.jsx:377:  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/Ferias.jsx:440:    queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
+src/pages/Ferias.jsx:453:    enabled: isAccessResolved && canAccessModule('ferias'),
+src/pages/Ferias.jsx:465:  const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail];
+src/pages/Ferias.jsx:466:  const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
+src/pages/Ferias.jsx:470:    if (isAdmin && isFeriasError) return 'Ferias.list';
+src/pages/Ferias.jsx:483:      isAdmin,
+src/pages/Ferias.jsx:522:    queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail],
+src/pages/Ferias.jsx:524:    enabled: isAccessResolved && canAccessModule('ferias'),
+src/pages/Ferias.jsx:843:    if (!canAccessAction('excluir_ferias') || !canAccessAction('admin_mode') || !modoAdmin) {
+src/pages/Ferias.jsx:879:    if (!canAccessAction('excluir_ferias') || !canAccessAction('admin_mode') || !modoAdmin) {
+src/pages/Ferias.jsx:1009:  if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
+src/pages/Ferias.jsx:1028:            {canAccessAction('admin_mode') && (
+src/pages/Ferias.jsx:1631:                                        {(canAccessAction('excluir_ferias')) && (() => {
+src/pages/Ferias.jsx:1649:                                          const disabled = !modoAdmin || !canAccessAction('admin_mode') || semEscopo;
+src/pages/Ferias.jsx:1650:                                          const title = !canAccessAction('admin_mode')
+src/pages/CadastrarAtestado.jsx:125:  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/CadastrarAtestado.jsx:127:  const hasAtestadosAccess = canAccessModule('atestados');
+src/pages/HistoricoImportacoesMilitares.jsx:31:  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/HistoricoImportacoesMilitares.jsx:99:  if (!canAccessModule('migracao_militares') || !canAccessAction('ver_historico_importacoes')) return <AccessDenied modulo="Histórico de Importações" />;
+src/pages/ControleAtestadosTemporarios.jsx:87:    isAdmin,
+src/pages/ControleAtestadosTemporarios.jsx:88:    canAccessModule,
+src/pages/ControleAtestadosTemporarios.jsx:96:  const hasControleAccess = canAccessModule('controle_atestados_temporarios');
+src/pages/ControleAtestadosTemporarios.jsx:102:    isAdmin: Boolean(isAdmin),
+src/pages/ControleAtestadosTemporarios.jsx:107:  }), [effectiveEmail, effectiveUserEmail, isAdmin, modoAcesso, userEmail]);
+src/pages/ExtratoAtestadosMedicos.jsx:155:  const { canAccessModule, canAccessAction, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+src/pages/ExtratoAtestadosMedicos.jsx:157:  const hasAccess = canAccessModule('atestados');
+src/pages/ExtratoAtestadosMedicos.jsx:185:  const canShowDiagnostics = Boolean(isAdmin || import.meta.env.DEV);
+src/pages/ExtratoAtestadosMedicos.jsx:186:  const canGenerateDpDintelReport = canAccessAction('gerar_relatorio_dp_dintel_atestados');
+src/pages/ExtratoAtestadosMedicos.jsx:187:  const canManageEncaminhamento = canAccessAction('gerir_encaminhamento_dp_dintel_atestado');
+src/pages/ExtratoAtestadosMedicos.jsx:327:    enabled: isAccessResolved && hasAccess,
+src/pages/ExtratoAtestadosMedicos.jsx:534:  if (!hasAccess) return <AccessDenied modulo="Atestados" />;
+src/pages/TiposMedalha.jsx:35:  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/TiposMedalha.jsx:36:  const hasMedalhasAccess = canAccessModule('medalhas');
+src/pages/TiposMedalha.jsx:53:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/TiposMedalha.jsx:74:  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+src/pages/Atestados.jsx:63:  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
+src/pages/Atestados.jsx:65:  const hasAtestadosAccess = canAccessModule('atestados');
+src/pages/Atestados.jsx:66:  const canAdicionarAtestado = canAccessAction('adicionar_atestados');
+src/pages/Atestados.jsx:67:  const canEditarAtestado = canAccessAction('editar_atestados');
+src/pages/Atestados.jsx:68:  const canExcluirAtestado = canAccessAction('excluir_atestado');
+src/pages/Atestados.jsx:81:    queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
+src/pages/CadastrarFerias.jsx:63:    isAdmin,
+src/pages/CadastrarFerias.jsx:66:    canAccessModule,
+src/pages/CadastrarFerias.jsx:71:  const hasFeriasAccess = canAccessModule('ferias');
+src/pages/CadastrarFerias.jsx:83:      Boolean(isAdmin),
+src/pages/CadastrarPunicao.jsx:40:  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/CadastrarPunicao.jsx:42:  const hasPunicoesAccess = canAccessModule('punicoes');
+src/pages/CadastrarPunicao.jsx:70:  const canAdicionarPunicoes = canAccessAction('adicionar_punicoes');
+src/pages/CadastrarPunicao.jsx:71:  const canEditarPunicoes = canAccessAction('editar_punicoes');
+src/pages/CadastrarPunicao.jsx:72:  const canExcluirPunicoes = canAccessAction('excluir_punicoes');
+src/pages/Funcoes.jsx:7:  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/Funcoes.jsx:8:  const hasFuncoesAccess = canAccessModule('adicoes_personalizacoes') || canAccessAction('gerir_adicoes_personalizacoes');
+src/pages/Funcoes.jsx:9:  const canEditFuncoes = canAccessAction('gerir_configuracoes') || canAccessAction('gerir_adicoes_personalizacoes');
+src/pages/AgendaAcoesOperacionais.jsx:192:    canAccessModule,
+src/pages/AgendaAcoesOperacionais.jsx:193:    canAccessAction,
+src/pages/AgendaAcoesOperacionais.jsx:196:    getMilitarScopeFilters,
+src/pages/AgendaAcoesOperacionais.jsx:198:  const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
+src/pages/AgendaAcoesOperacionais.jsx:228:  const canManageAcoes = canAccessAction('gerir_acoes_operacionais');
+src/pages/AgendaAcoesOperacionais.jsx:235:      const militarScopeFilters = getMilitarScopeFilters();
+src/pages/AgendaAcoesOperacionais.jsx:362:      if (!canAccessAction('gerir_acoes_operacionais')) {
+src/pages/AgendaAcoesOperacionais.jsx:369:      if (!canAccessAction('excluir_acao_operacional')) {
+src/pages/AgendaAcoesOperacionais.jsx:376:      if (!canAccessAction('gerir_acoes_operacionais')) {
+src/pages/AgendaAcoesOperacionais.jsx:390:      if (!canAccessAction('gerir_acoes_operacionais')) {
+src/pages/AgendarJISO.jsx:20:  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
+src/pages/AgendarJISO.jsx:22:  const hasAtestadosAccess = canAccessModule('atestados');
+src/pages/AgendarJISO.jsx:27:    queryKey: ['atestados-jiso-bundle', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
+src/pages/AgendarJISO.jsx:194:                      {canAccessAction('registrar_decisao_jiso') && (
+src/pages/PerfisPermissao.jsx:50:  const { canAccessAction, isLoading: loadingUser } = useCurrentUser();
+src/pages/PerfisPermissao.jsx:116:  if (!canAccessAction('gerir_permissoes')) {
+src/pages/PerfisPermissao.jsx:155:    if (!canAccessAction('gerir_permissoes')) {
+src/pages/PerfisPermissao.jsx:176:    if (!canAccessAction('gerir_permissoes')) {
+src/pages/RevisaoDuplicidadesMilitar.jsx:36:  const { user, isLoading: loadingUser, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/RevisaoDuplicidadesMilitar.jsx:74:  if (!loadingUser && isAccessResolved && (!canAccessModule('migracao_alteracoes_legado') || !canAccessAction('revisar_duplicidades'))) {
+src/pages/Promocoes.jsx:84:  const { isAdmin } = useCurrentUser();
+src/pages/Promocoes.jsx:249:          {isAdmin && (
+src/pages/Promocoes.jsx:333:                        {isAdmin && promocaoPermiteExclusao(promocao, { vinculadosReais: totaisReais[promocao.id] || 0 }) && (
+src/pages/IndicacoesDomPedroII.jsx:63:  const { user, isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/IndicacoesDomPedroII.jsx:64:  const hasMedalhasAccess = canAccessModule('medalhas');
+src/pages/IndicacoesDomPedroII.jsx:65:  const hasDomPedroAccess = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
+src/pages/IndicacoesDomPedroII.jsx:66:  const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
+src/pages/IndicacoesDomPedroII.jsx:67:  const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
+src/pages/IndicacoesDomPedroII.jsx:68:  const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
+src/pages/IndicacoesDomPedroII.jsx:69:  const podeModoAdmin = canAccessAction(ACOES_MEDALHAS.ADMIN_OVERRIDE);
+src/pages/IndicacoesDomPedroII.jsx:85:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/IndicacoesDomPedroII.jsx:90:    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters }),
+src/pages/IndicacoesDomPedroII.jsx:91:    enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
+src/pages/IndicacoesDomPedroII.jsx:96:      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+src/pages/IndicacoesDomPedroII.jsx:97:      return listarMedalhasEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+src/pages/IndicacoesDomPedroII.jsx:99:    enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
+src/pages/IndicacoesDomPedroII.jsx:104:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/IndicacoesDomPedroII.jsx:109:      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+src/pages/IndicacoesDomPedroII.jsx:110:      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+src/pages/IndicacoesDomPedroII.jsx:112:    enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
+src/pages/IndicacoesDomPedroII.jsx:208:      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.DOM_PEDRO, mensagem: 'Sem permissão para indicar Dom Pedro II.' });
+src/pages/IndicacoesDomPedroII.jsx:209:      validarMilitarDentroEscopo({ isAdmin, militarId: militar?.id, militarIdsEscopo });
+src/pages/IndicacoesDomPedroII.jsx:226:      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.ADMIN_OVERRIDE, mensagem: 'Sem permissão para usar override administrativo.' });
+src/pages/IndicacoesDomPedroII.jsx:227:      validarMilitarDentroEscopo({ isAdmin, militarId: militar?.id, militarIdsEscopo });
+src/pages/IndicacoesDomPedroII.jsx:258:      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.CONCEDER, mensagem: 'Sem permissão para conceder medalhas.' });
+src/pages/IndicacoesDomPedroII.jsx:259:      validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo });
+src/pages/IndicacoesDomPedroII.jsx:276:      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.RESETAR, mensagem: 'Sem permissão para resetar indicações.' });
+src/pages/IndicacoesDomPedroII.jsx:278:      const pendentesEscopo = isAdmin ? pendentes : pendentes.filter((m) => militarIdsEscopo.has(m.militar_id));
+src/pages/IndicacoesDomPedroII.jsx:295:  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+src/pages/IndicacoesDomPedroII.jsx:303:          canAccessAction={canAccessAction}
+src/pages/Medalhas.jsx:75:  const { isAdmin, modoAcesso, userEmail, effectiveUserEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/Medalhas.jsx:77:  const hasMedalhasAccess = canAccessModule('medalhas');
+src/pages/Medalhas.jsx:78:  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
+src/pages/Medalhas.jsx:79:  const podeGerirDomPedro = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
+src/pages/Medalhas.jsx:119:  const medalhasQueryKey = ['medalhas', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null, searchTerm, statusFilter, tipoFilter, unidadeFilter, postoFilter];
+src/pages/Medalhas.jsx:123:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/Medalhas.jsx:244:  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+src/pages/Medalhas.jsx:251:          canAccessAction={canAccessAction}
+src/pages/ConciliacaoBoletim.jsx:560:  const { isAdmin, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+src/pages/ConciliacaoBoletim.jsx:561:  const hasAccess = canAccessModule('conciliacao_boletim');
+src/pages/ConciliacaoBoletim.jsx:566:      if (isAdmin) return base44.entities.RegistroLivro.list('-created_date');
+src/pages/ConciliacaoBoletim.jsx:567:      const scopeFilters = getMilitarScopeFilters();
+src/pages/ConciliacaoBoletim.jsx:578:    enabled: isAccessResolved && hasAccess
+src/pages/ConciliacaoBoletim.jsx:583:    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
+src/pages/ConciliacaoBoletim.jsx:584:    enabled: isAccessResolved && hasAccess
+src/pages/ConciliacaoBoletim.jsx:590:    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
+src/pages/ConciliacaoBoletim.jsx:591:    enabled: isAccessResolved && hasAccess
+src/pages/ConciliacaoBoletim.jsx:1025:  if (!hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
+src/pages/PermissoesUsuarios.jsx:90:    canAccessAction,
+src/pages/PermissoesUsuarios.jsx:99:  const hasAccess = !loadingUser && isAccessResolved && canAccessAction('gerir_permissoes');
+src/pages/PermissoesUsuarios.jsx:100:  const canManageAccessLifecycle = hasAccess && (
+src/pages/PermissoesUsuarios.jsx:101:    canAccessAction('gerir_permissoes_usuarios')
+src/pages/PermissoesUsuarios.jsx:102:    || canAccessAction('gerir_permissoes')
+src/pages/PermissoesUsuarios.jsx:103:    || canAccessAction('excluir_usuarios_acesso')
+src/pages/PermissoesUsuarios.jsx:105:  const canHardDeleteAccess = hasAccess && canAccessAction('excluir_usuarios_acesso');
+src/pages/PermissoesUsuarios.jsx:106:  const isAdministrator = normalizeAccessMode(acessoLogado?.tipo_acesso) === 'admin' || isSuperAdmin(null, acessoLogado);
+src/pages/PermissoesUsuarios.jsx:141:    enabled: hasAccess
+src/pages/PermissoesUsuarios.jsx:143:  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome'), enabled: hasAccess });
+src/pages/PermissoesUsuarios.jsx:147:    enabled: hasAccess,
+src/pages/PermissoesUsuarios.jsx:152:    enabled: hasAccess,
+src/pages/PermissoesUsuarios.jsx:244:  if (!canAccessAction('gerir_permissoes')) {
+src/pages/PermissoesUsuarios.jsx:383:    if (!canAccessAction('gerir_permissoes')) {
+src/pages/PermissoesUsuarios.jsx:672:        const mensagemBloqueio = isAdministrator
+src/pages/ImportarMedalhaTempoServico.jsx:50:  const { isLoading, isAccessResolved, canAccessModule, userEmail } = useCurrentUser();
+src/pages/ImportarMedalhaTempoServico.jsx:143:  if (!canAccessModule('migracao_alteracoes_legado')) return <AccessDenied modulo="Importar Medalhas Tempo de Serviço" />;
+src/pages/consultaMilitar/consultaMilitarColumns.js:487:  if (userContext?.isAdmin) return true;
+src/pages/consultaMilitar/consultaMilitarColumns.js:489:  const canAccessSensitiveAction = typeof userContext?.canAccessAction === 'function'
+src/pages/consultaMilitar/consultaMilitarColumns.js:490:    ? userContext.canAccessAction('acesso_dados_sensiveis')
+src/pages/consultaMilitar/consultaMilitarColumns.jsx:514:  if (userContext?.isAdmin) return true;
+src/pages/consultaMilitar/consultaMilitarColumns.jsx:516:  const canAccessSensitiveAction = typeof userContext?.canAccessAction === 'function'
+src/pages/consultaMilitar/consultaMilitarColumns.jsx:517:    ? userContext.canAccessAction('acesso_dados_sensiveis')
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:16:    isAdmin: true,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:17:    canAccessAction: () => false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:27:    isAdmin: false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:28:    canAccessAction: (action) => action === 'acesso_dados_sensiveis',
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:38:    isAdmin: false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:39:    canAccessAction: () => false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:51:    isAdmin: false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:52:    canAccessAction: () => false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:70:    isAdmin: false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:71:    canAccessAction: () => false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:85:    isAdmin: true,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:86:    canAccessAction: () => true,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:96:    isAdmin: false,
+src/pages/consultaMilitar/consultaMilitarColumns.test.js:97:    canAccessAction: () => false,
+src/pages/RP.jsx:47:    canAccessModule,
+src/pages/RP.jsx:50:    isAdmin,
+src/pages/RP.jsx:58:    getMilitarScopeFilters,
+src/pages/RP.jsx:61:  const hasAccess = canAccessModule('rp');
+src/pages/RP.jsx:63:    isAdmin,
+src/pages/RP.jsx:70:  }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
+src/pages/RP.jsx:76:        getLivroMetricasRPContrato({ isAdmin, getMilitarScopeFilters }),
+src/pages/RP.jsx:77:        listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
+src/pages/RP.jsx:78:        listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
+src/pages/RP.jsx:99:    enabled: isAccessResolved && hasAccess,
+src/pages/RP.jsx:113:  if (!loadingUser && isAccessResolved && !hasAccess) {
+src/pages/DetalhePromocao.jsx:257:  isAdmin,
+src/pages/DetalhePromocao.jsx:325:            const podeReverter = canReverterPublicacao && canReverterItem(registro, { isAdmin });
+src/pages/DetalhePromocao.jsx:326:            const podeExcluirDefinitivo = canExcluirDefinitivo(registro, { isAdmin });
+src/pages/DetalhePromocao.jsx:361:  const { isAdmin, user } = useCurrentUser();
+src/pages/DetalhePromocao.jsx:790:      if (!isAdmin) throw new Error('Apenas administrador pode excluir definitivamente.');
+src/pages/DetalhePromocao.jsx:811:      if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
+src/pages/DetalhePromocao.jsx:812:      if (!canReverterItem(registro, { isAdmin })) throw new Error('Somente item publicado pode ser revertido.');
+src/pages/DetalhePromocao.jsx:1261:                        canReverterPublicacao={isAdmin === true}
+src/pages/DetalhePromocao.jsx:1263:                        isAdmin={isAdmin === true}
+src/pages/VerAtestado.jsx:78:  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/VerAtestado.jsx:79:  const hasAtestadosAccess = canAccessModule('atestados');
+src/pages/PeriodosAquisitivos.jsx:51:  const { canAccessModule, isLoading: loadingUser, isAccessResolved, isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
+src/pages/PeriodosAquisitivos.jsx:52:  const hasFeriasAccess = canAccessModule('ferias');
+src/pages/PeriodosAquisitivos.jsx:64:  const paBundleQueryKey = ['pa-bundle', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null];
+src/pages/TemplatesTexto.jsx:712:  const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/TemplatesTexto.jsx:713:  const canGerirTemplates = canAccessAction('gerir_templates');
+src/pages/ImportarMedalhaDomPedroII.jsx:36:  const { isLoading, isAccessResolved, canAccessModule, canAccessAction, userEmail } = useCurrentUser();
+src/pages/ImportarMedalhaDomPedroII.jsx:125:  if (!canAccessModule('migracao_alteracoes_legado')) return <AccessDenied modulo="Importar Medalha Dom Pedro II" />;
+src/pages/ClassificacoesHistoricasAlteracoes.jsx:158:  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/ClassificacoesHistoricasAlteracoes.jsx:166:  const hasAccess = canAccessModule('migracao_alteracoes_legado') && canAccessAction('gerir_classificacoes_historicas');
+src/pages/ClassificacoesHistoricasAlteracoes.jsx:174:    enabled: isAccessResolved && hasAccess,
+src/pages/ClassificacoesHistoricasAlteracoes.jsx:223:  if (!hasAccess) return <AccessDenied modulo="Classificações Históricas de Alterações" />;
+src/pages/EditarJISO.jsx:40:  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, user } = useCurrentUser();
+src/pages/EditarJISO.jsx:42:  const hasAtestadosAccess = canAccessModule('atestados');
+src/pages/EditarJISO.jsx:43:  const canGerirJiso = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
+src/pages/FolhaAlteracoes.jsx:211:    isAdmin,
+src/pages/FolhaAlteracoes.jsx:218:    hasSelfAccess,
+src/pages/FolhaAlteracoes.jsx:219:    canAccessModule,
+src/pages/FolhaAlteracoes.jsx:220:    getMilitarScopeFilters,
+src/pages/FolhaAlteracoes.jsx:242:    queryKey: ['folha-alteracoes-militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+src/pages/FolhaAlteracoes.jsx:244:      if (isAdmin) {
+src/pages/FolhaAlteracoes.jsx:269:            if (!hasSelfAccess(m) || ids.has(m.id)) return false;
+src/pages/FolhaAlteracoes.jsx:277:      const filters = getMilitarScopeFilters();
+src/pages/FolhaAlteracoes.jsx:458:  if (!loadingUser && isAccessResolved && !canAccessModule('folha_alteracoes')) {
+src/pages/Armamentos.jsx:51:  const { isAdmin, modoAcesso, userEmail, effectiveUserEmail, isLoading: loadingUser, canAccessModule, canAccessAction, isAccessResolved } = useCurrentUser();
+src/pages/Armamentos.jsx:53:  const canAdicionarArmamentos = canAccessAction('adicionar_armamentos');
+src/pages/Armamentos.jsx:65:  const armamentosQueryKey = ['armamentos', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null];
+src/pages/Armamentos.jsx:69:    enabled: Boolean(isAccessResolved && canAccessModule('armamentos')),
+src/pages/Armamentos.jsx:149:  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
+src/pages/CadastrarMedalha.jsx:26:  const { canAccessModule, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/CadastrarMedalha.jsx:28:  const hasMedalhasAccess = canAccessModule('medalhas');
+src/pages/CadastrarMedalha.jsx:29:  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
+src/pages/CadastrarMedalha.jsx:75:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/CadastrarMedalha.jsx:132:        canAccessAction,
+src/pages/CadastrarMedalha.jsx:158:  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+src/pages/CreditosExtraordinariosFerias.jsx:99:  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/CreditosExtraordinariosFerias.jsx:121:    enabled: isAccessResolved && canAccessModule('ferias'),
+src/pages/CreditosExtraordinariosFerias.jsx:150:    enabled: isAccessResolved && canAccessModule('ferias'),
+src/pages/CreditosExtraordinariosFerias.jsx:161:    enabled: isAccessResolved && canAccessModule('ferias'),
+src/pages/CreditosExtraordinariosFerias.jsx:342:  if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
+src/pages/Publicacoes.jsx:358:    isAdmin,
+src/pages/Publicacoes.jsx:366:    canAccessModule,
+src/pages/Publicacoes.jsx:367:    canAccessAction,
+src/pages/Publicacoes.jsx:368:    getMilitarScopeFilters,
+src/pages/Publicacoes.jsx:373:  const hasPublicacoesAccess = canAccessModule('controle_publicacoes');
+src/pages/Publicacoes.jsx:374:  const canCriarPublicacoes = canAccessAction('adicionar_publicacoes') || canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+src/pages/Publicacoes.jsx:376:    isAdmin,
+src/pages/Publicacoes.jsx:383:  }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, user?.email, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
+src/pages/Publicacoes.jsx:391:    queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
+src/pages/Publicacoes.jsx:397:    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
+src/pages/Publicacoes.jsx:403:    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
+src/pages/Publicacoes.jsx:605:    if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
+src/pages/Publicacoes.jsx:606:    const permitirReversaoPublicado = !!(isAdmin && canAccessAction('admin_mode') && modoAdmin);
+src/pages/Publicacoes.jsx:637:    if ((!canAccessAction('excluir_publicacoes') && !canAccessAction('admin_mode')) || !modoAdmin) return alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
+src/pages/Publicacoes.jsx:687:                {canAccessAction('admin_mode') && (
+src/pages/Publicacoes.jsx:782:                        canAccessAction={canAccessAction}
+src/pages/Publicacoes.jsx:784:                        isAdmin={isAdmin}
+src/pages/ClassificacaoPendentesLegado.jsx:15:  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/ClassificacaoPendentesLegado.jsx:16:  const hasMigrationAccess = canAccessModule('migracao_alteracoes_legado');
+src/pages/ClassificacaoPendentesLegado.jsx:17:  const canClassificarLegado = canAccessAction('classificar_legado');
+src/pages/Militares.jsx:184:    isAdmin,
+src/pages/Militares.jsx:188:    canAccessModule,
+src/pages/Militares.jsx:189:    canAccessAction,
+src/pages/Militares.jsx:218:    () => getAllowedConsultaMilitarColumns({ userContext: { isAdmin, canAccessAction, modoAcesso } }),
+src/pages/Militares.jsx:219:    [isAdmin, canAccessAction, modoAcesso],
+src/pages/Militares.jsx:327:  const shouldShowLotacaoFilter = isAdmin || ['setor', 'subsetor', 'unidade'].includes(modoAcesso);
+src/pages/Militares.jsx:376:  const incluirInativos = isAdmin && mostrarInativos;
+src/pages/Militares.jsx:380:    isAdmin,
+src/pages/Militares.jsx:495:    enabled: isAccessResolved && canAccessAction('perm_visualizar_conferencias_militares'),
+src/pages/Militares.jsx:1179:  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) {
+src/pages/Militares.jsx:1194:              Escopo atual: {isAdmin ? 'Administrador' : (linkedMilitarEmail || userEmail || 'Usuário')}
+src/pages/Militares.jsx:1265:            {canAccessAction('adicionar_militares') && (
+src/pages/Militares.jsx:1373:            {isAdmin && (
+src/pages/Militares.jsx:1602:                  isAdmin={isAdmin}
+src/pages/Militares.jsx:1603:                  canAccessAction={canAccessAction}
+src/pages/GratificacoesFuncao.jsx:526:  const { isAdmin, canAccessAction, canAccessAll, permissions, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/GratificacoesFuncao.jsx:527:  const hasAbsoluteAccess = Boolean(isAdmin || canAccessAll || hasAllPermissions(permissions));
+src/pages/GratificacoesFuncao.jsx:529:  const canView = hasAbsoluteAccess || canAccessAction('visualizar_gratificacoes_funcao');
+src/pages/GratificacoesFuncao.jsx:530:  const canManageCadastros = hasAbsoluteAccess || canAccessAction('gerir_cotas_gratificacao_funcao');
+src/pages/GratificacoesFuncao.jsx:531:  const canManageGratificacoes = hasAbsoluteAccess || canAccessAction('gerir_gratificacoes_funcao');
+src/pages/GratificacoesFuncao.jsx:532:  const canViewAdministrativeQuotas = hasAbsoluteAccess || isAdmin || modoAcesso !== 'proprio';
+src/pages/VerMilitar.jsx:174:  const { isAdmin, hasAccess, hasSelfAccess, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/VerMilitar.jsx:175:  const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
+src/pages/VerMilitar.jsx:176:  const podeGerirAcervo = canAccessAction('gerir_acervo_historico');
+src/pages/VerMilitar.jsx:177:  const podeBaixarAcervo = canAccessAction('baixar_acervo_historico');
+src/pages/VerMilitar.jsx:181:  const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
+src/pages/VerMilitar.jsx:182:  const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+src/pages/VerMilitar.jsx:183:  const podeEditarContratoDesignacao = isAdmin || canAccessAction('editar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+src/pages/VerMilitar.jsx:184:  const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+src/pages/VerMilitar.jsx:185:  const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+src/pages/VerMilitar.jsx:186:  const podeExcluirContratoDesignacao = isAdmin || canAccessAction('excluir_contrato_designacao');
+src/pages/VerMilitar.jsx:218:    enabled: !!id && isAccessResolved && canAccessAction('perm_visualizar_conferencias_militares'),
+src/pages/VerMilitar.jsx:242:  const contratosDesignacaoQueryKey = ['ver-contratos-designacao', id, isAdmin, modoAcesso, userEmail, effectiveEmail || null];
+src/pages/VerMilitar.jsx:277:  const canViewMilitar = militar ? hasAccess(militar) || hasSelfAccess(militar) : false;
+src/pages/VerMilitar.jsx:428:      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
+src/pages/VerMilitar.jsx:450:      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
+src/pages/VerMilitar.jsx:926:          canAccessModule,
+src/pages/VerMilitar.jsx:927:          canAccessAction,
+src/pages/VerMilitar.jsx:1078:          canAccessModule,
+src/pages/VerMilitar.jsx:1079:          canAccessAction,
+src/pages/VerMilitar.jsx:1138:            canManage={isAdmin}
+src/pages/VerMilitar.jsx:1155:        visible: canAccessAction('visualizar_acervo_historico'),
+src/pages/VerMilitar.jsx:1493:    medalhasConcedidasSistema, armamentosSistema, isLoadingArmamentos, canAccessModule, canAccessAction, podeVisualizarContratosDesignacao,
+src/pages/VerMilitar.jsx:1497:    contratoDesignacaoMutation.isPending, historicoPromocoes, isAdmin, queryClient, refetchHistoricoPromocoes
+src/pages/VerMilitar.jsx:1590:            {isAdmin &&
+src/pages/Configuracoes.jsx:20:  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/Configuracoes.jsx:21:  const hasConfiguracoesAccess = canAccessModule('configuracoes');
+src/pages/Configuracoes.jsx:29:  if (!canAccessAction('gerir_configuracoes')) {
+src/pages/Configuracoes.jsx:53:          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} initialTab={selectedTab} showFuncoesTab={false} />
+src/pages/CadastrarMilitar.jsx:158:  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/CadastrarMilitar.jsx:159:  const hasMilitaresAccess = canAccessModule('militares');
+src/pages/CadastrarMilitar.jsx:380:      if (!editId && !isAdmin && subgrupamentoId) {
+src/pages/CadastrarMilitar.jsx:748:          {editId && isAdmin && !militarMesclado && (
+src/pages/ConferenciasMilitares.jsx:89:  const { user, canAccessAction } = useCurrentUser();
+src/pages/ConferenciasMilitares.jsx:92:  const canManage = canAccessAction('perm_gerir_conferencias_militares');
+src/pages/ConferenciasMilitares.jsx:416:  const { user, canAccessAction } = useCurrentUser();
+src/pages/ConferenciasMilitares.jsx:419:  const canManage = canAccessAction('perm_gerir_conferencias_militares');
+src/pages/QuadroOperacional.jsx:120:  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, isAdmin, getMilitarScopeFilters } = useCurrentUser();
+src/pages/QuadroOperacional.jsx:122:  const hasAccess = canAccessModule('quadro_operacional');
+src/pages/QuadroOperacional.jsx:123:  const canMoverCard = canAccessAction('mover_card');
+src/pages/QuadroOperacional.jsx:124:  const canGerirColunas = canAccessAction('gerir_colunas');
+src/pages/QuadroOperacional.jsx:125:  const canGerirQuadro = canAccessAction('gerir_quadro');
+src/pages/QuadroOperacional.jsx:137:    if (isAdmin) return null; // Admin sees all, no need to filter by militar_id
+src/pages/QuadroOperacional.jsx:139:    const militarScopeFilters = getMilitarScopeFilters();
+src/pages/QuadroOperacional.jsx:150:    if (!isAdmin) filters.militar_id = { $in: await fetchAccessibleMilitarIds() };
+src/pages/QuadroOperacional.jsx:161:    enabled: isAccessResolved && hasAccess,
+src/pages/QuadroOperacional.jsx:168:    enabled: isAccessResolved && hasAccess && !!quadro?.id,
+src/pages/QuadroOperacional.jsx:174:    enabled: isAccessResolved && hasAccess && !!quadro?.id && colunas.length > 0,
+src/pages/QuadroOperacional.jsx:180:    enabled: isAccessResolved && hasAccess && !!quadro?.id,
+src/pages/QuadroOperacional.jsx:584:  if (!hasAccess) return <AccessDenied modulo="Quadro Operacional" />;
+src/pages/CadastrarRegistroRP.jsx:203:    canAccessModule,
+src/pages/CadastrarRegistroRP.jsx:204:    canAccessAction,
+src/pages/CadastrarRegistroRP.jsx:208:    isAdmin,
+src/pages/CadastrarRegistroRP.jsx:213:  const hasAccess = canAccessModule('rp');
+src/pages/CadastrarRegistroRP.jsx:214:  const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+src/pages/CadastrarRegistroRP.jsx:215:  const canPublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
+src/pages/CadastrarRegistroRP.jsx:312:    isAdmin: isAdmin === true,
+src/pages/CadastrarRegistroRP.jsx:315:  }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, user?.email]);
+src/pages/CadastrarRegistroRP.jsx:316:  const canRunScopedQueries = Boolean(isAccessResolved && hasAccess && canGerirPublicacoes);
+src/pages/CadastrarRegistroRP.jsx:1162:  if (!loadingUser && isAccessResolved && !hasAccess) {
+src/pages/LotacaoMilitares.jsx:36:  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin } = useCurrentUser();
+src/pages/LotacaoMilitares.jsx:37:  const hasLotacaoAccess = canAccessModule('lotacao_militares');
+src/pages/LotacaoMilitares.jsx:151:        isAdmin,
+src/pages/LotacaoMilitares.jsx:203:    isAdmin,
+src/pages/LotacaoMilitares.jsx:421:    if (!canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
+src/pages/LotacaoMilitares.jsx:433:  const canAccess = canAccessAction('gerir_estrutura') || canAccessAction('gerir_permissoes');
+src/pages/Tags.jsx:6:  const { isAdmin } = useCurrentUser();
+src/pages/Tags.jsx:9:      <FuncoesTagsManager initialTab="grupos" showFuncoesTab={false} isAdmin={isAdmin} />
+src/pages/Punicoes.jsx:29:  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/Punicoes.jsx:33:  const canAdicionarPunicoes = canAccessAction('adicionar_punicoes');
+src/pages/Punicoes.jsx:34:  const canEditarPunicoes = canAccessAction('editar_punicoes');
+src/pages/Punicoes.jsx:35:  const canExcluirPunicoes = canAccessAction('excluir_punicoes');
+src/pages/Punicoes.jsx:41:  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+src/pages/Punicoes.jsx:96:  if (!loadingUser && isAccessResolved && !canAccessModule('punicoes')) return <AccessDenied modulo="Lançamento de Punições" />;
+src/pages/EstruturaOrganizacional.jsx:53:  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
+src/pages/EstruturaOrganizacional.jsx:54:  const hasEstruturaAccess = canAccessModule('estrutura_organizacional');
+src/pages/EstruturaOrganizacional.jsx:110:  if (!canAccessAction('gerir_estrutura')) {
+src/pages/SolicitacoesAtualizacao.jsx:11:import RequireAdmin from '@/components/auth/RequireAdmin';
+src/pages/SolicitacoesAtualizacao.jsx:41:  const { user, isAdmin } = useCurrentUser();
+src/pages/SolicitacoesAtualizacao.jsx:57:    if (!isAdmin) return;
+src/pages/SolicitacoesAtualizacao.jsx:82:  // Exceção temporária: mantido em admin puro (RequireAdmin) até a criação
+src/pages/SolicitacoesAtualizacao.jsx:85:    <RequireAdmin>
+src/pages/SolicitacoesAtualizacao.jsx:153:                    {isAdmin && s.status === 'Pendente' && (
+src/pages/SolicitacoesAtualizacao.jsx:204:    </RequireAdmin>
+src/pages/MigracaoAlteracoesLegado.jsx:172:  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/MigracaoAlteracoesLegado.jsx:481:  if (!canAccessModule('migracao_alteracoes_legado') || !canAccessAction('migrar_alteracoes_legado')) return <AccessDenied modulo="Migração de Alterações Legado" />;
+src/pages/ApuracaoMedalhasTempoServico.jsx:84:  const { user, isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/ApuracaoMedalhasTempoServico.jsx:85:  const hasMedalhasAccess = canAccessModule('medalhas');
+src/pages/ApuracaoMedalhasTempoServico.jsx:86:  const hasApuracaoAccess = temAlgumaPermissaoMedalhas(canAccessAction, ACOES_APURACAO);
+src/pages/ApuracaoMedalhasTempoServico.jsx:87:  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
+src/pages/ApuracaoMedalhasTempoServico.jsx:88:  const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
+src/pages/ApuracaoMedalhasTempoServico.jsx:89:  const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
+src/pages/ApuracaoMedalhasTempoServico.jsx:90:  const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
+src/pages/ApuracaoMedalhasTempoServico.jsx:91:  const podeModoAdmin = canAccessAction(ACOES_MEDALHAS.ADMIN_OVERRIDE);
+src/pages/ApuracaoMedalhasTempoServico.jsx:112:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/ApuracaoMedalhasTempoServico.jsx:117:    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters }),
+src/pages/ApuracaoMedalhasTempoServico.jsx:118:    enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
+src/pages/ApuracaoMedalhasTempoServico.jsx:124:      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+src/pages/ApuracaoMedalhasTempoServico.jsx:125:      return listarMedalhasEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+src/pages/ApuracaoMedalhasTempoServico.jsx:127:    enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
+src/pages/ApuracaoMedalhasTempoServico.jsx:133:    enabled: isAccessResolved && hasMedalhasAccess,
+src/pages/ApuracaoMedalhasTempoServico.jsx:139:      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+src/pages/ApuracaoMedalhasTempoServico.jsx:140:      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+src/pages/ApuracaoMedalhasTempoServico.jsx:142:    enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
+src/pages/ApuracaoMedalhasTempoServico.jsx:327:        canAccessAction,
+src/pages/ApuracaoMedalhasTempoServico.jsx:331:      validarMilitarDentroEscopo({ isAdmin, militarId: item?.militar_id, militarIdsEscopo });
+src/pages/ApuracaoMedalhasTempoServico.jsx:351:        canAccessAction,
+src/pages/ApuracaoMedalhasTempoServico.jsx:355:      validarMilitarDentroEscopo({ isAdmin, militarId: item?.militar_id, militarIdsEscopo });
+src/pages/ApuracaoMedalhasTempoServico.jsx:390:        canAccessAction,
+src/pages/ApuracaoMedalhasTempoServico.jsx:394:      validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo });
+src/pages/ApuracaoMedalhasTempoServico.jsx:414:        canAccessAction,
+src/pages/ApuracaoMedalhasTempoServico.jsx:419:      const pendentesEscopo = isAdmin ? pendentes : pendentes.filter((m) => militarIdsEscopo.has(m.militar_id));
+src/pages/ApuracaoMedalhasTempoServico.jsx:436:  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+src/pages/ApuracaoMedalhasTempoServico.jsx:446:          canAccessAction={canAccessAction}
+src/pages/__tests__/ApuracaoMedalhasTempoServico.reset.test.js:19:    isAdmin,
+src/pages/__tests__/ApuracaoMedalhasTempoServico.reset.test.js:26:    const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
+src/pages/__tests__/ApuracaoMedalhasTempoServico.reset.test.js:61:            isAdmin: false,
+src/pages/__tests__/ApuracaoMedalhasTempoServico.reset.test.js:84:            isAdmin: true,
+src/pages/__tests__/IndicacoesDomPedroII.reset.test.js:18:    isAdmin,
+src/pages/__tests__/IndicacoesDomPedroII.reset.test.js:25:    const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
+src/pages/__tests__/IndicacoesDomPedroII.reset.test.js:60:            isAdmin: false,
+src/pages/__tests__/IndicacoesDomPedroII.reset.test.js:80:            isAdmin: true,
+src/pages/__tests__/IndicacoesDomPedroII.reset.test.js:101:            isAdmin: true,
+src/pages/__tests__/IndicacoesDomPedroII.reset.test.js:122:            isAdmin: true,
+src/pages/DetalheComportamento.jsx:39:  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+src/pages/DashboardAcervo.jsx:37:  const { canAccessAction } = useCurrentUser();
+src/pages/DashboardAcervo.jsx:46:  const podeVisualizarAcervo = canAccessAction('visualizar_acervo_historico');
+src/pages/MigracaoMilitares.jsx:31:  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+src/pages/MigracaoMilitares.jsx:44:  const podeImportar = canAccessAction('importar_militares');
+src/pages/MigracaoMilitares.jsx:45:  const podeConferir = canAccessAction('conferir_base_militares');
+src/pages/MigracaoMilitares.jsx:241:  if (!canAccessModule('migracao_militares') || (!podeImportar && !podeConferir)) return <AccessDenied modulo="Migração de Militares" />;
+src/pages/VisualizacaoGestorEfetivo.jsx:27:  const { canAccessModule, isAccessResolved, userEmail, modoAcesso, linkedMilitarEmail } = useCurrentUser();
+src/pages/VisualizacaoGestorEfetivo.jsx:115:  if (!canAccessModule('militares')) return <AccessDenied moduleName="Efetivo" />;
+src/pages/AuditoriaComportamento.jsx:30: *  - Página protegida por RequireAdmin no roteador.
+src/pages/AuditoriaComportamento.jsx:35:  const { isLoading: loadingUser, isAdmin, isAccessResolved } = useCurrentUser();
+src/pages/AuditoriaComportamento.jsx:179:  if (!isAdmin) {
+src/pages/AvaliacaoComportamento.jsx:32:    canAccessAction,
+src/pages/AvaliacaoComportamento.jsx:33:    isAdmin,
+src/pages/AvaliacaoComportamento.jsx:36:    getMilitarScopeFilters,
+src/pages/AvaliacaoComportamento.jsx:38:  const canGerarPendencias = canAccessAction('gerar_pendencias_comportamento');
+src/pages/AvaliacaoComportamento.jsx:39:  const canAprovarMudanca = canAccessAction('aprovar_mudanca_comportamento');
+src/pages/AvaliacaoComportamento.jsx:49:  // listagem escopada via getMilitarScopeFilters().
+src/pages/AvaliacaoComportamento.jsx:50:  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+src/pages/AvaliacaoComportamento.jsx:54:    queryKey: ['avaliacao-comportamento-militares', isAdmin, modoAcesso, userEmail],
+src/pages/AvaliacaoComportamento.jsx:57:      if (isAdmin) {
+src/pages/AvaliacaoComportamento.jsx:60:        const filters = getMilitarScopeFilters();
+src/pages/AvaliacaoComportamento.jsx:162:        usuarioAtual: { canAccessAction },
+src/pages/RegistrosMilitar.jsx:120:    canAccessModule,
+src/pages/RegistrosMilitar.jsx:121:    isAdmin,
+src/pages/RegistrosMilitar.jsx:122:    canAccessAction,
+src/pages/RegistrosMilitar.jsx:148:  const canAccessRegistrosMilitar = canAccessModule('registros_militar');
+src/pages/RegistrosMilitar.jsx:149:  const canUseAdminMode = isAdmin && canAccessAction('admin_mode');
+src/pages/RegistrosMilitar.jsx:150:  const canEditarRegistros = canUseAdminMode && canAccessAction('editar_registros_militar');
+src/pages/RegistrosMilitar.jsx:151:  const canExcluirRegistros = canUseAdminMode && canAccessAction('excluir_registros_militar');
+src/pages/Home.jsx:129:    isAdmin,
+src/pages/Home.jsx:134:    hasSelfAccess,
+src/pages/Home.jsx:135:    getMilitarScopeFilters,
+src/pages/Home.jsx:146:    queryKey: ['militares-ativos', isAdmin, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+src/pages/Home.jsx:148:      if (isAdmin) {
+src/pages/Home.jsx:171:          if (!hasSelfAccess(m) || ids.has(m.id)) return false;
+src/pages/Home.jsx:179:      const filters = getMilitarScopeFilters();
+src/pages/Home.jsx:204:  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds({
+src/pages/Home.jsx:522:        {isAdmin && (
+src/pages/Home.jsx:524:            <AuditoriaComportamentoAlert isAdmin={isAdmin} />
+src/pages/ContratosDesignacao.jsx:243:  const { isAdmin, canAccessAction, canAccessAll, permissions, userEmail, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+src/pages/ContratosDesignacao.jsx:245:  const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
+src/pages/ContratosDesignacao.jsx:246:  const canCreate = hasAbsoluteAccess || isAdmin || canAccessAction('gerir_contratos_designacao');
+src/pages/ContratosDesignacao.jsx:265:    queryKey: ['painel-contratos-designacao', Boolean(isAdmin || hasAbsoluteAccess), null, userEmail || null, null, offset, PAGE_SIZE, effectiveEmail || null],
+src/pages/ContratosDesignacao.jsx:271:    queryKey: ['contratos-designacao-militares-disponiveis', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
+src/App.jsx:12:import RequireAdmin from '@/components/auth/RequireAdmin';
+src/App.jsx:13:import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
+src/App.jsx:18:const adminOnlyPages = new Set([
+src/App.jsx:19:  // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
+src/App.jsx:148:        if (adminOnlyPages.has(path)) {
+src/App.jsx:150:            <RequireAdmin>
+src/App.jsx:152:            </RequireAdmin>
+src/App.jsx:161:            <RequireModuleAccess
+src/App.jsx:169:            </RequireModuleAccess>
+src/Layout.jsx:130:          { name: 'Cadastro de Médicos', page: 'Medicos', icon: Stethoscope, adminOnly: true, moduleKey: 'atestados' },
+src/Layout.jsx:153:          { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
+src/Layout.jsx:163:          { name: 'Auditar Comportamento', page: 'AuditoriaComportamento', icon: ShieldCheck, adminOnly: true },
+src/Layout.jsx:187:          { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp', menuGroup: 'Cadastros' },
+src/Layout.jsx:237:          { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
+src/Layout.jsx:250:    isAdmin,
+src/Layout.jsx:251:    canAccessModule,
+src/Layout.jsx:252:    canAccessAction,
+src/Layout.jsx:266:  const temPermissao = (actionKey) => canAccessAction(actionKey);
+src/Layout.jsx:267:  useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
+src/Layout.jsx:311:    if (entry.adminOnly && !isAdmin) return false;
+src/Layout.jsx:315:    if (entry.actionKey && !canAccessAction(entry.actionKey)) return false;
+src/Layout.jsx:316:    if (entry.moduleKey && !canAccessModule(entry.moduleKey)) return false;
+src/Layout.jsx:320:          ? canAccessModule(permission.key)
+src/Layout.jsx:321:          : canAccessAction(permission.key)
+src/Layout.jsx:664:      {canAccessAction('perm_visualizar_quadro_operacional') && <AlertasOperacionais />}
+src/lib/publicacoesQueryKeys.js:16:  isAdmin = false,
+src/lib/publicacoesQueryKeys.js:25:    isAdmin: Boolean(isAdmin),
