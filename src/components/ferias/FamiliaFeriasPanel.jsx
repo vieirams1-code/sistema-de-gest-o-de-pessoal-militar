@@ -284,8 +284,18 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
 
     return (descontosFerias || [])
       .filter((desconto) => desconto?.periodo_aquisitivo_id === periodoId)
+      .filter((desconto) => desconto?.publicacao_id && desconto?.publicacao)
+      .filter((desconto) => desconto?.status !== 'cancelado')
       .sort((a, b) => new Date(b?.created_date || 0) - new Date(a?.created_date || 0));
   }, [descontosFerias, ferias]);
+
+  const descontosEfetivosDoPeriodo = useMemo(() => (descontosDoPeriodo || []).filter(
+    (desconto) => desconto?.status === 'ativo' && desconto?.saldo_aplicado === true
+  ), [descontosDoPeriodo]);
+
+  const descontosPendentesDoPeriodo = useMemo(() => (descontosDoPeriodo || []).filter(
+    (desconto) => desconto?.status === 'pendente_publicacao'
+  ), [descontosDoPeriodo]);
 
 
   const matriculaDocumental = useMemo(() => montarLabelMilitarFerias(ferias, { contexto: 'documental' }), [ferias]);
@@ -487,17 +497,17 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
           </div>
         )}
 
-        {descontosDoPeriodo.length > 0 && (
+        {descontosEfetivosDoPeriodo.length > 0 && (
           <div className="bg-violet-50 rounded-xl border border-violet-200 p-4">
             <div className="flex items-center gap-2 mb-3">
               <CalendarMinus2 className="w-4 h-4 text-violet-700" />
               <span className="text-xs font-bold text-violet-700 uppercase tracking-wide">
-                Ajustes do período
+                Ajustes efetivos do período
               </span>
             </div>
 
             <div className="space-y-3">
-              {descontosDoPeriodo.map((desconto) => {
+              {descontosEfetivosDoPeriodo.map((desconto) => {
                 const statusLabel = descontoStatusLabels[desconto.status] || desconto.status || '—';
                 const statusClass = descontoStatusColors[desconto.status] || 'bg-slate-100 text-slate-600 border-slate-200';
 
@@ -530,6 +540,49 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+
+        {descontosPendentesDoPeriodo.length > 0 && (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarMinus2 className="w-4 h-4 text-amber-700" />
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
+                Pendentes de publicação
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {descontosPendentesDoPeriodo.map((desconto) => (
+                <div key={desconto.id} className="bg-white rounded-lg border border-amber-100 p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Desconto em Férias: -{Number(desconto.dias || 0)} dia(s)
+                      </p>
+                      {desconto.data_inicio && (
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          A partir de {formatDate(desconto.data_inicio)}
+                        </p>
+                      )}
+                    </div>
+                    <Badge className={`${descontoStatusColors.pendente_publicacao} text-xs shrink-0`}>
+                      {descontoStatusLabels.pendente_publicacao}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span className="text-slate-400">Publicação</span>
+                    <span className="text-slate-700 font-medium">{formatPublicacaoDesconto(desconto)}</span>
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-amber-700 bg-amber-100/70 border border-amber-200 rounded-md px-2 py-1">
+                    Não altera o saldo enquanto não publicado.
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         )}
