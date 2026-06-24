@@ -284,6 +284,7 @@ export default function RegistroLivroModal({
   onClose,
   ferias,
   tipoInicial = 'Saída Férias',
+  modoAdmin = false,
 }) {
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
@@ -502,6 +503,19 @@ export default function RegistroLivroModal({
 
     return null;
   }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias]);
+
+
+  const diagnosticoSaldoInicio = useMemo(() => {
+    if (!ferias || !resumo || tipoRegistro !== 'Saída Férias') return null;
+
+    const periodoSaldo = periodoAquisitivoFerias || ferias;
+
+    return {
+      origem: periodoAquisitivoFerias ? 'PeriodoAquisitivo' : 'Ferias snapshot',
+      obterDiasBase: obterDiasBase(periodoSaldo),
+      saldoUtilizavelPeriodo: calcularSaldoUtilizavelPeriodo(periodoSaldo),
+    };
+  }, [ferias, resumo, tipoRegistro, periodoAquisitivoFerias]);
 
   const erroCronologia = useMemo(() => {
     return validarCronologia({
@@ -838,6 +852,55 @@ export default function RegistroLivroModal({
               {tipoRegistro === 'Saída Férias' && (
                 <div className="mt-3 text-xs text-cyan-800">
                   Retorno previsto: <strong>{formatDateBR(resumo.retorno)}</strong>
+                </div>
+              )}
+
+
+              {tipoRegistro === 'Saída Férias' && modoAdmin && diagnosticoSaldoInicio && (
+                <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+                  <div className="mb-2 font-semibold uppercase tracking-wide text-amber-800">
+                    Diagnóstico temporário do saldo de férias
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className="font-semibold text-amber-900">Dados da férias recebida</div>
+                      <dl className="mt-1 space-y-1">
+                        <div><dt className="inline font-medium">ferias.id:</dt> <dd className="inline break-all">{ferias.id ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">ferias.periodo_aquisitivo_id:</dt> <dd className="inline break-all">{ferias.periodo_aquisitivo_id ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">ferias.periodo_aquisitivo_ref:</dt> <dd className="inline">{ferias.periodo_aquisitivo_ref ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">ferias.dias:</dt> <dd className="inline">{ferias.dias ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">ferias.dias_base:</dt> <dd className="inline">{ferias.dias_base ?? '—'}</dd></div>
+                      </dl>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-amber-900">Dados do período encontrado</div>
+                      <dl className="mt-1 space-y-1">
+                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.id:</dt> <dd className="inline break-all">{periodoAquisitivoFerias?.id ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.ano_referencia:</dt> <dd className="inline">{periodoAquisitivoFerias?.ano_referencia ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_direito:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_direito ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_adquiridos:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_adquiridos ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_base:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_base ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_adicionais:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_adicionais ?? '—'}</dd></div>
+                      </dl>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className="font-semibold text-amber-900">Dados calculados</div>
+                      <dl className="mt-1 space-y-1">
+                        <div><dt className="inline font-medium">obterDiasBase(periodoSaldo):</dt> <dd className="inline">{diagnosticoSaldoInicio.obterDiasBase}</dd></div>
+                        <div><dt className="inline font-medium">calcularSaldoUtilizavelPeriodo(periodoSaldo):</dt> <dd className="inline">{diagnosticoSaldoInicio.saldoUtilizavelPeriodo}</dd></div>
+                        <div><dt className="inline font-medium">resumo.diasBase:</dt> <dd className="inline">{resumo.diasBase ?? '—'}</dd></div>
+                        <div><dt className="inline font-medium">resumo.saldoUtilizavel:</dt> <dd className="inline">{resumo.saldoUtilizavel ?? '—'}</dd></div>
+                      </dl>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-amber-900">Origem usada</div>
+                      <div className="mt-1 rounded border border-amber-200 bg-white/60 px-2 py-1 font-mono text-amber-900">
+                        {diagnosticoSaldoInicio.origem}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

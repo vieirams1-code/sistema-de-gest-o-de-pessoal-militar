@@ -1809,6 +1809,7 @@ export default function Ferias() {
         }
         ferias={registroLivroModal.ferias}
         tipoInicial={registroLivroModal.tipo}
+        modoAdmin={modoAdmin}
       />
 
       <Dialog
