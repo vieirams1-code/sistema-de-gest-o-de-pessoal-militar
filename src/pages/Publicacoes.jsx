@@ -15,6 +15,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { ativarDescontoFeriasPublicado } from '@/services/ativarDescontoFeriasPublicadoClient';
+import { cancelarDescontoFeriasPendente } from '@/services/cancelarDescontoFeriasPendenteClient';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -432,7 +433,6 @@ export default function Publicacoes() {
       const registroAtual = todosRegistros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo, { permitirReversaoPublicado });
       const origemTipo = normalizarOrigemTipoRegistro(tipo);
-      const entity = mapearEntityPublicacao(origemTipo);
       const campoStatus = campoStatusPorTipo(origemTipo);
       const statusAntes = normalizarStatusPublicacao(registroAtual?.status_calculado || registroAtual?.status_publicacao || registroAtual?.status) || calcularStatusPublicacaoRegistro(registroAtual || {});
       const registroDestino = { ...(registroAtual || {}), ...payloadFinal };
@@ -505,7 +505,11 @@ export default function Publicacoes() {
       if (tipo === 'atestado') return;
 
       const origemTipo = normalizarOrigemTipoRegistro(tipo);
-      const entity = mapearEntityPublicacao(origemTipo);
+
+      if (origemTipo === 'ex-officio' && registro?.tipo === 'Dispensa com Desconto em Férias') {
+        await cancelarDescontoFeriasPendente(id);
+      }
+
       const statusAtual = normalizarStatusPublicacao(registro?.status_calculado || registro?.status_publicacao || registro?.status) || calcularStatusPublicacaoRegistro(registro || {});
       const eventoExclusao = criarEventoAuditoriaPublicacao({
         registro: { ...(registro || {}), id, origem_tipo: origemTipo },
@@ -559,7 +563,11 @@ export default function Publicacoes() {
       }
     },
     onSuccess: async () => {
-      await Promise.all([refrescarDadosPublicacoes(), queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] })]);
+      await Promise.all([
+        refrescarDadosPublicacoes(),
+        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+        queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
+      ]);
     },
     onError: (error) => alert(error?.message || 'Erro ao excluir registro.'),
   });
@@ -638,7 +646,6 @@ export default function Publicacoes() {
     });
     if (!validacao.valido) {
       const origemTipo = normalizarOrigemTipoRegistro(tipo);
-      const entity = mapearEntityPublicacao(origemTipo);
       const eventoBloqueio = criarEventoAuditoriaPublicacao({
         registro: { ...(registroAtual || {}), id, origem_tipo: origemTipo },
         evento: EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO,
