@@ -35,6 +35,7 @@ import {
   normalizarStatusPublicacao,
   obterStatusCanonicoPublicacao,
   STATUS_PUBLICACAO,
+  temDadosCompletosBg,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
@@ -473,11 +474,13 @@ export default function Publicacoes() {
       const resultadoPublicacao = await atualizarEscopado('PublicacaoExOfficio', id, payloadComAuditoria);
 
       // Fase 2 — ativação do Desconto em Férias: quando a publicação interna
-      // "Dispensa com Desconto em Férias" passa a Publicado, aplica o abatimento
-      // no período aquisitivo. Idempotente e seguro (no-op para demais tipos).
+      // "Dispensa com Desconto em Férias" possui dados completos de BG
+      // (numero_bg + data_bg), aplica o abatimento no período aquisitivo.
+      // Não depende do campo status persistido (que pode divergir do calculado).
+      // Idempotência e demais validações ficam no backend.
       if (
         registroAtual?.tipo === 'Dispensa com Desconto em Férias' &&
-        statusDepois === STATUS_PUBLICACAO.PUBLICADO
+        temDadosCompletosBg(registroDestino)
       ) {
         await ativarDescontoFeriasPublicado(id);
       }
