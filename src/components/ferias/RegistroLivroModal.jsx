@@ -341,6 +341,10 @@ export default function RegistroLivroModal({
       if (!ferias?.militar_id) return [];
       return base44.entities.PeriodoAquisitivo.filter({ militar_id: ferias.militar_id });
     },
+    // Sempre revalida ao abrir o modal: garante que o saldo (dias_direito) reflita
+    // descontos em férias ativados em outra tela, evitando snapshot desatualizado.
+    refetchOnMount: 'always',
+    staleTime: 0,
     enabled: open && !!ferias?.militar_id,
   });
 

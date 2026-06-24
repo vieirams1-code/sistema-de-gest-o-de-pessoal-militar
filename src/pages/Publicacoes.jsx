@@ -491,6 +491,7 @@ export default function Publicacoes() {
       await Promise.all([
         refrescarDadosPublicacoes(),
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+        queryClient.invalidateQueries({ queryKey: ['periodos-militar-modal'] }),
         queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
       ]);
     },
