@@ -33,7 +33,7 @@ import {
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
-import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais } from '@/components/ferias/periodoSaldoUtils';
+import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais, obterDiasBase } from '@/components/ferias/periodoSaldoUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import FeriasTagsSection from '@/components/ferias/FeriasTagsSection';
@@ -425,13 +425,11 @@ export default function RegistroLivroModal({
   const resumo = useMemo(() => {
     if (!ferias || !dataRegistro) return null;
 
-    const baseDiasOriginal = Number(ferias.dias_base ?? ferias.dias ?? 0);
     const periodoSaldo = periodoAquisitivoFerias || ferias;
+    const baseDiasOperacional = obterDiasBase(periodoSaldo);
     const diasAdicionaisPeriodo = obterDiasAdicionais(periodoSaldo);
-    const saldoUtilizavelPeriodo = periodoAquisitivoFerias
-      ? calcularSaldoUtilizavelPeriodo(periodoAquisitivoFerias)
-      : Math.max(0, baseDiasOriginal + diasAdicionaisPeriodo);
-    const baseDias = tipoRegistro === 'Saída Férias' ? saldoUtilizavelPeriodo : baseDiasOriginal;
+    const saldoUtilizavelPeriodo = calcularSaldoUtilizavelPeriodo(periodoSaldo);
+    const baseDias = tipoRegistro === 'Saída Férias' ? saldoUtilizavelPeriodo : baseDiasOperacional;
     const creditosSelecionados = (creditosExtra || []).filter((credito) => creditosSelecionadosIds.includes(credito.id));
     const totaisGozo = calcularTotaisGozoComCreditos({
       diasBase: baseDias,
@@ -447,7 +445,7 @@ export default function RegistroLivroModal({
         titulo: 'Resumo do Início',
         inicio: dataRegistro,
         dias: totaisGozo.dias_totais_gozo,
-        diasBase: baseDiasOriginal,
+        diasBase: baseDiasOperacional,
         diasAdicionaisPeriodo,
         saldoUtilizavel: saldoUtilizavelPeriodo,
         diasExtras: totaisGozo.dias_extras_creditos,
@@ -641,7 +639,7 @@ export default function RegistroLivroModal({
           gozoFeriasId: ferias.id,
         });
         const totaisGozo = calcularTotaisGozoComCreditos({
-          diasBase: Number(ferias.dias_base ?? ferias.dias ?? 0),
+          diasBase: Number(resumo.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)),
           creditos: creditosValidados,
         });
 
@@ -721,7 +719,7 @@ export default function RegistroLivroModal({
               {ferias.militar_nome}
             </div>
             <div className="text-sm text-slate-500 mt-1">
-              Base: {ferias.dias_base ?? ferias.dias ?? 0}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
+              Base operacional: {resumo?.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
             </div>
           </div>
 
