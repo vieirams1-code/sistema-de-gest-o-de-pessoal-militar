@@ -28,6 +28,12 @@ function calcStatusPublicacao(pub = {}) {
   return 'Aguardando Nota';
 }
 
+function getStatusPublicacaoDesconto(desconto, publicacao) {
+  if (publicacao) return calcStatusPublicacao(publicacao);
+  if (desconto?.publicacao_id) return 'Publicação não encontrada';
+  return '—';
+}
+
 /**
  * Lista os descontos de férias e enriquece cada um com o status atual
  * da PublicacaoExOfficio vinculada (origem da verdade documental).
@@ -51,7 +57,7 @@ export async function listarDescontosFerias() {
     return {
       ...desconto,
       publicacao,
-      status_publicacao: publicacao ? calcStatusPublicacao(publicacao) : '—',
+      status_publicacao: getStatusPublicacaoDesconto(desconto, publicacao),
     };
   });
 }
