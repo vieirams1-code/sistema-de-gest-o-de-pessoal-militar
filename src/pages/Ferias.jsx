@@ -66,6 +66,7 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
+import { listarDescontosFerias } from '@/services/descontoFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { bulkFeriasTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
@@ -527,6 +528,12 @@ export default function Ferias() {
   const retryFeriasLoad = async () => {
     await refetchFerias();
   };
+
+  const { data: descontosFerias = [] } = useQuery({
+    queryKey: ['ferias-descontos-ferias', isAdmin, modoAcesso, userEmail],
+    queryFn: listarDescontosFerias,
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
 
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail],
@@ -1934,6 +1941,7 @@ export default function Ferias() {
           <FamiliaFeriasPanel
             ferias={familiaPanel.ferias}
             registrosLivro={registrosLivro}
+            descontosFerias={descontosFerias}
             onClose={() => setFamiliaPanel({ open: false, ferias: null })}
             modoAdmin={modoAdmin}
           />
