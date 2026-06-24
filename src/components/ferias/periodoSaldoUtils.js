@@ -47,16 +47,16 @@ export function filtrarFeriasDoPeriodo(periodo = {}, ferias = []) {
 }
 
 export function obterDiasBase(periodo = {}) {
+  if (hasNumericValue(periodo?.dias_direito)) {
+    return toNumber(periodo.dias_direito, DIAS_BASE_PADRAO);
+  }
+
   if (hasNumericValue(periodo?.dias_adquiridos)) {
     return toNumber(periodo.dias_adquiridos, DIAS_BASE_PADRAO);
   }
 
   if (hasNumericValue(periodo?.dias_base)) {
     return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
-  }
-
-  if (hasNumericValue(periodo?.dias_direito)) {
-    return toNumber(periodo.dias_direito, DIAS_BASE_PADRAO);
   }
 
   return DIAS_BASE_PADRAO;
