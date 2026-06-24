@@ -8,6 +8,7 @@ import {
   PauseCircle,
   RefreshCw,
   Timer,
+  CalendarMinus2,
   TrendingDown,
   AlertTriangle,
   CheckCircle2,
@@ -34,6 +35,29 @@ const pubStatusColors = {
   'Aguardando Publicação': 'bg-blue-100 text-blue-700',
   Publicado: 'bg-emerald-100 text-emerald-700',
 };
+
+const descontoStatusColors = {
+  pendente_publicacao: 'bg-amber-100 text-amber-800 border-amber-200',
+  ativo: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  revertido: 'bg-rose-100 text-rose-800 border-rose-200',
+  cancelado: 'bg-slate-100 text-slate-600 border-slate-200',
+};
+
+const descontoStatusLabels = {
+  pendente_publicacao: 'Pendente',
+  ativo: 'Ativo',
+  revertido: 'Revertido',
+  cancelado: 'Cancelado',
+};
+
+function formatPublicacaoDesconto(desconto) {
+  const publicacao = desconto?.publicacao;
+  if (publicacao?.numero_bg) {
+    return `BG nº ${publicacao.numero_bg}${publicacao.data_bg ? ` de ${formatDate(publicacao.data_bg)}` : ''}`;
+  }
+
+  return 'Aguardando publicação';
+}
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -221,7 +245,7 @@ function detectarInconsistencias(cadeia) {
   return [...new Set(inconsistencias)];
 }
 
-export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, modoAdmin = false }) {
+export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFerias = [], onClose, modoAdmin = false }) {
   const { isAdmin } = useCurrentUser();
 
   const eventosVinculados = useMemo(() => {
@@ -252,6 +276,16 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, mo
       .sort(compareEvents)
       .pop();
   }, [eventosVinculados]);
+
+
+  const descontosDoPeriodo = useMemo(() => {
+    const periodoId = ferias?.periodo_aquisitivo_id;
+    if (!periodoId) return [];
+
+    return (descontosFerias || [])
+      .filter((desconto) => desconto?.periodo_aquisitivo_id === periodoId)
+      .sort((a, b) => new Date(b?.created_date || 0) - new Date(a?.created_date || 0));
+  }, [descontosFerias, ferias]);
 
 
   const matriculaDocumental = useMemo(() => montarLabelMilitarFerias(ferias, { contexto: 'documental' }), [ferias]);
@@ -449,6 +483,53 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, mo
                   {item}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {descontosDoPeriodo.length > 0 && (
+          <div className="bg-violet-50 rounded-xl border border-violet-200 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarMinus2 className="w-4 h-4 text-violet-700" />
+              <span className="text-xs font-bold text-violet-700 uppercase tracking-wide">
+                Ajustes do período
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {descontosDoPeriodo.map((desconto) => {
+                const statusLabel = descontoStatusLabels[desconto.status] || desconto.status || '—';
+                const statusClass = descontoStatusColors[desconto.status] || 'bg-slate-100 text-slate-600 border-slate-200';
+
+                return (
+                  <div key={desconto.id} className="bg-white rounded-lg border border-violet-100 p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          Desconto em Férias: -{Number(desconto.dias || 0)} dia(s)
+                        </p>
+                        {desconto.data_inicio && (
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            A partir de {formatDate(desconto.data_inicio)}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className={`${statusClass} text-xs shrink-0`}>{statusLabel}</Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="text-slate-400">Status</span>
+                      <span className="text-slate-700 font-medium">{statusLabel}</span>
+                      <span className="text-slate-400">Publicação</span>
+                      <span className="text-slate-700 font-medium">{formatPublicacaoDesconto(desconto)}</span>
+                    </div>
+
+                    <p className="mt-2 text-[11px] text-violet-700 bg-violet-100/70 border border-violet-200 rounded-md px-2 py-1">
+                      Reversão disponível apenas em Descontos em Férias.
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
