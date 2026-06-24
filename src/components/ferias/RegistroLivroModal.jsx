@@ -83,6 +83,22 @@ function formatDateBR(dateStr) {
   return format(parseDate(dateStr), 'dd/MM/yyyy');
 }
 
+
+function montarFeriasParaTemplateLivro(ferias, tipoRegistro, resumo) {
+  if (tipoRegistro !== 'Saída Férias' || !resumo) return ferias;
+
+  const diasOperacionais = Number(resumo.dias || resumo.saldoUtilizavel || 0);
+  const diasBaseGozo = Number(resumo.diasBase || 0);
+
+  return {
+    ...ferias,
+    dias: diasOperacionais,
+    dias_base_gozo: diasBaseGozo,
+    dias_totais_gozo: diasOperacionais,
+    dias_base: diasBaseGozo,
+  };
+}
+
 function calcStatusPublicacao(nota, numeroBg, dataBg) {
   if (numeroBg && dataBg) return 'Publicado';
   if (nota) return 'Aguardando Publicação';
@@ -571,8 +587,10 @@ export default function RegistroLivroModal({
       };
     }
 
+    const feriasParaTemplate = montarFeriasParaTemplateLivro(ferias, tipoRegistro, resumo);
+
     const vars = buildVarsLivro({
-      ferias,
+      ferias: feriasParaTemplate,
       militar:
         militarCompleto ||
         ferias?.militar ||
@@ -657,10 +675,13 @@ export default function RegistroLivroModal({
           creditos: creditosValidados,
         });
 
-        registroPayload.dias = Number(resumo.dias || ferias.dias || 0);
-        registroPayload.dias_base_gozo = totaisGozo.dias_base_gozo;
+        const diasOperacionais = Number(resumo.dias || resumo.saldoUtilizavel || 0);
+        const diasBaseGozo = Number(resumo.diasBase || 0);
+
+        registroPayload.dias = diasOperacionais;
+        registroPayload.dias_base_gozo = diasBaseGozo;
         registroPayload.dias_extras_creditos = totaisGozo.dias_extras_creditos;
-        registroPayload.dias_totais_gozo = totaisGozo.dias_totais_gozo;
+        registroPayload.dias_totais_gozo = diasOperacionais;
         registroPayload.creditos_extra_ids = creditosValidados.map((credito) => credito.id);
         registroPayload.creditos_extra_resumo = creditosValidados
           .map((credito) => `${formatarTipoCreditoExtra(credito.tipo_credito)} (+${credito.quantidade_dias}d)`)
@@ -676,9 +697,9 @@ export default function RegistroLivroModal({
         }
 
         await atualizarEscopado('Ferias', ferias.id, {
-          dias_base_gozo: totaisGozo.dias_base_gozo,
+          dias_base_gozo: registroPayload.dias_base_gozo,
           dias_extras_creditos: totaisGozo.dias_extras_creditos,
-          dias_totais_gozo: totaisGozo.dias_totais_gozo,
+          dias_totais_gozo: registroPayload.dias_totais_gozo,
         });
       }
 
