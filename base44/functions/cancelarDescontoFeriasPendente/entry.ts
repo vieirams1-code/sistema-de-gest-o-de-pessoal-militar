@@ -19,6 +19,33 @@ const TIPO_INTERNO = 'Dispensa com Desconto em Férias';
 const MENSAGEM_REVERSAO = 'Este desconto já foi publicado. Use Solicitar Reversão em Descontos em Férias.';
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
+async function upsertAjusteDescontoFerias(base44, desconto, overrides = {}) {
+  if (!desconto?.id) return null;
+  const existentes = await base44.asServiceRole.entities.AjusteSaldoFerias
+    .filter({ entidade_origem: 'DescontoFerias', entidade_origem_id: desconto.id })
+    .catch(() => []);
+  const existente = (existentes || [])[0];
+  const data = {
+    militar_id: desconto.militar_id || '',
+    militar_nome: desconto.militar_nome || '',
+    periodo_aquisitivo_id: desconto.periodo_aquisitivo_id || '',
+    periodo_aquisitivo_ref: desconto.periodo_aquisitivo_ref || '',
+    tipo: 'debito',
+    dias: Math.max(0, Number(desconto.dias) || 0),
+    motivo: 'Desconto em férias',
+    origem: 'desconto_ferias',
+    status: 'cancelado',
+    publicacao_id: desconto.publicacao_id || '',
+    entidade_origem: 'DescontoFerias',
+    entidade_origem_id: desconto.id,
+    observacoes: desconto.observacoes || '',
+    criado_por_email: desconto.criado_por_email || '',
+    ...overrides,
+  };
+  if (existente?.id) return base44.asServiceRole.entities.AjusteSaldoFerias.update(existente.id, data);
+  return base44.asServiceRole.entities.AjusteSaldoFerias.create(data);
+}
+
 function publicacaoEstaPublicada(pub = {}) {
   if (String(pub.status || '').trim() === 'Publicado') return true;
   return Boolean(pub.numero_bg || pub.data_bg);
@@ -60,7 +87,8 @@ Deno.serve(async (req) => {
     }
 
     if (String(desconto.status || '') === 'cancelado') {
-      return Response.json({ ok: true, cancelado: false, ja_cancelado: true, descontoFerias: desconto });
+      const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, desconto, { status: 'cancelado' });
+      return Response.json({ ok: true, cancelado: false, ja_cancelado: true, descontoFerias: desconto, ajusteSaldoFerias });
     }
 
     if (desconto.saldo_aplicado === true || String(desconto.status || '') === 'ativo') {
@@ -82,8 +110,15 @@ Deno.serve(async (req) => {
       saldo_aplicado: false,
       observacoes: observacoesNovas,
     });
+    const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, descontoAtualizado, {
+      status: 'cancelado',
+      observacoes: observacoesNovas,
+      cancelado_em: carimbo,
+      cancelado_por_email: normalizeEmail(authUser.email),
+      motivo_cancelamento: `Exclusão da publicação pendente ${publicacaoId}`,
+    });
 
-    return Response.json({ ok: true, cancelado: true, descontoFerias: descontoAtualizado });
+    return Response.json({ ok: true, cancelado: true, descontoFerias: descontoAtualizado, ajusteSaldoFerias });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     console.error('[cancelarDescontoFeriasPendente] erro', { message: error?.message, status });
