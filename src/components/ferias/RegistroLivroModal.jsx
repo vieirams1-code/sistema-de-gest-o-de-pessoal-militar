@@ -352,7 +352,7 @@ export default function RegistroLivroModal({
     enabled: open && !!ferias?.militar_id,
   });
 
-  const { data: periodosDoMilitar = [] } = useQuery({
+  const { data: periodosDoMilitar = [], isLoading: periodosDoMilitarLoading, isFetching: periodosDoMilitarFetching } = useQuery({
     queryKey: ['periodos-militar-modal', ferias?.militar_id],
     queryFn: async () => {
       if (!ferias?.militar_id) return [];
@@ -386,11 +386,32 @@ export default function RegistroLivroModal({
   const periodoAquisitivoFerias = useMemo(() => {
     if (!ferias) return null;
 
-    return (periodosDoMilitar || []).find((item) =>
-      (ferias.periodo_aquisitivo_id && item.id === ferias.periodo_aquisitivo_id) ||
-      ((item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || ''))
-    ) || null;
+    if (ferias.periodo_aquisitivo_id) {
+      return (periodosDoMilitar || []).find((item) => item.id === ferias.periodo_aquisitivo_id) || null;
+    }
+
+    if (ferias.periodo_aquisitivo_ref) {
+      return (periodosDoMilitar || []).find((item) =>
+        (item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || '')
+      ) || null;
+    }
+
+    return null;
   }, [periodosDoMilitar, ferias]);
+
+  const bloqueioPeriodoAquisitivoSaida = useMemo(() => {
+    if (tipoRegistro !== 'Saída Férias') return null;
+
+    if (periodosDoMilitarLoading || periodosDoMilitarFetching) {
+      return 'Carregando período aquisitivo vinculado...';
+    }
+
+    if (ferias?.periodo_aquisitivo_id && !periodoAquisitivoFerias) {
+      return 'Carregando período aquisitivo vinculado...';
+    }
+
+    return null;
+  }, [tipoRegistro, periodosDoMilitarLoading, periodosDoMilitarFetching, ferias, periodoAquisitivoFerias]);
 
   const dataLimiteGozo = useMemo(() => {
     return periodoAquisitivoFerias?.data_limite_gozo || ferias?.data_limite_gozo || null;
@@ -441,6 +462,8 @@ export default function RegistroLivroModal({
 
   const resumo = useMemo(() => {
     if (!ferias || !dataRegistro) return null;
+
+    if (tipoRegistro === 'Saída Férias' && bloqueioPeriodoAquisitivoSaida) return null;
 
     const periodoSaldo = periodoAquisitivoFerias || ferias;
     const baseDiasOperacional = obterDiasBase(periodoSaldo);
@@ -518,20 +541,8 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias, bloqueioPeriodoAquisitivoSaida]);
 
-
-  const diagnosticoSaldoInicio = useMemo(() => {
-    if (!ferias || !resumo || tipoRegistro !== 'Saída Férias') return null;
-
-    const periodoSaldo = periodoAquisitivoFerias || ferias;
-
-    return {
-      origem: periodoAquisitivoFerias ? 'PeriodoAquisitivo' : 'Ferias snapshot',
-      obterDiasBase: obterDiasBase(periodoSaldo),
-      saldoUtilizavelPeriodo: calcularSaldoUtilizavelPeriodo(periodoSaldo),
-    };
-  }, [ferias, resumo, tipoRegistro, periodoAquisitivoFerias]);
 
   const erroCronologia = useMemo(() => {
     return validarCronologia({
@@ -568,10 +579,11 @@ export default function RegistroLivroModal({
 
     setTemplateError(null);
 
-    const periodoFerias = (periodosDoMilitar || []).find((item) =>
-      (ferias.periodo_aquisitivo_id && item.id === ferias.periodo_aquisitivo_id) ||
-      ((item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || ''))
-    );
+    const periodoFerias = periodoAquisitivoFerias || (ferias.periodo_aquisitivo_id
+      ? null
+      : (periodosDoMilitar || []).find((item) =>
+        (item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || '')
+      ));
 
     let interrupcaoInfo = null;
     if (tipoRegistro === 'Interrupção de Férias') {
@@ -603,7 +615,7 @@ export default function RegistroLivroModal({
     // Proteção operacional: este texto é re-renderizado de forma determinística a cada
     // alteração de dados do formulário (fluxo TEMPLATE_IMUTAVEL/RENDER_LAZY).
     setTextoPublicacao(aplicarTemplate(tmpl.template, vars));
-  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar, militarCompleto]);
+  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar, militarCompleto, periodoAquisitivoFerias]);
 
   const statusPublicacao = useMemo(
     () => calcStatusPublicacao(notaParaBg, numeroBg, dataBg),
@@ -611,7 +623,7 @@ export default function RegistroLivroModal({
   );
 
   const handleSalvar = async () => {
-    if (!ferias || !dataRegistro || erroCronologia) return;
+    if (!ferias || !dataRegistro || erroCronologia || bloqueioPeriodoAquisitivoSaida || (tipoRegistro === 'Saída Férias' && !resumo)) return;
 
     if (!canGerirCadeia) {
       alert('Ação negada: Você não possui permissão para gerir a cadeia de férias (adicionar registros).');
@@ -671,7 +683,7 @@ export default function RegistroLivroModal({
           gozoFeriasId: ferias.id,
         });
         const totaisGozo = calcularTotaisGozoComCreditos({
-          diasBase: Number(resumo.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)),
+          diasBase: Number(resumo.diasBase ?? obterDiasBase(periodoAquisitivoFerias)),
           creditos: creditosValidados,
         });
 
@@ -754,7 +766,7 @@ export default function RegistroLivroModal({
               {ferias.militar_nome}
             </div>
             <div className="text-sm text-slate-500 mt-1">
-              Base operacional: {resumo?.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
+              Base operacional: {bloqueioPeriodoAquisitivoSaida ? 'carregando...' : `${resumo?.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)}d`} | Período: {ferias.periodo_aquisitivo_ref || '—'}
             </div>
           </div>
 
@@ -840,10 +852,24 @@ export default function RegistroLivroModal({
             </div>
           )}
 
+          {bloqueioPeriodoAquisitivoSaida && !erroCronologia && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 flex gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{bloqueioPeriodoAquisitivoSaida}</span>
+            </div>
+          )}
+
           {templateError && !erroCronologia && (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{templateError}</span>
+            </div>
+          )}
+
+          {bloqueioPeriodoAquisitivoSaida && !erroCronologia && (
+            <div className="rounded-lg border p-4 bg-cyan-50 border-cyan-200">
+              <div className="font-semibold text-cyan-800 mb-2">Resumo do Início</div>
+              <div className="text-sm text-cyan-700">Carregando período aquisitivo vinculado...</div>
             </div>
           )}
 
@@ -876,54 +902,6 @@ export default function RegistroLivroModal({
                 </div>
               )}
 
-
-              {tipoRegistro === 'Saída Férias' && modoAdmin && diagnosticoSaldoInicio && (
-                <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
-                  <div className="mb-2 font-semibold uppercase tracking-wide text-amber-800">
-                    Diagnóstico temporário do saldo de férias
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <div className="font-semibold text-amber-900">Dados da férias recebida</div>
-                      <dl className="mt-1 space-y-1">
-                        <div><dt className="inline font-medium">ferias.id:</dt> <dd className="inline break-all">{ferias.id ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">ferias.periodo_aquisitivo_id:</dt> <dd className="inline break-all">{ferias.periodo_aquisitivo_id ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">ferias.periodo_aquisitivo_ref:</dt> <dd className="inline">{ferias.periodo_aquisitivo_ref ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">ferias.dias:</dt> <dd className="inline">{ferias.dias ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">ferias.dias_base:</dt> <dd className="inline">{ferias.dias_base ?? '—'}</dd></div>
-                      </dl>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-amber-900">Dados do período encontrado</div>
-                      <dl className="mt-1 space-y-1">
-                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.id:</dt> <dd className="inline break-all">{periodoAquisitivoFerias?.id ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.ano_referencia:</dt> <dd className="inline">{periodoAquisitivoFerias?.ano_referencia ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_direito:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_direito ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_adquiridos:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_adquiridos ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_base:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_base ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">periodoAquisitivoFerias?.dias_adicionais:</dt> <dd className="inline">{periodoAquisitivoFerias?.dias_adicionais ?? '—'}</dd></div>
-                      </dl>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <div>
-                      <div className="font-semibold text-amber-900">Dados calculados</div>
-                      <dl className="mt-1 space-y-1">
-                        <div><dt className="inline font-medium">obterDiasBase(periodoSaldo):</dt> <dd className="inline">{diagnosticoSaldoInicio.obterDiasBase}</dd></div>
-                        <div><dt className="inline font-medium">calcularSaldoUtilizavelPeriodo(periodoSaldo):</dt> <dd className="inline">{diagnosticoSaldoInicio.saldoUtilizavelPeriodo}</dd></div>
-                        <div><dt className="inline font-medium">resumo.diasBase:</dt> <dd className="inline">{resumo.diasBase ?? '—'}</dd></div>
-                        <div><dt className="inline font-medium">resumo.saldoUtilizavel:</dt> <dd className="inline">{resumo.saldoUtilizavel ?? '—'}</dd></div>
-                      </dl>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-amber-900">Origem usada</div>
-                      <div className="mt-1 rounded border border-amber-200 bg-white/60 px-2 py-1 font-mono text-amber-900">
-                        {diagnosticoSaldoInicio.origem}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {tipoRegistro === 'Retorno Férias' && (
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1037,7 +1015,7 @@ export default function RegistroLivroModal({
               </div>
             </div>
 
-            {!textoPublicacao && !erroCronologia && (
+            {!textoPublicacao && !erroCronologia && !bloqueioPeriodoAquisitivoSaida && (
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 flex gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>O texto da publicação está vazio. Revise antes de salvar.</span>
@@ -1062,7 +1040,7 @@ export default function RegistroLivroModal({
             </Button>
             <Button
               onClick={handleSalvar}
-              disabled={saving || !dataRegistro || !!erroCronologia || !canGerirCadeia || !!templateError}
+              disabled={saving || !dataRegistro || !!erroCronologia || !!bloqueioPeriodoAquisitivoSaida || (tipoRegistro === 'Saída Férias' && !resumo) || !canGerirCadeia || !!templateError}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
             >
               {saving ? 'Salvando...' : 'Salvar Registro'}
