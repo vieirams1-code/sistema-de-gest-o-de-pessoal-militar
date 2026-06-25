@@ -1,0 +1,25 @@
+{
+  "name": "AjusteSaldoFerias",
+  "type": "object",
+  "title": "Ajuste de Saldo de Férias",
+  "description": "Ajuste derivado para composição futura do saldo líquido de férias.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "militar_nome": { "type": "string", "default": "" },
+    "periodo_aquisitivo_id": { "type": "string", "default": "" },
+    "periodo_aquisitivo_ref": { "type": "string", "default": "" },
+    "tipo": { "type": "string", "default": "credito" },
+    "dias": { "type": "number", "default": 0 },
+    "motivo": { "type": "string", "default": "" },
+    "origem": { "type": "string", "default": "manual" },
+    "status": { "type": "string", "default": "rascunho" },
+    "publicacao_id": { "type": "string", "default": "" },
+    "entidade_origem": { "type": "string", "default": "" },
+    "entidade_origem_id": { "type": "string", "default": "" },
+    "observacoes": { "type": "string", "default": "" },
+    "criado_por_email": { "type": "string", "default": "" },
+    "cancelado_em": { "type": "string", "default": "" },
+    "cancelado_por_email": { "type": "string", "default": "" },
+    "motivo_cancelamento": { "type": "string", "default": "" }
+  }
+}
