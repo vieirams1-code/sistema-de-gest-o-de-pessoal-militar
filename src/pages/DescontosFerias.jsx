@@ -36,6 +36,7 @@ export default function DescontosFerias() {
   const [modalCadastro, setModalCadastro] = useState(false);
   const [modalPublicacao, setModalPublicacao] = useState(false);
   const [dadosDesconto, setDadosDesconto] = useState(null);
+  const [solicitandoReversaoId, setSolicitandoReversaoId] = useState(null);
 
   const [busca, setBusca] = useState('');
   const [filtroLotacao, setFiltroLotacao] = useState('todas');
@@ -99,11 +100,21 @@ export default function DescontosFerias() {
     setModalPublicacao(true);
   };
 
+  const publicacaoEstaPublicada = (publicacao) => {
+    if (!publicacao) return false;
+    const status = String(publicacao.status || publicacao.status_publicacao || '').toLowerCase();
+    return status.includes('publicad') || Boolean(publicacao.numero_bg && publicacao.data_bg);
+  };
+
+  const getTextoReversaoSolicitada = (publicacaoReversao) => {
+    if (!publicacaoReversao) return null;
+    return publicacaoReversao.status || publicacaoReversao.status_publicacao || 'Reversão solicitada';
+  };
+
   const podeSolicitarReversao = (desconto) => (
     desconto?.status === 'ativo'
     && desconto?.saldo_aplicado === true
-    && desconto?.publicacao
-    && (desconto.publicacao.status === 'Publicado' || (desconto.publicacao.numero_bg && desconto.publicacao.data_bg))
+    && publicacaoEstaPublicada(desconto?.publicacao)
     && !desconto?.publicacao_reversao
   );
 
@@ -113,14 +124,18 @@ export default function DescontosFerias() {
     if (!confirmado) return;
 
     try {
+      setSolicitandoReversaoId(desconto.id);
       await solicitarReversaoDescontoFerias(desconto.id);
       toast({ title: 'Reversão solicitada', description: 'Publicação de Tornar sem Efeito criada no RP. O saldo ainda não foi restituído.' });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
         queryClient.invalidateQueries({ queryKey: ['publicacoes'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
       ]);
     } catch (error) {
       toast({ title: 'Falha ao solicitar reversão', description: error?.message || 'Não foi possível solicitar a reversão.', variant: 'destructive' });
+    } finally {
+      setSolicitandoReversaoId(null);
     }
   };
 
@@ -227,9 +242,21 @@ export default function DescontosFerias() {
                   </TableCell>
                   <TableCell className="text-right">
                     {podeSolicitarReversao(d) ? (
-                      <Button variant="outline" size="sm" onClick={() => handleSolicitarReversao(d)}>
-                        <RotateCcw className="w-4 h-4 mr-2" /> Solicitar reversão
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSolicitarReversao(d)}
+                        disabled={solicitandoReversaoId === d.id}
+                      >
+                        {solicitandoReversaoId === d.id ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                        )}
+                        Solicitar reversão
                       </Button>
+                    ) : getTextoReversaoSolicitada(d.publicacao_reversao) ? (
+                      <span className="text-xs font-medium text-amber-700">{getTextoReversaoSolicitada(d.publicacao_reversao)}</span>
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
                     )}
