@@ -1,0 +1,51 @@
+{
+  "name": "AjusteSaldoFerias",
+  "type": "object",
+  "title": "Ajuste de Saldo de Férias",
+  "description": "Ajuste derivado para composição futura do saldo líquido de férias. Fase 0: não substitui o cálculo oficial nem migra dados automaticamente.",
+  "properties": {
+    "militar_id": { "type": "string", "description": "ID do militar" },
+    "militar_nome": { "type": "string", "description": "Snapshot do nome completo do militar" },
+    "periodo_aquisitivo_id": { "type": "string", "description": "ID do PeriodoAquisitivo impactado" },
+    "periodo_aquisitivo_ref": { "type": "string", "description": "Snapshot da referência do período aquisitivo" },
+    "tipo": {
+      "type": "string",
+      "enum": ["credito", "debito"],
+      "description": "Natureza do ajuste sobre o saldo derivado"
+    },
+    "dias": { "type": "number", "description": "Quantidade de dias do ajuste" },
+    "motivo": { "type": "string", "description": "Motivo administrativo do ajuste" },
+    "origem": {
+      "type": "string",
+      "enum": ["manual", "dias_adicionais", "desconto_ferias", "migracao"],
+      "default": "manual",
+      "description": "Origem operacional do ajuste"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["rascunho", "pendente_publicacao", "ativo", "cancelado", "revertido"],
+      "default": "rascunho",
+      "description": "Ciclo de vida do ajuste. Apenas ativo altera o saldo derivado."
+    },
+    "publicacao_id": { "type": "string", "description": "ID da publicação vinculada, quando existir" },
+    "entidade_origem": { "type": "string", "description": "Nome da entidade que originou o ajuste" },
+    "entidade_origem_id": { "type": "string", "description": "ID do registro que originou o ajuste" },
+    "observacoes": { "type": "string", "description": "Observações livres" },
+    "criado_por_email": { "type": "string", "description": "Auditoria — e-mail do usuário que criou o ajuste" },
+    "cancelado_em": { "type": "string", "format": "date-time", "description": "Auditoria — data/hora do cancelamento" },
+    "cancelado_por_email": { "type": "string", "description": "Auditoria — e-mail do usuário que cancelou o ajuste" },
+    "motivo_cancelamento": { "type": "string", "description": "Justificativa do cancelamento" }
+  },
+  "required": ["militar_id", "periodo_aquisitivo_id", "tipo", "dias", "origem", "status"],
+  "rls": {
+    "read": {
+      "$or": [
+        { "user_condition": { "role": "admin" } },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": { "role": "admin" }
+    }
+  }
+}
