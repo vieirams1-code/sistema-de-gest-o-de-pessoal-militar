@@ -20,7 +20,7 @@ const TIPO_INTERNO = 'Dispensa com Desconto em Férias';
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
 function calcStatusPublicacao({ numero_bg, data_bg, nota_para_bg }) {
-  if (numero_bg || data_bg) return 'Publicado';
+  if (numero_bg && data_bg) return 'Publicado';
   if (nota_para_bg) return 'Aguardando Publicação';
   return 'Aguardando Nota';
 }

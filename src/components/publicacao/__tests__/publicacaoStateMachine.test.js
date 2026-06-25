@@ -5,6 +5,7 @@ import {
   STATUS_PUBLICACAO,
   calcularStatusPublicacaoRegistro,
   obterStatusCanonicoPublicacao,
+  statusPersistidoDivergenteComBg,
 } from '../publicacaoStateMachine.js';
 
 test('obterStatusCanonicoPublicacao prioriza BG completo mesmo com status legado divergente', () => {
@@ -42,5 +43,27 @@ test('obterStatusCanonicoPublicacao usa o cálculo por campos como fallback can�
   assert.equal(
     obterStatusCanonicoPublicacao(registro),
     STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO,
+  );
+});
+
+test('statusPersistidoDivergenteComBg detecta PublicacaoExOfficio com BG completo e status não publicado', () => {
+  assert.equal(
+    statusPersistidoDivergenteComBg({
+      numero_bg: '123',
+      data_bg: '2026-05-18',
+      status: 'Aguardando Publicação',
+    }),
+    true,
+  );
+});
+
+test('statusPersistidoDivergenteComBg exige número e data de BG completos', () => {
+  assert.equal(
+    statusPersistidoDivergenteComBg({
+      numero_bg: '123',
+      data_bg: '',
+      status: 'Aguardando Publicação',
+    }),
+    false,
   );
 });
