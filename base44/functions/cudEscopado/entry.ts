@@ -65,6 +65,47 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
 ]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
+async function upsertAjusteSaldoFeriasPorOrigem(base44, entidadeOrigem, entidadeOrigemId, payload) {
+  const origemId = String(entidadeOrigemId || '').trim();
+  if (!origemId) return null;
+
+  const existentes = await base44.asServiceRole.entities.AjusteSaldoFerias
+    .filter({ entidade_origem: entidadeOrigem, entidade_origem_id: origemId })
+    .catch(() => []);
+  const existente = (existentes || [])[0];
+
+  const data = {
+    ...payload,
+    entidade_origem: entidadeOrigem,
+    entidade_origem_id: origemId,
+  };
+
+  if (existente?.id) {
+    return base44.asServiceRole.entities.AjusteSaldoFerias.update(existente.id, data);
+  }
+  return base44.asServiceRole.entities.AjusteSaldoFerias.create(data);
+}
+
+async function sincronizarAjusteCreditoExtraFerias(base44, credito, userEmail) {
+  if (!credito?.id) return null;
+
+  const dias = Math.max(0, Number(credito?.quantidade_dias) || 0);
+  return upsertAjusteSaldoFeriasPorOrigem(base44, 'CreditoExtraordinarioFerias', credito.id, {
+    militar_id: credito.militar_id || '',
+    militar_nome: credito.militar_nome || '',
+    periodo_aquisitivo_id: credito.periodo_aquisitivo_id || '',
+    periodo_aquisitivo_ref: credito.periodo_aquisitivo_ref || '',
+    tipo: 'credito',
+    dias,
+    motivo: credito.tipo_credito || credito.origem_documental || 'Crédito extraordinário de férias',
+    origem: 'dias_adicionais',
+    status: 'ativo',
+    publicacao_id: credito.publicacao_id || '',
+    observacoes: credito.observacoes || '',
+    criado_por_email: userEmail || credito.criado_por_email || '',
+  });
+}
+
 // =====================================================================
 // PERMISSIONS_MAP — Validação funcional por entidade × operação
 // ---------------------------------------------------------------------
@@ -1178,6 +1219,9 @@ Deno.serve(async (req) => {
         () => entity.create(dataValidada),
         `${entityName}.create`,
       );
+      if (entityName === 'CreditoExtraFerias') {
+        await sincronizarAjusteCreditoExtraFerias(base44, resultado, targetEmail);
+      }
     } else if (operation === 'update' || operation === 'encerrar' || operation === 'remover' || operation === 'desativar') {
       // Em update por restrito, garantimos que militar_id permaneça o canônico.
       const dataSegura = exigeEscopoMilitar && !targetIsAdmin && dataValidada
@@ -1187,6 +1231,9 @@ Deno.serve(async (req) => {
         () => entity.update(registroId, dataSegura),
         `${entityName}.update:${registroId}`,
       );
+      if (entityName === 'CreditoExtraFerias') {
+        await sincronizarAjusteCreditoExtraFerias(base44, resultado, targetEmail);
+      }
     } else if (operation === 'delete') {
       if (entityName === 'ContratoDesignacaoMilitar') {
         console.info('[cudEscopado] exclusão controlada de contrato de designação', {

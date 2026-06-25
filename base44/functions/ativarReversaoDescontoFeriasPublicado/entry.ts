@@ -7,6 +7,33 @@ const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const isPublicado = (p = {}) => String(p.status || '').trim() === 'Publicado' || Boolean(p.numero_bg && p.data_bg);
 const erro = (message, status = 400) => Response.json({ error: message }, { status });
 
+async function upsertAjusteDescontoFerias(base44, desconto, overrides = {}) {
+  if (!desconto?.id) return null;
+  const existentes = await base44.asServiceRole.entities.AjusteSaldoFerias
+    .filter({ entidade_origem: 'DescontoFerias', entidade_origem_id: desconto.id })
+    .catch(() => []);
+  const existente = (existentes || [])[0];
+  const data = {
+    militar_id: desconto.militar_id || '',
+    militar_nome: desconto.militar_nome || '',
+    periodo_aquisitivo_id: desconto.periodo_aquisitivo_id || '',
+    periodo_aquisitivo_ref: desconto.periodo_aquisitivo_ref || '',
+    tipo: 'debito',
+    dias: Math.max(0, Number(desconto.dias) || 0),
+    motivo: 'Desconto em férias',
+    origem: 'desconto_ferias',
+    status: 'revertido',
+    publicacao_id: desconto.publicacao_id || '',
+    entidade_origem: 'DescontoFerias',
+    entidade_origem_id: desconto.id,
+    observacoes: desconto.observacoes || '',
+    criado_por_email: desconto.criado_por_email || '',
+    ...overrides,
+  };
+  if (existente?.id) return base44.asServiceRole.entities.AjusteSaldoFerias.update(existente.id, data);
+  return base44.asServiceRole.entities.AjusteSaldoFerias.create(data);
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -35,11 +62,11 @@ Deno.serve(async (req) => {
     const [desconto] = await base44.asServiceRole.entities.DescontoFerias.filter({ publicacao_id: original.id }).catch(() => []);
     if (!desconto) return erro('Desconto em férias vinculado à publicação original não encontrado.', 404);
 
-    if (String(desconto.status || '') === 'revertido' || desconto.saldo_aplicado === false) {
-      return Response.json({ ok: true, aplicado: false, ja_aplicado: true, descontoFerias: desconto });
+    if (String(desconto.status || '') === 'revertido') {
+      const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, desconto, { status: 'revertido' });
+      return Response.json({ ok: true, aplicado: false, ja_aplicado: true, descontoFerias: desconto, ajusteSaldoFerias });
     }
     if (String(desconto.status || '') !== 'ativo') return erro('Somente desconto ativo pode ser revertido.');
-    if (desconto.saldo_aplicado !== true) return erro('Somente desconto com saldo aplicado pode ser revertido.');
 
     const ferias = await base44.asServiceRole.entities.Ferias.filter({ periodo_aquisitivo_id: desconto.periodo_aquisitivo_id }).catch(() => []);
     if ((ferias || []).some((f) => STATUS_FERIAS_BLOQUEIO.includes(String(f?.status || '').trim()))) {
@@ -56,19 +83,19 @@ Deno.serve(async (req) => {
     const dias = Math.max(0, Number(desconto.dias) || 0);
     if (dias <= 0) return erro('Desconto sem dias válidos para reverter.');
     const diasDireitoAtual = Number.isFinite(Number(periodo.dias_direito)) ? Number(periodo.dias_direito) : 30;
-    const diasDireitoNovo = diasDireitoAtual + dias;
-
-    await base44.asServiceRole.entities.PeriodoAquisitivo.update(periodo.id, { dias_direito: diasDireitoNovo });
-
     const carimbo = new Date().toISOString();
-    const auditoriaTexto = `[${carimbo}] Saldo restituído por Tornar sem Efeito ${tse.id} (BG ${tse.numero_bg || '—'} de ${tse.data_bg || '—'}). Restituídos ${dias}d ao período ${periodo.ano_referencia || periodo.id}: dias_direito ${diasDireitoAtual} -> ${diasDireitoNovo}. Acionado por ${acionadoPor}.`;
+    const auditoriaTexto = `[${carimbo}] Desconto revertido por Tornar sem Efeito ${tse.id} (BG ${tse.numero_bg || '—'} de ${tse.data_bg || '—'}). AjusteSaldoFerias de ${dias}d marcado como revertido para o período ${periodo.ano_referencia || periodo.id}. Nenhuma alteração realizada no cálculo oficial/dias_direito (${diasDireitoAtual}). Acionado por ${acionadoPor}.`;
     const descontoAtualizado = await base44.asServiceRole.entities.DescontoFerias.update(desconto.id, {
       status: 'revertido',
       saldo_aplicado: false,
       observacoes: [String(desconto.observacoes || '').trim(), auditoriaTexto].filter(Boolean).join('\n'),
     });
+    const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, descontoAtualizado, {
+      status: 'revertido',
+      observacoes: descontoAtualizado.observacoes || '',
+    });
 
-    return Response.json({ ok: true, aplicado: true, descontoFerias: descontoAtualizado, periodo: { id: periodo.id, dias_direito_anterior: diasDireitoAtual, dias_direito_novo: diasDireitoNovo } });
+    return Response.json({ ok: true, aplicado: true, descontoFerias: descontoAtualizado, ajusteSaldoFerias, periodo: { id: periodo.id, dias_direito_anterior: diasDireitoAtual, dias_direito_novo: diasDireitoAtual } });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     console.error('[ativarReversaoDescontoFeriasPublicado] erro', { message: error?.message, status });

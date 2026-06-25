@@ -32,6 +32,33 @@ function calcDataFim(dataInicio, dias) {
   return base.toISOString().slice(0, 10);
 }
 
+async function upsertAjusteDescontoFerias(base44, desconto, overrides = {}) {
+  if (!desconto?.id) return null;
+  const existentes = await base44.asServiceRole.entities.AjusteSaldoFerias
+    .filter({ entidade_origem: 'DescontoFerias', entidade_origem_id: desconto.id })
+    .catch(() => []);
+  const existente = (existentes || [])[0];
+  const data = {
+    militar_id: desconto.militar_id || '',
+    militar_nome: desconto.militar_nome || '',
+    periodo_aquisitivo_id: desconto.periodo_aquisitivo_id || '',
+    periodo_aquisitivo_ref: desconto.periodo_aquisitivo_ref || '',
+    tipo: 'debito',
+    dias: Math.max(0, Number(desconto.dias) || 0),
+    motivo: 'Desconto em férias',
+    origem: 'desconto_ferias',
+    status: 'pendente_publicacao',
+    publicacao_id: desconto.publicacao_id || '',
+    entidade_origem: 'DescontoFerias',
+    entidade_origem_id: desconto.id,
+    observacoes: desconto.observacoes || '',
+    criado_por_email: desconto.criado_por_email || '',
+    ...overrides,
+  };
+  if (existente?.id) return base44.asServiceRole.entities.AjusteSaldoFerias.update(existente.id, data);
+  return base44.asServiceRole.entities.AjusteSaldoFerias.create(data);
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -119,7 +146,11 @@ Deno.serve(async (req) => {
     const jaExiste = await base44.asServiceRole.entities.DescontoFerias
       .filter({ publicacao_id: publicacao.id }).catch(() => []);
     if (jaExiste && jaExiste.length > 0) {
-      return Response.json({ ok: true, publicacao, descontoFerias: jaExiste[0], idempotente: true });
+      const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, jaExiste[0], {
+        status: 'pendente_publicacao',
+        publicacao_id: publicacao.id,
+      });
+      return Response.json({ ok: true, publicacao, descontoFerias: jaExiste[0], ajusteSaldoFerias, idempotente: true });
     }
 
     const descontoFerias = await base44.asServiceRole.entities.DescontoFerias.create({
@@ -139,8 +170,9 @@ Deno.serve(async (req) => {
       criado_por_email: authUser.email,
       criado_em: new Date().toISOString(),
     });
+    const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, descontoFerias);
 
-    return Response.json({ ok: true, publicacao, descontoFerias });
+    return Response.json({ ok: true, publicacao, descontoFerias, ajusteSaldoFerias });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     console.error('[criarDescontoFeriasGateway] erro', { message: error?.message, status });

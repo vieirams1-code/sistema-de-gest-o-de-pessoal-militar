@@ -16,8 +16,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 //
 // Ao ativar:
 //   - DescontoFerias.status -> ativo;
-//   - DescontoFerias.saldo_aplicado -> true;
-//   - PeriodoAquisitivo.dias_direito abatido pelos dias do desconto;
+//   - AjusteSaldoFerias vinculado -> ativo;
+//   - NÃO altera PeriodoAquisitivo nem cálculo oficial nesta fase;
 //   - auditoria textual no DescontoFerias.observacoes.
 //
 // Idempotência: se saldo_aplicado já for true OU status já for ativo,
@@ -29,6 +29,33 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const TIPO_INTERNO = 'Dispensa com Desconto em Férias';
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
+
+async function upsertAjusteDescontoFerias(base44, desconto, overrides = {}) {
+  if (!desconto?.id) return null;
+  const existentes = await base44.asServiceRole.entities.AjusteSaldoFerias
+    .filter({ entidade_origem: 'DescontoFerias', entidade_origem_id: desconto.id })
+    .catch(() => []);
+  const existente = (existentes || [])[0];
+  const data = {
+    militar_id: desconto.militar_id || '',
+    militar_nome: desconto.militar_nome || '',
+    periodo_aquisitivo_id: desconto.periodo_aquisitivo_id || '',
+    periodo_aquisitivo_ref: desconto.periodo_aquisitivo_ref || '',
+    tipo: 'debito',
+    dias: Math.max(0, Number(desconto.dias) || 0),
+    motivo: 'Desconto em férias',
+    origem: 'desconto_ferias',
+    status: 'ativo',
+    publicacao_id: desconto.publicacao_id || '',
+    entidade_origem: 'DescontoFerias',
+    entidade_origem_id: desconto.id,
+    observacoes: desconto.observacoes || '',
+    criado_por_email: desconto.criado_por_email || '',
+    ...overrides,
+  };
+  if (existente?.id) return base44.asServiceRole.entities.AjusteSaldoFerias.update(existente.id, data);
+  return base44.asServiceRole.entities.AjusteSaldoFerias.create(data);
+}
 
 function publicacaoEstaPublicada(pub = {}) {
   if (String(pub.status || '').trim() === 'Publicado') return true;
@@ -83,7 +110,8 @@ Deno.serve(async (req) => {
 
     // ---- Idempotência: já aplicado / já ativo ----
     if (desconto.saldo_aplicado === true || String(desconto.status || '') === 'ativo') {
-      return Response.json({ ok: true, aplicado: false, ja_aplicado: true, descontoFerias: desconto });
+      const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, desconto, { status: 'ativo' });
+      return Response.json({ ok: true, aplicado: false, ja_aplicado: true, descontoFerias: desconto, ajusteSaldoFerias });
     }
 
     // ---- Não aplicar para descontos cancelados/revertidos ----
@@ -101,32 +129,31 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Desconto sem dias válidos para aplicar.' }, { status: 400 });
     }
 
-    // ---- Carregar período aquisitivo ----
+    // ---- Carregar período aquisitivo apenas para auditoria/retorno; não alterar saldo oficial nesta fase. ----
     const periodo = await base44.asServiceRole.entities.PeriodoAquisitivo
       .get(desconto.periodo_aquisitivo_id).catch(() => null);
     if (!periodo) {
       return Response.json({ error: 'Período aquisitivo vinculado não encontrado.' }, { status: 404 });
     }
 
-    // ---- Aplicar abatimento no saldo (reduz dias_direito) ----
     const diasDireitoAtual = Number.isFinite(Number(periodo.dias_direito)) ? Number(periodo.dias_direito) : 30;
-    const diasDireitoNovo = Math.max(0, diasDireitoAtual - dias);
-
-    await base44.asServiceRole.entities.PeriodoAquisitivo.update(periodo.id, {
-      dias_direito: diasDireitoNovo,
-    });
 
     // ---- Atualizar o desconto (status + saldo_aplicado + auditoria) ----
     const carimbo = new Date().toISOString();
-    const auditoriaTexto = `[${carimbo}] Saldo aplicado por publicação ${publicacaoId} (status Publicado). ` +
-      `Abatidos ${dias}d do período ${periodo.ano_referencia || periodo.id}: dias_direito ${diasDireitoAtual} -> ${diasDireitoNovo}. ` +
+    const auditoriaTexto = `[${carimbo}] Desconto ativado por publicação ${publicacaoId} (status Publicado). ` +
+      `Criado/ativado AjusteSaldoFerias de débito com ${dias}d para o período ${periodo.ano_referencia || periodo.id}. ` +
+      `Nenhuma alteração realizada no cálculo oficial/dias_direito (${diasDireitoAtual}). ` +
       `Acionado por ${normalizeEmail(authUser.email)}.`;
     const observacoesNovas = [String(desconto.observacoes || '').trim(), auditoriaTexto]
       .filter(Boolean).join('\n');
 
     const descontoAtualizado = await base44.asServiceRole.entities.DescontoFerias.update(desconto.id, {
       status: 'ativo',
-      saldo_aplicado: true,
+      saldo_aplicado: false,
+      observacoes: observacoesNovas,
+    });
+    const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, descontoAtualizado, {
+      status: 'ativo',
       observacoes: observacoesNovas,
     });
 
@@ -134,7 +161,8 @@ Deno.serve(async (req) => {
       ok: true,
       aplicado: true,
       descontoFerias: descontoAtualizado,
-      periodo: { id: periodo.id, dias_direito_anterior: diasDireitoAtual, dias_direito_novo: diasDireitoNovo },
+      ajusteSaldoFerias,
+      periodo: { id: periodo.id, dias_direito_anterior: diasDireitoAtual, dias_direito_novo: diasDireitoAtual },
     });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
