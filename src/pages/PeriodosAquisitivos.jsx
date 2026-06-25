@@ -7,7 +7,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
+import { AjusteSaldoFerias, CreditoExtraFerias } from '@/api/entities';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { listarDescontosFerias } from '@/services/descontoFeriasService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -74,6 +76,30 @@ export default function PeriodosAquisitivos() {
     enabled: isPaBundleQueryEnabled,
   });
 
+  const { data: ajustesSaldoFerias = [], isLoading: loadingAjustesSaldoFerias } = useQuery({
+    queryKey: ['pa-diagnostico-ajustes-saldo-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
+    queryFn: () => AjusteSaldoFerias.list('-created_date'),
+    enabled: isPaBundleQueryEnabled && isAdmin,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: creditosExtraFerias = [], isLoading: loadingCreditosExtraFerias } = useQuery({
+    queryKey: ['pa-diagnostico-creditos-extra-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
+    queryFn: () => CreditoExtraFerias.list('-data_referencia'),
+    enabled: isPaBundleQueryEnabled && isAdmin,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: descontosFerias = [], isLoading: loadingDescontosFerias } = useQuery({
+    queryKey: ['pa-diagnostico-descontos-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
+    queryFn: listarDescontosFerias,
+    enabled: isPaBundleQueryEnabled && isAdmin,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const periodos = paBundle?.periodosAquisitivos || [];
   const ferias = paBundle?.ferias || [];
   const registrosLivro = paBundle?.registrosLivro || [];
@@ -81,6 +107,7 @@ export default function PeriodosAquisitivos() {
   const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
+  const isLoadingDiagnosticoSaldo = loadingAjustesSaldoFerias || loadingCreditosExtraFerias || loadingDescontosFerias;
 
 
   const updatePeriodoMutation = useMutation({
@@ -538,6 +565,14 @@ export default function PeriodosAquisitivos() {
                               setPeriodoGerenciado(periodo);
                             }}
                             onOpenFerias={abrirFeriasVinculadas}
+                            showDiagnosticoSaldo={isAdmin}
+                            diagnosticoSaldoProps={{
+                              ajustes: ajustesSaldoFerias,
+                              ferias,
+                              creditosExtraordinarios: creditosExtraFerias,
+                              descontos: descontosFerias,
+                              isLoading: isLoadingDiagnosticoSaldo,
+                            }}
                           />
                         ))}
                       </div>

@@ -3,6 +3,7 @@ import { AlertCircle, CalendarDays, Clock3, ExternalLink } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { obterDiasBase, calcularDiasTotal } from './feriasRules';
+import DiagnosticoSaldoPeriodoBadge from './DiagnosticoSaldoPeriodoBadge';
 
 const statusColors = {
   'Pendente': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -20,7 +21,14 @@ const alertaClasses = {
   success: 'bg-emerald-50 border-emerald-200 text-emerald-700',
 };
 
-export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias, canManage = false }) {
+export default function PeriodoAquisitivoCard({
+  periodo,
+  onManage,
+  onOpenFerias,
+  canManage = false,
+  showDiagnosticoSaldo = false,
+  diagnosticoSaldoProps = {},
+}) {
   const diasBase = obterDiasBase(periodo);
   const diasTotal = Number(periodo.dias_total ?? calcularDiasTotal(periodo));
   const diasGozados = Number(periodo.dias_gozados || 0);
@@ -71,6 +79,13 @@ export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias,
         <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Previstos</p><p className="font-semibold text-slate-800">{diasPrevistos}d</p></div>
         <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Saldo</p><p className="font-semibold text-[#1e3a5f]">{diasSaldo}d</p></div>
       </div>
+
+      {showDiagnosticoSaldo && (
+        <DiagnosticoSaldoPeriodoBadge
+          periodo={periodo}
+          {...diagnosticoSaldoProps}
+        />
+      )}
 
       <div className="mb-4">
         <p className="text-xs font-semibold text-slate-500 mb-2">FRAÇÕES RELACIONADAS</p>
