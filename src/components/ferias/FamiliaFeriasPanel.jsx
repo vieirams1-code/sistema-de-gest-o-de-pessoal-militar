@@ -293,6 +293,10 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
     (desconto) => desconto?.status === 'ativo' && desconto?.saldo_aplicado === true
   ), [descontosDoPeriodo]);
 
+  const descontosRevertidosDoPeriodo = useMemo(() => (descontosDoPeriodo || []).filter(
+    (desconto) => desconto?.status === 'revertido' || desconto?.publicacao_reversao
+  ), [descontosDoPeriodo]);
+
   const descontosPendentesDoPeriodo = useMemo(() => (descontosDoPeriodo || []).filter(
     (desconto) => desconto?.status === 'pendente_publicacao'
   ), [descontosDoPeriodo]);
@@ -540,6 +544,34 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+
+        {descontosRevertidosDoPeriodo.length > 0 && (
+          <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarMinus2 className="w-4 h-4 text-emerald-700" />
+              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                Reversões do período
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {descontosRevertidosDoPeriodo.map((desconto) => (
+                <div key={desconto.id} className="bg-white rounded-lg border border-emerald-100 p-3 shadow-sm">
+                  <p className="text-sm font-semibold text-slate-800">
+                    Desconto em Férias revertido: +{Number(desconto.dias || 0)} dia(s)
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span className="text-slate-400">Publicação TSE</span>
+                    <span className="text-slate-700 font-medium">{formatPublicacaoDesconto({ publicacao: desconto.publicacao_reversao })}</span>
+                    <span className="text-slate-400">Desconto original</span>
+                    <span className="text-slate-700 font-medium">{formatPublicacaoDesconto(desconto)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

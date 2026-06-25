@@ -52,11 +52,22 @@ export async function listarDescontosFerias() {
     });
   }
 
+  const reversoesPorReferencia = new Map();
+  if (pubIds.length > 0) {
+    const reversoes = await Promise.all(
+      pubIds.map((id) => base44.entities.PublicacaoExOfficio.filter({ publicacao_referencia_id: id }).catch(() => [])),
+    );
+    reversoes.flat()
+      .filter((pub) => pub?.tipo === 'Tornar sem Efeito')
+      .forEach((pub) => reversoesPorReferencia.set(pub.publicacao_referencia_id, pub));
+  }
+
   return (descontos || []).map((desconto) => {
     const publicacao = publicacoesPorId.get(desconto.publicacao_id) || null;
     return {
       ...desconto,
       publicacao,
+      publicacao_reversao: reversoesPorReferencia.get(desconto.publicacao_id) || null,
       status_publicacao: getStatusPublicacaoDesconto(desconto, publicacao),
     };
   });

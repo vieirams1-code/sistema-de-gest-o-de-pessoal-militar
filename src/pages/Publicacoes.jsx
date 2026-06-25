@@ -16,6 +16,7 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { ativarDescontoFeriasPublicado } from '@/services/ativarDescontoFeriasPublicadoClient';
 import { cancelarDescontoFeriasPendente } from '@/services/cancelarDescontoFeriasPendenteClient';
+import { ativarReversaoDescontoFeriasPublicado } from '@/services/ativarReversaoDescontoFeriasPublicadoClient';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -510,6 +511,13 @@ export default function Publicacoes() {
         await ativarDescontoFeriasPublicado(id);
       }
 
+      if (
+        registroAtual?.tipo === 'Tornar sem Efeito' &&
+        temDadosCompletosBg(registroDestino)
+      ) {
+        await ativarReversaoDescontoFeriasPublicado(id);
+      }
+
       return resultadoPublicacao;
     },
     onSuccess: async () => {
@@ -518,6 +526,7 @@ export default function Publicacoes() {
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
         queryClient.invalidateQueries({ queryKey: ['periodos-militar-modal'] }),
         queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
+        queryClient.invalidateQueries({ queryKey: ['ferias'] }),
       ]);
     },
     onError: (error) => {
@@ -592,6 +601,7 @@ export default function Publicacoes() {
         refrescarDadosPublicacoes(),
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
         queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
+        queryClient.invalidateQueries({ queryKey: ['ferias'] }),
       ]);
     },
     onError: (error) => alert(error?.message || 'Erro ao excluir registro.'),
