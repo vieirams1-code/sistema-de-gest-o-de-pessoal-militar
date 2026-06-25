@@ -58,6 +58,7 @@ export default function PeriodosAquisitivos() {
   const canExcluirPeriodoAquisitivo = canAccessAction('excluir_periodo_aquisitivo');
   const canGerenciarPeriodoAquisitivo = canEditarPeriodoAquisitivo || canAlterarStatusPeriodoAquisitivo || canExcluirPeriodoAquisitivo;
   const isPaBundleQueryEnabled = isAccessResolved === true && !loadingUser && hasFeriasAccess;
+  const showDiagnosticoSaldo = Boolean(isAdmin);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -79,7 +80,7 @@ export default function PeriodosAquisitivos() {
   const { data: ajustesSaldoFerias = [], isLoading: loadingAjustesSaldoFerias } = useQuery({
     queryKey: ['pa-diagnostico-ajustes-saldo-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
     queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: isPaBundleQueryEnabled && isAdmin,
+    enabled: isPaBundleQueryEnabled && showDiagnosticoSaldo,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -87,7 +88,7 @@ export default function PeriodosAquisitivos() {
   const { data: creditosExtraFerias = [], isLoading: loadingCreditosExtraFerias } = useQuery({
     queryKey: ['pa-diagnostico-creditos-extra-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
     queryFn: () => CreditoExtraFerias.list('-data_referencia'),
-    enabled: isPaBundleQueryEnabled && isAdmin,
+    enabled: isPaBundleQueryEnabled && showDiagnosticoSaldo,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -95,7 +96,7 @@ export default function PeriodosAquisitivos() {
   const { data: descontosFerias = [], isLoading: loadingDescontosFerias } = useQuery({
     queryKey: ['pa-diagnostico-descontos-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
     queryFn: listarDescontosFerias,
-    enabled: isPaBundleQueryEnabled && isAdmin,
+    enabled: isPaBundleQueryEnabled && showDiagnosticoSaldo,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -565,7 +566,7 @@ export default function PeriodosAquisitivos() {
                               setPeriodoGerenciado(periodo);
                             }}
                             onOpenFerias={abrirFeriasVinculadas}
-                            showDiagnosticoSaldo={isAdmin}
+                            showDiagnosticoSaldo={showDiagnosticoSaldo}
                             diagnosticoSaldoProps={{
                               ajustes: ajustesSaldoFerias,
                               ferias,
