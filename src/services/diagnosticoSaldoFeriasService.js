@@ -97,6 +97,27 @@ export function converterRegistrosLegadosEmAjustesVirtuais({ creditosExtraordina
   return [...creditosVirtuais, ...debitosVirtuais];
 }
 
+function montarModeloOficialAtual(periodo = {}) {
+  return {
+    saldo_atual_sistema: obterSaldoAtualSistema(periodo),
+    base_atual: toNumber(periodo?.dias_base ?? periodo?.dias_direito ?? periodo?.dias_adquiridos, 30),
+    previstos: toNumber(periodo?.dias_previstos, 0),
+    gozados: toNumber(periodo?.dias_gozados, 0),
+  };
+}
+
+function montarModeloCalculado({ periodo = {}, ajustes = [], ferias = [] } = {}) {
+  const saldo = calcularSaldoLiquidoPeriodo({ periodo, ajustes, ferias });
+
+  return {
+    saldo: saldo.saldo_liquido,
+    base: saldo.dias_base,
+    creditos_ativos: saldo.creditos_ativos,
+    debitos_ativos: saldo.debitos_ativos,
+    gozados_previstos: saldo.dias_gozados_previstos,
+  };
+}
+
 function montarInconsistencias({ periodo, saldoAtualSistema, saldoDerivado, ajustesPeriodo }) {
   const inconsistencias = [];
 
@@ -110,22 +131,47 @@ function montarInconsistencias({ periodo, saldoAtualSistema, saldoDerivado, ajus
   return inconsistencias;
 }
 
-export function compararSaldoPeriodo({ periodo = {}, ajustes = [], ferias = [] } = {}) {
-  const ajustesPeriodo = (ajustes || []).filter((ajuste) => isRegistroDoPeriodo(ajuste, periodo));
-  const saldo = calcularSaldoLiquidoPeriodo({ periodo, ajustes: ajustesPeriodo, ferias });
-  const saldo_atual_sistema = obterSaldoAtualSistema(periodo);
-  const saldo_derivado = saldo.saldo_liquido;
+export function compararSaldoPeriodo({
+  periodo = {},
+  ajustes = [],
+  ferias = [],
+  creditosExtraordinarios = [],
+  descontos = [],
+} = {}) {
+  const ajustesReaisPeriodo = (ajustes || []).filter((ajuste) => isRegistroDoPeriodo(ajuste, periodo));
+  const ajustesVirtuaisLegados = converterRegistrosLegadosEmAjustesVirtuais({
+    creditosExtraordinarios,
+    descontos,
+  }).filter((ajuste) => isRegistroDoPeriodo(ajuste, periodo));
+  const ajustesLegadoPeriodo = ajustesVirtuaisLegados;
+
+  const modelo_oficial_atual = montarModeloOficialAtual(periodo);
+  const modelo_derivado_legado = montarModeloCalculado({ periodo, ajustes: ajustesLegadoPeriodo, ferias });
+  const modelo_ajustes_puro = montarModeloCalculado({ periodo, ajustes: ajustesReaisPeriodo, ferias });
+  const saldo_atual_sistema = modelo_oficial_atual.saldo_atual_sistema;
+  const saldo_derivado = modelo_derivado_legado.saldo;
 
   return {
     periodo_id: periodo?.id || '',
     periodo_ref: normalizarReferenciaPeriodo(periodo),
+    modelo_oficial_atual,
+    modelo_derivado_legado,
+    modelo_ajustes_puro,
+    diferenca_oficial_vs_legado: modelo_derivado_legado.saldo - saldo_atual_sistema,
+    diferenca_oficial_vs_ajustes_puro: modelo_ajustes_puro.saldo - saldo_atual_sistema,
+    diferenca_legado_vs_ajustes_puro: modelo_ajustes_puro.saldo - modelo_derivado_legado.saldo,
     saldo_atual_sistema,
     saldo_derivado,
     diferenca: saldo_derivado - saldo_atual_sistema,
-    dias_base: saldo.dias_base,
-    creditos_ativos: saldo.creditos_ativos,
-    debitos_ativos: saldo.debitos_ativos,
-    dias_gozados_previstos: saldo.dias_gozados_previstos,
-    inconsistencias: montarInconsistencias({ periodo, saldoAtualSistema: saldo_atual_sistema, saldoDerivado: saldo_derivado, ajustesPeriodo }),
+    dias_base: modelo_derivado_legado.base,
+    creditos_ativos: modelo_derivado_legado.creditos_ativos,
+    debitos_ativos: modelo_derivado_legado.debitos_ativos,
+    dias_gozados_previstos: modelo_derivado_legado.gozados_previstos,
+    inconsistencias: montarInconsistencias({
+      periodo,
+      saldoAtualSistema: saldo_atual_sistema,
+      saldoDerivado: saldo_derivado,
+      ajustesPeriodo: ajustesLegadoPeriodo,
+    }),
   };
 }
