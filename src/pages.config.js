@@ -73,6 +73,7 @@ import CreditosExtraordinariosFerias from './pages/CreditosExtraordinariosFerias
 import Configuracoes from './pages/Configuracoes';
 import ControleAtestadosTemporarios from './pages/ControleAtestadosTemporarios';
 import DetalheComportamento from './pages/DetalheComportamento';
+import DiagnosticoSaldoFerias from './pages/DiagnosticoSaldoFerias';
 import EditarJISO from './pages/EditarJISO';
 import ExtratoAtestadosMedicos from './pages/ExtratoAtestadosMedicos';
 import Ferias from './pages/Ferias';
@@ -150,6 +151,7 @@ export const PAGES = {
     "Configuracoes": Configuracoes,
     "ControleAtestadosTemporarios": ControleAtestadosTemporarios,
     "DetalheComportamento": DetalheComportamento,
+    "DiagnosticoSaldoFerias": DiagnosticoSaldoFerias,
     "EditarJISO": EditarJISO,
     "ExtratoAtestadosMedicos": ExtratoAtestadosMedicos,
     "Ferias": Ferias,
