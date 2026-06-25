@@ -31,6 +31,7 @@ const adminOnlyPages = new Set([
   'SubtiposDOEMS',
   // P0 Segurança: rota administrativa sensível sem guarda explícita anterior.
   'BackupSistema',
+  'DiagnosticoSaldoFerias',
 ]);
 
 
@@ -74,6 +75,7 @@ const moduleGuardByPage = {
   PlanoAnualFerias: { moduleKey: 'ferias', actionKey: 'visualizar_plano_ferias', moduleName: 'Férias' },
   PeriodosAquisitivos: { moduleKey: 'ferias', actionKey: 'visualizar_periodos_aquisitivos', moduleName: 'Férias' },
   CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias', moduleName: 'Férias' },
+  DiagnosticoSaldoFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
   CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   Livro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   RP: { moduleKey: 'rp', moduleName: 'Registro de Publicações' },

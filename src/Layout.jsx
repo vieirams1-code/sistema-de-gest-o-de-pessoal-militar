@@ -37,6 +37,7 @@ import {
   Tags as TagsIcon,
   Stethoscope,
   GraduationCap,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -106,6 +107,7 @@ const menuGroups = [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
           { name: 'Dias Adicionais', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
           { name: 'Descontos em Férias', page: 'DescontosFerias', icon: CalendarMinus2, adminOnly: true },
+          { name: 'Diagnóstico de Saldo', page: 'DiagnosticoSaldoFerias', icon: Activity, adminOnly: true },
         ],
       },
       {

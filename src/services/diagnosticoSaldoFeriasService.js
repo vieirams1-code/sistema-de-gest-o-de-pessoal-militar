@@ -115,6 +115,8 @@ function montarModeloCalculado({ periodo = {}, ajustes = [], ferias = [] } = {})
     creditos_ativos: saldo.creditos_ativos,
     debitos_ativos: saldo.debitos_ativos,
     gozados_previstos: saldo.dias_gozados_previstos,
+    detalhes_creditos: saldo.detalhes_creditos || [],
+    detalhes_debitos: saldo.detalhes_debitos || [],
   };
 }
 
