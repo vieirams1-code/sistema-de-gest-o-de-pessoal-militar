@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, CalendarMinus2, Loader2, Search } from 'lucide-react';
+import { Plus, CalendarMinus2, Loader2, Search, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { listarDescontosFerias, getStatusDescontoLabel, getStatusDescontoBadgeClass } from '@/services/descontoFeriasService';
 import { criarDescontoFeriasGateway } from '@/services/descontoFeriasGatewayClient';
+import { solicitarReversaoDescontoFerias } from '@/services/solicitarReversaoDescontoFeriasClient';
 import AdicionarDescontoModal from '@/components/descontos-ferias/AdicionarDescontoModal';
 import PublicacaoDescontoModal from '@/components/descontos-ferias/PublicacaoDescontoModal';
 
@@ -98,6 +99,31 @@ export default function DescontosFerias() {
     setModalPublicacao(true);
   };
 
+  const podeSolicitarReversao = (desconto) => (
+    desconto?.status === 'ativo'
+    && desconto?.saldo_aplicado === true
+    && desconto?.publicacao
+    && (desconto.publicacao.status === 'Publicado' || (desconto.publicacao.numero_bg && desconto.publicacao.data_bg))
+    && !desconto?.publicacao_reversao
+  );
+
+  const handleSolicitarReversao = async (desconto) => {
+    if (!podeSolicitarReversao(desconto)) return;
+    const confirmado = window.confirm('Será gerada uma publicação de Tornar Sem Efeito. O saldo será restituído somente após a publicação em BG.');
+    if (!confirmado) return;
+
+    try {
+      await solicitarReversaoDescontoFerias(desconto.id);
+      toast({ title: 'Reversão solicitada', description: 'Publicação de Tornar sem Efeito criada no RP. O saldo ainda não foi restituído.' });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes'] }),
+      ]);
+    } catch (error) {
+      toast({ title: 'Falha ao solicitar reversão', description: error?.message || 'Não foi possível solicitar a reversão.', variant: 'destructive' });
+    }
+  };
+
   const handleConfirmarPublicacao = async (dadosPublicacao) => {
     await criarDescontoFeriasGateway({
       militar_id: dadosDesconto.militar_id,
@@ -161,18 +187,19 @@ export default function DescontosFerias() {
               <TableHead>Fim</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Publicação (RP)</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(loadingDescontos || loadingBundle) ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={8} className="text-center py-12 text-slate-500">
                   <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Carregando...
                 </TableCell>
               </TableRow>
             ) : descontosFiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={8} className="text-center py-12 text-slate-500">
                   Nenhum desconto em férias encontrado.
                 </TableCell>
               </TableRow>
@@ -192,7 +219,21 @@ export default function DescontosFerias() {
                       {getStatusDescontoLabel(d.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-slate-600">{d.status_publicacao}</TableCell>
+                  <TableCell className="text-sm text-slate-600">
+                    <div>{d.status_publicacao}</div>
+                    {d.publicacao_reversao && (
+                      <div className="text-xs text-amber-700 mt-1">TSE: {d.publicacao_reversao.status || 'em elaboração'}</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {podeSolicitarReversao(d) ? (
+                      <Button variant="outline" size="sm" onClick={() => handleSolicitarReversao(d)}>
+                        <RotateCcw className="w-4 h-4 mr-2" /> Solicitar reversão
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             )}
