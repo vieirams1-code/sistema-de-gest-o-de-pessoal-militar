@@ -29,6 +29,7 @@ import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 import { calcularFoiApostilada } from '@/components/publicacao/apostilaUtils';
 import {
   anexarEventoAuditoriaPublicacao,
+  calcularStatusPersistidoPublicacao,
   calcularStatusPublicacaoRegistro,
   criarEventoAuditoriaPublicacao,
   EVENTO_AUDITORIA_PUBLICACAO,
@@ -36,6 +37,7 @@ import {
   normalizarStatusPublicacao,
   obterStatusCanonicoPublicacao,
   STATUS_PUBLICACAO,
+  statusPersistidoDivergenteComBg,
   temDadosCompletosBg,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
@@ -304,7 +306,7 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo, opcoes = {})
   const houveAlteracaoCamposPublicacao = ['nota_para_bg', 'numero_bg', 'data_bg'].some((campo) => Object.prototype.hasOwnProperty.call(dataParcial || {}, campo));
   if (!houveAlteracaoCamposPublicacao) return dataParcial || {};
   const registroDestino = { ...(registroAtual || {}), ...(dataParcial || {}) };
-  const statusCalculado = calcularStatusPublicacaoRegistro(registroDestino);
+  const statusCalculado = calcularStatusPersistidoPublicacao(registroDestino);
   const validacao = validarPayloadPublicacao({
     registroAtual,
     registroDestino,
@@ -315,6 +317,21 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo, opcoes = {})
   }
   if (tipo === 'atestado') return { ...(dataParcial || {}), status_publicacao: statusCalculado };
   return { ...(dataParcial || {}), status: statusCalculado };
+}
+
+async function sincronizarStatusPublicacoesComBgCompleto(publicacoes = []) {
+  const divergentes = (Array.isArray(publicacoes) ? publicacoes : [])
+    .filter((publicacao) => statusPersistidoDivergenteComBg(publicacao));
+
+  if (!divergentes.length) return 0;
+
+  const resultados = await Promise.allSettled(
+    divergentes.map((publicacao) => atualizarEscopado('PublicacaoExOfficio', publicacao.id, {
+      status: STATUS_PUBLICACAO.PUBLICADO,
+    })),
+  );
+
+  return resultados.filter((resultado) => resultado.status === 'fulfilled').length;
 }
 
 function isFeriasOperacional(registro) {
@@ -397,7 +414,15 @@ export default function Publicacoes() {
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
     queryKey: publicacoesExOfficioQueryKey,
-    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email }),
+    queryFn: async () => {
+      const publicacoes = await listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
+      const sincronizadas = await sincronizarStatusPublicacoesComBgCompleto(publicacoes);
+      if (sincronizadas > 0) {
+        queryClient.invalidateQueries({ queryKey: rpListaQueryKey, exact: true });
+        return listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
+      }
+      return publicacoes;
+    },
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 

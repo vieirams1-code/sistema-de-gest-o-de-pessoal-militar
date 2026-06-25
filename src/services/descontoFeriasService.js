@@ -23,7 +23,7 @@ export function getStatusDescontoBadgeClass(status) {
 }
 
 function calcStatusPublicacao(pub = {}) {
-  if (pub.numero_bg || pub.data_bg) return 'Publicado';
+  if (pub.numero_bg && pub.data_bg) return 'Publicado';
   if (pub.nota_para_bg) return 'Aguardando Publicação';
   return 'Aguardando Nota';
 }

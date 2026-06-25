@@ -33,7 +33,7 @@ const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 function publicacaoEstaPublicada(pub = {}) {
   if (String(pub.status || '').trim() === 'Publicado') return true;
   // Equivalência padrão do RP: possui BG/data caracteriza Publicado.
-  return Boolean(pub.numero_bg || pub.data_bg);
+  return Boolean(pub.numero_bg && pub.data_bg);
 }
 
 Deno.serve(async (req) => {
@@ -65,6 +65,12 @@ Deno.serve(async (req) => {
     // ---- Condição: publicação publicada (com BG/data) ----
     if (!publicacaoEstaPublicada(publicacao)) {
       return Response.json({ ok: true, aplicado: false, motivo: 'publicacao_nao_publicada' });
+    }
+
+    if (String(publicacao.status || '').trim() !== 'Publicado' && publicacao.numero_bg && publicacao.data_bg) {
+      await base44.asServiceRole.entities.PublicacaoExOfficio.update(publicacao.id, {
+        status: 'Publicado',
+      });
     }
 
     // ---- Condição: existe desconto vinculado ----

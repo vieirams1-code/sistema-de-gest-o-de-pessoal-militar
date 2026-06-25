@@ -56,6 +56,15 @@ export function calcularStatusPublicacaoRegistro(registro = {}) {
   return STATUS_PUBLICACAO.AGUARDANDO_NOTA;
 }
 
+export function calcularStatusPersistidoPublicacao(registro = {}) {
+  return calcularStatusPublicacaoRegistro(registro);
+}
+
+export function statusPersistidoDivergenteComBg(registro = {}) {
+  return temDadosCompletosBg(registro) &&
+    normalizarStatusPublicacao(registro.status_publicacao || registro.status) !== STATUS_PUBLICACAO.PUBLICADO;
+}
+
 export function obterStatusCanonicoPublicacao(registro = {}) {
   if (temDadosCompletosBg(registro)) return STATUS_PUBLICACAO.PUBLICADO;
 
