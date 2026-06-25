@@ -37,6 +37,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RegistroLivro',
   'PublicacaoExOfficio',
   'CreditoExtraFerias',
+  'AjusteSaldoFerias',
   'ContratoDesignacaoMilitar',
   'PerfilPermissao',
   'UsuarioAcesso',
