@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, AlertTriangle, CheckCircle2, Search, ShieldAlert } from 'lucide-react';
-import { AjusteSaldoFerias, CreditoExtraFerias } from '@/api/entities';
+import { AjusteSaldoFerias } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,12 +12,10 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { createPageUrl } from '@/utils';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
-import { listarDescontosFerias } from '@/services/descontoFeriasService';
 import { compararSaldoPeriodo } from '@/services/diagnosticoSaldoFeriasService';
 
 const STATUS_TODOS = 'todos';
 const STATUS_COMPATIVEL = 'Compatível';
-const STATUS_SHADOW = 'Shadow pendente';
 const STATUS_DIVERGENTE = 'Divergente';
 
 function normalizarTexto(value) {
@@ -79,17 +77,11 @@ function montarNomeMilitar(periodo = {}, militarById = new Map()) {
 }
 
 function resolverStatus(diagnostico) {
-  const oficialCompativelComLegado = Number(diagnostico?.diferenca_oficial_vs_legado) === 0;
-  const ajustesPuroCompativelComLegado = Number(diagnostico?.diferenca_legado_vs_ajustes_puro) === 0;
-
-  if (oficialCompativelComLegado && ajustesPuroCompativelComLegado) return STATUS_COMPATIVEL;
-  if (oficialCompativelComLegado && !ajustesPuroCompativelComLegado) return STATUS_SHADOW;
-  return STATUS_DIVERGENTE;
+  return Number(diagnostico?.diferenca_oficial_vs_operacional) === 0 ? STATUS_COMPATIVEL : STATUS_DIVERGENTE;
 }
 
 function getStatusBadgeClass(status) {
   if (status === STATUS_COMPATIVEL) return 'border-emerald-200 bg-emerald-100 text-emerald-800';
-  if (status === STATUS_SHADOW) return 'border-amber-200 bg-amber-100 text-amber-800';
   return 'border-red-200 bg-red-100 text-red-800';
 }
 
@@ -136,29 +128,16 @@ export default function DiagnosticoSaldoFerias() {
     staleTime: 60 * 1000,
   });
 
-  const { data: creditosExtraordinarios = [], isLoading: loadingCreditos } = useQuery({
-    queryKey: ['diagnostico-saldo-ferias-creditos-extra', isAdmin],
-    queryFn: () => CreditoExtraFerias.list('-data_referencia'),
-    enabled: queryEnabled,
-    staleTime: 60 * 1000,
-  });
-
-  const { data: descontos = [], isLoading: loadingDescontos } = useQuery({
-    queryKey: ['diagnostico-saldo-ferias-descontos', isAdmin],
-    queryFn: listarDescontosFerias,
-    enabled: queryEnabled,
-    staleTime: 60 * 1000,
-  });
 
   const periodos = paBundle?.periodosAquisitivos || [];
   const ferias = paBundle?.ferias || [];
   const militares = paBundle?.militares || [];
-  const isLoading = loadingBundle || loadingAjustes || loadingCreditos || loadingDescontos;
+  const isLoading = loadingBundle || loadingAjustes;
 
   const militarById = useMemo(() => new Map(militares.map((militar) => [militar.id, militar])), [militares]);
 
   const linhas = useMemo(() => periodos.map((periodo) => {
-    const diagnostico = compararSaldoPeriodo({ periodo, ajustes, ferias, creditosExtraordinarios, descontos });
+    const diagnostico = compararSaldoPeriodo({ periodo, ajustes, ferias });
     const militar = montarNomeMilitar(periodo, militarById);
     const periodoRef = diagnostico.periodo_ref || normalizarReferenciaPeriodo(periodo) || '—';
     const status = resolverStatus(diagnostico);
@@ -172,7 +151,7 @@ export default function DiagnosticoSaldoFerias() {
       ajustesPeriodo: ajustes.filter((item) => isRegistroDoPeriodo(item, periodo)),
       feriasConsideradas: ferias.filter((item) => isFeriasConsiderada(item, periodo)),
     };
-  }).sort((a, b) => a.militar.localeCompare(b.militar) || b.periodoRef.localeCompare(a.periodoRef)), [ajustes, creditosExtraordinarios, descontos, ferias, militarById, periodos]);
+  }).sort((a, b) => a.militar.localeCompare(b.militar) || b.periodoRef.localeCompare(a.periodoRef)), [ajustes, ferias, militarById, periodos]);
 
   const linhasFiltradas = useMemo(() => linhas.filter((linha) => {
     const militarOk = !militarFilter || normalizarLower(linha.militar).includes(normalizarLower(militarFilter));
@@ -184,10 +163,9 @@ export default function DiagnosticoSaldoFerias() {
   const resumo = useMemo(() => linhas.reduce((acc, linha) => {
     acc.total += 1;
     if (linha.status === STATUS_COMPATIVEL) acc.compativeis += 1;
-    if (linha.status === STATUS_SHADOW) acc.shadow += 1;
     if (linha.status === STATUS_DIVERGENTE) acc.divergentes += 1;
     return acc;
-  }, { total: 0, compativeis: 0, shadow: 0, divergentes: 0 }), [linhas]);
+  }, { total: 0, compativeis: 0, divergentes: 0 }), [linhas]);
 
   const linhaSelecionada = linhas.find((linha) => linha.id === linhaSelecionadaId) || null;
 
@@ -204,7 +182,7 @@ export default function DiagnosticoSaldoFerias() {
             <div>
               <h1 className="text-3xl font-bold text-[#1e3a5f]">Diagnóstico de Saldo de Férias</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Visão administrativa somente leitura para comparar saldo oficial, derivado legado e AjusteSaldoFerias.
+                Visão administrativa somente leitura para comparar o saldo gravado com o motor operacional único.
               </p>
             </div>
           </div>
@@ -216,7 +194,7 @@ export default function DiagnosticoSaldoFerias() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Total de períodos analisados</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold text-slate-900">{resumo.total}</p></CardContent></Card>
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Compatíveis</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold text-emerald-700">{resumo.compativeis}</p></CardContent></Card>
-          <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Shadow pendente</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold text-amber-700">{resumo.shadow}</p></CardContent></Card>
+          
           <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Divergentes</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold text-red-700">{resumo.divergentes}</p></CardContent></Card>
         </div>
 
@@ -228,7 +206,6 @@ export default function DiagnosticoSaldoFerias() {
                 <SelectContent>
                   <SelectItem value={STATUS_TODOS}>Todos os status</SelectItem>
                   <SelectItem value={STATUS_COMPATIVEL}>{STATUS_COMPATIVEL}</SelectItem>
-                  <SelectItem value={STATUS_SHADOW}>{STATUS_SHADOW}</SelectItem>
                   <SelectItem value={STATUS_DIVERGENTE}>{STATUS_DIVERGENTE}</SelectItem>
                 </SelectContent>
               </Select>
@@ -247,23 +224,21 @@ export default function DiagnosticoSaldoFerias() {
               <table className="w-full min-w-[980px] text-sm">
                 <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3">Militar</th><th className="px-4 py-3">Período</th><th className="px-4 py-3">Oficial</th><th className="px-4 py-3">Legado</th><th className="px-4 py-3">Ajustes</th><th className="px-4 py-3">Dif. legado</th><th className="px-4 py-3">Dif. ajustes</th><th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Militar</th><th className="px-4 py-3">Período</th><th className="px-4 py-3">Oficial</th><th className="px-4 py-3">Operacional</th><th className="px-4 py-3">Dif. operacional</th><th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Carregando diagnóstico...</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">Carregando diagnóstico...</td></tr>
                   ) : linhasFiltradas.length === 0 ? (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nenhum período encontrado para os filtros informados.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">Nenhum período encontrado para os filtros informados.</td></tr>
                   ) : linhasFiltradas.map((linha) => (
                     <tr key={linha.id} onClick={() => setLinhaSelecionadaId(linha.id)} className={`cursor-pointer hover:bg-blue-50 ${linhaSelecionadaId === linha.id ? 'bg-blue-50' : 'bg-white'}`}>
                       <td className="px-4 py-3 font-medium text-slate-800">{linha.militar}</td>
                       <td className="px-4 py-3 text-slate-600">{linha.periodoRef}</td>
                       <td className="px-4 py-3">{formatarDias(linha.diagnostico.modelo_oficial_atual?.saldo_atual_sistema)}</td>
-                      <td className="px-4 py-3">{formatarDias(linha.diagnostico.modelo_derivado_legado?.saldo)}</td>
-                      <td className="px-4 py-3">{formatarDias(linha.diagnostico.modelo_ajustes_puro?.saldo)}</td>
-                      <td className="px-4 py-3">{formatarDias(linha.diagnostico.diferenca_oficial_vs_legado)}</td>
-                      <td className="px-4 py-3">{formatarDias(linha.diagnostico.diferenca_oficial_vs_ajustes_puro)}</td>
+                      <td className="px-4 py-3">{formatarDias(linha.diagnostico.modelo_operacional?.saldo)}</td>
+                      <td className="px-4 py-3">{formatarDias(linha.diagnostico.diferenca_oficial_vs_operacional)}</td>
                       <td className="px-4 py-3"><Badge className={`${getStatusBadgeClass(linha.status)} border`}>{linha.status}</Badge></td>
                     </tr>
                   ))}
@@ -284,12 +259,12 @@ export default function DiagnosticoSaldoFerias() {
             <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <DetalheLista
                 titulo="Créditos ativos"
-                itens={linhaSelecionada.diagnostico.modelo_ajustes_puro?.detalhes_creditos || []}
+                itens={linhaSelecionada.diagnostico.modelo_operacional?.detalhes_creditos || []}
                 renderItem={(item) => <><p className="font-semibold">{formatarDias(item.dias)} — {item.motivo || item.tipo || 'Crédito'}</p><p className="text-xs text-slate-500">Origem: {item.origem || item.entidade_origem || 'AjusteSaldoFerias'}</p></>}
               />
               <DetalheLista
                 titulo="Débitos ativos"
-                itens={linhaSelecionada.diagnostico.modelo_ajustes_puro?.detalhes_debitos || []}
+                itens={linhaSelecionada.diagnostico.modelo_operacional?.detalhes_debitos || []}
                 renderItem={(item) => <><p className="font-semibold">{formatarDias(item.dias)} — {item.motivo || item.tipo || 'Débito'}</p><p className="text-xs text-slate-500">Origem: {item.origem || item.entidade_origem || 'AjusteSaldoFerias'}</p></>}
               />
               <DetalheLista

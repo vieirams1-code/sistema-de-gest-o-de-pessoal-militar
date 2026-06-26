@@ -1,9 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  compararSaldoPeriodo,
-  converterRegistrosLegadosEmAjustesVirtuais,
-} from '../diagnosticoSaldoFeriasService.js';
+import { compararSaldoPeriodo } from '../diagnosticoSaldoFeriasService.js';
 
 const periodo = { id: 'p1', militar_id: 'm1', ano_referencia: '2025/2026', dias_direito: 30, dias_saldo: 30 };
 
@@ -24,21 +21,7 @@ describe('diagnosticoSaldoFeriasService', () => {
     assert.equal(resultado.saldo_atual_sistema, 20);
   });
 
-  it('sem AjusteSaldoFerias reais: ajustes_puro fica diferente do legado virtualizado', () => {
-    const resultado = compararSaldoPeriodo({
-      periodo: { ...periodo, dias_saldo: 32 },
-      ajustes: [],
-      ferias: [],
-      creditosExtraordinarios: [{ id: 'c1', periodo_aquisitivo_id: 'p1', status: 'DISPONIVEL', quantidade_dias: 5 }],
-      descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'ativo', saldo_aplicado: true, dias: 3 }],
-    });
-
-    assert.equal(resultado.modelo_derivado_legado.saldo, 32);
-    assert.equal(resultado.modelo_ajustes_puro.saldo, 30);
-    assert.equal(resultado.diferenca_legado_vs_ajustes_puro, -2);
-  });
-
-  it('com AjusteSaldoFerias equivalente: ajustes_puro fica igual ao legado virtualizado', () => {
+  it('usa somente AjusteSaldoFerias reais no modelo operacional', () => {
     const resultado = compararSaldoPeriodo({
       periodo: { ...periodo, dias_saldo: 32 },
       ajustes: [
@@ -46,51 +29,24 @@ describe('diagnosticoSaldoFeriasService', () => {
         { id: 'a2', periodo_aquisitivo_id: 'p1', tipo: 'debito', dias: 3, status: 'ativo' },
       ],
       ferias: [],
-      creditosExtraordinarios: [{ id: 'c1', periodo_aquisitivo_id: 'p1', status: 'DISPONIVEL', quantidade_dias: 5 }],
-      descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'ativo', saldo_aplicado: true, dias: 3 }],
     });
 
-    assert.equal(resultado.modelo_derivado_legado.saldo, 32);
-    assert.equal(resultado.modelo_ajustes_puro.saldo, 32);
-    assert.equal(resultado.diferenca_legado_vs_ajustes_puro, 0);
+    assert.equal(resultado.modelo_operacional.saldo, 32);
+    assert.equal(resultado.diferenca_oficial_vs_operacional, 0);
   });
 
-  it('calcula diferenças entre oficial, legado e ajustes_puro corretamente', () => {
+  it('desconta férias previstas e gozadas pelo serviço operacional', () => {
     const resultado = compararSaldoPeriodo({
-      periodo: { ...periodo, dias_saldo: 29 },
+      periodo: { ...periodo, dias_saldo: 21 },
       ajustes: [{ id: 'a1', periodo_aquisitivo_id: 'p1', tipo: 'credito', dias: 1, status: 'ativo' }],
-      ferias: [],
-      creditosExtraordinarios: [{ id: 'c1', periodo_aquisitivo_id: 'p1', status: 'DISPONIVEL', quantidade_dias: 4 }],
-      descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'ativo', saldo_aplicado: true, dias: 2 }],
+      ferias: [
+        { id: 'f1', militar_id: 'm1', periodo_aquisitivo_id: 'p1', status: 'Gozada', dias: 6 },
+        { id: 'f2', militar_id: 'm1', periodo_aquisitivo_id: 'p1', status: 'Prevista', dias: 4 },
+      ],
     });
 
-    assert.equal(resultado.modelo_oficial_atual.saldo_atual_sistema, 29);
-    assert.equal(resultado.modelo_derivado_legado.saldo, 32);
-    assert.equal(resultado.modelo_ajustes_puro.saldo, 31);
-    assert.equal(resultado.diferenca_oficial_vs_legado, 3);
-    assert.equal(resultado.diferenca_oficial_vs_ajustes_puro, 2);
-    assert.equal(resultado.diferenca_legado_vs_ajustes_puro, -1);
-  });
-
-  it('desconto ativo vira débito virtual', () => {
-    const ajustesVirtuais = converterRegistrosLegadosEmAjustesVirtuais({
-      descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'ativo', saldo_aplicado: true, dias: 3 }],
-    });
-    const resultado = compararSaldoPeriodo({ periodo: { ...periodo, dias_saldo: 27 }, descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'ativo', saldo_aplicado: true, dias: 3 }] });
-
-    assert.equal(ajustesVirtuais[0].tipo, 'debito');
-    assert.equal(resultado.modelo_derivado_legado.debitos_ativos, 3);
-    assert.equal(resultado.modelo_derivado_legado.saldo, 27);
-  });
-
-  it('desconto pendente não entra no legado virtualizado', () => {
-    const ajustesVirtuais = converterRegistrosLegadosEmAjustesVirtuais({
-      descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'pendente_publicacao', saldo_aplicado: true, dias: 3 }],
-    });
-    const resultado = compararSaldoPeriodo({ periodo, descontos: [{ id: 'd1', periodo_aquisitivo_id: 'p1', status: 'pendente_publicacao', saldo_aplicado: true, dias: 3 }] });
-
-    assert.equal(ajustesVirtuais.length, 0);
-    assert.equal(resultado.modelo_derivado_legado.debitos_ativos, 0);
-    assert.equal(resultado.modelo_derivado_legado.saldo, 30);
+    assert.equal(resultado.modelo_operacional.saldo, 21);
+    assert.equal(resultado.modelo_operacional.gozados_previstos, 10);
+    assert.equal(resultado.diferenca, 0);
   });
 });

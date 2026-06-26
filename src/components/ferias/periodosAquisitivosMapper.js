@@ -1,6 +1,6 @@
 import { differenceInDays, format } from 'date-fns';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo, getFracaoNumero } from './feriasRules';
-import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from './periodoSaldoUtils';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes, isFeriasDoPeriodo } from '@/services/saldoFeriasOperacionalService';
 import { calcularStatusPeriodoAquisitivo } from './recalcularPeriodoAquisitivo';
 
 const STATUS_CODIGO_MAP = {
@@ -71,8 +71,8 @@ function normalizarFeriasFracoes(ferias = []) {
     }));
 }
 
-function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
-  const saldoConsolidado = getSaldoConsolidadoPeriodo({ periodo, ferias: feriasRelacionadas });
+function mapPeriodo(periodo, feriasRelacionadas = [], ajustes = [], hoje) {
+  const saldoConsolidado = calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo, ajustes, ferias: feriasRelacionadas });
 
   const statusRecalculado = calcularStatusPeriodoAquisitivo({
     periodo,
@@ -167,7 +167,7 @@ function createMilitarResumo(periodos = []) {
   return resumoBase;
 }
 
-export function mapPeriodosAquisitivosPorMilitar({ periodos = [], ferias = [] } = {}) {
+export function mapPeriodosAquisitivosPorMilitar({ periodos = [], ferias = [], ajustes = [] } = {}) {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
@@ -188,7 +188,7 @@ export function mapPeriodosAquisitivosPorMilitar({ periodos = [], ferias = [] } 
 
     const relacionadas = ferias.filter((item) => isFeriasDoPeriodo(item, periodo));
     const unicas = [...new Map(relacionadas.map((item) => [item.id, item])).values()];
-    acc[periodo.militar_id].periodos.push(mapPeriodo(periodo, unicas, hoje));
+    acc[periodo.militar_id].periodos.push(mapPeriodo(periodo, unicas, ajustes, hoje));
 
     return acc;
   }, {});

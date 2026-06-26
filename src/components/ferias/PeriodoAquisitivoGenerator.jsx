@@ -9,7 +9,7 @@ import {
 } from '@/services/periodosAquisitivosGeracao';
 import { resolverDataBaseFerias, ORIGENS_DATA_BASE_FERIAS } from '@/services/resolverDataBaseFerias';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
-import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
+import { DIAS_BASE_PADRAO } from '@/services/saldoFeriasOperacionalService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

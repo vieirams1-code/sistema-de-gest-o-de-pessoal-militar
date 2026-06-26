@@ -1,5 +1,5 @@
 import { isFeriasVigente } from './statusOperacionalService.js';
-import { recalcularSaldoPeriodo } from '../components/ferias/periodoSaldoUtils.js';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes } from './saldoFeriasOperacionalService.js';
 import { isPeriodoDisponivelOperacional } from './periodosAquisitivosOperacionais.js';
 
 /**
@@ -11,14 +11,14 @@ import { isPeriodoDisponivelOperacional } from './periodosAquisitivosOperacionai
  * @param {Date|string} [params.hoje] - Data de referência para cálculos de vigência
  * @returns {Object} { saldoAtual, periodos, historico, situacaoAtual, proximoVencimento }
  */
-export function consolidarFerias({ periodosAquisitivos = [], ferias = [], hoje = new Date() } = {}) {
+export function consolidarFerias({ periodosAquisitivos = [], ferias = [], ajustes = [], hoje = new Date() } = {}) {
   const hojeRef = hoje instanceof Date ? hoje : new Date(hoje);
 
   // 1. Períodos operacionais e seus saldos
   const periodosOperacionais = (periodosAquisitivos || [])
     .filter(isPeriodoDisponivelOperacional)
     .map((p) => {
-      const saldo = recalcularSaldoPeriodo(p, ferias);
+      const saldo = calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo: p, ajustes, ferias });
       return {
         ...p,
         ...saldo,

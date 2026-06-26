@@ -22,7 +22,7 @@ import {
   validarInicioNoPeriodoConcessivo,
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
-import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
+import { DIAS_BASE_PADRAO } from '@/services/saldoFeriasOperacionalService';
 import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';

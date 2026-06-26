@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { recalcularSaldoPeriodo } from './periodoSaldoUtils';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 function parseDateOnly(date) {
@@ -38,13 +38,13 @@ export function calcularStatusPeriodoAquisitivo({ periodo = {}, dias_previstos =
   return periodo?.status || 'Disponível';
 }
 
-export function montarPayloadRecalculoPeriodo(periodo = {}, ferias = []) {
-  const saldo = recalcularSaldoPeriodo(periodo, ferias);
+export function montarPayloadRecalculoPeriodo(periodo = {}, ferias = [], ajustes = []) {
+  const saldo = calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo, ajustes, ferias });
   const status = calcularStatusPeriodoAquisitivo({
     periodo,
     dias_previstos: saldo.dias_previstos,
     dias_gozados: saldo.dias_gozados,
-    dias_saldo: saldo.dias_saldo,
+    dias_saldo: saldo.saldo_restante,
   });
 
   return {
@@ -79,11 +79,14 @@ export async function recalcularPeriodoAquisitivoVinculado({ periodoId = null, p
   const todasFerias = militarAlvo
     ? await base44.entities.Ferias.filter({ militar_id: militarAlvo })
     : await base44.entities.Ferias.list();
+  const ajustesSaldoFerias = militarAlvo
+    ? await base44.entities.AjusteSaldoFerias.filter({ militar_id: militarAlvo })
+    : await base44.entities.AjusteSaldoFerias.list();
 
   const atualizacoes = [];
 
   for (const periodo of periodos) {
-    const payload = montarPayloadRecalculoPeriodo(periodo, todasFerias);
+    const payload = montarPayloadRecalculoPeriodo(periodo, todasFerias, ajustesSaldoFerias);
     await atualizarEscopado('PeriodoAquisitivo', periodo.id, payload);
     atualizacoes.push({ periodoId: periodo.id, payload });
   }
