@@ -200,6 +200,54 @@ function getDataRetornoOperacionalFerias(ferias, diasOperacionais) {
   return addDaysIso(ferias?.data_inicio, diasOperacionais) || ferias?.data_retorno;
 }
 
+function montarContextoOperacionalRegistroLivro({ feriasSelecionada, tipo, periodosByKey, ajustesSaldoFerias, todasFerias, registrosLivro }) {
+  if (!feriasSelecionada) return null;
+
+  const periodoKey = getFeriasPeriodoKey(feriasSelecionada);
+  const periodoAquisitivo = periodoKey ? periodosByKey.get(periodoKey) || null : null;
+  const militarId = String(feriasSelecionada?.militar_id || '');
+  const periodoId = String(periodoAquisitivo?.id || feriasSelecionada?.periodo_aquisitivo_id || '');
+  const periodoRef = String(periodoAquisitivo?.ano_referencia || periodoAquisitivo?.referencia || feriasSelecionada?.periodo_aquisitivo_ref || '');
+  const feriasDoMilitar = (todasFerias || []).filter((item) => String(item?.militar_id || '') === militarId);
+  const ajustesFiltrados = (ajustesSaldoFerias || []).filter((ajuste) => {
+    if (String(ajuste?.militar_id || '') !== militarId) return false;
+    const ajustePeriodoId = String(ajuste?.periodo_aquisitivo_id || '');
+    const ajustePeriodoRef = String(ajuste?.periodo_aquisitivo_ref || ajuste?.ano_referencia || ajuste?.referencia || '');
+    if (periodoId && ajustePeriodoId) return ajustePeriodoId === periodoId;
+    if (periodoRef && ajustePeriodoRef) return ajustePeriodoRef === periodoRef;
+    return !periodoId && !periodoRef;
+  });
+  const registrosLivroDaFerias = (registrosLivro || []).filter((registro) => String(registro?.ferias_id || '') === String(feriasSelecionada.id || ''));
+  const feriasParaSaldo = feriasDoMilitar.filter((item) => String(item?.id || '') !== String(feriasSelecionada?.id || ''));
+  const saldoOperacional = periodoAquisitivo
+    ? calcularSaldoOperacionalPeriodoComTodosAjustes({
+        periodo: periodoAquisitivo,
+        ajustes: ajustesFiltrados,
+        ferias: feriasParaSaldo,
+      })
+    : null;
+  const diasOperacionais = Number(saldoOperacional?.direito_liquido);
+  const saldoRestante = Number(saldoOperacional?.saldo_restante);
+  const retornoOperacional = Number.isFinite(diasOperacionais)
+    ? getDataRetornoOperacionalFerias(feriasSelecionada, diasOperacionais)
+    : feriasSelecionada?.data_retorno || null;
+
+  return {
+    ferias: feriasSelecionada,
+    tipoRegistro: tipo,
+    periodoAquisitivo,
+    ajustesSaldoFerias: ajustesFiltrados,
+    feriasDoMilitar,
+    registrosLivroDaFerias,
+    militar: feriasSelecionada?.militar || null,
+    saldoOperacional,
+    diasOperacionais: Number.isFinite(diasOperacionais) ? diasOperacionais : Number(feriasSelecionada?.dias || 0),
+    direito_liquido: Number.isFinite(diasOperacionais) ? diasOperacionais : saldoOperacional?.direito_liquido,
+    saldo_restante: Number.isFinite(saldoRestante) ? saldoRestante : saldoOperacional?.saldo_restante,
+    retornoOperacional,
+  };
+}
+
 function deriveInterrupcaoData(ferias, registrosLivro) {
   if (!ferias || !Array.isArray(registrosLivro)) {
     return {
@@ -990,13 +1038,21 @@ export default function Ferias() {
     });
   };
 
-  const abrirRegistroLivroModal = (ferias, tipo) => {
-    const escopo = validarEscopoMilitar(ferias?.militar_id);
+  const abrirRegistroLivroModal = (feriasSelecionada, tipo) => {
+    const escopo = validarEscopoMilitar(feriasSelecionada?.militar_id);
     if (!escopo.permitido) {
       alert(escopo.motivo);
       return;
     }
-    setRegistroLivroModal({ open: true, ferias, tipo });
+    const contextoOperacionalInicial = montarContextoOperacionalRegistroLivro({
+      feriasSelecionada,
+      tipo,
+      periodosByKey: periodosAquisitivosByKey,
+      ajustesSaldoFerias,
+      todasFerias: ferias,
+      registrosLivro,
+    });
+    setRegistroLivroModal({ open: true, ferias: feriasSelecionada, tipo, contextoOperacionalInicial });
   };
 
   const abrirEdicaoFerias = (ferias) => {
@@ -1884,11 +1940,12 @@ export default function Ferias() {
       <RegistroLivroModal
         open={registroLivroModal.open}
         onClose={() =>
-          setRegistroLivroModal({ open: false, ferias: null, tipo: 'Saída Férias' })
+          setRegistroLivroModal({ open: false, ferias: null, tipo: 'Saída Férias', contextoOperacionalInicial: null })
         }
         ferias={registroLivroModal.ferias}
         tipoInicial={registroLivroModal.tipo}
         modoAdmin={modoAdmin}
+        contextoOperacionalInicial={registroLivroModal.contextoOperacionalInicial}
       />
 
       <Dialog
