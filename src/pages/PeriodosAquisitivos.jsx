@@ -7,9 +7,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
-import { AjusteSaldoFerias, CreditoExtraFerias } from '@/api/entities';
+import { AjusteSaldoFerias } from '@/api/entities';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
-import { listarDescontosFerias } from '@/services/descontoFeriasService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -85,21 +84,6 @@ export default function PeriodosAquisitivos() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: creditosExtraFerias = [], isLoading: loadingCreditosExtraFerias } = useQuery({
-    queryKey: ['pa-diagnostico-creditos-extra-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
-    queryFn: () => CreditoExtraFerias.list('-data_referencia'),
-    enabled: isPaBundleQueryEnabled && showDiagnosticoSaldo,
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: descontosFerias = [], isLoading: loadingDescontosFerias } = useQuery({
-    queryKey: ['pa-diagnostico-descontos-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
-    queryFn: listarDescontosFerias,
-    enabled: isPaBundleQueryEnabled && showDiagnosticoSaldo,
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
 
   const periodos = paBundle?.periodosAquisitivos || [];
   const ferias = paBundle?.ferias || [];
@@ -108,7 +92,7 @@ export default function PeriodosAquisitivos() {
   const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
-  const isLoadingDiagnosticoSaldo = (showDiagnosticoSaldo && (loadingCreditosExtraFerias || loadingDescontosFerias)) || loadingAjustesSaldoFerias;
+  const isLoadingDiagnosticoSaldo = loadingAjustesSaldoFerias;
 
 
   const updatePeriodoMutation = useMutation({
@@ -152,7 +136,7 @@ export default function PeriodosAquisitivos() {
   const militarRevisao = militarIdFiltro ? militaresPorId.get(String(militarIdFiltro)) : null;
 
   const periodosTransformados = useMemo(() => {
-    const mapeados = mapPeriodosAquisitivosPorMilitar({ periodos, ferias });
+    const mapeados = mapPeriodosAquisitivosPorMilitar({ periodos, ferias, ajustes: ajustesSaldoFerias });
 
     return {
       ...mapeados,
@@ -184,7 +168,7 @@ export default function PeriodosAquisitivos() {
           };
         }),
     };
-  }, [periodos, ferias, militaresPorId]);
+  }, [periodos, ferias, ajustesSaldoFerias, militaresPorId]);
 
   const periodosFlat = useMemo(
     () => periodosTransformados.militares.flatMap((grupoMilitar) => grupoMilitar.periodos),
@@ -570,8 +554,6 @@ export default function PeriodosAquisitivos() {
                             diagnosticoSaldoProps={{
                               ajustes: ajustesSaldoFerias,
                               ferias,
-                              creditosExtraordinarios: creditosExtraFerias,
-                              descontos: descontosFerias,
                               isLoading: isLoadingDiagnosticoSaldo,
                             }}
                           />

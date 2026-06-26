@@ -1,11 +1,5 @@
 import { differenceInCalendarDays } from 'date-fns';
-import {
-  obterDiasBase,
-  calcularDiasTotal,
-  calcularDiasGozados,
-  calcularDiasPrevistos,
-  calcularDiasSaldo,
-} from './periodoSaldoUtils';
+import { obterDiasBase } from '@/services/saldoFeriasOperacionalService';
 
 const STARTED_STATUSES = new Set(['Em Curso', 'Gozada', 'Interrompida']);
 
@@ -158,10 +152,4 @@ export function hasPrevisaoValidaPeriodo(periodo) {
   return ['Previsto', 'Parcialmente Gozado', 'Gozado'].includes(periodo.status);
 }
 
-export {
-  obterDiasBase,
-  calcularDiasTotal,
-  calcularDiasGozados,
-  calcularDiasPrevistos,
-  calcularDiasSaldo,
-};
+export { obterDiasBase };

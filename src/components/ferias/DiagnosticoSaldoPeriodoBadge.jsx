@@ -17,8 +17,6 @@ export default function DiagnosticoSaldoPeriodoBadge({
   periodo,
   ajustes = [],
   ferias = [],
-  creditosExtraordinarios = [],
-  descontos = [],
   isLoading = false,
 }) {
   const diagnostico = useMemo(() => {
@@ -28,10 +26,8 @@ export default function DiagnosticoSaldoPeriodoBadge({
       periodo,
       ajustes,
       ferias,
-      creditosExtraordinarios,
-      descontos,
     });
-  }, [ajustes, creditosExtraordinarios, descontos, ferias, isLoading, periodo]);
+  }, [ajustes, ferias, isLoading, periodo]);
 
   if (isLoading) {
     return (
@@ -55,23 +51,15 @@ export default function DiagnosticoSaldoPeriodoBadge({
     );
   }
 
-  const oficialCompativelComLegado = Number(diagnostico.diferenca_oficial_vs_legado) === 0;
-  const ajustesPuroCompativelComLegado = Number(diagnostico.diferenca_legado_vs_ajustes_puro) === 0;
-  const shadowPendente = oficialCompativelComLegado && !ajustesPuroCompativelComLegado;
-  let statusLabel = 'Divergência';
-  let badgeClass = 'border-red-200 bg-red-100 text-red-700';
-
-  if (oficialCompativelComLegado && ajustesPuroCompativelComLegado) {
-    statusLabel = 'Compatível';
-    badgeClass = 'border-emerald-200 bg-emerald-100 text-emerald-700';
-  } else if (shadowPendente) {
-    statusLabel = 'Shadow pendente';
-    badgeClass = 'border-amber-200 bg-amber-100 text-amber-800';
-  }
-  const Icon = oficialCompativelComLegado && !shadowPendente ? CheckCircle2 : AlertTriangle;
+  const operacionalCompativel = Number(diagnostico.diferenca_oficial_vs_operacional) === 0;
+  const statusLabel = operacionalCompativel ? 'Compatível' : 'Divergência';
+  const badgeClass = operacionalCompativel
+    ? 'border-emerald-200 bg-emerald-100 text-emerald-700'
+    : 'border-red-200 bg-red-100 text-red-700';
+  const Icon = operacionalCompativel ? CheckCircle2 : AlertTriangle;
 
   return (
-    <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${oficialCompativelComLegado && !shadowPendente ? 'border-emerald-100 bg-emerald-50/70' : 'border-amber-100 bg-amber-50/70'}`}>
+    <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${operacionalCompativel ? 'border-emerald-100 bg-emerald-50/70' : 'border-amber-100 bg-amber-50/70'}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold text-slate-700">Diagnóstico admin de saldo</p>
         <Badge className={`${badgeClass} border text-xs`}>
@@ -79,20 +67,14 @@ export default function DiagnosticoSaldoPeriodoBadge({
           {statusLabel}
         </Badge>
       </div>
-      <div className="grid grid-cols-1 gap-2 text-slate-600 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 text-slate-600 sm:grid-cols-2">
         <div>
           <p className="text-slate-500">Oficial atual</p>
           <p className="font-semibold text-slate-800">{formatarDias(diagnostico.modelo_oficial_atual?.saldo_atual_sistema)}</p>
         </div>
         <div>
-          <p className="text-slate-500">Derivado legado</p>
-          <p className="font-semibold text-slate-800">{formatarDias(diagnostico.modelo_derivado_legado?.saldo)}</p>
-        </div>
-        <div>
-          <p className="text-slate-500">Ajustes puro</p>
-          <p className={`font-semibold ${ajustesPuroCompativelComLegado ? 'text-emerald-700' : 'text-amber-800'}`}>
-            {formatarDias(diagnostico.modelo_ajustes_puro?.saldo)}
-          </p>
+          <p className="text-slate-500">Operacional</p>
+          <p className="font-semibold text-slate-800">{formatarDias(diagnostico.modelo_operacional?.saldo)}</p>
         </div>
       </div>
     </div>

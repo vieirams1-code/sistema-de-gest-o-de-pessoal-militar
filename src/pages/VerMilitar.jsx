@@ -55,7 +55,7 @@ import { useToast } from '@/components/ui/use-toast';
 import {
   formatarTipoCreditoExtra } from
 '@/services/creditoExtraFeriasService';
-import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from '@/components/ferias/periodoSaldoUtils';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes, isFeriasDoPeriodo } from '@/services/saldoFeriasOperacionalService';
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
@@ -280,6 +280,12 @@ export default function VerMilitar() {
   const { data: ferias = [] } = useQuery({
     queryKey: ['ver-ferias', id],
     queryFn: () => base44.entities.Ferias.filter({ militar_id: id }, '-data_inicio'),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const { data: ajustesSaldoFerias = [] } = useQuery({
+    queryKey: ['ver-ajustes-saldo-ferias', id],
+    queryFn: () => base44.entities.AjusteSaldoFerias.filter({ militar_id: id }, '-created_date'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
@@ -586,7 +592,7 @@ export default function VerMilitar() {
         const feriasRelacionadas = feriasSistema.filter((f) =>
           isFeriasDoPeriodo(f, periodo)
         );
-        const saldo = getSaldoConsolidadoPeriodo({ periodo, ferias: feriasRelacionadas });
+        const saldo = calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo, ajustes: ajustesSaldoFerias, ferias: feriasRelacionadas });
         const statusRecalculado = calcularStatusPeriodoAquisitivo({
           periodo,
           dias_previstos: saldo.dias_previstos,
@@ -595,7 +601,7 @@ export default function VerMilitar() {
         });
         return { periodo, feriasRelacionadas, saldo, statusRecalculado };
       });
-  }, [periodosSistema, feriasSistema]);
+  }, [periodosSistema, feriasSistema, ajustesSaldoFerias]);
   const creditosExtraPorPeriodo = React.useMemo(() => {
     const gozoById = new Map(feriasSistema.map((item) => [item.id, item]));
     const mapa = new Map();
