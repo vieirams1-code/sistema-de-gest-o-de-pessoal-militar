@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { criarAjusteSaldoFerias } from '@/services/criarAjusteSaldoFeriasClient';
+import { cancelarAjusteSaldoFerias } from '@/services/cancelarAjusteSaldoFeriasClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import {
@@ -160,7 +161,6 @@ export default function AjustesSaldoFerias() {
     mutationFn: async () => {
       const dias = Number(form.dias);
       const periodo = periodoById.get(String(form.periodo_aquisitivo_id));
-      const militar = militarById.get(String(form.militar_id));
       const motivo = String(form.motivo || '').trim();
       if (!form.militar_id) throw new Error('Militar é obrigatório.');
       if (!form.periodo_aquisitivo_id || !periodo) throw new Error('Período aquisitivo é obrigatório.');
@@ -174,22 +174,19 @@ export default function AjustesSaldoFerias() {
         }).saldo_liquido;
         if (saldoComDebito < 0) throw new Error('Débito não permitido: deixaria o saldo líquido negativo.');
       }
-      return criarEscopado('AjusteSaldoFerias', {
+      return criarAjusteSaldoFerias({
         militar_id: form.militar_id,
-        militar_nome: militar ? formatarNomeMilitar(militar) : '',
         periodo_aquisitivo_id: form.periodo_aquisitivo_id,
-        periodo_aquisitivo_ref: obterPeriodoRef(periodo),
         tipo: form.tipo,
         dias,
         motivo,
-        origem: 'manual',
-        status: STATUS_AJUSTE_SALDO_FERIAS.ATIVO,
       });
     },
     onSuccess: () => {
       toast({ title: 'Ajuste criado', description: 'O ajuste manual foi registrado como ativo.' });
       setForm(formInicial);
       queryClient.invalidateQueries({ queryKey: ajustesKey });
+      queryClient.invalidateQueries({ queryKey: bundleKey });
     },
     onError: (error) => toast({ title: 'Não foi possível criar o ajuste', description: error?.message, variant: 'destructive' }),
   });
@@ -199,17 +196,16 @@ export default function AjustesSaldoFerias() {
       const motivo = String(motivoCancelamento[ajuste.id] || '').trim();
       if (!STATUS_CANCELAVEIS.has(normalizar(ajuste?.status))) throw new Error('Somente ajustes ativos, rascunho ou pendentes podem ser cancelados.');
       if (!motivo) throw new Error('Informe o motivo do cancelamento.');
-      return atualizarEscopado('AjusteSaldoFerias', ajuste.id, {
-        status: STATUS_AJUSTE_SALDO_FERIAS.CANCELADO,
+      return cancelarAjusteSaldoFerias({
+        ajuste_id: ajuste.id,
         motivo_cancelamento: motivo,
-        cancelado_em: new Date().toISOString(),
-        cancelado_por_email: user?.email || effectiveEmail || '',
       });
     },
     onSuccess: () => {
       toast({ title: 'Ajuste cancelado', description: 'O registro foi mantido e marcado como cancelado.' });
       setMotivoCancelamento({});
       queryClient.invalidateQueries({ queryKey: ajustesKey });
+      queryClient.invalidateQueries({ queryKey: bundleKey });
     },
     onError: (error) => toast({ title: 'Não foi possível cancelar', description: error?.message, variant: 'destructive' }),
   });
