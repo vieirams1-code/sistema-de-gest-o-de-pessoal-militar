@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
-import { CalendarClock, CalendarX, AlertTriangle, UserX, PenLine, PauseCircle } from 'lucide-react';
+import { CalendarClock, CalendarX, UserX, PenLine, PauseCircle } from 'lucide-react';
 import { classificarPrazo, getStatusBadgeClass } from '@/utils/controle-processos/controleProcessosConfig';
 
 function diasParados(processo) {
   const ref = processo.updated_date || processo.created_date;
   if (!ref) return 0;
-  const diff = (Date.now() - new Date(ref).getTime()) / (1000 * 60 * 60 * 24);
+  const dataRef = new Date(ref).getTime();
+  if (Number.isNaN(dataRef)) return 0;
+  const diff = (Date.now() - dataRef) / (1000 * 60 * 60 * 24);
   return Math.floor(diff);
 }
 
@@ -39,7 +41,7 @@ function Card({ icon: Icon, titulo, cor, processos, onVer }) {
 
 export default function PrazosPanel({ processos = [], onVer }) {
   const grupos = useMemo(() => {
-    const ativos = processos.filter((p) => !p.arquivado && p.status !== 'Concluído' && p.status !== 'Cancelado');
+    const ativos = (processos || []).filter((p) => !p.arquivado && p.status !== 'Concluído' && p.status !== 'Cancelado');
     return {
       hoje: ativos.filter((p) => classificarPrazo(p.prazo) === 'hoje'),
       proximo: ativos.filter((p) => classificarPrazo(p.prazo) === 'proximo'),

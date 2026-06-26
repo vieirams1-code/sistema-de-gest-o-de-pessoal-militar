@@ -10,6 +10,7 @@ import {
 import {
   getStatusBadgeClass, getPrioridadeBadgeClass,
 } from '@/utils/controle-processos/controleProcessosConfig';
+import { sanitizarLinkExterno } from '@/utils/controle-processos/sanitizarLinkExterno';
 import { listarTramites, listarEventos } from '@/services/controleProcessosService';
 
 function formatDateTime(iso) {
@@ -66,6 +67,9 @@ export default function ProcessoDetalheModal({
     await onConcluir(processo);
     refetchEventos();
   };
+  const linkExternoSeguro = processo.link_externo
+    ? sanitizarLinkExterno(processo.link_externo).linkLimpo
+    : '';
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -83,9 +87,9 @@ export default function ProcessoDetalheModal({
 
         {/* Ações rápidas */}
         <div className="flex flex-wrap gap-2 border-y border-slate-100 py-3">
-          {processo.link_externo && (
+          {linkExternoSeguro && (
             <Button variant="outline" size="sm" asChild>
-              <a href={processo.link_externo} target="_blank" rel="noopener noreferrer">
+              <a href={linkExternoSeguro} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="w-4 h-4 mr-1.5" /> Abrir no sistema externo
               </a>
             </Button>
@@ -122,15 +126,17 @@ export default function ProcessoDetalheModal({
         </div>
 
         {/* Novo despacho */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-slate-800">Novo despacho interno</h4>
-          <Textarea value={despacho} onChange={(e) => setDespacho(e.target.value)} rows={2} placeholder="Escreva um despacho..." />
-          <div className="flex justify-end">
-            <Button size="sm" onClick={handleDespacho} disabled={!despacho.trim() || enviando}>
-              <Send className="w-4 h-4 mr-1.5" /> {enviando ? 'Registrando...' : 'Registrar despacho'}
-            </Button>
+        {podeEditar && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-slate-800">Novo despacho interno</h4>
+            <Textarea value={despacho} onChange={(e) => setDespacho(e.target.value)} rows={2} placeholder="Escreva um despacho..." />
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleDespacho} disabled={!despacho.trim() || enviando}>
+                <Send className="w-4 h-4 mr-1.5" /> {enviando ? 'Registrando...' : 'Registrar despacho'}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Histórico de tramitações */}
         <div className="space-y-2">

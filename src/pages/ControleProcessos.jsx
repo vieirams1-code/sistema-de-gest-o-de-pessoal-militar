@@ -29,12 +29,12 @@ export default function ControleProcessos() {
   const queryClient = useQueryClient();
   const { userEmail, isAdmin, canAccessAction } = useCurrentUser();
 
-  const podeCriar = canAccessAction('criar_processo_controle');
-  const podeEditar = canAccessAction('editar_processo_controle');
-  const podeTramitar = canAccessAction('tramitar_processo_controle');
-  const podeArquivar = canAccessAction('arquivar_processo_controle');
-  const podeGerenciarCaixas = canAccessAction('gerenciar_caixas_processuais');
-  const podeVerTodas = isAdmin || canAccessAction('visualizar_todas_caixas_processuais');
+  const podeCriar = canAccessAction('perm_criar_processo_controle');
+  const podeEditar = canAccessAction('perm_editar_processo_controle');
+  const podeTramitar = canAccessAction('perm_tramitar_processo_controle');
+  const podeArquivar = canAccessAction('perm_arquivar_processo_controle');
+  const podeGerenciarCaixas = canAccessAction('perm_gerenciar_caixas_processuais');
+  const podeVerTodas = isAdmin || canAccessAction('perm_visualizar_todas_caixas_processuais');
 
   const [aba, setAba] = useState('minha-caixa');
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
@@ -58,9 +58,9 @@ export default function ControleProcessos() {
 
   const aplicarFiltros = (lista) => {
     const busca = filtros.busca.trim().toLowerCase();
-    return lista.filter((p) => {
+    return (lista || []).filter((p) => {
       if (busca) {
-        const alvo = `${p.titulo} ${p.nup || ''} ${p.assunto || ''} ${p.numero_documento || ''}`.toLowerCase();
+        const alvo = `${p.titulo || ''} ${p.nup || ''} ${p.assunto || ''} ${p.numero_documento || ''}`.toLowerCase();
         if (!alvo.includes(busca)) return false;
       }
       if (filtros.caixa && p.caixa_atual_id !== filtros.caixa) return false;
@@ -69,7 +69,7 @@ export default function ControleProcessos() {
       if (filtros.prioridade && p.prioridade !== filtros.prioridade) return false;
       if (filtros.sistema && p.sistema_origem !== filtros.sistema) return false;
       if (filtros.responsavel && !(p.responsavel_id || '').toLowerCase().includes(filtros.responsavel.toLowerCase())) return false;
-      if (filtros.interessado && !(p.interessados_ids || []).includes(filtros.interessado)) return false;
+      if (filtros.interessado && !(p.interessados_ids || []).includes(filtros.interessado.trim())) return false;
       if (filtros.prazo) {
         const cls = classificarPrazo(p.prazo);
         if (filtros.prazo === 'atrasado' && cls !== 'atrasado') return false;
@@ -96,6 +96,7 @@ export default function ControleProcessos() {
 
   // Determina se o usuário pode agir (gestor da caixa atual ou admin/permissão ampla).
   const podeAgirNoProcesso = (processo) => {
+    if (!processo) return false;
     if (podeVerTodas) return true;
     const caixa = caixasById[processo?.caixa_atual_id];
     return isGestorDaCaixa(caixa, userEmail) || processo?.responsavel_id === userEmail;
@@ -104,11 +105,10 @@ export default function ControleProcessos() {
   const handleSalvarProcesso = async (dados) => {
     setSalvando(true);
     try {
-      const { interessados, ...payload } = dados;
       if (modalProcesso.processo) {
-        await atualizarProcesso(modalProcesso.processo.id, payload, userEmail, modalProcesso.processo);
+        await atualizarProcesso(modalProcesso.processo.id, dados, userEmail, modalProcesso.processo);
       } else {
-        await criarProcesso(payload, userEmail);
+        await criarProcesso(dados, userEmail);
       }
       toast({ title: 'Processo salvo com sucesso.' });
       setModalProcesso({ open: false, processo: null });
@@ -189,7 +189,8 @@ export default function ControleProcessos() {
 
   const renderLista = (lista, vazioMsg) => {
     if (isLoading) return <p className="text-sm text-slate-500 py-8 text-center">Carregando...</p>;
-    if (lista.length === 0) {
+    const itens = lista || [];
+    if (itens.length === 0) {
       return (
         <div className="rounded-lg border border-dashed border-slate-300 p-10 text-center">
           <Inbox className="w-8 h-8 mx-auto text-slate-300 mb-2" />
@@ -199,16 +200,16 @@ export default function ControleProcessos() {
     }
     return (
       <div className="space-y-2.5">
-        {lista.map((p) => {
+        {itens.map((p) => {
           const agir = podeAgirNoProcesso(p);
           return (
             <ProcessoListItem
               key={p.id}
               processo={p}
               caixaNome={caixasById[p.caixa_atual_id]?.nome}
-              podeEditar={podeEditar && agir}
-              podeTramitar={podeTramitar && agir}
-              podeArquivar={podeArquivar && agir}
+              podeEditar={Boolean(podeEditar && agir)}
+              podeTramitar={Boolean(podeTramitar && agir)}
+              podeArquivar={Boolean(podeArquivar && agir)}
               onVer={() => setModalDetalhe({ open: true, processo: p })}
               onTramitar={() => setModalTramitar({ open: true, processo: p })}
               onEditar={() => setModalProcesso({ open: true, processo: p })}
@@ -294,9 +295,9 @@ export default function ControleProcessos() {
         processo={modalDetalhe.processo}
         caixaNome={caixasById[modalDetalhe.processo?.caixa_atual_id]?.nome}
         caixasById={caixasById}
-        podeTramitar={podeTramitar && modalDetalhe.processo && podeAgirNoProcesso(modalDetalhe.processo)}
-        podeEditar={podeEditar && modalDetalhe.processo && podeAgirNoProcesso(modalDetalhe.processo)}
-        podeArquivar={podeArquivar && modalDetalhe.processo && podeAgirNoProcesso(modalDetalhe.processo)}
+        podeTramitar={Boolean(podeTramitar && modalDetalhe.processo && podeAgirNoProcesso(modalDetalhe.processo))}
+        podeEditar={Boolean(podeEditar && modalDetalhe.processo && podeAgirNoProcesso(modalDetalhe.processo))}
+        podeArquivar={Boolean(podeArquivar && modalDetalhe.processo && podeAgirNoProcesso(modalDetalhe.processo))}
         onClose={() => setModalDetalhe({ open: false, processo: null })}
         onTramitar={(p) => setModalTramitar({ open: true, processo: p })}
         onConcluir={handleConcluir}

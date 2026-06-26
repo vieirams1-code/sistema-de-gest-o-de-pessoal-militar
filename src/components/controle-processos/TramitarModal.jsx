@@ -43,7 +43,11 @@ export default function TramitarModal({ open, onClose, onSubmit, caixas = [], pr
             <Select value={form.caixa_destino_id} onValueChange={(v) => set('caixa_destino_id', v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {caixasDestino.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                {caixasDestino.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-slate-500">Nenhuma caixa de destino disponível.</div>
+                ) : (
+                  caixasDestino.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)
+                )}
               </SelectContent>
             </Select>
           </div>
