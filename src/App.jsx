@@ -108,7 +108,7 @@ const moduleGuardByPage = {
   BackupSistema: { moduleName: 'Backup do Sistema' },
   DashboardAcervo: { actionKey: 'visualizar_acervo_historico', moduleName: 'Documentos Históricos' },
   CursosFormacao: { moduleKey: 'cursos_formacao', actionKey: 'visualizar_cursos_formacao', moduleName: 'Cursos de Formação' },
-  ControleProcessos: { moduleKey: 'controle_processos', actionKey: 'visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
+  ControleProcessos: { moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {
@@ -131,6 +131,7 @@ const actionGuardByPage = {
   CreditosExtraordinariosFerias: { moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias', moduleName: 'Férias' },
   Atestados: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
   ExtratoAtestadosMedicos: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
+  ControleProcessos: { moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
 };
 
 const actionGuardByPageNormalized = Object.entries(actionGuardByPage).reduce((acc, [pageKey, guard]) => {

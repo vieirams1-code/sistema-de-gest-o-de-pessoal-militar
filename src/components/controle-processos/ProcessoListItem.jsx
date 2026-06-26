@@ -8,6 +8,7 @@ import { MoreVertical, ExternalLink, ArrowLeftRight, Pencil, Archive, Eye, Users
 import {
   getStatusBadgeClass, getPrioridadeBadgeClass, classificarPrazo,
 } from '@/utils/controle-processos/controleProcessosConfig';
+import { sanitizarLinkExterno } from '@/utils/controle-processos/sanitizarLinkExterno';
 
 function PrazoLabel({ prazo }) {
   if (!prazo) return <span className="text-slate-400">—</span>;
@@ -31,6 +32,9 @@ export default function ProcessoListItem({
   onVer, onTramitar, onEditar, onArquivar,
 }) {
   const interessados = processo.interessados_ids || [];
+  const linkExternoSeguro = processo.link_externo
+    ? sanitizarLinkExterno(processo.link_externo).linkLimpo
+    : '';
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
@@ -68,9 +72,9 @@ export default function ProcessoListItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onVer}><Eye className="w-4 h-4 mr-2" /> Ver detalhes</DropdownMenuItem>
-            {processo.link_externo && (
+            {linkExternoSeguro && (
               <DropdownMenuItem asChild>
-                <a href={processo.link_externo} target="_blank" rel="noopener noreferrer">
+                <a href={linkExternoSeguro} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="w-4 h-4 mr-2" /> Abrir no {processo.sistema_origem || 'sistema'}
                 </a>
               </DropdownMenuItem>

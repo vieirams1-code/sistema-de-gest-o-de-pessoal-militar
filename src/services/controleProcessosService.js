@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { sanitizarLinkExterno } from '@/utils/controle-processos/sanitizarLinkExterno';
 
 // =====================================================================
 // controleProcessosService — camada de acesso do módulo Controle de Processos.
@@ -11,6 +12,13 @@ import { base44 } from '@/api/base44Client';
 const { CaixaProcessual, ProcessoControle, TramiteProcessual, EventoProcessual } = base44.entities;
 
 const nowIso = () => new Date().toISOString();
+const limparDadosProcesso = (dados = {}) => {
+  const { interessados, ...limpos } = dados;
+  if (limpos.link_externo) {
+    limpos.link_externo = sanitizarLinkExterno(limpos.link_externo).linkLimpo;
+  }
+  return limpos;
+};
 
 /* ----------------------------- Caixas ----------------------------- */
 
@@ -60,9 +68,7 @@ export async function listarProcessos() {
 export function filtrarProcessosVisiveis(processos, { userEmail, podeVerTodas, caixasDoUsuario }) {
   if (podeVerTodas) return processos || [];
   const caixaIds = new Set((caixasDoUsuario || []).map((c) => c.id));
-  return (processos || []).filter((p) =>
-    caixaIds.has(p.caixa_atual_id) || p.criado_por === userEmail || p.responsavel_id === userEmail
-  );
+  return (processos || []).filter((p) => caixaIds.has(p.caixa_atual_id));
 }
 
 export async function obterProcesso(id) {
@@ -70,31 +76,33 @@ export async function obterProcesso(id) {
 }
 
 export async function criarProcesso(dados, userEmail) {
+  const payload = limparDadosProcesso(dados);
   const processo = await ProcessoControle.create({
     status: 'Novo',
     prioridade: 'Normal',
     arquivado: false,
     interessados_ids: [],
     criado_por: userEmail,
-    ...dados,
+    ...payload,
   });
   await registrarEvento(processo.id, {
     tipo_evento: 'criacao',
     descricao: `Processo criado: ${processo.titulo}`,
     usuario_id: userEmail,
-    dados_novos: dados,
+    dados_novos: payload,
   });
   return processo;
 }
 
 export async function atualizarProcesso(id, dados, userEmail, anteriores = null) {
-  const atualizado = await ProcessoControle.update(id, dados);
+  const payload = limparDadosProcesso(dados);
+  const atualizado = await ProcessoControle.update(id, payload);
   await registrarEvento(id, {
     tipo_evento: 'edicao',
     descricao: 'Processo atualizado',
     usuario_id: userEmail,
     dados_anteriores: anteriores,
-    dados_novos: dados,
+    dados_novos: payload,
   });
   return atualizado;
 }

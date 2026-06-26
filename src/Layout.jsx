@@ -126,7 +126,7 @@ const menuGroups = [
             icon: Archive,
             actionKey: 'visualizar_acervo_historico',
           },
-          { name: 'Controle de Processos', page: 'ControleProcessos', icon: FolderKanban, moduleKey: 'controle_processos', actionKey: 'visualizar_controle_processos' },
+          { name: 'Controle de Processos', page: 'ControleProcessos', icon: FolderKanban, moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos' },
         ],
       },
       {

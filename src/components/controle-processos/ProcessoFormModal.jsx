@@ -38,9 +38,7 @@ export default function ProcessoFormModal({ open, onClose, onSubmit, caixas = []
       setForm({
         ...ESTADO_INICIAL,
         ...processo,
-        interessados: (processo.interessados || []).length
-          ? processo.interessados
-          : (processo.interessados_ids || []).map((id) => ({ id, nome: id })),
+        interessados: (processo.interessados_ids || []).map((id) => ({ id, nome: id })),
       });
     } else {
       setForm(ESTADO_INICIAL);
@@ -67,11 +65,15 @@ export default function ProcessoFormModal({ open, onClose, onSubmit, caixas = []
   const handleSubmit = () => {
     if (!podeSalvar) return;
     const { interessados, ...rest } = form;
+    const { linkLimpo, removeu, paramsRemovidos } = sanitizarLinkExterno(rest.link_externo);
+    if (removeu) {
+      setAlertaLink(`Removemos dados sensíveis do link (${paramsRemovidos.join(', ')}). Mantivemos apenas o endereço do processo.`);
+    }
     onSubmit({
       ...rest,
+      link_externo: linkLimpo,
       prazo: rest.prazo || undefined,
       interessados_ids: interessados.map((i) => i.id),
-      interessados,
     });
   };
 
@@ -149,7 +151,11 @@ export default function ProcessoFormModal({ open, onClose, onSubmit, caixas = []
             <Select value={form.caixa_atual_id} onValueChange={(v) => set('caixa_atual_id', v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {caixas.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                {caixas.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-slate-500">Nenhuma caixa disponível.</div>
+                ) : (
+                  caixas.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)
+                )}
               </SelectContent>
             </Select>
           </div>
