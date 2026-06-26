@@ -2,14 +2,19 @@ import { calcularSaldoLiquidoPeriodo } from './calculadoraSaldoFeriasService.js'
 
 export function calcularSaldoOperacionalPeriodo({ periodo = {}, ajustes = [], ferias = [] } = {}) {
   const saldo = calcularSaldoLiquidoPeriodo({ periodo, ajustes, ferias });
+  const base = saldo.dias_base;
+  const feriasPrevistasGozadas = saldo.dias_gozados_previstos;
+  const direitoLiquido = base + saldo.creditos_ativos - saldo.debitos_ativos;
+  const saldoRestante = direitoLiquido - feriasPrevistasGozadas;
 
   return {
-    dias_base: saldo.dias_base,
+    base,
+    dias_base: base,
     creditos_ativos: saldo.creditos_ativos,
     debitos_ativos: saldo.debitos_ativos,
-    direito_liquido: saldo.dias_base + saldo.creditos_ativos - saldo.debitos_ativos,
-    ferias_previstas_gozadas: saldo.dias_gozados_previstos,
-    saldo_restante: saldo.saldo_liquido,
+    direito_liquido: direitoLiquido,
+    ferias_previstas_gozadas: feriasPrevistasGozadas,
+    saldo_restante: saldoRestante,
     detalhes_creditos: saldo.detalhes_creditos,
     detalhes_debitos: saldo.detalhes_debitos,
   };
@@ -31,9 +36,11 @@ export function filtrarAjustesDoPeriodo(ajustes = [], periodo = {}) {
 }
 
 export function calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo = {}, ajustes = [], ferias = [] } = {}) {
+  const periodoOperacional = periodo?.raw ? { ...periodo.raw, ...periodo } : periodo;
+
   return calcularSaldoOperacionalPeriodo({
-    periodo,
-    ajustes: filtrarAjustesDoPeriodo(ajustes, periodo),
+    periodo: periodoOperacional,
+    ajustes: filtrarAjustesDoPeriodo(ajustes, periodoOperacional),
     ferias,
   });
 }

@@ -94,6 +94,8 @@ function montarFeriasParaTemplateLivro(ferias, tipoRegistro, resumo) {
   return {
     ...ferias,
     dias: diasOperacionais,
+    data_fim: resumo.fim || ferias.data_fim,
+    data_retorno: resumo.retorno || ferias.data_retorno,
     dias_base_gozo: diasBaseGozo,
     dias_totais_gozo: diasOperacionais,
     dias_base: diasBaseGozo,
@@ -484,7 +486,7 @@ export default function RegistroLivroModal({
       ajustes: ajustesSaldoFerias,
       ferias: todasFeriasDoMilitar.filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
     });
-    const baseDiasOperacional = saldoOperacional.direito_liquido || obterDiasBase(periodoSaldo);
+    const baseDiasOperacional = saldoOperacional.direito_liquido ?? obterDiasBase(periodoSaldo);
     const diasAdicionaisPeriodo = obterDiasAdicionais(periodoSaldo);
     const saldoUtilizavelPeriodo = saldoOperacional.saldo_restante ?? calcularSaldoUtilizavelPeriodo(periodoSaldo);
     const baseDias = baseDiasOperacional;
@@ -597,11 +599,19 @@ export default function RegistroLivroModal({
 
     setTemplateError(null);
 
-    const periodoFerias = periodoAquisitivoFerias || (ferias.periodo_aquisitivo_id
+    const periodoFeriasBase = periodoAquisitivoFerias || (ferias.periodo_aquisitivo_id
       ? null
       : (periodosDoMilitar || []).find((item) =>
         (item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || '')
       ));
+    const periodoFerias = tipoRegistro === 'Saída Férias' && resumo && periodoFeriasBase
+      ? {
+          ...periodoFeriasBase,
+          dias_direito_operacional: Number(resumo.diasBase || 0),
+          dias_total_operacional: Number(resumo.diasBase || 0),
+          dias_saldo_operacional: Number(resumo.saldoUtilizavel || 0),
+        }
+      : periodoFeriasBase;
 
     let interrupcaoInfo = null;
     if (tipoRegistro === 'Interrupção de Férias') {
