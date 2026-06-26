@@ -66,9 +66,11 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
+import { AjusteSaldoFerias } from '@/api/entities';
 import { listarDescontosFerias } from '@/services/descontoFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { bulkFeriasTagsEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import FeriasTagsBulkPanel from '@/components/ferias/FeriasTagsBulkPanel';
 import IconeCatalogo from '@/components/funcoes-tags/IconeCatalogo';
@@ -78,6 +80,7 @@ import { isFeriasTagVinculoAtivo } from '@/utils/funcoesTags/feriasTags';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -154,6 +157,47 @@ function getDataInicioFerias(ferias) {
     parseFeriasDateStart(ferias?.data_inicio_gozo) ||
     parseFeriasDateStart(ferias?.inicio)
   );
+}
+
+
+function addDaysIso(dateString, days) {
+  if (!dateString || !Number.isFinite(Number(days)) || Number(days) <= 0) return null;
+  return toIsoDate(addDays(parseDate(dateString), Number(days)));
+}
+
+function getPeriodoKey(periodo = {}) {
+  const id = String(periodo?.id || '').trim();
+  if (id) return `id:${id}`;
+  const militarId = String(periodo?.militar_id || '').trim();
+  const ref = String(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref || '').trim();
+  return militarId && ref ? `ref:${militarId}:${ref}` : '';
+}
+
+function getFeriasPeriodoKey(ferias = {}) {
+  const id = String(ferias?.periodo_aquisitivo_id || '').trim();
+  if (id) return `id:${id}`;
+  const militarId = String(ferias?.militar_id || '').trim();
+  const ref = String(ferias?.periodo_aquisitivo_ref || '').trim();
+  return militarId && ref ? `ref:${militarId}:${ref}` : '';
+}
+
+function getDiasOperacionaisFerias(ferias, periodosByKey, ajustesSaldoFerias, todasFerias) {
+  const key = getFeriasPeriodoKey(ferias);
+  const periodo = key ? periodosByKey.get(key) : null;
+  if (!periodo) return Number(ferias?.dias || 0);
+
+  const saldo = calcularSaldoOperacionalPeriodoComTodosAjustes({
+    periodo,
+    ajustes: ajustesSaldoFerias,
+    ferias: (todasFerias || []).filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
+  });
+  const diasOperacionais = Number(saldo?.direito_liquido);
+  return Number.isFinite(diasOperacionais) ? diasOperacionais : Number(ferias?.dias || 0);
+}
+
+function getDataRetornoOperacionalFerias(ferias, diasOperacionais) {
+  if (!['Prevista', 'Autorizada', 'Em Curso'].includes(ferias?.status)) return ferias?.data_retorno;
+  return addDaysIso(ferias?.data_inicio, diasOperacionais) || ferias?.data_retorno;
 }
 
 function deriveInterrupcaoData(ferias, registrosLivro) {
@@ -540,6 +584,21 @@ export default function Ferias() {
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
+
+  const { data: periodosAquisitivosFerias = [] } = useQuery({
+    queryKey: ['ferias-periodos-aquisitivos-operacionais', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      const bundle = await fetchScopedPeriodosAquisitivosBundle();
+      return bundle.periodosAquisitivos || [];
+    },
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
+
+  const { data: ajustesSaldoFerias = [] } = useQuery({
+    queryKey: ['ferias-ajustes-saldo-operacionais', isAdmin, modoAcesso, userEmail],
+    queryFn: () => AjusteSaldoFerias.list('-created_date'),
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
   const feriasIdsEscopoTags = useMemo(
     () => ferias.map((item) => String(item.id)).filter(Boolean),
     [ferias],
@@ -614,6 +673,17 @@ export default function Ferias() {
   const anoAquisitivoOptions = useMemo(() => [...new Set(ferias.map((f) => deriveAnoAquisitivo(f)))].sort((a, b) => a.localeCompare(b, 'pt-BR')).map((value) => ({ value, label: value === 'nao-classificado' ? 'Não classificado' : value })), [ferias]);
   const statusGozoOptions = [{ value: 'nao-iniciado', label: 'Não iniciado' }, { value: 'parcial', label: 'Parcial' }, { value: 'em-gozo', label: 'Em gozo' }, { value: 'finalizado', label: 'Finalizado' }, { value: 'nao-classificado', label: 'Não classificado' }];
   const situacaoPeriodoOptions = [{ value: 'em-aberto', label: 'Em aberto' }, { value: 'em-gozo', label: 'Em gozo' }, { value: 'finalizado', label: 'Finalizado' }, { value: 'problemas', label: 'Problemas' }, { value: 'nao-classificado', label: 'Não classificado' }];
+
+  const periodosAquisitivosByKey = useMemo(() => {
+    const mapa = new Map();
+    (periodosAquisitivosFerias || []).forEach((periodo) => {
+      const idKey = periodo?.id ? `id:${periodo.id}` : '';
+      const refKey = getPeriodoKey(periodo);
+      if (idKey) mapa.set(idKey, periodo);
+      if (refKey) mapa.set(refKey, periodo);
+    });
+    return mapa;
+  }, [periodosAquisitivosFerias]);
 
   const filteredFerias = useMemo(() => {
     const hasPeriodFilter = Boolean(periodStart && periodEnd);
@@ -1404,6 +1474,8 @@ export default function Ferias() {
                         );
                         const creditosDoGozo = creditosPorGozo.get(f.id) || [];
                         const diasExtras = creditosDoGozo.reduce((acc, credito) => acc + Number(credito?.quantidade_dias || 0), 0);
+                        const diasOperacionais = getDiasOperacionaisFerias(f, periodosAquisitivosByKey, ajustesSaldoFerias, ferias);
+                        const dataRetornoOperacional = getDataRetornoOperacionalFerias(f, diasOperacionais);
 
                         const interrupcaoInfo =
                           f.status === 'Interrompida'
@@ -1517,12 +1589,12 @@ export default function Ferias() {
                               </div>
                             </td>
 
-                            <td className="px-4 py-3 text-slate-700">{formatDate(f.data_retorno)}</td>
+                            <td className="px-4 py-3 text-slate-700">{formatDate(dataRetornoOperacional)}</td>
 
                             <td className="px-4 py-3 text-slate-700">
                               <div className="flex flex-col">
                                 <span className="flex items-center gap-1">
-                                  {f.dias}d
+                                  {diasOperacionais}d
                                   {diasExtras > 0 && (
                                     <TooltipProvider delayDuration={100}>
                                       <Tooltip>

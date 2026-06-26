@@ -33,11 +33,10 @@ import {
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
-import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais, obterDiasBase } from '@/components/ferias/periodoSaldoUtils';
+import { calcularSaldoUtilizavelPeriodo, obterDiasBase } from '@/components/ferias/periodoSaldoUtils';
 import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
-import FeriasTagsSection from '@/components/ferias/FeriasTagsSection';
 import {
   calcularTotaisGozoComCreditos,
   formatarTipoCreditoExtra,
@@ -487,7 +486,6 @@ export default function RegistroLivroModal({
       ferias: todasFeriasDoMilitar.filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
     });
     const baseDiasOperacional = saldoOperacional.direito_liquido ?? obterDiasBase(periodoSaldo);
-    const diasAdicionaisPeriodo = obterDiasAdicionais(periodoSaldo);
     const saldoUtilizavelPeriodo = saldoOperacional.saldo_restante ?? calcularSaldoUtilizavelPeriodo(periodoSaldo);
     const baseDias = baseDiasOperacional;
     const creditosSelecionados = (creditosExtra || []).filter((credito) => creditosSelecionadosIds.includes(credito.id));
@@ -506,7 +504,6 @@ export default function RegistroLivroModal({
         inicio: dataRegistro,
         dias: totaisGozo.dias_totais_gozo,
         diasBase: baseDiasOperacional,
-        diasAdicionaisPeriodo,
         saldoUtilizavel: saldoUtilizavelPeriodo,
         diasExtras: totaisGozo.dias_extras_creditos,
         creditosSelecionados,
@@ -798,49 +795,6 @@ export default function RegistroLivroModal({
             </div>
           </div>
 
-          <FeriasTagsSection ferias={ferias} />
-
-
-          {tipoRegistro === 'Saída Férias' && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
-              <div>
-                <h4 className="text-sm font-semibold text-slate-700">Dias adicionais vinculáveis</h4>
-                <p className="text-xs text-slate-500">Selecione créditos extraordinários disponíveis para este gozo.</p>
-              </div>
-              <div className="space-y-2 max-h-44 overflow-y-auto">
-                {creditosExtra.length === 0 && (
-                  <p className="text-xs text-slate-500">Nenhum crédito extraordinário cadastrado para este militar.</p>
-                )}
-                {creditosExtra.map((credito) => {
-                  const selecionado = creditosSelecionadosIds.includes(credito.id);
-                  const bloqueado =
-                    credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO ||
-                    (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO && credito.gozo_ferias_id !== ferias.id);
-
-                  return (
-                    <label key={credito.id} className={`flex items-start gap-2 rounded-md border p-2 ${bloqueado ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
-                      <input
-                        type="checkbox"
-                        disabled={bloqueado}
-                        checked={selecionado}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setCreditosSelecionadosIds((atual) => (
-                            checked ? [...new Set([...atual, credito.id])] : atual.filter((id) => id !== credito.id)
-                          ));
-                        }}
-                      />
-                      <span className="text-xs text-slate-700">
-                        <strong>{formatarTipoCreditoExtra(credito.tipo_credito)}</strong> (+{credito.quantidade_dias}d)
-                        {' · '}Status: {credito.status}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {cadeiaOperacional.length > 0 && (
             <div className="rounded-lg border border-slate-200 bg-white p-4">
               <div className="text-sm font-semibold text-slate-700 mb-2">
@@ -913,7 +867,7 @@ export default function RegistroLivroModal({
                   </div>
                   <div>
                     <div className="text-cyan-700">Dias disponíveis</div>
-                    <div className="font-semibold">{resumo.diasBase}d + {resumo.diasAdicionaisPeriodo}d = {resumo.saldoUtilizavel}d</div>
+                    <div className="font-semibold">{resumo.saldoUtilizavel}d</div>
                     {resumo.diasExtras > 0 && (
                       <div className="text-xs text-cyan-700 mt-1">Créditos vinculados ao gozo: +{resumo.diasExtras}d (total projetado {resumo.dias}d)</div>
                     )}

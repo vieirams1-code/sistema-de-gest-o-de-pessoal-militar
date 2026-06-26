@@ -187,6 +187,9 @@ export default function AjustesSaldoFerias() {
       setForm(formInicial);
       queryClient.invalidateQueries({ queryKey: ajustesKey });
       queryClient.invalidateQueries({ queryKey: bundleKey });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-periodos-aquisitivos-operacionais'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-ajustes-saldo-operacionais'] });
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey?.[0] || '').includes('periodos-aquisitivos') || String(query.queryKey?.[0] || '').includes('ferias') || String(query.queryKey?.[0] || '').includes('ajustes-saldo-ferias') || String(query.queryKey?.[0] || '').includes('diagnostico-saldo-ferias') || String(query.queryKey?.[0] || '').includes('pa-bundle') });
     },
     onError: (error) => toast({ title: 'Não foi possível criar o ajuste', description: error?.message, variant: 'destructive' }),
@@ -207,6 +210,9 @@ export default function AjustesSaldoFerias() {
       setMotivoCancelamento({});
       queryClient.invalidateQueries({ queryKey: ajustesKey });
       queryClient.invalidateQueries({ queryKey: bundleKey });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-periodos-aquisitivos-operacionais'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-ajustes-saldo-operacionais'] });
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey?.[0] || '').includes('periodos-aquisitivos') || String(query.queryKey?.[0] || '').includes('ferias') || String(query.queryKey?.[0] || '').includes('ajustes-saldo-ferias') || String(query.queryKey?.[0] || '').includes('diagnostico-saldo-ferias') || String(query.queryKey?.[0] || '').includes('pa-bundle') });
     },
     onError: (error) => toast({ title: 'Não foi possível cancelar', description: error?.message, variant: 'destructive' }),
