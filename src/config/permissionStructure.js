@@ -211,6 +211,20 @@ export const permissionStructure = [
           { key: 'perm_visualizar_conferencias_militares', label: 'Visualizar Conferências Militares' },
           { key: 'perm_gerir_conferencias_militares', label: 'Gerir Conferências Militares', sensitive: true }
         ]
+      },
+      {
+        key: 'acesso_controle_processos',
+        label: 'Controle de Processos e Procedimentos',
+        actions: [
+          { key: 'perm_visualizar_controle_processos', label: 'Visualizar Controle de Processos' },
+          { key: 'perm_criar_processo_controle', label: 'Criar Processo de Controle' },
+          { key: 'perm_editar_processo_controle', label: 'Editar Processo de Controle' },
+          { key: 'perm_tramitar_processo_controle', label: 'Tramitar Processo de Controle' },
+          { key: 'perm_arquivar_processo_controle', label: 'Arquivar Processo de Controle' },
+          { key: 'perm_gerenciar_caixas_processuais', label: 'Gerenciar Caixas Processuais', sensitive: true },
+          { key: 'perm_visualizar_todas_caixas_processuais', label: 'Visualizar Todas as Caixas Processuais', sensitive: true },
+          { key: 'perm_excluir_processo_controle', label: 'Excluir Processo de Controle', sensitive: true }
+        ]
       }
     ]
   },

@@ -1,0 +1,132 @@
+{
+  "name": "ProcessoControle",
+  "type": "object",
+  "title": "Processo de Controle",
+  "description": "Camada interna de controle, tramita\u00e7\u00e3o e identifica\u00e7\u00e3o de processos/documentos oriundos de sistemas externos (e-MS, TARS, etc). N\u00e3o substitui os sistemas de origem.",
+  "properties": {
+    "tipo_interno": {
+      "type": "string",
+      "enum": [
+        "PAD",
+        "IPM",
+        "Sindic\u00e2ncia",
+        "Processo de direito de militar",
+        "Requerimento administrativo",
+        "Reserva remunerada/Reforma",
+        "Desligamento/Exclus\u00e3o",
+        "Processo disciplinar",
+        "Processo de sa\u00fade/JISO",
+        "Comunica\u00e7\u00e3o interna",
+        "Of\u00edcio",
+        "Outro"
+      ],
+      "description": "Tipo interno de classifica\u00e7\u00e3o do processo"
+    },
+    "sistema_origem": {
+      "type": "string",
+      "enum": [
+        "e-MS",
+        "TARS",
+        "Outro"
+      ],
+      "description": "Sistema externo de origem do processo/documento"
+    },
+    "nup": {
+      "type": "string",
+      "description": "N\u00famero \u00danico de Protocolo"
+    },
+    "numero_documento": {
+      "type": "string",
+      "description": "N\u00famero do documento de refer\u00eancia"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo interno do processo"
+    },
+    "assunto": {
+      "type": "string",
+      "description": "Assunto do processo"
+    },
+    "descricao_operacional": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o operacional/contexto interno"
+    },
+    "link_externo": {
+      "type": "string",
+      "description": "Link para o processo no sistema externo (sanitizado, sem tokens sens\u00edveis)"
+    },
+    "caixa_atual_id": {
+      "type": "string",
+      "description": "ID da caixa processual onde o processo est\u00e1 atualmente"
+    },
+    "responsavel_id": {
+      "type": "string",
+      "description": "E-mail do usu\u00e1rio respons\u00e1vel atual pelo processo"
+    },
+    "prioridade": {
+      "type": "string",
+      "enum": [
+        "Baixa",
+        "Normal",
+        "Alta",
+        "Urgente"
+      ],
+      "default": "Normal",
+      "description": "Prioridade do processo"
+    },
+    "prazo": {
+      "type": "string",
+      "format": "date",
+      "description": "Prazo limite do processo"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Novo",
+        "Em an\u00e1lise",
+        "Aguardando assinatura",
+        "Aguardando resposta externa",
+        "Aguardando provid\u00eancia da caixa",
+        "Devolvido para ajustes",
+        "Conclu\u00eddo",
+        "Arquivado",
+        "Cancelado"
+      ],
+      "default": "Novo",
+      "description": "Status atual do processo"
+    },
+    "interessados_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs dos militares interessados/vinculados ao processo"
+    },
+    "unidade_id": {
+      "type": "string",
+      "description": "ID da unidade/estrutura do processo"
+    },
+    "criado_por": {
+      "type": "string",
+      "description": "E-mail do usu\u00e1rio que criou o processo"
+    },
+    "arquivado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se o processo est\u00e1 arquivado"
+    }
+  },
+  "required": [
+    "tipo_interno",
+    "titulo",
+    "caixa_atual_id"
+  ],
+  "rls": {
+    "read": true,
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

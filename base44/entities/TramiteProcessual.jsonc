@@ -1,0 +1,94 @@
+{
+  "name": "TramiteProcessual",
+  "type": "object",
+  "title": "Tr\u00e2mite Processual",
+  "description": "Registro de uma tramita\u00e7\u00e3o de processo entre caixas processuais.",
+  "properties": {
+    "processo_id": {
+      "type": "string",
+      "description": "ID do ProcessoControle tramitado"
+    },
+    "caixa_origem_id": {
+      "type": "string",
+      "description": "ID da caixa de origem"
+    },
+    "caixa_destino_id": {
+      "type": "string",
+      "description": "ID da caixa de destino"
+    },
+    "remetente_id": {
+      "type": "string",
+      "description": "E-mail do usu\u00e1rio remetente"
+    },
+    "destinatario_id": {
+      "type": "string",
+      "description": "E-mail do destinat\u00e1rio (opcional)"
+    },
+    "mensagem": {
+      "type": "string",
+      "description": "Mensagem/despacho interno"
+    },
+    "acao_solicitada": {
+      "type": "string",
+      "enum": [
+        "Assinar documento",
+        "Analisar",
+        "Elaborar resposta",
+        "Juntar documento",
+        "Despachar",
+        "Tomar ci\u00eancia",
+        "Devolver com provid\u00eancia",
+        "Cumprir determina\u00e7\u00e3o"
+      ],
+      "description": "A\u00e7\u00e3o solicitada na tramita\u00e7\u00e3o"
+    },
+    "prazo": {
+      "type": "string",
+      "format": "date",
+      "description": "Prazo da tramita\u00e7\u00e3o"
+    },
+    "status_tramite": {
+      "type": "string",
+      "enum": [
+        "Enviado",
+        "Recebido",
+        "Conclu\u00eddo",
+        "Devolvido"
+      ],
+      "default": "Enviado",
+      "description": "Status da tramita\u00e7\u00e3o"
+    },
+    "urgente": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se a tramita\u00e7\u00e3o \u00e9 urgente"
+    },
+    "data_envio": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do envio"
+    },
+    "data_recebimento": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do recebimento"
+    },
+    "data_conclusao": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da conclus\u00e3o"
+    }
+  },
+  "required": [
+    "processo_id",
+    "caixa_destino_id"
+  ],
+  "rls": {
+    "read": true,
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

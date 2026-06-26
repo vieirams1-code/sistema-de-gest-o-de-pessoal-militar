@@ -108,6 +108,7 @@ const moduleGuardByPage = {
   BackupSistema: { moduleName: 'Backup do Sistema' },
   DashboardAcervo: { actionKey: 'visualizar_acervo_historico', moduleName: 'Documentos Históricos' },
   CursosFormacao: { moduleKey: 'cursos_formacao', actionKey: 'visualizar_cursos_formacao', moduleName: 'Cursos de Formação' },
+  ControleProcessos: { moduleKey: 'controle_processos', actionKey: 'visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {
@@ -252,6 +253,7 @@ const AuthenticatedApp = () => {
       />
       {/* Alias e redirecionamento para evitar 404 em acessos legados/manuais */}
       <Route path="/templates" element={<Navigate to="/TemplatesTexto" replace />} />
+      <Route path="/controle-processos" element={<Navigate to="/ControleProcessos" replace />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

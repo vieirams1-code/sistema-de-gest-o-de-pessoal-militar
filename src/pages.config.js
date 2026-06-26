@@ -70,6 +70,7 @@ import ClassificacoesHistoricasAlteracoes from './pages/ClassificacoesHistoricas
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import ContratosDesignacao from './pages/ContratosDesignacao';
+import ControleProcessos from './pages/ControleProcessos';
 import CreditosExtraordinariosFerias from './pages/CreditosExtraordinariosFerias';
 import Configuracoes from './pages/Configuracoes';
 import ControleAtestadosTemporarios from './pages/ControleAtestadosTemporarios';
@@ -149,6 +150,7 @@ export const PAGES = {
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "ConciliacaoBoletim": ConciliacaoBoletim,
     "ContratosDesignacao": ContratosDesignacao,
+    "ControleProcessos": ControleProcessos,
     "CreditosExtraordinariosFerias": CreditosExtraordinariosFerias,
     "Configuracoes": Configuracoes,
     "ControleAtestadosTemporarios": ControleAtestadosTemporarios,
