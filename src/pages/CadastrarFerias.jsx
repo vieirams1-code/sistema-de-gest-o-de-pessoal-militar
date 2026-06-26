@@ -30,9 +30,9 @@ import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOp
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
-// Fracoes válidas: combinações fixas com soma = 30
+// Frações válidas: integral acompanha o saldo operacional; fracionadas seguem combinações fixas.
 const OPCOES_FRACOES = [
-  { label: '1 fração integral', fracoes: [30] },
+  { label: '1 fração integral', fracoes: [] },
   { label: '2 frações: 15 + 15', fracoes: [15, 15] },
   { label: '2 frações: 20 + 10', fracoes: [20, 10] },
   { label: '2 frações: 10 + 20', fracoes: [10, 20] },
@@ -435,14 +435,21 @@ export default function CadastrarFerias() {
                 <FormSection title="Fracionamento" icon={Calendar} defaultOpen={true}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {OPCOES_FRACOES.map((op, i) => (
+                      (() => {
+                        const saldoIntegral = Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO);
+                        const label = i === 0 ? `1 fração integral (${saldoIntegral} dias)` : op.label;
+
+                        return (
                       <button
                         key={i}
                         type="button"
                         onClick={() => handleOpcaoFracao(i)}
                         className={`p-3 rounded-lg border text-sm text-left transition-all ${opcaoFracao === i ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 text-[#1e3a5f] font-medium' : 'border-slate-200 hover:border-slate-300'}`}
                       >
-                        {op.label}
+                        {label}
                       </button>
+                        );
+                      })()
                     ))}
                   </div>
                 </FormSection>
