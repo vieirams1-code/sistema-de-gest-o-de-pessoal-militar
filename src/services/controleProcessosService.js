@@ -1,29 +1,33 @@
 import { base44 } from '@/api/base44Client';
-import { sanitizarLinkExterno } from '@/utils/controle-processos/sanitizarLinkExterno';
+import {
+  listarCaixasEscopado,
+  listarProcessosEscopado,
+  criarCaixaEscopado,
+  editarCaixaEscopado,
+  criarProcessoEscopado,
+  editarProcessoEscopado,
+  tramitarProcessoEscopado,
+  arquivarProcessoEscopado,
+  registrarDespachoEscopado,
+} from '@/services/controleProcessosEscopadoClient';
 
 // =====================================================================
-// controleProcessosService — camada de acesso do módulo Controle de Processos.
-// Centraliza leitura/escrita das entidades e a regra de visibilidade por caixa.
-//   - usuário comum vê apenas processos das caixas em que está inserido;
-//   - quem tem visualizar_todas_caixas (ou admin) vê tudo.
-// As escritas registram eventos na linha do tempo (EventoProcessual).
+// controleProcessosService — camada de acesso do módulo Controle de
+// Processos. TODA escrita e a leitura escopada de caixas/processos
+// passam pela Deno Function `controleProcessosEscopado` (a escrita
+// direta pelo SDK é bloqueada por RLS admin-only nas entidades).
+//
+// Os reads de TramiteProcessual / EventoProcessual de um processo
+// específico continuam diretos pelo SDK (RLS read = true), pois são
+// detalhes carregados sob demanda no modal.
 // =====================================================================
 
-const { CaixaProcessual, ProcessoControle, TramiteProcessual, EventoProcessual } = base44.entities;
-
-const nowIso = () => new Date().toISOString();
-const limparDadosProcesso = (dados = {}) => {
-  const { interessados, ...limpos } = dados;
-  if (limpos.link_externo) {
-    limpos.link_externo = sanitizarLinkExterno(limpos.link_externo).linkLimpo;
-  }
-  return limpos;
-};
+const { TramiteProcessual, EventoProcessual } = base44.entities;
 
 /* ----------------------------- Caixas ----------------------------- */
 
 export async function listarCaixas() {
-  return CaixaProcessual.list('-data_criacao', 500);
+  return listarCaixasEscopado();
 }
 
 /** Caixas em que o e-mail é membro ou gestor. */
@@ -39,145 +43,51 @@ export function isGestorDaCaixa(caixa, userEmail) {
   return (caixa.gestores_ids || []).includes(userEmail);
 }
 
-export async function criarCaixa(dados, userEmail) {
-  return CaixaProcessual.create({
-    ativa: true,
-    criada_por: userEmail,
-    data_criacao: nowIso(),
-    usuarios_ids: [],
-    gestores_ids: [],
-    ...dados,
-  });
+export async function criarCaixa(dados) {
+  return criarCaixaEscopado(dados);
 }
 
 export async function atualizarCaixa(id, dados) {
-  return CaixaProcessual.update(id, dados);
+  return editarCaixaEscopado(id, dados);
 }
 
 /* --------------------------- Processos ---------------------------- */
 
 export async function listarProcessos() {
-  return ProcessoControle.list('-updated_date', 1000);
+  return listarProcessosEscopado();
 }
 
 /**
- * Aplica a regra de visibilidade por caixa.
- * @param {Array} processos
- * @param {Object} opts { userEmail, podeVerTodas, caixasDoUsuario }
+ * Aplica a regra de visibilidade por caixa (apenas refinamento de UI;
+ * o backend já restringe a leitura ao escopo do usuário).
  */
-export function filtrarProcessosVisiveis(processos, { userEmail, podeVerTodas, caixasDoUsuario }) {
+export function filtrarProcessosVisiveis(processos, { podeVerTodas, caixasDoUsuario }) {
   if (podeVerTodas) return processos || [];
   const caixaIds = new Set((caixasDoUsuario || []).map((c) => c.id));
   return (processos || []).filter((p) => caixaIds.has(p.caixa_atual_id));
 }
 
-export async function obterProcesso(id) {
-  return ProcessoControle.get(id);
+export async function criarProcesso(dados) {
+  return criarProcessoEscopado(dados);
 }
 
-export async function criarProcesso(dados, userEmail) {
-  const payload = limparDadosProcesso(dados);
-  const processo = await ProcessoControle.create({
-    status: 'Novo',
-    prioridade: 'Normal',
-    arquivado: false,
-    interessados_ids: [],
-    criado_por: userEmail,
-    ...payload,
-  });
-  await registrarEvento(processo.id, {
-    tipo_evento: 'criacao',
-    descricao: `Processo criado: ${processo.titulo}`,
-    usuario_id: userEmail,
-    dados_novos: payload,
-  });
-  return processo;
+export async function atualizarProcesso(id, dados) {
+  return editarProcessoEscopado(id, dados);
 }
 
-export async function atualizarProcesso(id, dados, userEmail, anteriores = null) {
-  const payload = limparDadosProcesso(dados);
-  const atualizado = await ProcessoControle.update(id, payload);
-  await registrarEvento(id, {
-    tipo_evento: 'edicao',
-    descricao: 'Processo atualizado',
-    usuario_id: userEmail,
-    dados_anteriores: anteriores,
-    dados_novos: payload,
-  });
-  return atualizado;
+export async function arquivarProcesso(id) {
+  return arquivarProcessoEscopado(id);
 }
 
-export async function arquivarProcesso(id, userEmail) {
-  const atualizado = await ProcessoControle.update(id, { arquivado: true, status: 'Arquivado' });
-  await registrarEvento(id, {
-    tipo_evento: 'arquivamento',
-    descricao: 'Processo arquivado',
-    usuario_id: userEmail,
-  });
-  return atualizado;
-}
-
-export async function concluirProcesso(id, userEmail) {
-  const atualizado = await ProcessoControle.update(id, { status: 'Concluído' });
-  await registrarEvento(id, {
-    tipo_evento: 'conclusao',
-    descricao: 'Processo concluído',
-    usuario_id: userEmail,
-  });
-  return atualizado;
-}
-
-export async function excluirProcesso(id) {
-  return ProcessoControle.delete(id);
+export async function concluirProcesso(id) {
+  // Conclusão é uma edição de status validada no backend (participação na caixa).
+  return editarProcessoEscopado(id, { status: 'Concluído' });
 }
 
 /* --------------------------- Tramitação --------------------------- */
 
-/**
- * Tramita um processo entre caixas: atualiza caixa_atual_id, registra
- * TramiteProcessual e EventoProcessual e altera o status quando aplicável.
- */
-export async function tramitarProcesso(processo, dados, userEmail) {
-  const {
-    caixa_destino_id,
-    destinatario_id = '',
-    mensagem = '',
-    acao_solicitada = '',
-    prazo = '',
-    urgente = false,
-  } = dados;
-
-  await TramiteProcessual.create({
-    processo_id: processo.id,
-    caixa_origem_id: processo.caixa_atual_id || '',
-    caixa_destino_id,
-    remetente_id: userEmail,
-    destinatario_id,
-    mensagem,
-    acao_solicitada,
-    prazo: prazo || undefined,
-    urgente,
-    status_tramite: 'Enviado',
-    data_envio: nowIso(),
-  });
-
-  const novoStatus = acao_solicitada === 'Devolver com providência'
-    ? 'Devolvido para ajustes'
-    : 'Aguardando providência da caixa';
-
-  await ProcessoControle.update(processo.id, {
-    caixa_atual_id: caixa_destino_id,
-    status: novoStatus,
-    responsavel_id: destinatario_id || processo.responsavel_id || '',
-    ...(prazo ? { prazo } : {}),
-  });
-
-  await registrarEvento(processo.id, {
-    tipo_evento: 'tramitacao',
-    descricao: `Tramitado para nova caixa${acao_solicitada ? ` — ${acao_solicitada}` : ''}`,
-    usuario_id: userEmail,
-    dados_novos: { caixa_destino_id, acao_solicitada, mensagem },
-  });
+export async function tramitarProcesso(processo, dados) {
+  return tramitarProcessoEscopado(processo.id, dados);
 }
 
 export async function listarTramites(processoId) {
@@ -187,11 +97,8 @@ export async function listarTramites(processoId) {
 /* ----------------------------- Eventos ---------------------------- */
 
 export async function registrarEvento(processoId, evento) {
-  return EventoProcessual.create({
-    processo_id: processoId,
-    data_evento: nowIso(),
-    ...evento,
-  });
+  // Apenas despachos são criados pela UI; rota validada no backend.
+  return registrarDespachoEscopado(processoId, evento?.descricao || '');
 }
 
 export async function listarEventos(processoId) {
