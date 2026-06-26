@@ -302,6 +302,7 @@ export default function RegistroLivroModal({
   ferias,
   tipoInicial = 'Saída Férias',
   modoAdmin = false,
+  contextoOperacionalInicial = null,
 }) {
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
@@ -314,6 +315,10 @@ export default function RegistroLivroModal({
   
   const { canAccessAction, user } = useCurrentUser();
   const canGerirCadeia = canAccessAction('gerir_cadeia_ferias');
+  const contextoInicial = contextoOperacionalInicial || null;
+  const temContextoInicial = Boolean(contextoInicial);
+  const feriasOperacional = contextoInicial?.ferias || ferias;
+  const militarInicial = contextoInicial?.militar || feriasOperacional?.militar || null;
 
   const [tipoRegistro, setTipoRegistro] = useState(tipoInicial);
   const [dataRegistro, setDataRegistro] = useState('');
@@ -336,64 +341,69 @@ export default function RegistroLivroModal({
   });
 
   const { data: registrosDaFerias = [] } = useQuery({
-    queryKey: ['registros-livro-ferias-modal', ferias?.id],
+    queryKey: ['registros-livro-ferias-modal', feriasOperacional?.id],
     queryFn: async () => {
-      if (!ferias?.id) return [];
-      return base44.entities.RegistroLivro.filter({ ferias_id: ferias.id });
+      if (!feriasOperacional?.id) return [];
+      return base44.entities.RegistroLivro.filter({ ferias_id: feriasOperacional.id });
     },
-    enabled: open && !!ferias?.id,
+    initialData: () => contextoInicial?.registrosLivroDaFerias,
+    enabled: open && !!feriasOperacional?.id && !contextoInicial?.registrosLivroDaFerias,
   });
 
   const { data: todasFeriasDoMilitar = [] } = useQuery({
-    queryKey: ['ferias-militar-modal', ferias?.militar_id],
+    queryKey: ['ferias-militar-modal', feriasOperacional?.militar_id],
     queryFn: async () => {
-      if (!ferias?.militar_id) return [];
-      return base44.entities.Ferias.filter({ militar_id: ferias.militar_id });
+      if (!feriasOperacional?.militar_id) return [];
+      return base44.entities.Ferias.filter({ militar_id: feriasOperacional.militar_id });
     },
-    enabled: open && !!ferias?.militar_id,
+    initialData: () => contextoInicial?.feriasDoMilitar,
+    enabled: open && !!feriasOperacional?.militar_id && !contextoInicial?.feriasDoMilitar,
   });
 
   const { data: periodosDoMilitar = [], isLoading: periodosDoMilitarLoading, isFetching: periodosDoMilitarFetching } = useQuery({
-    queryKey: ['periodos-militar-modal', ferias?.militar_id],
+    queryKey: ['periodos-militar-modal', feriasOperacional?.militar_id],
     queryFn: async () => {
-      if (!ferias?.militar_id) return [];
-      return base44.entities.PeriodoAquisitivo.filter({ militar_id: ferias.militar_id });
+      if (!feriasOperacional?.militar_id) return [];
+      return base44.entities.PeriodoAquisitivo.filter({ militar_id: feriasOperacional.militar_id });
     },
-    // Sempre revalida ao abrir o modal: garante que o saldo (dias_direito) reflita
-    // descontos em férias ativados em outra tela, evitando snapshot desatualizado.
+    // Sem contexto inicial, busca o período necessário; com contexto, a primeira renderização útil
+    // usa o snapshot da tela Férias e evita loading redundante no modal.
     refetchOnMount: 'always',
     staleTime: 0,
-    enabled: open && !!ferias?.militar_id,
+    initialData: () => (contextoInicial?.periodoAquisitivo ? [contextoInicial.periodoAquisitivo] : undefined),
+    enabled: open && !!feriasOperacional?.militar_id && !contextoInicial?.periodoAquisitivo,
   });
 
 
   const { data: ajustesSaldoFerias = [] } = useQuery({
-    queryKey: ['ajustes-saldo-ferias-modal', ferias?.militar_id],
+    queryKey: ['ajustes-saldo-ferias-modal', feriasOperacional?.militar_id],
     queryFn: async () => {
-      if (!ferias?.militar_id) return [];
-      return base44.entities.AjusteSaldoFerias.filter({ militar_id: ferias.militar_id }, '-created_date');
+      if (!feriasOperacional?.militar_id) return [];
+      return base44.entities.AjusteSaldoFerias.filter({ militar_id: feriasOperacional.militar_id }, '-created_date');
     },
     refetchOnMount: 'always',
     staleTime: 0,
-    enabled: open && !!ferias?.militar_id,
+    initialData: () => contextoInicial?.ajustesSaldoFerias,
+    enabled: open && !!feriasOperacional?.militar_id && !contextoInicial?.ajustesSaldoFerias,
   });
 
   const { data: creditosExtra = [] } = useQuery({
-    queryKey: ['creditos-extra-ferias-modal', ferias?.militar_id],
+    queryKey: ['creditos-extra-ferias-modal', feriasOperacional?.militar_id],
     queryFn: async () => {
-      if (!ferias?.militar_id) return [];
-      return base44.entities.CreditoExtraFerias.filter({ militar_id: ferias.militar_id }, '-data_referencia');
+      if (!feriasOperacional?.militar_id) return [];
+      return base44.entities.CreditoExtraFerias.filter({ militar_id: feriasOperacional.militar_id }, '-data_referencia');
     },
-    enabled: open && !!ferias?.militar_id,
+    enabled: open && !!feriasOperacional?.militar_id,
   });
 
   const { data: militarCompleto = null } = useQuery({
-    queryKey: ['militar-modal-ferias-livro', ferias?.militar_id],
+    queryKey: ['militar-modal-ferias-livro', feriasOperacional?.militar_id],
     queryFn: async () => {
-      if (!ferias?.militar_id) return null;
-      return base44.entities.Militar.get(ferias.militar_id);
+      if (!feriasOperacional?.militar_id) return null;
+      return base44.entities.Militar.get(feriasOperacional.militar_id);
     },
-    enabled: open && !!ferias?.militar_id,
+    initialData: () => militarInicial,
+    enabled: open && !!feriasOperacional?.militar_id && !militarInicial,
   });
 
   const periodoAquisitivoFerias = useMemo(() => {
@@ -415,16 +425,16 @@ export default function RegistroLivroModal({
   const bloqueioPeriodoAquisitivoSaida = useMemo(() => {
     if (tipoRegistro !== 'Saída Férias') return null;
 
-    if (periodosDoMilitarLoading || periodosDoMilitarFetching) {
+    if (!temContextoInicial && (periodosDoMilitarLoading || periodosDoMilitarFetching)) {
       return 'Carregando período aquisitivo vinculado...';
     }
 
-    if (ferias?.periodo_aquisitivo_id && !periodoAquisitivoFerias) {
+    if (!temContextoInicial && ferias?.periodo_aquisitivo_id && !periodoAquisitivoFerias) {
       return 'Carregando período aquisitivo vinculado...';
     }
 
     return null;
-  }, [tipoRegistro, periodosDoMilitarLoading, periodosDoMilitarFetching, ferias, periodoAquisitivoFerias]);
+  }, [tipoRegistro, periodosDoMilitarLoading, periodosDoMilitarFetching, ferias, periodoAquisitivoFerias, temContextoInicial]);
 
   const dataLimiteGozo = useMemo(() => {
     return periodoAquisitivoFerias?.data_limite_gozo || ferias?.data_limite_gozo || null;
@@ -479,7 +489,7 @@ export default function RegistroLivroModal({
     if (tipoRegistro === 'Saída Férias' && bloqueioPeriodoAquisitivoSaida) return null;
 
     const periodoSaldo = periodoAquisitivoFerias || ferias;
-    const saldoOperacional = calcularSaldoOperacionalPeriodoComTodosAjustes({
+    const saldoOperacional = contextoInicial?.saldoOperacional || calcularSaldoOperacionalPeriodoComTodosAjustes({
       periodo: periodoSaldo,
       ajustes: ajustesSaldoFerias,
       ferias: todasFeriasDoMilitar.filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
@@ -557,7 +567,7 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias, bloqueioPeriodoAquisitivoSaida, ajustesSaldoFerias, todasFeriasDoMilitar]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias, bloqueioPeriodoAquisitivoSaida, ajustesSaldoFerias, todasFeriasDoMilitar, contextoInicial]);
 
 
   const erroCronologia = useMemo(() => {
@@ -629,6 +639,7 @@ export default function RegistroLivroModal({
       ferias: feriasParaTemplate,
       militar:
         militarCompleto ||
+        militarInicial ||
         ferias?.militar ||
         null,
       dataRegistro,
@@ -639,7 +650,7 @@ export default function RegistroLivroModal({
     // Proteção operacional: este texto é re-renderizado de forma determinística a cada
     // alteração de dados do formulário (fluxo TEMPLATE_IMUTAVEL/RENDER_LAZY).
     setTextoPublicacao(aplicarTemplate(tmpl.template, vars));
-  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar, militarCompleto, periodoAquisitivoFerias]);
+  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar, militarCompleto, militarInicial, periodoAquisitivoFerias]);
 
   const statusPublicacao = useMemo(
     () => calcStatusPublicacao(notaParaBg, numeroBg, dataBg),
@@ -847,7 +858,7 @@ export default function RegistroLivroModal({
             </div>
           )}
 
-          {bloqueioPeriodoAquisitivoSaida && !erroCronologia && (
+          {bloqueioPeriodoAquisitivoSaida && !temContextoInicial && !erroCronologia && (
             <div className="rounded-lg border p-4 bg-cyan-50 border-cyan-200">
               <div className="font-semibold text-cyan-800 mb-2">Resumo do Início</div>
               <div className="text-sm text-cyan-700">Carregando período aquisitivo vinculado...</div>
