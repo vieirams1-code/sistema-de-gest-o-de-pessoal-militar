@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { AjusteSaldoFerias } from '@/api/entities';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,8 @@ import {
   validarInicioNoPeriodoConcessivo,
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
-import { validarDiasNoSaldoPeriodo, calcularDiasTotal, DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
+import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
@@ -103,6 +105,14 @@ export default function CadastrarFerias() {
   const feriasExistentes = (paBundle?.ferias || [])
     .filter(f => String(f.militar_id) === String(formData.militar_id));
 
+  const { data: ajustesSaldoFerias = [] } = useQuery({
+    queryKey: ['cadastrar-ferias-ajustes-saldo-ferias', Boolean(isAdmin), modoAcesso || null, userEmail || null, effectiveEmail || null, formData.militar_id || null],
+    queryFn: () => AjusteSaldoFerias.list('-created_date'),
+    enabled: isAccessResolved && hasFeriasAccess && hasRequiredFeriasAction && !!formData.militar_id,
+    refetchOnMount: 'always',
+    staleTime: 0,
+  });
+
   // Só períodos disponíveis operacionalmente para novas férias.
   const periodosAtivos = periodosExistentes.filter(isPeriodoDisponivelOperacional);
 
@@ -137,7 +147,7 @@ export default function CadastrarFerias() {
 
   const handleOpcaoFracao = (idx) => {
     setOpcaoFracao(idx);
-    const saldoUtilizavel = periodoSelecionado ? calcularDiasTotal(periodoSelecionado) : DIAS_BASE_PADRAO;
+    const saldoUtilizavel = saldoOperacionalSelecionado ? Math.max(0, saldoOperacionalSelecionado.saldo_restante) : DIAS_BASE_PADRAO;
     const diasOpcao = idx === 0 ? [saldoUtilizavel] : OPCOES_FRACOES[idx].fracoes;
     const novasFracoes = diasOpcao.map(d => ({ dias: d, data_inicio: '', data_fim: '', data_retorno: '' }));
     setFracoes(novasFracoes);
@@ -147,6 +157,11 @@ export default function CadastrarFerias() {
   const [erroRegras, setErroRegras] = useState(null);
 
   const periodoSelecionado = periodosAtivos.find((p) => p.id === formData.periodo_aquisitivo_id);
+  const saldoOperacionalSelecionado = periodoSelecionado ? calcularSaldoOperacionalPeriodoComTodosAjustes({
+    periodo: periodoSelecionado,
+    ajustes: ajustesSaldoFerias,
+    ferias: feriasExistentes.filter((item) => !editId || String(item?.id) !== String(editId)),
+  }) : null;
 
   const handleFracaoChange = (i, field, value) => {
     setFracoes(prev => {
@@ -175,7 +190,7 @@ export default function CadastrarFerias() {
 
   const handlePeriodoChange = (ref) => {
     const periodoExistente = periodosAtivos.find(p => p.ano_referencia === ref);
-    const saldoUtilizavel = periodoExistente ? calcularDiasTotal(periodoExistente) : DIAS_BASE_PADRAO;
+    const saldoUtilizavel = periodoExistente ? Math.max(0, calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo: periodoExistente, ajustes: ajustesSaldoFerias, ferias: feriasExistentes }).saldo_restante) : DIAS_BASE_PADRAO;
     setFormData(prev => ({
       ...prev,
       periodo_aquisitivo_ref: ref,
@@ -230,15 +245,9 @@ export default function CadastrarFerias() {
 
     if (periodoSelecionado) {
       const totalDiasSolicitados = fracoes.reduce((sum, item) => sum + Number(item?.dias || 0), 0);
-      const validacaoSaldo = validarDiasNoSaldoPeriodo({
-        periodo: periodoSelecionado,
-        ferias: feriasExistentes,
-        quantidade: totalDiasSolicitados,
-        ignorarFeriasId: editId || null,
-      });
-
-      if (!validacaoSaldo.ok) {
-        setErroRegras(validacaoSaldo.mensagem);
+      const saldoRestante = Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO);
+      if (totalDiasSolicitados > saldoRestante) {
+        setErroRegras(`Quantidade de dias informada (${totalDiasSolicitados}d) ultrapassa o saldo restante operacional do período (${saldoRestante}d), já considerando AjusteSaldoFerias ativo.`);
         return;
       }
     }
@@ -331,6 +340,7 @@ export default function CadastrarFerias() {
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+    queryClient.invalidateQueries({ queryKey: ['ajustes-saldo-ferias'] });
     setLoading(false);
     navigate(createPageUrl('Ferias'));
   };
@@ -440,8 +450,8 @@ export default function CadastrarFerias() {
 
               {periodoSelecionado && (
                 <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-800">
-                  Saldo utilizável do período: <strong>{calcularDiasTotal(periodoSelecionado)} dias</strong>
-                  <span className="text-xs ml-2">(adquiridos + adicionais - descontados)</span>
+                  Saldo utilizável do período: <strong>{saldoOperacionalSelecionado?.direito_liquido ?? DIAS_BASE_PADRAO} dias</strong>
+                  <span className="text-xs ml-2">(direito líquido derivado de AjusteSaldoFerias; saldo restante: {Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO)} dias)</span>
                 </div>
               )}
 
