@@ -34,6 +34,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
 import { calcularSaldoUtilizavelPeriodo, obterDiasAdicionais, obterDiasBase } from '@/components/ferias/periodoSaldoUtils';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import FeriasTagsSection from '@/components/ferias/FeriasTagsSection';
@@ -365,6 +366,18 @@ export default function RegistroLivroModal({
     enabled: open && !!ferias?.militar_id,
   });
 
+
+  const { data: ajustesSaldoFerias = [] } = useQuery({
+    queryKey: ['ajustes-saldo-ferias-modal', ferias?.militar_id],
+    queryFn: async () => {
+      if (!ferias?.militar_id) return [];
+      return base44.entities.AjusteSaldoFerias.filter({ militar_id: ferias.militar_id }, '-created_date');
+    },
+    refetchOnMount: 'always',
+    staleTime: 0,
+    enabled: open && !!ferias?.militar_id,
+  });
+
   const { data: creditosExtra = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-modal', ferias?.militar_id],
     queryFn: async () => {
@@ -466,10 +479,15 @@ export default function RegistroLivroModal({
     if (tipoRegistro === 'Saída Férias' && bloqueioPeriodoAquisitivoSaida) return null;
 
     const periodoSaldo = periodoAquisitivoFerias || ferias;
-    const baseDiasOperacional = obterDiasBase(periodoSaldo);
+    const saldoOperacional = calcularSaldoOperacionalPeriodoComTodosAjustes({
+      periodo: periodoSaldo,
+      ajustes: ajustesSaldoFerias,
+      ferias: todasFeriasDoMilitar.filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
+    });
+    const baseDiasOperacional = saldoOperacional.direito_liquido || obterDiasBase(periodoSaldo);
     const diasAdicionaisPeriodo = obterDiasAdicionais(periodoSaldo);
-    const saldoUtilizavelPeriodo = calcularSaldoUtilizavelPeriodo(periodoSaldo);
-    const baseDias = tipoRegistro === 'Saída Férias' ? saldoUtilizavelPeriodo : baseDiasOperacional;
+    const saldoUtilizavelPeriodo = saldoOperacional.saldo_restante ?? calcularSaldoUtilizavelPeriodo(periodoSaldo);
+    const baseDias = baseDiasOperacional;
     const creditosSelecionados = (creditosExtra || []).filter((credito) => creditosSelecionadosIds.includes(credito.id));
     const totaisGozo = calcularTotaisGozoComCreditos({
       diasBase: baseDias,
@@ -541,7 +559,7 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias, bloqueioPeriodoAquisitivoSaida]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds, periodoAquisitivoFerias, bloqueioPeriodoAquisitivoSaida, ajustesSaldoFerias, todasFeriasDoMilitar]);
 
 
   const erroCronologia = useMemo(() => {
@@ -766,7 +784,7 @@ export default function RegistroLivroModal({
               {ferias.militar_nome}
             </div>
             <div className="text-sm text-slate-500 mt-1">
-              Base operacional: {bloqueioPeriodoAquisitivoSaida ? 'carregando...' : `${resumo?.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)}d`} | Período: {ferias.periodo_aquisitivo_ref || '—'}
+              Base operacional derivada: {bloqueioPeriodoAquisitivoSaida ? 'carregando...' : `${resumo?.diasBase ?? obterDiasBase(periodoAquisitivoFerias || ferias)}d`} | Período: {ferias.periodo_aquisitivo_ref || '—'}
             </div>
           </div>
 

@@ -80,8 +80,8 @@ export default function PeriodosAquisitivos() {
   const { data: ajustesSaldoFerias = [], isLoading: loadingAjustesSaldoFerias } = useQuery({
     queryKey: ['pa-diagnostico-ajustes-saldo-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
     queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: isPaBundleQueryEnabled && showDiagnosticoSaldo,
-    staleTime: 60 * 1000,
+    enabled: isPaBundleQueryEnabled,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
 
@@ -108,7 +108,7 @@ export default function PeriodosAquisitivos() {
   const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
-  const isLoadingDiagnosticoSaldo = loadingAjustesSaldoFerias || loadingCreditosExtraFerias || loadingDescontosFerias;
+  const isLoadingDiagnosticoSaldo = (showDiagnosticoSaldo && (loadingCreditosExtraFerias || loadingDescontosFerias)) || loadingAjustesSaldoFerias;
 
 
   const updatePeriodoMutation = useMutation({

@@ -2,8 +2,8 @@ import React from 'react';
 import { AlertCircle, CalendarDays, Clock3, ExternalLink } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { obterDiasBase, calcularDiasTotal } from './feriasRules';
 import DiagnosticoSaldoPeriodoBadge from './DiagnosticoSaldoPeriodoBadge';
+import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 
 const statusColors = {
   'Pendente': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -29,11 +29,15 @@ export default function PeriodoAquisitivoCard({
   showDiagnosticoSaldo = false,
   diagnosticoSaldoProps = {},
 }) {
-  const diasBase = obterDiasBase(periodo);
-  const diasTotal = Number(periodo.dias_total ?? calcularDiasTotal(periodo));
-  const diasGozados = Number(periodo.dias_gozados || 0);
-  const diasPrevistos = Number(periodo.dias_previstos || 0);
-  const diasSaldo = Number(periodo.dias_saldo ?? diasTotal - diasGozados - diasPrevistos);
+  const saldoOperacional = calcularSaldoOperacionalPeriodoComTodosAjustes({
+    periodo,
+    ajustes: diagnosticoSaldoProps?.ajustes || [],
+    ferias: diagnosticoSaldoProps?.ferias || [],
+  });
+  const diasBase = saldoOperacional.dias_base;
+  const diasTotal = saldoOperacional.direito_liquido;
+  const diasGozadosPrevistos = saldoOperacional.ferias_previstas_gozadas;
+  const diasSaldo = saldoOperacional.saldo_restante;
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -74,10 +78,10 @@ export default function PeriodoAquisitivoCard({
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs mb-4">
         <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Base</p><p className="font-semibold text-slate-800">{diasBase}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Total</p><p className="font-semibold text-slate-800">{diasTotal}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Gozados</p><p className="font-semibold text-slate-800">{diasGozados}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Previstos</p><p className="font-semibold text-slate-800">{diasPrevistos}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Saldo</p><p className="font-semibold text-[#1e3a5f]">{diasSaldo}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Ajustes</p><p className="font-semibold text-slate-800">+{saldoOperacional.creditos_ativos} / -{saldoOperacional.debitos_ativos}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Direito líquido</p><p className="font-semibold text-slate-800">{diasTotal}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Previstos/Gozados</p><p className="font-semibold text-slate-800">{diasGozadosPrevistos}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Saldo restante</p><p className="font-semibold text-[#1e3a5f]">{diasSaldo}d</p></div>
       </div>
 
       {showDiagnosticoSaldo && (
