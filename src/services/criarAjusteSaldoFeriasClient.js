@@ -38,5 +38,5 @@ export async function criarAjusteSaldoFerias(payload = {}) {
     throw error;
   }
 
-  return body?.ajusteSaldoFerias || body?.data || body;
+  return body;
 }

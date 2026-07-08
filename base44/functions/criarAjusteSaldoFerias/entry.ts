@@ -30,12 +30,14 @@ function feriasImpactaPeriodo(item = {}, periodo = {}) {
   return Boolean(refFerias && refPeriodo && refFerias === refPeriodo);
 }
 
-function saldoLiquido(periodo, ajustes = [], ferias = []) {
+function totaisPeriodo(periodo, ajustes = [], ferias = []) {
   const ativos = (ajustes || []).filter((a) => normalize(a?.status).toLowerCase() === 'ativo');
   const creditos = ativos.filter((a) => normalize(a?.tipo).toLowerCase() === 'credito').reduce((acc, a) => acc + Math.max(0, Number(a?.dias) || 0), 0);
   const debitos = ativos.filter((a) => normalize(a?.tipo).toLowerCase() === 'debito').reduce((acc, a) => acc + Math.max(0, Number(a?.dias) || 0), 0);
-  const gozados = (ferias || []).filter((f) => feriasImpactaPeriodo(f, periodo)).reduce((acc, f) => acc + Math.max(0, Number(f?.dias) || 0), 0);
-  return diasBase(periodo) + creditos - debitos - gozados;
+  const gozadosPrevistos = (ferias || []).filter((f) => feriasImpactaPeriodo(f, periodo)).reduce((acc, f) => acc + Math.max(0, Number(f?.dias) || 0), 0);
+  const direitoLiquido = diasBase(periodo) + creditos - debitos;
+
+  return { creditos, debitos, gozadosPrevistos, direitoLiquido, saldoRestante: direitoLiquido - gozadosPrevistos };
 }
 
 function nomeMilitar(militar = {}) {
@@ -80,9 +82,19 @@ Deno.serve(async (req) => {
 
     const ajustes = await base44.asServiceRole.entities.AjusteSaldoFerias.filter({ periodo_aquisitivo_id: periodoId }).catch(() => []);
     const ferias = await base44.asServiceRole.entities.Ferias.filter({ militar_id: militarId }).catch(() => []);
+    const warnings = [];
     if (tipo === 'debito') {
-      const saldoProjetado = saldoLiquido(periodo, [...(ajustes || []), { tipo, dias, status: 'ativo' }], ferias || []);
-      if (saldoProjetado < 0) return Response.json({ error: 'Débito não permitido: deixaria o saldo líquido negativo.' }, { status: 400 });
+      const totaisProjetados = totaisPeriodo(periodo, [...(ajustes || []), { tipo, dias, status: 'ativo' }], ferias || []);
+      if (totaisProjetados.direitoLiquido < 0) return Response.json({ error: 'Débito não permitido: deixaria o direito líquido negativo.' }, { status: 400 });
+      if (totaisProjetados.direitoLiquido < totaisProjetados.gozadosPrevistos) {
+        warnings.push({
+          code: 'DIREITO_LIQUIDO_INFERIOR_FERIAS_PREVISTAS_GOZADAS',
+          message: 'Ajuste criado, mas o direito líquido final ficou abaixo das férias previstas/gozadas do período.',
+          direito_liquido_final: totaisProjetados.direitoLiquido,
+          ferias_previstas_gozadas: totaisProjetados.gozadosPrevistos,
+          saldo_restante_final: totaisProjetados.saldoRestante,
+        });
+      }
     }
 
     const ajusteSaldoFerias = await base44.asServiceRole.entities.AjusteSaldoFerias.create({
@@ -100,7 +112,7 @@ Deno.serve(async (req) => {
       created_by: effectiveEmail,
     });
 
-    return Response.json({ ok: true, ajusteSaldoFerias });
+    return Response.json({ ok: true, ajusteSaldoFerias, warnings });
   } catch (error) {
     const status = error?.status || error?.response?.status || 500;
     console.error('[criarAjusteSaldoFerias] erro', { message: error?.message, status });

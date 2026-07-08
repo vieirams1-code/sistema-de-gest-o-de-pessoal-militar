@@ -114,6 +114,19 @@ export function calcularAjustesPeriodo(ajustes = []) {
   });
 }
 
+
+export function calcularDireitoLiquidoPeriodo({ periodo = {}, ajustes = [] } = {}) {
+  const dias_base = obterDiasBase(periodo);
+  const { creditos_ativos, debitos_ativos } = calcularAjustesPeriodo(ajustes);
+
+  return {
+    dias_base,
+    creditos_ativos,
+    debitos_ativos,
+    direito_liquido: dias_base + creditos_ativos - debitos_ativos,
+  };
+}
+
 export function calcularSaldoLiquidoPeriodo({ periodo = {}, ajustes = [], ferias = [] } = {}) {
   const dias_base = obterDiasBase(periodo);
   const ajustesAtivos = (ajustes || []).filter(isAjusteAtivo);

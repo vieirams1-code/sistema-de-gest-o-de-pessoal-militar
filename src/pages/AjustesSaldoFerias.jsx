@@ -21,6 +21,7 @@ import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriod
 import {
   STATUS_AJUSTE_SALDO_FERIAS,
   TIPOS_AJUSTE_SALDO_FERIAS,
+  calcularDireitoLiquidoPeriodo,
   calcularSaldoLiquidoPeriodo,
 } from '@/services/calculadoraSaldoFeriasService';
 import { formatNomeMilitarTexto } from '@/components/militar/NomeMilitar';
@@ -167,12 +168,11 @@ export default function AjustesSaldoFerias() {
       if (!Number.isFinite(dias) || dias <= 0) throw new Error('Dias deve ser maior que zero.');
       if (!motivo) throw new Error('Motivo é obrigatório.');
       if (form.tipo === TIPOS_AJUSTE_SALDO_FERIAS.DEBITO) {
-        const saldoComDebito = calcularSaldoLiquidoPeriodo({
+        const direitoComDebito = calcularDireitoLiquidoPeriodo({
           periodo,
           ajustes: [...ajustesPeriodoSelecionado, { tipo: TIPOS_AJUSTE_SALDO_FERIAS.DEBITO, dias, status: STATUS_AJUSTE_SALDO_FERIAS.ATIVO }],
-          ferias,
-        }).saldo_liquido;
-        if (saldoComDebito < 0) throw new Error('Débito não permitido: deixaria o saldo líquido negativo.');
+        }).direito_liquido;
+        if (direitoComDebito < 0) throw new Error('Débito não permitido: deixaria o direito líquido negativo.');
       }
       return criarAjusteSaldoFerias({
         militar_id: form.militar_id,
@@ -182,8 +182,13 @@ export default function AjustesSaldoFerias() {
         motivo,
       });
     },
-    onSuccess: () => {
-      toast({ title: 'Ajuste criado', description: 'O ajuste manual foi registrado como ativo.' });
+    onSuccess: (resultado) => {
+      const warnings = Array.isArray(resultado?.warnings) ? resultado.warnings : [];
+      const warningMessage = warnings.map((warning) => warning?.message || warning).filter(Boolean).join(' ');
+      toast({
+        title: warningMessage ? 'Ajuste criado com alerta' : 'Ajuste criado',
+        description: warningMessage || 'O ajuste manual foi registrado como ativo.',
+      });
       setForm(formInicial);
       queryClient.invalidateQueries({ queryKey: ajustesKey });
       queryClient.invalidateQueries({ queryKey: bundleKey });

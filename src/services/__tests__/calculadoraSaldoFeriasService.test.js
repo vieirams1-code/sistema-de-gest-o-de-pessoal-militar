@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcularAjustesPeriodo,
+  calcularDireitoLiquidoPeriodo,
   calcularSaldoLiquidoPeriodo,
   isAjusteAtivo,
   isAjustePendente,
@@ -41,6 +42,19 @@ describe('calculadoraSaldoFeriasService', () => {
 
   it('Crédito cancelado não altera', () => {
     assert.equal(calcular({ ajustes: [{ tipo: 'credito', dias: 2, status: 'cancelado' }] }).saldo_liquido, 30);
+  });
+
+  it('direito líquido para ajuste não desconta férias previstas/gozadas', () => {
+    const resultado = calcularDireitoLiquidoPeriodo({
+      periodo,
+      ajustes: [
+        { tipo: 'credito', dias: 2, status: 'ativo' },
+        { tipo: 'debito', dias: 1, status: 'ativo' },
+        { tipo: 'debito', dias: 8, status: 'ativo' },
+      ],
+    });
+
+    assert.equal(resultado.direito_liquido, 23);
   });
 
   it('Férias previstas/gozadas reduzem saldo', () => {
