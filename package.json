@@ -22,7 +22,7 @@
     "test:template-utils": "node --test src/components/utils/templateContratoUtils.test.js"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.36",
+    "@base44/sdk": "^0.8.37",
     "@base44/vite-plugin": "^1.0.30",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
