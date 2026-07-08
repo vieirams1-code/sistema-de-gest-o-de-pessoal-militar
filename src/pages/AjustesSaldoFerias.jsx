@@ -168,10 +168,23 @@ export default function AjustesSaldoFerias() {
       if (!Number.isFinite(dias) || dias <= 0) throw new Error('Dias deve ser maior que zero.');
       if (!motivo) throw new Error('Motivo é obrigatório.');
       if (form.tipo === TIPOS_AJUSTE_SALDO_FERIAS.DEBITO) {
+        // Valida usando exatamente os ajustes do período selecionado no formulário
+        // (não do filtro da lista), espelhando o payload real enviado ao backend.
+        const ajustesDoPeriodoForm = ajustes.filter(
+          (a) => String(a?.periodo_aquisitivo_id || '') === String(form.periodo_aquisitivo_id),
+        );
         const direitoComDebito = calcularDireitoLiquidoPeriodo({
           periodo,
-          ajustes: [...ajustesPeriodoSelecionado, { tipo: TIPOS_AJUSTE_SALDO_FERIAS.DEBITO, dias, status: STATUS_AJUSTE_SALDO_FERIAS.ATIVO }],
+          ajustes: [...ajustesDoPeriodoForm, { tipo: TIPOS_AJUSTE_SALDO_FERIAS.DEBITO, dias, status: STATUS_AJUSTE_SALDO_FERIAS.ATIVO }],
         }).direito_liquido;
+        if (import.meta.env?.DEV) {
+          console.debug('[AjustesSaldoFerias] validação débito', {
+            periodoSelecionadoId: periodoSelecionado?.id || null,
+            formPeriodoId: form.periodo_aquisitivo_id,
+            ajustesDoPeriodoForm: ajustesDoPeriodoForm.map((a) => ({ id: a.id, tipo: a.tipo, dias: a.dias, status: a.status, periodo_aquisitivo_id: a.periodo_aquisitivo_id })),
+            direitoComDebito,
+          });
+        }
         if (direitoComDebito < 0) throw new Error('Débito não permitido: deixaria o direito líquido negativo.');
       }
       return criarAjusteSaldoFerias({
