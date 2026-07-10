@@ -181,20 +181,6 @@ function getFeriasPeriodoKey(ferias = {}) {
   return militarId && ref ? `ref:${militarId}:${ref}` : '';
 }
 
-function getDiasOperacionaisFerias(ferias, periodosByKey, ajustesSaldoFerias, todasFerias) {
-  const key = getFeriasPeriodoKey(ferias);
-  const periodo = key ? periodosByKey.get(key) : null;
-  if (!periodo) return Number(ferias?.dias || 0);
-
-  const saldo = calcularSaldoOperacionalPeriodoComTodosAjustes({
-    periodo,
-    ajustes: ajustesSaldoFerias,
-    ferias: (todasFerias || []).filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
-  });
-  const diasOperacionais = Number(saldo?.direito_liquido);
-  return Number.isFinite(diasOperacionais) ? diasOperacionais : Number(ferias?.dias || 0);
-}
-
 function getDataRetornoOperacionalFerias(ferias, diasOperacionais) {
   if (!['Prevista', 'Autorizada', 'Em Curso'].includes(ferias?.status)) return ferias?.data_retorno;
   return addDaysIso(ferias?.data_inicio, diasOperacionais) || ferias?.data_retorno;
@@ -1530,7 +1516,10 @@ export default function Ferias() {
                         );
                         const creditosDoGozo = creditosPorGozo.get(f.id) || [];
                         const diasExtras = creditosDoGozo.reduce((acc, credito) => acc + Number(credito?.quantidade_dias || 0), 0);
-                        const diasOperacionais = getDiasOperacionaisFerias(f, periodosAquisitivosByKey, ajustesSaldoFerias, ferias);
+                        // Coluna "Dias" = dias daquele registro específico de férias (a fração),
+                        // NÃO o direito líquido/total do período aquisitivo.
+                        const diasFracao = Number(f?.dias);
+                        const diasOperacionais = Number.isFinite(diasFracao) ? diasFracao : Number(f?.dias || 0);
                         const dataRetornoOperacional = getDataRetornoOperacionalFerias(f, diasOperacionais);
 
                         const interrupcaoInfo =
