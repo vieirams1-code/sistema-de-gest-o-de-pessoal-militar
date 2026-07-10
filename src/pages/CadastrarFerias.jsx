@@ -29,14 +29,14 @@ import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { distribuirFracoesPorSaldo, somarFracoes } from '@/components/ferias/distribuicaoFracoesFerias';
 
-// Frações válidas: integral acompanha o saldo operacional; fracionadas seguem combinações fixas.
+// Opções por QUANTIDADE de frações. A distribuição dos dias é derivada do
+// saldo operacional calculado pelo motor oficial (nunca fixa em 10+10+10).
 const OPCOES_FRACOES = [
-  { label: '1 fração integral', fracoes: [] },
-  { label: '2 frações: 15 + 15', fracoes: [15, 15] },
-  { label: '2 frações: 20 + 10', fracoes: [20, 10] },
-  { label: '2 frações: 10 + 20', fracoes: [10, 20] },
-  { label: '3 frações: 10 + 10 + 10', fracoes: [10, 10, 10] },
+  { label: '1 fração integral', quantidade: 1 },
+  { label: '2 frações', quantidade: 2 },
+  { label: '3 frações', quantidade: 3 },
 ];
 
 const calcularFim = (inicio, dias) => {
@@ -80,6 +80,7 @@ export default function CadastrarFerias() {
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [opcaoFracao, setOpcaoFracao] = useState(0);
+  const [indiceDiferenca, setIndiceDiferenca] = useState(null);
   const [fracoes, setFracoes] = useState([{ dias: 30, data_inicio: '', data_fim: '', data_retorno: '' }]);
 
   // Bundle escopado de períodos aquisitivos e férias do militar para evitar cache vazio/race condition.
@@ -147,10 +148,21 @@ export default function CadastrarFerias() {
 
   const handleOpcaoFracao = (idx) => {
     setOpcaoFracao(idx);
+    const quantidade = OPCOES_FRACOES[idx].quantidade;
     const saldoUtilizavel = saldoOperacionalSelecionado ? Math.max(0, saldoOperacionalSelecionado.saldo_restante) : DIAS_BASE_PADRAO;
-    const diasOpcao = idx === 0 ? [saldoUtilizavel] : OPCOES_FRACOES[idx].fracoes;
+    const idxDiff = quantidade > 1 ? quantidade - 1 : null;
+    setIndiceDiferenca(idxDiff);
+    const diasOpcao = distribuirFracoesPorSaldo(saldoUtilizavel, quantidade, idxDiff);
     const novasFracoes = diasOpcao.map(d => ({ dias: d, data_inicio: '', data_fim: '', data_retorno: '' }));
     setFracoes(novasFracoes);
+  };
+
+  const handleIndiceDiferenca = (idx) => {
+    setIndiceDiferenca(idx);
+    const quantidade = OPCOES_FRACOES[opcaoFracao].quantidade;
+    const saldoUtilizavel = saldoOperacionalSelecionado ? Math.max(0, saldoOperacionalSelecionado.saldo_restante) : DIAS_BASE_PADRAO;
+    const diasOpcao = distribuirFracoesPorSaldo(saldoUtilizavel, quantidade, idx);
+    setFracoes(prev => prev.map((f, i) => ({ ...f, dias: diasOpcao[i] })));
   };
 
   const [avisoVencimento, setAvisoVencimento] = useState(null);
@@ -162,6 +174,11 @@ export default function CadastrarFerias() {
     ajustes: ajustesSaldoFerias,
     ferias: feriasExistentes.filter((item) => !editId || String(item?.id) !== String(editId)),
   }) : null;
+
+  const totalOperacionalDisponivel = Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO);
+  const somaFracoes = somarFracoes(fracoes);
+  const somaDivergente = !editId && !!periodoSelecionado && somaFracoes !== totalOperacionalDisponivel;
+  const temParcelaInvalida = !editId && fracoes.some((f) => Number(f?.dias) <= 0);
 
   const handleFracaoChange = (i, field, value) => {
     setFracoes(prev => {
@@ -243,11 +260,14 @@ export default function CadastrarFerias() {
       return;
     }
 
-    if (periodoSelecionado) {
-      const totalDiasSolicitados = fracoes.reduce((sum, item) => sum + Number(item?.dias || 0), 0);
-      const saldoRestante = Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO);
-      if (totalDiasSolicitados > saldoRestante) {
-        setErroRegras(`Quantidade de dias informada (${totalDiasSolicitados}d) ultrapassa o saldo restante operacional do período (${saldoRestante}d), já considerando AjusteSaldoFerias ativo.`);
+    if (periodoSelecionado && !editId) {
+      const totalDiasSolicitados = somarFracoes(fracoes);
+      if (fracoes.some((item) => Number(item?.dias) <= 0)) {
+        setErroRegras('Nenhuma fração pode ter zero ou menos dias. Ajuste a distribuição.');
+        return;
+      }
+      if (totalDiasSolicitados !== totalOperacionalDisponivel) {
+        setErroRegras(`A soma das frações (${totalDiasSolicitados}d) deve ser exatamente igual aos ${totalOperacionalDisponivel} dias disponíveis do período.`);
         return;
       }
     }
@@ -371,7 +391,7 @@ export default function CadastrarFerias() {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.militar_id || !formData.periodo_aquisitivo_ref || fracoes.some(f => !f.data_inicio)}
+            disabled={loading || !formData.militar_id || !formData.periodo_aquisitivo_ref || fracoes.some(f => !f.data_inicio) || somaDivergente || temParcelaInvalida}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
             {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
@@ -433,24 +453,49 @@ export default function CadastrarFerias() {
             <>
               {!editId && (
                 <FormSection title="Fracionamento" icon={Calendar} defaultOpen={true}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {OPCOES_FRACOES.map((op, i) => (
-                      (() => {
-                        const saldoIntegral = Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO);
-                        const label = i === 0 ? `1 fração integral (${saldoIntegral} dias)` : op.label;
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {OPCOES_FRACOES.map((op, i) => {
+                      const label = i === 0 ? `1 fração integral (${totalOperacionalDisponivel} dias)` : op.label;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleOpcaoFracao(i)}
+                          className={`p-3 rounded-lg border text-sm text-left transition-all ${opcaoFracao === i ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 text-[#1e3a5f] font-medium' : 'border-slate-200 hover:border-slate-300'}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                        return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => handleOpcaoFracao(i)}
-                        className={`p-3 rounded-lg border text-sm text-left transition-all ${opcaoFracao === i ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 text-[#1e3a5f] font-medium' : 'border-slate-200 hover:border-slate-300'}`}
-                      >
-                        {label}
-                      </button>
-                        );
-                      })()
-                    ))}
+                  {fracoes.length > 1 && (
+                    <div className="mt-4">
+                      <Label className="text-sm font-medium text-slate-700">Fração que recebe a diferença</Label>
+                      <div className="grid grid-cols-3 gap-2 mt-1.5">
+                        {fracoes.map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleIndiceDiferenca(i)}
+                            className={`p-2 rounded-lg border text-sm transition-all ${indiceDiferenca === i ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 text-[#1e3a5f] font-medium' : 'border-slate-200 hover:border-slate-300'}`}
+                          >
+                            {i + 1}ª fração
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${somaDivergente || temParcelaInvalida ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                    <div>Total disponível: <strong>{totalOperacionalDisponivel} dias</strong></div>
+                    <div className="mt-1">Soma das frações: <strong>{somaFracoes} de {totalOperacionalDisponivel} dias</strong></div>
+                    {somaDivergente && (
+                      <div className="mt-1 font-medium">A soma das frações deve ser exatamente igual aos {totalOperacionalDisponivel} dias disponíveis.</div>
+                    )}
+                    {temParcelaInvalida && (
+                      <div className="mt-1 font-medium">Nenhuma fração pode ter zero ou menos dias.</div>
+                    )}
                   </div>
                 </FormSection>
               )}
@@ -467,6 +512,19 @@ export default function CadastrarFerias() {
                   <h3 className="text-base font-semibold text-[#1e3a5f] mb-4">
                     {fracoes.length > 1 ? `${i + 1}ª Fração — ${f.dias} dias` : `Férias — ${f.dias} dias`}
                   </h3>
+                  {!editId && fracoes.length > 1 && (
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium text-slate-700">Dias desta fração</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={f.dias}
+                        onChange={e => handleFracaoChange(i, 'dias', Number(e.target.value))}
+                        className="mt-1.5 max-w-32"
+                      />
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-slate-700">Data de Início <span className="text-red-500">*</span></Label>

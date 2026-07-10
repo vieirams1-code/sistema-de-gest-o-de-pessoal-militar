@@ -86,16 +86,21 @@ function formatDateBR(dateStr) {
 function montarFeriasParaTemplateLivro(ferias, tipoRegistro, resumo) {
   if (tipoRegistro !== 'Saída Férias' || !resumo) return ferias;
 
-  const diasOperacionais = Number(resumo.dias || resumo.saldoUtilizavel || 0);
+  // Dias EFETIVOS da movimentação (a fração que está sendo iniciada), não o
+  // direito líquido total do período. Prioriza ferias.dias (a fração registrada);
+  // só cai no total operacional quando a fração não define dias próprios.
+  const diasMovimentacao = Number(ferias?.dias) > 0
+    ? Number(ferias.dias)
+    : Number(resumo.dias || resumo.saldoUtilizavel || 0);
   const diasBaseGozo = Number(resumo.diasBase || 0);
 
   return {
     ...ferias,
-    dias: diasOperacionais,
+    dias: diasMovimentacao,
     data_fim: resumo.fim || ferias.data_fim,
     data_retorno: resumo.retorno || ferias.data_retorno,
     dias_base_gozo: diasBaseGozo,
-    dias_totais_gozo: diasOperacionais,
+    dias_totais_gozo: diasMovimentacao,
     dias_base: diasBaseGozo,
   };
 }

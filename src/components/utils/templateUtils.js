@@ -18,7 +18,9 @@ const numeroPorExtenso = (num) => {
     11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze',16:'dezesseis',17:'dezessete',
     18:'dezoito',19:'dezenove',20:'vinte',21:'vinte e um',22:'vinte e dois',23:'vinte e três',
     24:'vinte e quatro',25:'vinte e cinco',26:'vinte e seis',27:'vinte e sete',28:'vinte e oito',
-    29:'vinte e nove',30:'trinta',60:'sessenta',120:'cento e vinte'
+    29:'vinte e nove',30:'trinta',31:'trinta e um',32:'trinta e dois',33:'trinta e três',
+    34:'trinta e quatro',35:'trinta e cinco',36:'trinta e seis',40:'quarenta',45:'quarenta e cinco',
+    60:'sessenta',120:'cento e vinte'
   };
   return numeros[num] || num.toString();
 };
