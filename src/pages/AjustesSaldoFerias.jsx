@@ -27,6 +27,9 @@ import {
 import { formatNomeMilitarTexto } from '@/components/militar/NomeMilitar';
 
 const ALL = 'all';
+// Status de férias que representam compromisso válido do período e bloqueiam débito.
+// Espelha exatamente o STATUS_IMPACTO_FERIAS do backend (criarAjusteSaldoFerias).
+const STATUS_FERIAS_BLOQUEIA_DEBITO = new Set(['gozada', 'prevista', 'autorizada', 'em curso', 'interrompida']);
 const STATUS_CANCELAVEIS = new Set([
   STATUS_AJUSTE_SALDO_FERIAS.ATIVO,
   STATUS_AJUSTE_SALDO_FERIAS.RASCUNHO,
@@ -68,6 +71,16 @@ function normalizar(value) {
 
 function obterPeriodoRef(periodo = {}) {
   return texto(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref, 'Sem referência');
+}
+
+// Mesmo vínculo oficial do backend: prioriza periodo_aquisitivo_id e usa o
+// fallback textual apenas quando o id não está presente no registro de férias.
+function feriasVinculadaAoPeriodo(item = {}, periodo = {}) {
+  if (!periodo?.id) return false;
+  if (item?.periodo_aquisitivo_id) return String(item.periodo_aquisitivo_id) === String(periodo.id);
+  const refFerias = normalizar(item?.periodo_aquisitivo_ref);
+  const refPeriodo = normalizar(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref);
+  return Boolean(refFerias && refPeriodo && refFerias === refPeriodo);
 }
 
 function formatarNomeMilitar(militar = {}) {
@@ -147,6 +160,16 @@ export default function AjustesSaldoFerias() {
     return calcularSaldoLiquidoPeriodo({ periodo: periodoSelecionado, ajustes: ajustesPeriodoSelecionado, ferias });
   }, [ajustesPeriodoSelecionado, ferias, periodoSelecionado]);
 
+  // Férias válidas vinculadas ao período escolhido no formulário (não ao filtro da lista).
+  const periodoDoFormulario = periodoById.get(String(form.periodo_aquisitivo_id || '')) || null;
+  const feriasBloqueadorasForm = useMemo(() => {
+    if (!periodoDoFormulario?.id) return [];
+    return ferias.filter((f) => (
+      STATUS_FERIAS_BLOQUEIA_DEBITO.has(normalizar(f?.status)) && feriasVinculadaAoPeriodo(f, periodoDoFormulario)
+    ));
+  }, [ferias, periodoDoFormulario]);
+  const debitoBloqueadoPorFerias = form.tipo === TIPOS_AJUSTE_SALDO_FERIAS.DEBITO && feriasBloqueadorasForm.length > 0;
+
   const ajustesFiltrados = useMemo(() => ajustes.filter((ajuste) => {
     if (filtros.militar_id !== ALL && String(ajuste?.militar_id || '') !== filtros.militar_id) return false;
     if (filtros.periodo_id !== ALL && String(ajuste?.periodo_aquisitivo_id || '') !== filtros.periodo_id) return false;
@@ -168,6 +191,15 @@ export default function AjustesSaldoFerias() {
       if (!Number.isFinite(dias) || dias <= 0) throw new Error('Dias deve ser maior que zero.');
       if (!motivo) throw new Error('Motivo é obrigatório.');
       if (form.tipo === TIPOS_AJUSTE_SALDO_FERIAS.DEBITO) {
+        // Bloqueio antecipado: período com férias válidas não aceita débito.
+        const bloqueadoras = ferias.filter(
+          (f) => STATUS_FERIAS_BLOQUEIA_DEBITO.has(normalizar(f?.status)) && feriasVinculadaAoPeriodo(f, periodo),
+        );
+        if (bloqueadoras.length > 0) {
+          const qtd = bloqueadoras.length;
+          const plural = qtd === 1 ? 'férias cadastrada' : `${qtd} frações de férias cadastradas`;
+          throw new Error(`Este período possui ${plural}. Para lançar um débito, primeiro remova ou cancele as férias existentes e depois refaça o cadastro com o saldo atualizado.`);
+        }
         // Valida usando exatamente os ajustes do período selecionado no formulário
         // (não do filtro da lista), espelhando o payload real enviado ao backend.
         const ajustesDoPeriodoForm = ajustes.filter(
@@ -293,7 +325,15 @@ export default function AjustesSaldoFerias() {
                 <div><Label>Período aquisitivo</Label><Select value={form.periodo_aquisitivo_id || undefined} onValueChange={(v) => setForm((p) => ({ ...p, periodo_aquisitivo_id: v }))}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{periodosDoMilitar.map((p) => <SelectItem key={p.id} value={String(p.id)}>{obterPeriodoRef(p)}</SelectItem>)}</SelectContent></Select></div>
                 <div><Label>Dias</Label><Input type="number" min="1" step="1" value={form.dias} onChange={(e) => setForm((p) => ({ ...p, dias: e.target.value }))} /></div>
                 <div><Label>Motivo obrigatório</Label><Textarea value={form.motivo} onChange={(e) => setForm((p) => ({ ...p, motivo: e.target.value }))} placeholder="Descreva o motivo do ajuste manual" /></div>
-                <Button className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => salvarMutation.mutate()} disabled={!canCriar || salvarMutation.isPending}>{form.tipo === 'debito' ? 'Criar Débito' : 'Criar Crédito'}</Button>
+                {debitoBloqueadoPorFerias && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                    <Ban className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Este período possui {feriasBloqueadorasForm.length === 1 ? '1 férias cadastrada' : `${feriasBloqueadorasForm.length} frações de férias cadastradas`}. Para lançar um débito, primeiro remova ou cancele as férias existentes e depois refaça o cadastro com o saldo atualizado.
+                    </span>
+                  </div>
+                )}
+                <Button className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => salvarMutation.mutate()} disabled={!canCriar || salvarMutation.isPending || debitoBloqueadoPorFerias}>{form.tipo === 'debito' ? 'Criar Débito' : 'Criar Crédito'}</Button>
                 {!canCriar && <p className="text-xs text-amber-700">Seu perfil pode visualizar, mas não criar ajustes.</p>}
               </CardContent>
             </Card>
