@@ -450,7 +450,19 @@ const TEMPLATE_VAR_CONTRACT = {
   },
   [resolveTipoRegistroTemplate('Ata JISO')]: {
     obrigatorias: ['nome_completo', 'posto_nome', 'matricula'],
-    opcionais: ['data_registro', 'quadro', 'quadro_nome', 'militar_quadro'],
+    opcionais: [
+      'data_registro',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      // Variáveis específicas da Ata JISO — exibidas nos chips do editor e
+      // preenchidas pelo runtime (RPSpecificFieldsExOfficio + rpVarsService).
+      'finalidade_jiso',
+      'secao_jiso',
+      'data_ata',
+      'nup',
+      'parecer_jiso',
+    ],
     aliases: {
       posto: 'posto_nome',
       nome: 'nome_completo',
