@@ -2,6 +2,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const TIPOS_VALIDOS = new Set(['credito', 'debito']);
 const STATUS_IMPACTO_FERIAS = new Set(['Gozada', 'Prevista', 'Autorizada', 'Em Curso', 'Interrompida']);
+// Status de férias que representam compromisso válido do período e, portanto,
+// bloqueiam o lançamento de débito (mesma base do STATUS_IMPACTO_FERIAS).
+// Cancelada é o único status de anulação existente na entidade Ferias.
+const STATUS_FERIAS_BLOQUEIA_DEBITO = STATUS_IMPACTO_FERIAS;
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const normalize = (v) => String(v ?? '').trim();
 
@@ -22,12 +26,18 @@ function diasBase(periodo = {}) {
   return 30;
 }
 
-function feriasImpactaPeriodo(item = {}, periodo = {}) {
-  if (!STATUS_IMPACTO_FERIAS.has(normalize(item?.status))) return false;
+// Vínculo oficial férias → período: prioriza periodo_aquisitivo_id e só usa o
+// fallback textual legado quando o id não está presente no registro de férias.
+function vinculadaAoPeriodo(item = {}, periodo = {}) {
   if (item?.periodo_aquisitivo_id) return String(item.periodo_aquisitivo_id) === String(periodo.id || '');
   const refFerias = normalize(item?.periodo_aquisitivo_ref);
   const refPeriodo = normalize(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref);
   return Boolean(refFerias && refPeriodo && refFerias === refPeriodo);
+}
+
+function feriasImpactaPeriodo(item = {}, periodo = {}) {
+  if (!STATUS_IMPACTO_FERIAS.has(normalize(item?.status))) return false;
+  return vinculadaAoPeriodo(item, periodo);
 }
 
 function totaisPeriodo(periodo, ajustes = [], ferias = []) {
@@ -84,6 +94,20 @@ Deno.serve(async (req) => {
     const ferias = await base44.asServiceRole.entities.Ferias.filter({ militar_id: militarId }).catch(() => []);
     const warnings = [];
     if (tipo === 'debito') {
+      // Bloqueio: não permitir débito quando o período já tem férias válidas cadastradas.
+      // Usa o mesmo vínculo oficial (periodo_aquisitivo_id + fallback textual) do motor.
+      const feriasBloqueadoras = (ferias || []).filter((f) => (
+        STATUS_FERIAS_BLOQUEIA_DEBITO.has(normalize(f?.status)) && vinculadaAoPeriodo(f, periodo)
+      ));
+      if (feriasBloqueadoras.length > 0) {
+        const qtd = feriasBloqueadoras.length;
+        const plural = qtd === 1 ? 'férias cadastrada' : `${qtd} frações de férias cadastradas`;
+        return Response.json({
+          error: `Este período possui ${plural}. Remova ou cancele as férias existentes, registre o débito e depois cadastre novamente as férias com o saldo atualizado.`,
+          code: 'PERIODO_COM_FERIAS_CADASTRADAS',
+          ferias_encontradas: qtd,
+        }, { status: 400 });
+      }
       const totaisProjetados = totaisPeriodo(periodo, [...(ajustes || []), { tipo, dias, status: 'ativo' }], ferias || []);
       if (totaisProjetados.direitoLiquido < 0) return Response.json({ error: 'Débito não permitido: deixaria o direito líquido negativo.' }, { status: 400 });
       if (totaisProjetados.direitoLiquido < totaisProjetados.gozadosPrevistos) {
