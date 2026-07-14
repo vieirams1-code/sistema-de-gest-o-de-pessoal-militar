@@ -527,10 +527,14 @@ export default function RegistroLivroModal({
     }
 
     if (tipoRegistro === 'Retorno Férias') {
+      // Dias ENCERRADOS = dias da fração que está sendo encerrada (ferias.dias),
+      // não o direito operacional total do período (baseDias = direito_liquido).
+      // Para a 1ª fração da Gleiciane: 15d, nunca 30d.
+      const diasEncerrados = Number(ferias?.dias) > 0 ? Number(ferias.dias) : baseDias;
       return {
         titulo: 'Resumo do Término',
         retorno: dataRegistro,
-        dias: baseDias,
+        dias: diasEncerrados,
       };
     }
 

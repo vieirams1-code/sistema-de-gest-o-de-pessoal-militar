@@ -129,6 +129,17 @@ function getEventDate(evento) {
   return evento?.data_registro || evento?.data_inicio || null;
 }
 
+// Dias da MOVIMENTAÇÃO do evento de Início/Término = dias da fração (ferias.dias),
+// não o direito operacional total do período. Alguns registros legados foram
+// gravados com o direito total (ex.: 30) em frações de 15 — aqui preferimos a
+// fração para exibição, sem alterar o registro persistido.
+function getDiasEventoFracao(evento, ferias) {
+  const diasFracao = Number(ferias?.dias);
+  const diasEvento = Number(evento?.dias);
+  if (diasFracao > 0) return diasFracao;
+  return Number.isFinite(diasEvento) ? diasEvento : null;
+}
+
 function compareEvents(a, b) {
   const da = getEventDate(a) || '2000-01-01';
   const db = getEventDate(b) || '2000-01-01';
@@ -779,10 +790,10 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
 
                           {(evento.tipo_registro === 'Saída Férias' ||
                             evento.tipo_registro === 'Retorno Férias') &&
-                            evento.dias != null && (
+                            getDiasEventoFracao(evento, ferias) != null && (
                               <>
                                 <span className="text-slate-400">Dias</span>
-                                <span className="text-slate-700 font-medium">{Number(evento.dias)}d</span>
+                                <span className="text-slate-700 font-medium">{getDiasEventoFracao(evento, ferias)}d</span>
                               </>
                             )}
 
