@@ -241,7 +241,7 @@ export default function RPSpecificFieldsExOfficio({
                   <FormField label="Data da Ata" name="data_ata" value={formData.data_ata} onChange={handleChange} type="date" required />
                 </div>
                 <div className="col-span-2">
-                  <FormField label="NUP" name="nup" value={formData.nup} onChange={handleChange} placeholder="31.001.005-12" />
+                  <FormField label="TARS" name="nup" value={formData.nup} onChange={handleChange} placeholder="Número do TARS" />
                 </div>
                 <div className="col-span-2">
                   <Label>Parecer</Label>

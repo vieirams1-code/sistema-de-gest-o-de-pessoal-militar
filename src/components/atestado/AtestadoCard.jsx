@@ -783,8 +783,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                     <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" />
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm">NUP</Label>
-                    <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
+                    <Label className="text-sm">TARS</Label>
+                    <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="Número do TARS" />
                   </div>
                   <div className="col-span-2">
                     <Label className="text-sm">Parecer</Label>

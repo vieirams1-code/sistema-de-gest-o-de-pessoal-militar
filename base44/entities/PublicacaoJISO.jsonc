@@ -49,7 +49,7 @@
     },
     "nup": {
       "type": "string",
-      "description": "NUP"
+      "description": "TARS"
     },
     "parecer": {
       "type": "string",
