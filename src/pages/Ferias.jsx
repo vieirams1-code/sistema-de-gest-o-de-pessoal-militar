@@ -81,6 +81,7 @@ import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { resolveTagVisual } from '@/utils/tags/tagPresenter';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
+import { montarMapaInconsistenciaPorPeriodo, getChaveInconsistenciaFerias } from '@/services/familiasFeriasInconsistentesService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -718,6 +719,12 @@ export default function Ferias() {
     });
     return mapa;
   }, [periodosAquisitivosFerias]);
+
+  const mapaInconsistenciaPorPeriodo = useMemo(() => montarMapaInconsistenciaPorPeriodo({
+    periodos: periodosAquisitivosFerias,
+    ajustes: ajustesSaldoFerias,
+    ferias,
+  }), [periodosAquisitivosFerias, ajustesSaldoFerias, ferias]);
 
   const filteredFerias = useMemo(() => {
     const hasPeriodFilter = Boolean(periodStart && periodEnd);
@@ -1538,6 +1545,7 @@ export default function Ferias() {
                         const tagsVisuais = feriasTagsVisuaisMap.get(String(f.id)) || [];
                         const tagsPreview = tagsVisuais.slice(0, 3);
                         const tagsOverflow = Math.max(0, tagsVisuais.length - 3);
+                        const familiaInconsistente = mapaInconsistenciaPorPeriodo.get(getChaveInconsistenciaFerias(f)) || null;
                         const hasDropdownActions =
                           (canLancarInicioFerias && (f.status === 'Prevista' || f.status === 'Autorizada')) ||
                           (canContinuarFerias && f.status === 'Interrompida') ||
@@ -1617,7 +1625,28 @@ export default function Ferias() {
                               )}
                             </td>
 
-                            <td className="px-4 py-3 text-slate-600">{f.periodo_aquisitivo_ref || '-'}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              <div className="flex items-center gap-1.5">
+                                <span>{f.periodo_aquisitivo_ref || '-'}</span>
+                                {familiaInconsistente && (
+                                  <TooltipProvider delayDuration={100}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 cursor-help">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          Inconsistência no período
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-[320px] p-3 bg-slate-50 border border-slate-200 text-slate-700 shadow-lg">
+                                        <p className="text-xs text-slate-600">
+                                          As férias válidas deste período somam {familiaInconsistente.soma_valida} dias, mas o direito operacional é de {familiaInconsistente.direito_operacional} dias.
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </td>
 
                             <td className="px-4 py-3 text-slate-700">
                               <div className="flex items-center gap-1 group">
