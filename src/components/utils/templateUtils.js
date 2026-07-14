@@ -9,6 +9,7 @@ import {
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
 } from './templateContratoUtils.js';
+import { ATA_JISO_TARS_TEMPLATE_SAMPLE } from '../atestado/ataJisoLabels.js';
 
 export { abreviarPosto, buildTemplateVarsContrato, composeTemplateVarsRP, montarPostoNomeTemplate, resolveQuadroTemplate, numeroPorExtenso };
 
@@ -254,7 +255,7 @@ export const VARS_PREVIEW = buildPreviewTemplateVars({
   finalidade_jiso: 'LTS',
   secao_jiso: '62/JISO/2026',
   data_ata: '01/03/2026',
-  nup: '31.001.005-12',
+  nup: ATA_JISO_TARS_TEMPLATE_SAMPLE,
   parecer_jiso: 'Apto',
   data_melhoria: '01/03/2026',
   comportamento_atual: 'Bom',

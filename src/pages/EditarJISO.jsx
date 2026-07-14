@@ -24,6 +24,7 @@ import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { buildObservacoesJiso, parseDadosAdministrativosJiso } from '@/components/atestado/jisoObservacoesUtils';
+import { ATA_JISO_TARS_LABEL, ATA_JISO_TARS_PLACEHOLDER } from '@/components/atestado/ataJisoLabels';
 
 export default function EditarJISO() {
   // GOVERNANÇA TEMPLATE:
@@ -401,11 +402,11 @@ export default function EditarJISO() {
                   </Select>
                 </div>
                 <div>
-                  <Label>NUP</Label>
+                  <Label>{ATA_JISO_TARS_LABEL}</Label>
                   <Input
                     value={formData.nup}
                     onChange={(e) => handleChange('nup', e.target.value)}
-                    placeholder="Número do NUP"
+                    placeholder={ATA_JISO_TARS_PLACEHOLDER}
                     className="mt-1.5"
                   />
                 </div>

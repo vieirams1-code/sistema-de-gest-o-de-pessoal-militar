@@ -23,6 +23,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
+import { ATA_JISO_TARS_LABEL, ATA_JISO_TARS_PLACEHOLDER } from './ataJisoLabels';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
   aplicarTemplate,
@@ -783,8 +784,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                     <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" />
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-sm">NUP</Label>
-                    <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
+                    <Label className="text-sm">{ATA_JISO_TARS_LABEL}</Label>
+                    <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder={ATA_JISO_TARS_PLACEHOLDER} />
                   </div>
                   <div className="col-span-2">
                     <Label className="text-sm">Parecer</Label>

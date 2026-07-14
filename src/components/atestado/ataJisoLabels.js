@@ -1,0 +1,3 @@
+export const ATA_JISO_TARS_LABEL = 'TARS';
+export const ATA_JISO_TARS_PLACEHOLDER = 'Número do TARS';
+export const ATA_JISO_TARS_TEMPLATE_SAMPLE = '12345/TARS/2026';
