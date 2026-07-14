@@ -13,7 +13,6 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { createPageUrl } from '@/utils';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { compararSaldoPeriodo } from '@/services/diagnosticoSaldoFeriasService';
-import FamiliasInconsistentesSection from '@/components/ferias/FamiliasInconsistentesSection';
 
 const STATUS_TODOS = 'todos';
 const STATUS_COMPATIVEL = 'Compatível';
@@ -283,14 +282,6 @@ export default function DiagnosticoSaldoFerias() {
             </CardContent>
           </Card>
         )}
-
-        <FamiliasInconsistentesSection
-          periodos={periodos}
-          ajustes={ajustes}
-          ferias={ferias}
-          militares={militares}
-          isLoading={isLoading}
-        />
       </div>
     </div>
   );

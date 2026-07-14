@@ -5,16 +5,17 @@
  * oficial (calcularSaldoOperacionalPeriodoComTodosAjustes) entre N frações,
  * garantindo que a soma das parcelas seja SEMPRE igual ao total.
  *
- * Regra de distribuição:
- * - Frações "padrão" recebem 10 dias (bloco regulamentar).
- * - A fração escolhida (indiceDiferenca) absorve a diferença restante.
- * - Nunca gera parcela negativa; a diferença sempre fica na fração escolhida.
+ * Regra histórica/operacional:
+ * - 1 fração: integral (todo o saldo).
+ * - 2+ frações: divide o total o mais igualmente possível (ex.: 30 → 15+15,
+ *   30 → 10+10+10). A fração escolhida (indiceDiferenca) absorve o resto da
+ *   divisão inteira, quando houver.
+ * - Nunca gera parcela negativa nem zero forçado se o total permitir.
+ * - A soma das parcelas é SEMPRE exatamente igual ao total.
  */
 
-const BLOCO_PADRAO = 10;
-
 export function distribuirFracoesPorSaldo(total, quantidadeFracoes, indiceDiferenca = null) {
-  const totalNum = Math.max(0, Number(total) || 0);
+  const totalNum = Math.max(0, Math.round(Number(total) || 0));
   const qtd = Math.max(1, Number(quantidadeFracoes) || 1);
 
   if (qtd === 1) return [totalNum];
@@ -23,22 +24,14 @@ export function distribuirFracoesPorSaldo(total, quantidadeFracoes, indiceDifere
     ? indiceDiferenca
     : qtd - 1;
 
-  const parcelas = new Array(qtd).fill(BLOCO_PADRAO);
-  const somaPadrao = BLOCO_PADRAO * (qtd - 1);
-  const restante = totalNum - somaPadrao;
+  // Divisão o mais igual possível: cada parcela recebe o piso (total / qtd) e
+  // o resto da divisão inteira vai para a fração escolhida. Ex.: 30/2 = 15+15;
+  // 22/2 = 11+11; 30/3 = 10+10+10; 22/3 = 7+7+8 (resto na fração escolhida).
+  const base = Math.floor(totalNum / qtd);
+  const resto = totalNum - base * qtd;
 
-  parcelas[idxDiff] = restante;
-
-  // Se a diferença ficar negativa (total menor que o mínimo dos blocos padrão),
-  // rebalanceia zerando o excedente a partir do fim, mantendo a soma exata.
-  if (restante < 0) {
-    let sobra = totalNum;
-    for (let i = 0; i < qtd; i += 1) {
-      const valor = Math.min(BLOCO_PADRAO, sobra);
-      parcelas[i] = valor;
-      sobra -= valor;
-    }
-  }
+  const parcelas = new Array(qtd).fill(base);
+  parcelas[idxDiff] += resto;
 
   return parcelas;
 }
