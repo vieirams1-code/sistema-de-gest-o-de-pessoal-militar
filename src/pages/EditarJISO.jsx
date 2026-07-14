@@ -401,11 +401,11 @@ export default function EditarJISO() {
                   </Select>
                 </div>
                 <div>
-                  <Label>NUP</Label>
+                  <Label>TARS</Label>
                   <Input
                     value={formData.nup}
                     onChange={(e) => handleChange('nup', e.target.value)}
-                    placeholder="Número do NUP"
+                    placeholder="Número do TARS"
                     className="mt-1.5"
                   />
                 </div>

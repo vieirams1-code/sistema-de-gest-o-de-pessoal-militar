@@ -659,7 +659,7 @@ const VARS_POR_TIPO = {
       { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO' },
       { v: '{{secao_jiso}}', desc: 'Seção JISO' },
       { v: '{{data_ata}}', desc: 'Data da ata' },
-      { v: '{{nup}}', desc: 'NUP' },
+      { v: '{{nup}}', desc: 'TARS' },
       { v: '{{parecer_jiso}}', desc: 'Parecer da JISO' },
     ]
   },
