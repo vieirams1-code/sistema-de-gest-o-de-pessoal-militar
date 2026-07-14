@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import FormField from '@/components/militar/FormField';
+import { ATA_JISO_TARS_LABEL, ATA_JISO_TARS_PLACEHOLDER } from '@/components/atestado/ataJisoLabels';
 export default function RPSpecificFieldsExOfficio({
   tipoRegistro,
   formData,
@@ -241,7 +242,7 @@ export default function RPSpecificFieldsExOfficio({
                   <FormField label="Data da Ata" name="data_ata" value={formData.data_ata} onChange={handleChange} type="date" required />
                 </div>
                 <div className="col-span-2">
-                  <FormField label="TARS" name="nup" value={formData.nup} onChange={handleChange} placeholder="Número do TARS" />
+                  <FormField label={ATA_JISO_TARS_LABEL} name="nup" value={formData.nup} onChange={handleChange} placeholder={ATA_JISO_TARS_PLACEHOLDER} />
                 </div>
                 <div className="col-span-2">
                   <Label>Parecer</Label>

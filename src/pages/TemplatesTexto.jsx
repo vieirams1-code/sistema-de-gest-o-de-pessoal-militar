@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ATA_JISO_TARS_LABEL } from '@/components/atestado/ataJisoLabels';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle, Copy } from 'lucide-react';
 import { aplicarTemplate, buildPreviewTemplateVars, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils.js';
@@ -659,7 +660,7 @@ const VARS_POR_TIPO = {
       { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO' },
       { v: '{{secao_jiso}}', desc: 'Seção JISO' },
       { v: '{{data_ata}}', desc: 'Data da ata' },
-      { v: '{{nup}}', desc: 'TARS' },
+      { v: '{{nup}}', desc: ATA_JISO_TARS_LABEL },
       { v: '{{parecer_jiso}}', desc: 'Parecer da JISO' },
     ]
   },
