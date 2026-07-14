@@ -55,6 +55,138 @@ const ENTIDADES_PERMITIDAS = new Set([
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
+
+// =====================================================================
+// Barreira de integridade da família de Férias.
+// ---------------------------------------------------------------------
+// Espelha EXATAMENTE a regra canônica de saldoFeriasOperacionalService /
+// calculadoraSaldoFeriasService (frontend). NÃO é um motor paralelo:
+// replica os mesmos status de impacto, o mesmo vínculo por período e o
+// mesmo cálculo de direito líquido (dias_base + créditos - débitos).
+// =====================================================================
+const STATUS_FERIAS_COM_IMPACTO = new Set(['Gozada', 'Prevista', 'Autorizada', 'Em Curso', 'Interrompida']);
+const STATUS_AJUSTE_ATIVO = 'ativo';
+const DIAS_BASE_PADRAO_FERIAS = 30;
+
+function toNumberFerias(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+function hasNumericValueFerias(value) {
+  return Number.isFinite(Number(value));
+}
+function normalizarIdFerias(value) {
+  return String(value ?? '').trim();
+}
+
+function obterDiasBaseFerias(periodo) {
+  const p = periodo || {};
+  if (hasNumericValueFerias(p.dias_direito)) return toNumberFerias(p.dias_direito, DIAS_BASE_PADRAO_FERIAS);
+  if (hasNumericValueFerias(p.dias_adquiridos)) return toNumberFerias(p.dias_adquiridos, DIAS_BASE_PADRAO_FERIAS);
+  if (hasNumericValueFerias(p.dias_base)) return toNumberFerias(p.dias_base, DIAS_BASE_PADRAO_FERIAS);
+  return DIAS_BASE_PADRAO_FERIAS;
+}
+
+function isFeriasDoMesmoPeriodo(ferias, periodo) {
+  const feriasPeriodoId = normalizarIdFerias(ferias?.periodo_aquisitivo_id);
+  const periodoId = normalizarIdFerias(periodo?.id);
+  if (feriasPeriodoId) return Boolean(periodoId && feriasPeriodoId === periodoId);
+  const feriasRef = normalizarIdFerias(ferias?.periodo_aquisitivo_ref);
+  const periodoRef = normalizarIdFerias(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref);
+  return Boolean(feriasRef && periodoRef && feriasRef === periodoRef);
+}
+
+function isAjusteDoPeriodo(ajuste, periodo) {
+  const periodoId = normalizarIdFerias(periodo?.id);
+  const ajustePeriodoId = normalizarIdFerias(ajuste?.periodo_aquisitivo_id);
+  if (periodoId && ajustePeriodoId) return ajustePeriodoId === periodoId;
+  const periodoRef = normalizarIdFerias(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref);
+  const ajusteRef = normalizarIdFerias(ajuste?.periodo_aquisitivo_ref || ajuste?.ano_referencia);
+  const militarId = normalizarIdFerias(periodo?.militar_id);
+  const ajusteMilitarId = normalizarIdFerias(ajuste?.militar_id);
+  return Boolean(periodoRef && ajusteRef && periodoRef === ajusteRef && (!militarId || !ajusteMilitarId || militarId === ajusteMilitarId));
+}
+
+function calcularDireitoOperacional(periodo, ajustes) {
+  const base = obterDiasBaseFerias(periodo);
+  let creditos = 0;
+  let debitos = 0;
+  (ajustes || []).forEach((a) => {
+    if (String(a?.status || '').trim().toLowerCase() !== STATUS_AJUSTE_ATIVO) return;
+    if (!isAjusteDoPeriodo(a, periodo)) return;
+    const dias = Math.max(0, toNumberFerias(a?.dias, 0));
+    const tipo = String(a?.tipo || '').trim().toLowerCase();
+    if (tipo === 'debito') debitos += dias;
+    else creditos += dias;
+  });
+  return base + creditos - debitos;
+}
+
+// Valida a soma projetada da família de Férias contra o direito operacional.
+// Lança erro com status 400 e code FERIAS_EXCEDEM_DIREITO_PERIODO quando excede.
+async function validarIntegridadeFamiliaFerias({ base44, operation, registroId, dataFinal, registroExistente, militarId }) {
+  const diasRegistro = Math.max(0, toNumberFerias(dataFinal?.dias, 0));
+
+  // Só valida quando há dias positivos (registros sem impacto não somam).
+  // O status do registro em si define impacto — se cancelado, não valida.
+  const statusRegistro = String(dataFinal?.status ?? registroExistente?.status ?? '').trim();
+  if (!STATUS_FERIAS_COM_IMPACTO.has(statusRegistro)) return;
+  if (diasRegistro <= 0) return;
+
+  const periodoId = normalizarIdFerias(dataFinal?.periodo_aquisitivo_id ?? registroExistente?.periodo_aquisitivo_id);
+  const periodoRef = normalizarIdFerias(dataFinal?.periodo_aquisitivo_ref ?? registroExistente?.periodo_aquisitivo_ref);
+  const alvoMilitarId = normalizarIdFerias(militarId);
+
+  // Resolve o período aquisitivo: prioridade por ID; fallback textual só para legado sem ID.
+  let periodo = null;
+  if (periodoId) {
+    periodo = await base44.asServiceRole.entities.PeriodoAquisitivo.get(periodoId).catch(() => null);
+  }
+  if (!periodo && !periodoId && periodoRef && alvoMilitarId) {
+    const lista = await base44.asServiceRole.entities.PeriodoAquisitivo
+      .filter({ militar_id: alvoMilitarId, ano_referencia: periodoRef }, undefined, 1, 0)
+      .catch(() => []);
+    periodo = (lista || [])[0] || null;
+  }
+  // Sem período resolvível não há como calcular o direito — não bloqueia (fallback seguro).
+  if (!periodo) return;
+
+  // Carrega ajustes e a família de férias do militar.
+  const [ajustes, feriasMilitar] = await Promise.all([
+    base44.asServiceRole.entities.AjusteSaldoFerias
+      .filter({ militar_id: alvoMilitarId }, undefined, 500, 0).catch(() => []),
+    base44.asServiceRole.entities.Ferias
+      .filter({ militar_id: alvoMilitarId }, undefined, 500, 0).catch(() => []),
+  ]);
+
+  const direitoOperacional = calcularDireitoOperacional(periodo, ajustes);
+
+  const idEmEdicao = operation === 'update' ? normalizarIdFerias(registroId) : null;
+  const diasExistentes = (feriasMilitar || [])
+    .filter((f) => f && isFeriasDoMesmoPeriodo(f, periodo))
+    .filter((f) => normalizarIdFerias(f.id) !== idEmEdicao)
+    .filter((f) => STATUS_FERIAS_COM_IMPACTO.has(String(f?.status || '').trim()))
+    .reduce((acc, f) => acc + Math.max(0, toNumberFerias(f?.dias, 0)), 0);
+
+  const totalProjetado = diasExistentes + diasRegistro;
+
+  if (totalProjetado > direitoOperacional) {
+    const erro = new Error(
+      `A soma das férias deste período ultrapassa o direito operacional disponível. ` +
+      `Já existem ${diasExistentes} dias cadastrados; com este registro, o total seria ${totalProjetado} dias, ` +
+      `mas o período permite ${direitoOperacional} dias.`
+    );
+    erro.status = 400;
+    erro.code = 'FERIAS_EXCEDEM_DIREITO_PERIODO';
+    erro.detalhes = {
+      dias_existentes: diasExistentes,
+      dias_registro: diasRegistro,
+      total_projetado: totalProjetado,
+      direito_operacional: direitoOperacional,
+    };
+    throw erro;
+  }
+}
 const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'PerfilPermissao',
   'UsuarioAcesso',
@@ -1210,6 +1342,20 @@ Deno.serve(async (req) => {
       dataValidada = await prepararTagCatalogo({ base44, operation, id: registroId, data, registroAtual: registroExistente });
     }
 
+    // ---- Barreira de integridade da família de Férias (autoridade final) ----
+    // Aplica-se a create/update de Ferias. Impede que a soma da família
+    // ultrapasse o direito operacional real do período (motor canônico).
+    if (entityName === 'Ferias' && (operation === 'create' || operation === 'update')) {
+      await validarIntegridadeFamiliaFerias({
+        base44,
+        operation,
+        registroId,
+        dataFinal: operation === 'update' ? { ...registroExistente, ...dataValidada } : dataValidada,
+        registroExistente,
+        militarId: militarAlvoId,
+      });
+    }
+
     // ---- Execução com service role ----
     const entity = getEntity(base44, entityName);
     let resultado = null;
@@ -1271,9 +1417,9 @@ Deno.serve(async (req) => {
       message: error?.message,
       status,
     });
-    return Response.json(
-      { error: error?.message || 'Erro interno em cudEscopado.' },
-      { status },
-    );
+    const body = { error: error?.message || 'Erro interno em cudEscopado.' };
+    if (error?.code) body.code = error.code;
+    if (error?.detalhes) body.detalhes = error.detalhes;
+    return Response.json(body, { status });
   }
 });

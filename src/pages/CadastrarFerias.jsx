@@ -176,9 +176,24 @@ export default function CadastrarFerias() {
   }) : null;
 
   const totalOperacionalDisponivel = Math.max(0, saldoOperacionalSelecionado?.saldo_restante ?? DIAS_BASE_PADRAO);
+  // Direito líquido operacional do período (dias_base + créditos - débitos), sem descontar as férias.
+  const direitoOperacional = saldoOperacionalSelecionado?.direito_liquido ?? DIAS_BASE_PADRAO;
   const somaFracoes = somarFracoes(fracoes);
-  const somaDivergente = !editId && !!periodoSelecionado && somaFracoes !== totalOperacionalDisponivel;
-  const temParcelaInvalida = !editId && fracoes.some((f) => Number(f?.dias) <= 0);
+
+  // Soma das férias válidas já existentes na família, excluindo o próprio registro em edição.
+  const STATUS_FERIAS_COM_IMPACTO = ['Gozada', 'Prevista', 'Autorizada', 'Em Curso', 'Interrompida'];
+  const somaFamiliaExistente = feriasExistentes
+    .filter((f) => (!editId || String(f?.id) !== String(editId)))
+    .filter((f) => String(f?.periodo_aquisitivo_ref || '') === String(formData.periodo_aquisitivo_ref || ''))
+    .filter((f) => STATUS_FERIAS_COM_IMPACTO.includes(String(f?.status || '').trim()))
+    .reduce((acc, f) => acc + Math.max(0, Number(f?.dias) || 0), 0);
+
+  const somaProjetadaFamilia = somaFamiliaExistente + somaFracoes;
+  // Criação: exige soma exata do disponível. Edição: bloqueia apenas quando ultrapassa o direito.
+  const somaDivergente = !!periodoSelecionado && (
+    editId ? somaProjetadaFamilia > direitoOperacional : somaFracoes !== totalOperacionalDisponivel
+  );
+  const temParcelaInvalida = fracoes.some((f) => Number(f?.dias) <= 0);
 
   const handleFracaoChange = (i, field, value) => {
     setFracoes(prev => {
@@ -260,14 +275,19 @@ export default function CadastrarFerias() {
       return;
     }
 
-    if (periodoSelecionado && !editId) {
-      const totalDiasSolicitados = somarFracoes(fracoes);
+    if (periodoSelecionado) {
       if (fracoes.some((item) => Number(item?.dias) <= 0)) {
         setErroRegras('Nenhuma fração pode ter zero ou menos dias. Ajuste a distribuição.');
         return;
       }
-      if (totalDiasSolicitados !== totalOperacionalDisponivel) {
-        setErroRegras(`A soma das frações (${totalDiasSolicitados}d) deve ser exatamente igual aos ${totalOperacionalDisponivel} dias disponíveis do período.`);
+      if (!editId) {
+        const totalDiasSolicitados = somarFracoes(fracoes);
+        if (totalDiasSolicitados !== totalOperacionalDisponivel) {
+          setErroRegras(`A soma das frações (${totalDiasSolicitados}d) deve ser exatamente igual aos ${totalOperacionalDisponivel} dias disponíveis do período.`);
+          return;
+        }
+      } else if (somaProjetadaFamilia > direitoOperacional) {
+        setErroRegras(`A soma das férias deste período ultrapassa o direito operacional. Já existem ${somaFamiliaExistente} dias na família; com este registro o total seria ${somaProjetadaFamilia} dias, mas o período permite ${direitoOperacional} dias.`);
         return;
       }
     }
