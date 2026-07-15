@@ -734,7 +734,13 @@ export default function RegistroLivroModal({
         const diasOperacionais = Number(resumo.dias || resumo.saldoUtilizavel || 0);
         const diasBaseGozo = Number(resumo.diasBase || 0);
 
-        registroPayload.dias = diasOperacionais;
+        // PARTE 1 — Persistência do evento de Início/Saída Férias.
+        // O campo `dias` do evento deve refletir a fração INICIADA (ferias.dias),
+        // nunca o direito operacional total do período (direito_liquido / diasOperacionais).
+        // Para a 1ª fração da Gleiciane: 15d, jamais 30d.
+        const diasFracaoInicio = Number(ferias.dias) > 0 ? Number(ferias.dias) : diasOperacionais;
+
+        registroPayload.dias = diasFracaoInicio;
         registroPayload.dias_base_gozo = diasBaseGozo;
         registroPayload.dias_extras_creditos = totaisGozo.dias_extras_creditos;
         registroPayload.dias_totais_gozo = diasOperacionais;
