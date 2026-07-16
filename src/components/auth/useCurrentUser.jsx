@@ -80,7 +80,10 @@ async function fetchUserPermissions(effectiveEmail) {
 
   if (payload?.error && !payload?.user) {
     const err = new Error(payload.error || 'Falha ao carregar permissões');
-    err.status = response?.status || 500;
+    err.status = response?.status || payload?.authError?.status || 500;
+    err.code = payload?.authError?.code || payload?.code || null;
+    err.stage = payload?.errorStage || null;
+    err.authError = payload?.authError || null;
     throw err;
   }
 
@@ -195,7 +198,7 @@ export function useCurrentUser() {
   });
 
   // Estados de erro/carregamento mapeados para a API antiga.
-  const isAuthError = isError && (error?.status === 401);
+  const isAuthError = isError && (error?.stage === 'AUTH_USER' || error?.status === 401 || error?.status === 403);
   const isPermissionsError = isError && !isAuthError;
   // hasUserButNoAccess: usuário autenticado mas sem registro de UsuarioAcesso
   // (cenário atendido pelo getUserPermissions que retorna 200 com acessos: [])
@@ -210,7 +213,13 @@ export function useCurrentUser() {
   const isAccessError = Boolean(isAuthError || isPermissionsError || hasUserButNoAccess);
   const isPermissionPartialError = false; // backend consolida tudo em uma chamada
   const shouldBlockAccessByPermissionError = false;
-  const permissionErrorMessage = isPermissionsError ? (error?.message || 'Falha ao carregar permissões.') : null;
+  const permissionErrorMessage = isAuthError
+    ? (error?.message || 'Falha ao carregar sessão/usuário autenticado.')
+    : isPermissionsError
+      ? (error?.message || 'Falha ao carregar perfil e permissões.')
+      : hasUserButNoAccess
+        ? 'Usuário autenticado sem registro válido em UsuarioAcesso.'
+        : null;
 
   const accessErrorDetails = {
     critical: {
@@ -379,6 +388,12 @@ export function useCurrentUser() {
         isLoading,
         isError,
         hasData: Boolean(user),
+        error: error ? {
+          message: error?.authError?.message || error?.message || null,
+          status: error?.authError?.status || error?.status || null,
+          code: error?.authError?.code || error?.code || null,
+          stage: error?.stage || null,
+        } : null,
       },
       auth: {
         isAuthenticated: Boolean(user),

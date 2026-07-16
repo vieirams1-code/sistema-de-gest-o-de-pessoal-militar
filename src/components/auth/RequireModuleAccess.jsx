@@ -38,6 +38,13 @@ export default function RequireModuleAccess({
     return null;
   }
 
+  const accessErrorMessage = permissionErrorMessage
+    || (accessErrorDetails?.critical?.auth
+      ? 'Falha ao carregar a sessão ou o usuário autenticado. Faça login novamente ou tente recarregar a página.'
+      : accessErrorDetails?.critical?.commonUserWithoutValidAccess
+        ? 'Usuário autenticado sem registro válido em UsuarioAcesso. Solicite a configuração de acesso.'
+        : 'Falha ao carregar perfil e permissões. Tente novamente.');
+
   if (isAccessError) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -47,7 +54,7 @@ export default function RequireModuleAccess({
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Erro de Permissões</h1>
           <p className="text-slate-500 text-sm leading-relaxed">
-            Erro ao carregar permissões. Tente novamente.
+            {accessErrorMessage}
           </p>
           <Button
             type="button"

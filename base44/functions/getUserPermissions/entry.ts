@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
 
 // =====================================================================
 // Constantes
@@ -58,6 +58,23 @@ async function fetchWithRetry(queryFn, label = 'query') {
 // =====================================================================
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
+
+function getErrorStatus(error) {
+    return error?.response?.status || error?.status || 500;
+}
+
+function getErrorCode(error) {
+    return error?.response?.data?.code || error?.data?.code || error?.code || null;
+}
+
+function sanitizeAuthError(error) {
+    return {
+        message: error?.message || 'Falha ao carregar usuário autenticado',
+        status: getErrorStatus(error),
+        code: getErrorCode(error),
+    };
+}
+
 
 // Extrai a matriz de permissões serializada no campo `descricao` de um
 // PerfilPermissao, no formato:
@@ -203,9 +220,35 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        const authUser = await base44.auth.me();
+        let authUser = null;
+        try {
+            authUser = await base44.auth.me();
+        } catch (authError) {
+            const sanitized = sanitizeAuthError(authError);
+            console.error('[getUserPermissions] falha ao carregar usuário autenticado:', sanitized);
+            return Response.json(
+                {
+                    error: sanitized.message,
+                    errorStage: 'AUTH_USER',
+                    authError: sanitized,
+                    acessos: [],
+                    perfis: {},
+                    modules: {},
+                    actions: {},
+                    scope: { tipo: 'erro', estruturaIds: [], militarId: null, reason: 'AUTH_USER_ERROR' },
+                    accessMode: 'restricted',
+                    permissionsResolvedAs: 'profiles',
+                    isImpersonating: false,
+                },
+                { status: sanitized.status || 401 }
+            );
+        }
         if (!authUser) {
-            return Response.json({ error: 'Não autenticado' }, { status: 401 });
+            return Response.json({
+                error: 'Não autenticado',
+                errorStage: 'AUTH_USER',
+                authError: { message: 'Não autenticado', status: 401, code: null },
+            }, { status: 401 });
         }
 
         // Lê payload opcional
@@ -360,7 +403,7 @@ Deno.serve(async (req) => {
             },
         });
     } catch (error) {
-        const status = error?.response?.status || error?.status || 500;
+        const status = getErrorStatus(error);
         console.error('[getUserPermissions] erro fatal:', {
             message: error?.message,
             status,
@@ -368,6 +411,8 @@ Deno.serve(async (req) => {
         return Response.json(
             {
                 error: error?.message || 'Erro interno ao buscar permissões',
+                errorStage: status === 401 || status === 403 ? 'AUTH_USER' : 'PERMISSIONS',
+                authError: status === 401 || status === 403 ? sanitizeAuthError(error) : null,
                 acessos: [],
                 perfis: {},
                 modules: {},
