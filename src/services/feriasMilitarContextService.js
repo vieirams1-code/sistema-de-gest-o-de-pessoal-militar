@@ -59,6 +59,7 @@ export function aplicarContextoMilitarNaFerias(ferias = {}, militar = null, { co
       militar_matricula_vinculo: matriculaRegistro,
     }, { contexto }),
     militar_mesclado: mesclado,
+    militar_status_cadastro: militar?.status_cadastro || null,
   };
 }
 

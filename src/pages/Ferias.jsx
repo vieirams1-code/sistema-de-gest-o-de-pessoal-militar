@@ -43,6 +43,7 @@ import {
   MessageSquareText,
   ChevronDown,
   ChevronUp,
+  Ban,
 } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import FamiliaFeriasPanel from '@/components/ferias/FamiliaFeriasPanel';
@@ -1538,20 +1539,23 @@ export default function Ferias() {
                         const tagsVisuais = feriasTagsVisuaisMap.get(String(f.id)) || [];
                         const tagsPreview = tagsVisuais.slice(0, 3);
                         const tagsOverflow = Math.max(0, tagsVisuais.length - 3);
-                        const hasDropdownActions =
+                        const militarInativo = f.militar_status_cadastro === 'Inativo';
+                        const hasDropdownActions = !militarInativo && (
                           (canLancarInicioFerias && (f.status === 'Prevista' || f.status === 'Autorizada')) ||
                           (canContinuarFerias && f.status === 'Interrompida') ||
                           ((canLancarRetornoFerias || canInterromperFerias) && f.status === 'Em Curso') ||
-                          (f.status !== 'Gozada' && (canAlterarDataInicioFerias || canEditarFerias || canAccessAction('excluir_ferias')));
+                          (f.status !== 'Gozada' && (canAlterarDataInicioFerias || canEditarFerias || canAccessAction('excluir_ferias')))
+                        );
 
                         return (
                           <tr
                             key={f.id}
-                            className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                            className={`border-b border-slate-50 transition-colors ${militarInativo ? 'bg-slate-100/60 opacity-60 hover:bg-slate-100/80' : 'hover:bg-slate-50'}`}
                           >
                             <td className="px-4 py-3">
                               <input
                                 type="checkbox"
+                                disabled={militarInativo}
                                 checked={selectedFeriasIds.includes(String(f.id))}
                                 onChange={(e) => setSelectedFeriasIds((prev) => e.target.checked ? [...new Set([...prev, String(f.id)])] : prev.filter((id) => id !== String(f.id)))}
                               />
@@ -1584,7 +1588,13 @@ export default function Ferias() {
                               {f.militar_mesclado && (
                                 <p className="text-[11px] text-amber-700">Registro vinculado a militar mesclado (somente histórico documental).</p>
                               )}
-                            </td>
+                              {militarInativo && (
+                                <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-medium text-slate-500">
+                                  <Ban className="w-3 h-3" />
+                                  Militar inativo — registro preservado para histórico
+                                </span>
+                              )}
+                              </td>
                             <td className="px-4 py-3 text-slate-700">
                               {tagsVisuais.length === 0 ? (
                                 <span className="text-slate-300">—</span>
@@ -1622,7 +1632,7 @@ export default function Ferias() {
                             <td className="px-4 py-3 text-slate-700">
                               <div className="flex items-center gap-1 group">
                                 <span>{formatDate(f.data_inicio)}</span>
-                                {f.status !== 'Gozada' && canAlterarDataInicioFerias && (
+                                {f.status !== 'Gozada' && canAlterarDataInicioFerias && !militarInativo && (
                                   <button
                                     className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-[#1e3a5f]"
                                     title="Alterar data de início"
