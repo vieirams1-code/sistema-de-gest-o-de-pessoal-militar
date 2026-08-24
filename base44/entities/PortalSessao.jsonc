@@ -1,0 +1,101 @@
+{
+  "name": "PortalSessao",
+  "type": "object",
+  "title": "Sessão do Portal do Militar",
+  "description": "Armazena desafios de autenticação, hashes de tokens e sessões ativas do Portal do Militar.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar vinculado à sessão"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "CRIADA_AGUARDANDO_OTP",
+        "ATIVA",
+        "REVOGADA",
+        "EXPIRADA"
+      ],
+      "default": "CRIADA_AGUARDANDO_OTP",
+      "description": "Estado atual do ciclo de vida da sessão"
+    },
+    "token_hash": {
+      "type": "string",
+      "description": "SHA-256 do PortalToken. O token em texto puro NUNCA é persistido."
+    },
+    "token_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora limite de expiração do token"
+    },
+    "otp_hash": {
+      "type": "string",
+      "description": "Hash criptográfico do código OTP. O código em claro NUNCA é persistido."
+    },
+    "otp_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora limite de validade do OTP"
+    },
+    "otp_attempts": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de tentativas consecutivas de validação do OTP"
+    },
+    "otp_blocked_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora até a qual tentativas de OTP estão bloqueadas por excesso de falhas"
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da última atividade registrada (para cálculo de idle timeout)"
+    },
+    "absolute_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de expiração absoluta e irrevogável da sessão"
+    },
+    "revogada_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora em que a sessão foi revogada (se aplicável)"
+    },
+    "motivo_revogacao": {
+      "type": "string",
+      "description": "Motivo do encerramento precoce da sessão"
+    },
+    "ip_criacao": {
+      "type": "string",
+      "description": "IP de origem durante a criação da sessão (para fins de auditoria)"
+    },
+    "user_agent_criacao": {
+      "type": "string",
+      "description": "User-Agent do cliente no momento da criação"
+    },
+    "ip_ultima_atividade": {
+      "type": "string",
+      "description": "IP registrado na última requisição autorizada"
+    },
+    "user_agent_ultima_atividade": {
+      "type": "string",
+      "description": "User-Agent registrado na última requisição autorizada"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de criação da sessão"
+    }
+  },
+  "required": [
+    "status",
+    "created_at"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
