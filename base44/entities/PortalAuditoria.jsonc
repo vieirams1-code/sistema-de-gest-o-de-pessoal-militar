@@ -1,0 +1,83 @@
+{
+  "name": "PortalAuditoria",
+  "type": "object",
+  "title": "Auditoria do Portal do Militar",
+  "description": "Trilha de auditoria e segurança para todos os eventos e requisições do Portal do Militar.",
+  "properties": {
+    "sessao_id": {
+      "type": "string",
+      "description": "ID da sessão relacionada ao evento (se houver)"
+    },
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar identificado (opcional: ausente em eventos pré-autenticação)"
+    },
+    "identificador_informado_sanitizado": {
+      "type": "string",
+      "description": "Identificador truncado/mascarado informado no login (nunca CPF completo)"
+    },
+    "acao": {
+      "type": "string",
+      "enum": [
+        "LOGIN_SOLICITADO",
+        "LOGIN_FALHA_OTP",
+        "LOGIN_FALHA_BLOQUEIO",
+        "LOGIN_SUCESSO",
+        "PORTAL_GET_ME",
+        "SESSAO_EXPIRADA",
+        "SESSAO_REVOGADA",
+        "LOGOUT",
+        "ERRO_SEGURANCA"
+      ],
+      "description": "Tipo de ação ou evento de segurança auditado"
+    },
+    "resultado": {
+      "type": "boolean",
+      "description": "True se a operação foi bem-sucedida, false em caso de falha ou bloqueio"
+    },
+    "motivo_falha_sanitizado": {
+      "type": "string",
+      "description": "Descrição sanitizada do motivo de erro ou recusa"
+    },
+    "ip_origem": {
+      "type": "string",
+      "description": "IP de origem da requisição"
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "User-Agent do cliente"
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Identificador de correlação único da requisição para rastreabilidade"
+    },
+    "recurso_tipo": {
+      "type": "string",
+      "description": "Tipo do recurso acessado (ex: Militar, Tarefa)"
+    },
+    "recurso_id": {
+      "type": "string",
+      "description": "ID do recurso manipulado"
+    },
+    "metadata_sanitizada": {
+      "type": "string",
+      "description": "JSON string contendo metadados sanitizados (sem segredos ou dados pessoais integrais)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp do evento"
+    }
+  },
+  "required": [
+    "acao",
+    "resultado",
+    "created_at"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

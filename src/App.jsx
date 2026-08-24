@@ -14,6 +14,7 @@ import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 import DescontosFerias from '@/pages/DescontosFerias';
+import PortalApp from '@/portal/PortalApp';
 
 const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
@@ -262,19 +263,27 @@ const AuthenticatedApp = () => {
 
 
 function App() {
-
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <NavigationTracker />
-          <AuthenticatedApp />
-        </Router>
+    <QueryClientProvider client={queryClientInstance}>
+      <Router>
+        <NavigationTracker />
+        <Routes>
+          <Route path="/portal/*" element={<PortalApp />} />
+          <Route path="/portal" element={<PortalApp />} />
+          <Route
+            path="/*"
+            element={
+              <AuthProvider>
+                <AuthenticatedApp />
+              </AuthProvider>
+            }
+          />
+        </Routes>
         <Toaster />
         <VisualEditAgent />
-      </QueryClientProvider>
-    </AuthProvider>
-  )
+      </Router>
+    </QueryClientProvider>
+  );
 }
 
-export default App
+export default App;
