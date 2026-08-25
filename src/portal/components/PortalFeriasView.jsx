@@ -85,6 +85,10 @@ export default function PortalFeriasView({ onBack }) {
         } catch (_err) {}
       } else {
         setIsEditing(true);
+        setMesOpcao1('01');
+        setMesOpcao2('07');
+        setMesOpcao3('10');
+        setModalidade('2_ETAPAS_15');
       }
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao carregar dados do plano de férias.');

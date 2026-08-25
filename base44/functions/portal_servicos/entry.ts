@@ -331,7 +331,16 @@ export default async function (req: Request): Promise<Response> {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
           }
           await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
-          return new Response(JSON.stringify({ ok: true, message: 'Campanha excluída com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+          // Remove também todas as opções que foram registradas para essa campanha específica
+          try {
+            const opcoesDaCampanha = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id });
+            for (const op of (opcoesDaCampanha || [])) {
+              await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
+            }
+          } catch (_eDelOp) {}
+
+          return new Response(JSON.stringify({ ok: true, message: 'Campanha e opções associadas excluídas com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
 
         // Arquivar Campanha
@@ -407,23 +416,28 @@ export default async function (req: Request): Promise<Response> {
               todasCampanhasPortal = [];
             }
             const campanhasFerias = (todasCampanhasPortal || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS');
+            const campanhasIdsValidos = new Set(campanhasFerias.map((c: any) => c.id));
 
-            // 2. Busca opções de férias
+            // 2. Busca opções de férias de forma estritamente isolada pela campanha
             let opcoes: any[] = [];
             if (payload.campanha_id) {
-              opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id: payload.campanha_id });
-              if (!opcoes || opcoes.length === 0) {
-                // Fallback por ano para registros antigos sem campanha_id explícito
-                const campSelected = campanhasFerias.find((c: any) => c.id === payload.campanha_id);
-                if (campSelected?.ano_referencia) {
-                  opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: campSelected.ano_referencia });
+              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+              opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === payload.campanha_id);
+            } else if (campanhasFerias.length > 0) {
+              const primeiraCamp = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0];
+              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+              opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === primeiraCamp.id);
+            }
+
+            // 3. Purga opções órfãs de campanhas que foram excluídas
+            try {
+              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+              for (const op of (allOpcoes || [])) {
+                if (op.campanha_id && !campanhasIdsValidos.has(op.campanha_id)) {
+                  await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
                 }
               }
-            } else if (payload.ano_referencia) {
-              opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: Number(payload.ano_referencia) });
-            } else {
-              opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-            }
+            } catch (_ePurge) {}
 
             // Rotina de reparo/sincronização automática para férias já geradas
             try {
@@ -879,13 +893,15 @@ export default async function (req: Request): Promise<Response> {
           saldo_disponivel: Math.max(0, (p.dias_direito || 30) - (p.dias_gozados || 0)),
         }));
 
-        // Busca opção de férias já enviada pelo militar para esta campanha
+        // Busca opção de férias já enviada pelo militar para esta campanha específica
         let opcoesEnviadas: any[] = [];
         try {
-          opcoesEnviadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-            militar_id: militarId,
-            ano_referencia: anoCampanha,
-          });
+          if (campanhaFeriasAtiva?.id) {
+            opcoesEnviadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+              militar_id: militarId,
+              campanha_id: campanhaFeriasAtiva.id,
+            });
+          }
         } catch (_e) {}
 
         return new Response(JSON.stringify({
@@ -914,7 +930,9 @@ export default async function (req: Request): Promise<Response> {
 
       case 'FERIAS_SUBMETER_OPCAO': {
         const { periodo_aquisitivo_id, modalidade, opcao_1, opcao_2, opcao_3 } = payload;
-        const anoCampanha = payload.ano_referencia || (new Date().getFullYear() + 1);
+        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
+        const campanhaId = payload.campanha_id || campanhaFeriasAtiva?.id || null;
+        const anoCampanha = payload.ano_referencia || campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
         if (!periodo_aquisitivo_id || !opcao_1?.parcelas?.length || !opcao_2?.parcelas?.length || !opcao_3?.parcelas?.length) {
           return new Response(JSON.stringify({ error: 'É obrigatório preencher as 3 opções de preferências de meses.' }), {
@@ -931,12 +949,16 @@ export default async function (req: Request): Promise<Response> {
           });
         }
 
-        const existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-          militar_id: militarId,
-          ano_referencia: anoCampanha,
-        });
+        let existentes: any[] = [];
+        if (campanhaId) {
+          existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+            militar_id: militarId,
+            campanha_id: campanhaId,
+          });
+        }
 
         const opcaoPayload = {
+          campanha_id: campanhaId,
           ano_referencia: anoCampanha,
           militar_id: militarId,
           militar_nome: militar.nome_completo || militar.nome_guerra || '',
