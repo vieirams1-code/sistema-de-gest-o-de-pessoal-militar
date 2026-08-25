@@ -1,0 +1,97 @@
+{
+  "name": "CampanhaPortal",
+  "type": "object",
+  "title": "Campanha de Ação do Portal do Militar",
+  "description": "Orquestração de campanhas de férias e atualização cadastral lançadas pelos gestores por escopo e prazo.",
+  "properties": {
+    "tipo": {
+      "type": "string",
+      "enum": ["PLANO_FERIAS", "ATUALIZACAO_CADASTRAL", "CONFERENCIA_GERAL"],
+      "description": "Tipo da ação atribuída ao militar"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "Título da campanha (ex: Plano Anual de Férias 2027)"
+    },
+    "ano_referencia": {
+      "type": "number",
+      "description": "Ano de referência (ex: 2027)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Rascunho", "Aberta_Coleta", "Em_Homologacao", "Homologada", "Encerrada"],
+      "default": "Aberta_Coleta"
+    },
+    "tipo_escopo": {
+      "type": "string",
+      "enum": ["TODOS", "UNIDADES", "SELECAO_MILITARES", "QUADROS"],
+      "default": "TODOS",
+      "description": "Forma de seleção do público-alvo"
+    },
+    "escopo_unidades_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lista de IDs das unidades/lotações incluídas"
+    },
+    "escopo_unidades_nomes": {
+      "type": "string",
+      "description": "Nomes das unidades para exibição resumida"
+    },
+    "escopo_militares_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lista de IDs de militares específicos incluídos"
+    },
+    "escopo_quadros": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de início da campanha"
+    },
+    "data_fim_militar": {
+      "type": "string",
+      "format": "date",
+      "description": "Prazo limite para o militar responder no portal"
+    },
+    "data_fim_unidade": {
+      "type": "string",
+      "format": "date",
+      "description": "Prazo para homologação pelos gestores da unidade"
+    },
+    "instrucoes": {
+      "type": "string",
+      "description": "Orientações aos militares exibidas no portal"
+    },
+    "config_regras": {
+      "type": "string",
+      "description": "JSON com regras personalizadas da campanha"
+    },
+    "total_publico_alvo": {
+      "type": "number",
+      "default": 0
+    },
+    "total_respondidos": {
+      "type": "number",
+      "default": 0
+    },
+    "total_pendentes": {
+      "type": "number",
+      "default": 0
+    },
+    "criado_por_nome": {
+      "type": "string"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["tipo", "titulo", "status"]
+}

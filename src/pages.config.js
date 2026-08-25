@@ -125,6 +125,7 @@ import CursosFormacao from './pages/CursosFormacao';
 import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
 import PainelPlanoFerias from './pages/PainelPlanoFerias';
+import GerirCampanhasPortal from './pages/GerirCampanhasPortal';
 import Portal from './pages/Portal';
 import PortalFerias from './pages/PortalFerias';
 import PortalCadastro from './pages/PortalCadastro';
@@ -132,6 +133,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "GerirCampanhasPortal": GerirCampanhasPortal,
     "Portal": Portal,
     "PortalFerias": PortalFerias,
     "PortalCadastro": PortalCadastro,

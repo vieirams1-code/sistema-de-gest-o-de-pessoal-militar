@@ -35,6 +35,7 @@ const adminOnlyPages = new Set([
   'DiagnosticoSaldoFerias',
   'ConfiguracoesPortal',
   'PainelPlanoFerias',
+  'GerirCampanhasPortal',
 ]);
 
 

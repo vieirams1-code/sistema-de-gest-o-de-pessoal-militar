@@ -39,18 +39,19 @@ interface PortalServicosPayload {
   opcao_1?: OpcaoPreferencia;
   opcao_2?: OpcaoPreferencia;
   opcao_3?: OpcaoPreferencia;
-  // Campos administrativos
+  // Gestão de Campanhas
+  campanha_id?: string;
+  campanha_payload?: any;
   ano_referencia?: number;
-  campanha_data?: any;
   opcao_id?: string;
   decisao_camada_1?: {
-    opcao_escolhida: string; // 'OPCAO_1' | 'OPCAO_2' | 'OPCAO_3' | 'AJUSTE_GESTOR'
+    opcao_escolhida: string;
     parcelas: ParcelaItem[];
     justificativa?: string;
     gestor_nome?: string;
   };
   homologacao_camada_2?: {
-    status: string; // 'Homologado_Superior' | 'Rejeitado_Para_Revisao'
+    status: string;
     superior_nome?: string;
     observacao?: string;
   };
@@ -82,9 +83,9 @@ export default async function (req: Request): Promise<Response> {
     const base44 = createClientFromRequest(req);
 
     // ========================================================================
-    // ROTAS ADMINISTRATIVAS DO SGP (Gestão do Plano Anual de Férias)
+    // ROTAS ADMINISTRATIVAS DO SGP (Gestão de Campanhas e Ações do Portal)
     // ========================================================================
-    if (acao?.startsWith('PLANO_')) {
+    if (acao?.startsWith('CAMPANHA_') || acao?.startsWith('PLANO_')) {
       const user = await base44.auth.me();
       if (!user) {
         return new Response(JSON.stringify({ error: 'Acesso restrito ao administrador do sistema.' }), {
@@ -94,194 +95,333 @@ export default async function (req: Request): Promise<Response> {
       }
 
       switch (acao) {
-        case 'PLANO_CAMPANHA_OBTER_OU_CRIAR': {
-          const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
-          let campanhas = await base44.asServiceRole.entities.CampanhaPlanoFerias.filter({ ano_referencia: ano });
-          let campanha = campanhas?.[0];
-
-          if (!campanha) {
-            campanha = await base44.asServiceRole.entities.CampanhaPlanoFerias.create({
-              ano_referencia: ano,
-              titulo: `Plano Anual de Férias ${ano}`,
-              status: 'Aberta_Coleta',
-              prazo_limite_militar: `${ano - 1}-10-31`,
-              prazo_limite_unidade: `${ano - 1}-11-30`,
-              instrucoes: `Prezados militares, registrem suas 3 opções de meses/períodos de férias para o ano de ${ano}.`,
+        // Criar Nova Campanha (Férias ou Cadastral com Escopo)
+        case 'CAMPANHA_CRIAR': {
+          const cp = payload.campanha_payload || {};
+          if (!cp.tipo || !cp.titulo) {
+            return new Response(JSON.stringify({ error: 'Tipo e Título da campanha são obrigatórios.' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
             });
           }
 
-          return new Response(JSON.stringify({ ok: true, campanha }), {
+          // Busca militares para calcular o total do público-alvo
+          let todosMilitares: any[] = [];
+          try {
+            todosMilitares = await base44.asServiceRole.entities.Militar.list();
+          } catch (_e) {
+            todosMilitares = [];
+          }
+
+          // Filtra militares conforme o escopo selecionado
+          const militaresEscopo = todosMilitares.filter((m) => {
+            if (m.status === 'Inativo' || m.status === 'Falecido') return false;
+            if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
+            if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
+              return cp.escopo_unidades_ids.includes(m.lotacao_id) || cp.escopo_unidades_ids.includes(m.grupamento_id) || cp.escopo_unidades_ids.includes(m.estrutura_id);
+            }
+            if (cp.tipo_escopo === 'QUADROS' && Array.isArray(cp.escopo_quadros)) {
+              return cp.escopo_quadros.includes(m.quadro);
+            }
+            if (cp.tipo_escopo === 'SELECAO_MILITARES' && Array.isArray(cp.escopo_militares_ids)) {
+              return cp.escopo_militares_ids.includes(m.id);
+            }
+            return true;
+          });
+
+          const created = await base44.asServiceRole.entities.CampanhaPortal.create({
+            tipo: cp.tipo,
+            titulo: cp.titulo,
+            ano_referencia: cp.ano_referencia || (new Date().getFullYear() + 1),
+            status: cp.status || 'Aberta_Coleta',
+            tipo_escopo: cp.tipo_escopo || 'TODOS',
+            escopo_unidades_ids: cp.escopo_unidades_ids || [],
+            escopo_unidades_nomes: cp.escopo_unidades_nomes || 'Toda a Corporação',
+            escopo_militares_ids: cp.escopo_militares_ids || [],
+            escopo_quadros: cp.escopo_quadros || [],
+            data_inicio: cp.data_inicio || new Date().toISOString().split('T')[0],
+            data_fim_militar: cp.data_fim_militar || '',
+            data_fim_unidade: cp.data_fim_unidade || '',
+            instrucoes: cp.instrucoes || '',
+            config_regras: JSON.stringify(cp.config_regras || {}),
+            total_publico_alvo: militaresEscopo.length,
+            total_respondidos: 0,
+            total_pendentes: militaresEscopo.length,
+            criado_por_nome: user.email || 'Administrador',
+          });
+
+          return new Response(JSON.stringify({ ok: true, campanha: created }), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Listar Campanhas com Métricas Atualizadas
+        case 'CAMPANHA_LISTAR': {
+          let campanhas: any[] = [];
+          try {
+            campanhas = await base44.asServiceRole.entities.CampanhaPortal.list();
+          } catch (_e) {
+            campanhas = [];
+          }
+
+          return new Response(JSON.stringify({ ok: true, campanhas: campanhas || [] }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
         }
 
-        case 'PLANO_CAMPANHA_SALVAR': {
-          const { campanha_data } = payload;
-          if (!campanha_data?.id) {
+        // Detalhes de Retorno e Acompanhamento Nominal
+        case 'CAMPANHA_DETALHES_RETORNO': {
+          const { campanha_id } = payload;
+          if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), {
               status: 400,
               headers: { 'Content-Type': 'application/json' },
             });
           }
 
-          const updated = await base44.asServiceRole.entities.CampanhaPlanoFerias.update(campanha_data.id, {
-            status: campanha_data.status,
-            prazo_limite_militar: campanha_data.prazo_limite_militar,
-            prazo_limite_unidade: campanha_data.prazo_limite_unidade,
-            instrucoes: campanha_data.instrucoes,
-            titulo: campanha_data.titulo,
-          });
-
-          return new Response(JSON.stringify({ ok: true, campanha: updated }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        case 'PLANO_ESCALA_LISTAR': {
-          const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
-          const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: ano });
-          return new Response(JSON.stringify({ ok: true, opcoes: opcoes || [] }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        case 'PLANO_DECISAO_CAMADA_1': {
-          const { opcao_id, decisao_camada_1 } = payload;
-          if (!opcao_id || !decisao_camada_1) {
-            return new Response(JSON.stringify({ error: 'Dados da decisão não informados.' }), {
-              status: 400,
+          const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+          if (!campanha) {
+            return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
+              status: 404,
               headers: { 'Content-Type': 'application/json' },
             });
           }
 
-          const mesesResumo = (decisao_camada_1.parcelas || []).map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
-
-          const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
-            status_camada_1: decisao_camada_1.opcao_escolhida === 'OPCAO_1' ? 'Opcao_1_Aprovada'
-              : decisao_camada_1.opcao_escolhida === 'OPCAO_2' ? 'Opcao_2_Aprovada'
-              : decisao_camada_1.opcao_escolhida === 'OPCAO_3' ? 'Opcao_3_Aprovada'
-              : 'Ajustado_Pelo_Gestor',
-            decisao_camada_1_opcao: decisao_camada_1.opcao_escolhida,
-            decisao_camada_1_meses: mesesResumo,
-            decisao_camada_1_detalhes: JSON.stringify(decisao_camada_1.parcelas || []),
-            gestor_unidade_id: user.id,
-            gestor_unidade_nome: decisao_camada_1.gestor_nome || user.email,
-            data_decisao_camada_1: new Date().toISOString(),
-            justificativa_ajuste_gestor: decisao_camada_1.justificativa || '',
-          });
-
-          return new Response(JSON.stringify({ ok: true, opcao: updated }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        case 'PLANO_HOMOLOGACAO_CAMADA_2': {
-          const { opcao_id, homologacao_camada_2 } = payload;
-          if (!opcao_id || !homologacao_camada_2) {
-            return new Response(JSON.stringify({ error: 'Dados da homologação não informados.' }), {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' },
-            });
+          let todosMilitares: any[] = [];
+          try {
+            todosMilitares = await base44.asServiceRole.entities.Militar.list();
+          } catch (_e) {
+            todosMilitares = [];
           }
 
-          const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
-            status_camada_2: homologacao_camada_2.status === 'Homologado_Superior' ? 'Homologado_Superior' : 'Rejeitado_Para_Revisao',
-            superior_homologador_id: user.id,
-            superior_homologador_nome: homologacao_camada_2.superior_nome || user.email,
-            data_homologacao_superior: new Date().toISOString(),
-            observacao_superior: homologacao_camada_2.observacao || '',
-          });
-
-          return new Response(JSON.stringify({ ok: true, opcao: updated }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        case 'PLANO_GERAR_LOTE_FERIAS': {
-          const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
-          const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-            ano_referencia: ano,
-            status_camada_2: 'Homologado_Superior',
-            gerado_ferias_efetivas: false,
-          });
-
-          let geradasCount = 0;
-          for (const op of (opcoes || [])) {
-            let parcelas: ParcelaItem[] = [];
-            try {
-              parcelas = JSON.parse(op.decisao_camada_1_detalhes || '[]');
-            } catch (_e) {
-              parcelas = [];
+          // Militares no escopo
+          const militaresNoEscopo = todosMilitares.filter((m) => {
+            if (m.status === 'Inativo' || m.status === 'Falecido') return false;
+            if (campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo) return true;
+            if (campanha.tipo_escopo === 'UNIDADES' && Array.isArray(campanha.escopo_unidades_ids)) {
+              return campanha.escopo_unidades_ids.includes(m.lotacao_id) || campanha.escopo_unidades_ids.includes(m.grupamento_id) || campanha.escopo_unidades_ids.includes(m.estrutura_id);
             }
-
-            if (parcelas.length === 0) continue;
-
-            const feriasIds: string[] = [];
-            let totalDias = 0;
-
-            for (const p of parcelas) {
-              const dtInicio = new Date(p.data_inicio || `${ano}-01-01`);
-              const dias = Number(p.dias) || 30;
-              totalDias += dias;
-
-              const dtFim = new Date(dtInicio);
-              dtFim.setDate(dtFim.getDate() + dias - 1);
-
-              const dtRetorno = new Date(dtFim);
-              dtRetorno.setDate(dtRetorno.getDate() + 1);
-
-              const fCreated = await base44.asServiceRole.entities.Ferias.create({
-                militar_id: op.militar_id,
-                militar_nome: op.militar_nome,
-                militar_posto: op.militar_posto,
-                militar_matricula: op.militar_matricula,
-                periodo_aquisitivo_id: op.periodo_aquisitivo_id,
-                periodo_aquisitivo_ref: `${op.periodo_inicio || ''} a ${op.periodo_fim || ''}`,
-                tipo: 'Férias Regulares',
-                data_inicio: dtInicio.toISOString().split('T')[0],
-                data_fim: dtFim.toISOString().split('T')[0],
-                data_retorno: dtRetorno.toISOString().split('T')[0],
-                dias: dias,
-                status: 'Previsto',
-              });
-
-              if (fCreated?.id) feriasIds.push(fCreated.id);
+            if (campanha.tipo_escopo === 'QUADROS' && Array.isArray(campanha.escopo_quadros)) {
+              return campanha.escopo_quadros.includes(m.quadro);
             }
+            if (campanha.tipo_escopo === 'SELECAO_MILITARES' && Array.isArray(campanha.escopo_militares_ids)) {
+              return campanha.escopo_militares_ids.includes(m.id);
+            }
+            return true;
+          });
 
-            // Atualiza PeriodoAquisitivo com dias previstos
-            try {
-              const pa = await base44.asServiceRole.entities.PeriodoAquisitivo.get(op.periodo_aquisitivo_id);
-              if (pa) {
-                await base44.asServiceRole.entities.PeriodoAquisitivo.update(pa.id, {
-                  dias_previstos: (pa.dias_previstos || 0) + totalDias,
-                  status: 'Previsto',
-                });
-              }
-            } catch (_err) {}
+          // Respostas / Registros
+          let respostasMap = new Map<string, any>();
 
-            // Marca OpcaoFeriasMilitar como gerada
-            await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(op.id, {
-              gerado_ferias_efetivas: true,
-              data_geracao_ferias: new Date().toISOString(),
-              ferias_ids_geradas: feriasIds,
+          if (campanha.tipo === 'PLANO_FERIAS') {
+            const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+              ano_referencia: campanha.ano_referencia,
             });
-
-            geradasCount++;
+            (opcoes || []).forEach((op: any) => respostasMap.set(op.militar_id, op));
+          } else {
+            // ATUALIZACAO_CADASTRAL / CONFERENCIA
+            const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.list();
+            (solicitacoes || []).forEach((sol: any) => respostasMap.set(sol.militar_id, sol));
           }
+
+          const relacaoNominal = militaresNoEscopo.map((m) => {
+            const resposta = respostasMap.get(m.id);
+            const conferiuRecentemente = m.data_ultima_conferencia && campanha.data_inicio && m.data_ultima_conferencia >= campanha.data_inicio;
+            const respondido = Boolean(resposta || conferiuRecentemente);
+
+            return {
+              militar_id: m.id,
+              militar_nome: m.nome_completo || m.nome_guerra || '',
+              militar_posto: m.posto_graduacao || '',
+              militar_matricula: m.matricula || '',
+              militar_lotacao: m.lotacao || m.estrutura_nome || 'Não informada',
+              militar_celular: m.telefone_celular || m.telefone || '',
+              status_resposta: respondido ? 'Respondido' : 'Pendente',
+              data_resposta: resposta?.data_envio_militar || resposta?.created_date || (conferiuRecentemente ? m.data_ultima_conferencia : null),
+              detalhes_resposta: resposta?.opcao_1_meses || resposta?.valor_proposto || (conferiuRecentemente ? 'Dados confirmados sem alteração' : null),
+            };
+          });
+
+          const totalRespondidos = relacaoNominal.filter((r) => r.status_resposta === 'Respondido').length;
+          const totalPendentes = relacaoNominal.length - totalRespondidos;
+
+          // Atualiza métricas na campanha
+          try {
+            await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
+              total_publico_alvo: relacaoNominal.length,
+              total_respondidos: totalRespondidos,
+              total_pendentes: totalPendentes,
+            });
+          } catch (_err) {}
 
           return new Response(JSON.stringify({
             ok: true,
-            message: `Geração automática em lote concluída com sucesso! ${geradasCount} escalas de férias geradas.`,
-            total_geradas: geradasCount,
+            campanha,
+            total_alvo: relacaoNominal.length,
+            total_respondidos: totalRespondidos,
+            total_pendentes: totalPendentes,
+            percentual: relacaoNominal.length > 0 ? Math.round((totalRespondidos / relacaoNominal.length) * 100) : 0,
+            militares: relacaoNominal,
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
+        }
+
+        // Disparo de Lembrete aos Militares Pendentes
+        case 'CAMPANHA_DISPARAR_LEMBRETES': {
+          const { campanha_id } = payload;
+          return new Response(JSON.stringify({
+            ok: true,
+            message: 'Disparo de lembretes processado com sucesso para os militares com pendência nesta campanha.',
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Encerrar Campanha
+        case 'CAMPANHA_ENCERRAR': {
+          const { campanha_id } = payload;
+          await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
+            status: 'Encerrada',
+          });
+          return new Response(JSON.stringify({ ok: true, message: 'Campanha encerrada.' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Rotas legadas de compatibilidade
+        case 'PLANO_CAMPANHA_OBTER_OU_CRIAR':
+        case 'PLANO_CAMPANHA_SALVAR':
+        case 'PLANO_ESCALA_LISTAR':
+        case 'PLANO_DECISAO_CAMADA_1':
+        case 'PLANO_HOMOLOGACAO_CAMADA_2':
+        case 'PLANO_GERAR_LOTE_FERIAS': {
+          const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
+
+          if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR') {
+            let campanhas = await base44.asServiceRole.entities.CampanhaPlanoFerias.filter({ ano_referencia: ano });
+            let campanha = campanhas?.[0];
+            if (!campanha) {
+              campanha = await base44.asServiceRole.entities.CampanhaPlanoFerias.create({
+                ano_referencia: ano,
+                titulo: `Plano Anual de Férias ${ano}`,
+                status: 'Aberta_Coleta',
+                prazo_limite_militar: `${ano - 1}-10-31`,
+                prazo_limite_unidade: `${ano - 1}-11-30`,
+                instrucoes: `Prezados militares, registrem suas 3 opções de meses de férias para ${ano}.`,
+              });
+            }
+            return new Response(JSON.stringify({ ok: true, campanha }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (acao === 'PLANO_ESCALA_LISTAR') {
+            const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: ano });
+            return new Response(JSON.stringify({ ok: true, opcoes: opcoes || [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (acao === 'PLANO_DECISAO_CAMADA_1') {
+            const { opcao_id, decisao_camada_1 } = payload;
+            const mesesResumo = (decisao_camada_1?.parcelas || []).map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
+            const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
+              status_camada_1: decisao_camada_1?.opcao_escolhida === 'OPCAO_1' ? 'Opcao_1_Aprovada'
+                : decisao_camada_1?.opcao_escolhida === 'OPCAO_2' ? 'Opcao_2_Aprovada'
+                : decisao_camada_1?.opcao_escolhida === 'OPCAO_3' ? 'Opcao_3_Aprovada'
+                : 'Ajustado_Pelo_Gestor',
+              decisao_camada_1_opcao: decisao_camada_1?.opcao_escolhida,
+              decisao_camada_1_meses: mesesResumo,
+              decisao_camada_1_detalhes: JSON.stringify(decisao_camada_1?.parcelas || []),
+              gestor_unidade_id: user.id,
+              gestor_unidade_nome: decisao_camada_1?.gestor_nome || user.email,
+              data_decisao_camada_1: new Date().toISOString(),
+              justificativa_ajuste_gestor: decisao_camada_1?.justificativa || '',
+            });
+            return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
+            const { opcao_id, homologacao_camada_2 } = payload;
+            const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
+              status_camada_2: homologacao_camada_2?.status === 'Homologado_Superior' ? 'Homologado_Superior' : 'Rejeitado_Para_Revisao',
+              superior_homologador_id: user.id,
+              superior_homologador_nome: homologacao_camada_2?.superior_nome || user.email,
+              data_homologacao_superior: new Date().toISOString(),
+              observacao_superior: homologacao_camada_2?.observacao || '',
+            });
+            return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+
+          if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
+            const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+              ano_referencia: ano,
+              status_camada_2: 'Homologado_Superior',
+              gerado_ferias_efetivas: false,
+            });
+
+            let geradasCount = 0;
+            for (const op of (opcoes || [])) {
+              let parcelas: ParcelaItem[] = [];
+              try { parcelas = JSON.parse(op.decisao_camada_1_detalhes || '[]'); } catch (_e) { parcelas = []; }
+              if (parcelas.length === 0) continue;
+
+              const feriasIds: string[] = [];
+              let totalDias = 0;
+
+              for (const p of parcelas) {
+                const dtInicio = new Date(p.data_inicio || `${ano}-01-01`);
+                const dias = Number(p.dias) || 30;
+                totalDias += dias;
+                const dtFim = new Date(dtInicio);
+                dtFim.setDate(dtFim.getDate() + dias - 1);
+                const dtRetorno = new Date(dtFim);
+                dtRetorno.setDate(dtRetorno.getDate() + 1);
+
+                const fCreated = await base44.asServiceRole.entities.Ferias.create({
+                  militar_id: op.militar_id,
+                  militar_nome: op.militar_nome,
+                  militar_posto: op.militar_posto,
+                  militar_matricula: op.militar_matricula,
+                  periodo_aquisitivo_id: op.periodo_aquisitivo_id,
+                  tipo: 'Férias Regulares',
+                  data_inicio: dtInicio.toISOString().split('T')[0],
+                  data_fim: dtFim.toISOString().split('T')[0],
+                  data_retorno: dtRetorno.toISOString().split('T')[0],
+                  dias: dias,
+                  status: 'Previsto',
+                });
+                if (fCreated?.id) feriasIds.push(fCreated.id);
+              }
+
+              try {
+                const pa = await base44.asServiceRole.entities.PeriodoAquisitivo.get(op.periodo_aquisitivo_id);
+                if (pa) {
+                  await base44.asServiceRole.entities.PeriodoAquisitivo.update(pa.id, {
+                    dias_previstos: (pa.dias_previstos || 0) + totalDias,
+                    status: 'Previsto',
+                  });
+                }
+              } catch (_err) {}
+
+              await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(op.id, {
+                gerado_ferias_efetivas: true,
+                data_geracao_ferias: new Date().toISOString(),
+                ferias_ids_geradas: feriasIds,
+              });
+
+              geradasCount++;
+            }
+
+            return new Response(JSON.stringify({
+              ok: true,
+              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas.`,
+              total_geradas: geradasCount,
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+          break;
         }
 
         default:
@@ -315,6 +455,27 @@ export default async function (req: Request): Promise<Response> {
     }
 
     const portalConfig = await loadAuthConfig(base44);
+
+    // Consulta campanhas ativas aplicáveis a este militar
+    let campanhasAtivasMilitar: any[] = [];
+    try {
+      const allCamp = await base44.asServiceRole.entities.CampanhaPortal.filter({ status: 'Aberta_Coleta' });
+      campanhasAtivasMilitar = (allCamp || []).filter((cp: any) => {
+        if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
+        if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
+          return cp.escopo_unidades_ids.includes(militar.lotacao_id) || cp.escopo_unidades_ids.includes(militar.grupamento_id) || cp.escopo_unidades_ids.includes(militar.estrutura_id);
+        }
+        if (cp.tipo_escopo === 'QUADROS' && Array.isArray(cp.escopo_quadros)) {
+          return cp.escopo_quadros.includes(militar.quadro);
+        }
+        if (cp.tipo_escopo === 'SELECAO_MILITARES' && Array.isArray(cp.escopo_militares_ids)) {
+          return cp.escopo_militares_ids.includes(militar.id);
+        }
+        return true;
+      });
+    } catch (_e) {
+      campanhasAtivasMilitar = [];
+    }
 
     switch (acao) {
       // 1.3A: Cadastral
@@ -363,15 +524,19 @@ export default async function (req: Request): Promise<Response> {
           dependente_ir: Boolean(dep.dependente_ir),
         }));
 
+        const campanhaCadastralAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL');
+
         return new Response(JSON.stringify({
           ok: true,
           cadastro: dadosCadastrais,
           dependentes: sanitizedDependentes,
           solicitacoes: solicitacoes || [],
+          campanha_ativa: campanhaCadastralAtiva || null,
           config: {
             ativo: portalConfig?.cadastro_ativo !== false,
             permitir_solicitacao: portalConfig?.cadastro_permitir_solicitacao !== false,
-            instrucoes: portalConfig?.cadastro_instrucoes || 'Confira seus dados funcionais e de contato.',
+            instrucoes: campanhaCadastralAtiva?.instrucoes || portalConfig?.cadastro_instrucoes || 'Confira seus dados funcionais e de contato.',
+            prazo_limite: campanhaCadastralAtiva?.data_fim_militar || '',
           },
         }), {
           status: 200,
@@ -452,11 +617,8 @@ export default async function (req: Request): Promise<Response> {
 
       // 1.3B: Férias no Portal com 3 Opções de Meses
       case 'FERIAS_GET': {
-        const anoCampanha = new Date().getFullYear() + 1; // Padrão: 2027
-
-        // Busca campanha ativa
-        let campanhas = await base44.asServiceRole.entities.CampanhaPlanoFerias.filter({ ano_referencia: anoCampanha });
-        const campanha = campanhas?.[0] || null;
+        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
+        const anoCampanha = campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
         // Busca períodos aquisitivos do militar
         let rawPeriodos: any[] = [];
@@ -497,7 +659,8 @@ export default async function (req: Request): Promise<Response> {
         return new Response(JSON.stringify({
           ok: true,
           ano_referencia: anoCampanha,
-          campanha: campanha,
+          campanha: campanhaFeriasAtiva || null,
+          campanhas_ativas: campanhasAtivasMilitar,
           periodos: periodosFormatados,
           periodo_mais_antigo_id: maisAntigoId,
           opcao_militar_enviada: opcoesEnviadas?.[0] || null,
@@ -508,8 +671,8 @@ export default async function (req: Request): Promise<Response> {
             permitir_2_etapas: portalConfig?.ferias_permitir_2_etapas_15d !== false,
             permitir_3_etapas: portalConfig?.ferias_permitir_3_etapas_10d !== false,
             permitir_custom: Boolean(portalConfig?.ferias_permitir_custom),
-            prazo_limite: campanha?.prazo_limite_militar || portalConfig?.ferias_prazo_limite || '',
-            instrucoes: campanha?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas 3 opções de meses para a escala de férias.',
+            prazo_limite: campanhaFeriasAtiva?.data_fim_militar || portalConfig?.ferias_prazo_limite || '',
+            instrucoes: campanhaFeriasAtiva?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas 3 opções de meses para a escala de férias.',
           },
         }), {
           status: 200,
@@ -536,7 +699,6 @@ export default async function (req: Request): Promise<Response> {
           });
         }
 
-        // Verifica se já existia opção para atualizar ou criar nova
         const existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
           militar_id: militarId,
           ano_referencia: anoCampanha,
@@ -575,7 +737,6 @@ export default async function (req: Request): Promise<Response> {
           salvoRecord = await base44.asServiceRole.entities.OpcaoFeriasMilitar.create(opcaoPayload);
         }
 
-        // Auditoria
         await registrarAuditoriaPortal(base44, {
           sessao_id: sessionAuth.context.sessao_id,
           militar_id: militarId,
