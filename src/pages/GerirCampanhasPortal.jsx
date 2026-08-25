@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import {
   Megaphone,
   Plus,
@@ -18,6 +19,7 @@ import {
   Check,
   X,
   Building,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +31,9 @@ export default function GerirCampanhasPortal() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
+
+  // Busca interna no modal de unidades
+  const [buscaUnidade, setBuscaUnidade] = useState('');
 
   // Modal de Criação de Campanha
   const [modalNovaCampanha, setModalNovaCampanha] = useState({
@@ -61,18 +66,41 @@ export default function GerirCampanhasPortal() {
       const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
       setCampanhas(res.data?.campanhas || []);
 
-      // 2. Carrega lista de unidades/estruturas para o escopo
-      let estruturas = [];
+      // 2. Carrega lista de unidades/estruturas/lotações
+      let unidades = [];
       try {
-        estruturas = await base44.entities.EstruturaOrganizacional.list();
-      } catch (_e) {
+        const lotRes = await fetchScopedLotacoes({});
+        if (Array.isArray(lotRes?.lotacoes) && lotRes.lotacoes.length > 0) {
+          unidades = lotRes.lotacoes.map((l) => ({
+            id: String(l.id || l.nome || '').trim(),
+            nome: l.nome || l.sigla || l.label || l.id,
+          }));
+        }
+      } catch (lotErr) {
+        console.warn('Falha no fetchScopedLotacoes, tentando entidades:', lotErr);
+      }
+
+      // Fallback robusto: busca militares e extrai todas as lotações distintas reais cadastradas
+      if (unidades.length === 0) {
         try {
-          estruturas = await base44.entities.Unidade.list();
+          const milList = await base44.entities.Militar.list();
+          const distinct = new Set();
+          (milList || []).forEach((m) => {
+            const loc = (m.lotacao || m.estrutura_nome || '').trim();
+            if (loc) distinct.add(loc);
+          });
+          unidades = Array.from(distinct)
+            .sort()
+            .map((nome) => ({
+              id: nome,
+              nome: nome,
+            }));
         } catch (_err) {}
       }
-      setUnidadesList(estruturas || []);
+
+      setUnidadesList(unidades || []);
     } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar campanhas.' });
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do painel.' });
     } finally {
       setLoading(false);
     }
@@ -83,6 +111,7 @@ export default function GerirCampanhasPortal() {
   }, []);
 
   const abrirCriacaoCampanha = (tipo) => {
+    setBuscaUnidade('');
     const ano = new Date().getFullYear() + 1;
     if (tipo === 'PLANO_FERIAS') {
       setModalNovaCampanha({
@@ -124,8 +153,22 @@ export default function GerirCampanhasPortal() {
     }
   };
 
+  const handleSelecionarTodasUnidades = () => {
+    const allIds = unidadesList.map((u) => u.id);
+    setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: allIds });
+  };
+
+  const handleLimparSelecaoUnidades = () => {
+    setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: [] });
+  };
+
   const handleSalvarCampanha = async (e) => {
     e.preventDefault();
+    if (modalNovaCampanha.tipo_escopo === 'UNIDADES' && modalNovaCampanha.escopo_unidades_ids.length === 0) {
+      setFeedback({ type: 'error', msg: 'Por favor, selecione ao menos uma unidade para o escopo.' });
+      return;
+    }
+
     setActionLoading(true);
     setFeedback({ type: '', msg: '' });
 
@@ -134,7 +177,7 @@ export default function GerirCampanhasPortal() {
     if (modalNovaCampanha.tipo_escopo === 'UNIDADES' && modalNovaCampanha.escopo_unidades_ids.length > 0) {
       const nomes = unidadesList
         .filter((u) => modalNovaCampanha.escopo_unidades_ids.includes(u.id))
-        .map((u) => u.nome || u.sigla || u.denominacao);
+        .map((u) => u.nome || u.sigla || u.id);
       unidadesNomes = nomes.slice(0, 3).join(', ') + (nomes.length > 3 ? ` (+${nomes.length - 3} unidades)` : '');
     }
 
@@ -219,6 +262,11 @@ export default function GerirCampanhasPortal() {
       </div>
     );
   }
+
+  const unidadesFiltradas = unidadesList.filter((u) => {
+    if (!buscaUnidade.trim()) return true;
+    return (u.nome || u.id || '').toLowerCase().includes(buscaUnidade.toLowerCase().trim());
+  });
 
   const militaresFiltrados = (detalhesRetorno.dados?.militares || []).filter((m) => {
     if (detalhesRetorno.filtro === 'TODOS') return true;
@@ -463,11 +511,18 @@ export default function GerirCampanhasPortal() {
                 </div>
 
                 {/* SELEÇÃO DE ESCOPO / PÚBLICO-ALVO */}
-                <div className="space-y-2.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                  <label className="font-bold text-slate-800 block flex items-center">
-                    <Building className="w-4 h-4 mr-1.5 text-blue-600" />
-                    Público-Alvo / Escopo de Atribuição
-                  </label>
+                <div className="space-y-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800 block flex items-center">
+                      <Building className="w-4 h-4 mr-1.5 text-blue-600" />
+                      Público-Alvo / Escopo de Atribuição
+                    </label>
+                    {modalNovaCampanha.tipo_escopo === 'UNIDADES' && (
+                      <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
+                        {modalNovaCampanha.escopo_unidades_ids.length} selecionada(s)
+                      </span>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     {[
@@ -489,32 +544,64 @@ export default function GerirCampanhasPortal() {
                     ))}
                   </div>
 
-                  {/* Checkboxes de Unidades se Escopo for UNIDADES */}
+                  {/* Lista de Unidades com Barra de Busca e Ações Rápidas */}
                   {modalNovaCampanha.tipo_escopo === 'UNIDADES' && (
                     <div className="space-y-2 pt-2 border-t border-slate-200">
-                      <span className="text-[11px] text-slate-600 font-semibold block">
-                        Selecione as Unidades / Lotações Participantes:
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-xl border border-slate-200">
-                        {unidadesList.map((u) => {
-                          const checked = modalNovaCampanha.escopo_unidades_ids.includes(u.id);
-                          return (
-                            <label
-                              key={u.id}
-                              className={`p-2 rounded-lg border text-[11px] flex items-center space-x-2 cursor-pointer transition-colors ${
-                                checked ? 'bg-blue-50 border-blue-200 text-[#1e3a5f] font-bold' : 'border-slate-100 hover:bg-slate-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => handleToggleUnidadeEscopo(u.id)}
-                                className="accent-[#1e3a5f] rounded"
-                              />
-                              <span className="truncate">{u.nome || u.sigla || u.denominacao}</span>
-                            </label>
-                          );
-                        })}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="relative flex-1">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                          <Input
+                            type="text"
+                            placeholder="Pesquisar unidade (ex: 1º GBM, ABM, DGP)..."
+                            value={buscaUnidade}
+                            onChange={(e) => setBuscaUnidade(e.target.value)}
+                            className="h-8 pl-8 text-xs rounded-lg bg-white"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            type="button"
+                            onClick={handleSelecionarTodasUnidades}
+                            className="px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-[10px] font-bold text-slate-700"
+                          >
+                            Todas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleLimparSelecaoUnidades}
+                            className="px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-[10px] font-bold text-slate-500"
+                          >
+                            Limpar
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto p-1.5 bg-white rounded-xl border border-slate-200">
+                        {unidadesFiltradas.length === 0 ? (
+                          <div className="col-span-2 p-3 text-center text-slate-400 text-[11px]">
+                            Nenhuma unidade encontrada para "{buscaUnidade}".
+                          </div>
+                        ) : (
+                          unidadesFiltradas.map((u) => {
+                            const checked = modalNovaCampanha.escopo_unidades_ids.includes(u.id);
+                            return (
+                              <label
+                                key={u.id}
+                                className={`p-2 rounded-lg border text-[11px] flex items-center space-x-2 cursor-pointer transition-colors ${
+                                  checked ? 'bg-blue-50/80 border-blue-200 text-[#1e3a5f] font-bold' : 'border-slate-100 hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => handleToggleUnidadeEscopo(u.id)}
+                                  className="accent-[#1e3a5f] rounded"
+                                />
+                                <span className="truncate">{u.nome}</span>
+                              </label>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   )}
@@ -551,7 +638,7 @@ export default function GerirCampanhasPortal() {
                   <textarea
                     rows={2}
                     value={modalNovaCampanha.instrucoes}
-                    onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, instruções: e.target.value })}
+                    onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, instrucoes: e.target.value })}
                     required
                     className="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:border-[#1e3a5f]"
                   />

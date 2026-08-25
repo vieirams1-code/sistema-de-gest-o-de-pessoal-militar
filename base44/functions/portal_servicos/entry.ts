@@ -15,6 +15,32 @@ export function assertNoClientSuppliedMilitarId(body: unknown): void {
   }
 }
 
+function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean {
+  if (!Array.isArray(escopoUnidadesIds) || escopoUnidadesIds.length === 0) return true;
+
+  const lotacaoMilitar = (m.lotacao || '').trim().toLowerCase();
+  const estruturaMilitar = (m.estrutura_nome || '').trim().toLowerCase();
+  const lotacaoId = String(m.lotacao_id || '').trim();
+  const grupamentoId = String(m.grupamento_id || '').trim();
+  const estruturaId = String(m.estrutura_id || '').trim();
+
+  return escopoUnidadesIds.some((idRaw) => {
+    const id = String(idRaw || '').trim();
+    if (!id) return false;
+    const idLower = id.toLowerCase();
+
+    return (
+      id === lotacaoId ||
+      id === grupamentoId ||
+      id === estruturaId ||
+      idLower === lotacaoMilitar ||
+      idLower === estruturaMilitar ||
+      (lotacaoMilitar && lotacaoMilitar.includes(idLower)) ||
+      (estruturaMilitar && estruturaMilitar.includes(idLower))
+    );
+  });
+}
+
 interface ParcelaItem {
   etapa: number;
   dias: number;
@@ -118,7 +144,7 @@ export default async function (req: Request): Promise<Response> {
             if (m.status === 'Inativo' || m.status === 'Falecido') return false;
             if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
             if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
-              return cp.escopo_unidades_ids.includes(m.lotacao_id) || cp.escopo_unidades_ids.includes(m.grupamento_id) || cp.escopo_unidades_ids.includes(m.estrutura_id);
+              return matchMilitarEscopoUnidade(m, cp.escopo_unidades_ids);
             }
             if (cp.tipo_escopo === 'QUADROS' && Array.isArray(cp.escopo_quadros)) {
               return cp.escopo_quadros.includes(m.quadro);
@@ -201,7 +227,7 @@ export default async function (req: Request): Promise<Response> {
             if (m.status === 'Inativo' || m.status === 'Falecido') return false;
             if (campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo) return true;
             if (campanha.tipo_escopo === 'UNIDADES' && Array.isArray(campanha.escopo_unidades_ids)) {
-              return campanha.escopo_unidades_ids.includes(m.lotacao_id) || campanha.escopo_unidades_ids.includes(m.grupamento_id) || campanha.escopo_unidades_ids.includes(m.estrutura_id);
+              return matchMilitarEscopoUnidade(m, campanha.escopo_unidades_ids);
             }
             if (campanha.tipo_escopo === 'QUADROS' && Array.isArray(campanha.escopo_quadros)) {
               return campanha.escopo_quadros.includes(m.quadro);
@@ -221,7 +247,6 @@ export default async function (req: Request): Promise<Response> {
             });
             (opcoes || []).forEach((op: any) => respostasMap.set(op.militar_id, op));
           } else {
-            // ATUALIZACAO_CADASTRAL / CONFERENCIA
             const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.list();
             (solicitacoes || []).forEach((sol: any) => respostasMap.set(sol.militar_id, sol));
           }
@@ -247,7 +272,6 @@ export default async function (req: Request): Promise<Response> {
           const totalRespondidos = relacaoNominal.filter((r) => r.status_resposta === 'Respondido').length;
           const totalPendentes = relacaoNominal.length - totalRespondidos;
 
-          // Atualiza métricas na campanha
           try {
             await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
               total_publico_alvo: relacaoNominal.length,
@@ -270,9 +294,8 @@ export default async function (req: Request): Promise<Response> {
           });
         }
 
-        // Disparo de Lembrete aos Militares Pendentes
+        // Disparo de Lembretes
         case 'CAMPANHA_DISPARAR_LEMBRETES': {
-          const { campanha_id } = payload;
           return new Response(JSON.stringify({
             ok: true,
             message: 'Disparo de lembretes processado com sucesso para os militares com pendência nesta campanha.',
@@ -463,7 +486,7 @@ export default async function (req: Request): Promise<Response> {
       campanhasAtivasMilitar = (allCamp || []).filter((cp: any) => {
         if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
         if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
-          return cp.escopo_unidades_ids.includes(militar.lotacao_id) || cp.escopo_unidades_ids.includes(militar.grupamento_id) || cp.escopo_unidades_ids.includes(militar.estrutura_id);
+          return matchMilitarEscopoUnidade(militar, cp.escopo_unidades_ids);
         }
         if (cp.tipo_escopo === 'QUADROS' && Array.isArray(cp.escopo_quadros)) {
           return cp.escopo_quadros.includes(militar.quadro);
