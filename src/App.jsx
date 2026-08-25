@@ -181,8 +181,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <Router>
-        <NavigationTracker />
         <AuthProvider>
+          <NavigationTracker />
           <Routes>
             {/* Rotas Públicas e Seguras do Portal do Militar */}
             <Route path="/portal/*" element={<PortalApp />} />
