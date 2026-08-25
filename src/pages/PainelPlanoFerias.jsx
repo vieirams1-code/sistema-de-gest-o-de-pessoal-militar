@@ -6,23 +6,56 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  RefreshCw,
   Zap,
   Sliders,
   Check,
   Edit3,
+  Star,
   Layers,
   ChevronRight,
   Medal,
   Award,
+  Sparkles,
+  Info,
+  CalendarDays,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-const MESES = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+const LISTA_MESES = [
+  { val: '01', nome: 'Janeiro' },
+  { val: '02', nome: 'Fevereiro' },
+  { val: '03', nome: 'Março' },
+  { val: '04', nome: 'Abril' },
+  { val: '05', nome: 'Maio' },
+  { val: '06', nome: 'Junho' },
+  { val: '07', nome: 'Julho' },
+  { val: '08', nome: 'Agosto' },
+  { val: '09', nome: 'Setembro' },
+  { val: '10', nome: 'Outubro' },
+  { val: '11', nome: 'Novembro' },
+  { val: '12', nome: 'Dezembro' },
 ];
+
+function getNomeMesPorVal(val) {
+  const m = LISTA_MESES.find((item) => item.val === val);
+  return m ? m.nome : val;
+}
+
+function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
+  if (!detalhesStr) return fallbackVal;
+  try {
+    const arr = JSON.parse(detalhesStr);
+    if (Array.isArray(arr) && arr.length > 0 && arr[0].mes) {
+      return arr[0].mes;
+    }
+    if (Array.isArray(arr) && arr.length > 0 && arr[0].data_inicio?.length >= 7) {
+      return arr[0].data_inicio.slice(5, 7);
+    }
+  } catch (_e) {}
+  return fallbackVal;
+}
 
 export default function PainelPlanoFerias() {
   const [ano, setAno] = useState(new Date().getFullYear() + 1); // 2027
@@ -32,8 +65,8 @@ export default function PainelPlanoFerias() {
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
 
-  // Modal / Ajuste manual de mês do gestor
-  const [modalAjuste, setModalAjuste] = useState({ open: false, opcao: null, mes1: '01', mes2: '07', justificativa: '' });
+  // Estado de seleção das frações por militar: { [opcaoId]: { fracao1: '01', fracao2: '07', fracao3: '10', justificativa: '' } }
+  const [selecoesMilitares, setSelecoesMilitares] = useState({});
 
   const loadPlano = async (anoRef = ano) => {
     setLoading(true);
@@ -51,7 +84,40 @@ export default function PainelPlanoFerias() {
         acao: 'PLANO_ESCALA_LISTAR',
         ano_referencia: Number(anoRef),
       });
-      setOpcoes(resEscala.data?.opcoes || []);
+      const listaOpcoes = resEscala.data?.opcoes || [];
+      setOpcoes(listaOpcoes);
+
+      // 3. Inicializa estado de seleção para cada militar
+      const initialMap = {};
+      listaOpcoes.forEach((op) => {
+        const mes1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+        const mes2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+        const mes3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+
+        // Se o gestor já havia salvo decisão previamente
+        if (op.decisao_camada_1_detalhes) {
+          try {
+            const salvas = JSON.parse(op.decisao_camada_1_detalhes);
+            initialMap[op.id] = {
+              fracao1: salvas[0]?.mes || salvas[0]?.data_inicio?.slice(5, 7) || mes1,
+              fracao2: salvas[1]?.mes || salvas[1]?.data_inicio?.slice(5, 7) || mes2,
+              fracao3: salvas[2]?.mes || salvas[2]?.data_inicio?.slice(5, 7) || mes3,
+              justificativa: op.justificativa_ajuste_gestor || '',
+            };
+          } catch (_e) {
+            initialMap[op.id] = { fracao1: mes1, fracao2: mes2, fracao3: mes3, justificativa: '' };
+          }
+        } else {
+          // Inicial padrão: Fração 1 usa a Opção 1, Fração 2 usa a Opção 2, Fração 3 usa a Opção 3
+          initialMap[op.id] = {
+            fracao1: mes1,
+            fracao2: mes2,
+            fracao3: mes3,
+            justificativa: '',
+          };
+        }
+      });
+      setSelecoesMilitares(initialMap);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do plano de férias.' });
     } finally {
@@ -63,61 +129,66 @@ export default function PainelPlanoFerias() {
     loadPlano(ano);
   }, [ano]);
 
-  // Decisão Camada 1: Aprovar Opção 1, 2 ou 3
-  const handleAprovarOpcaoCamada1 = async (op, tipoOpcao) => {
-    setActionLoading(true);
-    try {
-      let parcelas = [];
-      if (tipoOpcao === 'OPCAO_1') parcelas = JSON.parse(op.opcao_1_detalhes || '[]');
-      if (tipoOpcao === 'OPCAO_2') parcelas = JSON.parse(op.opcao_2_detalhes || '[]');
-      if (tipoOpcao === 'OPCAO_3') parcelas = JSON.parse(op.opcao_3_detalhes || '[]');
-
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_DECISAO_CAMADA_1',
-        opcao_id: op.id,
-        decisao_camada_1: {
-          opcao_escolhida: tipoOpcao,
-          parcelas: parcelas,
-          gestor_nome: 'S1 / Gestor da Unidade',
-        },
-      });
-
-      setFeedback({ type: 'success', msg: `Opção do militar ${op.militar_nome} aprovada com sucesso!` });
-      await loadPlano(ano);
-    } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao aprovar opção.' });
-    } finally {
-      setActionLoading(false);
-    }
+  const handleMudarMesFracao = (opId, numFracao, novoMes) => {
+    setSelecoesMilitares((prev) => ({
+      ...prev,
+      [opId]: {
+        ...(prev[opId] || {}),
+        [`fracao${numFracao}`]: novoMes,
+      },
+    }));
   };
 
-  // Decisão Camada 1: Ajustar Mês
-  const handleSalvarAjusteGestor = async () => {
-    if (!modalAjuste.opcao) return;
+  // Salvar Validação da Escala do Militar (Camada 1)
+  const handleSalvarValidacaoMilitar = async (op) => {
+    const selecao = selecoesMilitares[op.id] || {};
+    const mod = op.modalidade || '2_ETAPAS_15';
+
+    let parcelas = [];
+    if (mod === '1_ETAPA_30') {
+      const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+      parcelas = [{ etapa: 1, dias: 30, mes: m1, data_inicio: `${ano}-${m1}-01` }];
+    } else if (mod === '2_ETAPAS_15') {
+      const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+      const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+      parcelas = [
+        { etapa: 1, dias: 15, mes: m1, data_inicio: `${ano}-${m1}-01` },
+        { etapa: 2, dias: 15, mes: m2, data_inicio: `${ano}-${m2}-01` },
+      ];
+    } else if (mod === '3_ETAPAS_10') {
+      const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+      const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+      const m3 = selecao.fracao3 || extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+      parcelas = [
+        { etapa: 1, dias: 10, mes: m1, data_inicio: `${ano}-${m1}-01` },
+        { etapa: 2, dias: 10, mes: m2, data_inicio: `${ano}-${m2}-01` },
+        { etapa: 3, dias: 10, mes: m3, data_inicio: `${ano}-${m3}-01` },
+      ];
+    } else {
+      const m1 = selecao.fracao1 || '01';
+      parcelas = [{ etapa: 1, dias: 30, mes: m1, data_inicio: `${ano}-${m1}-01` }];
+    }
+
+    const mesesResumoFormatado = parcelas.map((p) => `${getNomeMesPorVal(p.mes)} (${p.dias}d)`).join(' + ');
+
     setActionLoading(true);
     try {
-      const op = modalAjuste.opcao;
-      const parcelas = [
-        { etapa: 1, dias: 15, mes: modalAjuste.mes1, data_inicio: `${ano}-${modalAjuste.mes1}-05` },
-        { etapa: 2, dias: 15, mes: modalAjuste.mes2, data_inicio: `${ano}-${modalAjuste.mes2}-05` },
-      ];
-
       await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_DECISAO_CAMADA_1',
         opcao_id: op.id,
         decisao_camada_1: {
-          opcao_escolhida: 'AJUSTE_GESTOR',
+          opcao_escolhida: 'ESCALA_VALIDADA',
           parcelas: parcelas,
-          justificativa: modalAjuste.justificativa || 'Ajuste operacional da escala da unidade.',
+          resumo_meses: mesesResumoFormatado,
+          justificativa: selecao.justificativa || '',
           gestor_nome: 'S1 / Gestor da Unidade',
         },
       });
 
-      setModalAjuste({ open: false, opcao: null, mes1: '01', mes2: '07', justificativa: '' });
-      setFeedback({ type: 'success', msg: `Mês ajustado pelo gestor para ${op.militar_nome}.` });
+      setFeedback({ type: 'success', msg: `Escala validada para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
       await loadPlano(ano);
     } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar ajuste.' });
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar validação da escala.' });
     } finally {
       setActionLoading(false);
     }
@@ -152,7 +223,7 @@ export default function PainelPlanoFerias() {
 
   // Geração Automática em Lote
   const handleGerarLoteFerias = async () => {
-    if (!window.confirm(`Deseja gerar automaticamente todos os lançamentos de férias de ${ano} no sistema SGP?`)) return;
+    if (!window.confirm(`Deseja gerar automaticamente todos os lançamentos de férias de ${ano} no sistema SGP para os militares homologados?`)) return;
 
     setActionLoading(true);
     try {
@@ -211,7 +282,7 @@ export default function PainelPlanoFerias() {
                 Plano Anual de Férias — {ano}
               </h1>
               <p className="text-xs text-slate-500">
-                Gestão e escalação em duas camadas: Unidade (Camada 1) e Comando Superior (Camada 2)
+                Mesa do Gestor: Valide ou altere as frações de férias conforme as opções dos militares
               </p>
             </div>
           </div>
@@ -242,7 +313,7 @@ export default function PainelPlanoFerias() {
           </div>
         )}
 
-        {/* CARDS DE STATS E AÇÕES PRINCIPAIS */}
+        {/* CARDS DE STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <Card className="border-slate-200 bg-white">
             <CardContent className="p-4 flex items-center justify-between text-xs">
@@ -257,7 +328,7 @@ export default function PainelPlanoFerias() {
           <Card className="border-slate-200 bg-white">
             <CardContent className="p-4 flex items-center justify-between text-xs">
               <div>
-                <span className="text-slate-500 block">Aprovadas na Unidade (C1)</span>
+                <span className="text-slate-500 block">Validadas na Unidade (C1)</span>
                 <strong className="text-xl text-blue-700 font-extrabold">
                   {opcoes.filter((o) => o.status_camada_1 !== 'Pendente').length}
                 </strong>
@@ -287,26 +358,26 @@ export default function PainelPlanoFerias() {
           </Card>
         </div>
 
-        {/* DISTRIBUIÇÃO DE EFETIVO POR MÊS (EVITAR DESFALQUE OPERACIONAL) */}
+        {/* DISTRIBUIÇÃO DE EFETIVO POR MÊS */}
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="p-4 pb-2 border-b border-slate-100">
             <CardTitle className="text-xs sm:text-sm font-bold text-slate-800 flex items-center">
-              <Users className="w-4 h-4 mr-2 text-[#1e3a5f]" />
+              <CalendarDays className="w-4 h-4 mr-2 text-[#1e3a5f]" />
               Distribuição de Efetivo Previsto em Férias por Mês ({ano})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 text-xs">
             <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 text-center">
-              {MESES.map((m, idx) => {
+              {LISTA_MESES.map((m, idx) => {
                 const count = contagemPorMes[idx];
                 return (
                   <div
-                    key={m}
+                    key={m.val}
                     className={`p-2 rounded-xl border ${
                       count > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
                     }`}
                   >
-                    <span className="text-[10px] text-slate-500 block truncate">{m.slice(0, 3)}</span>
+                    <span className="text-[10px] text-slate-500 block truncate">{m.nome.slice(0, 3)}</span>
                     <strong className={`text-sm ${count > 0 ? 'text-[#1e3a5f]' : 'text-slate-400'}`}>
                       {count}
                     </strong>
@@ -320,7 +391,7 @@ export default function PainelPlanoFerias() {
         {/* AÇÕES DE HOMOLOGAÇÃO EM LOTE */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-900 to-[#1e3a5f] p-4 rounded-2xl text-white shadow-md">
           <div>
-            <h3 className="font-bold text-sm">Ações do Plano Anual</h3>
+            <h3 className="font-bold text-sm">Ações Consolidadas do Plano</h3>
             <p className="text-xs text-blue-200">
               Homologue o plano superior ou gere todas as férias de forma automática
             </p>
@@ -349,236 +420,234 @@ export default function PainelPlanoFerias() {
           </div>
         </div>
 
-        {/* TABELA DE ESCALAÇÃO DOS MILITARES */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="p-4 border-b border-slate-100">
-            <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
+        {/* LISTAGEM DE MILITARES COM SELEÇÃO DIRETA DE FRAÇÕES E 3 OPÇÕES */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-extrabold text-slate-800 flex items-center">
               <Sliders className="w-4 h-4 mr-2 text-blue-600" />
-              Relação de Militares & Escolha das 3 Opções
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Aprove a 1ª, 2ª ou 3ª preferência do militar ou ajuste o mês operacionalmente
-            </CardDescription>
-          </CardHeader>
+              Validação das Frações por Militar
+            </h2>
+            <span className="text-xs text-slate-500">
+              Clique na opção de mês para validar cada fração ou escolha outro mês no seletor
+            </span>
+          </div>
 
-          <CardContent className="p-0 text-xs">
-            {opcoes.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
+          {opcoes.length === 0 ? (
+            <Card className="border-slate-200 shadow-sm bg-white">
+              <CardContent className="p-8 text-center text-slate-500 text-xs">
                 Nenhum militar enviou opções de férias para o plano de {ano} até o momento.
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {opcoes.map((op) => (
-                  <div
-                    key={op.id}
-                    className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/80 transition-colors"
-                  >
-                    {/* Militar Info */}
-                    <div className="space-y-1 lg:w-1/3">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-extrabold text-slate-900 text-sm">
-                          {op.militar_posto} {op.militar_nome}
-                        </span>
-                        <span className="text-slate-400">• Mat: {op.militar_matricula || '-'}</span>
+              </CardContent>
+            </Card>
+          ) : (
+            opcoes.map((op) => {
+              const modalidade = op.modalidade || '2_ETAPAS_15';
+              const numFracoes = modalidade === '1_ETAPA_30' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
+              const diasPorFracao = modalidade === '1_ETAPA_30' ? [30] : modalidade === '3_ETAPAS_10' ? [10, 10, 10] : [15, 15];
+
+              // Os 3 meses escolhidos pelo militar
+              const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+              const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+              const mesOpcao3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+
+              const militarSelecao = selecoesMilitares[op.id] || {
+                fracao1: mesOpcao1,
+                fracao2: mesOpcao2,
+                fracao3: mesOpcao3,
+              };
+
+              const isValidado = op.status_camada_1 !== 'Pendente';
+              const isHomologado = op.status_camada_2 === 'Homologado_Superior';
+
+              return (
+                <Card key={op.id} className="border-slate-200 bg-white shadow-xs rounded-2xl overflow-hidden">
+                  <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-900 flex items-center justify-center font-black text-xs shrink-0">
+                        {op.militar_posto?.slice(0, 3) || 'MIL'}
                       </div>
-                      <p className="text-[11px] text-slate-500">
-                        Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> | Período: {op.periodo_inicio} a {op.periodo_fim}
-                      </p>
-                      <div className="flex items-center space-x-1.5 pt-1">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          op.status_camada_2 === 'Homologado_Superior'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : op.status_camada_1 !== 'Pendente'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {op.status_camada_2 === 'Homologado_Superior'
-                            ? 'Camada 2: Homologado'
-                            : op.status_camada_1 !== 'Pendente'
-                            ? `Camada 1: ${op.decisao_camada_1_opcao || 'Aprovado'}`
-                            : 'Camada 1: Pendente'}
-                        </span>
-                        {op.gerado_ferias_efetivas && (
-                          <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold">
-                            Lançado no SGP
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-extrabold text-slate-900 text-sm">
+                            {op.militar_posto} {op.militar_nome}
                           </span>
+                          <span className="text-xs text-slate-400 font-mono">
+                            Mat: {op.militar_matricula || '-'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: {op.periodo_inicio} a {op.periodo_fim}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2.5 py-1 rounded-xl bg-slate-200 text-slate-800 text-[11px] font-bold">
+                        {modalidade === '1_ETAPA_30' ? 'Integral (1 Período de 30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10 + 10 + 10d)' : '2 Frações (15 + 15d)'}
+                      </span>
+                      <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold ${
+                        isHomologado
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : isValidado
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {isHomologado ? 'Homologado Superior' : isValidado ? 'Validado na Unidade' : 'Pendente de Validação'}
+                      </span>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="p-4 sm:p-5 space-y-4 text-xs">
+                    {/* FRAÇÕES DO MILITAR */}
+                    <div className="space-y-3">
+                      {Array.from({ length: numFracoes }).map((_, idx) => {
+                        const numFracao = idx + 1;
+                        const dias = diasPorFracao[idx] || 15;
+                        const mesAtualFracao = militarSelecao[`fracao${numFracao}`] || '01';
+
+                        const isOpcao1 = mesAtualFracao === mesOpcao1;
+                        const isOpcao2 = mesAtualFracao === mesOpcao2;
+                        const isOpcao3 = mesAtualFracao === mesOpcao3;
+                        const isOutroMes = !isOpcao1 && !isOpcao2 && !isOpcao3;
+
+                        return (
+                          <div
+                            key={numFracao}
+                            className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-slate-800 text-xs flex items-center">
+                                <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                                {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias):
+                              </span>
+                              <span className="text-[11px] font-bold text-slate-600">
+                                Mês Escolhido para a Fração: <strong className="text-blue-900 bg-white px-2 py-0.5 rounded-md border border-blue-200">{getNomeMesPorVal(mesAtualFracao)} / {ano}</strong>
+                              </span>
+                            </div>
+
+                            {/* OS 3 BOTÕES DAS OPÇÕES DO MILITAR + OPÇÃO OUTRO MÊS */}
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                              {/* 1ª OPÇÃO */}
+                              <button
+                                type="button"
+                                onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao1)}
+                                className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                  isOpcao1
+                                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-200'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30'
+                                }`}
+                              >
+                                <div>
+                                  <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao1 ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                                    ⭐ 1ª Opção
+                                  </span>
+                                  <strong className="text-xs block">{getNomeMesPorVal(mesOpcao1)}</strong>
+                                </div>
+                                {isOpcao1 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                              </button>
+
+                              {/* 2ª OPÇÃO */}
+                              <button
+                                type="button"
+                                onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao2)}
+                                className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                  isOpcao2
+                                    ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
+                                }`}
+                              >
+                                <div>
+                                  <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao2 ? 'text-blue-100' : 'text-slate-500'}`}>
+                                    2ª Opção
+                                  </span>
+                                  <strong className="text-xs block">{getNomeMesPorVal(mesOpcao2)}</strong>
+                                </div>
+                                {isOpcao2 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                              </button>
+
+                              {/* 3ª OPÇÃO */}
+                              <button
+                                type="button"
+                                onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao3)}
+                                className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                  isOpcao3
+                                    ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
+                                }`}
+                              >
+                                <div>
+                                  <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao3 ? 'text-blue-100' : 'text-slate-500'}`}>
+                                    3ª Opção
+                                  </span>
+                                  <strong className="text-xs block">{getNomeMesPorVal(mesOpcao3)}</strong>
+                                </div>
+                                {isOpcao3 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                              </button>
+
+                              {/* SELETOR: OUTRO MÊS (NÃO ESCOLHIDO NAS OPÇÕES) */}
+                              <div className={`p-2 rounded-xl border flex flex-col justify-center transition-all ${
+                                isOutroMes
+                                  ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-200'
+                                  : 'bg-white border-slate-200'
+                              }`}>
+                                <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
+                                  ✏️ Outro Mês
+                                </span>
+                                <select
+                                  value={isOutroMes ? mesAtualFracao : ''}
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      handleMudarMesFracao(op.id, numFracao, e.target.value);
+                                    }
+                                  }}
+                                  className="w-full h-7 px-1.5 bg-transparent border-0 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                                >
+                                  <option value="">Selecionar...</option>
+                                  {LISTA_MESES.map((m) => (
+                                    <option key={m.val} value={m.val}>
+                                      {m.nome}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* BARRA INFERIOR DE CONFIRMAÇÃO DO MILITAR */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                      <div className="text-[11px] text-slate-500">
+                        {op.decisao_camada_1_meses ? (
+                          <span>
+                            Escala Registrada: <strong className="text-slate-800">{op.decisao_camada_1_meses}</strong> (por {op.gestor_unidade_nome || 'Gestor'})
+                          </span>
+                        ) : (
+                          <span>* Clique no botão abaixo para confirmar e homologar a escala deste militar na Camada 1.</span>
                         )}
                       </div>
-                    </div>
-
-                    {/* As 3 Opções Enviadas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 text-[11px]">
-                      <div className={`p-2.5 rounded-xl border ${
-                        op.decisao_camada_1_opcao === 'OPCAO_1' ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <div className="flex items-center justify-between pb-1">
-                          <span className="font-bold text-slate-700 flex items-center">
-                            <Medal className="w-3 h-3 text-amber-500 mr-1" /> 1ª Opção
-                          </span>
-                        </div>
-                        <span className="font-semibold text-slate-900 block">{op.opcao_1_meses || '-'}</span>
-                      </div>
-
-                      <div className={`p-2.5 rounded-xl border ${
-                        op.decisao_camada_1_opcao === 'OPCAO_2' ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <div className="flex items-center justify-between pb-1">
-                          <span className="font-bold text-slate-700 flex items-center">
-                            <Award className="w-3 h-3 text-slate-400 mr-1" /> 2ª Opção
-                          </span>
-                        </div>
-                        <span className="font-semibold text-slate-900 block">{op.opcao_2_meses || '-'}</span>
-                      </div>
-
-                      <div className={`p-2.5 rounded-xl border ${
-                        op.decisao_camada_1_opcao === 'OPCAO_3' ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <div className="flex items-center justify-between pb-1">
-                          <span className="font-bold text-slate-700 flex items-center">
-                            <Award className="w-3 h-3 text-amber-700 mr-1" /> 3ª Opção
-                          </span>
-                        </div>
-                        <span className="font-semibold text-slate-900 block">{op.opcao_3_meses || '-'}</span>
-                      </div>
-                    </div>
-
-                    {/* Botões de Ação do Gestor */}
-                    <div className="flex items-center space-x-1.5 self-end lg:self-center">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => handleAprovarOpcaoCamada1(op, 'OPCAO_1')}
-                        disabled={actionLoading}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs h-8 px-2.5"
-                      >
-                        <Check className="w-3 h-3 mr-1" />
-                        Aprovar 1ª
-                      </Button>
 
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
-                        onClick={() => handleAprovarOpcaoCamada1(op, 'OPCAO_2')}
                         disabled={actionLoading}
-                        className="text-xs h-8 px-2.5"
+                        onClick={() => handleSalvarValidacaoMilitar(op)}
+                        className={`rounded-xl text-xs font-bold h-9 px-4 shadow-sm transition-all ${
+                          isValidado
+                            ? 'bg-slate-800 hover:bg-slate-900 text-white'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        }`}
                       >
-                        Aprovar 2ª
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setModalAjuste({
-                          open: true,
-                          opcao: op,
-                          mes1: '01',
-                          mes2: '07',
-                          justificativa: '',
-                        })}
-                        disabled={actionLoading}
-                        className="text-xs h-8 px-2.5 text-blue-700 border-blue-200 hover:bg-blue-50"
-                      >
-                        <Edit3 className="w-3 h-3 mr-1" />
-                        Ajustar
+                        <Check className="w-3.5 h-3.5 mr-1.5" />
+                        {isValidado ? 'Atualizar Escalação' : 'Confirmar e Validar Escala'}
                       </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* MODAL DE AJUSTE DE MÊS PELO GESTOR */}
-        {modalAjuste.open && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-4 text-xs animate-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-slate-800 text-sm flex items-center">
-                  <Edit3 className="w-4 h-4 mr-2 text-blue-600" />
-                  Ajustar Mês Operacional da Escala
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setModalAjuste({ open: false, opcao: null, mes1: '01', mes2: '07', justificativa: '' })}
-                  className="text-slate-400 hover:text-slate-600 font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-slate-600">
-                  Militar: <strong>{modalAjuste.opcao?.militar_posto} {modalAjuste.opcao?.militar_nome}</strong>
-                </p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">1ª Fração (Mês)</label>
-                    <select
-                      value={modalAjuste.mes1}
-                      onChange={(e) => setModalAjuste({ ...modalAjuste, mes1: e.target.value })}
-                      className="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs font-semibold"
-                    >
-                      {MESES.map((m, idx) => {
-                        const val = String(idx + 1).padStart(2, '0');
-                        return <option key={val} value={val}>{m}</option>;
-                      })}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">2ª Fração (Mês)</label>
-                    <select
-                      value={modalAjuste.mes2}
-                      onChange={(e) => setModalAjuste({ ...modalAjuste, mes2: e.target.value })}
-                      className="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs font-semibold"
-                    >
-                      {MESES.map((m, idx) => {
-                        const val = String(idx + 1).padStart(2, '0');
-                        return <option key={val} value={val}>{m}</option>;
-                      })}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-slate-500 block">Justificativa Operacional</label>
-                  <textarea
-                    rows={2}
-                    value={modalAjuste.justificativa}
-                    onChange={(e) => setModalAjuste({ ...modalAjuste, justificativa: e.target.value })}
-                    placeholder="Motivo da escala fora das opções do militar (ex: suprir escala de praia)."
-                    className="w-full p-2 border border-slate-300 rounded-lg text-xs outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setModalAjuste({ open: false, opcao: null, mes1: '01', mes2: '07', justificativa: '' })}
-                  className="text-xs h-8"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleSalvarAjusteGestor}
-                  disabled={actionLoading}
-                  className="bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white text-xs h-8 px-4"
-                >
-                  Salvar Ajuste
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
