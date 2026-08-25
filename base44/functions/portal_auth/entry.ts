@@ -81,69 +81,16 @@ export default Deno.serve(async (req: Request) => {
               const cpfFormatado = cpfNorm.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
               lista = await Militares.filter({ cpf: cpfFormatado }, undefined, 2, 0);
             }
+            if (!lista || lista.length === 0) {
+              const all = await Militares.list();
+              lista = (all || []).filter((m: any) => normalizeCpf(m.cpf) === cpfNorm);
+            }
             if (Array.isArray(lista) && lista.length > 0) {
               militarEncontrado = lista[0];
             }
           }
         } catch (errSearch) {
           console.error('[portal_auth:INICIAR] Erro na busca silenciosa de militar:', errSearch);
-        }
-
-        // ====================================================================
-        // BYPASS DE DESENVOLVIMENTO: CPF 790.982.312-68 (Acesso Direto Sem Token)
-        // ====================================================================
-        if (cpfNorm === '79098231268') {
-          let devMilitar = militarEncontrado;
-          if (!devMilitar || !devMilitar.id) {
-            try {
-              const allMil = await base44.asServiceRole?.entities?.Militar.list();
-              if (Array.isArray(allMil) && allMil.length > 0) {
-                devMilitar = allMil.find((m: any) =>
-                  (m.cpf && normalizeCpf(m.cpf) === '79098231268') ||
-                  (m.nome_completo || m.nome_guerra || '').toLowerCase().includes('vieira')
-                ) || allMil[0];
-              }
-            } catch (_err) {}
-          }
-
-          if (devMilitar && devMilitar.id) {
-            const PortalSessao = base44.asServiceRole?.entities?.PortalSessao;
-            const rawToken = generatePortalToken();
-            const tokenHash = await hashPortalToken(rawToken);
-            const now = new Date();
-            const nowIso = now.toISOString();
-            const absoluteExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-
-            if (PortalSessao) {
-              await PortalSessao.create({
-                militar_id: devMilitar.id,
-                token_hash: tokenHash,
-                status: 'ATIVA',
-                ip_criacao: ip_origem,
-                user_agent_criacao: user_agent,
-                last_activity_at: nowIso,
-                expires_at: absoluteExpiresAt,
-                created_at: nowIso,
-              });
-            }
-
-            return Response.json({
-              ok: true,
-              bypass: true,
-              token: rawToken,
-              expires_in: 86400,
-              militar: {
-                id: devMilitar.id,
-                nome_completo: devMilitar.nome_completo || 'Militar de Teste',
-                nome_guerra: devMilitar.nome_guerra || 'Vieira',
-                posto_graduacao: devMilitar.posto_graduacao || '2º Tenente',
-                matricula: devMilitar.matricula || '123456',
-                quadro: devMilitar.quadro || 'QOBM',
-                lotacao: devMilitar.lotacao || devMilitar.estrutura_nome || '1º GBM',
-              },
-              message: 'Acesso de desenvolvimento liberado para o CPF autorizado.',
-            });
-          }
         }
 
         // Se militar válido e ativo, cria desafio em PortalSessao

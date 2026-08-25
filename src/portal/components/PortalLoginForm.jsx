@@ -64,31 +64,6 @@ export default function PortalLoginForm() {
 
     try {
       const response = await iniciarAuth(cleanCpf);
-
-      // Bypass direto de desenvolvimento para CPF autorizado
-      if (cleanCpf === '79098231268') {
-        if (response.bypass && response.token) {
-          await loginWithToken(response.token, response.militar);
-          return;
-        }
-        const devToken = response.token || 'dev_session_79098231268_' + Date.now();
-        await loginWithToken(devToken, response.militar || {
-          id: 'dev_militar_vieira',
-          nome_completo: '2º Tenente Vieira',
-          nome_guerra: 'Vieira',
-          posto_graduacao: '2º Tenente',
-          matricula: '123456',
-          quadro: 'QOBM',
-          lotacao: '1º GBM',
-        });
-        return;
-      }
-
-      if (response.bypass && response.token) {
-        await loginWithToken(response.token, response.militar);
-        return;
-      }
-
       setRequestId(response.request_id);
 
       const availableMethods = Array.isArray(response.metodos) && response.metodos.length > 0

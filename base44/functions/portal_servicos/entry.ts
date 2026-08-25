@@ -482,8 +482,12 @@ export default async function (req: Request): Promise<Response> {
     // Consulta campanhas ativas aplicáveis a este militar
     let campanhasAtivasMilitar: any[] = [];
     try {
-      const allCamp = await base44.asServiceRole.entities.CampanhaPortal.filter({ status: 'Aberta_Coleta' });
+      const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
       campanhasAtivasMilitar = (allCamp || []).filter((cp: any) => {
+        const st = String(cp.status || '').toLowerCase();
+        const isAtiva = st === 'aberta_coleta' || st === 'ativa' || st === 'aberta' || st === 'em_andamento' || !cp.status;
+        if (!isAtiva) return false;
+
         if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
         if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
           return matchMilitarEscopoUnidade(militar, cp.escopo_unidades_ids);
