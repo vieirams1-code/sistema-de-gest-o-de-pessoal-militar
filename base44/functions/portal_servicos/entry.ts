@@ -460,7 +460,7 @@ export default async function (req: Request): Promise<Response> {
     // ========================================================================
     assertNoClientSuppliedMilitarId(rawBody);
 
-    const sessionAuth = await requirePortalSession(req, base44, correlationId);
+    const sessionAuth = await requirePortalSession(req, base44, rawBody);
     if (!sessionAuth.ok || !sessionAuth.context) {
       return new Response(JSON.stringify({ error: sessionAuth.error || 'Sessão inválida ou expirada.' }), {
         status: sessionAuth.status || 401,
