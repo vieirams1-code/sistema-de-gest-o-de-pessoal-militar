@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../context/PortalAuthContext';
 import PortalCadastroView from './PortalCadastroView';
 import PortalFeriasView from './PortalFeriasView';
@@ -17,16 +18,20 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 
 export default function PortalHomeView() {
   const { militar, logout } = usePortalAuth();
-  const [currentModule, setCurrentModule] = useState('HOME'); // 'HOME' | 'CADASTRO' | 'FERIAS'
+  const location = useLocation();
+  const navigate = useNavigate();
 
   if (!militar) return null;
 
-  if (currentModule === 'CADASTRO') {
-    return <PortalCadastroView onBack={() => setCurrentModule('HOME')} />;
+  const pathname = (location.pathname || '').toLowerCase();
+
+  // Roteamento direto por URL
+  if (pathname.includes('/cadastro') || pathname.includes('/conferencia')) {
+    return <PortalCadastroView onBack={() => navigate('/portal')} />;
   }
 
-  if (currentModule === 'FERIAS') {
-    return <PortalFeriasView onBack={() => setCurrentModule('HOME')} />;
+  if (pathname.includes('/ferias') || pathname.includes('/opcao-ferias')) {
+    return <PortalFeriasView onBack={() => navigate('/portal')} />;
   }
 
   const initials = militar.nome_guerra
@@ -107,7 +112,7 @@ export default function PortalHomeView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Card 1: Atualização Cadastral (Fase 1.3A) */}
           <Card
-            onClick={() => setCurrentModule('CADASTRO')}
+            onClick={() => navigate('/portal/cadastro')}
             className="hover:shadow-md transition-all border-slate-200 cursor-pointer group hover:border-[#1e3a5f]/40 bg-white"
           >
             <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
@@ -130,7 +135,7 @@ export default function PortalHomeView() {
 
           {/* Card 2: Férias e Fracionamento (Fase 1.3B) */}
           <Card
-            onClick={() => setCurrentModule('FERIAS')}
+            onClick={() => navigate('/portal/ferias')}
             className="hover:shadow-md transition-all border-slate-200 cursor-pointer group hover:border-emerald-600/40 bg-white"
           >
             <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
@@ -143,7 +148,7 @@ export default function PortalHomeView() {
                     Plano de Férias & Saldos
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Opção de parcelamento e consulta de períodos
+                    Escolha suas 3 opções de meses e consulte saldos
                   </CardDescription>
                 </div>
               </div>
