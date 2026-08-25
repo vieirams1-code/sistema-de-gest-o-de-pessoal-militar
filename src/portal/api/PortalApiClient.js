@@ -136,3 +136,47 @@ export async function portalFetch(functionName, data = {}) {
     throw err;
   }
 }
+
+/**
+ * Inicia o desafio de autenticação identificando o militar por CPF.
+ */
+export async function iniciarAuth(cpf) {
+  return portalFetch('portal_auth', {
+    acao: 'INICIAR',
+    cpf,
+  });
+}
+
+/**
+ * Solicita o envio do código OTP pelo canal escolhido.
+ */
+export async function enviarOtp(requestId, canal = 'EMAIL') {
+  return portalFetch('portal_auth', {
+    acao: 'ENVIAR',
+    request_id: requestId,
+    canal,
+  });
+}
+
+/**
+ * Valida o código OTP e obtém o PortalToken.
+ */
+export async function validarOtp(requestId, otp) {
+  const result = await portalFetch('portal_auth', {
+    acao: 'VALIDAR',
+    request_id: requestId,
+    otp,
+  });
+  if (result?.token) {
+    setPortalToken(result.token);
+  }
+  return result;
+}
+
+/**
+ * Consulta o perfil seguro do militar autenticado.
+ */
+export async function getMe() {
+  return portalFetch('portal_getMe');
+}
+

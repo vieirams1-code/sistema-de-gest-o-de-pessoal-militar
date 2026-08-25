@@ -1,0 +1,94 @@
+{
+  "name": "PortalAuthConfig",
+  "type": "object",
+  "title": "Configuração de Autenticação do Portal",
+  "description": "Configurações globais de canais e parâmetros de segurança da autenticação OTP do Portal do Militar.",
+  "properties": {
+    "email_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Habilita o canal de e-mail para envio de OTP"
+    },
+    "sms_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Habilita o canal de SMS para envio de OTP"
+    },
+    "whatsapp_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Habilita o canal de WhatsApp para envio de OTP"
+    },
+    "email_provider": {
+      "type": "string",
+      "default": "base44_core",
+      "description": "Provedor operacional de e-mail (ex: base44_core)"
+    },
+    "sms_provider": {
+      "type": "string",
+      "default": "disabled",
+      "description": "Provedor operacional de SMS (ex: disabled)"
+    },
+    "whatsapp_provider": {
+      "type": "string",
+      "default": "disabled",
+      "description": "Provedor operacional de WhatsApp (ex: disabled)"
+    },
+    "allow_channel_choice": {
+      "type": "boolean",
+      "default": true,
+      "description": "Permite que o usuário selecione o canal se houver múltiplos disponíveis"
+    },
+    "default_channel": {
+      "type": "string",
+      "enum": ["EMAIL", "SMS", "WHATSAPP"],
+      "default": "EMAIL",
+      "description": "Canal prioritário padrão"
+    },
+    "otp_ttl_seconds": {
+      "type": "number",
+      "default": 300,
+      "description": "Tempo de vida útil (TTL) do código OTP em segundos (padrão: 300s = 5min)"
+    },
+    "otp_resend_seconds": {
+      "type": "number",
+      "default": 60,
+      "description": "Tempo mínimo de espera para reenvio de novo código OTP em segundos"
+    },
+    "otp_max_attempts": {
+      "type": "number",
+      "default": 3,
+      "description": "Número máximo de tentativas consecutivas incorretas antes da invalidação"
+    },
+    "otp_max_sends_per_hour": {
+      "type": "number",
+      "default": 3,
+      "description": "Limite máximo de disparos de OTP permitidos por militar no intervalo de 1 hora"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Define se a configuração está ativa"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp da última alteração"
+    }
+  },
+  "required": [
+    "email_enabled",
+    "email_provider",
+    "otp_ttl_seconds",
+    "otp_resend_seconds",
+    "otp_max_attempts",
+    "otp_max_sends_per_hour",
+    "ativo"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
