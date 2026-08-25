@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   Calendar,
@@ -100,6 +100,11 @@ export default function PainelPlanoFerias() {
   const [selecoesMilitares, setSelecoesMilitares] = useState({});
   const [militaresEmEdicao, setMilitaresEmEdicao] = useState({});
 
+  // POPUP LATERAL (DRAWER) E DESTAQUE TEMPORÁRIO DE 2 SEGUNDOS
+  const [militarModalAberto, setMilitarModalAberto] = useState(null);
+  const [militarDestaqueAmareloId, setMilitarDestaqueAmareloId] = useState(null);
+  const destaqueTimerRef = useRef(null);
+
   // Filtros & Pesquisa
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
@@ -109,6 +114,30 @@ export default function PainelPlanoFerias() {
 
   // Modal para Justificativa de Não Contemplado
   const [modalNaoContemplado, setModalNaoContemplado] = useState({ open: false, opcao: null, justificativa: '' });
+
+  // Função para fechar o popup lateral e ativar o destaque amarelo de 2 segundos
+  const handleFecharPopupLateral = (opIdTarget = null) => {
+    const idParaDestacar = opIdTarget || militarModalAberto?.id;
+    setMilitarModalAberto(null);
+
+    if (idParaDestacar) {
+      setMilitarDestaqueAmareloId(idParaDestacar);
+      if (destaqueTimerRef.current) {
+        clearTimeout(destaqueTimerRef.current);
+      }
+      destaqueTimerRef.current = setTimeout(() => {
+        setMilitarDestaqueAmareloId(null);
+      }, 2000);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (destaqueTimerRef.current) {
+        clearTimeout(destaqueTimerRef.current);
+      }
+    };
+  }, []);
 
   // Carrega lista de campanhas e opções da campanha selecionada
   const carregarPainel = async (campanhaAlvoId = null) => {
@@ -130,7 +159,6 @@ export default function PainelPlanoFerias() {
         selected = listaCampanhas.find((c) => c.id === campanhaAlvoId) || null;
       }
       if (!selected && listaCampanhas.length > 0) {
-        // Prioriza a primeira campanha ativa/aberta; se não houver, pega a primeira
         selected = listaCampanhas.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || listaCampanhas[0];
       }
       setCampanhaSelecionada(selected);
@@ -165,7 +193,7 @@ export default function PainelPlanoFerias() {
           initialEditing[op.id] = false;
         } else {
           initialMap[op.id] = { fracao1: mes1, fracao2: mes2, fracao3: mes3, justificativa: '' };
-          initialEditing[op.id] = selected?.status === 'Aberta_Coleta'; // Se campanha estiver ativa, começa editável
+          initialEditing[op.id] = selected?.status === 'Aberta_Coleta';
         }
       });
 
@@ -244,6 +272,7 @@ export default function PainelPlanoFerias() {
       setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
       setFeedback({ type: 'success', msg: `Escala salva para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
       await carregarPainel(campanhaSelecionada?.id);
+      handleFecharPopupLateral(op.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar escala.' });
     } finally {
@@ -269,10 +298,12 @@ export default function PainelPlanoFerias() {
         },
       });
 
+      const opId = op.id;
       setModalNaoContemplado({ open: false, opcao: null, justificativa: '' });
-      setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
+      setMilitaresEmEdicao((prev) => ({ ...prev, [opId]: false }));
       setFeedback({ type: 'success', msg: `${op.militar_posto} ${op.militar_nome} registrado como NÃO CONTEMPLADO.` });
       await carregarPainel(campanhaSelecionada?.id);
+      handleFecharPopupLateral(opId);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao registrar não contemplado.' });
     } finally {
@@ -809,8 +840,8 @@ export default function PainelPlanoFerias() {
               </CardContent>
             </Card>
 
-            {/* LISTAGEM DE MILITARES */}
-            <div className="space-y-4">
+            {/* LISTAGEM COMPACTA DE MILITARES (APENAS CABEÇALHO/LINHA) */}
+            <div className="space-y-2.5">
               {opcoesFiltradas.length === 0 ? (
                 <Card className="border-slate-200 shadow-sm bg-white">
                   <CardContent className="p-8 text-center text-slate-500 text-xs">
@@ -820,323 +851,98 @@ export default function PainelPlanoFerias() {
               ) : (
                 opcoesFiltradas.map((op) => {
                   const modalidade = op.modalidade || '2_ETAPAS_15';
-                  const numFracoes = modalidade === '1_ETAPA_30' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
-                  const diasPorFracao = modalidade === '1_ETAPA_30' ? [30] : modalidade === '3_ETAPAS_10' ? [10, 10, 10] : [15, 15];
-
-                  const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
-                  const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
-                  const mesOpcao3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
-
-                  const militarSelecao = selecoesMilitares[op.id] || {
-                    fracao1: mesOpcao1,
-                    fracao2: mesOpcao2,
-                    fracao3: mesOpcao3,
-                  };
-
                   const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
                   const isGerado = Boolean(op.gerado_ferias_efetivas);
                   const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
-                  const isEditing = militaresEmEdicao[op.id] === true;
+                  const isDestacadoAmarelo = militarDestaqueAmareloId === op.id;
 
                   return (
-                    <Card key={op.id} className="border-slate-200 bg-white shadow-xs rounded-2xl overflow-hidden">
-                      <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-                            {op.militar_posto?.slice(0, 3) || 'MIL'}
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-extrabold text-slate-900 text-sm">
-                                {op.militar_posto} {op.militar_nome}
-                              </span>
-                              <span className="text-xs text-slate-400 font-mono">
-                                Mat: {op.militar_matricula || '-'}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500">
-                              Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</strong>
-                            </p>
-                          </div>
+                    <div
+                      key={op.id}
+                      onClick={() => setMilitarModalAberto(op)}
+                      className={`p-3.5 rounded-2xl border transition-all duration-700 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs hover:shadow-sm ${
+                        isDestacadoAmarelo
+                          ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300 shadow-md'
+                          : 'bg-white border-slate-200 hover:border-[#1e3a5f]/40 hover:bg-slate-50/70'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                          {op.militar_posto?.slice(0, 3) || 'MIL'}
                         </div>
-
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2.5 py-1 rounded-xl bg-slate-200 text-slate-800 text-[11px] font-bold">
-                            {modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}
-                          </span>
-
-                          <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center shadow-2xs ${
-                            isGerado
-                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                              : isNaoContemplado
-                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                              : isSalvo
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : 'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}>
-                            {isGerado ? (
-                              <>
-                                <Lock className="w-3 h-3 mr-1" />
-                                Férias Geradas no SGP
-                              </>
-                            ) : isNaoContemplado ? (
-                              <>
-                                <Ban className="w-3 h-3 mr-1" />
-                                Não Contemplado
-                              </>
-                            ) : isSalvo ? (
-                              <>
-                                <Check className="w-3 h-3 mr-1" />
-                                Escala Salva / Pronta
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="w-3 h-3 mr-1" />
-                                Pendente de Definição
-                              </>
-                            )}
-                          </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-2 flex-wrap">
+                            <span className="font-extrabold text-slate-900 text-sm">
+                              {op.militar_posto} {op.militar_nome}
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono">
+                              Mat: {op.militar_matricula || '-'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</strong>
+                          </p>
                         </div>
-                      </CardHeader>
+                      </div>
 
-                      <CardContent className="p-4 sm:p-5 space-y-4 text-xs">
-                        {/* HISTÓRICO PERMANENTE DAS OPÇÕES */}
-                        <div className="p-3 bg-slate-100/60 rounded-2xl border border-slate-200 space-y-1.5">
-                          <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wide flex items-center">
-                            <Star className="w-3 h-3 mr-1 text-amber-500 fill-amber-500" />
-                            Histórico de Preferências Registradas pelo Militar no Portal:
+                      <div className="flex items-center space-x-2 shrink-0 justify-between sm:justify-end">
+                        {isSalvo && op.decisao_camada_1_meses && (
+                          <span className="hidden md:inline-flex px-2.5 py-1 rounded-xl bg-blue-50 border border-blue-200 text-[#1e3a5f] text-[11px] font-bold">
+                            {op.decisao_camada_1_meses}
                           </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                            <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                              <span className="text-slate-500 text-[11px]">1ª Opção:</span>
-                              <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao1)}</strong>
-                            </div>
-                            <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                              <span className="text-slate-500 text-[11px]">2ª Opção:</span>
-                              <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao2)}</strong>
-                            </div>
-                            <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                              <span className="text-slate-500 text-[11px]">3ª Opção:</span>
-                              <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao3)}</strong>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* ESTADO DE EXIBIÇÃO / EDIÇÃO */}
-                        {isGerado ? (
-                          <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-extrabold text-purple-950 text-xs flex items-center">
-                                <Lock className="w-3.5 h-3.5 mr-1 text-purple-700" />
-                                Escalação Oficial Consolidada & Gerada:
-                              </span>
-                              <span className="text-[11px] text-purple-800 font-semibold">
-                                Férias registradas no módulo SGP
-                              </span>
-                            </div>
-                            <p className="text-sm font-black text-purple-900">
-                              {op.decisao_camada_1_meses}
-                            </p>
-                          </div>
-                        ) : isNaoContemplado && !isEditing ? (
-                          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="space-y-1">
-                              <span className="font-extrabold text-rose-950 text-xs flex items-center">
-                                <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
-                                Militar Não Contemplado nesta Campanha
-                              </span>
-                              <p className="text-rose-800 text-[11px]">
-                                {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar nesta campanha.'}
-                              </p>
-                            </div>
-
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
-                              className="border-rose-300 text-rose-900 hover:bg-rose-100 rounded-xl text-xs font-bold h-8 shrink-0"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 mr-1" />
-                              Alterar / Contemplar
-                            </Button>
-                          </div>
-                        ) : isSalvo && !isEditing ? (
-                          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="space-y-1">
-                              <span className="font-extrabold text-emerald-950 text-xs flex items-center">
-                                <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
-                                Escala Definida e Pronta para Geração:
-                              </span>
-                              <p className="text-sm font-extrabold text-emerald-900">
-                                {op.decisao_camada_1_meses}
-                              </p>
-                            </div>
-
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
-                              className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs font-bold h-8 shrink-0"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 mr-1" />
-                              Editar Escala
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {Array.from({ length: numFracoes }).map((_, idx) => {
-                              const numFracao = idx + 1;
-                              const dias = diasPorFracao[idx] || 15;
-                              const mesAtualFracao = militarSelecao[`fracao${numFracao}`] || '01';
-
-                              const isOpcao1 = mesAtualFracao === mesOpcao1;
-                              const isOpcao2 = mesAtualFracao === mesOpcao2;
-                              const isOpcao3 = mesAtualFracao === mesOpcao3;
-                              const isOutroMes = !isOpcao1 && !isOpcao2 && !isOpcao3;
-
-                              return (
-                                <div
-                                  key={numFracao}
-                                  className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-extrabold text-slate-800 text-xs flex items-center">
-                                      <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                                      {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias):
-                                    </span>
-                                    <span className="text-[11px] font-bold text-slate-600">
-                                      Mês Selecionado: <strong className="text-blue-900 bg-white px-2 py-0.5 rounded-md border border-blue-200">{getNomeMesPorVal(mesAtualFracao)}</strong>
-                                    </span>
-                                  </div>
-
-                                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao1)}
-                                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                        isOpcao1
-                                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-200'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30'
-                                      }`}
-                                    >
-                                      <div>
-                                        <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao1 ? 'text-emerald-100' : 'text-emerald-700'}`}>
-                                          ⭐ 1ª Opção
-                                        </span>
-                                        <strong className="text-xs block">{getNomeMesPorVal(mesOpcao1)}</strong>
-                                      </div>
-                                      {isOpcao1 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao2)}
-                                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                        isOpcao2
-                                          ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
-                                      }`}
-                                    >
-                                      <div>
-                                        <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao2 ? 'text-blue-100' : 'text-slate-500'}`}>
-                                          2ª Opção
-                                        </span>
-                                        <strong className="text-xs block">{getNomeMesPorVal(mesOpcao2)}</strong>
-                                      </div>
-                                      {isOpcao2 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao3)}
-                                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                        isOpcao3
-                                          ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
-                                      }`}
-                                    >
-                                      <div>
-                                        <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao3 ? 'text-blue-100' : 'text-slate-500'}`}>
-                                          3ª Opção
-                                        </span>
-                                        <strong className="text-xs block">{getNomeMesPorVal(mesOpcao3)}</strong>
-                                      </div>
-                                      {isOpcao3 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                    </button>
-
-                                    <div className={`p-2 rounded-xl border flex flex-col justify-center transition-all ${
-                                      isOutroMes
-                                        ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-200'
-                                        : 'bg-white border-slate-200'
-                                    }`}>
-                                      <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
-                                        ✏️ Outro Mês
-                                      </span>
-                                      <select
-                                        value={isOutroMes ? mesAtualFracao : ''}
-                                        onChange={(e) => {
-                                          if (e.target.value) {
-                                            handleMudarMesFracao(op.id, numFracao, e.target.value);
-                                          }
-                                        }}
-                                        className="w-full h-7 px-1.5 bg-transparent border-0 text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                                      >
-                                        <option value="">Selecionar...</option>
-                                        {LISTA_MESES.map((m) => (
-                                          <option key={m.val} value={m.val}>
-                                            {m.nome}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
-                                className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-bold rounded-xl h-9"
-                              >
-                                <Ban className="w-3.5 h-3.5 mr-1" />
-                                🚫 Marcar como Não Contemplado
-                              </Button>
-
-                              <div className="flex items-center space-x-2">
-                                {isSalvo && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }))}
-                                    className="text-slate-500 hover:text-slate-800 text-xs rounded-xl h-9"
-                                  >
-                                    Cancelar
-                                  </Button>
-                                )}
-
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={actionLoading}
-                                  onClick={() => handleSalvarEscalaMilitar(op)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-9 px-5 shadow-sm"
-                                >
-                                  <Check className="w-3.5 h-3.5 mr-1.5" />
-                                  Salvar Escala Definitiva
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
                         )}
-                      </CardContent>
-                    </Card>
+
+                        <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 text-[11px] font-bold">
+                          {modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}
+                        </span>
+
+                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center shadow-2xs ${
+                          isGerado
+                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                            : isNaoContemplado
+                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                            : isSalvo
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}>
+                          {isGerado ? (
+                            <>
+                              <Lock className="w-3 h-3 mr-1" />
+                              Férias Geradas
+                            </>
+                          ) : isNaoContemplado ? (
+                            <>
+                              <Ban className="w-3 h-3 mr-1" />
+                              Não Contemplado
+                            </>
+                          ) : isSalvo ? (
+                            <>
+                              <Check className="w-3 h-3 mr-1" />
+                              Escala Salva / Pronta
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pendente
+                            </>
+                          )}
+                        </span>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMilitarModalAberto(op);
+                          }}
+                          className="h-8 px-2.5 text-xs text-[#1e3a5f] hover:bg-blue-100 rounded-xl font-bold flex items-center"
+                        >
+                          <span>Opções</span>
+                          <ChevronRight className="w-4 h-4 ml-1 text-slate-400" />
+                        </Button>
+                      </div>
+                    </div>
                   );
                 })
               )}
@@ -1206,6 +1012,316 @@ export default function PainelPlanoFerias() {
             </div>
           </div>
         )}
+
+        {/* POPUP LATERAL (DRAWER / SLIDE-OVER) PARA GERENCIAR AS OPÇÕES DO MILITAR */}
+        {militarModalAberto && (() => {
+          const op = militarModalAberto;
+          const modalidade = op.modalidade || '2_ETAPAS_15';
+          const numFracoes = modalidade === '1_ETAPA_30' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
+          const diasPorFracao = modalidade === '1_ETAPA_30' ? [30] : modalidade === '3_ETAPAS_10' ? [10, 10, 10] : [15, 15];
+
+          const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+          const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+          const mesOpcao3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+
+          const militarSelecao = selecoesMilitares[op.id] || {
+            fracao1: mesOpcao1,
+            fracao2: mesOpcao2,
+            fracao3: mesOpcao3,
+          };
+
+          const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
+          const isGerado = Boolean(op.gerado_ferias_efetivas);
+          const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
+          const isEditing = militaresEmEdicao[op.id] === true;
+
+          return (
+            <div className="fixed inset-0 z-50 overflow-hidden">
+              {/* Backdrop */}
+              <div
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in"
+                onClick={() => handleFecharPopupLateral(op.id)}
+              />
+
+              {/* Painel Lateral */}
+              <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+                <div className="w-screen max-w-xl bg-white shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300">
+                  {/* CABEÇALHO DO POPUP */}
+                  <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                        {op.militar_posto?.slice(0, 3) || 'MIL'}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-extrabold text-slate-900 text-sm">
+                            {op.militar_posto} {op.militar_nome}
+                          </h3>
+                          <span className="text-xs text-slate-400 font-mono">
+                            Mat: {op.militar_matricula || '-'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {op.lotacao_nome || 'Unidade'} • Período: <strong>{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleFecharPopupLateral(op.id)}
+                      className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* CORPO DO POPUP */}
+                  <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1">
+                    {/* HISTÓRICO PERMANENTE DAS 3 PREFERÊNCIAS */}
+                    <div className="p-3.5 bg-slate-100/70 rounded-2xl border border-slate-200 space-y-2">
+                      <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide flex items-center">
+                        <Star className="w-3.5 h-3.5 mr-1 text-amber-500 fill-amber-500" />
+                        Histórico de Preferências Registradas pelo Militar:
+                      </span>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                          <span className="text-slate-500 text-[10px] block">1ª Opção:</span>
+                          <strong className="text-slate-900 font-bold block truncate">{getNomeMesPorVal(mesOpcao1)}</strong>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                          <span className="text-slate-500 text-[10px] block">2ª Opção:</span>
+                          <strong className="text-slate-900 font-bold block truncate">{getNomeMesPorVal(mesOpcao2)}</strong>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                          <span className="text-slate-500 text-[10px] block">3ª Opção:</span>
+                          <strong className="text-slate-900 font-bold block truncate">{getNomeMesPorVal(mesOpcao3)}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ESTADO CONSOLIDADO OU FORMULÁRIO DE SELEÇÃO */}
+                    {isGerado ? (
+                      <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-2">
+                        <span className="font-extrabold text-purple-950 text-xs flex items-center">
+                          <Lock className="w-4 h-4 mr-1.5 text-purple-700" />
+                          Escalação Oficial Consolidada & Gerada no SGP:
+                        </span>
+                        <p className="text-sm font-black text-purple-900">
+                          {op.decisao_camada_1_meses}
+                        </p>
+                      </div>
+                    ) : isNaoContemplado && !isEditing ? (
+                      <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-rose-950 text-xs flex items-center">
+                            <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
+                            Militar Não Contemplado nesta Campanha
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
+                            className="border-rose-300 text-rose-900 hover:bg-rose-100 rounded-xl text-xs font-bold h-7"
+                          >
+                            <Edit3 className="w-3 h-3 mr-1" />
+                            Alterar / Contemplar
+                          </Button>
+                        </div>
+                        <p className="text-rose-800 text-[11px]">
+                          {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar nesta campanha.'}
+                        </p>
+                      </div>
+                    ) : isSalvo && !isEditing ? (
+                      <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-emerald-950 text-xs flex items-center">
+                            <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
+                            Escala Definida e Pronta para Geração:
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
+                            className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs font-bold h-7"
+                          >
+                            <Edit3 className="w-3 h-3 mr-1" />
+                            Editar Escala
+                          </Button>
+                        </div>
+                        <p className="text-sm font-extrabold text-emerald-900">
+                          {op.decisao_camada_1_meses}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between pb-1">
+                          <span className="font-bold text-slate-800 text-xs">
+                            Definição dos Meses ({modalidade === '1_ETAPA_30' ? 'Integral' : `${numFracoes} Frações`}):
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            Clique na opção desejada para cada fração
+                          </span>
+                        </div>
+
+                        {Array.from({ length: numFracoes }).map((_, idx) => {
+                          const numFracao = idx + 1;
+                          const dias = diasPorFracao[idx] || 15;
+                          const mesAtualFracao = militarSelecao[`fracao${numFracao}`] || '01';
+
+                          const isOpcao1 = mesAtualFracao === mesOpcao1;
+                          const isOpcao2 = mesAtualFracao === mesOpcao2;
+                          const isOpcao3 = mesAtualFracao === mesOpcao3;
+                          const isOutroMes = !isOpcao1 && !isOpcao2 && !isOpcao3;
+
+                          return (
+                            <div
+                              key={numFracao}
+                              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-slate-800 text-xs flex items-center">
+                                  <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                                  {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias):
+                                </span>
+                                <span className="text-[11px] font-bold text-slate-600">
+                                  Mês: <strong className="text-blue-900 bg-white px-2 py-0.5 rounded-md border border-blue-200">{getNomeMesPorVal(mesAtualFracao)}</strong>
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao1)}
+                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                    isOpcao1
+                                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-200'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30'
+                                  }`}
+                                >
+                                  <div>
+                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao1 ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                                      ⭐ 1ª Opção
+                                    </span>
+                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao1)}</strong>
+                                  </div>
+                                  {isOpcao1 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao2)}
+                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                    isOpcao2
+                                      ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
+                                  }`}
+                                >
+                                  <div>
+                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao2 ? 'text-blue-100' : 'text-slate-500'}`}>
+                                      2ª Opção
+                                    </span>
+                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao2)}</strong>
+                                  </div>
+                                  {isOpcao2 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao3)}
+                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                    isOpcao3
+                                      ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
+                                  }`}
+                                >
+                                  <div>
+                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao3 ? 'text-blue-100' : 'text-slate-500'}`}>
+                                      3ª Opção
+                                    </span>
+                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao3)}</strong>
+                                  </div>
+                                  {isOpcao3 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                                </button>
+
+                                <div className={`p-2 rounded-xl border flex flex-col justify-center transition-all ${
+                                  isOutroMes
+                                    ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-200'
+                                    : 'bg-white border-slate-200'
+                                }`}>
+                                  <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
+                                    ✏️ Outro Mês
+                                  </span>
+                                  <select
+                                    value={isOutroMes ? mesAtualFracao : ''}
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        handleMudarMesFracao(op.id, numFracao, e.target.value);
+                                      }
+                                    }}
+                                    className="w-full h-7 px-1.5 bg-transparent border-0 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                                  >
+                                    <option value="">Selecionar...</option>
+                                    {LISTA_MESES.map((m) => (
+                                      <option key={m.val} value={m.val}>
+                                        {m.nome}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RODAPÉ DO POPUP */}
+                  <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
+                      className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-bold rounded-xl h-9"
+                    >
+                      <Ban className="w-3.5 h-3.5 mr-1" />
+                      🚫 Não Contemplado
+                    </Button>
+
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFecharPopupLateral(op.id)}
+                        className="text-slate-600 hover:text-slate-800 text-xs rounded-xl h-9"
+                      >
+                        Fechar
+                      </Button>
+
+                      {(!isSalvo || isEditing) && !isGerado && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={actionLoading}
+                          onClick={() => handleSalvarEscalaMilitar(op)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-9 px-5 shadow-sm"
+                        >
+                          <Check className="w-3.5 h-3.5 mr-1.5" />
+                          Salvar Escala Definitiva
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* MODAL PARA JUSTIFICATIVA DE NÃO CONTEMPLADO */}
         {modalNaoContemplado.open && (
