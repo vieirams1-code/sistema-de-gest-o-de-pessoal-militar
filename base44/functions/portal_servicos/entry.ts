@@ -736,30 +736,74 @@ export default async function (req: Request): Promise<Response> {
           solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ militar_id: militarId });
         } catch (_e) {}
 
+        let militarFresh = militar;
+
+        // Auto-sincronização de solicitações aprovadas para garantir que a ficha do militar esteja sempre atualizada
+        try {
+          const solicitacoesAprovadas = (solicitacoes || []).filter((s: any) => s.status === 'Aprovada' && s.campo_chave && s.valor_proposto);
+          if (solicitacoesAprovadas.length > 0) {
+            let militarUpdatePayload: any = {};
+            for (const s of (solicitacoesAprovadas as any[])) {
+              const campo = s.campo_chave;
+              const valor = s.valor_proposto;
+
+              if (campo === 'endereco_logradouro' || campo === 'logradouro' || campo === 'endereco') {
+                if (militarFresh.logradouro !== valor) militarUpdatePayload.logradouro = valor;
+              } else if (campo === 'endereco_numero' || campo === 'numero_endereco' || campo === 'numero') {
+                if (militarFresh.numero_endereco !== valor) militarUpdatePayload.numero_endereco = valor;
+              } else if (campo === 'endereco_bairro' || campo === 'bairro') {
+                if (militarFresh.bairro !== valor) militarUpdatePayload.bairro = valor;
+              } else if (campo === 'endereco_cidade' || campo === 'cidade') {
+                if (militarFresh.cidade !== valor) militarUpdatePayload.cidade = valor;
+              } else if (campo === 'endereco_cep' || campo === 'cep') {
+                if (militarFresh.cep !== valor) militarUpdatePayload.cep = valor;
+              } else if (campo === 'endereco_complemento' || campo === 'complemento') {
+                if (militarFresh.complemento !== valor) militarUpdatePayload.complemento = valor;
+              } else if (campo === 'telefone_celular' || campo === 'telefone' || campo === 'celular') {
+                if (militarFresh.telefone_celular !== valor || militarFresh.telefone !== valor) {
+                  militarUpdatePayload.telefone = valor;
+                  militarUpdatePayload.telefone_celular = valor;
+                }
+              } else if (campo === 'email_funcional') {
+                if (militarFresh.email_funcional !== valor) militarUpdatePayload.email_funcional = valor;
+              } else if (campo === 'email_particular' || campo === 'email') {
+                if (militarFresh.email_particular !== valor) militarUpdatePayload.email_particular = valor;
+              } else if (campo === 'estado_civil') {
+                if (militarFresh.estado_civil !== valor) militarUpdatePayload.estado_civil = valor;
+              }
+            }
+
+            if (Object.keys(militarUpdatePayload).length > 0) {
+              await base44.asServiceRole.entities.Militar.update(militarId, militarUpdatePayload);
+              militarFresh = await base44.asServiceRole.entities.Militar.get(militarId);
+            }
+          }
+        } catch (_errSync) {}
+
         const dadosCadastrais = {
-          id: militar.id,
-          nome_completo: militar.nome_completo || '',
-          nome_guerra: militar.nome_guerra || '',
-          posto_graduacao: militar.posto_graduacao || '',
-          matricula: militar.matricula || '',
-          quadro: militar.quadro || '',
-          lotacao: militar.lotacao || '',
-          estrutura_nome: militar.estrutura_nome || '',
-          data_nascimento: militar.data_nascimento || '',
-          data_ingresso: militar.data_ingresso || '',
-          estado_civil: militar.estado_civil || '',
-          telefone_celular: militar.telefone_celular || militar.telefone || '',
-          email_funcional: militar.email_funcional || '',
-          email_particular: militar.email_particular || '',
-          endereco_logradouro: militar.endereco_logradouro || militar.endereco || '',
-          endereco_numero: militar.endereco_numero || '',
-          endereco_complemento: militar.endereco_complemento || '',
-          endereco_bairro: militar.endereco_bairro || '',
-          endereco_cidade: militar.endereco_cidade || '',
-          endereco_cep: militar.endereco_cep || '',
-          tipo_sanguineo: militar.tipo_sanguineo || '',
-          foto_url: militar.foto_url || '',
-          data_ultima_conferencia: militar.data_ultima_conferencia || null,
+          id: militarFresh.id,
+          nome_completo: militarFresh.nome_completo || '',
+          nome_guerra: militarFresh.nome_guerra || '',
+          posto_graduacao: militarFresh.posto_graduacao || '',
+          matricula: militarFresh.matricula || '',
+          quadro: militarFresh.quadro || '',
+          lotacao: militarFresh.lotacao || '',
+          estrutura_nome: militarFresh.estrutura_nome || '',
+          data_nascimento: militarFresh.data_nascimento || '',
+          data_ingresso: militarFresh.data_inclusao || militarFresh.data_ingresso || militarFresh.data_admissao || '',
+          estado_civil: militarFresh.estado_civil || '',
+          telefone_celular: militarFresh.telefone_celular || militarFresh.telefone || '',
+          email_funcional: militarFresh.email_funcional || militarFresh.email || '',
+          email_particular: militarFresh.email_particular || '',
+          endereco_logradouro: militarFresh.logradouro || militarFresh.endereco_logradouro || militarFresh.endereco || '',
+          endereco_numero: militarFresh.numero_endereco || militarFresh.endereco_numero || militarFresh.numero || '',
+          endereco_complemento: militarFresh.complemento || militarFresh.endereco_complemento || '',
+          endereco_bairro: militarFresh.bairro || militarFresh.endereco_bairro || '',
+          endereco_cidade: militarFresh.cidade || militarFresh.endereco_cidade || '',
+          endereco_cep: militarFresh.cep || militarFresh.endereco_cep || '',
+          tipo_sanguineo: militarFresh.tipo_sanguineo || '',
+          foto_url: militarFresh.foto_url || militarFresh.foto || '',
+          data_ultima_conferencia: militarFresh.data_ultima_conferencia || null,
         };
 
         const sanitizedDependentes = (dependentes || []).map((dep: any) => ({

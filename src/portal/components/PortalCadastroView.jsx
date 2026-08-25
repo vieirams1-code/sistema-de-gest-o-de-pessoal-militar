@@ -20,6 +20,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 
+function formatarDataBR(dataStr) {
+  if (!dataStr) return '-';
+  const str = String(dataStr).trim();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  return str;
+}
+
 export default function PortalCadastroView({ onBack }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -257,7 +267,7 @@ export default function PortalCadastroView({ onBack }) {
               </div>
               <div>
                 <span className="text-slate-500 block">Data de Ingresso</span>
-                <span className="font-semibold text-slate-800">{cad.data_ingresso || '-'}</span>
+                <span className="font-semibold text-slate-800">{formatarDataBR(cad.data_ingresso)}</span>
               </div>
             </div>
 
@@ -417,7 +427,7 @@ export default function PortalCadastroView({ onBack }) {
                   )}
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  {sol.data_solicitacao || 'Recentemente'}
+                  {formatarDataBR(sol.data_solicitacao) || 'Recentemente'}
                 </div>
               </div>
             ))}

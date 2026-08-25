@@ -66,11 +66,38 @@ export default function SolicitacoesAtualizacao() {
 
     // Se aprovado: atualizar o cadastro do militar
     if (acao === 'aprovar' && solicitacao.militar_id && solicitacao.campo_chave) {
-      if (CAMPOS_MUTAVEIS_WHITELIST.has(solicitacao.campo_chave)) {
-        await base44.entities.Militar.update(solicitacao.militar_id, {
-          [solicitacao.campo_chave]: solicitacao.valor_proposto,
-        });
+      const campo = solicitacao.campo_chave;
+      const valor = solicitacao.valor_proposto;
+
+      const updateData = {};
+      if (campo === 'endereco_logradouro' || campo === 'logradouro' || campo === 'endereco') {
+        updateData.logradouro = valor;
+      } else if (campo === 'endereco_numero' || campo === 'numero_endereco' || campo === 'numero') {
+        updateData.numero_endereco = valor;
+      } else if (campo === 'endereco_bairro' || campo === 'bairro') {
+        updateData.bairro = valor;
+      } else if (campo === 'endereco_cidade' || campo === 'cidade') {
+        updateData.cidade = valor;
+      } else if (campo === 'endereco_cep' || campo === 'cep') {
+        updateData.cep = valor;
+      } else if (campo === 'endereco_complemento' || campo === 'complemento') {
+        updateData.complemento = valor;
+      } else if (campo === 'telefone_celular' || campo === 'telefone' || campo === 'celular') {
+        updateData.telefone = valor;
+        updateData.telefone_celular = valor;
+      } else if (campo === 'email_funcional') {
+        updateData.email_funcional = valor;
+      } else if (campo === 'email_particular' || campo === 'email') {
+        updateData.email_particular = valor;
+      } else if (campo === 'estado_civil') {
+        updateData.estado_civil = valor;
+      } else {
+        updateData[campo] = valor;
       }
+
+      try {
+        await base44.entities.Militar.update(solicitacao.militar_id, updateData);
+      } catch (_errUpd) {}
     }
 
     queryClient.invalidateQueries({ queryKey: ['solicitacoes-atualizacao'] });

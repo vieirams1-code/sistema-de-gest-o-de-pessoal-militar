@@ -31,6 +31,16 @@ const MESES_ANO = [
   { valor: '12', nome: 'Dezembro' },
 ];
 
+function formatarDataBR(dataStr) {
+  if (!dataStr) return '-';
+  const str = String(dataStr).trim();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  return str;
+}
+
 export default function PortalFeriasView({ onBack }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -383,15 +393,15 @@ export default function PortalFeriasView({ onBack }) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs">
                   <div className="p-3 bg-white rounded-xl border border-emerald-200">
                     <span className="text-slate-500 block text-[11px]">Início do Período</span>
-                    <strong className="text-slate-800 text-sm">{periodoMaisAntigo.inicio_aquisitivo}</strong>
+                    <strong className="text-slate-800 text-sm">{formatarDataBR(periodoMaisAntigo.inicio_aquisitivo)}</strong>
                   </div>
                   <div className="p-3 bg-white rounded-xl border border-emerald-200">
                     <span className="text-slate-500 block text-[11px]">Fim do Período</span>
-                    <strong className="text-slate-800 text-sm">{periodoMaisAntigo.fim_aquisitivo}</strong>
+                    <strong className="text-slate-800 text-sm">{formatarDataBR(periodoMaisAntigo.fim_aquisitivo)}</strong>
                   </div>
                   <div className="p-3 bg-white rounded-xl border border-emerald-200">
                     <span className="text-slate-500 block text-[11px]">Data Limite para Fruição</span>
-                    <strong className="text-emerald-800 text-sm font-extrabold">{periodoMaisAntigo.limite_fruicao || `${anoCampanha}-12-31`}</strong>
+                    <strong className="text-emerald-800 text-sm font-extrabold">{formatarDataBR(periodoMaisAntigo.limite_fruicao || `${anoCampanha}-12-31`)}</strong>
                   </div>
                 </div>
               </CardContent>

@@ -59,6 +59,16 @@ function getNomeMesPorVal(val) {
   return m ? m.nome : val;
 }
 
+function formatarDataBR(dataStr) {
+  if (!dataStr) return '-';
+  const str = String(dataStr).trim();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  return str;
+}
+
 function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
   if (!detalhesStr) return fallbackVal;
   try {
@@ -544,7 +554,7 @@ export default function PainelPlanoFerias() {
                     </p>
 
                     <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Prazo: {camp.data_fim_militar || '-'}</span>
+                      <span>Prazo: {formatarDataBR(camp.data_fim_militar)}</span>
                       {modoAdmin && (
                         <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
                           <button
@@ -596,7 +606,7 @@ export default function PainelPlanoFerias() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Ano {campanhaSelecionada.ano_referencia} • Escopo: <strong>{campanhaSelecionada.escopo_unidades_nomes || 'Toda a Corporação'}</strong> • Prazo Limite: {campanhaSelecionada.data_fim_militar || 'Não definido'}
+                  Ano {campanhaSelecionada.ano_referencia} • Escopo: <strong>{campanhaSelecionada.escopo_unidades_nomes || 'Toda a Corporação'}</strong> • Prazo Limite: {formatarDataBR(campanhaSelecionada.data_fim_militar)}
                 </p>
               </div>
 
@@ -845,7 +855,7 @@ export default function PainelPlanoFerias() {
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-500">
-                              Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{op.periodo_inicio} a {op.periodo_fim}</strong>
+                              Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</strong>
                             </p>
                           </div>
                         </div>
