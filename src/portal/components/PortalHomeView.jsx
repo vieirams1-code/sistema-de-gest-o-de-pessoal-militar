@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePortalAuth } from '../context/PortalAuthContext';
+import PortalCadastroView from './PortalCadastroView';
+import PortalFeriasView from './PortalFeriasView';
 import {
   UserCheck,
   Calendar,
@@ -9,15 +11,23 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
-  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 export default function PortalHomeView() {
-  const { militar, logout, expiresAt } = usePortalAuth();
+  const { militar, logout } = usePortalAuth();
+  const [currentModule, setCurrentModule] = useState('HOME'); // 'HOME' | 'CADASTRO' | 'FERIAS'
 
   if (!militar) return null;
+
+  if (currentModule === 'CADASTRO') {
+    return <PortalCadastroView onBack={() => setCurrentModule('HOME')} />;
+  }
+
+  if (currentModule === 'FERIAS') {
+    return <PortalFeriasView onBack={() => setCurrentModule('HOME')} />;
+  }
 
   const initials = militar.nome_guerra
     ? militar.nome_guerra.slice(0, 2).toUpperCase()
@@ -91,12 +101,15 @@ export default function PortalHomeView() {
             <Sparkles className="w-4 h-4 mr-2 text-[#1e3a5f]" />
             Serviços e Autoatendimento
           </h3>
-          <span className="text-xs text-slate-500 font-medium">Portal do Militar</span>
+          <span className="text-xs text-slate-500 font-medium">Selecione uma opção</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {/* Card 1: Atualização Cadastral */}
-          <Card className="hover:shadow-md transition-all border-slate-200 cursor-pointer group">
+          {/* Card 1: Atualização Cadastral (Fase 1.3A) */}
+          <Card
+            onClick={() => setCurrentModule('CADASTRO')}
+            className="hover:shadow-md transition-all border-slate-200 cursor-pointer group hover:border-[#1e3a5f]/40 bg-white"
+          >
             <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1e3a5f] flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -107,7 +120,7 @@ export default function PortalHomeView() {
                     Ficha & Conferência Cadastral
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Confira seus dados pessoais e de contato
+                    Confira seus dados pessoais, endereço e contatos
                   </CardDescription>
                 </div>
               </div>
@@ -115,8 +128,11 @@ export default function PortalHomeView() {
             </CardHeader>
           </Card>
 
-          {/* Card 2: Férias e Fracionamento */}
-          <Card className="hover:shadow-md transition-all border-slate-200 cursor-pointer group">
+          {/* Card 2: Férias e Fracionamento (Fase 1.3B) */}
+          <Card
+            onClick={() => setCurrentModule('FERIAS')}
+            className="hover:shadow-md transition-all border-slate-200 cursor-pointer group hover:border-emerald-600/40 bg-white"
+          >
             <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -135,43 +151,41 @@ export default function PortalHomeView() {
             </CardHeader>
           </Card>
 
-          {/* Card 3: Atestados Médicos */}
-          <Card className="hover:shadow-md transition-all border-slate-200 cursor-pointer group">
+          {/* Card 3: Atestados Médicos (Informativo) */}
+          <Card className="border-slate-200 opacity-60 bg-slate-50">
             <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-bold text-slate-800 group-hover:text-amber-700 transition-colors">
+                  <CardTitle className="text-sm font-bold text-slate-700">
                     Atestados & JISO
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Envio de atestados e agendamentos de inspeção
+                    Em breve • Envio de atestados pelo celular
                   </CardDescription>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-700 transition-colors" />
             </CardHeader>
           </Card>
 
-          {/* Card 4: Central de Pendências */}
-          <Card className="hover:shadow-md transition-all border-slate-200 cursor-pointer group">
+          {/* Card 4: Central de Pendências (Informativo) */}
+          <Card className="border-slate-200 opacity-60 bg-slate-50">
             <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-bold text-slate-800 group-hover:text-purple-700 transition-colors">
+                  <CardTitle className="text-sm font-bold text-slate-700">
                     Central de Pendências
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Prazos, confirmações e avisos institucionais
+                    Em breve • Prazos e avisos da unidade
                   </CardDescription>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-700 transition-colors" />
             </CardHeader>
           </Card>
         </div>
