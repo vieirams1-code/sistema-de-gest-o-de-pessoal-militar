@@ -4,7 +4,7 @@ import PortalLayout from './PortalLayout';
 import PortalLoginForm from './components/PortalLoginForm';
 import PortalHomeView from './components/PortalHomeView';
 
-function PortalContent() {
+function PortalContent({ initialView }) {
   const { militar, isAuthenticated, isLoading } = usePortalAuth();
 
   if (isLoading) {
@@ -22,14 +22,14 @@ function PortalContent() {
   }
 
   // Autenticado: Exibe Painel de Autoatendimento do Militar
-  return <PortalHomeView />;
+  return <PortalHomeView initialView={initialView} />;
 }
 
-export default function PortalApp() {
+export default function PortalApp({ initialView }) {
   return (
     <PortalAuthProvider>
       <PortalLayout>
-        <PortalContent />
+        <PortalContent initialView={initialView} />
       </PortalLayout>
     </PortalAuthProvider>
   );

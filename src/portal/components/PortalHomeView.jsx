@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-export default function PortalHomeView() {
+export default function PortalHomeView({ initialView }) {
   const { militar, logout } = usePortalAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -25,12 +25,12 @@ export default function PortalHomeView() {
 
   const pathname = (location.pathname || '').toLowerCase();
 
-  // Roteamento direto por URL
-  if (pathname.includes('/cadastro') || pathname.includes('/conferencia')) {
+  // Roteamento direto por URL ou prop initialView
+  if (initialView === 'CADASTRO' || pathname.includes('/cadastro') || pathname.includes('/conferencia') || pathname.includes('portalcadastro')) {
     return <PortalCadastroView onBack={() => navigate('/portal')} />;
   }
 
-  if (pathname.includes('/ferias') || pathname.includes('/opcao-ferias')) {
+  if (initialView === 'FERIAS' || pathname.includes('/ferias') || pathname.includes('/opcao-ferias') || pathname.includes('portalferias')) {
     return <PortalFeriasView onBack={() => navigate('/portal')} />;
   }
 

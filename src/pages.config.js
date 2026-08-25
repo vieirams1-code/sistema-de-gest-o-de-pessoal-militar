@@ -125,10 +125,16 @@ import CursosFormacao from './pages/CursosFormacao';
 import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
 import PainelPlanoFerias from './pages/PainelPlanoFerias';
+import Portal from './pages/Portal';
+import PortalFerias from './pages/PortalFerias';
+import PortalCadastro from './pages/PortalCadastro';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "Portal": Portal,
+    "PortalFerias": PortalFerias,
+    "PortalCadastro": PortalCadastro,
     "PainelPlanoFerias": PainelPlanoFerias,
     "ConfiguracoesPortal": ConfiguracoesPortal,
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,

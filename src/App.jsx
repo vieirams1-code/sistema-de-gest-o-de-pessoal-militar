@@ -236,6 +236,18 @@ function App() {
                 }
               }
 
+              const isPortalPage = ['Portal', 'PortalFerias', 'PortalCadastro'].includes(path);
+
+              if (isPortalPage) {
+                return (
+                  <Route
+                    key={path}
+                    path={`/${path}`}
+                    element={pageContent}
+                  />
+                );
+              }
+
               return (
                 <Route
                   key={path}
