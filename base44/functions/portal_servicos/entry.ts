@@ -305,6 +305,45 @@ export default async function (req: Request): Promise<Response> {
           });
         }
 
+        // Editar Campanha
+        case 'CAMPANHA_EDITAR': {
+          const { campanha_id, campanha_payload } = payload;
+          if (!campanha_id) {
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+          }
+          const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
+            titulo: campanha_payload.titulo,
+            instrucoes: campanha_payload.instrucoes,
+            data_fim_militar: campanha_payload.data_fim_militar,
+            data_fim_unidade: campanha_payload.data_fim_unidade,
+            tipo_escopo: campanha_payload.tipo_escopo,
+            escopo_unidades_ids: campanha_payload.escopo_unidades_ids,
+            escopo_unidades_nomes: campanha_payload.escopo_unidades_nomes,
+            escopo_quadros: campanha_payload.escopo_quadros,
+          });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // Excluir Campanha
+        case 'CAMPANHA_EXCLUIR': {
+          const { campanha_id } = payload;
+          if (!campanha_id) {
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+          }
+          await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
+          return new Response(JSON.stringify({ ok: true, message: 'Campanha excluída com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // Arquivar Campanha
+        case 'CAMPANHA_ARQUIVAR': {
+          const { campanha_id } = payload;
+          if (!campanha_id) {
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+          }
+          const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Arquivada' });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha arquivada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
         // Encerrar Campanha
         case 'CAMPANHA_ENCERRAR': {
           const { campanha_id } = payload;
@@ -347,7 +386,6 @@ export default async function (req: Request): Promise<Response> {
 
             // Rotina de reparo/sincronização automática para férias já geradas
             try {
-              const allFerias = await base44.asServiceRole.entities.Ferias.filter({ data_inicio: `${ano}-01-01` });
               const allFerias2 = await base44.asServiceRole.entities.Ferias.list();
               const feriasDoAno = (allFerias2 || []).filter((f: any) => f.data_inicio && f.data_inicio.startsWith(String(ano)));
 
@@ -392,13 +430,25 @@ export default async function (req: Request): Promise<Response> {
 
           if (acao === 'PLANO_DECISAO_CAMADA_1') {
             const { opcao_id, decisao_camada_1 } = payload;
+            
+            if (decisao_camada_1?.opcao_escolhida === 'NAO_CONTEMPLADO') {
+              const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
+                status_camada_1: 'Nao_Contemplado',
+                decisao_camada_1_opcao: 'NAO_CONTEMPLADO',
+                decisao_camada_1_meses: 'Não Contemplado',
+                decisao_camada_1_detalhes: '[]',
+                gestor_unidade_id: user.id,
+                gestor_unidade_nome: decisao_camada_1?.gestor_nome || user.email,
+                data_decisao_camada_1: new Date().toISOString(),
+                justificativa_ajuste_gestor: decisao_camada_1?.justificativa || 'Militar não contemplado neste plano de férias.',
+              });
+              return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
+
             const mesesResumo = (decisao_camada_1?.parcelas || []).map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
             const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
-              status_camada_1: decisao_camada_1?.opcao_escolhida === 'OPCAO_1' ? 'Opcao_1_Aprovada'
-                : decisao_camada_1?.opcao_escolhida === 'OPCAO_2' ? 'Opcao_2_Aprovada'
-                : decisao_camada_1?.opcao_escolhida === 'OPCAO_3' ? 'Opcao_3_Aprovada'
-                : 'Ajustado_Pelo_Gestor',
-              decisao_camada_1_opcao: decisao_camada_1?.opcao_escolhida,
+              status_camada_1: 'Escala_Salva',
+              decisao_camada_1_opcao: decisao_camada_1?.opcao_escolhida || 'ESCALA_VALIDADA',
               decisao_camada_1_meses: decisao_camada_1?.resumo_meses || mesesResumo,
               decisao_camada_1_detalhes: JSON.stringify(decisao_camada_1?.parcelas || []),
               gestor_unidade_id: user.id,
@@ -422,14 +472,20 @@ export default async function (req: Request): Promise<Response> {
           }
 
           if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
-            const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+            const todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
               ano_referencia: ano,
-              status_camada_2: 'Homologado_Superior',
               gerado_ferias_efetivas: false,
             });
 
+            // Considera apenas quem foi salvo/definido e NÃO está marcado como Não Contemplado
+            const opcoes = (todasOpcoes || []).filter((op: any) =>
+              op.status_camada_1 !== 'Pendente' &&
+              op.status_camada_1 !== 'Nao_Contemplado' &&
+              op.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO'
+            );
+
             let geradasCount = 0;
-            for (const op of (opcoes || [])) {
+            for (const op of opcoes) {
               let parcelas: ParcelaItem[] = [];
               try { parcelas = JSON.parse(op.decisao_camada_1_detalhes || '[]'); } catch (_e) { parcelas = []; }
               if (parcelas.length === 0) continue;
@@ -509,9 +565,20 @@ export default async function (req: Request): Promise<Response> {
               geradasCount++;
             }
 
+            // ENCERRAMENTO AUTOMÁTICO DAS CAMPANHAS DO ANO VINCULADO
+            try {
+              const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
+              const campsAno = (allCamp || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS' && cp.ano_referencia === Number(ano));
+              for (const cp of campsAno) {
+                await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, {
+                  status: 'Encerrada',
+                });
+              }
+            } catch (_errClose) {}
+
             return new Response(JSON.stringify({
               ok: true,
-              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas.`,
+              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas no SGP e campanha de ${ano} encerrada.`,
               total_geradas: geradasCount,
             }), { status: 200, headers: { 'Content-Type': 'application/json' } });
           }

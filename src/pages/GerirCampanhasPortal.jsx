@@ -20,6 +20,10 @@ import {
   X,
   Building,
   Search,
+  Edit,
+  Trash2,
+  Archive,
+  Ban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,9 +39,11 @@ export default function GerirCampanhasPortal() {
   // Busca interna no modal de unidades
   const [buscaUnidade, setBuscaUnidade] = useState('');
 
-  // Modal de Criação de Campanha
+  // Modal de Criação / Edição de Campanha
   const [modalNovaCampanha, setModalNovaCampanha] = useState({
     open: false,
+    isEditing: false,
+    editId: null,
     tipo: 'PLANO_FERIAS', // 'PLANO_FERIAS' | 'ATUALIZACAO_CADASTRAL'
     titulo: 'Plano Anual de Férias 2027',
     ano_referencia: new Date().getFullYear() + 1,
@@ -62,11 +68,9 @@ export default function GerirCampanhasPortal() {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      // 1. Carrega campanhas do portal
       const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
       setCampanhas(res.data?.campanhas || []);
 
-      // 2. Carrega lista de unidades/estruturas/lotações
       let unidades = [];
       try {
         const lotRes = await fetchScopedLotacoes({});
@@ -80,7 +84,6 @@ export default function GerirCampanhasPortal() {
         console.warn('Falha no fetchScopedLotacoes, tentando entidades:', lotErr);
       }
 
-      // Fallback robusto: busca militares e extrai todas as lotações distintas reais cadastradas
       if (unidades.length === 0) {
         try {
           const milList = await base44.entities.Militar.list();
@@ -116,6 +119,8 @@ export default function GerirCampanhasPortal() {
     if (tipo === 'PLANO_FERIAS') {
       setModalNovaCampanha({
         open: true,
+        isEditing: false,
+        editId: null,
         tipo: 'PLANO_FERIAS',
         titulo: `Plano Anual de Férias ${ano}`,
         ano_referencia: ano,
@@ -130,6 +135,8 @@ export default function GerirCampanhasPortal() {
     } else {
       setModalNovaCampanha({
         open: true,
+        isEditing: false,
+        editId: null,
         tipo: 'ATUALIZACAO_CADASTRAL',
         titulo: `Recadastramento & Conferência Anual Obrigatória ${new Date().getFullYear()}`,
         ano_referencia: new Date().getFullYear(),
@@ -142,6 +149,25 @@ export default function GerirCampanhasPortal() {
         instrucoes: 'Conferência cadastral obrigatória de dados pessoais, contatos, endereço e dependentes.',
       });
     }
+  };
+
+  const abrirEdicaoCampanha = (camp) => {
+    setBuscaUnidade('');
+    setModalNovaCampanha({
+      open: true,
+      isEditing: true,
+      editId: camp.id,
+      tipo: camp.tipo || 'PLANO_FERIAS',
+      titulo: camp.titulo || '',
+      ano_referencia: camp.ano_referencia || (new Date().getFullYear() + 1),
+      tipo_escopo: camp.tipo_escopo || 'TODOS',
+      escopo_unidades_ids: camp.escopo_unidades_ids || [],
+      escopo_quadros: camp.escopo_quadros || [],
+      data_inicio: camp.data_inicio || new Date().toISOString().split('T')[0],
+      data_fim_militar: camp.data_fim_militar || '',
+      data_fim_unidade: camp.data_fim_unidade || '',
+      instrucoes: camp.instrucoes || '',
+    });
   };
 
   const handleToggleUnidadeEscopo = (uId) => {
@@ -172,7 +198,6 @@ export default function GerirCampanhasPortal() {
     setActionLoading(true);
     setFeedback({ type: '', msg: '' });
 
-    // Monta nomes resumidos das unidades
     let unidadesNomes = 'Toda a Corporação';
     if (modalNovaCampanha.tipo_escopo === 'UNIDADES' && modalNovaCampanha.escopo_unidades_ids.length > 0) {
       const nomes = unidadesList
@@ -182,19 +207,65 @@ export default function GerirCampanhasPortal() {
     }
 
     try {
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_CRIAR',
-        campanha_payload: {
-          ...modalNovaCampanha,
-          escopo_unidades_nomes: unidadesNomes,
-        },
-      });
+      if (modalNovaCampanha.isEditing) {
+        await base44.functions.invoke('portal_servicos', {
+          acao: 'CAMPANHA_EDITAR',
+          campanha_id: modalNovaCampanha.editId,
+          campanha_payload: {
+            ...modalNovaCampanha,
+            escopo_unidades_nomes: unidadesNomes,
+          },
+        });
+        setFeedback({ type: 'success', msg: `Campanha "${modalNovaCampanha.titulo}" atualizada com sucesso!` });
+      } else {
+        const res = await base44.functions.invoke('portal_servicos', {
+          acao: 'CAMPANHA_CRIAR',
+          campanha_payload: {
+            ...modalNovaCampanha,
+            escopo_unidades_nomes: unidadesNomes,
+          },
+        });
+        setFeedback({ type: 'success', msg: `Campanha "${res.data?.campanha?.titulo}" lançada com sucesso no Portal!` });
+      }
 
-      setFeedback({ type: 'success', msg: `Campanha "${res.data?.campanha?.titulo}" lançada com sucesso no Portal!` });
       setModalNovaCampanha({ ...modalNovaCampanha, open: false });
       await carregarDados();
     } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao criar campanha.' });
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar campanha.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExcluirCampanha = async (camp) => {
+    if (!window.confirm(`Tem certeza que deseja EXCLUIR permanentemente a campanha "${camp.titulo}"?`)) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_EXCLUIR',
+        campanha_id: camp.id,
+      });
+      setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" excluída com sucesso.` });
+      await carregarDados();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao excluir campanha.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleArquivarCampanha = async (camp) => {
+    if (!window.confirm(`Deseja arquivar a campanha "${camp.titulo}"?`)) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_ARQUIVAR',
+        campanha_id: camp.id,
+      });
+      setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" arquivada com sucesso.` });
+      await carregarDados();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao arquivar campanha.' });
     } finally {
       setActionLoading(false);
     }
@@ -287,7 +358,7 @@ export default function GerirCampanhasPortal() {
                 Gestor de Campanhas do Portal
               </h1>
               <p className="text-xs text-slate-500">
-                Inicie novos planos de férias ou recadastramentos por público-alvo e acompanhe a adesão em tempo real
+                Inicie novos planos de férias ou recadastramentos, edite prazos e acompanhe a adesão em tempo real
               </p>
             </div>
           </div>
@@ -357,6 +428,8 @@ export default function GerirCampanhasPortal() {
                 const respondidos = camp.total_respondidos || 0;
                 const percent = totalAlvo > 0 ? Math.round((respondidos / totalAlvo) * 100) : 0;
                 const isFerias = camp.tipo === 'PLANO_FERIAS';
+                const isEncerrada = camp.status === 'Encerrada';
+                const isArquivada = camp.status === 'Arquivada';
 
                 return (
                   <Card key={camp.id} className="border-slate-200 shadow-sm bg-white hover:shadow-md transition-shadow">
@@ -375,8 +448,10 @@ export default function GerirCampanhasPortal() {
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               camp.status === 'Aberta_Coleta'
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : camp.status === 'Encerrada'
+                                : isEncerrada
                                 ? 'bg-slate-100 text-slate-600'
+                                : isArquivada
+                                ? 'bg-rose-100 text-rose-700'
                                 : 'bg-blue-100 text-blue-800'
                             }`}>
                               {camp.status === 'Aberta_Coleta' ? 'Ativa • Coleta Aberta' : camp.status}
@@ -388,45 +463,71 @@ export default function GerirCampanhasPortal() {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2 self-end sm:self-center">
+                      {/* BOTÕES DE AÇÃO DA CAMPANHA (VER RETORNO, EDITAR, ARQUIVAR, EXCLUIR) */}
+                      <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-center">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => handleAbrirRetorno(camp)}
                           disabled={actionLoading}
-                          className="text-xs h-9 px-3 rounded-xl border-[#1e3a5f]/30 text-[#1e3a5f] hover:bg-blue-50 font-semibold"
+                          className="text-xs h-8 px-2.5 rounded-xl border-[#1e3a5f]/30 text-[#1e3a5f] hover:bg-blue-50 font-semibold"
                         >
-                          <Eye className="w-3.5 h-3.5 mr-1.5" />
-                          Ver Retorno & Militares
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          Retorno
                         </Button>
 
-                        {camp.status === 'Aberta_Coleta' && (
-                          <>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDispararLembretes(camp.id)}
-                              disabled={actionLoading}
-                              className="text-xs h-9 px-3 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50"
-                            >
-                              <Bell className="w-3.5 h-3.5 mr-1.5 text-amber-600" />
-                              Lembrete aos Pendentes
-                            </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => abrirEdicaoCampanha(camp)}
+                          disabled={actionLoading}
+                          className="text-xs h-8 px-2.5 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold"
+                        >
+                          <Edit className="w-3.5 h-3.5 mr-1" />
+                          Editar
+                        </Button>
 
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEncerrarCampanha(camp.id)}
-                              disabled={actionLoading}
-                              className="text-xs h-9 px-2 text-red-600 hover:bg-red-50 rounded-xl"
-                            >
-                              Encerrar
-                            </Button>
-                          </>
+                        {!isArquivada && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleArquivarCampanha(camp)}
+                            disabled={actionLoading}
+                            className="text-xs h-8 px-2 text-slate-600 hover:bg-slate-100 rounded-xl"
+                            title="Arquivar Campanha"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </Button>
                         )}
+
+                        {camp.status === 'Aberta_Coleta' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDispararLembretes(camp.id)}
+                            disabled={actionLoading}
+                            className="text-xs h-8 px-2.5 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50"
+                          >
+                            <Bell className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                            Lembretes
+                          </Button>
+                        )}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleExcluirCampanha(camp)}
+                          disabled={actionLoading}
+                          className="text-xs h-8 px-2 text-rose-600 hover:bg-rose-50 rounded-xl"
+                          title="Excluir Campanha"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     </CardHeader>
 
@@ -466,14 +567,18 @@ export default function GerirCampanhasPortal() {
           )}
         </div>
 
-        {/* MODAL: NOVA CAMPANHA (FÉRIAS OU CADASTRAL) */}
+        {/* MODAL: NOVA / EDITAR CAMPANHA */}
         {modalNovaCampanha.open && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-5 sm:p-7 space-y-5 text-xs animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-extrabold text-slate-800 text-base flex items-center">
                   <Megaphone className="w-5 h-5 mr-2 text-[#1e3a5f]" />
-                  {modalNovaCampanha.tipo === 'PLANO_FERIAS' ? 'Novo Plano Anual de Férias' : 'Nova Campanha de Atualização Cadastral'}
+                  {modalNovaCampanha.isEditing
+                    ? 'Editar Campanha'
+                    : modalNovaCampanha.tipo === 'PLANO_FERIAS'
+                    ? 'Novo Plano Anual de Férias'
+                    : 'Nova Campanha de Atualização Cadastral'}
                 </h3>
                 <button
                   type="button"
@@ -544,7 +649,6 @@ export default function GerirCampanhasPortal() {
                     ))}
                   </div>
 
-                  {/* Lista de Unidades com Barra de Busca e Ações Rápidas */}
                   {modalNovaCampanha.tipo_escopo === 'UNIDADES' && (
                     <div className="space-y-2 pt-2 border-t border-slate-200">
                       <div className="flex items-center justify-between gap-2">
@@ -552,7 +656,7 @@ export default function GerirCampanhasPortal() {
                           <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                           <Input
                             type="text"
-                            placeholder="Pesquisar unidade (ex: 1º GBM, ABM, DGP)..."
+                            placeholder="Pesquisar unidade..."
                             value={buscaUnidade}
                             onChange={(e) => setBuscaUnidade(e.target.value)}
                             className="h-8 pl-8 text-xs rounded-lg bg-white"
@@ -607,10 +711,10 @@ export default function GerirCampanhasPortal() {
                   )}
                 </div>
 
-                {/* PRAZOS */}
+                {/* PRAZOS DE VIGÊNCIA */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Prazo Final para o Militar Responder</label>
+                    <label className="font-bold text-slate-700 block">Prazo Limite para o Militar</label>
                     <Input
                       type="date"
                       value={modalNovaCampanha.data_fim_militar}
@@ -621,7 +725,7 @@ export default function GerirCampanhasPortal() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Prazo para Homologação da Unidade</label>
+                    <label className="font-bold text-slate-700 block">Prazo Limite para a Unidade</label>
                     <Input
                       type="date"
                       value={modalNovaCampanha.data_fim_unidade}
@@ -634,13 +738,13 @@ export default function GerirCampanhasPortal() {
 
                 {/* INSTRUÇÕES */}
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-700 block">Instruções aos Militares (Aviso no Portal)</label>
+                  <label className="font-bold text-slate-700 block">Instruções aos Militares</label>
                   <textarea
-                    rows={2}
+                    rows={3}
                     value={modalNovaCampanha.instrucoes}
                     onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, instrucoes: e.target.value })}
                     required
-                    className="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:border-[#1e3a5f]"
+                    className="w-full p-3 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-[#1e3a5f]"
                   />
                 </div>
 
@@ -648,19 +752,18 @@ export default function GerirCampanhasPortal() {
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
                     onClick={() => setModalNovaCampanha({ ...modalNovaCampanha, open: false })}
-                    className="text-xs h-9 px-4 rounded-xl"
+                    className="text-xs h-10 rounded-xl px-4"
                   >
                     Cancelar
                   </Button>
+
                   <Button
                     type="submit"
                     disabled={actionLoading}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold h-9 px-5 shadow-sm"
+                    className="bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white text-xs font-semibold h-10 rounded-xl px-5 shadow-sm"
                   >
-                    {actionLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Megaphone className="w-3.5 h-3.5 mr-1.5" />}
-                    Publicar e Iniciar Campanha
+                    {actionLoading ? 'Salvando...' : modalNovaCampanha.isEditing ? 'Atualizar Campanha' : 'Iniciar Campanha'}
                   </Button>
                 </div>
               </form>
@@ -668,23 +771,23 @@ export default function GerirCampanhasPortal() {
           </div>
         )}
 
-        {/* MODAL / DRAWER: DETALHES DE RETORNO & RELAÇÃO NOMINAL */}
+        {/* MODAL / DRAWER DE ACOMPANHAMENTO NOMINAL */}
         {detalhesRetorno.open && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-5 sm:p-7 space-y-5 text-xs animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-5 sm:p-7 space-y-4 text-xs animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base flex items-center">
-                    <Eye className="w-5 h-5 mr-2 text-[#1e3a5f]" />
+                  <h3 className="font-extrabold text-slate-800 text-base flex items-center">
+                    <Users className="w-5 h-5 mr-2 text-[#1e3a5f]" />
                     Retorno Nominal: {detalhesRetorno.campanha?.titulo}
                   </h3>
                   <p className="text-slate-500 text-[11px]">
-                    Acompanhamento em tempo real dos militares convocados
+                    Acompanhamento individual de cada militar atribuído ao escopo desta campanha
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setDetalhesRetorno({ open: false, campanha: null, dados: null, filtro: 'TODOS' })}
+                  onClick={() => setDetalhesRetorno({ ...detalhesRetorno, open: false })}
                   className="text-slate-400 hover:text-slate-600 font-bold text-base"
                 >
                   ✕
@@ -692,103 +795,102 @@ export default function GerirCampanhasPortal() {
               </div>
 
               {/* STATS RÁPIDOS */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-center">
-                  <span className="text-slate-500 block">Total do Público</span>
-                  <strong className="text-base text-slate-900 font-extrabold">{detalhesRetorno.dados?.total_alvo || 0}</strong>
+              <div className="grid grid-cols-3 gap-3 shrink-0">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                  <span className="text-slate-500 block text-[11px]">Total Alvo</span>
+                  <strong className="text-lg text-slate-900">{detalhesRetorno.dados?.total_alvo || 0}</strong>
                 </div>
-                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
-                  <span className="text-emerald-700 block">Respondidos</span>
-                  <strong className="text-base text-emerald-800 font-extrabold">{detalhesRetorno.dados?.total_respondidos || 0}</strong>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                  <span className="text-emerald-700 block text-[11px]">Respondidos</span>
+                  <strong className="text-lg text-emerald-800">{detalhesRetorno.dados?.total_respondidos || 0} ({detalhesRetorno.dados?.percentual || 0}%)</strong>
                 </div>
-                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-center">
-                  <span className="text-amber-700 block">Pendentes</span>
-                  <strong className="text-base text-amber-800 font-extrabold">{detalhesRetorno.dados?.total_pendentes || 0}</strong>
-                </div>
-              </div>
-
-              {/* FILTROS E TABELA */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex space-x-2">
-                    {['TODOS', 'Respondido', 'Pendente'].map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setDetalhesRetorno({ ...detalhesRetorno, filtro: f })}
-                        className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                          detalhesRetorno.filtro === f
-                            ? 'bg-[#1e3a5f] text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {f === 'TODOS' ? 'Todos' : f}
-                      </button>
-                    ))}
-                  </div>
-
-                  {detalhesRetorno.dados?.total_pendentes > 0 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => handleDispararLembretes(detalhesRetorno.campanha?.id)}
-                      className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs h-8 px-3 font-semibold"
-                    >
-                      <Bell className="w-3.5 h-3.5 mr-1" />
-                      Notificar Pendentes
-                    </Button>
-                  )}
-                </div>
-
-                <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                  {militaresFiltrados.length === 0 ? (
-                    <div className="p-6 text-center text-slate-500">
-                      Nenhum militar com status "{detalhesRetorno.filtro}".
-                    </div>
-                  ) : (
-                    militaresFiltrados.map((m) => (
-                      <div key={m.militar_id} className="p-3 flex items-center justify-between hover:bg-slate-50/80">
-                        <div className="space-y-0.5">
-                          <span className="font-bold text-slate-900 block">
-                            {m.militar_posto} {m.militar_nome}
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            Matrícula: {m.militar_matricula || '-'} • Lotação: {m.militar_lotacao}
-                          </span>
-                          {m.detalhes_resposta && (
-                            <span className="text-[11px] text-emerald-700 block font-semibold">
-                              Opção/Resposta: {m.detalhes_resposta}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-right">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            m.status_resposta === 'Respondido'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {m.status_resposta}
-                          </span>
-                          {m.data_resposta && (
-                            <span className="text-[10px] text-slate-400 block pt-0.5">
-                              {new Date(m.data_resposta).toLocaleDateString('pt-BR')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-center">
+                  <span className="text-amber-700 block text-[11px]">Pendentes</span>
+                  <strong className="text-lg text-amber-800">{detalhesRetorno.dados?.total_pendentes || 0}</strong>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2 border-t border-slate-100">
+              {/* FILTRO DE STATUS */}
+              <div className="flex items-center space-x-2 shrink-0">
+                <span className="font-bold text-slate-700">Filtrar:</span>
+                {['TODOS', 'Respondido', 'Pendente'].map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setDetalhesRetorno({ ...detalhesRetorno, filtro: f })}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                      detalhesRetorno.filtro === f
+                        ? 'bg-[#1e3a5f] text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {f === 'TODOS' ? 'Todos' : f}
+                  </button>
+                ))}
+              </div>
+
+              {/* TABELA DE MILITARES */}
+              <div className="flex-1 overflow-y-auto border border-slate-200 rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 text-slate-700 font-bold sticky top-0 border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">Militar</th>
+                      <th className="p-3">Lotação</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Data Envio / Detalhes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {militaresFiltrados.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="p-6 text-center text-slate-400">
+                          Nenhum militar correspondente ao filtro.
+                        </td>
+                      </tr>
+                    ) : (
+                      militaresFiltrados.map((m) => (
+                        <tr key={m.militar_id} className="hover:bg-slate-50">
+                          <td className="p-3">
+                            <span className="font-bold text-slate-900 block">{m.militar_posto} {m.militar_nome}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">Mat: {m.militar_matricula}</span>
+                          </td>
+                          <td className="p-3 text-slate-600">{m.militar_lotacao}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              m.status_resposta === 'Respondido'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {m.status_resposta}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-600">
+                            {m.data_resposta ? (
+                              <div>
+                                <span className="font-medium">{m.data_resposta.split('T')[0]}</span>
+                                {m.detalhes_resposta && (
+                                  <p className="text-[11px] text-slate-500 italic mt-0.5 truncate max-w-xs">
+                                    {m.detalhes_resposta}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic">Pendente de resposta</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100 shrink-0">
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  onClick={() => setDetalhesRetorno({ open: false, campanha: null, dados: null, filtro: 'TODOS' })}
-                  className="text-xs h-8 px-4 rounded-xl"
+                  onClick={() => setDetalhesRetorno({ ...detalhesRetorno, open: false })}
+                  className="text-xs h-9 rounded-xl"
                 >
                   Fechar
                 </Button>
