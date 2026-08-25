@@ -19,6 +19,10 @@
       "default": "CRIADA_AGUARDANDO_OTP",
       "description": "Estado atual do ciclo de vida da sessão"
     },
+    "request_id": {
+      "type": "string",
+      "description": "Identificador opaco de alta entropia do desafio de autenticação (desacoplado do ID de banco)"
+    },
     "token_hash": {
       "type": "string",
       "description": "SHA-256 do PortalToken. O token em texto puro NUNCA é persistido."
@@ -30,7 +34,7 @@
     },
     "otp_hash": {
       "type": "string",
-      "description": "Hash criptográfico do código OTP. O código em claro NUNCA é persistido."
+      "description": "Hash criptográfico do código OTP (HMAC-SHA256). O código em claro NUNCA é persistido."
     },
     "otp_expires_at": {
       "type": "string",
@@ -46,6 +50,29 @@
       "type": "string",
       "format": "date-time",
       "description": "Data/hora até a qual tentativas de OTP estão bloqueadas por excesso de falhas"
+    },
+    "otp_channel": {
+      "type": "string",
+      "enum": [
+        "EMAIL",
+        "SMS",
+        "WHATSAPP"
+      ],
+      "description": "Canal de comunicação utilizado para o envio do OTP"
+    },
+    "otp_provider": {
+      "type": "string",
+      "description": "Provedor utilizado no disparo do OTP (ex: base44_core)"
+    },
+    "otp_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de envio do OTP"
+    },
+    "otp_verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de validação bem-sucedida do OTP"
     },
     "last_activity_at": {
       "type": "string",

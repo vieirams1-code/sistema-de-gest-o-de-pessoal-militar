@@ -146,7 +146,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
 
-const AuthenticatedApp = () => {
+const AuthenticatedAppWrapper = ({ children, currentPageName }) => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
@@ -169,95 +169,10 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Render the main app
   return (
-    <Routes>
-      <Route path="/" element={
-        <Navigate to={homeRoute} replace />
-      } />
-      {Object.entries(Pages).map(([path, Page]) => {
-        let pageContent = <Page />;
-
-        if (adminOnlyPages.has(path)) {
-          pageContent = (
-            <RequireAdmin>
-              {pageContent}
-            </RequireAdmin>
-          );
-        }
-
-        // P1.3-A: rotas prioritárias usam RequireAction (AND: módulo + actionKey).
-        const pageActionGuard = getActionGuardByPage(path);
-
-        if (pageActionGuard) {
-          const { moduleKey, actionKey, moduleName } = pageActionGuard;
-          pageContent = (
-            <RequireAction
-              moduleKey={moduleKey}
-              actionKey={actionKey}
-              moduleName={moduleName}
-            >
-              {pageContent}
-            </RequireAction>
-          );
-        } else {
-          const pageModuleGuard = getModuleGuardByPage(path);
-
-          if (pageModuleGuard) {
-            const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageModuleGuard;
-            pageContent = (
-              <RequireModuleAccess
-                moduleKey={moduleKey}
-                moduleKeys={moduleKeys}
-                actionKey={actionKey}
-                actionKeys={actionKeys}
-                moduleName={moduleName}
-              >
-                {pageContent}
-              </RequireModuleAccess>
-            );
-          }
-        }
-
-        return (
-          <Route
-            key={path}
-            path={`/${path}`}
-            element={
-              <LayoutWrapper currentPageName={path}>
-                {pageContent}
-              </LayoutWrapper>
-            }
-          />
-        );
-      })}
-      {/* Fase 1 — Descontos em Férias (gateway). Rota explícita garantida (admin-only). */}
-      <Route
-        path="/DescontosFerias"
-        element={
-          <LayoutWrapper currentPageName="DescontosFerias">
-            <RequireAdmin>
-              <DescontosFerias />
-            </RequireAdmin>
-          </LayoutWrapper>
-        }
-      />
-      {/* P1.2-A2: rota administrativa de diagnóstico (mirror/read-only), fora do menu */}
-      <Route
-        path="/DiagnosticoAcesso"
-        element={
-          <LayoutWrapper currentPageName="DiagnosticoAcesso">
-            <RequireAdmin>
-              <DiagnosticoAcesso />
-            </RequireAdmin>
-          </LayoutWrapper>
-        }
-      />
-      {/* Alias e redirecionamento para evitar 404 em acessos legados/manuais */}
-      <Route path="/templates" element={<Navigate to="/TemplatesTexto" replace />} />
-      <Route path="/controle-processos" element={<Navigate to="/ControleProcessos" replace />} />
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <LayoutWrapper currentPageName={currentPageName}>
+      {children}
+    </LayoutWrapper>
   );
 };
 
@@ -267,18 +182,98 @@ function App() {
     <QueryClientProvider client={queryClientInstance}>
       <Router>
         <NavigationTracker />
-        <Routes>
-          <Route path="/portal/*" element={<PortalApp />} />
-          <Route path="/portal" element={<PortalApp />} />
-          <Route
-            path="/*"
-            element={
-              <AuthProvider>
-                <AuthenticatedApp />
-              </AuthProvider>
-            }
-          />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            {/* Rotas Públicas e Seguras do Portal do Militar */}
+            <Route path="/portal/*" element={<PortalApp />} />
+            <Route path="/portal" element={<PortalApp />} />
+
+            {/* Rotas Administrativas do SGP */}
+            <Route path="/" element={<Navigate to={homeRoute} replace />} />
+            {Object.entries(Pages).map(([path, Page]) => {
+              let pageContent = <Page />;
+
+              if (adminOnlyPages.has(path)) {
+                pageContent = (
+                  <RequireAdmin>
+                    {pageContent}
+                  </RequireAdmin>
+                );
+              }
+
+              // P1.3-A: rotas prioritárias usam RequireAction (AND: módulo + actionKey).
+              const pageActionGuard = getActionGuardByPage(path);
+
+              if (pageActionGuard) {
+                const { moduleKey, actionKey, moduleName } = pageActionGuard;
+                pageContent = (
+                  <RequireAction
+                    moduleKey={moduleKey}
+                    actionKey={actionKey}
+                    moduleName={moduleName}
+                  >
+                    {pageContent}
+                  </RequireAction>
+                );
+              } else {
+                const pageModuleGuard = getModuleGuardByPage(path);
+
+                if (pageModuleGuard) {
+                  const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageModuleGuard;
+                  pageContent = (
+                    <RequireModuleAccess
+                      moduleKey={moduleKey}
+                      moduleKeys={moduleKeys}
+                      actionKey={actionKey}
+                      actionKeys={actionKeys}
+                      moduleName={moduleName}
+                    >
+                      {pageContent}
+                    </RequireModuleAccess>
+                  );
+                }
+              }
+
+              return (
+                <Route
+                  key={path}
+                  path={`/${path}`}
+                  element={
+                    <AuthenticatedAppWrapper currentPageName={path}>
+                      {pageContent}
+                    </AuthenticatedAppWrapper>
+                  }
+                />
+              );
+            })}
+            {/* Fase 1 — Descontos em Férias (gateway). Rota explícita garantida (admin-only). */}
+            <Route
+              path="/DescontosFerias"
+              element={
+                <AuthenticatedAppWrapper currentPageName="DescontosFerias">
+                  <RequireAdmin>
+                    <DescontosFerias />
+                  </RequireAdmin>
+                </AuthenticatedAppWrapper>
+              }
+            />
+            {/* P1.2-A2: rota administrativa de diagnóstico (mirror/read-only), fora do menu */}
+            <Route
+              path="/DiagnosticoAcesso"
+              element={
+                <AuthenticatedAppWrapper currentPageName="DiagnosticoAcesso">
+                  <RequireAdmin>
+                    <DiagnosticoAcesso />
+                  </RequireAdmin>
+                </AuthenticatedAppWrapper>
+              }
+            />
+            {/* Alias e redirecionamento para evitar 404 em acessos legados/manuais */}
+            <Route path="/templates" element={<Navigate to="/TemplatesTexto" replace />} />
+            <Route path="/controle-processos" element={<Navigate to="/ControleProcessos" replace />} />
+            <Route path="*" element={<PageNotFound />} />
+          </Routes>
+        </AuthProvider>
         <Toaster />
         <VisualEditAgent />
       </Router>
