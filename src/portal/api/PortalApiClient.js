@@ -216,13 +216,27 @@ export async function getFerias() {
 }
 
 /**
- * Submete a opção de parcelamento/fracionamento de férias (Fase 1.3B).
+ * Submete as 3 opções de preferências de férias para o plano anual (Fase 1.3B).
  */
-export async function submeterOpcaoFerias({ periodo_aquisitivo_id, parcelas }) {
+export async function submeterOpcaoFerias({
+  periodo_aquisitivo_id,
+  ano_referencia,
+  modalidade,
+  opcao_1,
+  opcao_2,
+  opcao_3,
+  parcelas,
+}) {
   return portalFetch('portal_servicos', {
     acao: 'FERIAS_SUBMETER_OPCAO',
     periodo_aquisitivo_id,
+    ano_referencia,
+    modalidade,
+    opcao_1,
+    opcao_2,
+    opcao_3,
     parcelas,
   });
 }
+
 

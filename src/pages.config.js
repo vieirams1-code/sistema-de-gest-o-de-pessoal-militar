@@ -124,10 +124,12 @@ import BackupSistema from './pages/BackupSistema';
 import CursosFormacao from './pages/CursosFormacao';
 import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
+import PainelPlanoFerias from './pages/PainelPlanoFerias';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "PainelPlanoFerias": PainelPlanoFerias,
     "ConfiguracoesPortal": ConfiguracoesPortal,
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AjustesSaldoFerias": AjustesSaldoFerias,
