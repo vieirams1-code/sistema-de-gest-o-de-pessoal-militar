@@ -39,6 +39,9 @@ import {
   GraduationCap,
   Activity,
   SlidersHorizontal,
+  Megaphone,
+  Smartphone,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -241,6 +244,69 @@ const menuGroups = [
             anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }],
           },
           { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'PORTAL HOMOLOGAÇÃO',
+    sections: [
+      {
+        title: 'Autoatendimento & Campanhas',
+        icon: Megaphone,
+        description: 'Módulo de Gestão do Portal do Militar, Campanhas, Escala e Autoatendimento',
+        items: [
+          {
+            name: '1. Gestor de Campanhas',
+            page: 'GerirCampanhasPortal',
+            icon: Megaphone,
+            menuGroup: 'Gestão RH / Comando',
+          },
+          {
+            name: '2. Painel Plano de Férias',
+            page: 'PainelPlanoFerias',
+            icon: CalendarDays,
+            menuGroup: 'Gestão RH / Comando',
+          },
+          {
+            name: '3. Regras & Configurações',
+            page: 'ConfiguracoesPortal',
+            icon: SlidersHorizontal,
+            menuGroup: 'Gestão RH / Comando',
+          },
+          {
+            name: '4. Mesa de Conferências',
+            page: 'ConferenciasMilitares',
+            icon: ShieldCheck,
+            menuGroup: 'Gestão RH / Comando',
+          },
+          {
+            name: '5. Solicitações Cadastrais',
+            page: 'SolicitacoesAtualizacao',
+            icon: ClipboardList,
+            menuGroup: 'Gestão RH / Comando',
+          },
+          {
+            name: '6. Portal Militar (Hub Geral)',
+            page: 'Portal',
+            path: '/portal',
+            icon: Smartphone,
+            menuGroup: 'Autoatendimento Militar',
+          },
+          {
+            name: '7. Portal: Opção de Férias',
+            page: 'PortalFerias',
+            path: '/portal/ferias',
+            icon: CalendarClock,
+            menuGroup: 'Autoatendimento Militar',
+          },
+          {
+            name: '8. Portal: Ficha & Cadastro',
+            page: 'PortalCadastro',
+            path: '/portal/cadastro',
+            icon: Users,
+            menuGroup: 'Autoatendimento Militar',
+          },
         ],
       },
     ],
