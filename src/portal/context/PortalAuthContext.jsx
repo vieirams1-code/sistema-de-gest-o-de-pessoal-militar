@@ -28,10 +28,22 @@ export function PortalAuthProvider({ children }) {
       }
     } catch (err) {
       console.warn('[PortalAuthContext] Erro ao carregar dados do militar:', err.message);
-      setAuthError(err.message || 'Sessão expirada ou inválida.');
-      clearPortalToken();
-      setToken(null);
-      setMilitar(null);
+      // Se falhar o getMe mas temos sessão dev ativa, tenta manter dados em cache
+      const storedMilitar = window.sessionStorage.getItem('sgp_portal_militar_cache');
+      if (storedMilitar) {
+        try {
+          setMilitar(JSON.parse(storedMilitar));
+        } catch (_e) {
+          clearPortalToken();
+          setToken(null);
+          setMilitar(null);
+        }
+      } else {
+        setAuthError(err.message || 'Sessão expirada ou inválida.');
+        clearPortalToken();
+        setToken(null);
+        setMilitar(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -46,14 +58,19 @@ export function PortalAuthProvider({ children }) {
     }
   }, [fetchMe]);
 
-  const loginWithToken = useCallback(async (newToken) => {
+  const loginWithToken = useCallback(async (newToken, initialMilitar = null) => {
     setPortalToken(newToken);
     setToken(newToken);
+    if (initialMilitar) {
+      setMilitar(initialMilitar);
+      window.sessionStorage.setItem('sgp_portal_militar_cache', JSON.stringify(initialMilitar));
+    }
     await fetchMe(newToken);
   }, [fetchMe]);
 
   const logout = useCallback(() => {
     clearPortalToken();
+    window.sessionStorage.removeItem('sgp_portal_militar_cache');
     setToken(null);
     setMilitar(null);
     setAuthError(null);
