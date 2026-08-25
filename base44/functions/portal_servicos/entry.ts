@@ -344,6 +344,49 @@ export default async function (req: Request): Promise<Response> {
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
             const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: ano });
+
+            // Rotina de reparo/sincronização automática para férias já geradas
+            try {
+              const allFerias = await base44.asServiceRole.entities.Ferias.filter({ data_inicio: `${ano}-01-01` });
+              const allFerias2 = await base44.asServiceRole.entities.Ferias.list();
+              const feriasDoAno = (allFerias2 || []).filter((f: any) => f.data_inicio && f.data_inicio.startsWith(String(ano)));
+
+              for (const f of feriasDoAno) {
+                let needsUpdate = false;
+                const updatePayload: any = {};
+
+                if (f.status === 'Previsto') {
+                  updatePayload.status = 'Prevista';
+                  needsUpdate = true;
+                }
+
+                if (!f.periodo_aquisitivo_ref && f.periodo_aquisitivo_id) {
+                  const pa = await base44.asServiceRole.entities.PeriodoAquisitivo.get(f.periodo_aquisitivo_id);
+                  if (pa) {
+                    const ref = pa.ano_referencia || pa.referencia || (pa.inicio_aquisitivo && pa.fim_aquisitivo ? `${new Date(pa.inicio_aquisitivo).getFullYear()}/${new Date(pa.fim_aquisitivo).getFullYear()}` : '');
+                    if (ref) {
+                      updatePayload.periodo_aquisitivo_ref = ref;
+                      needsUpdate = true;
+                    }
+                  }
+                }
+
+                if (!f.dias_base && f.dias) {
+                  updatePayload.dias_base = f.dias;
+                  needsUpdate = true;
+                }
+
+                if (!f.fracionamento) {
+                  updatePayload.fracionamento = f.dias === 30 ? 'Integral' : '1ª Fração';
+                  needsUpdate = true;
+                }
+
+                if (needsUpdate) {
+                  await base44.asServiceRole.entities.Ferias.update(f.id, updatePayload);
+                }
+              }
+            } catch (_errRepair) {}
+
             return new Response(JSON.stringify({ ok: true, opcoes: opcoes || [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
           }
 
@@ -356,7 +399,7 @@ export default async function (req: Request): Promise<Response> {
                 : decisao_camada_1?.opcao_escolhida === 'OPCAO_3' ? 'Opcao_3_Aprovada'
                 : 'Ajustado_Pelo_Gestor',
               decisao_camada_1_opcao: decisao_camada_1?.opcao_escolhida,
-              decisao_camada_1_meses: mesesResumo,
+              decisao_camada_1_meses: decisao_camada_1?.resumo_meses || mesesResumo,
               decisao_camada_1_detalhes: JSON.stringify(decisao_camada_1?.parcelas || []),
               gestor_unidade_id: user.id,
               gestor_unidade_nome: decisao_camada_1?.gestor_nome || user.email,
@@ -391,17 +434,43 @@ export default async function (req: Request): Promise<Response> {
               try { parcelas = JSON.parse(op.decisao_camada_1_detalhes || '[]'); } catch (_e) { parcelas = []; }
               if (parcelas.length === 0) continue;
 
+              // Obtém o período aquisitivo para extrair a referência (ex: 2024/2025)
+              let periodoRef = '';
+              let pa: any = null;
+              try {
+                if (op.periodo_aquisitivo_id) {
+                  pa = await base44.asServiceRole.entities.PeriodoAquisitivo.get(op.periodo_aquisitivo_id);
+                  if (pa) {
+                    periodoRef = pa.ano_referencia || pa.referencia || '';
+                    if (!periodoRef && pa.inicio_aquisitivo && pa.fim_aquisitivo) {
+                      const y1 = new Date(pa.inicio_aquisitivo).getFullYear();
+                      const y2 = new Date(pa.fim_aquisitivo).getFullYear();
+                      periodoRef = `${y1}/${y2}`;
+                    }
+                  }
+                }
+              } catch (_errPA) {}
+
+              if (!periodoRef && op.periodo_inicio && op.periodo_fim) {
+                const y1 = new Date(op.periodo_inicio).getFullYear();
+                const y2 = new Date(op.periodo_fim).getFullYear();
+                periodoRef = `${y1}/${y2}`;
+              }
+
               const feriasIds: string[] = [];
               let totalDias = 0;
 
-              for (const p of parcelas) {
-                const dtInicio = new Date(p.data_inicio || `${ano}-01-01`);
-                const dias = Number(p.dias) || 30;
+              for (let i = 0; i < parcelas.length; i++) {
+                const p = parcelas[i];
+                const dtInicio = new Date(p.data_inicio || `${ano}-${p.mes || '01'}-01`);
+                const dias = Number(p.dias) || (parcelas.length === 1 ? 30 : 15);
                 totalDias += dias;
                 const dtFim = new Date(dtInicio);
                 dtFim.setDate(dtFim.getDate() + dias - 1);
                 const dtRetorno = new Date(dtFim);
                 dtRetorno.setDate(dtRetorno.getDate() + 1);
+
+                const labelFracionamento = parcelas.length > 1 ? `${p.etapa || (i + 1)}ª Fração` : 'Integral';
 
                 const fCreated = await base44.asServiceRole.entities.Ferias.create({
                   militar_id: op.militar_id,
@@ -409,18 +478,20 @@ export default async function (req: Request): Promise<Response> {
                   militar_posto: op.militar_posto,
                   militar_matricula: op.militar_matricula,
                   periodo_aquisitivo_id: op.periodo_aquisitivo_id,
+                  periodo_aquisitivo_ref: periodoRef || undefined,
                   tipo: 'Férias Regulares',
                   data_inicio: dtInicio.toISOString().split('T')[0],
                   data_fim: dtFim.toISOString().split('T')[0],
                   data_retorno: dtRetorno.toISOString().split('T')[0],
                   dias: dias,
-                  status: 'Previsto',
+                  dias_base: dias,
+                  fracionamento: labelFracionamento,
+                  status: 'Prevista',
                 });
                 if (fCreated?.id) feriasIds.push(fCreated.id);
               }
 
               try {
-                const pa = await base44.asServiceRole.entities.PeriodoAquisitivo.get(op.periodo_aquisitivo_id);
                 if (pa) {
                   await base44.asServiceRole.entities.PeriodoAquisitivo.update(pa.id, {
                     dias_previstos: (pa.dias_previstos || 0) + totalDias,
