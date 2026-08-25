@@ -1,0 +1,63 @@
+{
+  "name": "CampanhaPlanoFerias",
+  "type": "object",
+  "title": "Campanha do Plano Anual de Férias",
+  "description": "Controle do ano de referência, prazos e status do plano anual de férias da corporação.",
+  "properties": {
+    "ano_referencia": {
+      "type": "number",
+      "description": "Ano de fruição das férias (ex: 2027, 2028)"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "Título descritivo da campanha (ex: Plano de Férias 2027)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Aberta_Coleta",
+        "Em_Escalacao_Unidade",
+        "Em_Homologacao_Superior",
+        "Homologada",
+        "Gerada_No_Sistema",
+        "Encerrada"
+      ],
+      "default": "Aberta_Coleta"
+    },
+    "prazo_limite_militar": {
+      "type": "string",
+      "format": "date",
+      "description": "Data limite para os militares enviarem suas 3 opções"
+    },
+    "prazo_limite_unidade": {
+      "type": "string",
+      "format": "date",
+      "description": "Data limite para os gestores da unidade (Camada 1) homologarem"
+    },
+    "instrucoes": {
+      "type": "string",
+      "description": "Orientações institucionais exibidas no Portal do Militar"
+    },
+    "total_militares_previstos": {
+      "type": "number",
+      "default": 0
+    },
+    "total_opcoes_enviadas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_homologadas": {
+      "type": "number",
+      "default": 0
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["ano_referencia", "status"]
+}
