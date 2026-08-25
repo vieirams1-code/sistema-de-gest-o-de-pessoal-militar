@@ -12,7 +12,6 @@ import {
   Info,
   Edit3,
   ShieldCheck,
-  Building,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -43,15 +42,10 @@ export default function PortalFeriasView({ onBack }) {
   const [selectedPeriodoId, setSelectedPeriodoId] = useState('');
   const [modalidade, setModalidade] = useState('2_ETAPAS_15');
 
-  // 3 Meses de Opção
+  // 3 Meses de Opção (Sem seleção de dia; internamente sempre dia 01)
   const [mesOpcao1, setMesOpcao1] = useState('01');
-  const [diaOpcao1, setDiaOpcao1] = useState('05');
-
   const [mesOpcao2, setMesOpcao2] = useState('07');
-  const [diaOpcao2, setDiaOpcao2] = useState('05');
-
   const [mesOpcao3, setMesOpcao3] = useState('10');
-  const [diaOpcao3, setDiaOpcao3] = useState('05');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -82,15 +76,12 @@ export default function PortalFeriasView({ onBack }) {
         try {
           const p1 = JSON.parse(opEnviada.opcao_1_detalhes || '[]');
           if (p1[0]?.mes) setMesOpcao1(p1[0].mes);
-          if (p1[0]?.data_inicio?.length >= 10) setDiaOpcao1(p1[0].data_inicio.slice(8, 10));
 
           const p2 = JSON.parse(opEnviada.opcao_2_detalhes || '[]');
           if (p2[0]?.mes) setMesOpcao2(p2[0].mes);
-          if (p2[0]?.data_inicio?.length >= 10) setDiaOpcao2(p2[0].data_inicio.slice(8, 10));
 
           const p3 = JSON.parse(opEnviada.opcao_3_detalhes || '[]');
           if (p3[0]?.mes) setMesOpcao3(p3[0].mes);
-          if (p3[0]?.data_inicio?.length >= 10) setDiaOpcao3(p3[0].data_inicio.slice(8, 10));
         } catch (_err) {}
       } else {
         setIsEditing(true);
@@ -110,9 +101,8 @@ export default function PortalFeriasView({ onBack }) {
     return MESES_ANO.find((m) => m.valor === mesVal)?.nome || mesVal;
   };
 
-  const buildParcelasForMes = (mesVal, diaVal, ano) => {
-    const diaFormatted = String(diaVal || '05').padStart(2, '0');
-    const dataInicio = `${ano}-${mesVal}-${diaFormatted}`;
+  const buildParcelasForMes = (mesVal, ano) => {
+    const dataInicio = `${ano}-${mesVal}-01`;
 
     if (modalidade === '1_ETAPA_30') {
       return [{ etapa: 1, dias: 30, mes: mesVal, data_inicio: dataInicio }];
@@ -163,16 +153,16 @@ export default function PortalFeriasView({ onBack }) {
       campanha_id: campanha?.id,
       modalidade,
       opcao_1: {
-        meses_resumo: `${getNomeMes(mesOpcao1)} (Dia ${diaOpcao1}) • ${descModalidade}`,
-        parcelas: buildParcelasForMes(mesOpcao1, diaOpcao1, anoCampanha),
+        meses_resumo: `${getNomeMes(mesOpcao1)} • ${descModalidade}`,
+        parcelas: buildParcelasForMes(mesOpcao1, anoCampanha),
       },
       opcao_2: {
-        meses_resumo: `${getNomeMes(mesOpcao2)} (Dia ${diaOpcao2}) • ${descModalidade}`,
-        parcelas: buildParcelasForMes(mesOpcao2, diaOpcao2, anoCampanha),
+        meses_resumo: `${getNomeMes(mesOpcao2)} • ${descModalidade}`,
+        parcelas: buildParcelasForMes(mesOpcao2, anoCampanha),
       },
       opcao_3: {
-        meses_resumo: `${getNomeMes(mesOpcao3)} (Dia ${diaOpcao3}) • ${descModalidade}`,
-        parcelas: buildParcelasForMes(mesOpcao3, diaOpcao3, anoCampanha),
+        meses_resumo: `${getNomeMes(mesOpcao3)} • ${descModalidade}`,
+        parcelas: buildParcelasForMes(mesOpcao3, anoCampanha),
       },
     };
 
@@ -482,26 +472,11 @@ export default function PortalFeriasView({ onBack }) {
                         <select
                           value={mesOpcao1}
                           onChange={(e) => setMesOpcao1(e.target.value)}
-                          className="w-full h-10 px-3 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="w-full h-11 px-3 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
                         >
                           {MESES_ANO.map((m) => (
                             <option key={m.valor} value={m.valor}>
                               {m.nome} / {anoCampanha}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Dia Preferencial de Início</label>
-                        <select
-                          value={diaOpcao1}
-                          onChange={(e) => setDiaOpcao1(e.target.value)}
-                          className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 outline-none"
-                        >
-                          {['01', '05', '10', '15', '20'].map((d) => (
-                            <option key={d} value={d}>
-                              Dia {d} do mês
                             </option>
                           ))}
                         </select>
@@ -519,26 +494,11 @@ export default function PortalFeriasView({ onBack }) {
                         <select
                           value={mesOpcao2}
                           onChange={(e) => setMesOpcao2(e.target.value)}
-                          className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]"
+                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]"
                         >
                           {MESES_ANO.map((m) => (
                             <option key={m.valor} value={m.valor}>
                               {m.nome} / {anoCampanha}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Dia Preferencial de Início</label>
-                        <select
-                          value={diaOpcao2}
-                          onChange={(e) => setDiaOpcao2(e.target.value)}
-                          className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 outline-none"
-                        >
-                          {['01', '05', '10', '15', '20'].map((d) => (
-                            <option key={d} value={d}>
-                              Dia {d} do mês
                             </option>
                           ))}
                         </select>
@@ -556,26 +516,11 @@ export default function PortalFeriasView({ onBack }) {
                         <select
                           value={mesOpcao3}
                           onChange={(e) => setMesOpcao3(e.target.value)}
-                          className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]"
+                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]"
                         >
                           {MESES_ANO.map((m) => (
                             <option key={m.valor} value={m.valor}>
                               {m.nome} / {anoCampanha}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Dia Preferencial de Início</label>
-                        <select
-                          value={diaOpcao3}
-                          onChange={(e) => setDiaOpcao3(e.target.value)}
-                          className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 outline-none"
-                        >
-                          {['01', '05', '10', '15', '20'].map((d) => (
-                            <option key={d} value={d}>
-                              Dia {d} do mês
                             </option>
                           ))}
                         </select>
@@ -586,7 +531,7 @@ export default function PortalFeriasView({ onBack }) {
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
                   <p className="text-[11px] text-slate-500">
-                    * Ao confirmar, suas opções serão enviadas para elaboração da escala pelo gestor.
+                    * Ao confirmar, suas opções serão enviadas para elaboração da escala pelo gestor (início fixado em dia 01).
                   </p>
                   <Button
                     type="submit"

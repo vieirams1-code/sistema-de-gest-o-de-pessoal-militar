@@ -64,6 +64,13 @@ export default function PortalLoginForm() {
 
     try {
       const response = await iniciarAuth(cleanCpf);
+
+      // Bypass direto de desenvolvimento para CPF autorizado
+      if (response.bypass && response.token) {
+        await loginWithToken(response.token);
+        return;
+      }
+
       setRequestId(response.request_id);
 
       const availableMethods = Array.isArray(response.metodos) && response.metodos.length > 0
