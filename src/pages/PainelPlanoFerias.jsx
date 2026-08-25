@@ -26,6 +26,14 @@ import {
   Lock,
   RotateCcw,
   CheckCircle,
+  ShieldAlert,
+  Shield,
+  Trash2,
+  Archive,
+  PowerOff,
+  History,
+  FolderArchive,
+  Megaphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -66,12 +74,17 @@ function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
 }
 
 export default function PainelPlanoFerias() {
-  const [ano, setAno] = useState(new Date().getFullYear() + 1); // 2027
-  const [campanha, setCampanha] = useState(null);
+  // Lista de Campanhas e Campanha Selecionada
+  const [campanhas, setCampanhas] = useState([]);
+  const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
+
+  // Modo Admin para proteção de campanhas
+  const [modoAdmin, setModoAdmin] = useState(false);
 
   // Estados de Edição e Seleção por Militar
   const [selecoesMilitares, setSelecoesMilitares] = useState({});
@@ -79,7 +92,7 @@ export default function PainelPlanoFerias() {
 
   // Filtros & Pesquisa
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('TODOS'); // TODOS, PENDENTE, SALVO, NAO_CONTEMPLADO, GERADO
+  const [filtroStatus, setFiltroStatus] = useState('TODOS');
   const [filtroModalidade, setFiltroModalidade] = useState('TODOS');
   const [filtroUnidade, setFiltroUnidade] = useState('TODOS');
   const [filtroMes, setFiltroMes] = useState('TODOS');
@@ -87,21 +100,33 @@ export default function PainelPlanoFerias() {
   // Modal para Justificativa de Não Contemplado
   const [modalNaoContemplado, setModalNaoContemplado] = useState({ open: false, opcao: null, justificativa: '' });
 
-  const loadPlano = async (anoRef = ano) => {
+  // Carrega lista de campanhas e opções da campanha selecionada
+  const carregarPainel = async (campanhaAlvoId = null) => {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      const resCamp = await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_CAMPANHA_OBTER_OU_CRIAR',
-        ano_referencia: Number(anoRef),
-      });
-      setCampanha(resCamp.data?.campanha || null);
-
-      const resEscala = await base44.functions.invoke('portal_servicos', {
+      // 1. Carrega todas as campanhas de férias
+      const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_ESCALA_LISTAR',
-        ano_referencia: Number(anoRef),
+        campanha_id: campanhaAlvoId || undefined,
       });
-      const listaOpcoes = resEscala.data?.opcoes || [];
+
+      const listaCampanhas = res.data?.campanhas || [];
+      setCampanhas(listaCampanhas);
+
+      // Define campanha ativa/selecionada
+      let selected = null;
+      if (campanhaAlvoId) {
+        selected = listaCampanhas.find((c) => c.id === campanhaAlvoId) || null;
+      }
+      if (!selected && listaCampanhas.length > 0) {
+        // Prioriza a primeira campanha ativa/aberta; se não houver, pega a primeira
+        selected = listaCampanhas.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || listaCampanhas[0];
+      }
+      setCampanhaSelecionada(selected);
+
+      // 2. Opções da campanha selecionada
+      const listaOpcoes = res.data?.opcoes || [];
       setOpcoes(listaOpcoes);
 
       const initialMap = {};
@@ -130,22 +155,27 @@ export default function PainelPlanoFerias() {
           initialEditing[op.id] = false;
         } else {
           initialMap[op.id] = { fracao1: mes1, fracao2: mes2, fracao3: mes3, justificativa: '' };
-          initialEditing[op.id] = true; // Pendente começa em modo aberto para definição
+          initialEditing[op.id] = selected?.status === 'Aberta_Coleta'; // Se campanha estiver ativa, começa editável
         }
       });
 
       setSelecoesMilitares(initialMap);
       setMilitaresEmEdicao(initialEditing);
     } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do plano de férias.' });
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do painel de férias.' });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPlano(ano);
-  }, [ano]);
+    carregarPainel();
+  }, []);
+
+  const handleSelecionarCampanha = (camp) => {
+    setCampanhaSelecionada(camp);
+    carregarPainel(camp.id);
+  };
 
   const handleMudarMesFracao = (opId, numFracao, novoMes) => {
     setSelecoesMilitares((prev) => ({
@@ -161,26 +191,27 @@ export default function PainelPlanoFerias() {
   const handleSalvarEscalaMilitar = async (op) => {
     const selecao = selecoesMilitares[op.id] || {};
     const mod = op.modalidade || '2_ETAPAS_15';
+    const anoCampanha = campanhaSelecionada?.ano_referencia || (new Date().getFullYear() + 1);
 
     let parcelas = [];
     if (mod === '1_ETAPA_30') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
-      parcelas = [{ etapa: 1, dias: 30, mes: m1, data_inicio: `${ano}-${m1}-01` }];
+      parcelas = [{ etapa: 1, dias: 30, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` }];
     } else if (mod === '2_ETAPAS_15') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
       const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
       parcelas = [
-        { etapa: 1, dias: 15, mes: m1, data_inicio: `${ano}-${m1}-01` },
-        { etapa: 2, dias: 15, mes: m2, data_inicio: `${ano}-${m2}-01` },
+        { etapa: 1, dias: 15, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` },
+        { etapa: 2, dias: 15, mes: m2, data_inicio: `${anoCampanha}-${m2}-01` },
       ];
     } else if (mod === '3_ETAPAS_10') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
       const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
       const m3 = selecao.fracao3 || extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
       parcelas = [
-        { etapa: 1, dias: 10, mes: m1, data_inicio: `${ano}-${m1}-01` },
-        { etapa: 2, dias: 10, mes: m2, data_inicio: `${ano}-${m2}-01` },
-        { etapa: 3, dias: 10, mes: m3, data_inicio: `${ano}-${m3}-01` },
+        { etapa: 1, dias: 10, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` },
+        { etapa: 2, dias: 10, mes: m2, data_inicio: `${anoCampanha}-${m2}-01` },
+        { etapa: 3, dias: 10, mes: m3, data_inicio: `${anoCampanha}-${m3}-01` },
       ];
     }
 
@@ -201,8 +232,8 @@ export default function PainelPlanoFerias() {
       });
 
       setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
-      setFeedback({ type: 'success', msg: `Escala salva com sucesso para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
-      await loadPlano(ano);
+      setFeedback({ type: 'success', msg: `Escala salva para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
+      await carregarPainel(campanhaSelecionada?.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar escala.' });
     } finally {
@@ -231,7 +262,7 @@ export default function PainelPlanoFerias() {
       setModalNaoContemplado({ open: false, opcao: null, justificativa: '' });
       setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
       setFeedback({ type: 'success', msg: `${op.militar_posto} ${op.militar_nome} registrado como NÃO CONTEMPLADO.` });
-      await loadPlano(ano);
+      await carregarPainel(campanhaSelecionada?.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao registrar não contemplado.' });
     } finally {
@@ -239,18 +270,20 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  // Geração Automática em Lote e Encerramento da Campanha
+  // Geração de Férias Específica desta Campanha
   const handleGerarLoteFerias = async () => {
+    if (!campanhaSelecionada) return;
+
     const totalContemplados = opcoes.filter(
       (o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && !o.gerado_ferias_efetivas
     ).length;
 
     if (totalContemplados === 0) {
-      alert('Não há militares com escala salva prontos para geração de férias.');
+      alert('Não há militares com escala salva prontos para geração de férias nesta campanha.');
       return;
     }
 
-    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados? Após a geração, as férias serão criadas no SGP e a campanha de ${ano} será encerrada automaticamente.`)) {
+    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados da campanha "${campanhaSelecionada.titulo}"? A campanha será encerrada e as férias cadastradas no SGP.`)) {
       return;
     }
 
@@ -258,11 +291,12 @@ export default function PainelPlanoFerias() {
     try {
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_GERAR_LOTE_FERIAS',
-        ano_referencia: Number(ano),
+        campanha_id: campanhaSelecionada.id,
+        ano_referencia: Number(campanhaSelecionada.ano_referencia),
       });
 
       setFeedback({ type: 'success', msg: res.data?.message || 'Férias geradas no SGP e campanha encerrada com sucesso!' });
-      await loadPlano(ano);
+      await carregarPainel(campanhaSelecionada.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha na geração em lote.' });
     } finally {
@@ -270,7 +304,68 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  // Unidades únicas para o filtro
+  // Ações Administrativas de Campanha (Protegidas pelo Modo Admin)
+  const handleDesativarCampanhaAdmin = async (camp) => {
+    if (!window.confirm(`Modo Admin: Deseja desativar a campanha "${camp.titulo}"? Ela deixará de receber respostas e passará para o histórico de consulta.`)) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_DESATIVAR',
+        campanha_id: camp.id,
+      });
+      setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" desativada.` });
+      await carregarPainel();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao desativar campanha.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleArquivarCampanhaAdmin = async (camp) => {
+    if (!window.confirm(`Modo Admin: Deseja arquivar a campanha "${camp.titulo}"?`)) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_ARQUIVAR',
+        campanha_id: camp.id,
+      });
+      setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" arquivada.` });
+      await carregarPainel();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao arquivar campanha.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExcluirCampanhaAdmin = async (camp) => {
+    if (!window.confirm(`ALERTA MODO ADMIN: Tem certeza que deseja EXCLUIR a campanha "${camp.titulo}"? Todas as opções já registradas pelos militares permanecem protegidas no sistema.`)) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_EXCLUIR',
+        campanha_id: camp.id,
+      });
+      setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" excluída com sucesso.` });
+      await carregarPainel();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao excluir campanha.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Separação de Campanhas Ativas vs Histórico (Desativadas/Encerradas/Arquivadas)
+  const campanhasAtivas = useMemo(() => {
+    return campanhas.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
+  }, [campanhas]);
+
+  const campanhasHistorico = useMemo(() => {
+    return campanhas.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
+  }, [campanhas]);
+
+  // Unidades únicas
   const unidadesDisponiveis = useMemo(() => {
     const setU = new Set();
     opcoes.forEach((o) => {
@@ -279,7 +374,7 @@ export default function PainelPlanoFerias() {
     return Array.from(setU).sort();
   }, [opcoes]);
 
-  // Contagem de efetivo por mês para o gráfico
+  // Contagem de efetivo por mês
   const contagemPorMes = Array(12).fill(0);
   opcoes.forEach((op) => {
     if (op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO') return;
@@ -295,15 +390,15 @@ export default function PainelPlanoFerias() {
     }
   });
 
-  // Métricas
   const totalSalvos = opcoes.filter((o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO').length;
   const totalNaoContemplados = opcoes.filter((o) => o.status_camada_1 === 'Nao_Contemplado' || o.decisao_camada_1_opcao === 'NAO_CONTEMPLADO').length;
   const totalGeradas = opcoes.filter((o) => o.gerado_ferias_efetivas).length;
 
+  const isCampanhaEncerradaOuDesativada = campanhaSelecionada && (campanhaSelecionada.status === 'Encerrada' || campanhaSelecionada.status === 'Desativada' || campanhaSelecionada.status === 'Arquivada');
+
   // Filtragem dos Militares
   const opcoesFiltradas = useMemo(() => {
     return opcoes.filter((op) => {
-      // 1. Pesquisa ampla
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const nome = (op.militar_nome || '').toLowerCase();
@@ -315,7 +410,6 @@ export default function PainelPlanoFerias() {
         }
       }
 
-      // 2. Filtro de Status
       const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
       const isGerado = Boolean(op.gerado_ferias_efetivas);
       const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
@@ -326,13 +420,9 @@ export default function PainelPlanoFerias() {
       if (filtroStatus === 'NAO_CONTEMPLADO' && !isNaoContemplado) return false;
       if (filtroStatus === 'GERADO' && !isGerado) return false;
 
-      // 3. Filtro de Modalidade
       if (filtroModalidade !== 'TODOS' && op.modalidade !== filtroModalidade) return false;
-
-      // 4. Filtro de Unidade
       if (filtroUnidade !== 'TODOS' && op.lotacao_nome !== filtroUnidade) return false;
 
-      // 5. Filtro de Mês Escalado
       if (filtroMes !== 'TODOS') {
         const detalhes = op.decisao_camada_1_detalhes || op.opcao_1_detalhes;
         if (!detalhes || detalhes === '[]') return false;
@@ -353,7 +443,7 @@ export default function PainelPlanoFerias() {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
         <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-500 font-medium">Carregando painel de férias...</p>
+        <p className="text-sm text-slate-500 font-medium">Carregando plano anual de férias...</p>
       </div>
     );
   }
@@ -361,7 +451,7 @@ export default function PainelPlanoFerias() {
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* CABEÇALHO SUPERIOR */}
+        {/* CABEÇALHO SUPERIOR E TOGGLE DE MODO ADMIN */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-inner">
@@ -369,27 +459,27 @@ export default function PainelPlanoFerias() {
             </div>
             <div>
               <h1 className="text-2xl font-extrabold text-[#1e3a5f] tracking-tight flex items-center">
-                Plano Anual de Férias — {ano}
+                Painel do Plano de Férias
               </h1>
               <p className="text-xs text-slate-500">
-                Mesa de Escalação Direta: Defina os meses, salve e gere os lançamentos oficiais no SGP
+                Selecione uma campanha de férias para gerenciar suas opções e gerar os lançamentos no SGP
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <label className="text-xs font-bold text-slate-700">Ano do Plano:</label>
-            <select
-              value={ano}
-              onChange={(e) => setAno(Number(e.target.value))}
-              className="h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-[#1e3a5f] outline-none shadow-sm"
+            <button
+              type="button"
+              onClick={() => setModoAdmin(!modoAdmin)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-1.5 transition-all shadow-xs ${
+                modoAdmin
+                  ? 'bg-rose-700 text-white ring-2 ring-rose-300'
+                  : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
             >
-              {[2026, 2027, 2028, 2029, 2030].map((y) => (
-                <option key={y} value={y}>
-                  Ano {y}
-                </option>
-              ))}
-            </select>
+              {modoAdmin ? <ShieldAlert className="w-4 h-4" /> : <Shield className="w-4 h-4 text-slate-500" />}
+              <span>{modoAdmin ? 'Modo Admin: ATIVO' : 'Modo Admin'}</span>
+            </button>
           </div>
         </div>
 
@@ -403,562 +493,709 @@ export default function PainelPlanoFerias() {
           </div>
         )}
 
-        {/* CARDS DE STATS */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="p-4 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-slate-500 block">Opções Recebidas</span>
-                <strong className="text-xl text-[#1e3a5f] font-extrabold">{opcoes.length}</strong>
-              </div>
-              <Users className="w-8 h-8 text-blue-500 opacity-30" />
-            </CardContent>
-          </Card>
+        {/* SEÇÃO 1: CAMPANHAS DE FÉRIAS ATIVAS NO SISTEMA */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-extrabold text-slate-900 flex items-center">
+              <Megaphone className="w-4 h-4 mr-2 text-emerald-600" />
+              Campanhas de Férias Ativas
+            </h2>
+            <span className="text-xs text-slate-500">
+              Clique em uma campanha para gerenciar exclusivamente suas opções
+            </span>
+          </div>
 
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="p-4 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-slate-500 block">Escalas Salvas / Prontas</span>
-                <strong className="text-xl text-emerald-700 font-extrabold">{totalSalvos}</strong>
-              </div>
-              <CheckCircle className="w-8 h-8 text-emerald-500 opacity-30" />
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="p-4 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-slate-500 block">Não Contemplados</span>
-                <strong className="text-xl text-rose-700 font-extrabold">{totalNaoContemplados}</strong>
-              </div>
-              <Ban className="w-8 h-8 text-rose-500 opacity-30" />
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="p-4 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-slate-500 block">Férias Geradas no SGP</span>
-                <strong className="text-xl text-purple-700 font-extrabold">{totalGeradas}</strong>
-              </div>
-              <Zap className="w-8 h-8 text-purple-500 opacity-30" />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* DISTRIBUIÇÃO DE EFETIVO POR MÊS */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="p-4 pb-2 border-b border-slate-100">
-            <CardTitle className="text-xs sm:text-sm font-bold text-slate-800 flex items-center">
-              <CalendarDays className="w-4 h-4 mr-2 text-[#1e3a5f]" />
-              Distribuição de Efetivo Escalado por Mês ({ano})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 text-xs">
-            <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 text-center">
-              {LISTA_MESES.map((m, idx) => {
-                const count = contagemPorMes[idx];
+          {campanhasAtivas.length === 0 ? (
+            <Card className="border-slate-200 bg-white">
+              <CardContent className="p-6 text-center text-xs text-slate-500">
+                Nenhuma campanha de férias ativa no momento. Você pode consultar as campanhas no Histórico abaixo ou iniciar uma nova no Gestor de Campanhas.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {campanhasAtivas.map((camp) => {
+                const isSelected = campanhaSelecionada?.id === camp.id;
                 return (
                   <div
-                    key={m.val}
-                    className={`p-2 rounded-xl border ${
-                      count > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
+                    key={camp.id}
+                    onClick={() => handleSelecionarCampanha(camp)}
+                    className={`p-4 rounded-2xl border text-left cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-blue-50/80 border-[#1e3a5f] shadow-md ring-2 ring-[#1e3a5f]/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-xs'
                     }`}
                   >
-                    <span className="text-[10px] text-slate-500 block truncate">{m.nome.slice(0, 3)}</span>
-                    <strong className={`text-sm ${count > 0 ? 'text-[#1e3a5f]' : 'text-slate-400'}`}>
-                      {count}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                        {camp.ano_referencia ? `Ano ${camp.ano_referencia}` : 'Ativa'}
+                      </span>
+                      {isSelected && (
+                        <span className="flex items-center text-[10px] font-bold text-[#1e3a5f] bg-white px-2 py-0.5 rounded-full border border-blue-200">
+                          <Check className="w-3 h-3 mr-1 text-emerald-600" /> Selecionada
+                        </span>
+                      )}
+                    </div>
+
+                    <strong className="text-sm font-extrabold text-slate-900 block truncate">
+                      {camp.titulo}
                     </strong>
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                      Público: {camp.escopo_unidades_nomes || 'Geral'}
+                    </p>
+
+                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Prazo: {camp.data_fim_militar || '-'}</span>
+                      {modoAdmin && (
+                        <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            title="Desativar Campanha (Admin)"
+                            onClick={() => handleDesativarCampanhaAdmin(camp)}
+                            className="p-1 rounded hover:bg-slate-200 text-slate-700"
+                          >
+                            <PowerOff className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Arquivar Campanha (Admin)"
+                            onClick={() => handleArquivarCampanhaAdmin(camp)}
+                            className="p-1 rounded hover:bg-slate-200 text-slate-700"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* BARRA DE AÇÃO PRINCIPAL: GERAR FÉRIAS NO SGP */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-900 to-[#1e3a5f] p-4 rounded-2xl text-white shadow-md">
-          <div>
-            <h3 className="font-bold text-sm flex items-center">
-              <Zap className="w-4 h-4 mr-1.5 text-amber-400" />
-              Conclusão e Geração de Férias
-            </h3>
-            <p className="text-xs text-blue-200">
-              Gere os lançamentos no SGP para todos os militares com escala salva. A campanha será encerrada automaticamente.
-            </p>
-          </div>
-
-          <Button
-            type="button"
-            onClick={handleGerarLoteFerias}
-            disabled={actionLoading || totalSalvos === 0 || totalGeradas === totalSalvos}
-            className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-extrabold h-10 px-5 shadow-sm shrink-0"
-          >
-            <Zap className="w-4 h-4 mr-1.5" />
-            {totalGeradas > 0 && totalGeradas === totalSalvos
-              ? 'Todas as Férias Já Foram Geradas'
-              : 'Gerar Férias no Sistema SGP'}
-          </Button>
+          )}
         </div>
 
-        {/* BARRA DE PESQUISA AMPLA E FILTROS */}
-        <Card className="border-slate-200 shadow-sm bg-white">
-          <CardContent className="p-4 space-y-3">
-            {/* Input de Busca */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Pesquisar por nome do militar, nome de guerra, posto/graduação, matrícula ou lotação..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-8 h-10 text-xs rounded-xl bg-slate-50 border-slate-200 focus:bg-white"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Controles de Filtros */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
-              {/* Status */}
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block uppercase">Status da Escala</label>
-                <select
-                  value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value)}
-                  className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
-                >
-                  <option value="TODOS">Todos os Status ({opcoes.length})</option>
-                  <option value="PENDENTE">Pendentes de Definição</option>
-                  <option value="SALVO">Escalas Salvas / Prontas ({totalSalvos})</option>
-                  <option value="NAO_CONTEMPLADO">Não Contemplados ({totalNaoContemplados})</option>
-                  <option value="GERADO">Férias Geradas no SGP ({totalGeradas})</option>
-                </select>
+        {/* DETALHES E GESTÃO DA CAMPANHA SELECIONADA */}
+        {campanhaSelecionada && (
+          <div className="space-y-6 pt-2">
+            {/* BANNER DA CAMPANHA SELECIONADA */}
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm ${
+              isCampanhaEncerradaOuDesativada
+                ? 'bg-slate-100 border-slate-300 text-slate-700'
+                : 'bg-white border-blue-200 text-slate-800'
+            }`}>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-lg font-black text-slate-900">
+                    {campanhaSelecionada.titulo}
+                  </h2>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    campanhaSelecionada.status === 'Aberta_Coleta'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {campanhaSelecionada.status}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Ano {campanhaSelecionada.ano_referencia} • Escopo: <strong>{campanhaSelecionada.escopo_unidades_nomes || 'Toda a Corporação'}</strong> • Prazo Limite: {campanhaSelecionada.data_fim_militar || 'Não definido'}
+                </p>
               </div>
 
-              {/* Modalidade */}
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block uppercase">Modalidade</label>
-                <select
-                  value={filtroModalidade}
-                  onChange={(e) => setFiltroModalidade(e.target.value)}
-                  className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
-                >
-                  <option value="TODOS">Todas as Modalidades</option>
-                  <option value="1_ETAPA_30">Integral (30 dias)</option>
-                  <option value="2_ETAPAS_15">2 Frações (15 + 15 dias)</option>
-                  <option value="3_ETAPAS_10">3 Frações (10 + 10 + 10 dias)</option>
-                </select>
-              </div>
-
-              {/* Unidade */}
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block uppercase">Unidade / Lotação</label>
-                <select
-                  value={filtroUnidade}
-                  onChange={(e) => setFiltroUnidade(e.target.value)}
-                  className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
-                >
-                  <option value="TODOS">Todas as Unidades</option>
-                  {unidadesDisponiveis.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Mês */}
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block uppercase">Mês Escalado</label>
-                <select
-                  value={filtroMes}
-                  onChange={(e) => setFiltroMes(e.target.value)}
-                  className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
-                >
-                  <option value="TODOS">Qualquer Mês</option>
-                  {LISTA_MESES.map((m) => (
-                    <option key={m.val} value={m.val}>
-                      {m.nome}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex items-center space-x-2 shrink-0">
+                {!isCampanhaEncerradaOuDesativada && (
+                  <Button
+                    type="button"
+                    onClick={handleGerarLoteFerias}
+                    disabled={actionLoading || totalSalvos === 0 || totalGeradas === totalSalvos}
+                    className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-extrabold h-10 px-5 shadow-sm"
+                  >
+                    <Zap className="w-4 h-4 mr-1.5" />
+                    {totalGeradas > 0 && totalGeradas === totalSalvos
+                      ? 'Férias Desta Campanha Já Geradas'
+                      : 'Gerar Férias no Sistema SGP'}
+                  </Button>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>
-                Exibindo <strong>{opcoesFiltradas.length}</strong> de <strong>{opcoes.length}</strong> militares
-              </span>
-              {(searchTerm || filtroStatus !== 'TODOS' || filtroModalidade !== 'TODOS' || filtroUnidade !== 'TODOS' || filtroMes !== 'TODOS') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFiltroStatus('TODOS');
-                    setFiltroModalidade('TODOS');
-                    setFiltroUnidade('TODOS');
-                    setFiltroMes('TODOS');
-                  }}
-                  className="text-blue-600 hover:text-blue-800 font-bold"
-                >
-                  Limpar todos os filtros
-                </button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            {/* CARDS DE STATS DA CAMPANHA SELECIONADA */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <Card className="border-slate-200 bg-white">
+                <CardContent className="p-4 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Opções Desta Campanha</span>
+                    <strong className="text-xl text-[#1e3a5f] font-extrabold">{opcoes.length}</strong>
+                  </div>
+                  <Users className="w-8 h-8 text-blue-500 opacity-30" />
+                </CardContent>
+              </Card>
 
-        {/* LISTAGEM DE MILITARES */}
-        <div className="space-y-4">
-          {opcoesFiltradas.length === 0 ? (
-            <Card className="border-slate-200 shadow-sm bg-white">
-              <CardContent className="p-8 text-center text-slate-500 text-xs">
-                Nenhum militar encontrado com os filtros selecionados.
+              <Card className="border-slate-200 bg-white">
+                <CardContent className="p-4 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Escalas Salvas / Prontas</span>
+                    <strong className="text-xl text-emerald-700 font-extrabold">{totalSalvos}</strong>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-emerald-500 opacity-30" />
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200 bg-white">
+                <CardContent className="p-4 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Não Contemplados</span>
+                    <strong className="text-xl text-rose-700 font-extrabold">{totalNaoContemplados}</strong>
+                  </div>
+                  <Ban className="w-8 h-8 text-rose-500 opacity-30" />
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200 bg-white">
+                <CardContent className="p-4 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-500 block">Férias Geradas no SGP</span>
+                    <strong className="text-xl text-purple-700 font-extrabold">{totalGeradas}</strong>
+                  </div>
+                  <Zap className="w-8 h-8 text-purple-500 opacity-30" />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* DISTRIBUIÇÃO DE EFETIVO POR MÊS */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="p-4 pb-2 border-b border-slate-100">
+                <CardTitle className="text-xs sm:text-sm font-bold text-slate-800 flex items-center">
+                  <CalendarDays className="w-4 h-4 mr-2 text-[#1e3a5f]" />
+                  Distribuição de Efetivo Escalado nesta Campanha ({campanhaSelecionada.ano_referencia})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 text-xs">
+                <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 text-center">
+                  {LISTA_MESES.map((m, idx) => {
+                    const count = contagemPorMes[idx];
+                    return (
+                      <div
+                        key={m.val}
+                        className={`p-2 rounded-xl border ${
+                          count > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <span className="text-[10px] text-slate-500 block truncate">{m.nome.slice(0, 3)}</span>
+                        <strong className={`text-sm ${count > 0 ? 'text-[#1e3a5f]' : 'text-slate-400'}`}>
+                          {count}
+                        </strong>
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
-          ) : (
-            opcoesFiltradas.map((op) => {
-              const modalidade = op.modalidade || '2_ETAPAS_15';
-              const numFracoes = modalidade === '1_ETAPA_30' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
-              const diasPorFracao = modalidade === '1_ETAPA_30' ? [30] : modalidade === '3_ETAPAS_10' ? [10, 10, 10] : [15, 15];
 
-              // Os 3 meses escolhidos pelo militar (Histórico permanente)
-              const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
-              const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
-              const mesOpcao3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+            {/* BARRA DE PESQUISA E FILTROS */}
+            <Card className="border-slate-200 shadow-sm bg-white">
+              <CardContent className="p-4 space-y-3">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <Input
+                    type="text"
+                    placeholder="Pesquisar por nome do militar, nome de guerra, posto/graduação, matrícula ou lotação..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 pr-8 h-10 text-xs rounded-xl bg-slate-50 border-slate-200 focus:bg-white"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
 
-              const militarSelecao = selecoesMilitares[op.id] || {
-                fracao1: mesOpcao1,
-                fracao2: mesOpcao2,
-                fracao3: mesOpcao3,
-              };
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block uppercase">Status da Escala</label>
+                    <select
+                      value={filtroStatus}
+                      onChange={(e) => setFiltroStatus(e.target.value)}
+                      className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
+                    >
+                      <option value="TODOS">Todos os Status ({opcoes.length})</option>
+                      <option value="PENDENTE">Pendentes de Definição</option>
+                      <option value="SALVO">Escalas Salvas / Prontas ({totalSalvos})</option>
+                      <option value="NAO_CONTEMPLADO">Não Contemplados ({totalNaoContemplados})</option>
+                      <option value="GERADO">Férias Geradas no SGP ({totalGeradas})</option>
+                    </select>
+                  </div>
 
-              const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
-              const isGerado = Boolean(op.gerado_ferias_efetivas);
-              const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
-              const isEditing = militaresEmEdicao[op.id] === true;
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block uppercase">Modalidade</label>
+                    <select
+                      value={filtroModalidade}
+                      onChange={(e) => setFiltroModalidade(e.target.value)}
+                      className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
+                    >
+                      <option value="TODOS">Todas as Modalidades</option>
+                      <option value="1_ETAPA_30">Integral (30 dias)</option>
+                      <option value="2_ETAPAS_15">2 Frações (15 + 15 dias)</option>
+                      <option value="3_ETAPAS_10">3 Frações (10 + 10 + 10 dias)</option>
+                    </select>
+                  </div>
 
-              return (
-                <Card key={op.id} className="border-slate-200 bg-white shadow-xs rounded-2xl overflow-hidden transition-all">
-                  {/* HEADER DO CARD DO MILITAR */}
-                  <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-                        {op.militar_posto?.slice(0, 3) || 'MIL'}
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-extrabold text-slate-900 text-sm">
-                            {op.militar_posto} {op.militar_nome}
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono">
-                            Mat: {op.militar_matricula || '-'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500">
-                          Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{op.periodo_inicio} a {op.periodo_fim}</strong>
-                        </p>
-                      </div>
-                    </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block uppercase">Unidade / Lotação</label>
+                    <select
+                      value={filtroUnidade}
+                      onChange={(e) => setFiltroUnidade(e.target.value)}
+                      className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
+                    >
+                      <option value="TODOS">Todas as Unidades</option>
+                      {unidadesDisponiveis.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div className="flex items-center space-x-2">
-                      <span className="px-2.5 py-1 rounded-xl bg-slate-200 text-slate-800 text-[11px] font-bold">
-                        {modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}
-                      </span>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block uppercase">Mês Escalado</label>
+                    <select
+                      value={filtroMes}
+                      onChange={(e) => setFiltroMes(e.target.value)}
+                      className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
+                    >
+                      <option value="TODOS">Qualquer Mês</option>
+                      {LISTA_MESES.map((m) => (
+                        <option key={m.val} value={m.val}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                      <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center shadow-2xs ${
-                        isGerado
-                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                          : isNaoContemplado
-                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                          : isSalvo
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : 'bg-amber-100 text-amber-800 border border-amber-200'
-                      }`}>
-                        {isGerado ? (
-                          <>
-                            <Lock className="w-3 h-3 mr-1" />
-                            Férias Geradas no SGP
-                          </>
-                        ) : isNaoContemplado ? (
-                          <>
-                            <Ban className="w-3 h-3 mr-1" />
-                            Não Contemplado
-                          </>
-                        ) : isSalvo ? (
-                          <>
-                            <Check className="w-3 h-3 mr-1" />
-                            Escala Salva / Pronta
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-3 h-3 mr-1" />
-                            Pendente de Definição
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  </CardHeader>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-500">
+                  <span>
+                    Exibindo <strong>{opcoesFiltradas.length}</strong> de <strong>{opcoes.length}</strong> militares
+                  </span>
+                  {(searchTerm || filtroStatus !== 'TODOS' || filtroModalidade !== 'TODOS' || filtroUnidade !== 'TODOS' || filtroMes !== 'TODOS') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setFiltroStatus('TODOS');
+                        setFiltroModalidade('TODOS');
+                        setFiltroUnidade('TODOS');
+                        setFiltroMes('TODOS');
+                      }}
+                      className="text-blue-600 hover:text-blue-800 font-bold"
+                    >
+                      Limpar filtros
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-                  <CardContent className="p-4 sm:p-5 space-y-4 text-xs">
-                    {/* HISTÓRICO PERMANENTE DAS 3 OPÇÕES REGISTRADAS PELO MILITAR */}
-                    <div className="p-3 bg-slate-100/60 rounded-2xl border border-slate-200 space-y-1.5">
-                      <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wide flex items-center">
-                        <Star className="w-3 h-3 mr-1 text-amber-500 fill-amber-500" />
-                        Histórico de Preferências Registradas pelo Militar no Portal:
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                        <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                          <span className="text-slate-500 text-[11px]">1ª Opção:</span>
-                          <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao1)}</strong>
-                        </div>
-                        <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                          <span className="text-slate-500 text-[11px]">2ª Opção:</span>
-                          <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao2)}</strong>
-                        </div>
-                        <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                          <span className="text-slate-500 text-[11px]">3ª Opção:</span>
-                          <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao3)}</strong>
-                        </div>
-                      </div>
-                    </div>
+            {/* LISTAGEM DE MILITARES */}
+            <div className="space-y-4">
+              {opcoesFiltradas.length === 0 ? (
+                <Card className="border-slate-200 shadow-sm bg-white">
+                  <CardContent className="p-8 text-center text-slate-500 text-xs">
+                    Nenhuma opção de militar encontrada para os filtros selecionados nesta campanha.
+                  </CardContent>
+                </Card>
+              ) : (
+                opcoesFiltradas.map((op) => {
+                  const modalidade = op.modalidade || '2_ETAPAS_15';
+                  const numFracoes = modalidade === '1_ETAPA_30' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
+                  const diasPorFracao = modalidade === '1_ETAPA_30' ? [30] : modalidade === '3_ETAPAS_10' ? [10, 10, 10] : [15, 15];
 
-                    {/* ESTADO 1: FÉRIAS JÁ GERADAS NO SGP (BLOQUEADO) */}
-                    {isGerado ? (
-                      <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-purple-950 text-xs flex items-center">
-                            <Lock className="w-3.5 h-3.5 mr-1 text-purple-700" />
-                            Escalação Oficial Consolidada & Gerada:
-                          </span>
-                          <span className="text-[11px] text-purple-800 font-semibold">
-                            Férias registradas no módulo SGP
-                          </span>
-                        </div>
-                        <p className="text-sm font-black text-purple-900">
-                          {op.decisao_camada_1_meses}
-                        </p>
-                      </div>
-                    ) : isNaoContemplado && !isEditing ? (
-                      /* ESTADO 2: NÃO CONTEMPLADO */
-                      <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <span className="font-extrabold text-rose-950 text-xs flex items-center">
-                            <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
-                            Militar Não Contemplado neste Plano Anual
-                          </span>
-                          <p className="text-rose-800 text-[11px]">
-                            {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar no plano atual.'}
-                          </p>
-                        </div>
+                  const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+                  const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+                  const mesOpcao3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
-                          className="border-rose-300 text-rose-900 hover:bg-rose-100 rounded-xl text-xs font-bold h-8 shrink-0"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 mr-1" />
-                          Alterar / Contemplar
-                        </Button>
-                      </div>
-                    ) : isSalvo && !isEditing ? (
-                      /* ESTADO 3: ESCALA SALVA / PRONTA (MODO RESUMO COM BOTÃO EDITAR) */
-                      <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <span className="font-extrabold text-emerald-950 text-xs flex items-center">
-                            <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
-                            Escala Definida e Pronta para Geração:
-                          </span>
-                          <p className="text-sm font-extrabold text-emerald-900">
-                            {op.decisao_camada_1_meses}
-                          </p>
-                        </div>
+                  const militarSelecao = selecoesMilitares[op.id] || {
+                    fracao1: mesOpcao1,
+                    fracao2: mesOpcao2,
+                    fracao3: mesOpcao3,
+                  };
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
-                          className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs font-bold h-8 shrink-0"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 mr-1" />
-                          Editar Escala
-                        </Button>
-                      </div>
-                    ) : (
-                      /* ESTADO 4: MODO DE EDIÇÃO / DEFINIÇÃO DAS FRAÇÕES */
-                      <div className="space-y-3">
-                        {Array.from({ length: numFracoes }).map((_, idx) => {
-                          const numFracao = idx + 1;
-                          const dias = diasPorFracao[idx] || 15;
-                          const mesAtualFracao = militarSelecao[`fracao${numFracao}`] || '01';
+                  const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
+                  const isGerado = Boolean(op.gerado_ferias_efetivas);
+                  const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
+                  const isEditing = militaresEmEdicao[op.id] === true;
 
-                          const isOpcao1 = mesAtualFracao === mesOpcao1;
-                          const isOpcao2 = mesAtualFracao === mesOpcao2;
-                          const isOpcao3 = mesAtualFracao === mesOpcao3;
-                          const isOutroMes = !isOpcao1 && !isOpcao2 && !isOpcao3;
-
-                          return (
-                            <div
-                              key={numFracao}
-                              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-extrabold text-slate-800 text-xs flex items-center">
-                                  <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                                  {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias):
-                                </span>
-                                <span className="text-[11px] font-bold text-slate-600">
-                                  Mês Selecionado: <strong className="text-blue-900 bg-white px-2 py-0.5 rounded-md border border-blue-200">{getNomeMesPorVal(mesAtualFracao)} / {ano}</strong>
-                                </span>
-                              </div>
-
-                              {/* 3 BOTÕES DAS OPÇÕES + SELETOR DE OUTRO MÊS */}
-                              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                                {/* 1ª OPÇÃO */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao1)}
-                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                    isOpcao1
-                                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-200'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao1 ? 'text-emerald-100' : 'text-emerald-700'}`}>
-                                      ⭐ 1ª Opção
-                                    </span>
-                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao1)}</strong>
-                                  </div>
-                                  {isOpcao1 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                </button>
-
-                                {/* 2ª OPÇÃO */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao2)}
-                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                    isOpcao2
-                                      ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao2 ? 'text-blue-100' : 'text-slate-500'}`}>
-                                      2ª Opção
-                                    </span>
-                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao2)}</strong>
-                                  </div>
-                                  {isOpcao2 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                </button>
-
-                                {/* 3ª OPÇÃO */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao3)}
-                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                    isOpcao3
-                                      ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao3 ? 'text-blue-100' : 'text-slate-500'}`}>
-                                      3ª Opção
-                                    </span>
-                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao3)}</strong>
-                                  </div>
-                                  {isOpcao3 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                </button>
-
-                                {/* SELETOR: OUTRO MÊS */}
-                                <div className={`p-2 rounded-xl border flex flex-col justify-center transition-all ${
-                                  isOutroMes
-                                    ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-200'
-                                    : 'bg-white border-slate-200'
-                                }`}>
-                                  <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
-                                    ✏️ Outro Mês
-                                  </span>
-                                  <select
-                                    value={isOutroMes ? mesAtualFracao : ''}
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        handleMudarMesFracao(op.id, numFracao, e.target.value);
-                                      }
-                                    }}
-                                    className="w-full h-7 px-1.5 bg-transparent border-0 text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                                  >
-                                    <option value="">Selecionar...</option>
-                                    {LISTA_MESES.map((m) => (
-                                      <option key={m.val} value={m.val}>
-                                        {m.nome}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
+                  return (
+                    <Card key={op.id} className="border-slate-200 bg-white shadow-xs rounded-2xl overflow-hidden">
+                      <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                            {op.militar_posto?.slice(0, 3) || 'MIL'}
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-extrabold text-slate-900 text-sm">
+                                {op.militar_posto} {op.militar_nome}
+                              </span>
+                              <span className="text-xs text-slate-400 font-mono">
+                                Mat: {op.militar_matricula || '-'}
+                              </span>
                             </div>
-                          );
-                        })}
+                            <p className="text-[11px] text-slate-500">
+                              Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{op.periodo_inicio} a {op.periodo_fim}</strong>
+                            </p>
+                          </div>
+                        </div>
 
-                        {/* BOTÕES DE AÇÃO: SALVAR OU NÃO CONTEMPLADO */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
-                            className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-bold rounded-xl h-9"
-                          >
-                            <Ban className="w-3.5 h-3.5 mr-1" />
-                            🚫 Marcar como Não Contemplado
-                          </Button>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2.5 py-1 rounded-xl bg-slate-200 text-slate-800 text-[11px] font-bold">
+                            {modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}
+                          </span>
 
-                          <div className="flex items-center space-x-2">
-                            {isSalvo && (
+                          <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center shadow-2xs ${
+                            isGerado
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : isNaoContemplado
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : isSalvo
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}>
+                            {isGerado ? (
+                              <>
+                                <Lock className="w-3 h-3 mr-1" />
+                                Férias Geradas no SGP
+                              </>
+                            ) : isNaoContemplado ? (
+                              <>
+                                <Ban className="w-3 h-3 mr-1" />
+                                Não Contemplado
+                              </>
+                            ) : isSalvo ? (
+                              <>
+                                <Check className="w-3 h-3 mr-1" />
+                                Escala Salva / Pronta
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3 h-3 mr-1" />
+                                Pendente de Definição
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="p-4 sm:p-5 space-y-4 text-xs">
+                        {/* HISTÓRICO PERMANENTE DAS OPÇÕES */}
+                        <div className="p-3 bg-slate-100/60 rounded-2xl border border-slate-200 space-y-1.5">
+                          <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wide flex items-center">
+                            <Star className="w-3 h-3 mr-1 text-amber-500 fill-amber-500" />
+                            Histórico de Preferências Registradas pelo Militar no Portal:
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                            <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                              <span className="text-slate-500 text-[11px]">1ª Opção:</span>
+                              <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao1)}</strong>
+                            </div>
+                            <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                              <span className="text-slate-500 text-[11px]">2ª Opção:</span>
+                              <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao2)}</strong>
+                            </div>
+                            <div className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                              <span className="text-slate-500 text-[11px]">3ª Opção:</span>
+                              <strong className="text-slate-900 font-bold">{getNomeMesPorVal(mesOpcao3)}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ESTADO DE EXIBIÇÃO / EDIÇÃO */}
+                        {isGerado ? (
+                          <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-purple-950 text-xs flex items-center">
+                                <Lock className="w-3.5 h-3.5 mr-1 text-purple-700" />
+                                Escalação Oficial Consolidada & Gerada:
+                              </span>
+                              <span className="text-[11px] text-purple-800 font-semibold">
+                                Férias registradas no módulo SGP
+                              </span>
+                            </div>
+                            <p className="text-sm font-black text-purple-900">
+                              {op.decisao_camada_1_meses}
+                            </p>
+                          </div>
+                        ) : isNaoContemplado && !isEditing ? (
+                          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                              <span className="font-extrabold text-rose-950 text-xs flex items-center">
+                                <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
+                                Militar Não Contemplado nesta Campanha
+                              </span>
+                              <p className="text-rose-800 text-[11px]">
+                                {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar nesta campanha.'}
+                              </p>
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
+                              className="border-rose-300 text-rose-900 hover:bg-rose-100 rounded-xl text-xs font-bold h-8 shrink-0"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 mr-1" />
+                              Alterar / Contemplar
+                            </Button>
+                          </div>
+                        ) : isSalvo && !isEditing ? (
+                          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                              <span className="font-extrabold text-emerald-950 text-xs flex items-center">
+                                <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
+                                Escala Definida e Pronta para Geração:
+                              </span>
+                              <p className="text-sm font-extrabold text-emerald-900">
+                                {op.decisao_camada_1_meses}
+                              </p>
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
+                              className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs font-bold h-8 shrink-0"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 mr-1" />
+                              Editar Escala
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {Array.from({ length: numFracoes }).map((_, idx) => {
+                              const numFracao = idx + 1;
+                              const dias = diasPorFracao[idx] || 15;
+                              const mesAtualFracao = militarSelecao[`fracao${numFracao}`] || '01';
+
+                              const isOpcao1 = mesAtualFracao === mesOpcao1;
+                              const isOpcao2 = mesAtualFracao === mesOpcao2;
+                              const isOpcao3 = mesAtualFracao === mesOpcao3;
+                              const isOutroMes = !isOpcao1 && !isOpcao2 && !isOpcao3;
+
+                              return (
+                                <div
+                                  key={numFracao}
+                                  className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold text-slate-800 text-xs flex items-center">
+                                      <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                                      {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias):
+                                    </span>
+                                    <span className="text-[11px] font-bold text-slate-600">
+                                      Mês Selecionado: <strong className="text-blue-900 bg-white px-2 py-0.5 rounded-md border border-blue-200">{getNomeMesPorVal(mesAtualFracao)}</strong>
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao1)}
+                                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                        isOpcao1
+                                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-200'
+                                          : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30'
+                                      }`}
+                                    >
+                                      <div>
+                                        <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao1 ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                                          ⭐ 1ª Opção
+                                        </span>
+                                        <strong className="text-xs block">{getNomeMesPorVal(mesOpcao1)}</strong>
+                                      </div>
+                                      {isOpcao1 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao2)}
+                                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                        isOpcao2
+                                          ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
+                                          : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
+                                      }`}
+                                    >
+                                      <div>
+                                        <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao2 ? 'text-blue-100' : 'text-slate-500'}`}>
+                                          2ª Opção
+                                        </span>
+                                        <strong className="text-xs block">{getNomeMesPorVal(mesOpcao2)}</strong>
+                                      </div>
+                                      {isOpcao2 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao3)}
+                                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                        isOpcao3
+                                          ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
+                                          : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
+                                      }`}
+                                    >
+                                      <div>
+                                        <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao3 ? 'text-blue-100' : 'text-slate-500'}`}>
+                                          3ª Opção
+                                        </span>
+                                        <strong className="text-xs block">{getNomeMesPorVal(mesOpcao3)}</strong>
+                                      </div>
+                                      {isOpcao3 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
+                                    </button>
+
+                                    <div className={`p-2 rounded-xl border flex flex-col justify-center transition-all ${
+                                      isOutroMes
+                                        ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-200'
+                                        : 'bg-white border-slate-200'
+                                    }`}>
+                                      <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
+                                        ✏️ Outro Mês
+                                      </span>
+                                      <select
+                                        value={isOutroMes ? mesAtualFracao : ''}
+                                        onChange={(e) => {
+                                          if (e.target.value) {
+                                            handleMudarMesFracao(op.id, numFracao, e.target.value);
+                                          }
+                                        }}
+                                        className="w-full h-7 px-1.5 bg-transparent border-0 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                                      >
+                                        <option value="">Selecionar...</option>
+                                        {LISTA_MESES.map((m) => (
+                                          <option key={m.val} value={m.val}>
+                                            {m.nome}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }))}
-                                className="text-slate-500 hover:text-slate-800 text-xs rounded-xl h-9"
+                                onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
+                                className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-bold rounded-xl h-9"
                               >
-                                Cancelar
+                                <Ban className="w-3.5 h-3.5 mr-1" />
+                                🚫 Marcar como Não Contemplado
                               </Button>
-                            )}
 
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={actionLoading}
-                              onClick={() => handleSalvarEscalaMilitar(op)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-9 px-5 shadow-sm"
-                            >
-                              <Check className="w-3.5 h-3.5 mr-1.5" />
-                              Salvar Escala Definitiva
-                            </Button>
+                              <div className="flex items-center space-x-2">
+                                {isSalvo && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }))}
+                                    className="text-slate-500 hover:text-slate-800 text-xs rounded-xl h-9"
+                                  >
+                                    Cancelar
+                                  </Button>
+                                )}
+
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={actionLoading}
+                                  onClick={() => handleSalvarEscalaMilitar(op)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-9 px-5 shadow-sm"
+                                >
+                                  <Check className="w-3.5 h-3.5 mr-1.5" />
+                                  Salvar Escala Definitiva
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* SEÇÃO 2: HISTÓRICO DE CAMPANHAS DE FÉRIAS (DESATIVADAS / ENCERRADAS / ARQUIVADAS) */}
+        {campanhasHistorico.length > 0 && (
+          <div className="space-y-3 pt-6 border-t border-slate-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-extrabold text-slate-500 flex items-center">
+                <History className="w-4 h-4 mr-2" />
+                Histórico de Campanhas de Férias (Encerradas / Desativadas / Arquivadas)
+              </h2>
+              <span className="text-[11px] text-slate-400">
+                Disponíveis para consulta e auditoria de opções e férias geradas
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {campanhasHistorico.map((camp) => {
+                const isSelected = campanhaSelecionada?.id === camp.id;
+                return (
+                  <div
+                    key={camp.id}
+                    onClick={() => handleSelecionarCampanha(camp)}
+                    className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-slate-200/90 border-slate-400 shadow-sm ring-2 ring-slate-400'
+                        : 'bg-slate-100/70 border-slate-200 hover:bg-slate-100 opacity-75'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-bold">
+                        {camp.status} • Ano {camp.ano_referencia || '-'}
+                      </span>
+                      {isSelected && (
+                        <span className="text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md">
+                          Em Consulta
+                        </span>
+                      )}
+                    </div>
+
+                    <strong className="text-xs font-bold text-slate-700 block truncate">
+                      {camp.titulo}
+                    </strong>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                      Público: {camp.escopo_unidades_nomes || 'Geral'}
+                    </p>
+
+                    {modoAdmin && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          title="Excluir Definitivamente (Admin)"
+                          onClick={() => handleExcluirCampanhaAdmin(camp)}
+                          className="p-1 rounded text-rose-600 hover:bg-rose-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* MODAL PARA JUSTIFICATIVA DE NÃO CONTEMPLADO */}
         {modalNaoContemplado.open && (
@@ -983,7 +1220,7 @@ export default function PainelPlanoFerias() {
                   Militar: <strong>{modalNaoContemplado.opcao?.militar_posto} {modalNaoContemplado.opcao?.militar_nome}</strong>
                 </p>
                 <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
-                  O militar não terá frações de férias geradas no SGP neste plano anual. Você poderá alterar essa decisão a qualquer momento antes da geração final.
+                  O militar não terá frações de férias geradas nesta campanha. Você poderá alterar essa decisão a qualquer momento antes da geração final.
                 </div>
 
                 <div>

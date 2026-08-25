@@ -344,6 +344,16 @@ export default async function (req: Request): Promise<Response> {
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha arquivada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
 
+        // Desativar Campanha
+        case 'CAMPANHA_DESATIVAR': {
+          const { campanha_id } = payload;
+          if (!campanha_id) {
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+          }
+          const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Desativada' });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha desativada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
         // Encerrar Campanha
         case 'CAMPANHA_ENCERRAR': {
           const { campanha_id } = payload;
@@ -366,23 +376,54 @@ export default async function (req: Request): Promise<Response> {
           const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
 
           if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR') {
-            let campanhas = await base44.asServiceRole.entities.CampanhaPlanoFerias.filter({ ano_referencia: ano });
+            let campanhas = await base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS', ano_referencia: ano });
             let campanha = campanhas?.[0];
             if (!campanha) {
-              campanha = await base44.asServiceRole.entities.CampanhaPlanoFerias.create({
+              campanha = await base44.asServiceRole.entities.CampanhaPortal.create({
+                tipo: 'PLANO_FERIAS',
                 ano_referencia: ano,
                 titulo: `Plano Anual de Férias ${ano}`,
                 status: 'Aberta_Coleta',
-                prazo_limite_militar: `${ano - 1}-10-31`,
-                prazo_limite_unidade: `${ano - 1}-11-30`,
+                tipo_escopo: 'TODOS',
+                escopo_unidades_nomes: 'Toda a Corporação',
+                data_inicio: new Date().toISOString().split('T')[0],
+                data_fim_militar: `${ano - 1}-10-31`,
+                data_fim_unidade: `${ano - 1}-11-30`,
                 instrucoes: `Prezados militares, registrem suas 3 opções de meses de férias para ${ano}.`,
+                total_publico_alvo: 0,
+                total_respondidos: 0,
+                total_pendentes: 0,
               });
             }
             return new Response(JSON.stringify({ ok: true, campanha }), { status: 200, headers: { 'Content-Type': 'application/json' } });
           }
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
-            const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: ano });
+            // 1. Carrega todas as campanhas de férias cadastradas
+            let todasCampanhasPortal: any[] = [];
+            try {
+              todasCampanhasPortal = await base44.asServiceRole.entities.CampanhaPortal.list();
+            } catch (_e) {
+              todasCampanhasPortal = [];
+            }
+            const campanhasFerias = (todasCampanhasPortal || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS');
+
+            // 2. Busca opções de férias
+            let opcoes: any[] = [];
+            if (payload.campanha_id) {
+              opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id: payload.campanha_id });
+              if (!opcoes || opcoes.length === 0) {
+                // Fallback por ano para registros antigos sem campanha_id explícito
+                const campSelected = campanhasFerias.find((c: any) => c.id === payload.campanha_id);
+                if (campSelected?.ano_referencia) {
+                  opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: campSelected.ano_referencia });
+                }
+              }
+            } else if (payload.ano_referencia) {
+              opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ ano_referencia: Number(payload.ano_referencia) });
+            } else {
+              opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+            }
 
             // Rotina de reparo/sincronização automática para férias já geradas
             try {
@@ -425,7 +466,11 @@ export default async function (req: Request): Promise<Response> {
               }
             } catch (_errRepair) {}
 
-            return new Response(JSON.stringify({ ok: true, opcoes: opcoes || [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({
+              ok: true,
+              campanhas: campanhasFerias || [],
+              opcoes: opcoes || [],
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
           }
 
           if (acao === 'PLANO_DECISAO_CAMADA_1') {
@@ -472,10 +517,26 @@ export default async function (req: Request): Promise<Response> {
           }
 
           if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
-            const todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-              ano_referencia: ano,
-              gerado_ferias_efetivas: false,
-            });
+            const { campanha_id } = payload;
+            let todasOpcoes: any[] = [];
+
+            if (campanha_id) {
+              todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+                campanha_id: campanha_id,
+                gerado_ferias_efetivas: false,
+              });
+              if (!todasOpcoes || todasOpcoes.length === 0) {
+                todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+                  ano_referencia: ano,
+                  gerado_ferias_efetivas: false,
+                });
+              }
+            } else {
+              todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+                ano_referencia: ano,
+                gerado_ferias_efetivas: false,
+              });
+            }
 
             // Considera apenas quem foi salvo/definido e NÃO está marcado como Não Contemplado
             const opcoes = (todasOpcoes || []).filter((op: any) =>
@@ -565,20 +626,26 @@ export default async function (req: Request): Promise<Response> {
               geradasCount++;
             }
 
-            // ENCERRAMENTO AUTOMÁTICO DAS CAMPANHAS DO ANO VINCULADO
+            // ENCERRAMENTO AUTOMÁTICO DA CAMPANHA ESPECÍFICA
             try {
-              const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
-              const campsAno = (allCamp || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS' && cp.ano_referencia === Number(ano));
-              for (const cp of campsAno) {
-                await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, {
+              if (campanha_id) {
+                await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
                   status: 'Encerrada',
                 });
+              } else {
+                const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
+                const campsAno = (allCamp || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS' && cp.ano_referencia === Number(ano));
+                for (const cp of campsAno) {
+                  await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, {
+                    status: 'Encerrada',
+                  });
+                }
               }
             } catch (_errClose) {}
 
             return new Response(JSON.stringify({
               ok: true,
-              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas no SGP e campanha de ${ano} encerrada.`,
+              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas no SGP e campanha encerrada.`,
               total_geradas: geradasCount,
             }), { status: 200, headers: { 'Content-Type': 'application/json' } });
           }
