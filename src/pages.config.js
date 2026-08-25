@@ -123,10 +123,12 @@ import Tags from './pages/Tags';
 import BackupSistema from './pages/BackupSistema';
 import CursosFormacao from './pages/CursosFormacao';
 import ConferenciasMilitares from './pages/ConferenciasMilitares';
+import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "ConfiguracoesPortal": ConfiguracoesPortal,
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AjustesSaldoFerias": AjustesSaldoFerias,
     "AgendarJISO": AgendarJISO,

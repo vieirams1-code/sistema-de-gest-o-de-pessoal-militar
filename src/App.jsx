@@ -33,6 +33,7 @@ const adminOnlyPages = new Set([
   // P0 Segurança: rota administrativa sensível sem guarda explícita anterior.
   'BackupSistema',
   'DiagnosticoSaldoFerias',
+  'ConfiguracoesPortal',
 ]);
 
 

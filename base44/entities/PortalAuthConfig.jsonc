@@ -1,8 +1,8 @@
 {
   "name": "PortalAuthConfig",
   "type": "object",
-  "title": "Configuração de Autenticação do Portal",
-  "description": "Configurações globais de canais e parâmetros de segurança da autenticação OTP do Portal do Militar.",
+  "title": "Configuração Geral e Autoatendimento do Portal",
+  "description": "Configurações globais de canais, parâmetros de segurança, regras de férias e conferência cadastral do Portal do Militar.",
   "properties": {
     "email_enabled": {
       "type": "boolean",
@@ -16,13 +16,13 @@
     },
     "whatsapp_enabled": {
       "type": "boolean",
-      "default": false,
+      "default": true,
       "description": "Habilita o canal de WhatsApp para envio de OTP"
     },
     "email_provider": {
       "type": "string",
       "default": "base44_core",
-      "description": "Provedor operacional de e-mail (ex: base44_core)"
+      "description": "Provedor operacional de e-mail (ex: base44_core, resend)"
     },
     "sms_provider": {
       "type": "string",
@@ -31,8 +31,8 @@
     },
     "whatsapp_provider": {
       "type": "string",
-      "default": "disabled",
-      "description": "Provedor operacional de WhatsApp (ex: disabled)"
+      "default": "evolution_api",
+      "description": "Provedor operacional de WhatsApp (ex: evolution_api)"
     },
     "allow_channel_choice": {
       "type": "boolean",
@@ -42,7 +42,7 @@
     "default_channel": {
       "type": "string",
       "enum": ["EMAIL", "SMS", "WHATSAPP"],
-      "default": "EMAIL",
+      "default": "WHATSAPP",
       "description": "Canal prioritário padrão"
     },
     "otp_ttl_seconds": {
@@ -58,33 +58,75 @@
     "otp_max_attempts": {
       "type": "number",
       "default": 3,
-      "description": "Número máximo de tentativas consecutivas incorretas antes da invalidação"
+      "description": "Número máximo de tentativas incorretas permitidas antes do bloqueio"
     },
-    "otp_max_sends_per_hour": {
+    "hourly_limit_per_militar": {
       "type": "number",
-      "default": 3,
-      "description": "Limite máximo de disparos de OTP permitidos por militar no intervalo de 1 hora"
+      "default": 5,
+      "description": "Limite máximo de disparos de OTP por hora para o mesmo militar"
     },
-    "ativo": {
+    "app_base_url": {
+      "type": "string",
+      "default": "https://sistema-de-gestao-de-pessoal-milita-7aa75a23.base44.app/portal",
+      "description": "URL base pública do Portal do Militar"
+    },
+    "ferias_ativo": {
       "type": "boolean",
       "default": true,
-      "description": "Define se a configuração está ativa"
+      "description": "Habilita o módulo de férias no Portal do Militar"
     },
-    "updated_at": {
+    "ferias_modo_selecao_periodo": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp da última alteração"
+      "enum": ["mais_antigo", "todos"],
+      "default": "mais_antigo",
+      "description": "Modo de exibição dos períodos de férias: mais_antigo (prioriza o mais antigo com saldo) ou todos"
+    },
+    "ferias_permitir_1_etapa_30d": {
+      "type": "boolean",
+      "default": true,
+      "description": "Permite opção em 1 etapa integral de 30 dias"
+    },
+    "ferias_permitir_2_etapas_15d": {
+      "type": "boolean",
+      "default": true,
+      "description": "Permite opção em 2 etapas de 15 + 15 dias"
+    },
+    "ferias_permitir_3_etapas_10d": {
+      "type": "boolean",
+      "default": true,
+      "description": "Permite opção em 3 etapas de 10 + 10 + 10 dias"
+    },
+    "ferias_permitir_custom": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permite fracionamento personalizado (ex: 20 + 10 dias)"
+    },
+    "ferias_prazo_limite": {
+      "type": "string",
+      "default": "",
+      "description": "Data limite para envio da opção de férias pelo militar"
+    },
+    "ferias_instrucoes": {
+      "type": "string",
+      "default": "Prezados militares, registrem a opção de parcelamento de férias para a elaboração da escala anual da unidade.",
+      "description": "Instruções da Chefia aos militares exibidas no módulo de férias"
+    },
+    "cadastro_ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Habilita o módulo de conferência cadastral no Portal"
+    },
+    "cadastro_permitir_solicitacao": {
+      "type": "boolean",
+      "default": true,
+      "description": "Permite que os militares enviem solicitações de alteração de cadastro"
+    },
+    "cadastro_instrucoes": {
+      "type": "string",
+      "default": "Confira atentamente seus dados pessoais, de contato e endereço. Caso haja divergência, solicite a alteração.",
+      "description": "Instruções exibidas no topo do módulo de conferência cadastral"
     }
   },
-  "required": [
-    "email_enabled",
-    "email_provider",
-    "otp_ttl_seconds",
-    "otp_resend_seconds",
-    "otp_max_attempts",
-    "otp_max_sends_per_hour",
-    "ativo"
-  ],
   "rls": {
     "create": false,
     "read": false,

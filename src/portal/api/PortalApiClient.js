@@ -180,3 +180,49 @@ export async function getMe() {
   return portalFetch('portal_getMe');
 }
 
+/**
+ * Consulta os dados cadastrais completos e dependentes (Fase 1.3A).
+ */
+export async function getCadastro() {
+  return portalFetch('portal_servicos', { acao: 'CADASTRO_GET' });
+}
+
+/**
+ * Confirma a veracidade dos dados cadastrais com carimbo de tempo (Fase 1.3A).
+ */
+export async function confirmarCadastro() {
+  return portalFetch('portal_servicos', { acao: 'CADASTRO_CONFIRMAR' });
+}
+
+/**
+ * Envia uma solicitação de alteração cadastral para análise do RH (Fase 1.3A).
+ */
+export async function solicitarAlteracaoCadastral({ campo_chave, campo_label, valor_atual, valor_proposto, justificativa }) {
+  return portalFetch('portal_servicos', {
+    acao: 'CADASTRO_SOLICITAR_ALTERACAO',
+    campo_chave,
+    campo_label,
+    valor_atual,
+    valor_proposto,
+    justificativa,
+  });
+}
+
+/**
+ * Consulta os períodos aquisitivos e histórico de férias (Fase 1.3B).
+ */
+export async function getFerias() {
+  return portalFetch('portal_servicos', { acao: 'FERIAS_GET' });
+}
+
+/**
+ * Submete a opção de parcelamento/fracionamento de férias (Fase 1.3B).
+ */
+export async function submeterOpcaoFerias({ periodo_aquisitivo_id, parcelas }) {
+  return portalFetch('portal_servicos', {
+    acao: 'FERIAS_SUBMETER_OPCAO',
+    periodo_aquisitivo_id,
+    parcelas,
+  });
+}
+
