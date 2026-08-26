@@ -1274,25 +1274,42 @@ Deno.serve(async (req: Request) => {
         let motivoBloqueio = '';
         let campanhaCadastralPendente: any = null;
 
-        if (regrasCampanha.exigir_atualizacao_cadastral === true) {
+        const exigirAtualizacao = regrasCampanha.exigir_atualizacao_cadastral === true ||
+          portalConfig?.ferias_exigir_atualizacao_cadastral === true ||
+          Boolean(campanhaFeriasAtiva?.exigir_atualizacao_cadastral);
+
+        if (exigirAtualizacao) {
           const campanhaCadastralAtiva = campanhasAtivasMilitar.find(
             (c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL'
           );
 
-          // Verifica se o militar já confirmou os dados ou enviou solicitação cadastral na vigência
-          const dataConferencia = militar.data_ultima_conferencia;
-          const dataInicioCampanha = campanhaCadastralAtiva?.data_inicio || `${new Date().getFullYear()}-01-01`;
-          const conferiuNaVigencia = Boolean(dataConferencia && dataConferencia >= dataInicioCampanha);
+          // Data de início do ciclo que exige atualização
+          const dataReferenciaInicio = (campanhaCadastralAtiva?.data_inicio || campanhaFeriasAtiva?.data_inicio || `${new Date().getFullYear()}-01-01`).split('T')[0];
 
-          let temSolicitacaoRecente = false;
+          // Verifica se houve confirmação explícita no portal através do log de auditoria
+          let confirmouExpressamente = false;
+          try {
+            const logs = await base44.asServiceRole.entities.PortalAuditoria.filter({
+              militar_id: militarId,
+              acao: 'CONFERENCIA_CADASTRAL_CONFIRMADA',
+            });
+            confirmouExpressamente = (logs || []).some((l: any) => {
+              const dt = (l.created_at || l.created_date || '').split('T')[0];
+              return dt >= dataReferenciaInicio;
+            });
+          } catch (_errAudit) {}
+
+          // Se tem solicitação cadastral enviada na vigência da campanha
+          let temSolicitacaoNaVigencia = false;
           try {
             const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ militar_id: militarId });
-            temSolicitacaoRecente = (solicitacoes || []).some(
-              (s: any) => !s.data_solicitacao || s.data_solicitacao >= dataInicioCampanha
-            );
+            temSolicitacaoNaVigencia = (solicitacoes || []).some((s: any) => {
+              const dt = (s.data_solicitacao || s.created_date || '').split('T')[0];
+              return dt >= dataReferenciaInicio;
+            });
           } catch (_eSol) {}
 
-          const cadastroConcluido = conferiuNaVigencia || temSolicitacaoRecente;
+          const cadastroConcluido = confirmouExpressamente || temSolicitacaoNaVigencia;
           if (!cadastroConcluido) {
             bloqueadoPorDependencia = true;
             motivoBloqueio = 'Para registrar suas preferências de férias, é obrigatório concluir primeiro a Atualização & Conferência Cadastral.';
@@ -1319,7 +1336,7 @@ Deno.serve(async (req: Request) => {
             permitir_2_etapas: permitir2Etapas,
             permitir_3_etapas: permitir3Etapas,
             permitir_custom: Boolean(portalConfig?.ferias_permitir_custom),
-            exigir_atualizacao_cadastral: Boolean(regrasCampanha.exigir_atualizacao_cadastral),
+            exigir_atualizacao_cadastral: exigirAtualizacao,
             prazo_limite: campanhaFeriasAtiva?.data_fim_militar || portalConfig?.ferias_prazo_limite || '',
             instrucoes: campanhaFeriasAtiva?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas 3 opções de meses para a escala de férias.',
           },
@@ -1345,23 +1362,38 @@ Deno.serve(async (req: Request) => {
           } catch (_e) {}
         }
 
-        if (regrasCampanhaSubmissao.exigir_atualizacao_cadastral === true) {
+        const exigirAtualizacaoSubmissao = regrasCampanhaSubmissao.exigir_atualizacao_cadastral === true ||
+          portalConfig?.ferias_exigir_atualizacao_cadastral === true ||
+          Boolean(campanhaFeriasAtiva?.exigir_atualizacao_cadastral);
+
+        if (exigirAtualizacaoSubmissao) {
           const campanhaCadastralAtiva = campanhasAtivasMilitar.find(
             (c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL'
           );
-          const dataConferencia = militar.data_ultima_conferencia;
-          const dataInicioCampanha = campanhaCadastralAtiva?.data_inicio || `${new Date().getFullYear()}-01-01`;
-          const conferiuNaVigencia = Boolean(dataConferencia && dataConferencia >= dataInicioCampanha);
+          const dataReferenciaInicio = (campanhaCadastralAtiva?.data_inicio || campanhaFeriasAtiva?.data_inicio || `${new Date().getFullYear()}-01-01`).split('T')[0];
 
-          let temSolicitacaoRecente = false;
+          let confirmouExpressamente = false;
+          try {
+            const logs = await base44.asServiceRole.entities.PortalAuditoria.filter({
+              militar_id: militarId,
+              acao: 'CONFERENCIA_CADASTRAL_CONFIRMADA',
+            });
+            confirmouExpressamente = (logs || []).some((l: any) => {
+              const dt = (l.created_at || l.created_date || '').split('T')[0];
+              return dt >= dataReferenciaInicio;
+            });
+          } catch (_errAudit) {}
+
+          let temSolicitacaoNaVigencia = false;
           try {
             const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ militar_id: militarId });
-            temSolicitacaoRecente = (solicitacoes || []).some(
-              (s: any) => !s.data_solicitacao || s.data_solicitacao >= dataInicioCampanha
-            );
+            temSolicitacaoNaVigencia = (solicitacoes || []).some((s: any) => {
+              const dt = (s.data_solicitacao || s.created_date || '').split('T')[0];
+              return dt >= dataReferenciaInicio;
+            });
           } catch (_eSol) {}
 
-          if (!conferiuNaVigencia && !temSolicitacaoRecente) {
+          if (!confirmouExpressamente && !temSolicitacaoNaVigencia) {
             return new Response(JSON.stringify({
               error: 'É obrigatório concluir a Atualização Cadastral antes de enviar suas preferências de férias.'
             }), {

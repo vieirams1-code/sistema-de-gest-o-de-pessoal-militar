@@ -57,10 +57,10 @@ export default function PortalFeriasView({ onBack }) {
   const [selectedPeriodoId, setSelectedPeriodoId] = useState('');
   const [modalidade, setModalidade] = useState('2_ETAPAS_15');
 
-  // 3 Meses de Opção (Sem seleção de dia; internamente sempre dia 01)
-  const [mesOpcao1, setMesOpcao1] = useState('01');
-  const [mesOpcao2, setMesOpcao2] = useState('07');
-  const [mesOpcao3, setMesOpcao3] = useState('10');
+  // 3 Meses de Opção (Iniciam em branco, sem seleção prévia)
+  const [mesOpcao1, setMesOpcao1] = useState('');
+  const [mesOpcao2, setMesOpcao2] = useState('');
+  const [mesOpcao3, setMesOpcao3] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -100,9 +100,9 @@ export default function PortalFeriasView({ onBack }) {
         } catch (_err) {}
       } else {
         setIsEditing(true);
-        setMesOpcao1('01');
-        setMesOpcao2('07');
-        setMesOpcao3('10');
+        setMesOpcao1('');
+        setMesOpcao2('');
+        setMesOpcao3('');
       }
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao carregar informações de férias.');
@@ -568,12 +568,13 @@ export default function PortalFeriasView({ onBack }) {
                       value={mesOpcao1}
                       onChange={(e) => {
                         const v = e.target.value;
-                        if (v === mesOpcao2) setMesOpcao2(mesOpcao1);
-                        if (v === mesOpcao3) setMesOpcao3(mesOpcao1);
+                        if (v && v === mesOpcao2) setMesOpcao2(mesOpcao1);
+                        if (v && v === mesOpcao3) setMesOpcao3(mesOpcao1);
                         setMesOpcao1(v);
                       }}
                       className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
                     >
+                      <option value="">Selecione o mês...</option>
                       {MESES_ANO.map((m) => (
                         <option
                           key={m.valor}
@@ -592,12 +593,13 @@ export default function PortalFeriasView({ onBack }) {
                       value={mesOpcao2}
                       onChange={(e) => {
                         const v = e.target.value;
-                        if (v === mesOpcao1) setMesOpcao1(mesOpcao2);
-                        if (v === mesOpcao3) setMesOpcao3(mesOpcao2);
+                        if (v && v === mesOpcao1) setMesOpcao1(mesOpcao2);
+                        if (v && v === mesOpcao3) setMesOpcao3(mesOpcao2);
                         setMesOpcao2(v);
                       }}
                       className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
                     >
+                      <option value="">Selecione o mês...</option>
                       {MESES_ANO.map((m) => (
                         <option
                           key={m.valor}
@@ -616,12 +618,13 @@ export default function PortalFeriasView({ onBack }) {
                       value={mesOpcao3}
                       onChange={(e) => {
                         const v = e.target.value;
-                        if (v === mesOpcao1) setMesOpcao1(mesOpcao3);
-                        if (v === mesOpcao2) setMesOpcao2(mesOpcao3);
+                        if (v && v === mesOpcao1) setMesOpcao1(mesOpcao3);
+                        if (v && v === mesOpcao2) setMesOpcao2(mesOpcao3);
                         setMesOpcao3(v);
                       }}
                       className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
                     >
+                      <option value="">Selecione o mês...</option>
                       {MESES_ANO.map((m) => (
                         <option
                           key={m.valor}
