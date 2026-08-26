@@ -1038,6 +1038,7 @@ export default async function (req: Request): Promise<Response> {
         }));
 
         const campanhaCadastralAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL');
+        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
 
         return new Response(JSON.stringify({
           ok: true,
@@ -1045,6 +1046,8 @@ export default async function (req: Request): Promise<Response> {
           dependentes: sanitizedDependentes,
           solicitacoes: solicitacoes || [],
           campanha_ativa: campanhaCadastralAtiva || null,
+          campanha_ferias_ativa: campanhaFeriasAtiva || null,
+          tem_campanha_ferias_ativa: Boolean(campanhaFeriasAtiva),
           config: {
             ativo: portalConfig?.cadastro_ativo !== false,
             permitir_solicitacao: portalConfig?.cadastro_permitir_solicitacao !== false,
@@ -1058,7 +1061,7 @@ export default async function (req: Request): Promise<Response> {
       }
 
       case 'CADASTRO_CONFIRMAR': {
-        const nowIso = new Date().toISOString();
+        const nowIso = new Date().toISOString().split('T')[0];
         try {
           await base44.asServiceRole.entities.Militar.update(militarId, { data_ultima_conferencia: nowIso });
         } catch (_err) {}
@@ -1194,6 +1197,37 @@ export default async function (req: Request): Promise<Response> {
 
         const modoSelecao = regrasCampanha.modo_selecao_periodo || portalConfig?.ferias_modo_selecao_periodo || 'mais_antigo';
 
+        // Verificação de Dependência em Cascata (Exigir Atualização Cadastral prévia)
+        let bloqueadoPorDependencia = false;
+        let motivoBloqueio = '';
+        let campanhaCadastralPendente: any = null;
+
+        if (regrasCampanha.exigir_atualizacao_cadastral === true) {
+          const campanhaCadastralAtiva = campanhasAtivasMilitar.find(
+            (c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL'
+          );
+
+          // Verifica se o militar já confirmou os dados ou enviou solicitação cadastral na vigência
+          const dataConferencia = militar.data_ultima_conferencia;
+          const dataInicioCampanha = campanhaCadastralAtiva?.data_inicio || `${new Date().getFullYear()}-01-01`;
+          const conferiuNaVigencia = Boolean(dataConferencia && dataConferencia >= dataInicioCampanha);
+
+          let temSolicitacaoRecente = false;
+          try {
+            const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ militar_id: militarId });
+            temSolicitacaoRecente = (solicitacoes || []).some(
+              (s: any) => !s.data_solicitacao || s.data_solicitacao >= dataInicioCampanha
+            );
+          } catch (_eSol) {}
+
+          const cadastroConcluido = conferiuNaVigencia || temSolicitacaoRecente;
+          if (!cadastroConcluido) {
+            bloqueadoPorDependencia = true;
+            motivoBloqueio = 'Para registrar suas preferências de férias, é obrigatório concluir primeiro a Atualização & Conferência Cadastral.';
+            campanhaCadastralPendente = campanhaCadastralAtiva || null;
+          }
+        }
+
         return new Response(JSON.stringify({
           ok: true,
           ano_referencia: anoCampanha,
@@ -1202,6 +1236,10 @@ export default async function (req: Request): Promise<Response> {
           periodos: periodosFormatados,
           periodo_mais_antigo_id: maisAntigoId,
           opcao_militar_enviada: opcoesEnviadas?.[0] || null,
+          bloqueado_por_dependencia: bloqueadoPorDependencia,
+          motivo_bloqueio: motivoBloqueio,
+          dependencia_tipo: 'ATUALIZACAO_CADASTRAL',
+          campanha_cadastral_pendente: campanhaCadastralPendente,
           config: {
             ativo: portalConfig?.ferias_ativo !== false,
             modo_selecao: modoSelecao,
@@ -1209,6 +1247,7 @@ export default async function (req: Request): Promise<Response> {
             permitir_2_etapas: permitir2Etapas,
             permitir_3_etapas: permitir3Etapas,
             permitir_custom: Boolean(portalConfig?.ferias_permitir_custom),
+            exigir_atualizacao_cadastral: Boolean(regrasCampanha.exigir_atualizacao_cadastral),
             prazo_limite: campanhaFeriasAtiva?.data_fim_militar || portalConfig?.ferias_prazo_limite || '',
             instrucoes: campanhaFeriasAtiva?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas 3 opções de meses para a escala de férias.',
           },
@@ -1223,6 +1262,42 @@ export default async function (req: Request): Promise<Response> {
         const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
         const campanhaId = payload.campanha_id || campanhaFeriasAtiva?.id || null;
         const anoCampanha = payload.ano_referencia || campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
+
+        // Guard de Dependência em Cascata
+        let regrasCampanhaSubmissao: any = {};
+        if (campanhaFeriasAtiva?.config_regras) {
+          try {
+            regrasCampanhaSubmissao = typeof campanhaFeriasAtiva.config_regras === 'string'
+              ? JSON.parse(campanhaFeriasAtiva.config_regras)
+              : (campanhaFeriasAtiva.config_regras || {});
+          } catch (_e) {}
+        }
+
+        if (regrasCampanhaSubmissao.exigir_atualizacao_cadastral === true) {
+          const campanhaCadastralAtiva = campanhasAtivasMilitar.find(
+            (c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL'
+          );
+          const dataConferencia = militar.data_ultima_conferencia;
+          const dataInicioCampanha = campanhaCadastralAtiva?.data_inicio || `${new Date().getFullYear()}-01-01`;
+          const conferiuNaVigencia = Boolean(dataConferencia && dataConferencia >= dataInicioCampanha);
+
+          let temSolicitacaoRecente = false;
+          try {
+            const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ militar_id: militarId });
+            temSolicitacaoRecente = (solicitacoes || []).some(
+              (s: any) => !s.data_solicitacao || s.data_solicitacao >= dataInicioCampanha
+            );
+          } catch (_eSol) {}
+
+          if (!conferiuNaVigencia && !temSolicitacaoRecente) {
+            return new Response(JSON.stringify({
+              error: 'É obrigatório concluir a Atualização Cadastral antes de enviar suas preferências de férias.'
+            }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
 
         if (!periodo_aquisitivo_id || !opcao_1?.parcelas?.length || !opcao_2?.parcelas?.length || !opcao_3?.parcelas?.length) {
           return new Response(JSON.stringify({ error: 'É obrigatório preencher as 3 opções de preferências de meses.' }), {

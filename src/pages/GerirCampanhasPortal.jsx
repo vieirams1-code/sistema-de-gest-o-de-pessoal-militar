@@ -17,6 +17,7 @@ import {
   Edit,
   Trash2,
   Archive,
+  Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -135,6 +136,7 @@ export default function GerirCampanhasPortal() {
           permitir_2_etapas_15d: true,
           permitir_3_etapas_10d: true,
           modo_selecao_periodo: 'mais_antigo',
+          exigir_atualizacao_cadastral: true,
         },
       });
     } else {
@@ -164,6 +166,7 @@ export default function GerirCampanhasPortal() {
       permitir_2_etapas_15d: true,
       permitir_3_etapas_10d: true,
       modo_selecao_periodo: 'mais_antigo',
+      exigir_atualizacao_cadastral: false,
     };
     if (camp.config_regras) {
       try {
@@ -549,7 +552,21 @@ export default function GerirCampanhasPortal() {
                               {isFerias ? <Calendar className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                             </div>
                             <div>
-                              <p className="font-bold text-slate-800">{camp.titulo}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold text-slate-800">{camp.titulo}</p>
+                                {(() => {
+                                  let cr = {};
+                                  try {
+                                    cr = typeof camp.config_regras === 'string' ? JSON.parse(camp.config_regras) : (camp.config_regras || {});
+                                  } catch (_e) {}
+                                  return cr?.exigir_atualizacao_cadastral ? (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold inline-flex items-center gap-0.5" title="Exige que o militar conclua a Atualização Cadastral antes das Férias">
+                                      <Link2 className="w-2.5 h-2.5" />
+                                      Cascata
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </div>
                               <p className="text-xs text-slate-500 truncate max-w-[200px]" title={camp.instrucoes}>{camp.instrucoes}</p>
                             </div>
                           </div>
@@ -970,6 +987,36 @@ export default function GerirCampanhasPortal() {
                           <span>Exibir Todos os Períodos Abertos</span>
                         </label>
                       </div>
+                    </div>
+
+                    {/* DEPENDÊNCIA EM CASCATA */}
+                    <div className="pt-2 border-t border-emerald-200/60">
+                      <span className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center">
+                        <Link2 className="w-3.5 h-3.5 mr-1 text-emerald-700" />
+                        Campanha em Cascata / Dependência Obrigatória:
+                      </span>
+                      <label className="p-3 bg-white rounded-xl border border-slate-200 flex items-start gap-3 cursor-pointer hover:bg-slate-50 text-[11px] transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(modalNovaCampanha.config_regras?.exigir_atualizacao_cadastral)}
+                          onChange={(e) => setModalNovaCampanha({
+                            ...modalNovaCampanha,
+                            config_regras: {
+                              ...(modalNovaCampanha.config_regras || {}),
+                              exigir_atualizacao_cadastral: e.target.checked
+                            }
+                          })}
+                          className="w-4 h-4 accent-emerald-600 rounded mt-0.5"
+                        />
+                        <div>
+                          <strong className="block text-slate-800">
+                            Exigir Atualização & Conferência Cadastral antes de liberar o Plano de Férias
+                          </strong>
+                          <span className="text-slate-500 text-[10px] leading-tight block mt-0.5">
+                            O militar só terá acesso ao formulário de escolha dos meses de férias após concluir a conferência de seus dados no portal.
+                          </span>
+                        </div>
+                      </label>
                     </div>
                   </div>
                 )}

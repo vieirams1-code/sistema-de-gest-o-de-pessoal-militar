@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getCadastro, confirmarCadastro, solicitarAlteracaoCadastral } from '../api/PortalApiClient';
 import {
   UserCheck,
@@ -15,6 +16,8 @@ import {
   Send,
   X,
   ShieldCheck,
+  Calendar,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +34,7 @@ function formatarDataBR(dataStr) {
 }
 
 export default function PortalCadastroView({ onBack }) {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -213,17 +217,45 @@ export default function PortalCadastroView({ onBack }) {
         </div>
       )}
 
-      {/* STATUS DA ÚLTIMA CONFERÊNCIA */}
+      {/* STATUS DA ÚLTIMA CONFERÊNCIA & ATALHO DE FÉRIAS */}
       {cad.data_ultima_conferencia && (
-        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-[#1e3a5f]">
-          <span className="flex items-center">
-            <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-600" />
-            Dados conferidos pelo militar em:{' '}
-            <strong className="ml-1">
-              {new Date(cad.data_ultima_conferencia).toLocaleDateString('pt-BR')} às{' '}
-              {new Date(cad.data_ultima_conferencia).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </strong>
-          </span>
+        <div className="space-y-3">
+          <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-[#1e3a5f]">
+            <span className="flex items-center">
+              <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-600 shrink-0" />
+              Dados conferidos pelo militar em:{' '}
+              <strong className="ml-1">
+                {new Date(cad.data_ultima_conferencia).toLocaleDateString('pt-BR')}
+              </strong>
+            </span>
+          </div>
+
+          {data?.tem_campanha_ferias_ativa && (
+            <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-sm">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-emerald-950 block text-xs">
+                    Etapa Cadastral Concluída! Opção de Férias Liberada
+                  </span>
+                  <span className="text-emerald-700 text-[11px]">
+                    Você já pode registrar suas 3 opções de meses para o Plano de Férias.
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => navigate('/portal/ferias')}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs h-8 px-4 font-bold shadow-sm shrink-0 flex items-center justify-center"
+              >
+                Ir para Férias Agora
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getFerias, submeterOpcaoFerias } from '../api/PortalApiClient';
 import {
   Calendar,
@@ -12,6 +13,9 @@ import {
   Info,
   Edit3,
   ShieldCheck,
+  Lock,
+  ChevronRight,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -42,6 +46,7 @@ function formatarDataBR(dataStr) {
 }
 
 export default function PortalFeriasView({ onBack }) {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -98,10 +103,9 @@ export default function PortalFeriasView({ onBack }) {
         setMesOpcao1('01');
         setMesOpcao2('07');
         setMesOpcao3('10');
-        setModalidade('2_ETAPAS_15');
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Falha ao carregar dados do plano de férias.');
+      setErrorMsg(err.message || 'Falha ao carregar informações de férias.');
     } finally {
       setLoading(false);
     }
@@ -135,30 +139,29 @@ export default function PortalFeriasView({ onBack }) {
     return [{ etapa: 1, dias: 30, mes: mesVal, data_inicio: dataInicio }];
   };
 
-  const handleSubmitOpcoes = async (e) => {
-    e.preventDefault();
+  const handleSubmeter = async (e) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
     if (!selectedPeriodoId) {
-      setErrorMsg('Selecione o período aquisitivo.');
+      setErrorMsg('Selecione o período aquisitivo de férias.');
+      return;
+    }
+
+    if (!mesOpcao1 || !mesOpcao2 || !mesOpcao3) {
+      setErrorMsg('É obrigatório escolher as 3 opções de meses.');
+      return;
+    }
+
+    // Validação: os 3 meses de preferência devem ser diferentes
+    if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
+      setErrorMsg('As 3 opções de preferência de meses devem ser diferentes entre si (1ª, 2ª e 3ª opção).');
       return;
     }
 
     const campanha = data?.campanha;
     const anoCampanha = campanha?.ano_referencia || (new Date().getFullYear() + 1);
-
-    if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
-      setErrorMsg('Por favor, selecione 3 meses diferentes para as suas 3 opções de férias (1ª, 2ª e 3ª preferência).');
-      return;
-    }
-
-    setSubmitting(true);
-    setErrorMsg(null);
-
-    const descModalidade =
-      modalidade === '1_ETAPA_30'
-        ? 'Integral (30 dias)'
-        : modalidade === '2_ETAPAS_15'
-        ? '2 Frações (15 + 15 dias)'
-        : '3 Frações (10 + 10 + 10 dias)';
 
     const payload = {
       periodo_aquisitivo_id: selectedPeriodoId,
@@ -166,26 +169,27 @@ export default function PortalFeriasView({ onBack }) {
       campanha_id: campanha?.id,
       modalidade,
       opcao_1: {
-        meses_resumo: `${getNomeMes(mesOpcao1)} • ${descModalidade}`,
+        meses_resumo: `${getNomeMes(mesOpcao1)}`,
         parcelas: buildParcelasForMes(mesOpcao1, anoCampanha),
       },
       opcao_2: {
-        meses_resumo: `${getNomeMes(mesOpcao2)} • ${descModalidade}`,
+        meses_resumo: `${getNomeMes(mesOpcao2)}`,
         parcelas: buildParcelasForMes(mesOpcao2, anoCampanha),
       },
       opcao_3: {
-        meses_resumo: `${getNomeMes(mesOpcao3)} • ${descModalidade}`,
+        meses_resumo: `${getNomeMes(mesOpcao3)}`,
         parcelas: buildParcelasForMes(mesOpcao3, anoCampanha),
       },
     };
 
+    setSubmitting(true);
     try {
       const res = await submeterOpcaoFerias(payload);
-      setSuccessMsg(res.message || `Opções para o Plano de ${anoCampanha} registradas com sucesso!`);
+      setSuccessMsg(res.message || 'Opção de férias registrada com sucesso!');
       setIsEditing(false);
       await loadData();
     } catch (err) {
-      setErrorMsg(err.message || 'Falha ao registrar opções de férias.');
+      setErrorMsg(err.message || 'Falha ao salvar opção de férias.');
     } finally {
       setSubmitting(false);
     }
@@ -194,7 +198,7 @@ export default function PortalFeriasView({ onBack }) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-emerald-600 rounded-full animate-spin"></div>
         <p className="text-sm text-slate-500 font-medium">Carregando plano de férias...</p>
       </div>
     );
@@ -204,6 +208,7 @@ export default function PortalFeriasView({ onBack }) {
   const periodoMaisAntigo = (data?.periodos || []).find((p) => p.is_mais_antigo_pendente);
   const opcaoEnviada = data?.opcao_militar_enviada;
   const anoCampanha = campanha?.ano_referencia || (new Date().getFullYear() + 1);
+  const isBloqueadoPorDependencia = Boolean(data?.bloqueado_por_dependencia);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -245,8 +250,75 @@ export default function PortalFeriasView({ onBack }) {
         </div>
       )}
 
-      {/* CASO 1: NENHUMA CAMPANHA ATIVA NO MOMENTO */}
-      {!campanha ? (
+      {/* CASO 0: BLOQUEIO POR DEPENDÊNCIA EM CASCATA */}
+      {isBloqueadoPorDependencia ? (
+        <Card className="border-amber-200 bg-gradient-to-b from-amber-50/60 to-white shadow-md rounded-2xl sm:rounded-3xl overflow-hidden">
+          <CardContent className="p-6 sm:p-10 space-y-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 shrink-0 shadow-sm">
+                <Lock className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-200/80 border border-amber-300 text-amber-900 text-[11px] font-extrabold uppercase tracking-wide inline-block">
+                  🔒 Etapa Obrigatória Prévia
+                </span>
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                  Conclua sua Atualização Cadastral para Liberar o Plano de Férias
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Para registrar suas opções de meses de férias para o <strong>Plano {anoCampanha}</strong>, é obrigatório realizar primeiro a conferência periódica de seus dados pessoais, contatos e endereço no portal.
+                </p>
+              </div>
+            </div>
+
+            {/* FLUXO VISUAL EM PASSOS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-inner">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-[#1e3a5f] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  1
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 text-xs block">Atualização Cadastral</span>
+                  <span className="text-[11px] text-amber-800 font-semibold flex items-center">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Pendente • Ação Necessária
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center space-x-3 opacity-60">
+                <div className="w-8 h-8 rounded-full bg-slate-300 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                  2
+                </div>
+                <div>
+                  <span className="font-bold text-slate-700 text-xs block">Escolha de Férias ({anoCampanha})</span>
+                  <span className="text-[11px] text-slate-500 font-medium flex items-center">
+                    <Lock className="w-3 h-3 mr-1" />
+                    Liberada após o Passo 1
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* BOTÃO DE AÇÃO */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-amber-200/60">
+              <span className="text-xs text-slate-500 font-medium">
+                Leva menos de 1 minuto para conferir e confirmar seus dados.
+              </span>
+              <Button
+                type="button"
+                onClick={() => navigate('/portal/cadastro')}
+                className="w-full sm:w-auto bg-[#1e3a5f] hover:bg-[#152943] text-white rounded-xl text-xs h-10 px-6 font-bold shadow-md flex items-center justify-center"
+              >
+                <UserCheck className="w-4 h-4 mr-2" />
+                Ir para a Conferência Cadastral Agora
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : !campanha ? (
+        /* CASO 1: NENHUMA CAMPANHA ATIVA NO MOMENTO */
         <Card className="border-slate-200 shadow-sm bg-white">
           <CardContent className="p-8 sm:p-12 text-center space-y-4">
             <div className="w-14 h-14 rounded-3xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mx-auto">
