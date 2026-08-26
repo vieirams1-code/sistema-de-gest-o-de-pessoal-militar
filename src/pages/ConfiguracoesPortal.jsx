@@ -69,10 +69,10 @@ export default function ConfiguracoesPortal() {
         setConfigId(c.id);
         setFeriasAtivo(c.ferias_ativo !== false);
         setFeriasModoSelecao(c.ferias_modo_selecao_periodo || 'mais_antigo');
-        setPermitir1Etapa(c.ferias_permitir_1_etapa_30d !== false);
-        setPermitir2Etapas(c.ferias_permitir_2_etapas_15d !== false);
-        setPermitir3Etapas(c.ferias_permitir_3_etapas_10d !== false);
-        setPermitirCustom(Boolean(c.ferias_permitir_custom));
+        setFeriasPermitir1Etapa(c.ferias_permitir_1_etapa_30d !== false);
+        setFeriasPermitir2Etapas(c.ferias_permitir_2_etapas_15d !== false);
+        setFeriasPermitir3Etapas(c.ferias_permitir_3_etapas_10d !== false);
+        setFeriasPermitirCustom(Boolean(c.ferias_permitir_custom));
         setFeriasPrazoLimite(c.ferias_prazo_limite || '');
         setFeriasInstrucoes(c.ferias_instrucoes || '');
 
@@ -110,27 +110,33 @@ export default function ConfiguracoesPortal() {
   }, []);
 
   const handleSaveConfig = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSaving(true);
     setSuccessMsg(null);
     setErrorMsg(null);
 
     const payload = {
+      ativo: true,
       ferias_ativo: feriasAtivo,
       ferias_modo_selecao_periodo: feriasModoSelecao,
-      ferias_permitir_1_etapa_30d: permitir1Etapa,
-      ferias_permitir_2_etapas_15d: permitir2Etapas,
-      ferias_permitir_3_etapas_10d: permitir3Etapas,
-      ferias_permitir_custom: permitirCustom,
+      ferias_permitir_1_etapa_30d: feriasPermitir1Etapa,
+      ferias_permitir_2_etapas_15d: feriasPermitir2Etapas,
+      ferias_permitir_3_etapas_10d: feriasPermitir3Etapas,
+      ferias_permitir_custom: feriasPermitirCustom,
       ferias_prazo_limite: feriasPrazoLimite,
       ferias_instrucoes: feriasInstrucoes,
       cadastro_ativo: cadastroAtivo,
       cadastro_permitir_solicitacao: cadastroPermitirSolicitacao,
       cadastro_instrucoes: cadastroInstrucoes,
       whatsapp_enabled: whatsappEnabled,
+      whatsapp_provider: whatsappEnabled ? 'evolution_api' : 'disabled',
       email_enabled: emailEnabled,
+      email_provider: emailEnabled ? 'base44_core' : 'disabled',
+      allow_channel_choice: whatsappEnabled && emailEnabled,
+      default_channel: whatsappEnabled ? 'WHATSAPP' : 'EMAIL',
       otp_ttl_seconds: Number(otpTtlSeconds) || 300,
       otp_resend_seconds: Number(otpResendSeconds) || 60,
+      updated_at: new Date().toISOString(),
     };
 
     try {
@@ -140,7 +146,7 @@ export default function ConfiguracoesPortal() {
         const created = await base44.entities.PortalAuthConfig.create(payload);
         setConfigId(created.id);
       }
-      setSuccessMsg('Configurações do Portal do Militar salvas com sucesso!');
+      setSuccessMsg('Configurações do Portal salvas com sucesso! As alterações de canais e regras já estão ativas.');
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao salvar configurações.');
     } finally {

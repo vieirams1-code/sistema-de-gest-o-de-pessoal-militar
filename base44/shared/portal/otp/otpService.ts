@@ -65,30 +65,33 @@ export async function loadAuthConfig(base44Client: any): Promise<PortalAuthConfi
       return DEFAULT_AUTH_CONFIG;
     }
 
-    const configs = await PortalAuthConfig.filter({ ativo: true }, '-updated_at', 5, 0);
+    let configs = await PortalAuthConfig.filter({ ativo: true }, '-updated_at', 5, 0);
+    if (!Array.isArray(configs) || configs.length === 0) {
+      configs = await PortalAuthConfig.list();
+    }
     if (!Array.isArray(configs) || configs.length === 0) {
       return DEFAULT_AUTH_CONFIG;
     }
 
     if (configs.length > 1) {
-      console.warn('[loadAuthConfig] Múltiplos registros ativos de PortalAuthConfig encontrados. Utilizando o mais recente.');
+      console.warn('[loadAuthConfig] Múltiplos registros de PortalAuthConfig encontrados. Utilizando o mais recente.');
     }
 
     const c = configs[0];
     return {
       id: c.id,
-      email_enabled: typeof c.email_enabled === 'boolean' ? c.email_enabled : DEFAULT_AUTH_CONFIG.email_enabled,
-      sms_enabled: typeof c.sms_enabled === 'boolean' ? c.sms_enabled : DEFAULT_AUTH_CONFIG.sms_enabled,
-      whatsapp_enabled: typeof c.whatsapp_enabled === 'boolean' ? c.whatsapp_enabled : DEFAULT_AUTH_CONFIG.whatsapp_enabled,
-      email_provider: c.email_provider || DEFAULT_AUTH_CONFIG.email_provider,
-      sms_provider: c.sms_provider || DEFAULT_AUTH_CONFIG.sms_provider,
-      whatsapp_provider: c.whatsapp_provider || DEFAULT_AUTH_CONFIG.whatsapp_provider,
-      allow_channel_choice: typeof c.allow_channel_choice === 'boolean' ? c.allow_channel_choice : DEFAULT_AUTH_CONFIG.allow_channel_choice,
-      default_channel: c.default_channel || DEFAULT_AUTH_CONFIG.default_channel,
-      otp_ttl_seconds: typeof c.otp_ttl_seconds === 'number' && c.otp_ttl_seconds > 0 ? c.otp_ttl_seconds : DEFAULT_AUTH_CONFIG.otp_ttl_seconds,
-      otp_resend_seconds: typeof c.otp_resend_seconds === 'number' && c.otp_resend_seconds > 0 ? c.otp_resend_seconds : DEFAULT_AUTH_CONFIG.otp_resend_seconds,
-      otp_max_attempts: typeof c.otp_max_attempts === 'number' && c.otp_max_attempts > 0 ? c.otp_max_attempts : DEFAULT_AUTH_CONFIG.otp_max_attempts,
-      otp_max_sends_per_hour: typeof c.otp_max_sends_per_hour === 'number' && c.otp_max_sends_per_hour > 0 ? c.otp_max_sends_per_hour : DEFAULT_AUTH_CONFIG.otp_max_sends_per_hour,
+      email_enabled: typeof c.email_enabled === 'boolean' ? c.email_enabled : false,
+      sms_enabled: typeof c.sms_enabled === 'boolean' ? c.sms_enabled : false,
+      whatsapp_enabled: typeof c.whatsapp_enabled === 'boolean' ? c.whatsapp_enabled : true,
+      email_provider: c.email_provider || (c.email_enabled ? 'base44_core' : 'disabled'),
+      sms_provider: c.sms_provider || 'disabled',
+      whatsapp_provider: c.whatsapp_provider || 'evolution_api',
+      allow_channel_choice: typeof c.allow_channel_choice === 'boolean' ? c.allow_channel_choice : (Boolean(c.email_enabled) && Boolean(c.whatsapp_enabled)),
+      default_channel: c.default_channel || (c.whatsapp_enabled !== false ? 'WHATSAPP' : 'EMAIL'),
+      otp_ttl_seconds: typeof c.otp_ttl_seconds === 'number' && c.otp_ttl_seconds > 0 ? c.otp_ttl_seconds : 300,
+      otp_resend_seconds: typeof c.otp_resend_seconds === 'number' && c.otp_resend_seconds > 0 ? c.otp_resend_seconds : 60,
+      otp_max_attempts: typeof c.otp_max_attempts === 'number' && c.otp_max_attempts > 0 ? c.otp_max_attempts : 3,
+      otp_max_sends_per_hour: typeof c.otp_max_sends_per_hour === 'number' && c.otp_max_sends_per_hour > 0 ? c.otp_max_sends_per_hour : 3,
       ativo: c.ativo !== false,
     };
   } catch (err) {
