@@ -193,28 +193,36 @@ export default Deno.serve(async (req: Request) => {
 
         // Disparo: EMAIL
         if (canalSolicitado === 'EMAIL') {
-          const emailDestino = resolveMilitarEmail(militar);
+          const emailInfo = resolveMilitarEmail(militar);
+          const emailDestino = emailInfo?.email;
           if (!emailDestino) {
             return Response.json(respostaGenerica);
           }
 
           const emailProvider = resolveEmailProvider(config);
-          const dispatchRes = await emailProvider.send(
-            {
-              to: emailDestino,
-              code: otpCode,
-              militarNome: militar.nome_guerra || militar.nome_completo,
-              correlationId: correlation_id,
-            },
-            base44
-          );
+          let dispatchRes: any = { success: false, error: 'Provedor de e-mail indisponível.' };
+          if (emailProvider) {
+            try {
+              dispatchRes = await emailProvider.sendOtp(
+                {
+                  to: emailDestino,
+                  code: otpCode,
+                  militarNome: militar.nome_guerra || militar.nome_completo,
+                  correlationId: correlation_id,
+                },
+                base44
+              );
+            } catch (errDispatch) {
+              console.error('[portal_auth] Erro no envio de e-mail:', errDispatch);
+            }
+          }
 
           await registrarAuditoriaPortal(base44, {
             sessao_id: sessao.id,
             militar_id: sessao.militar_id,
             acao: 'LOGIN_SOLICITADO',
-            resultado: dispatchRes.success,
-            motivo_falha_sanitizado: dispatchRes.success ? null : dispatchRes.error,
+            resultado: Boolean(dispatchRes?.success),
+            motivo_falha_sanitizado: dispatchRes?.success ? null : dispatchRes?.error,
             ip_origem,
             user_agent,
             correlation_id,
@@ -231,22 +239,29 @@ export default Deno.serve(async (req: Request) => {
           }
 
           const whatsappProvider = resolveWhatsAppProvider(config);
-          const dispatchRes = await whatsappProvider.send(
-            {
-              to: telefoneDestino.formatted,
-              code: otpCode,
-              militarNome: militar.nome_guerra || militar.nome_completo,
-              correlationId: correlation_id,
-            },
-            base44
-          );
+          let dispatchRes: any = { success: false, error: 'Provedor de WhatsApp indisponível.' };
+          if (whatsappProvider) {
+            try {
+              dispatchRes = await whatsappProvider.sendOtp(
+                {
+                  to: telefoneDestino.formatted,
+                  code: otpCode,
+                  militarNome: militar.nome_guerra || militar.nome_completo,
+                  correlationId: correlation_id,
+                },
+                base44
+              );
+            } catch (errDispatch) {
+              console.error('[portal_auth] Erro no envio de WhatsApp:', errDispatch);
+            }
+          }
 
           await registrarAuditoriaPortal(base44, {
             sessao_id: sessao.id,
             militar_id: sessao.militar_id,
             acao: 'LOGIN_SOLICITADO',
-            resultado: dispatchRes.success,
-            motivo_falha_sanitizado: dispatchRes.success ? null : dispatchRes.error,
+            resultado: Boolean(dispatchRes?.success),
+            motivo_falha_sanitizado: dispatchRes?.success ? null : dispatchRes?.error,
             ip_origem,
             user_agent,
             correlation_id,
