@@ -33,6 +33,90 @@ function formatarDataBR(dataStr) {
   return str;
 }
 
+export const GRUPOS_CAMPOS_ALTERAVEIS = [
+  {
+    grupo: 'Contatos & Comunicação',
+    campos: [
+      { chave: 'telefone_celular', label: 'Telefone Celular / WhatsApp', placeholder: '(99) 99999-9999' },
+      { chave: 'email_particular', label: 'E-mail Particular', placeholder: 'seuemail@provedor.com' },
+      { chave: 'email_funcional', label: 'E-mail Institucional (@cbm.ms.gov.br)', placeholder: 'militar@cbm.ms.gov.br' },
+    ],
+  },
+  {
+    grupo: 'Endereço Residencial',
+    campos: [
+      { chave: 'endereco_logradouro', label: 'Logradouro (Rua / Av / Rodovia)', placeholder: 'Ex: Rua das Palmeiras' },
+      { chave: 'endereco_numero', label: 'Número da Residência', placeholder: 'Ex: 123 ou S/N' },
+      { chave: 'endereco_complemento', label: 'Complemento (Apto, Bloco)', placeholder: 'Ex: Apto 402, Bloco B' },
+      { chave: 'endereco_bairro', label: 'Bairro', placeholder: 'Ex: Centro' },
+      { chave: 'endereco_cidade', label: 'Cidade / Município', placeholder: 'Ex: Campo Grande' },
+      { chave: 'endereco_uf', label: 'UF do Endereço', placeholder: 'MS' },
+      { chave: 'endereco_cep', label: 'CEP', placeholder: '79000-000' },
+    ],
+  },
+  {
+    grupo: 'Dados Pessoais & Físicos',
+    campos: [
+      { chave: 'nome_completo', label: 'Nome Completo (Certidão/RG)', placeholder: 'Nome completo sem abreviações' },
+      { chave: 'nome_guerra', label: 'Nome de Guerra', placeholder: 'Ex: Silva' },
+      { chave: 'data_nascimento', label: 'Data de Nascimento', placeholder: 'AAAA-MM-DD' },
+      { chave: 'sexo', label: 'Sexo', placeholder: 'Masculino ou Feminino' },
+      { chave: 'estado_civil', label: 'Estado Civil', placeholder: 'Solteiro(a), Casado(a), etc.' },
+      { chave: 'tipo_sanguineo', label: 'Tipo Sanguíneo / Fator RH', placeholder: 'Ex: O+, A+, AB-' },
+      { chave: 'etnia', label: 'Etnia / Cor', placeholder: 'Branca, Preta, Parda, etc.' },
+      { chave: 'religiao', label: 'Religião / Crença', placeholder: 'Ex: Católica, Evangélica, etc.' },
+      { chave: 'altura', label: 'Altura (m)', placeholder: 'Ex: 1.78' },
+      { chave: 'peso', label: 'Peso (kg)', placeholder: 'Ex: 82' },
+      { chave: 'naturalidade', label: 'Naturalidade (Cidade de Nascimento)', placeholder: 'Ex: Dourados' },
+      { chave: 'naturalidade_uf', label: 'UF de Nascimento', placeholder: 'MS' },
+      { chave: 'nome_pai', label: 'Filiação: Nome do Pai', placeholder: 'Nome completo do pai' },
+      { chave: 'nome_mae', label: 'Filiação: Nome da Mãe', placeholder: 'Nome completo da mãe' },
+    ],
+  },
+  {
+    grupo: 'Documentação Civil & CNH',
+    campos: [
+      { chave: 'rg', label: 'Número do RG', placeholder: 'Número do RG' },
+      { chave: 'orgao_expedidor_rg', label: 'Órgão Expedidor do RG', placeholder: 'Ex: SEJUSP' },
+      { chave: 'uf_rg', label: 'UF do RG', placeholder: 'MS' },
+      { chave: 'cpf', label: 'CPF', placeholder: '000.000.000-00' },
+      { chave: 'cnh_numero', label: 'Número da CNH', placeholder: 'Número de registro da CNH' },
+      { chave: 'cnh_categoria', label: 'Categoria da CNH', placeholder: 'Ex: AB, C, D, E' },
+      { chave: 'cnh_validade', label: 'Validade da CNH', placeholder: 'AAAA-MM-DD' },
+    ],
+  },
+  {
+    grupo: 'Formação & Nível de Escolaridade',
+    campos: [
+      { chave: 'escolaridade', label: 'Nível de Escolaridade', placeholder: 'Ex: Ensino Superior Completo' },
+      { chave: 'curso_superior', label: 'Curso Superior (Graduação)', placeholder: 'Ex: Bacharelado em Direito' },
+      { chave: 'mestrado', label: 'Mestrado', placeholder: 'Ex: Mestrado em Gestão Pública' },
+      { chave: 'doutorado', label: 'Doutorado', placeholder: 'Ex: Doutorado' },
+    ],
+  },
+  {
+    grupo: 'Dados Bancários para Folha de Pagamento',
+    campos: [
+      { chave: 'banco', label: 'Instituição Bancária', placeholder: 'Ex: Banco do Brasil (001)' },
+      { chave: 'agencia', label: 'Agência Bancária', placeholder: 'Ex: 1234-5' },
+      { chave: 'conta', label: 'Conta Corrente', placeholder: 'Ex: 98765-4' },
+    ],
+  },
+  {
+    grupo: 'Dados Funcionais (Com Validação de Rito pelo RH)',
+    campos: [
+      { chave: 'posto_graduacao', label: 'Posto / Graduação', placeholder: 'Ex: 2º Tenente' },
+      { chave: 'quadro', label: 'Quadro Militar', placeholder: 'Ex: QOBM' },
+      { chave: 'matricula', label: 'Matrícula Funcional', placeholder: 'Ex: 123456' },
+      { chave: 'data_inclusao', label: 'Data de Inclusão na Corporação', placeholder: 'AAAA-MM-DD' },
+      { chave: 'lotacao', label: 'Lotação / Unidade', placeholder: 'Ex: 1º SGBM / 1º GBM' },
+      { chave: 'funcao', label: 'Função Exercida', placeholder: 'Ex: Comandante de Socorro' },
+    ],
+  },
+];
+
+export const TODOS_CAMPOS_ALTERAVEIS = GRUPOS_CAMPOS_ALTERAVEIS.flatMap((g) => g.campos);
+
 export default function PortalCadastroView({ onBack }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -43,24 +127,13 @@ export default function PortalCadastroView({ onBack }) {
   // Modal de Solicitação de Alteração
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [campoChave, setCampoChave] = useState('telefone_celular');
-  const [campoLabel, setCampoLabel] = useState('Telefone Celular');
+  const [campoLabel, setCampoLabel] = useState('Telefone Celular / WhatsApp');
+  const [campoPlaceholder, setCampoPlaceholder] = useState('');
   const [valorAtual, setValorAtual] = useState('');
   const [valorProposto, setValorProposto] = useState('');
   const [justificativa, setJustificativa] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
-
-  const camposAlteraveis = [
-    { chave: 'telefone_celular', label: 'Telefone Celular' },
-    { chave: 'email_particular', label: 'E-mail Particular' },
-    { chave: 'email_funcional', label: 'E-mail Funcional' },
-    { chave: 'endereco_logradouro', label: 'Endereço (Rua/Avenida)' },
-    { chave: 'endereco_numero', label: 'Número da Residência' },
-    { chave: 'endereco_bairro', label: 'Bairro' },
-    { chave: 'endereco_cidade', label: 'Cidade' },
-    { chave: 'endereco_cep', label: 'CEP' },
-    { chave: 'estado_civil', label: 'Estado Civil' },
-  ];
 
   const loadData = async () => {
     setLoading(true);
@@ -80,9 +153,10 @@ export default function PortalCadastroView({ onBack }) {
   }, []);
 
   const handleCampoChange = (chave) => {
-    const item = camposAlteraveis.find((c) => c.chave === chave);
+    const item = TODOS_CAMPOS_ALTERAVEIS.find((c) => c.chave === chave);
     setCampoChave(chave);
     setCampoLabel(item ? item.label : chave);
+    setCampoPlaceholder(item?.placeholder || `Informe o novo ${item?.label || chave}`);
     setValorAtual(data?.cadastro?.[chave] || '');
   };
 
@@ -263,11 +337,20 @@ export default function PortalCadastroView({ onBack }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* CARD 1: DADOS FUNCIONAIS */}
         <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="pb-3 border-b border-slate-100">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
               <UserCheck className="w-4 h-4 mr-2 text-[#1e3a5f]" />
               Identificação Funcional
             </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOpenModal('posto_graduacao')}
+              className="text-[11px] h-7 text-blue-600 hover:bg-blue-50 px-2"
+            >
+              Solicitar Correção
+            </Button>
           </CardHeader>
           <CardContent className="p-4 space-y-3 text-xs">
             <div className="grid grid-cols-2 gap-2">
@@ -299,13 +382,19 @@ export default function PortalCadastroView({ onBack }) {
               </div>
               <div>
                 <span className="text-slate-500 block">Data de Ingresso</span>
-                <span className="font-semibold text-slate-800">{formatarDataBR(cad.data_ingresso)}</span>
+                <span className="font-semibold text-slate-800">{formatarDataBR(cad.data_ingresso || cad.data_inclusao)}</span>
               </div>
             </div>
 
-            <div>
-              <span className="text-slate-500 block">Lotação / Unidade</span>
-              <span className="font-semibold text-slate-800">{cad.lotacao || cad.estrutura_nome || '-'}</span>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block">Lotação / Unidade</span>
+                <span className="font-semibold text-slate-800">{cad.lotacao || cad.estrutura_nome || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Função</span>
+                <span className="font-semibold text-slate-800">{cad.funcao || '-'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -380,20 +469,173 @@ export default function PortalCadastroView({ onBack }) {
                 <span className="font-semibold text-slate-800">{cad.endereco_bairro || '-'}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Cidade</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_cidade || '-'}</span>
+                <span className="text-slate-500 block">Complemento</span>
+                <span className="font-semibold text-slate-800">{cad.endereco_complemento || '-'}</span>
               </div>
             </div>
 
-            <div>
-              <span className="text-slate-500 block">CEP</span>
-              <span className="font-semibold text-slate-800">{cad.endereco_cep || '-'}</span>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block">Cidade / UF</span>
+                <span className="font-semibold text-slate-800">{cad.endereco_cidade ? `${cad.endereco_cidade} / ${cad.endereco_uf || 'MS'}` : '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">CEP</span>
+                <span className="font-semibold text-slate-800">{cad.endereco_cep || '-'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* CARD 4: DEPENDENTES / FAMILIARES */}
+        {/* CARD 4: DADOS PESSOAIS, FÍSICOS & FILIAÇÃO */}
         <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
+              <UserCheck className="w-4 h-4 mr-2 text-indigo-600" />
+              Dados Pessoais & Filiação
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOpenModal('estado_civil')}
+              className="text-[11px] h-7 text-blue-600 hover:bg-blue-50 px-2"
+            >
+              Alterar
+            </Button>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3 text-xs">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <span className="text-slate-500 block">Nascimento</span>
+                <span className="font-semibold text-slate-800">{formatarDataBR(cad.data_nascimento)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Estado Civil</span>
+                <span className="font-semibold text-slate-800">{cad.estado_civil || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Sexo</span>
+                <span className="font-semibold text-slate-800">{cad.sexo || '-'}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <span className="text-slate-500 block">Tipo Sanguíneo</span>
+                <span className="font-semibold text-slate-800">{cad.tipo_sanguineo || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Etnia / Cor</span>
+                <span className="font-semibold text-slate-800">{cad.etnia || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Religião</span>
+                <span className="font-semibold text-slate-800">{cad.religiao || '-'}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block">Pai</span>
+                <span className="font-semibold text-slate-800 truncate block">{cad.nome_pai || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Mãe</span>
+                <span className="font-semibold text-slate-800 truncate block">{cad.nome_mae || '-'}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CARD 5: DOCUMENTAÇÃO CIVIL & CNH */}
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
+              <ShieldCheck className="w-4 h-4 mr-2 text-teal-600" />
+              Documentos Civis & CNH
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOpenModal('rg')}
+              className="text-[11px] h-7 text-blue-600 hover:bg-blue-50 px-2"
+            >
+              Alterar
+            </Button>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3 text-xs">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block">RG</span>
+                <span className="font-semibold text-slate-800">{cad.rg ? `${cad.rg} (${cad.orgao_expedidor_rg || ''}/${cad.uf_rg || ''})` : '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">CPF</span>
+                <span className="font-semibold text-slate-800">{cad.cpf || '-'}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <span className="text-slate-500 block">CNH</span>
+                <span className="font-semibold text-slate-800">{cad.cnh_numero || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Categoria</span>
+                <span className="font-semibold text-slate-800">{cad.cnh_categoria || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Validade</span>
+                <span className="font-semibold text-slate-800">{formatarDataBR(cad.cnh_validade)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CARD 6: FORMAÇÃO ACADÊMICA & DADOS BANCÁRIOS */}
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
+              <Clock className="w-4 h-4 mr-2 text-cyan-600" />
+              Escolaridade & Dados Bancários
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => handleOpenModal('escolaridade')}
+              className="text-[11px] h-7 text-blue-600 hover:bg-blue-50 px-2"
+            >
+              Alterar
+            </Button>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3 text-xs">
+            <div>
+              <span className="text-slate-500 block">Escolaridade / Graduação</span>
+              <span className="font-semibold text-slate-800">{cad.escolaridade || '-'} {cad.curso_superior ? `• ${cad.curso_superior}` : ''}</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+              <div>
+                <span className="text-slate-500 block">Banco</span>
+                <span className="font-semibold text-slate-800">{cad.banco || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Agência</span>
+                <span className="font-semibold text-slate-800">{cad.agencia || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Conta</span>
+                <span className="font-semibold text-slate-800">{cad.conta || '-'}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CARD 7: DEPENDENTES / FAMILIARES */}
+        <Card className="border-slate-200 shadow-sm md:col-span-2">
           <CardHeader className="pb-3 border-b border-slate-100">
             <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
               <Users className="w-4 h-4 mr-2 text-purple-600" />
@@ -404,7 +646,7 @@ export default function PortalCadastroView({ onBack }) {
             {dependentes.length === 0 ? (
               <p className="text-slate-500 italic py-2">Nenhum dependente cadastrado.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {dependentes.map((dep, idx) => (
                   <div key={idx} className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
                     <div>
@@ -432,7 +674,7 @@ export default function PortalCadastroView({ onBack }) {
           <CardHeader className="pb-3 border-b border-slate-100">
             <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
               <Clock className="w-4 h-4 mr-2 text-blue-600" />
-              Suas Solicitações de Alteração ao RH
+              Suas Solicitações de Alteração ao RH ({solicitacoes.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 text-xs space-y-2">
@@ -457,6 +699,9 @@ export default function PortalCadastroView({ onBack }) {
                   {sol.justificativa && (
                     <p className="text-[11px] text-slate-500 italic mt-0.5">"{sol.justificativa}"</p>
                   )}
+                  {sol.observacao_decisao && (
+                    <p className="text-[11px] text-blue-600 font-medium mt-0.5">RH: {sol.observacao_decisao}</p>
+                  )}
                 </div>
                 <div className="text-[11px] text-slate-400">
                   {formatarDataBR(sol.data_solicitacao) || 'Recentemente'}
@@ -470,7 +715,7 @@ export default function PortalCadastroView({ onBack }) {
       {/* MODAL / DIALOG DE SOLICITAÇÃO DE ALTERAÇÃO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <Card className="w-full max-w-md bg-white shadow-2xl rounded-2xl border-slate-200">
+          <Card className="w-full max-w-lg bg-white shadow-2xl rounded-2xl border-slate-200 max-h-[90vh] flex flex-col">
             <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base font-bold text-[#1e3a5f] flex items-center">
                 <Edit3 className="w-4 h-4 mr-2" />
@@ -485,20 +730,32 @@ export default function PortalCadastroView({ onBack }) {
               </button>
             </CardHeader>
 
-            <form onSubmit={handleEnviarSolicitacao}>
+            <form onSubmit={handleEnviarSolicitacao} className="flex-1 overflow-y-auto">
               <CardContent className="p-4 sm:p-6 space-y-4 text-xs">
+                {/* Alerta de Rito Administrativo */}
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] leading-relaxed flex items-start space-x-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+                  <span>
+                    Todas as solicitações de alteração de dados pessoais, civis ou funcionais passam por conferência documental do RH e só são efetivadas na ficha funcional após homologação formal do gestor.
+                  </span>
+                </div>
+
                 {/* Seleção do Campo */}
                 <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700 block">Campo para Alteração</label>
+                  <label className="font-semibold text-slate-700 block">Campo para Alteração *</label>
                   <select
                     value={campoChave}
                     onChange={(e) => handleCampoChange(e.target.value)}
-                    className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white focus:border-[#1e3a5f] outline-none"
+                    className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white focus:border-[#1e3a5f] outline-none font-medium"
                   >
-                    {camposAlteraveis.map((c) => (
-                      <option key={c.chave} value={c.chave}>
-                        {c.label}
-                      </option>
+                    {GRUPOS_CAMPOS_ALTERAVEIS.map((grupo) => (
+                      <optgroup key={grupo.grupo} label={grupo.grupo}>
+                        {grupo.campos.map((c) => (
+                          <option key={c.chave} value={c.chave}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
@@ -507,7 +764,7 @@ export default function PortalCadastroView({ onBack }) {
                 <div className="space-y-1">
                   <label className="font-semibold text-slate-500 block">Valor Cadastrado Atual</label>
                   <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 font-mono text-xs truncate">
-                    {valorAtual || '(vazio)'}
+                    {valorAtual || '(não informado / vazio)'}
                   </div>
                 </div>
 
@@ -518,7 +775,7 @@ export default function PortalCadastroView({ onBack }) {
                     type="text"
                     value={valorProposto}
                     onChange={(e) => setValorProposto(e.target.value)}
-                    placeholder={`Informe o novo ${campoLabel}`}
+                    placeholder={campoPlaceholder || `Informe o novo ${campoLabel}`}
                     required
                     className="h-10 text-xs rounded-xl border-slate-300"
                   />
@@ -526,12 +783,12 @@ export default function PortalCadastroView({ onBack }) {
 
                 {/* Justificativa */}
                 <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700 block">Justificativa / Motivo</label>
+                  <label className="font-semibold text-slate-700 block">Justificativa / Observação do Militar</label>
                   <Input
                     type="text"
                     value={justificativa}
                     onChange={(e) => setJustificativa(e.target.value)}
-                    placeholder="Ex: Mudança de endereço residencial recente"
+                    placeholder="Ex: Correção de número de telefone / mudança recente de residência"
                     className="h-10 text-xs rounded-xl border-slate-300"
                   />
                 </div>
@@ -557,7 +814,7 @@ export default function PortalCadastroView({ onBack }) {
                   ) : (
                     <Send className="w-3.5 h-3.5 mr-1" />
                   )}
-                  Enviar ao RH
+                  Enviar Solicitação ao RH
                 </Button>
               </CardFooter>
             </form>
