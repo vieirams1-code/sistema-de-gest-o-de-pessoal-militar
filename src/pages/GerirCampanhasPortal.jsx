@@ -130,6 +130,12 @@ export default function GerirCampanhasPortal() {
         data_fim_militar: `${new Date().getFullYear()}-10-31`,
         data_fim_unidade: `${new Date().getFullYear()}-11-30`,
         instrucoes: `Prezados militares, registrem suas 3 opções de preferências de meses para o Plano de Férias de ${ano}.`,
+        config_regras: {
+          permitir_1_etapa_30d: true,
+          permitir_2_etapas_15d: true,
+          permitir_3_etapas_10d: true,
+          modo_selecao_periodo: 'mais_antigo',
+        },
       });
     } else {
       setModalNovaCampanha({
@@ -146,12 +152,25 @@ export default function GerirCampanhasPortal() {
         data_fim_militar: `${new Date().getFullYear()}-11-15`,
         data_fim_unidade: `${new Date().getFullYear()}-11-30`,
         instrucoes: 'Conferência cadastral obrigatória de dados pessoais, contatos, endereço e dependentes.',
+        config_regras: {},
       });
     }
   };
 
   const abrirEdicaoCampanha = (camp) => {
     setBuscaUnidade('');
+    let regras = {
+      permitir_1_etapa_30d: true,
+      permitir_2_etapas_15d: true,
+      permitir_3_etapas_10d: true,
+      modo_selecao_periodo: 'mais_antigo',
+    };
+    if (camp.config_regras) {
+      try {
+        regras = typeof camp.config_regras === 'string' ? JSON.parse(camp.config_regras) : camp.config_regras;
+      } catch (_e) {}
+    }
+
     setModalNovaCampanha({
       open: true,
       isEditing: true,
@@ -166,6 +185,7 @@ export default function GerirCampanhasPortal() {
       data_fim_militar: camp.data_fim_militar || '',
       data_fim_unidade: camp.data_fim_unidade || '',
       instrucoes: camp.instrucoes || '',
+      config_regras: regras,
     });
   };
 
@@ -838,7 +858,121 @@ export default function GerirCampanhasPortal() {
                   )}
                 </div>
 
-                {/* PRAZOS DE VIGÊNCIA */}
+                {/* REGRAS ESPECÍFICAS DE FÉRIAS DESTA CAMPANHA */}
+                {modalNovaCampanha.tipo === 'PLANO_FERIAS' && (
+                  <div className="space-y-3 p-3.5 bg-emerald-50/60 rounded-2xl border border-emerald-200">
+                    <label className="font-bold text-emerald-950 block flex items-center">
+                      <Calendar className="w-4 h-4 mr-1.5 text-emerald-700" />
+                      Regras de Férias desta Campanha
+                    </label>
+
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-700 block mb-1.5">
+                        Modalidades de Parcelamento Autorizadas aos Militares:
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <label className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-50 text-[11px]">
+                          <span className="font-semibold text-slate-800">Integral (30d)</span>
+                          <input
+                            type="checkbox"
+                            checked={modalNovaCampanha.config_regras?.permitir_1_etapa_30d !== false}
+                            onChange={(e) => setModalNovaCampanha({
+                              ...modalNovaCampanha,
+                              config_regras: {
+                                ...(modalNovaCampanha.config_regras || {}),
+                                permitir_1_etapa_30d: e.target.checked
+                              }
+                            })}
+                            className="w-4 h-4 accent-emerald-600 rounded"
+                          />
+                        </label>
+
+                        <label className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-50 text-[11px]">
+                          <span className="font-semibold text-slate-800">2 Frações (15+15d)</span>
+                          <input
+                            type="checkbox"
+                            checked={modalNovaCampanha.config_regras?.permitir_2_etapas_15d !== false}
+                            onChange={(e) => setModalNovaCampanha({
+                              ...modalNovaCampanha,
+                              config_regras: {
+                                ...(modalNovaCampanha.config_regras || {}),
+                                permitir_2_etapas_15d: e.target.checked
+                              }
+                            })}
+                            className="w-4 h-4 accent-emerald-600 rounded"
+                          />
+                        </label>
+
+                        <label className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-50 text-[11px]">
+                          <span className="font-semibold text-slate-800">3 Frações (10+10+10d)</span>
+                          <input
+                            type="checkbox"
+                            checked={modalNovaCampanha.config_regras?.permitir_3_etapas_10d !== false}
+                            onChange={(e) => setModalNovaCampanha({
+                              ...modalNovaCampanha,
+                              config_regras: {
+                                ...(modalNovaCampanha.config_regras || {}),
+                                permitir_3_etapas_10d: e.target.checked
+                              }
+                            })}
+                            className="w-4 h-4 accent-emerald-600 rounded"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-emerald-200/60">
+                      <span className="text-[11px] font-bold text-slate-700 block mb-1.5">
+                        Critério de Período Aquisitivo em Destaque:
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer text-[11px] ${
+                          (modalNovaCampanha.config_regras?.modo_selecao_periodo || 'mais_antigo') === 'mais_antigo'
+                            ? 'bg-white border-emerald-600 font-bold text-emerald-950 ring-1 ring-emerald-600'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}>
+                          <input
+                            type="radio"
+                            name="modo_selecao_periodo"
+                            value="mais_antigo"
+                            checked={(modalNovaCampanha.config_regras?.modo_selecao_periodo || 'mais_antigo') === 'mais_antigo'}
+                            onChange={() => setModalNovaCampanha({
+                              ...modalNovaCampanha,
+                              config_regras: {
+                                ...(modalNovaCampanha.config_regras || {}),
+                                modo_selecao_periodo: 'mais_antigo'
+                              }
+                            })}
+                            className="accent-emerald-600"
+                          />
+                          <span>Período Mais Antigo com Saldo</span>
+                        </label>
+
+                        <label className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer text-[11px] ${
+                          modalNovaCampanha.config_regras?.modo_selecao_periodo === 'todos'
+                            ? 'bg-white border-emerald-600 font-bold text-emerald-950 ring-1 ring-emerald-600'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}>
+                          <input
+                            type="radio"
+                            name="modo_selecao_periodo"
+                            value="todos"
+                            checked={modalNovaCampanha.config_regras?.modo_selecao_periodo === 'todos'}
+                            onChange={() => setModalNovaCampanha({
+                              ...modalNovaCampanha,
+                              config_regras: {
+                                ...(modalNovaCampanha.config_regras || {}),
+                                modo_selecao_periodo: 'todos'
+                              }
+                            })}
+                            className="accent-emerald-600"
+                          />
+                          <span>Exibir Todos os Períodos Abertos</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 block">Prazo Limite para o Militar</label>

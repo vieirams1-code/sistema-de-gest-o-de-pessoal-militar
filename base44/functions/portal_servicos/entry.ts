@@ -320,8 +320,102 @@ export default async function (req: Request): Promise<Response> {
             escopo_unidades_ids: campanha_payload.escopo_unidades_ids,
             escopo_unidades_nomes: campanha_payload.escopo_unidades_nomes,
             escopo_quadros: campanha_payload.escopo_quadros,
+            config_regras: JSON.stringify(campanha_payload.config_regras || {}),
           });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // Decisão de Solicitação de Atualização Cadastral pelo RH (Aprovar / Rejeitar com replicação na Ficha do Militar)
+        case 'CADASTRO_DECIDIR_SOLICITACAO': {
+          const { solicitacao_id, decisao, observacao } = payload;
+          if (!solicitacao_id || !decisao) {
+            return new Response(JSON.stringify({ error: 'ID da solicitação e decisão são obrigatórios.' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+
+          const sol = await base44.asServiceRole.entities.SolicitacaoAtualizacao.get(solicitacao_id);
+          if (!sol) {
+            return new Response(JSON.stringify({ error: 'Solicitação não encontrada.' }), {
+              status: 404,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+
+          const statusDecisao = decisao === 'Aprovada' ? 'Aprovada' : 'Rejeitada';
+          const updatedSol = await base44.asServiceRole.entities.SolicitacaoAtualizacao.update(solicitacao_id, {
+            status: statusDecisao,
+            data_decisao: new Date().toISOString().split('T')[0],
+            usuario_decisao: user.email || 'RH / Comando',
+            observacao_decisao: observacao || '',
+          });
+
+          // Se aprovada, replica diretamente na entidade Militar!
+          let militarAtualizado: any = null;
+          if (statusDecisao === 'Aprovada' && sol.militar_id && sol.campo_chave) {
+            const campo = sol.campo_chave.trim().toLowerCase();
+            const valor = sol.valor_proposto;
+            const updatePayload: Record<string, any> = {
+              data_ultima_conferencia: new Date().toISOString().split('T')[0],
+            };
+
+            if (campo === 'logradouro' || campo === 'endereco' || campo === 'endereco_logradouro') {
+              updatePayload.logradouro = valor;
+            } else if (campo === 'numero_endereco' || campo === 'numero' || campo === 'endereco_numero') {
+              updatePayload.numero_endereco = valor;
+            } else if (campo === 'bairro' || campo === 'endereco_bairro') {
+              updatePayload.bairro = valor;
+            } else if (campo === 'cidade' || campo === 'municipio' || campo === 'endereco_cidade') {
+              updatePayload.cidade = valor;
+            } else if (campo === 'cep' || campo === 'endereco_cep') {
+              updatePayload.cep = valor;
+            } else if (campo === 'uf' || campo === 'endereco_uf') {
+              updatePayload.uf = valor;
+            } else if (campo === 'complemento' || campo === 'endereco_complemento') {
+              updatePayload.complemento = valor;
+            } else if (campo === 'telefone_celular' || campo === 'celular' || campo === 'telefone') {
+              updatePayload.telefone = valor;
+            } else if (campo === 'email_funcional') {
+              updatePayload.email_funcional = valor;
+            } else if (campo === 'email_particular' || campo === 'email') {
+              updatePayload.email_particular = valor;
+            } else if (campo === 'estado_civil') {
+              updatePayload.estado_civil = valor;
+            } else if (campo === 'nome_mae' || campo === 'mae') {
+              updatePayload.nome_mae = valor;
+            } else if (campo === 'nome_pai' || campo === 'pai') {
+              updatePayload.nome_pai = valor;
+            } else if (campo === 'tipo_sanguineo') {
+              updatePayload.tipo_sanguineo = valor;
+            } else if (campo === 'religiao') {
+              updatePayload.religiao = valor;
+            } else if (campo === 'escolaridade') {
+              updatePayload.escolaridade = valor;
+            } else if (campo === 'naturalidade') {
+              updatePayload.naturalidade = valor;
+            } else if (campo === 'naturalidade_uf') {
+              updatePayload.naturalidade_uf = valor;
+            } else {
+              updatePayload[sol.campo_chave] = valor;
+            }
+
+            try {
+              militarAtualizado = await base44.asServiceRole.entities.Militar.update(sol.militar_id, updatePayload);
+            } catch (errUpd: any) {
+              console.error('Erro ao atualizar Militar na aprovação cadastral:', errUpd);
+            }
+          }
+
+          return new Response(JSON.stringify({
+            ok: true,
+            solicitacao: updatedSol,
+            militar_atualizado: militarAtualizado,
+            message: `Solicitação ${statusDecisao.toLowerCase()} com sucesso.`
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
         }
 
         // Excluir Campanha
@@ -960,6 +1054,29 @@ export default async function (req: Request): Promise<Response> {
           }
         } catch (_e) {}
 
+        let regrasCampanha: any = {};
+        if (campanhaFeriasAtiva?.config_regras) {
+          try {
+            regrasCampanha = typeof campanhaFeriasAtiva.config_regras === 'string'
+              ? JSON.parse(campanhaFeriasAtiva.config_regras)
+              : (campanhaFeriasAtiva.config_regras || {});
+          } catch (_errRegras) {}
+        }
+
+        const permitir1Etapa = regrasCampanha.permitir_1_etapa_30d !== undefined
+          ? Boolean(regrasCampanha.permitir_1_etapa_30d)
+          : (portalConfig?.ferias_permitir_1_etapa_30d !== false);
+
+        const permitir2Etapas = regrasCampanha.permitir_2_etapas_15d !== undefined
+          ? Boolean(regrasCampanha.permitir_2_etapas_15d)
+          : (portalConfig?.ferias_permitir_2_etapas_15d !== false);
+
+        const permitir3Etapas = regrasCampanha.permitir_3_etapas_10d !== undefined
+          ? Boolean(regrasCampanha.permitir_3_etapas_10d)
+          : (portalConfig?.ferias_permitir_3_etapas_10d !== false);
+
+        const modoSelecao = regrasCampanha.modo_selecao_periodo || portalConfig?.ferias_modo_selecao_periodo || 'mais_antigo';
+
         return new Response(JSON.stringify({
           ok: true,
           ano_referencia: anoCampanha,
@@ -970,10 +1087,10 @@ export default async function (req: Request): Promise<Response> {
           opcao_militar_enviada: opcoesEnviadas?.[0] || null,
           config: {
             ativo: portalConfig?.ferias_ativo !== false,
-            modo_selecao: portalConfig?.ferias_modo_selecao_periodo || 'mais_antigo',
-            permitir_1_etapa: portalConfig?.ferias_permitir_1_etapa_30d !== false,
-            permitir_2_etapas: portalConfig?.ferias_permitir_2_etapas_15d !== false,
-            permitir_3_etapas: portalConfig?.ferias_permitir_3_etapas_10d !== false,
+            modo_selecao: modoSelecao,
+            permitir_1_etapa: permitir1Etapa,
+            permitir_2_etapas: permitir2Etapas,
+            permitir_3_etapas: permitir3Etapas,
             permitir_custom: Boolean(portalConfig?.ferias_permitir_custom),
             prazo_limite: campanhaFeriasAtiva?.data_fim_militar || portalConfig?.ferias_prazo_limite || '',
             instrucoes: campanhaFeriasAtiva?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas 3 opções de meses para a escala de férias.',

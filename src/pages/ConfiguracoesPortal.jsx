@@ -144,48 +144,60 @@ export default function ConfiguracoesPortal() {
 
   const handleDecidirSolicitacao = async (solId, novoStatus) => {
     try {
-      const sol = solicitacoes.find((s) => s.id === solId);
-      await base44.entities.SolicitacaoAtualizacao.update(solId, {
-        status: novoStatus,
-        data_decisao: new Date().toISOString().split('T')[0],
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'CADASTRO_DECIDIR_SOLICITACAO',
+        solicitacao_id: solId,
+        decisao: novoStatus,
       });
 
-      if (novoStatus === 'Aprovada' && sol?.militar_id && sol?.campo_chave) {
-        const campo = sol.campo_chave;
-        const valor = sol.valor_proposto;
-        const updateData = {};
+      if (res.data?.ok) {
+        setSuccessMsg(`Solicitação ${novoStatus.toLowerCase()} e dados atualizados na ficha do militar com sucesso!`);
+      } else {
+        // Fallback direto via entidade
+        const sol = solicitacoes.find((s) => s.id === solId);
+        await base44.entities.SolicitacaoAtualizacao.update(solId, {
+          status: novoStatus,
+          data_decisao: new Date().toISOString().split('T')[0],
+        });
 
-        if (campo === 'endereco_logradouro' || campo === 'logradouro' || campo === 'endereco') {
-          updateData.logradouro = valor;
-        } else if (campo === 'endereco_numero' || campo === 'numero_endereco' || campo === 'numero') {
-          updateData.numero_endereco = valor;
-        } else if (campo === 'endereco_bairro' || campo === 'bairro') {
-          updateData.bairro = valor;
-        } else if (campo === 'endereco_cidade' || campo === 'cidade') {
-          updateData.cidade = valor;
-        } else if (campo === 'endereco_cep' || campo === 'cep') {
-          updateData.cep = valor;
-        } else if (campo === 'endereco_complemento' || campo === 'complemento') {
-          updateData.complemento = valor;
-        } else if (campo === 'telefone_celular' || campo === 'telefone' || campo === 'celular') {
-          updateData.telefone = valor;
-          updateData.telefone_celular = valor;
-        } else if (campo === 'email_funcional') {
-          updateData.email_funcional = valor;
-        } else if (campo === 'email_particular' || campo === 'email') {
-          updateData.email_particular = valor;
-        } else if (campo === 'estado_civil') {
-          updateData.estado_civil = valor;
-        } else {
-          updateData[campo] = valor;
+        if (novoStatus === 'Aprovada' && sol?.militar_id && sol?.campo_chave) {
+          const campo = sol.campo_chave.trim().toLowerCase();
+          const valor = sol.valor_proposto;
+          const updateData = {
+            data_ultima_conferencia: new Date().toISOString().split('T')[0],
+          };
+
+          if (campo === 'endereco_logradouro' || campo === 'logradouro' || campo === 'endereco') {
+            updateData.logradouro = valor;
+          } else if (campo === 'endereco_numero' || campo === 'numero_endereco' || campo === 'numero') {
+            updateData.numero_endereco = valor;
+          } else if (campo === 'endereco_bairro' || campo === 'bairro') {
+            updateData.bairro = valor;
+          } else if (campo === 'endereco_cidade' || campo === 'cidade' || campo === 'municipio') {
+            updateData.cidade = valor;
+          } else if (campo === 'endereco_cep' || campo === 'cep') {
+            updateData.cep = valor;
+          } else if (campo === 'endereco_complemento' || campo === 'complemento') {
+            updateData.complemento = valor;
+          } else if (campo === 'telefone_celular' || campo === 'telefone' || campo === 'celular') {
+            updateData.telefone = valor;
+          } else if (campo === 'email_funcional') {
+            updateData.email_funcional = valor;
+          } else if (campo === 'email_particular' || campo === 'email') {
+            updateData.email_particular = valor;
+          } else if (campo === 'estado_civil') {
+            updateData.estado_civil = valor;
+          } else {
+            updateData[sol.campo_chave] = valor;
+          }
+
+          try {
+            await base44.entities.Militar.update(sol.militar_id, updateData);
+          } catch (_errUpd) {}
         }
-
-        try {
-          await base44.entities.Militar.update(sol.militar_id, updateData);
-        } catch (_errUpd) {}
+        setSuccessMsg(`Solicitação marcada como ${novoStatus}.`);
       }
 
-      setSuccessMsg(`Solicitação marcada como ${novoStatus}.`);
       await loadSolicitacoes();
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao atualizar solicitação.');
@@ -285,14 +297,31 @@ export default function ConfiguracoesPortal() {
         {/* CONTEÚDO DA ABA 1: GESTÃO DE FÉRIAS */}
         {activeTab === 'ferias' && (
           <div className="space-y-4">
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3 text-xs text-emerald-950">
+              <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0 mt-0.5">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div className="space-y-1">
+                <span className="font-bold text-sm block text-emerald-900">
+                  Regras Específicas por Campanha
+                </span>
+                <p className="text-emerald-800 text-[11px] leading-relaxed">
+                  As regras de parcelamento autorizadas (30d, 15+15d, 10+10+10d), prazos limites e orientações são agora configuradas individualmente no lançamento de cada <strong>Plano de Férias</strong> em <em>PORTAL HOMOLOGAÇÃO &gt; Gestão RH / Comando &gt; 1. Gerir Campanhas</em>.
+                </p>
+                <p className="text-emerald-700 text-[11px]">
+                  Os parâmetros abaixo atuam como <strong>valores padrão globais</strong> para novos lançamentos e controle de visibilidade do módulo.
+                </p>
+              </div>
+            </div>
+
             <Card className="border-slate-200 shadow-sm">
               <CardHeader className="pb-3 border-b border-slate-100">
                 <CardTitle className="text-sm font-bold text-slate-800 flex items-center">
                   <Calendar className="w-4 h-4 mr-2 text-emerald-700" />
-                  Regras de Exibição e Período de Férias
+                  Padrões Globais do Módulo de Férias
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
-                  Defina qual período aquisitivo é exibido em destaque e as regras de parcelamento
+                  Valores padrão utilizados na abertura de novos planos e controle de disponibilidade
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-4 text-xs">
