@@ -129,10 +129,12 @@ import GerirCampanhasPortal from './pages/GerirCampanhasPortal';
 import Portal from './pages/Portal';
 import PortalFerias from './pages/PortalFerias';
 import PortalCadastro from './pages/PortalCadastro';
+import SistemaFeriasPreviewPage from './pages/SistemaFeriasPreviewPage';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "SistemaFeriasPreviewPage": SistemaFeriasPreviewPage,
     "GerirCampanhasPortal": GerirCampanhasPortal,
     "Portal": Portal,
     "PortalFerias": PortalFerias,

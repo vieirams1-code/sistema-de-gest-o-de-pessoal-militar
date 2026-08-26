@@ -307,6 +307,12 @@ const menuGroups = [
             icon: Users,
             menuGroup: 'Autoatendimento Militar',
           },
+          {
+            name: '9. Preview Novo Sistema Férias',
+            page: 'SistemaFeriasPreviewPage',
+            icon: Layers,
+            menuGroup: 'Autoatendimento Militar',
+          },
         ],
       },
     ],
