@@ -1136,6 +1136,62 @@ Deno.serve(async (req: Request) => {
           dependente_ir: Boolean(dep.dependente_ir),
         }));
 
+        const CAMPOS_OBRIGATORIOS_BACKEND = [
+          { chave: 'telefone_celular', label: 'Telefone Celular / WhatsApp', aliases: ['telefone_celular', 'telefone', 'celular'] },
+          { chave: 'email_particular', label: 'E-mail Particular', aliases: ['email_particular'] },
+          { chave: 'endereco_logradouro', label: 'Logradouro (Rua/Avenida)', aliases: ['endereco_logradouro', 'logradouro', 'endereco'] },
+          { chave: 'endereco_numero', label: 'Número da Residência', aliases: ['endereco_numero', 'numero_endereco', 'numero'] },
+          { chave: 'endereco_bairro', label: 'Bairro', aliases: ['endereco_bairro', 'bairro'] },
+          { chave: 'endereco_cidade', label: 'Cidade / Município', aliases: ['endereco_cidade', 'cidade', 'municipio'] },
+          { chave: 'endereco_uf', label: 'UF do Endereço', aliases: ['endereco_uf', 'uf'] },
+          { chave: 'endereco_cep', label: 'CEP', aliases: ['endereco_cep', 'cep'] },
+          { chave: 'nome_completo', label: 'Nome Completo', aliases: ['nome_completo'] },
+          { chave: 'nome_guerra', label: 'Nome de Guerra', aliases: ['nome_guerra'] },
+          { chave: 'data_nascimento', label: 'Data de Nascimento', aliases: ['data_nascimento'] },
+          { chave: 'sexo', label: 'Sexo', aliases: ['sexo'] },
+          { chave: 'estado_civil', label: 'Estado Civil', aliases: ['estado_civil'] },
+          { chave: 'tipo_sanguineo', label: 'Tipo Sanguíneo / Fator RH', aliases: ['tipo_sanguineo'] },
+          { chave: 'etnia', label: 'Etnia / Cor', aliases: ['etnia'] },
+          { chave: 'religiao', label: 'Religião / Crença', aliases: ['religiao'] },
+          { chave: 'altura', label: 'Altura (m)', aliases: ['altura'] },
+          { chave: 'peso', label: 'Peso (kg)', aliases: ['peso'] },
+          { chave: 'naturalidade', label: 'Naturalidade (Cidade de Nascimento)', aliases: ['naturalidade'] },
+          { chave: 'naturalidade_uf', label: 'UF de Nascimento', aliases: ['naturalidade_uf'] },
+          { chave: 'nome_mae', label: 'Filiação: Nome da Mãe', aliases: ['nome_mae', 'mae'] },
+          { chave: 'rg', label: 'Número do RG', aliases: ['rg'] },
+          { chave: 'orgao_expedidor_rg', label: 'Órgão Expedidor do RG', aliases: ['orgao_expedidor_rg'] },
+          { chave: 'uf_rg', label: 'UF do RG', aliases: ['uf_rg'] },
+          { chave: 'cpf', label: 'CPF', aliases: ['cpf'] },
+          { chave: 'cnh_numero', label: 'Número de Registro da CNH', aliases: ['cnh_numero'] },
+          { chave: 'cnh_categoria', label: 'Categoria da CNH', aliases: ['cnh_categoria'] },
+          { chave: 'cnh_validade', label: 'Validade da CNH', aliases: ['cnh_validade'] },
+          { chave: 'escolaridade', label: 'Nível de Escolaridade', aliases: ['escolaridade'] },
+          { chave: 'banco', label: 'Instituição Bancária', aliases: ['banco'] },
+          { chave: 'agencia', label: 'Agência Bancária', aliases: ['agencia'] },
+          { chave: 'conta', label: 'Conta Corrente', aliases: ['conta'] },
+          { chave: 'posto_graduacao', label: 'Posto / Graduação', aliases: ['posto_graduacao'] },
+          { chave: 'quadro', label: 'Quadro Militar', aliases: ['quadro'] },
+          { chave: 'matricula', label: 'Matrícula Funcional', aliases: ['matricula'] },
+          { chave: 'data_inclusao', label: 'Data de Inclusão na Corporação', aliases: ['data_inclusao', 'data_ingresso', 'data_admissao'] },
+        ];
+
+        const solicitacoesAtivas = (solicitacoes || []).filter((s: any) => s.status !== 'Rejeitada' && s.valor_proposto && String(s.valor_proposto).trim() !== '');
+        const camposObrigatoriosPendentes = CAMPOS_OBRIGATORIOS_BACKEND.filter((campo) => {
+          const temNoMilitar = campo.aliases.some((alias) => {
+            const val = militarFresh[alias];
+            return val !== null && val !== undefined && String(val).trim() !== '';
+          });
+          if (temNoMilitar) return false;
+
+          const temSolicitacao = solicitacoesAtivas.some((s: any) => {
+            const ch = (s.campo_chave || '').trim().toLowerCase();
+            return campo.chave.toLowerCase() === ch || campo.aliases.some((al) => al.toLowerCase() === ch);
+          });
+          if (temSolicitacao) return false;
+
+          return true;
+        });
+
         const campanhaCadastralAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'ATUALIZACAO_CADASTRAL' || c.tipo === 'CONFERENCIA_GERAL');
         const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
 
@@ -1144,6 +1200,8 @@ Deno.serve(async (req: Request) => {
           cadastro: dadosCadastrais,
           dependentes: sanitizedDependentes,
           solicitacoes: solicitacoes || [],
+          campos_obrigatorios_pendentes: camposObrigatoriosPendentes,
+          total_campos_obrigatorios_pendentes: camposObrigatoriosPendentes.length,
           campanha_ativa: campanhaCadastralAtiva || null,
           campanha_ferias_ativa: campanhaFeriasAtiva || null,
           tem_campanha_ferias_ativa: Boolean(campanhaFeriasAtiva),
@@ -1160,6 +1218,78 @@ Deno.serve(async (req: Request) => {
       }
 
       case 'CADASTRO_CONFIRMAR': {
+        const CAMPOS_OBRIGATORIOS_BACKEND = [
+          { chave: 'telefone_celular', label: 'Telefone Celular / WhatsApp', aliases: ['telefone_celular', 'telefone', 'celular'] },
+          { chave: 'email_particular', label: 'E-mail Particular', aliases: ['email_particular'] },
+          { chave: 'endereco_logradouro', label: 'Logradouro (Rua/Avenida)', aliases: ['endereco_logradouro', 'logradouro', 'endereco'] },
+          { chave: 'endereco_numero', label: 'Número da Residência', aliases: ['endereco_numero', 'numero_endereco', 'numero'] },
+          { chave: 'endereco_bairro', label: 'Bairro', aliases: ['endereco_bairro', 'bairro'] },
+          { chave: 'endereco_cidade', label: 'Cidade / Município', aliases: ['endereco_cidade', 'cidade', 'municipio'] },
+          { chave: 'endereco_uf', label: 'UF do Endereço', aliases: ['endereco_uf', 'uf'] },
+          { chave: 'endereco_cep', label: 'CEP', aliases: ['endereco_cep', 'cep'] },
+          { chave: 'nome_completo', label: 'Nome Completo', aliases: ['nome_completo'] },
+          { chave: 'nome_guerra', label: 'Nome de Guerra', aliases: ['nome_guerra'] },
+          { chave: 'data_nascimento', label: 'Data de Nascimento', aliases: ['data_nascimento'] },
+          { chave: 'sexo', label: 'Sexo', aliases: ['sexo'] },
+          { chave: 'estado_civil', label: 'Estado Civil', aliases: ['estado_civil'] },
+          { chave: 'tipo_sanguineo', label: 'Tipo Sanguíneo / Fator RH', aliases: ['tipo_sanguineo'] },
+          { chave: 'etnia', label: 'Etnia / Cor', aliases: ['etnia'] },
+          { chave: 'religiao', label: 'Religião / Crença', aliases: ['religiao'] },
+          { chave: 'altura', label: 'Altura (m)', aliases: ['altura'] },
+          { chave: 'peso', label: 'Peso (kg)', aliases: ['peso'] },
+          { chave: 'naturalidade', label: 'Naturalidade (Cidade de Nascimento)', aliases: ['naturalidade'] },
+          { chave: 'naturalidade_uf', label: 'UF de Nascimento', aliases: ['naturalidade_uf'] },
+          { chave: 'nome_mae', label: 'Filiação: Nome da Mãe', aliases: ['nome_mae', 'mae'] },
+          { chave: 'rg', label: 'Número do RG', aliases: ['rg'] },
+          { chave: 'orgao_expedidor_rg', label: 'Órgão Expedidor do RG', aliases: ['orgao_expedidor_rg'] },
+          { chave: 'uf_rg', label: 'UF do RG', aliases: ['uf_rg'] },
+          { chave: 'cpf', label: 'CPF', aliases: ['cpf'] },
+          { chave: 'cnh_numero', label: 'Número de Registro da CNH', aliases: ['cnh_numero'] },
+          { chave: 'cnh_categoria', label: 'Categoria da CNH', aliases: ['cnh_categoria'] },
+          { chave: 'cnh_validade', label: 'Validade da CNH', aliases: ['cnh_validade'] },
+          { chave: 'escolaridade', label: 'Nível de Escolaridade', aliases: ['escolaridade'] },
+          { chave: 'banco', label: 'Instituição Bancária', aliases: ['banco'] },
+          { chave: 'agencia', label: 'Agência Bancária', aliases: ['agencia'] },
+          { chave: 'conta', label: 'Conta Corrente', aliases: ['conta'] },
+          { chave: 'posto_graduacao', label: 'Posto / Graduação', aliases: ['posto_graduacao'] },
+          { chave: 'quadro', label: 'Quadro Militar', aliases: ['quadro'] },
+          { chave: 'matricula', label: 'Matrícula Funcional', aliases: ['matricula'] },
+          { chave: 'data_inclusao', label: 'Data de Inclusão na Corporação', aliases: ['data_inclusao', 'data_ingresso', 'data_admissao'] },
+        ];
+
+        let solicitacoesMilitar: any[] = [];
+        try {
+          solicitacoesMilitar = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ militar_id: militarId });
+        } catch (_e) {}
+
+        const solicitacoesValidas = (solicitacoesMilitar || []).filter((s: any) => s.status !== 'Rejeitada' && s.valor_proposto && String(s.valor_proposto).trim() !== '');
+
+        const pendencias = CAMPOS_OBRIGATORIOS_BACKEND.filter((campo) => {
+          const temNoMilitar = campo.aliases.some((alias) => {
+            const val = militar[alias];
+            return val !== null && val !== undefined && String(val).trim() !== '';
+          });
+          if (temNoMilitar) return false;
+
+          const temSolicitacao = solicitacoesValidas.some((s: any) => {
+            const ch = (s.campo_chave || '').trim().toLowerCase();
+            return campo.chave.toLowerCase() === ch || campo.aliases.some((al) => al.toLowerCase() === ch);
+          });
+          if (temSolicitacao) return false;
+
+          return true;
+        });
+
+        if (pendencias.length > 0) {
+          return new Response(JSON.stringify({
+            error: `Existem ${pendencias.length} campos obrigatórios ainda não preenchidos na sua ficha. Por favor, solicite a alteração/preenchimento desses campos antes de confirmar.`,
+            campos_pendentes: pendencias,
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
         const nowIso = new Date().toISOString().split('T')[0];
         try {
           await base44.asServiceRole.entities.Militar.update(militarId, { data_ultima_conferencia: nowIso });

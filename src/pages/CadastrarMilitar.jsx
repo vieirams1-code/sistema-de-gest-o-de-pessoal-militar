@@ -1001,7 +1001,7 @@ export default function CadastrarMilitar() {
           <FormSection title="Habilitação" icon={GraduationCap}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField label="CNH Número" name="cnh_numero" value={formData.cnh_numero} onChange={handleChange} />
-              <FormField label="CNH Categoria" name="cnh_categoria" value={formData.cnh_categoria} onChange={handleChange} type="select" options={['A', 'B', 'C', 'D', 'E']} />
+              <FormField label="CNH Categoria" name="cnh_categoria" value={formData.cnh_categoria} onChange={handleChange} type="select" options={['A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE', 'ACC']} />
               <FormField label="Validade CNH" name="cnh_validade" value={formData.cnh_validade} onChange={handleChange} type="date" />
             </div>
           </FormSection>

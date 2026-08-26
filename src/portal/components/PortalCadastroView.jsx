@@ -81,7 +81,7 @@ export const GRUPOS_CAMPOS_ALTERAVEIS = [
       { chave: 'uf_rg', label: 'UF do RG', placeholder: 'MS' },
       { chave: 'cpf', label: 'CPF', placeholder: '000.000.000-00' },
       { chave: 'cnh_numero', label: 'Número da CNH', placeholder: 'Número de registro da CNH' },
-      { chave: 'cnh_categoria', label: 'Categoria da CNH', placeholder: 'Ex: AB, C, D, E' },
+      { chave: 'cnh_categoria', label: 'Categoria da CNH', placeholder: 'Ex: A, B, AB, C, AC, D, AD, E, AE' },
       { chave: 'cnh_validade', label: 'Validade da CNH', placeholder: 'AAAA-MM-DD' },
     ],
   },
@@ -116,6 +116,128 @@ export const GRUPOS_CAMPOS_ALTERAVEIS = [
 ];
 
 export const TODOS_CAMPOS_ALTERAVEIS = GRUPOS_CAMPOS_ALTERAVEIS.flatMap((g) => g.campos);
+
+export const CAMPOS_OBRIGATORIOS_ATUALIZACAO = [
+  { chave: 'telefone_celular', label: 'Telefone Celular / WhatsApp', aliases: ['telefone_celular', 'telefone', 'celular'] },
+  { chave: 'email_particular', label: 'E-mail Particular', aliases: ['email_particular'] },
+  { chave: 'endereco_logradouro', label: 'Logradouro (Rua/Avenida)', aliases: ['endereco_logradouro', 'logradouro', 'endereco'] },
+  { chave: 'endereco_numero', label: 'Número da Residência', aliases: ['endereco_numero', 'numero_endereco', 'numero'] },
+  { chave: 'endereco_bairro', label: 'Bairro', aliases: ['endereco_bairro', 'bairro'] },
+  { chave: 'endereco_cidade', label: 'Cidade / Município', aliases: ['endereco_cidade', 'cidade', 'municipio'] },
+  { chave: 'endereco_uf', label: 'UF do Endereço', aliases: ['endereco_uf', 'uf'] },
+  { chave: 'endereco_cep', label: 'CEP', aliases: ['endereco_cep', 'cep'] },
+  { chave: 'nome_completo', label: 'Nome Completo', aliases: ['nome_completo'] },
+  { chave: 'nome_guerra', label: 'Nome de Guerra', aliases: ['nome_guerra'] },
+  { chave: 'data_nascimento', label: 'Data de Nascimento', aliases: ['data_nascimento'] },
+  { chave: 'sexo', label: 'Sexo', aliases: ['sexo'] },
+  { chave: 'estado_civil', label: 'Estado Civil', aliases: ['estado_civil'] },
+  { chave: 'tipo_sanguineo', label: 'Tipo Sanguíneo / Fator RH', aliases: ['tipo_sanguineo'] },
+  { chave: 'etnia', label: 'Etnia / Cor', aliases: ['etnia'] },
+  { chave: 'religiao', label: 'Religião / Crença', aliases: ['religiao'] },
+  { chave: 'altura', label: 'Altura (m)', aliases: ['altura'] },
+  { chave: 'peso', label: 'Peso (kg)', aliases: ['peso'] },
+  { chave: 'naturalidade', label: 'Naturalidade (Cidade de Nascimento)', aliases: ['naturalidade'] },
+  { chave: 'naturalidade_uf', label: 'UF de Nascimento', aliases: ['naturalidade_uf'] },
+  { chave: 'nome_mae', label: 'Filiação: Nome da Mãe', aliases: ['nome_mae', 'mae'] },
+  { chave: 'rg', label: 'Número do RG', aliases: ['rg'] },
+  { chave: 'orgao_expedidor_rg', label: 'Órgão Expedidor do RG', aliases: ['orgao_expedidor_rg'] },
+  { chave: 'uf_rg', label: 'UF do RG', aliases: ['uf_rg'] },
+  { chave: 'cpf', label: 'CPF', aliases: ['cpf'] },
+  { chave: 'cnh_numero', label: 'Número de Registro da CNH', aliases: ['cnh_numero'] },
+  { chave: 'cnh_categoria', label: 'Categoria da CNH', aliases: ['cnh_categoria'] },
+  { chave: 'cnh_validade', label: 'Validade da CNH', aliases: ['cnh_validade'] },
+  { chave: 'escolaridade', label: 'Nível de Escolaridade', aliases: ['escolaridade'] },
+  { chave: 'banco', label: 'Instituição Bancária', aliases: ['banco'] },
+  { chave: 'agencia', label: 'Agência Bancária', aliases: ['agencia'] },
+  { chave: 'conta', label: 'Conta Corrente', aliases: ['conta'] },
+  { chave: 'posto_graduacao', label: 'Posto / Graduação', aliases: ['posto_graduacao'] },
+  { chave: 'quadro', label: 'Quadro Militar', aliases: ['quadro'] },
+  { chave: 'matricula', label: 'Matrícula Funcional', aliases: ['matricula'] },
+  { chave: 'data_inclusao', label: 'Data de Inclusão na Corporação', aliases: ['data_inclusao', 'data_ingresso', 'data_admissao'] },
+];
+
+export const OPCOES_PREDEFINIDAS = {
+  cnh_categoria: [
+    { valor: 'A', label: 'A (Motocicleta / Triciclo)' },
+    { valor: 'B', label: 'B (Automóvel / Carro de Passeio)' },
+    { valor: 'AB', label: 'AB (Moto e Carro de Passeio)' },
+    { valor: 'C', label: 'C (Caminhão / Veículo de Carga)' },
+    { valor: 'AC', label: 'AC (Moto e Caminhão)' },
+    { valor: 'D', label: 'D (Ônibus / Micro-ônibus / Vans)' },
+    { valor: 'AD', label: 'AD (Moto e Ônibus/Micro)' },
+    { valor: 'E', label: 'E (Veículo Articulado / Carreta)' },
+    { valor: 'AE', label: 'AE (Moto e Veículo Articulado/Carreta)' },
+    { valor: 'ACC', label: 'ACC (Ciclomotor)' },
+    { valor: 'Não Possui', label: 'Não Possui CNH' },
+  ],
+  estado_civil: [
+    { valor: 'Solteiro(a)', label: 'Solteiro(a)' },
+    { valor: 'Casado(a)', label: 'Casado(a)' },
+    { valor: 'Divorciado(a)', label: 'Divorciado(a)' },
+    { valor: 'Viúvo(a)', label: 'Viúvo(a)' },
+    { valor: 'União Estável', label: 'União Estável' },
+  ],
+  sexo: [
+    { valor: 'Masculino', label: 'Masculino' },
+    { valor: 'Feminino', label: 'Feminino' },
+  ],
+  tipo_sanguineo: [
+    { valor: 'A+', label: 'A+' },
+    { valor: 'A-', label: 'A-' },
+    { valor: 'B+', label: 'B+' },
+    { valor: 'B-', label: 'B-' },
+    { valor: 'AB+', label: 'AB+' },
+    { valor: 'AB-', label: 'AB-' },
+    { valor: 'O+', label: 'O+' },
+    { valor: 'O-', label: 'O-' },
+  ],
+  etnia: [
+    { valor: 'Branca', label: 'Branca' },
+    { valor: 'Preta', label: 'Preta' },
+    { valor: 'Parda', label: 'Parda' },
+    { valor: 'Amarela', label: 'Amarela' },
+    { valor: 'Indígena', label: 'Indígena' },
+  ],
+  escolaridade: [
+    { valor: 'Ensino Fundamental Incompleto', label: 'Ensino Fundamental Incompleto' },
+    { valor: 'Ensino Fundamental Completo', label: 'Ensino Fundamental Completo' },
+    { valor: 'Ensino Médio Incompleto', label: 'Ensino Médio Incompleto' },
+    { valor: 'Ensino Médio Completo', label: 'Ensino Médio Completo' },
+    { valor: 'Ensino Superior Incompleto', label: 'Ensino Superior Incompleto' },
+    { valor: 'Ensino Superior Completo', label: 'Ensino Superior Completo' },
+    { valor: 'Pós-Graduação', label: 'Pós-Graduação' },
+    { valor: 'Mestrado', label: 'Mestrado' },
+    { valor: 'Doutorado', label: 'Doutorado' },
+  ],
+  posto_graduacao: [
+    { valor: 'Coronel', label: 'Coronel' },
+    { valor: 'Tenente Coronel', label: 'Tenente Coronel' },
+    { valor: 'Major', label: 'Major' },
+    { valor: 'Capitão', label: 'Capitão' },
+    { valor: '1º Tenente', label: '1º Tenente' },
+    { valor: '2º Tenente', label: '2º Tenente' },
+    { valor: 'Aspirante', label: 'Aspirante' },
+    { valor: 'Subtenente', label: 'Subtenente' },
+    { valor: '1º Sargento', label: '1º Sargento' },
+    { valor: '2º Sargento', label: '2º Sargento' },
+    { valor: '3º Sargento', label: '3º Sargento' },
+    { valor: 'Cabo', label: 'Cabo' },
+    { valor: 'Soldado', label: 'Soldado' },
+  ],
+  quadro: [
+    { valor: 'QOBM', label: 'QOBM (Quadro de Oficiais Bombeiros Militares)' },
+    { valor: 'QAOBM', label: 'QAOBM (Quadro de Administração)' },
+    { valor: 'QOEBM', label: 'QOEBM (Quadro de Especialistas)' },
+    { valor: 'QOSAU', label: 'QOSAU (Quadro de Saúde)' },
+    { valor: 'QBMP-1.a', label: 'QBMP-1.a (Combatente)' },
+    { valor: 'QBMP-1.b', label: 'QBMP-1.b (Condutor/Operador)' },
+    { valor: 'QBMP-2', label: 'QBMP-2 (Especialista)' },
+    { valor: 'QBMPT', label: 'QBMPT (Músico)' },
+  ],
+  uf_rg: ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(u => ({ valor: u, label: u })),
+  endereco_uf: ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(u => ({ valor: u, label: u })),
+  naturalidade_uf: ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(u => ({ valor: u, label: u })),
+};
 
 export default function PortalCadastroView({ onBack }) {
   const navigate = useNavigate();
@@ -167,9 +289,44 @@ export default function PortalCadastroView({ onBack }) {
     setIsModalOpen(true);
   };
 
+  const cad = data?.cadastro || {};
+  const dependentes = data?.dependentes || [];
+  const solicitacoes = data?.solicitacoes || [];
+
+  const solicitacoesValidas = (solicitacoes || []).filter(
+    (s) => s.status !== 'Rejeitada' && s.valor_proposto && String(s.valor_proposto).trim() !== ''
+  );
+
+  // Calcula campos obrigatórios pendentes de preenchimento
+  const camposPendentes = CAMPOS_OBRIGATORIOS_ATUALIZACAO.filter((campo) => {
+    const temNoCadastro = campo.aliases.some((al) => {
+      const v = cad[al];
+      return v !== null && v !== undefined && String(v).trim() !== '';
+    });
+    if (temNoCadastro) return false;
+
+    const temSolicitacao = solicitacoesValidas.some((s) => {
+      const ch = (s.campo_chave || '').trim().toLowerCase();
+      return campo.chave.toLowerCase() === ch || campo.aliases.some((al) => al.toLowerCase() === ch);
+    });
+    if (temSolicitacao) return false;
+
+    return true;
+  });
+
   const handleConfirmarCadastro = async () => {
-    setConfirming(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (camposPendentes.length > 0) {
+      setErrorMsg(
+        `Existem ${camposPendentes.length} campo(s) obrigatório(s) não preenchidos na sua ficha. Por favor, clique nos campos pendentes para preenchê-los antes de confirmar.`
+      );
+      handleOpenModal(camposPendentes[0].chave);
+      return;
+    }
+
+    setConfirming(true);
     try {
       const res = await confirmarCadastro();
       setSuccessMsg(res.message || 'Conferência cadastral confirmada com sucesso!');
@@ -210,6 +367,41 @@ export default function PortalCadastroView({ onBack }) {
     }
   };
 
+  const renderCampoValor = (chave, valorFormatado, valorBruto) => {
+    const isPendente = camposPendentes.some((c) => c.chave === chave);
+    const temSol = solicitacoesValidas.some((s) => {
+      const ch = (s.campo_chave || '').trim().toLowerCase();
+      const item = CAMPOS_OBRIGATORIOS_ATUALIZACAO.find((c) => c.chave === chave);
+      return chave.toLowerCase() === ch || item?.aliases.some((al) => al.toLowerCase() === ch);
+    });
+
+    if (temSol) {
+      return (
+        <div className="flex items-center space-x-1.5 flex-wrap">
+          <span className="font-semibold text-slate-800">{valorFormatado || valorBruto || '(em análise)'}</span>
+          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded">
+            Pendente RH
+          </span>
+        </div>
+      );
+    }
+
+    if (isPendente || (!valorBruto && !valorFormatado)) {
+      return (
+        <button
+          type="button"
+          onClick={() => handleOpenModal(chave)}
+          className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-md px-1.5 py-0.5 transition-colors"
+        >
+          <AlertCircle className="w-3 h-3 mr-1 text-amber-600 shrink-0" />
+          Preencher Obrigatório
+        </button>
+      );
+    }
+
+    return <span className="font-semibold text-slate-800">{valorFormatado || valorBruto}</span>;
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
@@ -218,10 +410,6 @@ export default function PortalCadastroView({ onBack }) {
       </div>
     );
   }
-
-  const cad = data?.cadastro || {};
-  const dependentes = data?.dependentes || [];
-  const solicitacoes = data?.solicitacoes || [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -333,6 +521,53 @@ export default function PortalCadastroView({ onBack }) {
         </div>
       )}
 
+      {/* BANNER DE CAMPOS OBRIGATÓRIOS PENDENTES */}
+      {camposPendentes.length > 0 && (
+        <div className="p-4 bg-amber-50/90 border border-amber-300 rounded-2xl shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div className="flex items-start space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-amber-950 text-sm flex items-center">
+                  Preenchimento Obrigatório Pendente
+                  <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-900 rounded-full text-xs font-extrabold">
+                    {camposPendentes.length} {camposPendentes.length === 1 ? 'campo pendente' : 'campos pendentes'}
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  Para concluir sua atualização cadastral e liberar a etapa de escolha de férias, os itens abaixo não podem ficar em branco. Clique em qualquer um deles para preencher:
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => handleOpenModal(camposPendentes[0]?.chave)}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl h-8 px-3 shrink-0 shadow-sm"
+            >
+              Preencher Pendências
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {camposPendentes.map((p) => (
+              <button
+                key={p.chave}
+                type="button"
+                onClick={() => handleOpenModal(p.chave)}
+                className="inline-flex items-center text-[11px] font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg px-2.5 py-1 transition-all"
+              >
+                <Edit3 className="w-3 h-3 mr-1 text-amber-700" />
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* GRADE DE CARDS CADASTRADOS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* CARD 1: DADOS FUNCIONAIS */}
@@ -355,44 +590,44 @@ export default function PortalCadastroView({ onBack }) {
           <CardContent className="p-4 space-y-3 text-xs">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-slate-500 block">Nome Completo</span>
-                <span className="font-semibold text-slate-800">{cad.nome_completo || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Nome Completo</span>
+                {renderCampoValor('nome_completo', cad.nome_completo, cad.nome_completo)}
               </div>
               <div>
-                <span className="text-slate-500 block">Nome de Guerra</span>
-                <span className="font-semibold text-slate-800">{cad.nome_guerra || '-'}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-slate-500 block">Posto / Graduação</span>
-                <span className="font-semibold text-slate-800">{cad.posto_graduacao || '-'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Quadro</span>
-                <span className="font-semibold text-slate-800">{cad.quadro || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Nome de Guerra</span>
+                {renderCampoValor('nome_guerra', cad.nome_guerra, cad.nome_guerra)}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-slate-500 block">Matrícula</span>
-                <span className="font-semibold text-slate-800">{cad.matricula || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Posto / Graduação</span>
+                {renderCampoValor('posto_graduacao', cad.posto_graduacao, cad.posto_graduacao)}
               </div>
               <div>
-                <span className="text-slate-500 block">Data de Ingresso</span>
-                <span className="font-semibold text-slate-800">{formatarDataBR(cad.data_ingresso || cad.data_inclusao)}</span>
+                <span className="text-slate-500 block mb-0.5">Quadro</span>
+                {renderCampoValor('quadro', cad.quadro, cad.quadro)}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-slate-500 block">Lotação / Unidade</span>
+                <span className="text-slate-500 block mb-0.5">Matrícula</span>
+                {renderCampoValor('matricula', cad.matricula, cad.matricula)}
+              </div>
+              <div>
+                <span className="text-slate-500 block mb-0.5">Data de Inclusão</span>
+                {renderCampoValor('data_inclusao', formatarDataBR(cad.data_ingresso || cad.data_inclusao), cad.data_ingresso || cad.data_inclusao)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block mb-0.5">Lotação / Unidade</span>
                 <span className="font-semibold text-slate-800">{cad.lotacao || cad.estrutura_nome || '-'}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">Função</span>
+                <span className="text-slate-500 block mb-0.5">Função</span>
                 <span className="font-semibold text-slate-800">{cad.funcao || '-'}</span>
               </div>
             </div>
@@ -418,18 +653,18 @@ export default function PortalCadastroView({ onBack }) {
           </CardHeader>
           <CardContent className="p-4 space-y-3 text-xs">
             <div>
-              <span className="text-slate-500 block">Telefone Celular (WhatsApp)</span>
-              <span className="font-semibold text-slate-800">{cad.telefone_celular || '-'}</span>
+              <span className="text-slate-500 block mb-0.5">Telefone Celular (WhatsApp)</span>
+              {renderCampoValor('telefone_celular', cad.telefone_celular || cad.telefone, cad.telefone_celular || cad.telefone)}
             </div>
 
             <div>
-              <span className="text-slate-500 block">E-mail Funcional</span>
+              <span className="text-slate-500 block mb-0.5">E-mail Particular</span>
+              {renderCampoValor('email_particular', cad.email_particular, cad.email_particular)}
+            </div>
+
+            <div>
+              <span className="text-slate-500 block mb-0.5">E-mail Funcional (@cbm.ms.gov.br)</span>
               <span className="font-semibold text-slate-800">{cad.email_funcional || '-'}</span>
-            </div>
-
-            <div>
-              <span className="text-slate-500 block">E-mail Particular</span>
-              <span className="font-semibold text-slate-800">{cad.email_particular || '-'}</span>
             </div>
           </CardContent>
         </Card>
@@ -454,35 +689,40 @@ export default function PortalCadastroView({ onBack }) {
           <CardContent className="p-4 space-y-3 text-xs">
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
-                <span className="text-slate-500 block">Logradouro</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_logradouro || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Logradouro</span>
+                {renderCampoValor('endereco_logradouro', cad.endereco_logradouro || cad.logradouro, cad.endereco_logradouro || cad.logradouro)}
               </div>
               <div>
-                <span className="text-slate-500 block">Número</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_numero || 'S/N'}</span>
+                <span className="text-slate-500 block mb-0.5">Número</span>
+                {renderCampoValor('endereco_numero', cad.endereco_numero || cad.numero_endereco, cad.endereco_numero || cad.numero_endereco)}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-slate-500 block">Bairro</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_bairro || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Bairro</span>
+                {renderCampoValor('endereco_bairro', cad.endereco_bairro || cad.bairro, cad.endereco_bairro || cad.bairro)}
               </div>
               <div>
-                <span className="text-slate-500 block">Complemento</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_complemento || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Complemento</span>
+                <span className="font-semibold text-slate-800">{cad.endereco_complemento || cad.complemento || '-'}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-slate-500 block">Cidade / UF</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_cidade ? `${cad.endereco_cidade} / ${cad.endereco_uf || 'MS'}` : '-'}</span>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <span className="text-slate-500 block mb-0.5">Cidade</span>
+                {renderCampoValor('endereco_cidade', cad.endereco_cidade || cad.cidade, cad.endereco_cidade || cad.cidade)}
               </div>
               <div>
-                <span className="text-slate-500 block">CEP</span>
-                <span className="font-semibold text-slate-800">{cad.endereco_cep || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">UF</span>
+                {renderCampoValor('endereco_uf', cad.endereco_uf || cad.uf, cad.endereco_uf || cad.uf)}
               </div>
+            </div>
+
+            <div>
+              <span className="text-slate-500 block mb-0.5">CEP</span>
+              {renderCampoValor('endereco_cep', cad.endereco_cep || cad.cep, cad.endereco_cep || cad.cep)}
             </div>
           </CardContent>
         </Card>
@@ -507,42 +747,64 @@ export default function PortalCadastroView({ onBack }) {
           <CardContent className="p-4 space-y-3 text-xs">
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <span className="text-slate-500 block">Nascimento</span>
-                <span className="font-semibold text-slate-800">{formatarDataBR(cad.data_nascimento)}</span>
+                <span className="text-slate-500 block mb-0.5">Nascimento</span>
+                {renderCampoValor('data_nascimento', formatarDataBR(cad.data_nascimento), cad.data_nascimento)}
               </div>
               <div>
-                <span className="text-slate-500 block">Estado Civil</span>
-                <span className="font-semibold text-slate-800">{cad.estado_civil || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Estado Civil</span>
+                {renderCampoValor('estado_civil', cad.estado_civil, cad.estado_civil)}
               </div>
               <div>
-                <span className="text-slate-500 block">Sexo</span>
-                <span className="font-semibold text-slate-800">{cad.sexo || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Sexo</span>
+                {renderCampoValor('sexo', cad.sexo, cad.sexo)}
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <span className="text-slate-500 block">Tipo Sanguíneo</span>
-                <span className="font-semibold text-slate-800">{cad.tipo_sanguineo || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Tipo Sanguíneo</span>
+                {renderCampoValor('tipo_sanguineo', cad.tipo_sanguineo, cad.tipo_sanguineo)}
               </div>
               <div>
-                <span className="text-slate-500 block">Etnia / Cor</span>
-                <span className="font-semibold text-slate-800">{cad.etnia || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Etnia / Cor</span>
+                {renderCampoValor('etnia', cad.etnia, cad.etnia)}
               </div>
               <div>
-                <span className="text-slate-500 block">Religião</span>
-                <span className="font-semibold text-slate-800">{cad.religiao || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Religião</span>
+                {renderCampoValor('religiao', cad.religiao, cad.religiao)}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-slate-500 block">Pai</span>
-                <span className="font-semibold text-slate-800 truncate block">{cad.nome_pai || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Altura (m)</span>
+                {renderCampoValor('altura', cad.altura ? `${cad.altura} m` : '', cad.altura)}
               </div>
               <div>
-                <span className="text-slate-500 block">Mãe</span>
-                <span className="font-semibold text-slate-800 truncate block">{cad.nome_mae || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Peso (kg)</span>
+                {renderCampoValor('peso', cad.peso ? `${cad.peso} kg` : '', cad.peso)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block mb-0.5">Naturalidade</span>
+                {renderCampoValor('naturalidade', cad.naturalidade, cad.naturalidade)}
+              </div>
+              <div>
+                <span className="text-slate-500 block mb-0.5">UF Naturalidade</span>
+                {renderCampoValor('naturalidade_uf', cad.naturalidade_uf, cad.naturalidade_uf)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-slate-500 block mb-0.5">Mãe (Obrigatório)</span>
+                {renderCampoValor('nome_mae', cad.nome_mae, cad.nome_mae)}
+              </div>
+              <div>
+                <span className="text-slate-500 block mb-0.5">Pai</span>
+                <span className="font-semibold text-slate-800 truncate block">{cad.nome_pai || '-'}</span>
               </div>
             </div>
           </CardContent>
@@ -566,29 +828,38 @@ export default function PortalCadastroView({ onBack }) {
             </Button>
           </CardHeader>
           <CardContent className="p-4 space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <div>
-                <span className="text-slate-500 block">RG</span>
-                <span className="font-semibold text-slate-800">{cad.rg ? `${cad.rg} (${cad.orgao_expedidor_rg || ''}/${cad.uf_rg || ''})` : '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Número RG</span>
+                {renderCampoValor('rg', cad.rg, cad.rg)}
               </div>
               <div>
-                <span className="text-slate-500 block">CPF</span>
-                <span className="font-semibold text-slate-800">{cad.cpf || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Órgão RG</span>
+                {renderCampoValor('orgao_expedidor_rg', cad.orgao_expedidor_rg, cad.orgao_expedidor_rg)}
               </div>
+              <div>
+                <span className="text-slate-500 block mb-0.5">UF RG</span>
+                {renderCampoValor('uf_rg', cad.uf_rg, cad.uf_rg)}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-slate-500 block mb-0.5">CPF</span>
+              {renderCampoValor('cpf', cad.cpf, cad.cpf)}
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <span className="text-slate-500 block">CNH</span>
-                <span className="font-semibold text-slate-800">{cad.cnh_numero || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">CNH Número</span>
+                {renderCampoValor('cnh_numero', cad.cnh_numero, cad.cnh_numero)}
               </div>
               <div>
-                <span className="text-slate-500 block">Categoria</span>
-                <span className="font-semibold text-slate-800">{cad.cnh_categoria || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Categoria CNH</span>
+                {renderCampoValor('cnh_categoria', cad.cnh_categoria, cad.cnh_categoria)}
               </div>
               <div>
-                <span className="text-slate-500 block">Validade</span>
-                <span className="font-semibold text-slate-800">{formatarDataBR(cad.cnh_validade)}</span>
+                <span className="text-slate-500 block mb-0.5">Validade CNH</span>
+                {renderCampoValor('cnh_validade', formatarDataBR(cad.cnh_validade), cad.cnh_validade)}
               </div>
             </div>
           </CardContent>
@@ -613,22 +884,29 @@ export default function PortalCadastroView({ onBack }) {
           </CardHeader>
           <CardContent className="p-4 space-y-3 text-xs">
             <div>
-              <span className="text-slate-500 block">Escolaridade / Graduação</span>
-              <span className="font-semibold text-slate-800">{cad.escolaridade || '-'} {cad.curso_superior ? `• ${cad.curso_superior}` : ''}</span>
+              <span className="text-slate-500 block mb-0.5">Nível de Escolaridade</span>
+              {renderCampoValor('escolaridade', cad.escolaridade, cad.escolaridade)}
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+            {cad.curso_superior && (
               <div>
-                <span className="text-slate-500 block">Banco</span>
-                <span className="font-semibold text-slate-800">{cad.banco || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Curso Superior</span>
+                <span className="font-semibold text-slate-800">{cad.curso_superior}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+              <div>
+                <span className="text-slate-500 block mb-0.5">Banco</span>
+                {renderCampoValor('banco', cad.banco, cad.banco)}
               </div>
               <div>
-                <span className="text-slate-500 block">Agência</span>
-                <span className="font-semibold text-slate-800">{cad.agencia || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Agência</span>
+                {renderCampoValor('agencia', cad.agencia, cad.agencia)}
               </div>
               <div>
-                <span className="text-slate-500 block">Conta</span>
-                <span className="font-semibold text-slate-800">{cad.conta || '-'}</span>
+                <span className="text-slate-500 block mb-0.5">Conta</span>
+                {renderCampoValor('conta', cad.conta, cad.conta)}
               </div>
             </div>
           </CardContent>
@@ -752,7 +1030,7 @@ export default function PortalCadastroView({ onBack }) {
                       <optgroup key={grupo.grupo} label={grupo.grupo}>
                         {grupo.campos.map((c) => (
                           <option key={c.chave} value={c.chave}>
-                            {c.label}
+                            {c.label} {camposPendentes.some((p) => p.chave === c.chave) ? '⚠️ (Obrigatório Vazio)' : ''}
                           </option>
                         ))}
                       </optgroup>
@@ -768,17 +1046,41 @@ export default function PortalCadastroView({ onBack }) {
                   </div>
                 </div>
 
-                {/* Novo Valor Proposto */}
+                {/* Novo Valor Proposto com Preset Inteligente */}
                 <div className="space-y-1.5">
                   <label className="font-semibold text-slate-700 block">Novo Valor Proposto *</label>
-                  <Input
-                    type="text"
-                    value={valorProposto}
-                    onChange={(e) => setValorProposto(e.target.value)}
-                    placeholder={campoPlaceholder || `Informe o novo ${campoLabel}`}
-                    required
-                    className="h-10 text-xs rounded-xl border-slate-300"
-                  />
+                  {OPCOES_PREDEFINIDAS[campoChave] ? (
+                    <select
+                      value={valorProposto}
+                      onChange={(e) => setValorProposto(e.target.value)}
+                      required
+                      className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white focus:border-[#1e3a5f] outline-none font-medium"
+                    >
+                      <option value="">Selecione uma opção...</option>
+                      {OPCOES_PREDEFINIDAS[campoChave].map((op) => (
+                        <option key={op.valor} value={op.valor}>
+                          {op.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : campoChave.includes('data') || campoChave.includes('validade') ? (
+                    <Input
+                      type="date"
+                      value={valorProposto}
+                      onChange={(e) => setValorProposto(e.target.value)}
+                      required
+                      className="h-10 text-xs rounded-xl border-slate-300"
+                    />
+                  ) : (
+                    <Input
+                      type="text"
+                      value={valorProposto}
+                      onChange={(e) => setValorProposto(e.target.value)}
+                      placeholder={campoPlaceholder || `Informe o novo ${campoLabel}`}
+                      required
+                      className="h-10 text-xs rounded-xl border-slate-300"
+                    />
+                  )}
                 </div>
 
                 {/* Justificativa */}
@@ -788,7 +1090,7 @@ export default function PortalCadastroView({ onBack }) {
                     type="text"
                     value={justificativa}
                     onChange={(e) => setJustificativa(e.target.value)}
-                    placeholder="Ex: Correção de número de telefone / mudança recente de residência"
+                    placeholder="Ex: Preenchimento de dados cadastrais obrigatórios"
                     className="h-10 text-xs rounded-xl border-slate-300"
                   />
                 </div>

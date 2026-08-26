@@ -86,7 +86,7 @@ const ETNIA_MAP = {
 };
 
 const UF_VALIDAS = new Set(['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']);
-const CNH_CATEGORIAS = new Set(['A', 'B', 'C', 'D', 'E']);
+const CNH_CATEGORIAS = new Set(['A', 'B', 'AB', 'C', 'AC', 'D', 'AD', 'E', 'AE', 'ACC']);
 
 function getMigracaoClient() {
   return migracaoClientOverride || base44;
