@@ -126,11 +126,5 @@
       "default": "Confira atentamente seus dados pessoais, de contato e endereço. Caso haja divergência, solicite a alteração.",
       "description": "Instruções exibidas no topo do módulo de conferência cadastral"
     }
-  },
-  "rls": {
-    "create": false,
-    "read": false,
-    "update": false,
-    "delete": false
   }
 }

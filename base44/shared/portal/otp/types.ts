@@ -18,14 +18,14 @@ export interface PortalAuthConfigData {
 }
 
 export const DEFAULT_AUTH_CONFIG: PortalAuthConfigData = {
-  email_enabled: true,
+  email_enabled: false,
   sms_enabled: false,
-  whatsapp_enabled: false,
-  email_provider: 'base44_core',
+  whatsapp_enabled: true,
+  email_provider: 'disabled',
   sms_provider: 'disabled',
-  whatsapp_provider: 'disabled',
-  allow_channel_choice: true,
-  default_channel: 'EMAIL',
+  whatsapp_provider: 'evolution_api',
+  allow_channel_choice: false,
+  default_channel: 'WHATSAPP',
   otp_ttl_seconds: 300,
   otp_resend_seconds: 60,
   otp_max_attempts: 3,
