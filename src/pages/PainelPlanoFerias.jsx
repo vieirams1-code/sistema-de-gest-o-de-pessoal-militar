@@ -77,6 +77,9 @@ export default function PainelPlanoFerias() {
   const [militarDestaqueAmareloId, setMilitarDestaqueAmareloId] = useState(null);
   const destaqueTimerRef = useRef(null);
 
+  // Quantitativo total de efetivo para cálculo do teto de 10%
+  const [totalEfetivoGeral, setTotalEfetivoGeral] = useState(0);
+
   // Filtros & Pesquisa
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
@@ -139,6 +142,17 @@ export default function PainelPlanoFerias() {
       const listaOpcoes = res.data?.opcoes || [];
       setOpcoes(listaOpcoes);
 
+      // 3. Carrega o quantitativo total de militares ativos para cálculo real de cotas e percentual
+      try {
+        const milList = await base44.entities.Militar.list();
+        const ativos = (milList || []).filter(
+          (m) => m.situacao !== 'Inativo' && m.status !== 'Inativo' && m.situacao !== 'Excluído' && m.situacao !== 'Falecido'
+        );
+        setTotalEfetivoGeral(ativos.length || milList?.length || 0);
+      } catch (_milErr) {
+        console.warn('Erro ao carregar efetivo total para cotas:', _milErr);
+      }
+
       const initialMap = {};
       const initialEditing = {};
 
@@ -157,10 +171,16 @@ export default function PainelPlanoFerias() {
         if (op.decisao_camada_1_detalhes && op.decisao_camada_1_detalhes !== '[]') {
           try {
             const salvas = JSON.parse(op.decisao_camada_1_detalhes);
+            let s1 = salvas[0]?.mes || salvas[0]?.data_inicio?.slice(5, 7) || mes1;
+            let s2 = salvas[1]?.mes || salvas[1]?.data_inicio?.slice(5, 7) || mes2;
+            let s3 = salvas[2]?.mes || salvas[2]?.data_inicio?.slice(5, 7) || mes3;
+            if (s2 === s1) s2 = mes2 !== s1 ? mes2 : '07';
+            if (s3 === s1 || s3 === s2) s3 = ['01', '07', '10', '11', '12'].find((m) => m !== s1 && m !== s2) || '10';
+
             initialMap[op.id] = {
-              fracao1: salvas[0]?.mes || salvas[0]?.data_inicio?.slice(5, 7) || mes1,
-              fracao2: salvas[1]?.mes || salvas[1]?.data_inicio?.slice(5, 7) || mes2,
-              fracao3: salvas[2]?.mes || salvas[2]?.data_inicio?.slice(5, 7) || mes3,
+              fracao1: s1,
+              fracao2: s2,
+              fracao3: s3,
               justificativa: op.justificativa_ajuste_gestor || '',
             };
           } catch (_e) {
@@ -195,13 +215,27 @@ export default function PainelPlanoFerias() {
   };
 
   const handleMudarMesFracao = (opId, numFracao, novoMes) => {
-    setSelecoesMilitares((prev) => ({
-      ...prev,
-      [opId]: {
-        ...(prev[opId] || {}),
-        [`fracao${numFracao}`]: novoMes,
-      },
-    }));
+    setSelecoesMilitares((prev) => {
+      const atual = { ...(prev[opId] || {}) };
+      const fracaoKey = `fracao${numFracao}`;
+      const mesAntigo = atual[fracaoKey];
+
+      // Se outra fração já estava usando esse novoMes, transfere o mês anterior para evitar duplicidade
+      [1, 2, 3].forEach((outroNum) => {
+        if (outroNum !== numFracao) {
+          const outroKey = `fracao${outroNum}`;
+          if (atual[outroKey] === novoMes) {
+            atual[outroKey] = mesAntigo || '01';
+          }
+        }
+      });
+
+      atual[fracaoKey] = novoMes;
+      return {
+        ...prev,
+        [opId]: atual,
+      };
+    });
   };
 
   // Salvar Escala Definitiva do Militar
@@ -580,7 +614,11 @@ export default function PainelPlanoFerias() {
         {/* PAINEL SUPERIOR DE COTAS MENSAIS E TETO DE 10% */}
         {campanhaSelecionada && (
           <ResumoCotasMensais
-            totalEfetivo={opcoes.length || 1}
+            totalEfetivo={
+              campanhaSelecionada?.total_militares_escopo ||
+              campanhaSelecionada?.efetivo_total ||
+              (totalEfetivoGeral > 0 ? totalEfetivoGeral : Math.max(opcoes.length, 100))
+            }
             solicitacoes={opcoes}
             titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${campanhaSelecionada.titulo}`}
           />
@@ -990,15 +1028,33 @@ export default function PainelPlanoFerias() {
                                 onChange={(e) => handleMudarMesFracao(op.id, numFracao, e.target.value)}
                                 className="w-full p-2.5 text-slate-900 bg-transparent outline-none font-medium cursor-pointer text-xs"
                               >
-                                <option value={mesOpcao1}>{getNomeMesPorVal(mesOpcao1)} (1ª Opção)</option>
-                                <option value={mesOpcao2}>{getNomeMesPorVal(mesOpcao2)} (2ª Opção)</option>
-                                <option value={mesOpcao3}>{getNomeMesPorVal(mesOpcao3)} (3ª Opção)</option>
+                                {[
+                                  { val: mesOpcao1, label: `${getNomeMesPorVal(mesOpcao1)} (1ª Opção)` },
+                                  { val: mesOpcao2, label: `${getNomeMesPorVal(mesOpcao2)} (2ª Opção)` },
+                                  { val: mesOpcao3, label: `${getNomeMesPorVal(mesOpcao3)} (3ª Opção)` },
+                                ].map((opt, oIdx) => {
+                                  const outroNum = Array.from({ length: numFracoes })
+                                    .map((_, fIdx) => fIdx + 1)
+                                    .find((outro) => outro !== numFracao && militarSelecao[`fracao${outro}`] === opt.val);
+
+                                  return (
+                                    <option key={oIdx} value={opt.val} disabled={Boolean(outroNum)}>
+                                      {opt.label} {outroNum ? `(Em uso na ${outroNum}ª fração)` : ''}
+                                    </option>
+                                  );
+                                })}
                                 <option disabled>──────────</option>
-                                {LISTA_MESES.map((m) => (
-                                  <option key={m.val} value={m.val}>
-                                    {m.nome}
-                                  </option>
-                                ))}
+                                {LISTA_MESES.map((m) => {
+                                  const outroNum = Array.from({ length: numFracoes })
+                                    .map((_, fIdx) => fIdx + 1)
+                                    .find((outro) => outro !== numFracao && militarSelecao[`fracao${outro}`] === m.val);
+
+                                  return (
+                                    <option key={m.val} value={m.val} disabled={Boolean(outroNum)}>
+                                      {m.nome} {outroNum ? `(Em uso na ${outroNum}ª fração)` : ''}
+                                    </option>
+                                  );
+                                })}
                               </select>
                             </div>
                           </div>

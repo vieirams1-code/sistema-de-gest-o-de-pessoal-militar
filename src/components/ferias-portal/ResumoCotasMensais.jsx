@@ -321,15 +321,17 @@ export default function ResumoCotasMensais({
                         ></div>
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] pt-0.5">
+                      <div className="flex items-center justify-between text-[10px] pt-1">
                         <span
-                          className={`font-bold ${
-                            isAlerta ? 'text-amber-800' : 'text-slate-500'
+                          className={`px-1.5 py-0.5 rounded font-black text-xs ${
+                            isAlerta
+                              ? 'bg-amber-200 text-amber-950'
+                              : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {st.percentualInicios}% da tropa
+                          {st.percentualInicios}%
                         </span>
-                        <span className="text-slate-400 text-[9px]">
+                        <span className="text-slate-400 text-[9px] font-medium">
                           {st.integrais}int + {st.fracao1}f1
                         </span>
                       </div>

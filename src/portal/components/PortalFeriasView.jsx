@@ -488,12 +488,21 @@ export default function PortalFeriasView({ onBack }) {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">1ª Opção (Preferencial)</label>
                     <select
                       value={mesOpcao1}
-                      onChange={(e) => setMesOpcao1(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === mesOpcao2) setMesOpcao2(mesOpcao1);
+                        if (v === mesOpcao3) setMesOpcao3(mesOpcao1);
+                        setMesOpcao1(v);
+                      }}
                       className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
                     >
                       {MESES_ANO.map((m) => (
-                        <option key={m.valor} value={m.valor}>
-                          {m.nome}
+                        <option
+                          key={m.valor}
+                          value={m.valor}
+                          disabled={m.valor === mesOpcao2 || m.valor === mesOpcao3}
+                        >
+                          {m.nome} {m.valor === mesOpcao2 ? '(Em uso na 2ª Opção)' : m.valor === mesOpcao3 ? '(Em uso na 3ª Opção)' : ''}
                         </option>
                       ))}
                     </select>
@@ -503,12 +512,21 @@ export default function PortalFeriasView({ onBack }) {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">2ª Opção (Alternativa A)</label>
                     <select
                       value={mesOpcao2}
-                      onChange={(e) => setMesOpcao2(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === mesOpcao1) setMesOpcao1(mesOpcao2);
+                        if (v === mesOpcao3) setMesOpcao3(mesOpcao2);
+                        setMesOpcao2(v);
+                      }}
                       className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
                     >
                       {MESES_ANO.map((m) => (
-                        <option key={m.valor} value={m.valor}>
-                          {m.nome}
+                        <option
+                          key={m.valor}
+                          value={m.valor}
+                          disabled={m.valor === mesOpcao1 || m.valor === mesOpcao3}
+                        >
+                          {m.nome} {m.valor === mesOpcao1 ? '(Em uso na 1ª Opção)' : m.valor === mesOpcao3 ? '(Em uso na 3ª Opção)' : ''}
                         </option>
                       ))}
                     </select>
@@ -518,12 +536,21 @@ export default function PortalFeriasView({ onBack }) {
                     <label className="block text-sm font-semibold text-slate-700 mb-2">3ª Opção (Alternativa B)</label>
                     <select
                       value={mesOpcao3}
-                      onChange={(e) => setMesOpcao3(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === mesOpcao1) setMesOpcao1(mesOpcao3);
+                        if (v === mesOpcao2) setMesOpcao2(mesOpcao3);
+                        setMesOpcao3(v);
+                      }}
                       className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
                     >
                       {MESES_ANO.map((m) => (
-                        <option key={m.valor} value={m.valor}>
-                          {m.nome}
+                        <option
+                          key={m.valor}
+                          value={m.valor}
+                          disabled={m.valor === mesOpcao1 || m.valor === mesOpcao2}
+                        >
+                          {m.nome} {m.valor === mesOpcao1 ? '(Em uso na 1ª Opção)' : m.valor === mesOpcao2 ? '(Em uso na 2ª Opção)' : ''}
                         </option>
                       ))}
                     </select>

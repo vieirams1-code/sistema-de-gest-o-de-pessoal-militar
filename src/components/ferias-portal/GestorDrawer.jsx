@@ -112,15 +112,19 @@ export default function GestorDrawer({
               <div className="bg-white rounded-lg border border-slate-300 shadow-sm p-1">
                 <select
                   value={fracao1}
-                  onChange={(e) => setFracao1(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === fracao2) setFracao2(fracao1);
+                    setFracao1(v);
+                  }}
                   className="w-full p-2.5 text-slate-900 bg-transparent outline-none font-medium cursor-pointer"
                 >
                   <option value="" disabled>
                     Selecione o mês...
                   </option>
                   {MESES_OPCOES.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                    <option key={opt.value} value={opt.value} disabled={opt.value === fracao2}>
+                      {opt.label} {opt.value === fracao2 ? '(Em uso na 2ª Fração)' : ''}
                     </option>
                   ))}
                 </select>
@@ -138,15 +142,19 @@ export default function GestorDrawer({
               <div className="bg-white rounded-lg border border-slate-300 shadow-sm p-1">
                 <select
                   value={fracao2}
-                  onChange={(e) => setFracao2(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === fracao1) setFracao1(fracao2);
+                    setFracao2(v);
+                  }}
                   className="w-full p-2.5 text-slate-900 bg-transparent outline-none font-medium cursor-pointer"
                 >
                   <option value="" disabled>
                     Selecione o mês...
                   </option>
                   {MESES_OPCOES.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                    <option key={opt.value} value={opt.value} disabled={opt.value === fracao1}>
+                      {opt.label} {opt.value === fracao1 ? '(Em uso na 1ª Fração)' : ''}
                     </option>
                   ))}
                 </select>
