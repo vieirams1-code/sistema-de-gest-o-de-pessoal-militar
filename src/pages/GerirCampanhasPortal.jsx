@@ -332,16 +332,6 @@ export default function GerirCampanhasPortal() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-500 font-medium">Carregando painel de campanhas...</p>
-      </div>
-    );
-  }
-
-  
   const campanhasFiltradas = useMemo(() => {
     return campanhas.filter(camp => {
       // Filtro de Arquivadas
@@ -385,6 +375,15 @@ export default function GerirCampanhasPortal() {
     if (detalhesRetorno.filtro === 'TODOS') return true;
     return m.status_resposta === detalhesRetorno.filtro;
   });
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
+        <p className="text-sm text-slate-500 font-medium">Carregando painel de campanhas...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
