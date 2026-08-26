@@ -481,7 +481,7 @@ export default function PortalFeriasView({ onBack }) {
 
           {/* FORMULÁRIO DE ESCOLHA DOS 3 MESES DE FÉRIAS (EXIBE SE NÃO TEM OPÇÃO OU CLICOU EM ALTERAR) */}
           {(isEditing || !opcaoEnviada) && (
-            <form onSubmit={handleSubmitOpcoes} className="space-y-6">
+            <form onSubmit={handleSubmeter} className="space-y-6">
               {/* PASSO 1: ESCOLHA A MODALIDADE */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-5">
