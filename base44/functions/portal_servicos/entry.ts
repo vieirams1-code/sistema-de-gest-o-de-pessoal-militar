@@ -83,14 +83,24 @@ interface PortalServicosPayload {
   };
 }
 
-export default async function (req: Request): Promise<Response> {
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id',
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   const correlationId = generateCorrelationId();
 
   try {
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'Método não permitido.' }), {
         status: 405,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
 
@@ -1456,4 +1466,4 @@ export default async function (req: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-}
+});
