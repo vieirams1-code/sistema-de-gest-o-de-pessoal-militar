@@ -12,6 +12,10 @@ import {
   Check,
   X,
   Inbox,
+  Edit3,
+  RotateCcw,
+  CheckCheck,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,10 +34,10 @@ export default function ConfiguracoesPortal() {
   // Estados de Férias
   const [feriasAtivo, setFeriasAtivo] = useState(true);
   const [feriasModoSelecao, setFeriasModoSelecao] = useState('mais_antigo');
-  const [permitir1Etapa, setPermitir1Etapa] = useState(true);
-  const [permitir2Etapas, setPermitir2Etapas] = useState(true);
-  const [permitir3Etapas, setPermitir3Etapas] = useState(true);
-  const [permitirCustom, setPermitirCustom] = useState(false);
+  const [feriasPermitir1Etapa, setFeriasPermitir1Etapa] = useState(true);
+  const [feriasPermitir2Etapas, setFeriasPermitir2Etapas] = useState(true);
+  const [feriasPermitir3Etapas, setFeriasPermitir3Etapas] = useState(true);
+  const [feriasPermitirCustom, setFeriasPermitirCustom] = useState(false);
   const [feriasPrazoLimite, setFeriasPrazoLimite] = useState('');
   const [feriasInstrucoes, setFeriasInstrucoes] = useState('');
 
@@ -42,16 +46,18 @@ export default function ConfiguracoesPortal() {
   const [cadastroPermitirSolicitacao, setCadastroPermitirSolicitacao] = useState(true);
   const [cadastroInstrucoes, setCadastroInstrucoes] = useState('');
 
-  // Estados de Canais
+  // Estados de Canais & OTP
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [otpTtlSeconds, setOtpTtlSeconds] = useState(300);
   const [otpResendSeconds, setOtpResendSeconds] = useState(60);
 
-  // Solicitações do RH
+  // Estados de Solicitações do RH
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [loadingSolicitacoes, setLoadingSolicitacoes] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
+  const [valoresEditados, setValoresEditados] = useState({}); // { [solId]: valorCorrigido }
+  const [modosEdicao, setModosEdicao] = useState({}); // { [solId]: boolean }
 
   const loadConfig = async () => {
     setLoading(true);
@@ -142,12 +148,37 @@ export default function ConfiguracoesPortal() {
     }
   };
 
+  const handleEditarValor = (solId, valor) => {
+    setValoresEditados((prev) => ({ ...prev, [solId]: valor }));
+  };
+
+  const handleRestaurarValor = (solId) => {
+    setValoresEditados((prev) => {
+      const next = { ...prev };
+      delete next[solId];
+      return next;
+    });
+    setModosEdicao((prev) => ({ ...prev, [solId]: false }));
+  };
+
+  const handleToggleEdicao = (solId, valorAtual) => {
+    setModosEdicao((prev) => {
+      const nextState = !prev[solId];
+      if (nextState && valoresEditados[solId] === undefined) {
+        setValoresEditados((v) => ({ ...v, [solId]: valorAtual }));
+      }
+      return { ...prev, [solId]: nextState };
+    });
+  };
+
   const handleDecidirSolicitacao = async (solId, novoStatus) => {
     try {
+      const valorCorrigido = valoresEditados[solId];
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'CADASTRO_DECIDIR_SOLICITACAO',
         solicitacao_id: solId,
         decisao: novoStatus,
+        valor_corrigido: valorCorrigido,
       });
 
       if (res.data?.ok) {
@@ -155,40 +186,50 @@ export default function ConfiguracoesPortal() {
       } else {
         // Fallback direto via entidade
         const sol = solicitacoes.find((s) => s.id === solId);
-        await base44.entities.SolicitacaoAtualizacao.update(solId, {
+        const foiEditado = valorCorrigido !== undefined && valorCorrigido !== sol?.valor_proposto;
+        const valorFinal = foiEditado ? valorCorrigido : sol?.valor_proposto;
+
+        const updatePayload = {
           status: novoStatus,
           data_decisao: new Date().toISOString().split('T')[0],
-        });
+        };
+        if (foiEditado) {
+          updatePayload.valor_original_militar = sol.valor_proposto;
+          updatePayload.valor_proposto = valorFinal;
+          updatePayload.editado_pelo_gestor = true;
+          updatePayload.observacao_decisao = `Retificado pelo gestor (original: "${sol.valor_proposto}")`;
+        }
+
+        await base44.entities.SolicitacaoAtualizacao.update(solId, updatePayload);
 
         if (novoStatus === 'Aprovada' && sol?.militar_id && sol?.campo_chave) {
           const campo = sol.campo_chave.trim().toLowerCase();
-          const valor = sol.valor_proposto;
           const updateData = {
             data_ultima_conferencia: new Date().toISOString().split('T')[0],
           };
 
           if (campo === 'endereco_logradouro' || campo === 'logradouro' || campo === 'endereco') {
-            updateData.logradouro = valor;
+            updateData.logradouro = valorFinal;
           } else if (campo === 'endereco_numero' || campo === 'numero_endereco' || campo === 'numero') {
-            updateData.numero_endereco = valor;
+            updateData.numero_endereco = valorFinal;
           } else if (campo === 'endereco_bairro' || campo === 'bairro') {
-            updateData.bairro = valor;
+            updateData.bairro = valorFinal;
           } else if (campo === 'endereco_cidade' || campo === 'cidade' || campo === 'municipio') {
-            updateData.cidade = valor;
+            updateData.cidade = valorFinal;
           } else if (campo === 'endereco_cep' || campo === 'cep') {
-            updateData.cep = valor;
+            updateData.cep = valorFinal;
           } else if (campo === 'endereco_complemento' || campo === 'complemento') {
-            updateData.complemento = valor;
+            updateData.complemento = valorFinal;
           } else if (campo === 'telefone_celular' || campo === 'telefone' || campo === 'celular') {
-            updateData.telefone = valor;
+            updateData.telefone = valorFinal;
           } else if (campo === 'email_funcional') {
-            updateData.email_funcional = valor;
+            updateData.email_funcional = valorFinal;
           } else if (campo === 'email_particular' || campo === 'email') {
-            updateData.email_particular = valor;
+            updateData.email_particular = valorFinal;
           } else if (campo === 'estado_civil') {
-            updateData.estado_civil = valor;
+            updateData.estado_civil = valorFinal;
           } else {
-            updateData[sol.campo_chave] = valor;
+            updateData[sol.campo_chave] = valorFinal;
           }
 
           try {
@@ -201,6 +242,34 @@ export default function ConfiguracoesPortal() {
       await loadSolicitacoes();
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao atualizar solicitação.');
+    }
+  };
+
+  const handleDecidirLoteMilitar = async (militarId, itens, novoStatus) => {
+    try {
+      const itensDecisao = itens.map((item) => ({
+        solicitacao_id: item.id,
+        valor_corrigido: valoresEditados[item.id] !== undefined ? valoresEditados[item.id] : item.valor_proposto,
+      }));
+
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'CADASTRO_DECIDIR_LOTE_MILITAR',
+        militar_id: militarId,
+        decisao: novoStatus,
+        itens_decisao: itensDecisao,
+      });
+
+      if (res.data?.ok) {
+        setSuccessMsg(`Todas as alterações do militar foram marcadas como ${novoStatus.toLowerCase()}s com sucesso!`);
+      } else {
+        for (const item of itens) {
+          await handleDecidirSolicitacao(item.id, novoStatus);
+        }
+      }
+
+      await loadSolicitacoes();
+    } catch (err) {
+      setErrorMsg(err.message || 'Falha ao processar alterações em lote.');
     }
   };
 
@@ -217,6 +286,23 @@ export default function ConfiguracoesPortal() {
     if (filtroStatus === 'TODOS') return true;
     return s.status === filtroStatus;
   });
+
+  const gruposMilitares = solicitacoesFiltradas.reduce((acc, sol) => {
+    const key = sol.militar_id || sol.militar_matricula || sol.militar_nome || 'desconhecido';
+    if (!acc[key]) {
+      acc[key] = {
+        militar_id: sol.militar_id,
+        militar_nome: sol.militar_nome,
+        militar_posto: sol.militar_posto,
+        militar_matricula: sol.militar_matricula,
+        itens: [],
+      };
+    }
+    acc[key].itens.push(sol);
+    return acc;
+  }, {});
+
+  const listaGruposMilitares = Object.values(gruposMilitares);
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
@@ -590,19 +676,19 @@ export default function ConfiguracoesPortal() {
           </div>
         )}
 
-        {/* CONTEÚDO DA ABA 4: MESA DO RH (SOLICITAÇÕES RECEBIDAS) */}
+        {/* CONTEÚDO DA ABA 4: MESA DO RH (SOLICITAÇÕES RECEBIDAS AGRUPADAS POR MILITAR) */}
         {activeTab === 'solicitacoes' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-1">
-              <div className="flex space-x-2">
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+              <div className="flex flex-wrap gap-1.5">
                 {['Pendente', 'Aprovada', 'Rejeitada', 'TODOS'].map((st) => (
                   <button
                     key={st}
                     type="button"
                     onClick={() => setFiltroStatus(st)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                       filtroStatus === st
-                        ? 'bg-[#1e3a5f] text-white'
+                        ? 'bg-[#1e3a5f] text-white shadow-sm ring-1 ring-[#1e3a5f]'
                         : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -611,83 +697,239 @@ export default function ConfiguracoesPortal() {
                 ))}
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={loadSolicitacoes}
-                className="text-xs h-8 rounded-lg"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loadingSolicitacoes ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-slate-500 font-medium">
+                  {listaGruposMilitares.length} militar(es) • {solicitacoesFiltradas.length} campo(s)
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={loadSolicitacoes}
+                  className="text-xs h-8 rounded-xl font-semibold bg-white"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loadingSolicitacoes ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+              </div>
             </div>
 
-            {solicitacoesFiltradas.length === 0 ? (
-              <Card className="border-slate-200">
-                <CardContent className="p-8 text-center text-xs text-slate-500">
-                  Nenhuma solicitação encontrada com o status "{filtroStatus}".
+            {listaGruposMilitares.length === 0 ? (
+              <Card className="border-slate-200 shadow-sm rounded-2xl">
+                <CardContent className="p-12 text-center text-xs text-slate-500 space-y-2">
+                  <Inbox className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="font-semibold text-slate-700">Nenhuma solicitação encontrada.</p>
+                  <p className="text-slate-400">Não há registros com o status selecionado ("{filtroStatus}").</p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {solicitacoesFiltradas.map((sol) => (
-                  <Card key={sol.id} className="border-slate-200 shadow-sm">
-                    <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-slate-900 text-sm">
-                            {sol.militar_posto} {sol.militar_nome}
-                          </span>
-                          <span className="text-slate-400">• Matrícula: {sol.militar_matricula || '-'}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            sol.status === 'Aprovada'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : sol.status === 'Rejeitada'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {sol.status || 'Pendente'}
-                          </span>
+              <div className="space-y-4">
+                {listaGruposMilitares.map((grupo) => {
+                  const itensPendentes = grupo.itens.filter((i) => i.status === 'Pendente');
+                  const temPendentes = itensPendentes.length > 0;
+
+                  return (
+                    <Card key={grupo.militar_id || grupo.militar_matricula} className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+                      {/* CABEÇALHO DO MILITAR COM AÇÕES EM LOTE */}
+                      <div className="p-4 bg-slate-50/80 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-2xl bg-blue-100 text-[#1e3a5f] flex items-center justify-center font-black text-sm">
+                            <User className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-slate-900 text-sm">
+                                {grupo.militar_posto} {grupo.militar_nome}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#1e3a5f] font-mono text-[10px] font-bold">
+                                Mat. {grupo.militar_matricula || '-'}
+                              </span>
+                            </div>
+                            <span className="text-slate-500 text-[11px]">
+                              {grupo.itens.length} alteração(ões) solicitada(s) • {itensPendentes.length} pendente(s)
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="text-slate-700">
-                          <strong>{sol.campo_label || sol.campo_chave}:</strong>{' '}
-                          <span className="text-slate-500 line-through mr-1">{sol.valor_atual || '(vazio)'}</span>
-                          <span className="text-emerald-700 font-bold">➔ {sol.valor_proposto}</span>
-                        </div>
-
-                        {sol.justificativa && (
-                          <p className="text-[11px] text-slate-500 italic">"{sol.justificativa}"</p>
+                        {temPendentes && (
+                          <div className="flex items-center space-x-2 self-end sm:self-center">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleDecidirLoteMilitar(grupo.militar_id, itensPendentes, 'Aprovada')}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs h-8 px-3 font-semibold shadow-sm"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5 mr-1" />
+                              Aprovar Todas do Militar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDecidirLoteMilitar(grupo.militar_id, itensPendentes, 'Rejeitada')}
+                              className="border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs h-8 px-3 font-semibold"
+                            >
+                              <X className="w-3.5 h-3.5 mr-1" />
+                              Rejeitar Todas
+                            </Button>
+                          </div>
                         )}
                       </div>
 
-                      {sol.status === 'Pendente' && (
-                        <div className="flex items-center space-x-2 self-end sm:self-center">
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleDecidirSolicitacao(sol.id, 'Aprovada')}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs h-8 px-3"
-                          >
-                            <Check className="w-3.5 h-3.5 mr-1" />
-                            Aprovar
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDecidirSolicitacao(sol.id, 'Rejeitada')}
-                            className="border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs h-8 px-3"
-                          >
-                            <X className="w-3.5 h-3.5 mr-1" />
-                            Rejeitar
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                      {/* LISTA DE CAMPOS SOLICITADOS COM EDIÇÃO INLINE */}
+                      <CardContent className="p-0 divide-y divide-slate-100">
+                        {grupo.itens.map((sol) => {
+                          const estaEditando = modosEdicao[sol.id];
+                          const valorEditado = valoresEditados[sol.id];
+                          const valorExibido = valorEditado !== undefined ? valorEditado : sol.valor_proposto;
+                          const foiModificadoPeloGestor = (valorEditado !== undefined && valorEditado !== sol.valor_proposto) || sol.editado_pelo_gestor;
+
+                          return (
+                            <div key={sol.id} className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+                              <div className="space-y-2 flex-1 min-w-0">
+                                <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 font-bold text-slate-800 text-[11px]">
+                                    {sol.campo_label || sol.campo_chave}
+                                  </span>
+
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    sol.status === 'Aprovada'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : sol.status === 'Rejeitada'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {sol.status || 'Pendente'}
+                                  </span>
+
+                                  {foiModificadoPeloGestor && (
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-900 text-[10px] font-bold flex items-center gap-1">
+                                      <Edit3 className="w-3 h-3 text-amber-600" />
+                                      Retificado pelo Gestor
+                                    </span>
+                                  )}
+
+                                  <span className="text-slate-400 text-[10px]">
+                                    {sol.data_solicitacao ? `Enviado em ${new Date(sol.data_solicitacao + 'T00:00:00').toLocaleDateString('pt-BR')}` : ''}
+                                  </span>
+                                </div>
+
+                                {/* COMPARAÇÃO: VALOR ATUAL -> VALOR SOLICITADO / CORRIGIDO */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80">
+                                    <span className="text-[10px] font-bold text-slate-400 block mb-0.5 uppercase tracking-wider">
+                                      Valor Atual no Sistema
+                                    </span>
+                                    <span className="text-slate-600 font-medium break-all">
+                                      {sol.valor_atual || '(vazio)'}
+                                    </span>
+                                  </div>
+
+                                  <div className={`p-2.5 rounded-xl border transition-all ${
+                                    foiModificadoPeloGestor
+                                      ? 'bg-amber-50/50 border-amber-300 ring-1 ring-amber-300'
+                                      : 'bg-emerald-50/50 border-emerald-200'
+                                  }`}>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                        foiModificadoPeloGestor ? 'text-amber-800' : 'text-emerald-800'
+                                      }`}>
+                                        {foiModificadoPeloGestor ? 'Valor Corrigido a ser Aplicado' : 'Valor Solicitado pelo Militar'}
+                                      </span>
+
+                                      {sol.status === 'Pendente' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleEdicao(sol.id, sol.valor_proposto)}
+                                          className="text-[11px] text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1"
+                                        >
+                                          <Edit3 className="w-3 h-3" />
+                                          {estaEditando ? 'Fechar Edição' : 'Corrigir Dado'}
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* CAMPO DE ENTRADA OU VISUALIZAÇÃO */}
+                                    {estaEditando && sol.status === 'Pendente' ? (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <Input
+                                          type="text"
+                                          value={valorExibido}
+                                          onChange={(e) => handleEditarValor(sol.id, e.target.value)}
+                                          className="h-8 text-xs bg-white rounded-lg border-amber-400 font-semibold text-slate-900"
+                                          placeholder="Digite a correção..."
+                                          autoFocus
+                                        />
+                                        {valorEditado !== undefined && valorEditado !== sol.valor_proposto && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRestaurarValor(sol.id)}
+                                            className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                                            title="Restaurar valor original do militar"
+                                          >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-emerald-950 font-bold break-all">
+                                          {valorExibido}
+                                        </span>
+                                        {foiModificadoPeloGestor && sol.valor_original_militar && (
+                                          <span className="text-[10px] text-slate-400 line-through ml-2">
+                                            (Original: {sol.valor_original_militar})
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {sol.justificativa && (
+                                  <p className="text-[11px] text-slate-500 italic bg-slate-50/50 p-2 rounded-lg border border-slate-100">
+                                    <strong>Justificativa do militar:</strong> "{sol.justificativa}"
+                                  </p>
+                                )}
+
+                                {sol.observacao_decisao && (
+                                  <p className="text-[11px] text-blue-800 bg-blue-50/40 p-2 rounded-lg border border-blue-100">
+                                    <strong>Obs. da decisão:</strong> {sol.observacao_decisao}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* AÇÕES INDIVIDUAIS DO CAMPO */}
+                              {sol.status === 'Pendente' && (
+                                <div className="flex sm:flex-col lg:flex-row items-center gap-2 shrink-0 self-end lg:self-center">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleDecidirSolicitacao(sol.id, 'Aprovada')}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs h-8 px-3 font-semibold shadow-sm"
+                                  >
+                                    <Check className="w-3.5 h-3.5 mr-1" />
+                                    Aprovar Campo
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDecidirSolicitacao(sol.id, 'Rejeitada')}
+                                    className="border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs h-8 px-3 font-semibold"
+                                  >
+                                    <X className="w-3.5 h-3.5 mr-1" />
+                                    Rejeitar
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>

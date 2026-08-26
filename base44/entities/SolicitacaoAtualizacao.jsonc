@@ -28,6 +28,15 @@
     "valor_proposto": {
       "type": "string"
     },
+    "valor_original_militar": {
+      "type": "string",
+      "description": "Valor original proposto pelo militar antes de retificação pelo gestor"
+    },
+    "editado_pelo_gestor": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se o gestor retificou o dado antes de aprovar"
+    },
     "justificativa": {
       "type": "string"
     },

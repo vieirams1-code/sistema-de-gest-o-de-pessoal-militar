@@ -325,9 +325,9 @@ export default async function (req: Request): Promise<Response> {
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
 
-        // Decisão de Solicitação de Atualização Cadastral pelo RH (Aprovar / Rejeitar com replicação na Ficha do Militar)
+        // Decisão de Solicitação de Atualização Cadastral pelo RH (Aprovar / Rejeitar com suporte a Retificação pelo Gestor)
         case 'CADASTRO_DECIDIR_SOLICITACAO': {
-          const { solicitacao_id, decisao, observacao } = payload;
+          const { solicitacao_id, decisao, valor_corrigido, observacao } = payload;
           if (!solicitacao_id || !decisao) {
             return new Response(JSON.stringify({ error: 'ID da solicitação e decisão são obrigatórios.' }), {
               status: 400,
@@ -344,60 +344,70 @@ export default async function (req: Request): Promise<Response> {
           }
 
           const statusDecisao = decisao === 'Aprovada' ? 'Aprovada' : 'Rejeitada';
-          const updatedSol = await base44.asServiceRole.entities.SolicitacaoAtualizacao.update(solicitacao_id, {
+          const foiEditado = Boolean(valor_corrigido !== undefined && valor_corrigido !== null && valor_corrigido !== sol.valor_proposto);
+          const valorFinal = foiEditado ? valor_corrigido : sol.valor_proposto;
+
+          const solUpdate: Record<string, any> = {
             status: statusDecisao,
             data_decisao: new Date().toISOString().split('T')[0],
             usuario_decisao: user.email || 'RH / Comando',
-            observacao_decisao: observacao || '',
-          });
+            observacao_decisao: observacao || (foiEditado ? `Retificado pelo gestor (original: "${sol.valor_proposto}")` : ''),
+          };
+
+          if (foiEditado) {
+            solUpdate.valor_original_militar = sol.valor_proposto;
+            solUpdate.valor_proposto = valorFinal;
+            solUpdate.editado_pelo_gestor = true;
+          }
+
+          const updatedSol = await base44.asServiceRole.entities.SolicitacaoAtualizacao.update(solicitacao_id, solUpdate);
 
           // Se aprovada, replica diretamente na entidade Militar!
           let militarAtualizado: any = null;
           if (statusDecisao === 'Aprovada' && sol.militar_id && sol.campo_chave) {
             const campo = sol.campo_chave.trim().toLowerCase();
-            const valor = sol.valor_proposto;
             const updatePayload: Record<string, any> = {
               data_ultima_conferencia: new Date().toISOString().split('T')[0],
             };
 
             if (campo === 'logradouro' || campo === 'endereco' || campo === 'endereco_logradouro') {
-              updatePayload.logradouro = valor;
+              updatePayload.logradouro = valorFinal;
             } else if (campo === 'numero_endereco' || campo === 'numero' || campo === 'endereco_numero') {
-              updatePayload.numero_endereco = valor;
+              updatePayload.numero_endereco = valorFinal;
             } else if (campo === 'bairro' || campo === 'endereco_bairro') {
-              updatePayload.bairro = valor;
+              updatePayload.bairro = valorFinal;
             } else if (campo === 'cidade' || campo === 'municipio' || campo === 'endereco_cidade') {
-              updatePayload.cidade = valor;
+              updatePayload.cidade = valorFinal;
             } else if (campo === 'cep' || campo === 'endereco_cep') {
-              updatePayload.cep = valor;
+              updatePayload.cep = valorFinal;
             } else if (campo === 'uf' || campo === 'endereco_uf') {
-              updatePayload.uf = valor;
+              updatePayload.uf = valorFinal;
             } else if (campo === 'complemento' || campo === 'endereco_complemento') {
-              updatePayload.complemento = valor;
+              updatePayload.complemento = valorFinal;
             } else if (campo === 'telefone_celular' || campo === 'celular' || campo === 'telefone') {
-              updatePayload.telefone = valor;
+              updatePayload.telefone = valorFinal;
             } else if (campo === 'email_funcional') {
-              updatePayload.email_funcional = valor;
+              updatePayload.email_funcional = valorFinal;
             } else if (campo === 'email_particular' || campo === 'email') {
-              updatePayload.email_particular = valor;
+              updatePayload.email_particular = valorFinal;
             } else if (campo === 'estado_civil') {
-              updatePayload.estado_civil = valor;
+              updatePayload.estado_civil = valorFinal;
             } else if (campo === 'nome_mae' || campo === 'mae') {
-              updatePayload.nome_mae = valor;
+              updatePayload.nome_mae = valorFinal;
             } else if (campo === 'nome_pai' || campo === 'pai') {
-              updatePayload.nome_pai = valor;
+              updatePayload.nome_pai = valorFinal;
             } else if (campo === 'tipo_sanguineo') {
-              updatePayload.tipo_sanguineo = valor;
+              updatePayload.tipo_sanguineo = valorFinal;
             } else if (campo === 'religiao') {
-              updatePayload.religiao = valor;
+              updatePayload.religiao = valorFinal;
             } else if (campo === 'escolaridade') {
-              updatePayload.escolaridade = valor;
+              updatePayload.escolaridade = valorFinal;
             } else if (campo === 'naturalidade') {
-              updatePayload.naturalidade = valor;
+              updatePayload.naturalidade = valorFinal;
             } else if (campo === 'naturalidade_uf') {
-              updatePayload.naturalidade_uf = valor;
+              updatePayload.naturalidade_uf = valorFinal;
             } else {
-              updatePayload[sol.campo_chave] = valor;
+              updatePayload[sol.campo_chave] = valorFinal;
             }
 
             try {
@@ -412,6 +422,113 @@ export default async function (req: Request): Promise<Response> {
             solicitacao: updatedSol,
             militar_atualizado: militarAtualizado,
             message: `Solicitação ${statusDecisao.toLowerCase()} com sucesso.`
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Decisão em Lote para todas as alterações do mesmo militar
+        case 'CADASTRO_DECIDIR_LOTE_MILITAR': {
+          const { militar_id, decisao, itens_decisao, observacao } = payload;
+          if (!militar_id || !decisao) {
+            return new Response(JSON.stringify({ error: 'ID do militar e decisão são obrigatórios.' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+
+          const statusDecisao = decisao === 'Aprovada' ? 'Aprovada' : 'Rejeitada';
+          const updateMilitarPayload: Record<string, any> = {
+            data_ultima_conferencia: new Date().toISOString().split('T')[0],
+          };
+
+          const itensArray: Array<{ solicitacao_id: string; valor_corrigido?: string; observacao?: string }> = itens_decisao || [];
+          const solicitacoesAtualizadas = [];
+
+          for (const item of itensArray) {
+            try {
+              const sol = await base44.asServiceRole.entities.SolicitacaoAtualizacao.get(item.solicitacao_id);
+              if (!sol || sol.militar_id !== militar_id) continue;
+
+              const foiEditado = Boolean(item.valor_corrigido !== undefined && item.valor_corrigido !== null && item.valor_corrigido !== sol.valor_proposto);
+              const valorFinal = foiEditado ? item.valor_corrigido : sol.valor_proposto;
+
+              const solUpdate: Record<string, any> = {
+                status: statusDecisao,
+                data_decisao: new Date().toISOString().split('T')[0],
+                usuario_decisao: user.email || 'RH / Comando',
+                observacao_decisao: item.observacao || observacao || (foiEditado ? `Retificado pelo gestor (original: "${sol.valor_proposto}")` : ''),
+              };
+
+              if (foiEditado) {
+                solUpdate.valor_original_militar = sol.valor_proposto;
+                solUpdate.valor_proposto = valorFinal;
+                solUpdate.editado_pelo_gestor = true;
+              }
+
+              const resUpd = await base44.asServiceRole.entities.SolicitacaoAtualizacao.update(sol.id, solUpdate);
+              solicitacoesAtualizadas.push(resUpd);
+
+              if (statusDecisao === 'Aprovada' && sol.campo_chave) {
+                const campo = sol.campo_chave.trim().toLowerCase();
+                if (campo === 'logradouro' || campo === 'endereco' || campo === 'endereco_logradouro') {
+                  updateMilitarPayload.logradouro = valorFinal;
+                } else if (campo === 'numero_endereco' || campo === 'numero' || campo === 'endereco_numero') {
+                  updateMilitarPayload.numero_endereco = valorFinal;
+                } else if (campo === 'bairro' || campo === 'endereco_bairro') {
+                  updateMilitarPayload.bairro = valorFinal;
+                } else if (campo === 'cidade' || campo === 'municipio' || campo === 'endereco_cidade') {
+                  updateMilitarPayload.cidade = valorFinal;
+                } else if (campo === 'cep' || campo === 'endereco_cep') {
+                  updateMilitarPayload.cep = valorFinal;
+                } else if (campo === 'uf' || campo === 'endereco_uf') {
+                  updateMilitarPayload.uf = valorFinal;
+                } else if (campo === 'complemento' || campo === 'endereco_complemento') {
+                  updateMilitarPayload.complemento = valorFinal;
+                } else if (campo === 'telefone_celular' || campo === 'celular' || campo === 'telefone') {
+                  updateMilitarPayload.telefone = valorFinal;
+                } else if (campo === 'email_funcional') {
+                  updateMilitarPayload.email_funcional = valorFinal;
+                } else if (campo === 'email_particular' || campo === 'email') {
+                  updateMilitarPayload.email_particular = valorFinal;
+                } else if (campo === 'estado_civil') {
+                  updateMilitarPayload.estado_civil = valorFinal;
+                } else if (campo === 'nome_mae' || campo === 'mae') {
+                  updateMilitarPayload.nome_mae = valorFinal;
+                } else if (campo === 'nome_pai' || campo === 'pai') {
+                  updateMilitarPayload.nome_pai = valorFinal;
+                } else if (campo === 'tipo_sanguineo') {
+                  updateMilitarPayload.tipo_sanguineo = valorFinal;
+                } else if (campo === 'religiao') {
+                  updateMilitarPayload.religiao = valorFinal;
+                } else if (campo === 'escolaridade') {
+                  updateMilitarPayload.escolaridade = valorFinal;
+                } else if (campo === 'naturalidade') {
+                  updateMilitarPayload.naturalidade = valorFinal;
+                } else if (campo === 'naturalidade_uf') {
+                  updateMilitarPayload.naturalidade_uf = valorFinal;
+                } else {
+                  updateMilitarPayload[sol.campo_chave] = valorFinal;
+                }
+              }
+            } catch (_errItem) {}
+          }
+
+          let militarAtualizado: any = null;
+          if (statusDecisao === 'Aprovada' && Object.keys(updateMilitarPayload).length > 1) {
+            try {
+              militarAtualizado = await base44.asServiceRole.entities.Militar.update(militar_id, updateMilitarPayload);
+            } catch (errMilitar) {
+              console.error('Erro ao atualizar Militar em lote:', errMilitar);
+            }
+          }
+
+          return new Response(JSON.stringify({
+            ok: true,
+            solicitacoes_atualizadas: solicitacoesAtualizadas,
+            militar_atualizado: militarAtualizado,
+            message: `${solicitacoesAtualizadas.length} alterações ${statusDecisao.toLowerCase()}s com sucesso.`
           }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
