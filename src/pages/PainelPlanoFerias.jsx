@@ -1,43 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
-  Calendar,
-  Users,
-  ShieldCheck,
   CheckCircle2,
-  AlertCircle,
-  Zap,
-  Sliders,
-  Check,
   Edit3,
-  Star,
-  Layers,
-  ChevronRight,
-  Medal,
-  Award,
-  Sparkles,
-  Info,
-  CalendarDays,
-  Clock,
-  Search,
-  X,
-  Filter,
   Ban,
   Lock,
-  RotateCcw,
-  CheckCircle,
-  ShieldAlert,
-  Shield,
   Trash2,
-  Archive,
-  PowerOff,
   History,
-  FolderArchive,
-  Megaphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import ResumoCotasMensais from '@/components/ferias-portal/ResumoCotasMensais';
 
 const LISTA_MESES = [
@@ -449,6 +420,7 @@ export default function PainelPlanoFerias() {
     }
   });
 
+  const totalPendentes = opcoes.filter((o) => o.status_camada_1 === 'Pendente').length;
   const totalSalvos = opcoes.filter((o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO').length;
   const totalNaoContemplados = opcoes.filter((o) => o.status_camada_1 === 'Nao_Contemplado' || o.decisao_camada_1_opcao === 'NAO_CONTEMPLADO').length;
   const totalGeradas = opcoes.filter((o) => o.gerado_ferias_efetivas).length;
