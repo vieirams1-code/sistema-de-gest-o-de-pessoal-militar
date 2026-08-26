@@ -6,28 +6,20 @@ import {
   Plus,
   Calendar,
   UserCheck,
-  Clock,
   Users,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
   Bell,
-  ChevronRight,
-  Shield,
   Eye,
-  Filter,
-  Check,
-  X,
   Building,
   Search,
   Edit,
   Trash2,
   Archive,
-  Ban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 
 export default function GerirCampanhasPortal() {
   const [campanhas, setCampanhas] = useState([]);

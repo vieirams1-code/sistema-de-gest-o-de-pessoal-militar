@@ -430,50 +430,56 @@ export default function PortalFeriasView({ onBack }) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
-                    <input
-                      type="radio"
-                      name="modalidade"
-                      value="1_ETAPA_30"
-                      className="peer sr-only"
-                      checked={modalidade === '1_ETAPA_30'}
-                      onChange={() => setModalidade('1_ETAPA_30')}
-                    />
-                    <span className="flex flex-col flex-1">
-                      <span className="block text-sm font-bold text-slate-900 mb-1">Integral (30 dias)</span>
-                    </span>
-                    <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
-                  </label>
+                  {(data?.config?.permitir_1_etapa !== false) && (
+                    <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
+                      <input
+                        type="radio"
+                        name="modalidade"
+                        value="1_ETAPA_30"
+                        className="peer sr-only"
+                        checked={modalidade === '1_ETAPA_30'}
+                        onChange={() => setModalidade('1_ETAPA_30')}
+                      />
+                      <span className="flex flex-col flex-1">
+                        <span className="block text-sm font-bold text-slate-900 mb-1">Integral (30 dias)</span>
+                      </span>
+                      <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
+                    </label>
+                  )}
 
-                  <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
-                    <input
-                      type="radio"
-                      name="modalidade"
-                      value="2_ETAPAS_15"
-                      className="peer sr-only"
-                      checked={modalidade === '2_ETAPAS_15'}
-                      onChange={() => setModalidade('2_ETAPAS_15')}
-                    />
-                    <span className="flex flex-col flex-1">
-                      <span className="block text-sm font-bold text-slate-900 mb-1">2 Frações (15 + 15)</span>
-                    </span>
-                    <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
-                  </label>
+                  {(data?.config?.permitir_2_etapas !== false) && (
+                    <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
+                      <input
+                        type="radio"
+                        name="modalidade"
+                        value="2_ETAPAS_15"
+                        className="peer sr-only"
+                        checked={modalidade === '2_ETAPAS_15'}
+                        onChange={() => setModalidade('2_ETAPAS_15')}
+                      />
+                      <span className="flex flex-col flex-1">
+                        <span className="block text-sm font-bold text-slate-900 mb-1">2 Frações (15 + 15)</span>
+                      </span>
+                      <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
+                    </label>
+                  )}
 
-                  <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
-                    <input
-                      type="radio"
-                      name="modalidade"
-                      value="3_ETAPAS_10"
-                      className="peer sr-only"
-                      checked={modalidade === '3_ETAPAS_10'}
-                      onChange={() => setModalidade('3_ETAPAS_10')}
-                    />
-                    <span className="flex flex-col flex-1">
-                      <span className="block text-sm font-bold text-slate-900 mb-1">3 Frações (10 + 10 + 10)</span>
-                    </span>
-                    <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
-                  </label>
+                  {(data?.config?.permitir_3_etapas !== false) && (
+                    <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
+                      <input
+                        type="radio"
+                        name="modalidade"
+                        value="3_ETAPAS_10"
+                        className="peer sr-only"
+                        checked={modalidade === '3_ETAPAS_10'}
+                        onChange={() => setModalidade('3_ETAPAS_10')}
+                      />
+                      <span className="flex flex-col flex-1">
+                        <span className="block text-sm font-bold text-slate-900 mb-1">3 Frações (10 + 10 + 10)</span>
+                      </span>
+                      <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
+                    </label>
+                  )}
                 </div>
               </div>
 

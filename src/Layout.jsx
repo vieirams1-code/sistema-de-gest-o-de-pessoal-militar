@@ -14,7 +14,6 @@ import {
   LogOut,
   HeartPulse,
   CalendarDays,
-  CalendarMinus2,
   ClipboardList,
   ScrollText,
   Medal,
@@ -37,11 +36,9 @@ import {
   Tags as TagsIcon,
   Stethoscope,
   GraduationCap,
-  Activity,
   SlidersHorizontal,
   Megaphone,
   Smartphone,
-  Sparkles,
   Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
