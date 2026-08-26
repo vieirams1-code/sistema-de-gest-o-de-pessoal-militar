@@ -494,8 +494,8 @@ export default function ConfiguracoesPortal() {
                       </div>
                       <input
                         type="checkbox"
-                        checked={permitir1Etapa}
-                        onChange={(e) => setPermitir1Etapa(e.target.checked)}
+                        checked={feriasPermitir1Etapa}
+                        onChange={(e) => setFeriasPermitir1Etapa(e.target.checked)}
                         className="w-4 h-4 accent-[#1e3a5f] rounded"
                       />
                     </label>
@@ -507,8 +507,8 @@ export default function ConfiguracoesPortal() {
                       </div>
                       <input
                         type="checkbox"
-                        checked={permitir2Etapas}
-                        onChange={(e) => setPermitir2Etapas(e.target.checked)}
+                        checked={feriasPermitir2Etapas}
+                        onChange={(e) => setFeriasPermitir2Etapas(e.target.checked)}
                         className="w-4 h-4 accent-[#1e3a5f] rounded"
                       />
                     </label>
@@ -520,8 +520,8 @@ export default function ConfiguracoesPortal() {
                       </div>
                       <input
                         type="checkbox"
-                        checked={permitir3Etapas}
-                        onChange={(e) => setPermitir3Etapas(e.target.checked)}
+                        checked={feriasPermitir3Etapas}
+                        onChange={(e) => setFeriasPermitir3Etapas(e.target.checked)}
                         className="w-4 h-4 accent-[#1e3a5f] rounded"
                       />
                     </label>
@@ -533,8 +533,8 @@ export default function ConfiguracoesPortal() {
                       </div>
                       <input
                         type="checkbox"
-                        checked={permitirCustom}
-                        onChange={(e) => setPermitirCustom(e.target.checked)}
+                        checked={feriasPermitirCustom}
+                        onChange={(e) => setFeriasPermitirCustom(e.target.checked)}
                         className="w-4 h-4 accent-[#1e3a5f] rounded"
                       />
                     </label>
