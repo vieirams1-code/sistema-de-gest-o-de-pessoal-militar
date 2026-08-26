@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import {
@@ -37,6 +37,13 @@ export default function GerirCampanhasPortal() {
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
 
   // Busca interna no modal de unidades
+  
+  // Filtros e Paginação (Tabela)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [mostrarArquivadas, setMostrarArquivadas] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [buscaUnidade, setBuscaUnidade] = useState('');
 
   // Modal de Criação / Edição de Campanha
@@ -334,6 +341,41 @@ export default function GerirCampanhasPortal() {
     );
   }
 
+  
+  const campanhasFiltradas = useMemo(() => {
+    return campanhas.filter(camp => {
+      // Filtro de Arquivadas
+      if (!mostrarArquivadas && camp.status === 'Arquivada') {
+        return false;
+      }
+      
+      // Filtro de Texto (Busca)
+      if (searchTerm) {
+        const termo = searchTerm.toLowerCase();
+        return (
+          (camp.titulo || '').toLowerCase().includes(termo) ||
+          (camp.instrucoes || '').toLowerCase().includes(termo) ||
+          (camp.escopo_unidades_nomes || '').toLowerCase().includes(termo)
+        );
+      }
+      
+      return true;
+    });
+  }, [campanhas, searchTerm, mostrarArquivadas]);
+
+  const totalItems = campanhasFiltradas.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  
+  const currentItems = useMemo(() => {
+    const start = (validCurrentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return campanhasFiltradas.slice(start, end);
+  }, [campanhasFiltradas, validCurrentPage, itemsPerPage]);
+
+  const handlePrevPage = () => setCurrentPage(p => Math.max(1, p - 1));
+  const handleNextPage = () => setCurrentPage(p => Math.min(totalPages, p + 1));
+
   const unidadesFiltradas = unidadesList.filter((u) => {
     if (!buscaUnidade.trim()) return true;
     return (u.nome || u.id || '').toLowerCase().includes(buscaUnidade.toLowerCase().trim());
@@ -395,176 +437,270 @@ export default function GerirCampanhasPortal() {
         )}
 
         {/* LISTA DE CAMPANHAS ATIVAS & HISTÓRICO */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-800 flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-[#1e3a5f]" />
-              Campanhas em Andamento & Histórico
-            </h2>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={carregarDados}
-              className="text-xs h-8 rounded-lg"
-            >
-              <RefreshCw className="w-3.5 h-3.5 mr-1" />
-              Atualizar
-            </Button>
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          
+          {/* TOOLBAR DA TABELA */}
+          <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Filtrar tabela..." 
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] shadow-sm w-full sm:w-64 transition-all"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={carregarDados}
+                className="h-9 rounded-md px-3 border-slate-300"
+                title="Atualizar"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-4 text-slate-600">
+              <span className="font-medium">{totalItems} resultados</span>
+              <div className="h-4 w-px bg-slate-300"></div>
+              <label className="flex items-center gap-2 cursor-pointer hover:text-slate-900">
+                <input 
+                  type="checkbox" 
+                  checked={mostrarArquivadas}
+                  onChange={(e) => {
+                    setMostrarArquivadas(e.target.checked);
+                    setCurrentPage(1);
+                  }}
+                  className="rounded text-[#1e3a5f] focus:ring-[#1e3a5f] border-slate-300"
+                /> 
+                Mostrar arquivadas
+              </label>
+            </div>
           </div>
 
-          {campanhas.length === 0 ? (
-            <Card className="border-slate-200">
-              <CardContent className="p-12 text-center text-xs text-slate-500 space-y-3">
-                <Megaphone className="w-10 h-10 mx-auto text-slate-300" />
-                <p className="font-semibold text-slate-700">Nenhuma campanha cadastrada até o momento.</p>
-                <p>Clique em <strong>"Novo Plano de Férias"</strong> ou <strong>"Nova Atualização Cadastral"</strong> para iniciar.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {campanhas.map((camp) => {
-                const totalAlvo = camp.total_publico_alvo || 0;
-                const respondidos = camp.total_respondidos || 0;
-                const percent = totalAlvo > 0 ? Math.round((respondidos / totalAlvo) * 100) : 0;
-                const isFerias = camp.tipo === 'PLANO_FERIAS';
-                const isEncerrada = camp.status === 'Encerrada';
-                const isArquivada = camp.status === 'Arquivada';
+          {/* CORPO DA TABELA */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider border-b border-slate-200">
+                  <th className="p-4 font-semibold w-10 text-center">
+                    <input type="checkbox" className="rounded text-[#1e3a5f]" />
+                  </th>
+                  <th className="p-4 font-semibold cursor-pointer hover:bg-slate-200 transition-colors group min-w-[200px]">
+                    Nome da Campanha
+                  </th>
+                  <th className="p-4 font-semibold">Status</th>
+                  <th className="p-4 font-semibold">Público Alvo</th>
+                  <th className="p-4 font-semibold min-w-[120px]">Período</th>
+                  <th className="p-4 font-semibold w-48">Adesão</th>
+                  <th className="p-4 font-semibold text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-sm">
+                
+                {currentItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="p-8 text-center text-slate-500">
+                      Nenhuma campanha encontrada com os filtros atuais.
+                    </td>
+                  </tr>
+                ) : (
+                  currentItems.map((camp) => {
+                    const totalAlvo = camp.total_publico_alvo || 0;
+                    const respondidos = camp.total_respondidos || 0;
+                    const percentual = totalAlvo > 0 ? Math.round((respondidos / totalAlvo) * 100) : 0;
+                    const isFerias = camp.tipo === 'PLANO_FERIAS';
+                    const isEncerrada = camp.status === 'Encerrada';
+                    const isArquivada = camp.status === 'Arquivada';
 
-                return (
-                  <Card key={camp.id} className="border-slate-200 shadow-sm bg-white hover:shadow-md transition-shadow">
-                    <CardHeader className="p-4 sm:p-5 pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          isFerias ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
-                        }`}>
-                          {isFerias ? <Calendar className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <CardTitle className="text-sm sm:text-base font-bold text-slate-900">
-                              {camp.titulo}
-                            </CardTitle>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              camp.status === 'Aberta_Coleta'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : isEncerrada
-                                ? 'bg-slate-100 text-slate-600'
-                                : isArquivada
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-blue-100 text-blue-800'
+                    let statusStyles = { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500 animate-pulse', label: 'Ativa' };
+                    if (isArquivada) statusStyles = { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300', label: 'Arquivada' };
+                    else if (isEncerrada) statusStyles = { bg: 'bg-slate-100', text: 'text-slate-800', dot: 'bg-slate-500', label: 'Encerrada' };
+                    else if (camp.status === 'Aberta_Coleta') statusStyles = { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500 animate-pulse', label: 'Aberta' };
+
+                    return (
+                      <tr key={camp.id} className="hover:bg-blue-50/50 transition-colors bg-white">
+                        <td className="p-4 text-center">
+                          <input type="checkbox" className="rounded text-[#1e3a5f] focus:ring-[#1e3a5f] border-slate-300" />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                              isFerias ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
                             }`}>
-                              {camp.status === 'Aberta_Coleta' ? 'Ativa • Coleta Aberta' : camp.status}
+                              {isFerias ? <Calendar className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-800">{camp.titulo}</p>
+                              <p className="text-xs text-slate-500 truncate max-w-[200px]" title={camp.instrucoes}>{camp.instrucoes}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles.bg} ${statusStyles.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`}></span>
+                            {statusStyles.label}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-600">
+                          <div className="line-clamp-2 max-w-[200px]" title={camp.escopo_unidades_nomes || 'Toda a Corporação'}>
+                            {camp.escopo_unidades_nomes || 'Toda a Corporação'}
+                          </div>
+                          <span className="text-xs font-medium text-slate-400">({totalAlvo})</span>
+                        </td>
+                        <td className="p-4 text-slate-600">
+                          <div className="flex flex-col">
+                            <span className="text-xs">Início: {camp.data_inicio || '-'}</span>
+                            <span className={`font-medium text-xs mt-0.5 ${isArquivada ? 'text-slate-500' : 'text-[#1e3a5f]'}`}>
+                              Prazo: {camp.data_fim_militar || 'Não definido'}
                             </span>
                           </div>
-                          <CardDescription className="text-xs text-slate-500">
-                            Público: <strong>{camp.escopo_unidades_nomes || 'Toda a Corporação'}</strong>
-                          </CardDescription>
-                        </div>
-                      </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-between mb-1 text-xs">
+                            <span className="font-medium text-slate-700">{respondidos}/{totalAlvo}</span>
+                            <span className={`font-bold ${isArquivada ? 'text-slate-500' : 'text-[#1e3a5f]'}`}>
+                              {percentual}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-1.5">
+                            <div 
+                              className={`${isArquivada ? 'bg-slate-400' : percentual >= 80 ? 'bg-emerald-500' : percentual >= 40 ? 'bg-blue-500' : 'bg-amber-500'} h-1.5 rounded-full transition-all duration-500`} 
+                              style={{ width: `${percentual}%` }}
+                            ></div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-1">
+                            {camp.status === 'Aberta_Coleta' && (
+                              <button 
+                                onClick={() => handleDispararLembretes(camp.id)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition-colors" 
+                                title="Lembretes"
+                              >
+                                <Bell className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleAbrirRetorno(camp)}
+                              disabled={actionLoading}
+                              className="p-1.5 text-[#1e3a5f] hover:bg-blue-50 rounded transition-colors" 
+                              title="Ver Retorno"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => abrirEdicaoCampanha(camp)}
+                              disabled={actionLoading}
+                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors" 
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            
+                            {!isArquivada && (
+                              <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                            )}
 
-                      {/* BOTÕES DE AÇÃO DA CAMPANHA (VER RETORNO, EDITAR, ARQUIVAR, EXCLUIR) */}
-                      <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-center">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAbrirRetorno(camp)}
-                          disabled={actionLoading}
-                          className="text-xs h-8 px-2.5 rounded-xl border-[#1e3a5f]/30 text-[#1e3a5f] hover:bg-blue-50 font-semibold"
-                        >
-                          <Eye className="w-3.5 h-3.5 mr-1" />
-                          Retorno
-                        </Button>
+                            {!isArquivada && (
+                              <button 
+                                onClick={() => handleArquivarCampanha(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors" 
+                                title="Arquivar"
+                              >
+                                <Archive className="w-4 h-4" />
+                              </button>
+                            )}
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => abrirEdicaoCampanha(camp)}
-                          disabled={actionLoading}
-                          className="text-xs h-8 px-2.5 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold"
-                        >
-                          <Edit className="w-3.5 h-3.5 mr-1" />
-                          Editar
-                        </Button>
-
-                        {!isArquivada && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleArquivarCampanha(camp)}
-                            disabled={actionLoading}
-                            className="text-xs h-8 px-2 text-slate-600 hover:bg-slate-100 rounded-xl"
-                            title="Arquivar Campanha"
-                          >
-                            <Archive className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-
-                        {camp.status === 'Aberta_Coleta' && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDispararLembretes(camp.id)}
-                            disabled={actionLoading}
-                            className="text-xs h-8 px-2.5 rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50"
-                          >
-                            <Bell className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                            Lembretes
-                          </Button>
-                        )}
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleExcluirCampanha(camp)}
-                          disabled={actionLoading}
-                          className="text-xs h-8 px-2 text-rose-600 hover:bg-rose-50 rounded-xl"
-                          title="Excluir Campanha"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="p-4 sm:p-5 pt-3 text-xs space-y-3">
-                      {/* BARRA DE PROGRESSO DE ADESÃO */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center text-slate-600">
-                          <span>
-                            Adesão do Público: <strong>{respondidos} de {totalAlvo} militares responderam</strong>
-                          </span>
-                          <strong className="text-[#1e3a5f] text-sm">{percent}%</strong>
-                        </div>
-
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                          <div
-                            className={`h-2.5 rounded-full transition-all ${
-                              percent >= 80 ? 'bg-emerald-600' : percent >= 40 ? 'bg-blue-600' : 'bg-amber-500'
-                            }`}
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* DATAS E INSTRUÇÕES */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-500 gap-2 border-t border-slate-100 pt-2">
-                        <div>
-                          <span>Início: <strong>{camp.data_inicio || '-'}</strong></span> |{' '}
-                          <span>Prazo Militar: <strong className="text-emerald-800">{camp.data_fim_militar || 'Não definido'}</strong></span>
-                        </div>
-                        <span className="italic truncate max-w-md">"{camp.instrucoes}"</span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                            {!isArquivada && (
+                              <button 
+                                onClick={() => handleExcluirCampanha(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors" 
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* PAGINAÇÃO */}
+          <div className="p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between text-sm gap-4">
+            <span className="text-slate-500">
+              Mostrando {totalItems === 0 ? 0 : ((validCurrentPage - 1) * itemsPerPage) + 1} a {Math.min(validCurrentPage * itemsPerPage, totalItems)} de {totalItems} registros
+            </span>
+            <div className="flex gap-1">
+              <button 
+                type="button"
+                onClick={handlePrevPage}
+                disabled={validCurrentPage === 1}
+                className={`px-3 py-1 border rounded font-medium transition-colors ${
+                  validCurrentPage === 1 
+                    ? 'border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50' 
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50 bg-white'
+                }`}
+              >
+                Anterior
+              </button>
+              
+              {Array.from({ length: totalPages }).map((_, idx) => {
+                const page = idx + 1;
+                const isCurrent = page === validCurrentPage;
+                // Simple pagination display: max 5 pages
+                if (totalPages > 5) {
+                  if (page !== 1 && page !== totalPages && Math.abs(page - validCurrentPage) > 1) {
+                    if (page === 2 || page === totalPages - 1) return <span key={page} className="px-2 py-1">...</span>;
+                    return null;
+                  }
+                }
+                
+                return (
+                  <button 
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 border rounded transition-colors font-medium ${
+                      isCurrent
+                        ? 'border-[#1e3a5f] bg-blue-50 text-[#1e3a5f]'
+                        : 'border-slate-300 text-slate-600 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
                 );
               })}
+
+              <button 
+                type="button"
+                onClick={handleNextPage}
+                disabled={validCurrentPage === totalPages || totalPages === 0}
+                className={`px-3 py-1 border rounded font-medium transition-colors ${
+                  validCurrentPage === totalPages || totalPages === 0
+                    ? 'border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50' 
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50 bg-white'
+                }`}
+              >
+                Próximo
+              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* MODAL: NOVA / EDITAR CAMPANHA */}
