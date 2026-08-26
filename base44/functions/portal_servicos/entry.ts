@@ -197,6 +197,55 @@ export default async function (req: Request): Promise<Response> {
           });
         }
 
+        // Consulta de Configurações Globais do Portal (Service Role)
+        case 'PORTAL_CONFIG_GET': {
+          let configs: any[] = [];
+          try {
+            configs = await base44.asServiceRole.entities.PortalAuthConfig.list();
+          } catch (_e) {}
+
+          const config = Array.isArray(configs) && configs.length > 0 ? configs[0] : DEFAULT_AUTH_CONFIG;
+          return new Response(JSON.stringify({ ok: true, config }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Gravação Segura de Configurações Globais do Portal (Service Role)
+        case 'PORTAL_CONFIG_SAVE': {
+          const configPayload = payload?.config_payload || payload;
+          const { acao: _acao, ...cleanData } = configPayload;
+
+          let configs: any[] = [];
+          try {
+            configs = await base44.asServiceRole.entities.PortalAuthConfig.list();
+          } catch (_e) {}
+
+          let savedConfig: any = null;
+          if (Array.isArray(configs) && configs.length > 0) {
+            savedConfig = await base44.asServiceRole.entities.PortalAuthConfig.update(configs[0].id, {
+              ...cleanData,
+              ativo: true,
+              updated_at: new Date().toISOString(),
+            });
+          } else {
+            savedConfig = await base44.asServiceRole.entities.PortalAuthConfig.create({
+              ...cleanData,
+              ativo: true,
+              updated_at: new Date().toISOString(),
+            });
+          }
+
+          return new Response(JSON.stringify({
+            ok: true,
+            config: savedConfig,
+            message: 'Configurações do Portal salvas com sucesso!',
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
         // Detalhes de Retorno e Acompanhamento Nominal
         case 'CAMPANHA_DETALHES_RETORNO': {
           const { campanha_id } = payload;

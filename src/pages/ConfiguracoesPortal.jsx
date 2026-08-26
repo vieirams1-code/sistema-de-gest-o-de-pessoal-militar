@@ -63,9 +63,22 @@ export default function ConfiguracoesPortal() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const records = await base44.entities.PortalAuthConfig.list();
-      if (Array.isArray(records) && records.length > 0) {
-        const c = records[0];
+      let c = null;
+      try {
+        const res = await base44.functions.invoke('portal_servicos', { acao: 'PORTAL_CONFIG_GET' });
+        if (res.data?.ok && res.data?.config) {
+          c = res.data.config;
+        }
+      } catch (_eFn) {}
+
+      if (!c) {
+        const records = await base44.entities.PortalAuthConfig.list();
+        if (Array.isArray(records) && records.length > 0) {
+          c = records[0];
+        }
+      }
+
+      if (c) {
         setConfigId(c.id);
         setFeriasAtivo(c.ferias_ativo !== false);
         setFeriasModoSelecao(c.ferias_modo_selecao_periodo || 'mais_antigo');
@@ -81,7 +94,7 @@ export default function ConfiguracoesPortal() {
         setCadastroInstrucoes(c.cadastro_instrucoes || '');
 
         setWhatsappEnabled(c.whatsapp_enabled !== false);
-        setEmailEnabled(c.email_enabled !== false);
+        setEmailEnabled(c.email_enabled === true); // desativado por padrão a menos que explicitamente true
         setOtpTtlSeconds(c.otp_ttl_seconds || 300);
         setOtpResendSeconds(c.otp_resend_seconds || 60);
       }
@@ -132,7 +145,7 @@ export default function ConfiguracoesPortal() {
       whatsapp_provider: whatsappEnabled ? 'evolution_api' : 'disabled',
       email_enabled: emailEnabled,
       email_provider: emailEnabled ? 'base44_core' : 'disabled',
-      allow_channel_choice: whatsappEnabled && emailEnabled,
+      allow_channel_choice: Boolean(whatsappEnabled && emailEnabled),
       default_channel: whatsappEnabled ? 'WHATSAPP' : 'EMAIL',
       otp_ttl_seconds: Number(otpTtlSeconds) || 300,
       otp_resend_seconds: Number(otpResendSeconds) || 60,
@@ -140,13 +153,26 @@ export default function ConfiguracoesPortal() {
     };
 
     try {
-      if (configId) {
-        await base44.entities.PortalAuthConfig.update(configId, payload);
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'PORTAL_CONFIG_SAVE',
+        config_payload: payload,
+      });
+
+      if (res.data?.ok) {
+        if (res.data?.config?.id) {
+          setConfigId(res.data.config.id);
+        }
+        setSuccessMsg('Configurações do Portal salvas com sucesso! As alterações de canais e regras já estão ativas.');
       } else {
-        const created = await base44.entities.PortalAuthConfig.create(payload);
-        setConfigId(created.id);
+        // Fallback direto
+        if (configId) {
+          await base44.entities.PortalAuthConfig.update(configId, payload);
+        } else {
+          const created = await base44.entities.PortalAuthConfig.create(payload);
+          setConfigId(created.id);
+        }
+        setSuccessMsg('Configurações do Portal salvas com sucesso!');
       }
-      setSuccessMsg('Configurações do Portal salvas com sucesso! As alterações de canais e regras já estão ativas.');
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao salvar configurações.');
     } finally {
