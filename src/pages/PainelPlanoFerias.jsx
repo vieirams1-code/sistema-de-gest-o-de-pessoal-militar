@@ -38,6 +38,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import ResumoCotasMensais from '@/components/ferias-portal/ResumoCotasMensais';
 
 const LISTA_MESES = [
   { val: '01', nome: 'Janeiro' },
@@ -718,35 +719,12 @@ export default function PainelPlanoFerias() {
               </Card>
             </div>
 
-            {/* DISTRIBUIÇÃO DE EFETIVO POR MÊS */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader className="p-4 pb-2 border-b border-slate-100">
-                <CardTitle className="text-xs sm:text-sm font-bold text-slate-800 flex items-center">
-                  <CalendarDays className="w-4 h-4 mr-2 text-[#1e3a5f]" />
-                  Distribuição de Efetivo Escalado nesta Campanha ({campanhaSelecionada.ano_referencia})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 text-xs">
-                <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 text-center">
-                  {LISTA_MESES.map((m, idx) => {
-                    const count = contagemPorMes[idx];
-                    return (
-                      <div
-                        key={m.val}
-                        className={`p-2 rounded-xl border ${
-                          count > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <span className="text-[10px] text-slate-500 block truncate">{m.nome.slice(0, 3)}</span>
-                        <strong className={`text-sm ${count > 0 ? 'text-[#1e3a5f]' : 'text-slate-400'}`}>
-                          {count}
-                        </strong>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            {/* PAINEL GERENCIAL DE COTAS MENSAIS E TETO DE PAGAMENTO (10%) */}
+            <ResumoCotasMensais
+              totalEfetivo={opcoes.length || 1}
+              solicitacoes={opcoes}
+              titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${campanhaSelecionada.titulo}`}
+            />
 
             {/* BARRA DE PESQUISA E FILTROS */}
             <Card className="border-slate-200 shadow-sm bg-white">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import GestorDrawer from './GestorDrawer';
+import ResumoCotasMensais from './ResumoCotasMensais';
 
 const MOCK_SOLICITACOES = [
   {
@@ -11,6 +12,8 @@ const MOCK_SOLICITACOES = [
     modalidadeResumo: '2 Frações (15+15d)',
     status: 'Pendente',
     preferencias: ['1º Jan', '2º Mar', '3º Nov'],
+    fracao1: 'jan',
+    fracao2: 'mar',
   },
   {
     id: 2,
@@ -21,6 +24,7 @@ const MOCK_SOLICITACOES = [
     modalidadeResumo: 'Integral (30d)',
     status: 'Pendente',
     preferencias: ['1º Jul', '2º Jan', '3º Dez'],
+    fracao1: 'jul',
   },
   {
     id: 3,
@@ -31,6 +35,32 @@ const MOCK_SOLICITACOES = [
     modalidadeResumo: '3 Frações (10+10+10d)',
     status: 'Homologado',
     preferencias: ['1º Fev', '2º Jun', '3º Out'],
+    fracao1: 'fev',
+    fracao2: 'jun',
+    fracao3: 'out',
+  },
+  {
+    id: 4,
+    postoAbrev: 'Maj',
+    nome: 'Major Marcos Paulo Fontes',
+    matricula: '112.540-331',
+    modalidade: 'Integral (30 dias)',
+    modalidadeResumo: 'Integral (30d)',
+    status: 'Homologado',
+    preferencias: ['1º Jan', '2º Fev', '3º Mar'],
+    fracao1: 'jan',
+  },
+  {
+    id: 5,
+    postoAbrev: 'Sub',
+    nome: 'Subtenente Valéria Mendes',
+    matricula: '085.122-443',
+    modalidade: '2 Frações (15 + 15 dias)',
+    modalidadeResumo: '2 Frações (15+15d)',
+    status: 'Homologado',
+    preferencias: ['1º Jan', '2º Ago', '3º Dez'],
+    fracao1: 'jan',
+    fracao2: 'ago',
   },
 ];
 
@@ -38,9 +68,11 @@ export default function PainelGestor({
   titulo = 'Gestão de Férias 2027',
   statusCampanha = 'Coleta Aberta',
   solicitacoes = MOCK_SOLICITACOES,
+  totalEfetivo = 30, // Exemplo com 30 militares para teto de 3 inícios (demonstrando Jan com alerta)
 }) {
+  const [listaSolicitacoes, setListaSolicitacoes] = useState(solicitacoes);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [militarSelecionado, setMilitarSelecionado] = useState(MOCK_SOLICITACOES[0]);
+  const [militarSelecionado, setMilitarSelecionado] = useState(solicitacoes[0]);
 
   const handleAbrirDrawer = (militar) => {
     setMilitarSelecionado(militar);
@@ -48,6 +80,23 @@ export default function PainelGestor({
   };
 
   const handleFecharDrawer = () => {
+    setIsDrawerOpen(false);
+  };
+
+  const handleSalvarEscala = (dadosEscala) => {
+    setListaSolicitacoes((prev) =>
+      prev.map((item) => {
+        if (item.id === dadosEscala.militar.id) {
+          return {
+            ...item,
+            status: 'Homologado',
+            fracao1: dadosEscala.fracao1,
+            fracao2: dadosEscala.fracao2,
+          };
+        }
+        return item;
+      })
+    );
     setIsDrawerOpen(false);
   };
 
@@ -70,10 +119,17 @@ export default function PainelGestor({
         </div>
       </div>
 
-      {/* Body List */}
+      {/* Body Content */}
       <div className="flex-1 overflow-y-auto p-6 relative">
+        {/* Painel Superior de Cotas Mensais e Teto de 10% */}
+        <ResumoCotasMensais
+          totalEfetivo={totalEfetivo}
+          solicitacoes={listaSolicitacoes}
+        />
+
+        {/* Tabela de Militares */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
-          {solicitacoes.map((item) => {
+          {listaSolicitacoes.map((item) => {
             const isPendente = item.status === 'Pendente';
 
             return (
@@ -92,7 +148,9 @@ export default function PainelGestor({
                 </div>
 
                 <div className="col-span-3">
-                  <p className="text-sm font-medium text-slate-800">{item.modalidadeResumo || item.modalidade}</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {item.modalidadeResumo || item.modalidade}
+                  </p>
                 </div>
 
                 <div className="col-span-2 text-center">
@@ -129,10 +187,7 @@ export default function PainelGestor({
           isOpen={isDrawerOpen}
           militar={militarSelecionado}
           onClose={handleFecharDrawer}
-          onSalvar={(escala) => {
-            console.log('Escala confirmada:', escala);
-            setIsDrawerOpen(false);
-          }}
+          onSalvar={handleSalvarEscala}
           onNegar={(m) => {
             console.log('Escala negada:', m);
             setIsDrawerOpen(false);
