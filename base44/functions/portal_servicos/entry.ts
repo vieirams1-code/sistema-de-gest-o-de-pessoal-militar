@@ -504,12 +504,24 @@ export default async function (req: Request): Promise<Response> {
               return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
 
-            const mesesResumo = (decisao_camada_1?.parcelas || []).map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
+            const parcelas = decisao_camada_1?.parcelas || [];
+            if (parcelas.length > 1) {
+              const mesesList = parcelas.map((p: any) => p.mes || p.data_inicio?.slice(5, 7));
+              const mesesSet = new Set(mesesList);
+              if (mesesSet.size !== parcelas.length) {
+                return new Response(JSON.stringify({ error: 'Para férias fracionadas, cada fração deve ser escalada em um mês diferente.' }), {
+                  status: 400,
+                  headers: { 'Content-Type': 'application/json' },
+                });
+              }
+            }
+
+            const mesesResumo = parcelas.map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
             const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
               status_camada_1: 'Escala_Salva',
               decisao_camada_1_opcao: decisao_camada_1?.opcao_escolhida || 'ESCALA_VALIDADA',
               decisao_camada_1_meses: decisao_camada_1?.resumo_meses || mesesResumo,
-              decisao_camada_1_detalhes: JSON.stringify(decisao_camada_1?.parcelas || []),
+              decisao_camada_1_detalhes: JSON.stringify(parcelas),
               gestor_unidade_id: user.id,
               gestor_unidade_nome: decisao_camada_1?.gestor_nome || user.email,
               data_decisao_camada_1: new Date().toISOString(),

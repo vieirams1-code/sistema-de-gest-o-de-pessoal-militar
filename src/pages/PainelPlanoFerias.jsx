@@ -172,8 +172,15 @@ export default function PainelPlanoFerias() {
 
       listaOpcoes.forEach((op) => {
         const mes1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
-        const mes2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
-        const mes3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+        let mes2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+        if (mes2 === mes1) {
+          mes2 = extrairMesDeDetalhes(op.opcao_3_detalhes, '08');
+          if (mes2 === mes1) mes2 = mes1 === '01' ? '07' : '01';
+        }
+        let mes3 = extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+        if (mes3 === mes1 || mes3 === mes2) {
+          mes3 = ['01', '07', '10', '11', '12'].find((m) => m !== mes1 && m !== mes2) || '10';
+        }
 
         if (op.decisao_camada_1_detalhes && op.decisao_camada_1_detalhes !== '[]') {
           try {
@@ -238,6 +245,11 @@ export default function PainelPlanoFerias() {
     } else if (mod === '2_ETAPAS_15') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
       const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
+      if (m1 === m2) {
+        setFeedback({ type: 'error', msg: 'Para férias de 2 frações, cada fração deve ser escalada em um mês diferente.' });
+        alert('Atenção: A 1ª e 2ª fração não podem ser no mesmo mês. Por favor, escolha meses distintos.');
+        return;
+      }
       parcelas = [
         { etapa: 1, dias: 15, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` },
         { etapa: 2, dias: 15, mes: m2, data_inicio: `${anoCampanha}-${m2}-01` },
@@ -246,6 +258,11 @@ export default function PainelPlanoFerias() {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
       const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
       const m3 = selecao.fracao3 || extrairMesDeDetalhes(op.opcao_3_detalhes, '10');
+      if (m1 === m2 || m1 === m3 || m2 === m3) {
+        setFeedback({ type: 'error', msg: 'Para férias de 3 frações, cada fração deve ser escalada em um mês diferente.' });
+        alert('Atenção: Não é permitido repetir meses entre as frações de férias. Por favor, escolha meses distintos.');
+        return;
+      }
       parcelas = [
         { etapa: 1, dias: 10, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` },
         { etapa: 2, dias: 10, mes: m2, data_inicio: `${anoCampanha}-${m2}-01` },
@@ -1035,6 +1052,16 @@ export default function PainelPlanoFerias() {
           const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
           const isEditing = militaresEmEdicao[op.id] === true;
 
+          const temMesesDuplicados = (() => {
+            if (numFracoes <= 1) return false;
+            const m1 = militarSelecao.fracao1;
+            const m2 = militarSelecao.fracao2;
+            const m3 = militarSelecao.fracao3;
+            if (numFracoes === 2) return m1 === m2;
+            if (numFracoes === 3) return m1 === m2 || m1 === m3 || m2 === m3;
+            return false;
+          })();
+
           return (
             <div className="fixed inset-0 z-50 overflow-hidden">
               {/* Backdrop */}
@@ -1275,6 +1302,14 @@ export default function PainelPlanoFerias() {
                             </div>
                           );
                         })}
+                        {temMesesDuplicados && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-center space-x-2 animate-in fade-in">
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                            <span>
+                              <strong>Atenção:</strong> O mesmo mês foi selecionado para mais de uma fração. Selecione meses diferentes para cada fração.
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1307,9 +1342,13 @@ export default function PainelPlanoFerias() {
                         <Button
                           type="button"
                           size="sm"
-                          disabled={actionLoading}
+                          disabled={actionLoading || temMesesDuplicados}
                           onClick={() => handleSalvarEscalaMilitar(op)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold h-9 px-5 shadow-sm"
+                          className={`rounded-xl text-xs font-bold h-9 px-5 shadow-sm text-white ${
+                            temMesesDuplicados
+                              ? 'bg-slate-400 cursor-not-allowed'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
                         >
                           <Check className="w-3.5 h-3.5 mr-1.5" />
                           Salvar Escala Definitiva

@@ -146,9 +146,8 @@ export default function PortalFeriasView({ onBack }) {
     const anoCampanha = campanha?.ano_referencia || (new Date().getFullYear() + 1);
 
     if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
-      if (!window.confirm('Você selecionou meses iguais para diferentes opções. Deseja manter mesmo assim?')) {
-        return;
-      }
+      setErrorMsg('Por favor, selecione 3 meses diferentes para as suas 3 opções de férias (1ª, 2ª e 3ª preferência).');
+      return;
     }
 
     setSubmitting(true);
