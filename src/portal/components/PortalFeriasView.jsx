@@ -409,158 +409,142 @@ export default function PortalFeriasView({ onBack }) {
 
           {/* FORMULÁRIO DE ESCOLHA DOS 3 MESES DE FÉRIAS (EXIBE SE NÃO TEM OPÇÃO OU CLICOU EM ALTERAR) */}
           {(isEditing || !opcaoEnviada) && (
-            <Card className="border-slate-200 shadow-sm bg-white rounded-2xl sm:rounded-3xl">
-              <CardHeader className="p-4 sm:p-5 border-b border-slate-100 flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm sm:text-base font-bold text-slate-900 flex items-center">
-                    <Calendar className="w-4 h-4 mr-2 text-emerald-700" />
-                    Escolha de Modalidade & 3 Meses de Preferência
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    Indique a modalidade e selecione 3 opções de meses para a escala do Plano de {anoCampanha}
-                  </CardDescription>
-                </div>
-                {opcaoEnviada && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditing(false)}
-                    className="text-xs text-slate-500 hover:text-slate-800 rounded-xl"
-                  >
-                    Cancelar Edição
-                  </Button>
-                )}
-              </CardHeader>
-
-              <form onSubmit={handleSubmitOpcoes} className="p-4 sm:p-6 space-y-6">
-                {/* 1. SELEÇÃO DE MODALIDADE */}
-                <div className="space-y-2">
-                  <label className="font-bold text-slate-800 text-xs block">
-                    1. Modalidade de Parcelamento das Férias:
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                    {[
-                      { id: '1_ETAPA_30', label: 'Integral (30 dias em 1 mês)' },
-                      { id: '2_ETAPAS_15', label: '2 Frações (15 + 15 dias)' },
-                      { id: '3_ETAPAS_10', label: '3 Frações (10 + 10 + 10 dias)' },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setModalidade(m.id)}
-                        className={`p-3 rounded-2xl border text-xs font-semibold text-center transition-all ${
-                          modalidade === m.id
-                            ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md'
-                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
+            <form onSubmit={handleSubmitOpcoes} className="space-y-6">
+              {/* PASSO 1: ESCOLHA A MODALIDADE */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-5">
+                  <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i className="ph ph-list-numbers text-green-600 text-xl"></i> Passo 1: Escolha a Modalidade
+                  </h4>
+                  {opcaoEnviada && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditing(false)}
+                      className="text-xs text-slate-500 hover:text-slate-800 rounded-xl"
+                    >
+                      Cancelar Edição
+                    </Button>
+                  )}
                 </div>
 
-                {/* 2. SELEÇÃO DOS 3 MESES DE OPÇÃO (1ª, 2ª E 3ª PREFERÊNCIA) */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800 text-xs block">
-                      2. Suas 3 Opções de Meses no Ano de {anoCampanha}:
-                    </label>
-                    <span className="text-[11px] text-slate-500">
-                      As frações serão distribuídas dentro desses 3 meses
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
+                    <input
+                      type="radio"
+                      name="modalidade"
+                      value="1_ETAPA_30"
+                      className="peer sr-only"
+                      checked={modalidade === '1_ETAPA_30'}
+                      onChange={() => setModalidade('1_ETAPA_30')}
+                    />
+                    <span className="flex flex-col flex-1">
+                      <span className="block text-sm font-bold text-slate-900 mb-1">Integral (30 dias)</span>
                     </span>
+                    <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
+                  </label>
+
+                  <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
+                    <input
+                      type="radio"
+                      name="modalidade"
+                      value="2_ETAPAS_15"
+                      className="peer sr-only"
+                      checked={modalidade === '2_ETAPAS_15'}
+                      onChange={() => setModalidade('2_ETAPAS_15')}
+                    />
+                    <span className="flex flex-col flex-1">
+                      <span className="block text-sm font-bold text-slate-900 mb-1">2 Frações (15 + 15)</span>
+                    </span>
+                    <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
+                  </label>
+
+                  <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
+                    <input
+                      type="radio"
+                      name="modalidade"
+                      value="3_ETAPAS_10"
+                      className="peer sr-only"
+                      checked={modalidade === '3_ETAPAS_10'}
+                      onChange={() => setModalidade('3_ETAPAS_10')}
+                    />
+                    <span className="flex flex-col flex-1">
+                      <span className="block text-sm font-bold text-slate-900 mb-1">3 Frações (10 + 10 + 10)</span>
+                    </span>
+                    <i className="ph ph-check-circle text-green-600 text-xl opacity-0 peer-checked:opacity-100 absolute right-4 top-4"></i>
+                  </label>
+                </div>
+              </div>
+
+              {/* PASSO 2: PREFERÊNCIA DE MESES */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h4 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-5 flex items-center gap-2">
+                  <i className="ph ph-calendar-star text-green-600 text-xl"></i> Passo 2: Preferência de Meses no Ano de {anoCampanha}
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">1ª Opção (Preferencial)</label>
+                    <select
+                      value={mesOpcao1}
+                      onChange={(e) => setMesOpcao1(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
+                    >
+                      {MESES_ANO.map((m) => (
+                        <option key={m.valor} value={m.valor}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* 1ª OPÇÃO */}
-                    <div className="p-4 bg-emerald-50/40 rounded-2xl border-2 border-emerald-200 space-y-3">
-                      <div className="flex items-center space-x-1.5 text-emerald-900 font-bold text-xs">
-                        <Star className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-                        <span>1ª Opção (Preferencial)</span>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">2ª Opção (Alternativa A)</label>
+                    <select
+                      value={mesOpcao2}
+                      onChange={(e) => setMesOpcao2(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
+                    >
+                      {MESES_ANO.map((m) => (
+                        <option key={m.valor} value={m.valor}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Mês Pretendido</label>
-                        <select
-                          value={mesOpcao1}
-                          onChange={(e) => setMesOpcao1(e.target.value)}
-                          className="w-full h-11 px-3 bg-white border border-emerald-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
-                        >
-                          {MESES_ANO.map((m) => (
-                            <option key={m.valor} value={m.valor}>
-                              {m.nome} / {anoCampanha}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* 2ª OPÇÃO */}
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                      <div className="flex items-center space-x-1.5 text-slate-800 font-bold text-xs">
-                        <span>2ª Opção (Alternativa A)</span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Mês Pretendido</label>
-                        <select
-                          value={mesOpcao2}
-                          onChange={(e) => setMesOpcao2(e.target.value)}
-                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]"
-                        >
-                          {MESES_ANO.map((m) => (
-                            <option key={m.valor} value={m.valor}>
-                              {m.nome} / {anoCampanha}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* 3ª OPÇÃO */}
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                      <div className="flex items-center space-x-1.5 text-slate-800 font-bold text-xs">
-                        <span>3ª Opção (Alternativa B)</span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">Mês Pretendido</label>
-                        <select
-                          value={mesOpcao3}
-                          onChange={(e) => setMesOpcao3(e.target.value)}
-                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-[#1e3a5f]"
-                        >
-                          {MESES_ANO.map((m) => (
-                            <option key={m.valor} value={m.valor}>
-                              {m.nome} / {anoCampanha}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">3ª Opção (Alternativa B)</label>
+                    <select
+                      value={mesOpcao3}
+                      onChange={(e) => setMesOpcao3(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
+                    >
+                      {MESES_ANO.map((m) => (
+                        <option key={m.valor} value={m.valor}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                  <p className="text-[11px] text-slate-500">
-                    * Ao confirmar, suas opções serão enviadas para elaboração da escala pelo gestor (início fixado em dia 01).
+                <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    * Ao confirmar, suas opções serão enviadas para a homologação do gestor (início no dia 01).
                   </p>
-                  <Button
+                  <button
                     type="submit"
                     disabled={submitting}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold h-10 px-6 shadow-md"
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
                   >
-                    {submitting ? (
-                      <RefreshCw className="w-4 h-4 animate-spin mr-1.5" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-1.5" />
-                    )}
-                    {opcaoEnviada ? 'Salvar Alterações das Opções' : 'Registrar Minhas 3 Opções de Férias'}
-                  </Button>
+                    <i className="ph ph-paper-plane-tilt text-lg"></i>
+                    {opcaoEnviada ? 'Salvar Alterações das Opções' : 'Registrar Minhas Opções'}
+                  </button>
                 </div>
-              </form>
-            </Card>
+              </div>
+            </form>
           )}
         </div>
       )}

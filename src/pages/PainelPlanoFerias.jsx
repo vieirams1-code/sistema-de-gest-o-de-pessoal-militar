@@ -835,14 +835,12 @@ export default function PainelPlanoFerias() {
               </CardContent>
             </Card>
 
-            {/* LISTAGEM COMPACTA DE MILITARES (APENAS CABEÇALHO/LINHA) */}
-            <div className="space-y-2.5">
+            {/* LISTAGEM DE MILITARES NO NOVO DESIGN COMPONENTIZADO */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               {opcoesFiltradas.length === 0 ? (
-                <Card className="border-slate-200 shadow-sm bg-white">
-                  <CardContent className="p-8 text-center text-slate-500 text-xs">
-                    Nenhuma opção de militar encontrada para os filtros selecionados nesta campanha.
-                  </CardContent>
-                </Card>
+                <div className="p-8 text-center text-slate-500 text-xs">
+                  Nenhuma opção de militar encontrada para os filtros selecionados nesta campanha.
+                </div>
               ) : (
                 opcoesFiltradas.map((op) => {
                   const modalidade = op.modalidade || '2_ETAPAS_15';
@@ -855,93 +853,81 @@ export default function PainelPlanoFerias() {
                     <div
                       key={op.id}
                       onClick={() => setMilitarModalAberto(op)}
-                      className={`p-3.5 rounded-2xl border transition-all duration-700 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs hover:shadow-sm ${
+                      className={`grid grid-cols-12 gap-4 p-4 items-center border-b transition-all duration-700 cursor-pointer ${
                         isDestacadoAmarelo
                           ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300 shadow-md'
-                          : 'bg-white border-slate-200 hover:border-[#1e3a5f]/40 hover:bg-slate-50/70'
+                          : 'border-slate-100 hover:bg-blue-50/60 bg-white'
                       }`}
                     >
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                      <div className="col-span-12 md:col-span-5 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
                           {op.militar_posto?.slice(0, 3) || 'MIL'}
                         </div>
                         <div className="min-w-0">
-                          <div className="flex items-center space-x-2 flex-wrap">
-                            <span className="font-extrabold text-slate-900 text-sm">
-                              {op.militar_posto} {op.militar_nome}
-                            </span>
-                            <span className="text-xs text-slate-400 font-mono">
-                              Mat: {op.militar_matricula || '-'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 truncate">
-                            Lotação: <strong className="text-slate-700">{op.lotacao_nome || 'Unidade'}</strong> • Período Aquisitivo: <strong>{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</strong>
+                          <p className="font-bold text-slate-900 text-sm truncate">
+                            {op.militar_posto} {op.militar_nome}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">
+                            Mat: {op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2 shrink-0 justify-between sm:justify-end">
+                      <div className="col-span-6 md:col-span-3">
+                        <p className="text-sm font-medium text-slate-800">
+                          {modalidade === '1_ETAPA_30'
+                            ? 'Integral (30d)'
+                            : modalidade === '3_ETAPAS_10'
+                            ? '3 Frações (10+10+10d)'
+                            : '2 Frações (15+15d)'}
+                        </p>
                         {isSalvo && op.decisao_camada_1_meses && (
-                          <span className="hidden md:inline-flex px-2.5 py-1 rounded-xl bg-blue-50 border border-blue-200 text-[#1e3a5f] text-[11px] font-bold">
+                          <span className="text-[11px] font-bold text-blue-700 block truncate">
                             {op.decisao_camada_1_meses}
                           </span>
                         )}
+                      </div>
 
-                        <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 text-[11px] font-bold">
-                          {modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}
-                        </span>
-
-                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center shadow-2xs ${
-                          isGerado
-                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      <div className="col-span-3 md:col-span-2 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                            isGerado
+                              ? 'bg-purple-100 text-purple-800 border-purple-200'
+                              : isNaoContemplado
+                              ? 'bg-rose-100 text-rose-800 border-rose-200'
+                              : isSalvo
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                              : 'bg-orange-100 text-orange-700 border-orange-200'
+                          }`}
+                        >
+                          {isGerado
+                            ? 'Férias Geradas'
                             : isNaoContemplado
-                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                            ? 'Não Contemplado'
                             : isSalvo
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-amber-100 text-amber-800 border border-amber-200'
-                        }`}>
-                          {isGerado ? (
-                            <>
-                              <Lock className="w-3 h-3 mr-1" />
-                              Férias Geradas
-                            </>
-                          ) : isNaoContemplado ? (
-                            <>
-                              <Ban className="w-3 h-3 mr-1" />
-                              Não Contemplado
-                            </>
-                          ) : isSalvo ? (
-                            <>
-                              <Check className="w-3 h-3 mr-1" />
-                              Escala Salva / Pronta
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pendente
-                            </>
-                          )}
+                            ? 'Escala Salva'
+                            : 'Pendente'}
                         </span>
+                      </div>
 
-                        <Button
+                      <div className="col-span-3 md:col-span-2 text-right">
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             setMilitarModalAberto(op);
                           }}
-                          className="h-8 px-2.5 text-xs text-[#1e3a5f] hover:bg-blue-100 rounded-xl font-bold flex items-center"
+                          className="px-4 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
                         >
-                          <span>Opções</span>
-                          <ChevronRight className="w-4 h-4 ml-1 text-slate-400" />
-                        </Button>
+                          {isSalvo ? 'Ver Escala' : 'Definir Escala'}
+                        </button>
                       </div>
                     </div>
                   );
                 })
               )}
             </div>
+
           </div>
         )}
 
@@ -1041,298 +1027,202 @@ export default function PainelPlanoFerias() {
           })();
 
           return (
-            <div className="fixed inset-0 z-50 overflow-hidden">
+            <div className="fixed inset-0 z-50 overflow-hidden font-sans">
               {/* Backdrop */}
               <div
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in"
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs z-20 transition-opacity animate-in fade-in"
                 onClick={() => handleFecharPopupLateral(op.id)}
               />
 
-              {/* Painel Lateral */}
-              <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-                <div className="w-screen max-w-xl bg-white shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300">
-                  {/* CABEÇALHO DO POPUP */}
-                  <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-                        {op.militar_posto?.slice(0, 3) || 'MIL'}
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-extrabold text-slate-900 text-sm">
-                            {op.militar_posto} {op.militar_nome}
-                          </h3>
-                          <span className="text-xs text-slate-400 font-mono">
-                            Mat: {op.militar_matricula || '-'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500">
-                          {op.lotacao_nome || 'Unidade'} • Período: <strong>{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</strong>
-                        </p>
+              {/* O Drawer lateral largo (750px) */}
+              <div className="fixed right-0 top-0 bottom-0 w-full md:w-[750px] bg-white shadow-2xl border-l border-slate-200 z-30 flex flex-col animate-in slide-in-from-right duration-200">
+                {/* Drawer Header */}
+                <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start shrink-0">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-10 h-10 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
+                      {op.militar_posto?.slice(0, 3) || 'MIL'}
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-xl text-slate-900">
+                        {op.militar_posto} {op.militar_nome}
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Mat: {op.militar_matricula || '-'} • Lotação: {op.lotacao_nome || 'Unidade'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleFecharPopupLateral(op.id)}
+                    className="text-slate-400 hover:text-slate-700 bg-white border border-slate-200 p-2 rounded-full shadow-sm cursor-pointer transition-colors"
+                  >
+                    <i className="ph ph-x text-lg"></i>
+                  </button>
+                </div>
+
+                {/* Drawer Body */}
+                <div className="flex-1 p-6 bg-white flex flex-col gap-6 overflow-y-auto">
+                  {/* Resumo Azul das Preferências */}
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+                    <div>
+                      <p className="text-xs font-bold text-blue-600 uppercase mb-1">Modalidade Solicitada</p>
+                      <p className="text-lg font-extrabold text-blue-900">
+                        {modalidade === '1_ETAPA_30'
+                          ? 'Integral (30 dias)'
+                          : modalidade === '3_ETAPAS_10'
+                          ? '3 Frações (10 + 10 + 10 dias)'
+                          : '2 Frações (15 + 15 dias)'}
+                      </p>
+                    </div>
+                    <div className="sm:text-right">
+                      <p className="text-xs font-bold text-blue-600 uppercase mb-2">Preferências do Militar</p>
+                      <div className="flex gap-2 sm:justify-end flex-wrap">
+                        <span className="bg-white border border-blue-200 text-blue-800 px-2.5 py-1 rounded text-xs font-bold">
+                          1º {getNomeMesPorVal(mesOpcao1)}
+                        </span>
+                        <span className="bg-white border border-blue-200 text-blue-800 px-2.5 py-1 rounded text-xs font-bold">
+                          2º {getNomeMesPorVal(mesOpcao2)}
+                        </span>
+                        <span className="bg-white border border-blue-200 text-blue-800 px-2.5 py-1 rounded text-xs font-bold">
+                          3º {getNomeMesPorVal(mesOpcao3)}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
+                  {/* Estado Consolidado ou Form de Frações */}
+                  {isGerado ? (
+                    <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-2">
+                      <span className="font-extrabold text-purple-950 text-xs flex items-center">
+                        <Lock className="w-4 h-4 mr-1.5 text-purple-700" />
+                        Escalação Oficial Consolidada & Gerada no SGP:
+                      </span>
+                      <p className="text-sm font-black text-purple-900">{op.decisao_camada_1_meses}</p>
+                    </div>
+                  ) : isNaoContemplado && !isEditing ? (
+                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-rose-950 text-xs flex items-center">
+                          <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
+                          Militar Não Contemplado nesta Campanha
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
+                          className="border-rose-300 text-rose-900 hover:bg-rose-100 rounded-xl text-xs font-bold h-7"
+                        >
+                          <Edit3 className="w-3 h-3 mr-1" />
+                          Alterar / Contemplar
+                        </Button>
+                      </div>
+                      <p className="text-rose-800 text-[11px]">
+                        {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar nesta campanha.'}
+                      </p>
+                    </div>
+                  ) : isSalvo && !isEditing ? (
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-emerald-950 text-xs flex items-center">
+                          <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
+                          Escala Definida e Pronta:
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
+                          className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs font-bold h-7"
+                        >
+                          <Edit3 className="w-3 h-3 mr-1" />
+                          Editar Escala
+                        </Button>
+                      </div>
+                      <p className="text-sm font-extrabold text-emerald-900">{op.decisao_camada_1_meses}</p>
+                    </div>
+                  ) : (
+                    /* Grade de Definição de Frações */
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-50 p-6 rounded-xl border border-slate-200 flex-1">
+                      {Array.from({ length: numFracoes }).map((_, idx) => {
+                        const numFracao = idx + 1;
+                        const dias = diasPorFracao[idx] || 15;
+                        const mesAtual = militarSelecao[`fracao${numFracao}`] || '01';
+
+                        return (
+                          <div key={numFracao}>
+                            <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                              <span className="bg-slate-800 text-white w-6 h-6 rounded flex items-center justify-center text-xs">
+                                {numFracao}
+                              </span>
+                              {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias)
+                            </label>
+                            <div className="bg-white rounded-lg border border-slate-300 shadow-sm p-1">
+                              <select
+                                value={mesAtual}
+                                onChange={(e) => handleMudarMesFracao(op.id, numFracao, e.target.value)}
+                                className="w-full p-2.5 text-slate-900 bg-transparent outline-none font-medium cursor-pointer text-xs"
+                              >
+                                <option value={mesOpcao1}>{getNomeMesPorVal(mesOpcao1)} (1ª Opção)</option>
+                                <option value={mesOpcao2}>{getNomeMesPorVal(mesOpcao2)} (2ª Opção)</option>
+                                <option value={mesOpcao3}>{getNomeMesPorVal(mesOpcao3)} (3ª Opção)</option>
+                                <option disabled>──────────</option>
+                                {LISTA_MESES.map((m) => (
+                                  <option key={m.val} value={m.val}>
+                                    {m.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {temMesesDuplicados && (
+                    <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-center gap-2">
+                      <i className="ph ph-warning-circle text-red-600 text-lg shrink-0"></i>
+                      <span>
+                        <strong>Atenção:</strong> O mesmo mês foi selecionado para mais de uma fração. Selecione meses diferentes para cada fração.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Drawer Footer */}
+                <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
+                    className="text-red-600 hover:bg-red-50 font-medium text-sm flex items-center gap-2 px-4 py-2.5 rounded-lg border border-transparent cursor-pointer transition-colors"
+                  >
+                    <i className="ph ph-prohibit text-lg"></i> Negar Solicitação
+                  </button>
+
+                  <div className="flex gap-3">
                     <button
                       type="button"
                       onClick={() => handleFecharPopupLateral(op.id)}
-                      className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition-colors"
+                      className="px-5 py-2.5 border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      <X className="w-5 h-5" />
+                      Cancelar
                     </button>
-                  </div>
 
-                  {/* CORPO DO POPUP */}
-                  <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1">
-                    {/* HISTÓRICO PERMANENTE DAS 3 PREFERÊNCIAS */}
-                    <div className="p-3.5 bg-slate-100/70 rounded-2xl border border-slate-200 space-y-2">
-                      <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wide flex items-center">
-                        <Star className="w-3.5 h-3.5 mr-1 text-amber-500 fill-amber-500" />
-                        Histórico de Preferências Registradas pelo Militar:
-                      </span>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                          <span className="text-slate-500 text-[10px] block">1ª Opção:</span>
-                          <strong className="text-slate-900 font-bold block truncate">{getNomeMesPorVal(mesOpcao1)}</strong>
-                        </div>
-                        <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                          <span className="text-slate-500 text-[10px] block">2ª Opção:</span>
-                          <strong className="text-slate-900 font-bold block truncate">{getNomeMesPorVal(mesOpcao2)}</strong>
-                        </div>
-                        <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                          <span className="text-slate-500 text-[10px] block">3ª Opção:</span>
-                          <strong className="text-slate-900 font-bold block truncate">{getNomeMesPorVal(mesOpcao3)}</strong>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ESTADO CONSOLIDADO OU FORMULÁRIO DE SELEÇÃO */}
-                    {isGerado ? (
-                      <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-2">
-                        <span className="font-extrabold text-purple-950 text-xs flex items-center">
-                          <Lock className="w-4 h-4 mr-1.5 text-purple-700" />
-                          Escalação Oficial Consolidada & Gerada no SGP:
-                        </span>
-                        <p className="text-sm font-black text-purple-900">
-                          {op.decisao_camada_1_meses}
-                        </p>
-                      </div>
-                    ) : isNaoContemplado && !isEditing ? (
-                      <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-rose-950 text-xs flex items-center">
-                            <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
-                            Militar Não Contemplado nesta Campanha
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
-                            className="border-rose-300 text-rose-900 hover:bg-rose-100 rounded-xl text-xs font-bold h-7"
-                          >
-                            <Edit3 className="w-3 h-3 mr-1" />
-                            Alterar / Contemplar
-                          </Button>
-                        </div>
-                        <p className="text-rose-800 text-[11px]">
-                          {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar nesta campanha.'}
-                        </p>
-                      </div>
-                    ) : isSalvo && !isEditing ? (
-                      <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-emerald-950 text-xs flex items-center">
-                            <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
-                            Escala Definida e Pronta para Geração:
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }))}
-                            className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs font-bold h-7"
-                          >
-                            <Edit3 className="w-3 h-3 mr-1" />
-                            Editar Escala
-                          </Button>
-                        </div>
-                        <p className="text-sm font-extrabold text-emerald-900">
-                          {op.decisao_camada_1_meses}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between pb-1">
-                          <span className="font-bold text-slate-800 text-xs">
-                            Definição dos Meses ({modalidade === '1_ETAPA_30' ? 'Integral' : `${numFracoes} Frações`}):
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            Clique na opção desejada para cada fração
-                          </span>
-                        </div>
-
-                        {Array.from({ length: numFracoes }).map((_, idx) => {
-                          const numFracao = idx + 1;
-                          const dias = diasPorFracao[idx] || 15;
-                          const mesAtualFracao = militarSelecao[`fracao${numFracao}`] || '01';
-
-                          const isOpcao1 = mesAtualFracao === mesOpcao1;
-                          const isOpcao2 = mesAtualFracao === mesOpcao2;
-                          const isOpcao3 = mesAtualFracao === mesOpcao3;
-                          const isOutroMes = !isOpcao1 && !isOpcao2 && !isOpcao3;
-
-                          return (
-                            <div
-                              key={numFracao}
-                              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-extrabold text-slate-800 text-xs flex items-center">
-                                  <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                                  {numFracoes === 1 ? 'Período Único' : `${numFracao}ª Fração`} ({dias} dias):
-                                </span>
-                                <span className="text-[11px] font-bold text-slate-600">
-                                  Mês: <strong className="text-blue-900 bg-white px-2 py-0.5 rounded-md border border-blue-200">{getNomeMesPorVal(mesAtualFracao)}</strong>
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao1)}
-                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                    isOpcao1
-                                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-200'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao1 ? 'text-emerald-100' : 'text-emerald-700'}`}>
-                                      ⭐ 1ª Opção
-                                    </span>
-                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao1)}</strong>
-                                  </div>
-                                  {isOpcao1 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao2)}
-                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                    isOpcao2
-                                      ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao2 ? 'text-blue-100' : 'text-slate-500'}`}>
-                                      2ª Opção
-                                    </span>
-                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao2)}</strong>
-                                  </div>
-                                  {isOpcao2 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleMudarMesFracao(op.id, numFracao, mesOpcao3)}
-                                  className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                                    isOpcao3
-                                      ? 'bg-blue-700 border-blue-700 text-white shadow-sm ring-2 ring-blue-200'
-                                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className={`text-[10px] block font-bold uppercase tracking-wider ${isOpcao3 ? 'text-blue-100' : 'text-slate-500'}`}>
-                                      3ª Opção
-                                    </span>
-                                    <strong className="text-xs block">{getNomeMesPorVal(mesOpcao3)}</strong>
-                                  </div>
-                                  {isOpcao3 && <Check className="w-4 h-4 text-white shrink-0 ml-1" />}
-                                </button>
-
-                                <div className={`p-2 rounded-xl border flex flex-col justify-center transition-all ${
-                                  isOutroMes
-                                    ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-200'
-                                    : 'bg-white border-slate-200'
-                                }`}>
-                                  <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
-                                    ✏️ Outro Mês
-                                  </span>
-                                  <select
-                                    value={isOutroMes ? mesAtualFracao : ''}
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        handleMudarMesFracao(op.id, numFracao, e.target.value);
-                                      }
-                                    }}
-                                    className="w-full h-7 px-1.5 bg-transparent border-0 text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                                  >
-                                    <option value="">Selecionar...</option>
-                                    {LISTA_MESES.map((m) => (
-                                      <option key={m.val} value={m.val}>
-                                        {m.nome}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {temMesesDuplicados && (
-                          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-center space-x-2 animate-in fade-in">
-                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                            <span>
-                              <strong>Atenção:</strong> O mesmo mês foi selecionado para mais de uma fração. Selecione meses diferentes para cada fração.
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* RODAPÉ DO POPUP */}
-                  <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
-                      className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-bold rounded-xl h-9"
-                    >
-                      <Ban className="w-3.5 h-3.5 mr-1" />
-                      🚫 Não Contemplado
-                    </Button>
-
-                    <div className="flex items-center space-x-2">
-                      <Button
+                    {(!isSalvo || isEditing) && !isGerado && (
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleFecharPopupLateral(op.id)}
-                        className="text-slate-600 hover:text-slate-800 text-xs rounded-xl h-9"
+                        disabled={actionLoading || temMesesDuplicados}
+                        onClick={() => handleSalvarEscalaMilitar(op)}
+                        className={`px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-colors text-white ${
+                          temMesesDuplicados
+                            ? 'bg-slate-400 cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
                       >
-                        Fechar
-                      </Button>
-
-                      {(!isSalvo || isEditing) && !isGerado && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={actionLoading || temMesesDuplicados}
-                          onClick={() => handleSalvarEscalaMilitar(op)}
-                          className={`rounded-xl text-xs font-bold h-9 px-5 shadow-sm text-white ${
-                            temMesesDuplicados
-                              ? 'bg-slate-400 cursor-not-allowed'
-                              : 'bg-emerald-600 hover:bg-emerald-700'
-                          }`}
-                        >
-                          <Check className="w-3.5 h-3.5 mr-1.5" />
-                          Salvar Escala Definitiva
-                        </Button>
-                      )}
-                    </div>
+                        <i className="ph ph-check-circle text-lg"></i> Salvar Escala
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
