@@ -106,11 +106,15 @@ Deno.serve(async (req: Request) => {
               } catch (_e) {}
             }
             if (!lista || lista.length === 0) {
-              try {
-                const all = await Militares.list();
-                lista = (all || []).filter((m: any) => normalizeCpf(m.cpf) === cpfNorm);
-              } catch (_e) {}
+              // Tentativa 3: CPF sem zeros à esquerda (caso tenha sido salvo como number/string sem padding)
+              const cpfSemZero = Number(cpfNorm).toString();
+              if (cpfSemZero !== cpfNorm) {
+                try {
+                  lista = await Militares.filter({ cpf: cpfSemZero }, undefined, 2, 0);
+                } catch (_e) {}
+              }
             }
+            
             if (Array.isArray(lista) && lista.length > 0) {
               militarEncontrado = lista[0];
             }

@@ -101,6 +101,9 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
 
       const text = `*Portal do Militar — CBMMS*\n\nSeu código de acesso é: *${params.code}*\n\n_Este código expira em 5 minutos._\n_Não compartilhe este código com ninguém._`;
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -116,7 +119,10 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
             linkPreview: false,
           },
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
@@ -137,7 +143,7 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
       return {
         success: false,
         provider: 'evolution_api',
-        error: 'Erro de conexão com o servidor do WhatsApp.',
+        error: err.name === 'AbortError' ? 'Timeout na conexão com o WhatsApp.' : 'Erro de conexão com o servidor do WhatsApp.',
       };
     }
   }

@@ -131,9 +131,14 @@ export async function portalFetch(functionName, data = {}) {
     }
     const body = sdkErr?.response?.data || sdkErr?.data || {};
     let errorMsg = body?.error || sdkErr?.message || 'Falha na comunicação com o servidor.';
-    if (typeof errorMsg === 'string' && (errorMsg.toLowerCase() === 'user-exception' || errorMsg.toLowerCase().includes('user-exception'))) {
-      errorMsg = body?.error || 'Não foi possível processar a solicitação no momento. Tente novamente.';
+    
+    if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('user-exception')) {
+      errorMsg = 'Não foi possível processar a solicitação no momento. O servidor está indisponível ou demorando a responder.';
     }
+    if (typeof body?.error === 'string' && body.error.toLowerCase().includes('user-exception')) {
+      body.error = 'Servidor indisponível.';
+    }
+
     const err = new Error(errorMsg);
     err.status = status;
     err.data = body;
