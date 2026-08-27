@@ -25,6 +25,7 @@ import {
   FileSpreadsheet,
   Check,
   X,
+  Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -287,6 +288,7 @@ export default function GerirCampanhasPortal() {
       isEditing: true,
       editId: camp.id,
       tipo: camp.tipo || 'PLANO_FERIAS',
+      status: camp.status || 'Aberta_Coleta',
       titulo: camp.titulo || '',
       ano_referencia: camp.ano_referencia || (new Date().getFullYear() + 1),
       tipo_escopo: camp.tipo_escopo || 'TODOS',
@@ -512,6 +514,23 @@ export default function GerirCampanhasPortal() {
       await carregarDados();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao arquivar campanha.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReabrirCampanha = async (camp) => {
+    if (!window.confirm(`Deseja reabrir a coleta da campanha "${camp.titulo}" para os militares no Portal?`)) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_REABRIR',
+        campanha_id: camp.id,
+      });
+      setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" reaberta com sucesso!` });
+      await carregarDados();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao reabrir campanha.' });
     } finally {
       setActionLoading(false);
     }
@@ -933,6 +952,16 @@ export default function GerirCampanhasPortal() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
+                            {camp.status !== 'Aberta_Coleta' && (
+                              <button
+                                onClick={() => handleReabrirCampanha(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                title="Reabrir Coleta no Portal"
+                              >
+                                <Play className="w-4 h-4" />
+                              </button>
+                            )}
                             {camp.status === 'Aberta_Coleta' && (
                               <button
                                 onClick={() => handleDispararLembretes(camp.id)}
@@ -1082,7 +1111,7 @@ export default function GerirCampanhasPortal() {
 
               <form onSubmit={handleSalvarCampanha} className="space-y-4">
                 {/* TIPO DE CAMPANHA & TÍTULO */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className={`grid grid-cols-1 ${modalNovaCampanha.isEditing ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 block">Tipo de Campanha *</label>
                     <select
@@ -1098,7 +1127,22 @@ export default function GerirCampanhasPortal() {
                     </select>
                   </div>
 
-                  <div className="sm:col-span-2 space-y-1">
+                  {modalNovaCampanha.isEditing && (
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 block">Status *</label>
+                      <select
+                        value={modalNovaCampanha.status || 'Aberta_Coleta'}
+                        onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, status: e.target.value })}
+                        className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white outline-none focus:border-[#1e3a5f] font-semibold"
+                      >
+                        <option value="Aberta_Coleta">🟢 Aberta / Ativa</option>
+                        <option value="Encerrada">⚪ Encerrada</option>
+                        <option value="Arquivada">📁 Arquivada</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className={`${modalNovaCampanha.isEditing ? 'sm:col-span-2' : 'sm:col-span-2'} space-y-1`}>
                     <label className="font-bold text-slate-700 block">Título da Campanha *</label>
                     <Input
                       type="text"

@@ -447,6 +447,7 @@ Deno.serve(async (req: Request) => {
           }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
+            status: campanha_payload.status || 'Aberta_Coleta',
             instrucoes: campanha_payload.instrucoes,
             data_fim_militar: campanha_payload.data_fim_militar,
             data_fim_unidade: campanha_payload.data_fim_unidade,
@@ -720,6 +721,22 @@ Deno.serve(async (req: Request) => {
             status: 'Encerrada',
           });
           return new Response(JSON.stringify({ ok: true, message: 'Campanha encerrada.' }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Reabrir / Ativar Campanha
+        case 'CAMPANHA_REABRIR':
+        case 'CAMPANHA_ATIVAR': {
+          const { campanha_id } = payload;
+          if (!campanha_id) {
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+          const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
+            status: 'Aberta_Coleta',
+          });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha reaberta com sucesso!' }), {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
