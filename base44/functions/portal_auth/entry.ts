@@ -89,34 +89,26 @@ Deno.serve(async (req: Request) => {
         const metodosPublicos = getAvailablePublicMethods(config);
         const requestId = generateRequestId();
 
-        // Busca militar silenciosamente
+        // Busca militar silenciosamente (em paralelo para evitar soma de timeouts de sequential scan)
         let militarEncontrado: any = null;
         try {
           const Militares = base44.asServiceRole?.entities?.Militar || base44.entities?.Militar;
           if (Militares) {
-            let lista: any[] = [];
-            try {
-              lista = await Militares.filter({ cpf: cpfNorm }, undefined, 2, 0);
-            } catch (_e) {}
-
-            if (!lista || lista.length === 0) {
-              const cpfFormatado = cpfNorm.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-              try {
-                lista = await Militares.filter({ cpf: cpfFormatado }, undefined, 2, 0);
-              } catch (_e) {}
-            }
-            if (!lista || lista.length === 0) {
-              // Tentativa 3: CPF sem zeros à esquerda (caso tenha sido salvo como number/string sem padding)
-              const cpfSemZero = Number(cpfNorm).toString();
-              if (cpfSemZero !== cpfNorm) {
-                try {
-                  lista = await Militares.filter({ cpf: cpfSemZero }, undefined, 2, 0);
-                } catch (_e) {}
-              }
-            }
+            const cpfFormatado = cpfNorm.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            const cpfSemZero = Number(cpfNorm).toString();
             
-            if (Array.isArray(lista) && lista.length > 0) {
-              militarEncontrado = lista[0];
+            const p1 = Militares.filter({ cpf: cpfNorm }, undefined, 2, 0).catch(() => []);
+            const p2 = Militares.filter({ cpf: cpfFormatado }, undefined, 2, 0).catch(() => []);
+            const p3 = cpfSemZero !== cpfNorm ? Militares.filter({ cpf: cpfSemZero }, undefined, 2, 0).catch(() => []) : Promise.resolve([]);
+
+            const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+            if (r1 && r1.length > 0) {
+              militarEncontrado = r1[0];
+            } else if (r2 && r2.length > 0) {
+              militarEncontrado = r2[0];
+            } else if (r3 && r3.length > 0) {
+              militarEncontrado = r3[0];
             }
           }
         } catch (errSearch) {
