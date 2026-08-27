@@ -1110,8 +1110,8 @@ export default function GerirCampanhasPortal() {
               </div>
 
               <form onSubmit={handleSalvarCampanha} className="space-y-4">
-                {/* TIPO DE CAMPANHA & TÍTULO */}
-                <div className={`grid grid-cols-1 ${modalNovaCampanha.isEditing ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
+                {/* TIPO DE CAMPANHA, ANO, STATUS & TÍTULO */}
+                <div className={`grid grid-cols-1 ${modalNovaCampanha.isEditing ? 'sm:grid-cols-4' : 'sm:grid-cols-4'} gap-3`}>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 block">Tipo de Campanha *</label>
                     <select
@@ -1125,6 +1125,20 @@ export default function GerirCampanhasPortal() {
                       <option value="ASSINATURA_DOCUMENTO">✍️ Assinatura de Documentos (Fixo)</option>
                       <option value="FORMULARIO_DINAMICO">📋 Formulário Dinâmico (Google Forms)</option>
                     </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block">Ano Exercício *</label>
+                    <Input
+                      type="number"
+                      min={2020}
+                      max={2050}
+                      value={modalNovaCampanha.ano_referencia || ''}
+                      onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, ano_referencia: Number(e.target.value) })}
+                      required
+                      placeholder="Ex: 2027"
+                      className="h-10 text-xs rounded-xl font-bold"
+                    />
                   </div>
 
                   {modalNovaCampanha.isEditing && (
@@ -1142,14 +1156,14 @@ export default function GerirCampanhasPortal() {
                     </div>
                   )}
 
-                  <div className={`${modalNovaCampanha.isEditing ? 'sm:col-span-2' : 'sm:col-span-2'} space-y-1`}>
+                  <div className={`${modalNovaCampanha.isEditing ? 'sm:col-span-1' : 'sm:col-span-2'} space-y-1`}>
                     <label className="font-bold text-slate-700 block">Título da Campanha *</label>
                     <Input
                       type="text"
                       value={modalNovaCampanha.titulo}
                       onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, titulo: e.target.value })}
                       required
-                      placeholder="Ex: Declaração de Acúmulo de Cargos 2026"
+                      placeholder="Ex: Plano Anual de Férias 2027"
                       className="h-10 text-xs rounded-xl"
                     />
                   </div>

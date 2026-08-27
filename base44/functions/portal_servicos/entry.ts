@@ -447,6 +447,7 @@ Deno.serve(async (req: Request) => {
           }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
+            ano_referencia: Number(campanha_payload.ano_referencia) || undefined,
             status: campanha_payload.status || 'Aberta_Coleta',
             instrucoes: campanha_payload.instrucoes,
             data_fim_militar: campanha_payload.data_fim_militar,
