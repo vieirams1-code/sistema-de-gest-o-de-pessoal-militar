@@ -23,12 +23,19 @@ export class Base44EmailProvider implements OtpDeliveryProvider {
       const subject = 'Código de acesso — Portal do Militar';
       const body = `Seu código de acesso ao Portal do Militar é: ${params.code}\n\nEste código expira em 5 minutos.\n\nSe você não solicitou este acesso, ignore esta mensagem.\n\nNão compartilhe este código.`;
 
-      await coreIntegrations.SendEmail({
+      // Timeout wrapper to prevent edge function hang
+      const sendPromise = coreIntegrations.SendEmail({
         to: params.to,
         subject,
         body,
         from_name: 'Portal do Militar',
       });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TIMEOUT_EMAIL')), 3500)
+      );
+
+      await Promise.race([sendPromise, timeoutPromise]);
 
       return {
         success: true,
@@ -39,7 +46,7 @@ export class Base44EmailProvider implements OtpDeliveryProvider {
       return {
         success: false,
         provider: 'base44_core',
-        error: err?.message || 'Falha no disparo do e-mail de autenticação.',
+        error: err?.message === 'TIMEOUT_EMAIL' ? 'Timeout na conexão com o servidor de e-mail.' : (err?.message || 'Falha no disparo do e-mail de autenticação.'),
       };
     }
   }
