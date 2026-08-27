@@ -196,10 +196,12 @@ Deno.serve(async (req: Request) => {
           if (now.getTime() - ultimoEnvio < cooldownMs) {
             return jsonResponse(
               {
-                error: `Aguarde ${config.otp_resend_seconds} segundos antes de solicitar novo envio.`,
+                ok: true,
+                message: `Código já enviado recentemente. Aguarde ${Math.ceil((cooldownMs - (now.getTime() - ultimoEnvio)) / 1000)}s para novo envio.`,
                 reenvio_em: Math.ceil((cooldownMs - (now.getTime() - ultimoEnvio)) / 1000),
+                expira_em: config.otp_ttl_seconds,
               },
-              429
+              200
             );
           }
         }
@@ -211,7 +213,7 @@ Deno.serve(async (req: Request) => {
           militar = Militar ? await Militar.get(sessao.militar_id) : null;
         } catch (_eM) {}
 
-        if (!militar || militar.status === 'Inativo' || militar.status === 'Falecido') {
+        if (!militar || militar.status === 'Inativo' || militar.status_cadastro === 'Inativo' || militar.status === 'Falecido') {
           return jsonResponse(respostaGenerica);
         }
 
@@ -234,13 +236,10 @@ Deno.serve(async (req: Request) => {
         if (canalSolicitado === 'EMAIL') {
           const emailInfo = resolveMilitarEmail(militar);
           const emailDestino = emailInfo?.email;
-          if (!emailDestino) {
-            return jsonResponse(respostaGenerica);
-          }
-
           const emailProvider = resolveEmailProvider(config);
           let dispatchRes: any = { success: false, error: 'Provedor de e-mail indisponível.' };
-          if (emailProvider) {
+
+          if (emailDestino && emailProvider) {
             try {
               dispatchRes = await emailProvider.sendOtp(
                 {
@@ -275,13 +274,10 @@ Deno.serve(async (req: Request) => {
         // Disparo: WHATSAPP
         if (canalSolicitado === 'WHATSAPP') {
           const telefoneDestino = resolveMilitarTelefone(militar);
-          if (!telefoneDestino || !telefoneDestino.formatted) {
-            return jsonResponse(respostaGenerica);
-          }
-
           const whatsappProvider = resolveWhatsAppProvider(config);
           let dispatchRes: any = { success: false, error: 'Provedor de WhatsApp indisponível.' };
-          if (whatsappProvider) {
+
+          if (telefoneDestino?.formatted && whatsappProvider) {
             try {
               dispatchRes = await whatsappProvider.sendOtp(
                 {
@@ -294,6 +290,28 @@ Deno.serve(async (req: Request) => {
               );
             } catch (errDispatch) {
               console.error('[portal_auth] Erro no envio de WhatsApp:', errDispatch);
+            }
+          }
+
+          // Fallback inteligente: se WhatsApp falhou mas militar tem email, tenta e-mail
+          if (!dispatchRes.success) {
+            const emailInfo = resolveMilitarEmail(militar);
+            const emailProvider = resolveEmailProvider(config);
+            if (emailInfo?.email && emailProvider) {
+              try {
+                const emailRes = await emailProvider.sendOtp(
+                  {
+                    to: emailInfo.email,
+                    code: otpCode,
+                    militarNome: militar.nome_guerra || militar.nome_completo,
+                    correlationId: correlation_id,
+                  },
+                  base44
+                );
+                if (emailRes.success) {
+                  dispatchRes = emailRes;
+                }
+              } catch (_e) {}
             }
           }
 

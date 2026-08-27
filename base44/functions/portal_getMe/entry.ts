@@ -19,6 +19,16 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id',
 };
 
+function jsonResponse(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...CORS_HEADERS,
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 /**
  * Endpoint de autoatendimento para o militar consultar seus dados básicos de identificação.
  * Protegido estritamente pelo Session Guard (X-Portal-Token).
@@ -34,10 +44,7 @@ Deno.serve(async (req: Request) => {
 
   // Validação de métodos permitidos
   if (req.method !== 'GET' && req.method !== 'POST') {
-    return Response.json(
-      { error: 'METODO_NAO_PERMITIDO' },
-      { status: 405, headers: CORS_HEADERS }
-    );
+    return jsonResponse({ error: 'METODO_NAO_PERMITIDO' }, 405);
   }
 
   try {
@@ -53,50 +60,33 @@ Deno.serve(async (req: Request) => {
         }
       }
     } catch (_e) {
-      return Response.json(
-        { error: 'PAYLOAD_INVALIDO: JSON malformado.' },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    // Valida que portal_getMe não recebe campos de entrada funcionais inesperados
-    if (payload && typeof payload === 'object') {
-      const allowedKeys = new Set(['portal_token']);
-      const invalidKeys = Object.keys(payload).filter((k) => !allowedKeys.has(k));
-      if (invalidKeys.length > 0) {
-        return Response.json(
-          { error: `CAMPOS_NAO_PERMITIDOS: ${invalidKeys.join(', ')}` },
-          { status: 400, headers: CORS_HEADERS }
-        );
-      }
+      return jsonResponse({ error: 'PAYLOAD_INVALIDO: JSON malformado.' }, 400);
     }
 
     // 1. Validação de Sessão Server-Side (Session Guard)
     const sessionCheck = await requirePortalSession(req, base44, payload);
     if (!sessionCheck.ok || !sessionCheck.context) {
-      return Response.json(
+      return jsonResponse(
         { error: sessionCheck.error || 'UNAUTHORIZED' },
-        { status: sessionCheck.status || 401, headers: CORS_HEADERS }
+        sessionCheck.status || 401
       );
     }
 
     const { sessao_id, militar_id, correlation_id, ip_origem, user_agent } = sessionCheck.context;
 
     // 2. Busca o Militar vinculado à sessão via Service Role
-    const MilitarEntity = base44.asServiceRole?.entities?.Militar;
+    const MilitarEntity = base44.asServiceRole?.entities?.Militar || base44.entities?.Militar;
     if (!MilitarEntity) {
-      return Response.json(
-        { error: 'SERVICO_INDISPONIVEL' },
-        { status: 500, headers: CORS_HEADERS }
-      );
+      return jsonResponse({ error: 'SERVICO_INDISPONIVEL' }, 500);
     }
 
-    const militar = await MilitarEntity.get(militar_id);
+    let militar: any = null;
+    try {
+      militar = await MilitarEntity.get(militar_id);
+    } catch (_e) {}
+
     if (!militar) {
-      return Response.json(
-        { error: 'MILITAR_NAO_ENCONTRADO' },
-        { status: 404, headers: CORS_HEADERS }
-      );
+      return jsonResponse({ error: 'MILITAR_NAO_ENCONTRADO' }, 404);
     }
 
     // 3. Projeção DTO estrita (Whitelist de campos permitidos - sem vazamento de CPF/RG/dados sensíveis)
@@ -113,27 +103,23 @@ Deno.serve(async (req: Request) => {
     };
 
     // 4. Auditoria de acesso
-    await registrarAuditoriaPortal(base44, {
-      sessao_id,
-      militar_id,
-      acao: 'PORTAL_GET_ME',
-      resultado: true,
-      recurso_tipo: 'Militar',
-      recurso_id: militar_id,
-      ip_origem,
-      user_agent,
-      correlation_id,
-    });
+    try {
+      await registrarAuditoriaPortal(base44, {
+        sessao_id,
+        militar_id,
+        acao: 'PORTAL_GET_ME',
+        resultado: true,
+        recurso_tipo: 'Militar',
+        recurso_id: militar_id,
+        ip_origem,
+        user_agent,
+        correlation_id,
+      });
+    } catch (_e) {}
 
-    return Response.json(
-      { ok: true, militar: dto },
-      { status: 200, headers: CORS_HEADERS }
-    );
+    return jsonResponse({ ok: true, militar: dto }, 200);
   } catch (error: any) {
     console.error('[portal_getMe] Erro não tratado:', error?.message || error);
-    return Response.json(
-      { error: 'ERRO_INTERNO' },
-      { status: 500, headers: CORS_HEADERS }
-    );
+    return jsonResponse({ error: 'ERRO_INTERNO' }, 500);
   }
 });

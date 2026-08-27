@@ -41,6 +41,11 @@ export function normalizeWhatsAppNumber(rawPhone: unknown): string | null {
     return digits;
   }
 
+  // Formato: 8 ou 9 dígitos sem DDD (ex: 999998888 ou 99998888) -> assume DDD 67 padrão da corporação
+  if (digits.length === 9 || digits.length === 8) {
+    return `5567${digits}`;
+  }
+
   // Se tiver pelo menos 10 dígitos, tenta adicionar 55 se não tiver
   if (digits.length >= 10 && !digits.startsWith('55')) {
     return `55${digits}`;

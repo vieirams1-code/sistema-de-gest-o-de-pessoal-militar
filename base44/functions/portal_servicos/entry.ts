@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
     } catch (_e) {
       return new Response(JSON.stringify({ error: 'Payload JSON inválido.' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
 
@@ -139,7 +139,7 @@ Deno.serve(async (req: Request) => {
       if (!autorizacaoOk && !user) {
         return new Response(JSON.stringify({ error: 'Acesso restrito ao administrador do sistema.' }), {
           status: 401,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -150,7 +150,7 @@ Deno.serve(async (req: Request) => {
           if (!cp.tipo || !cp.titulo) {
             return new Response(JSON.stringify({ error: 'Tipo e Título da campanha são obrigatórios.' }), {
               status: 400,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
 
           return new Response(JSON.stringify({ ok: true, campanha: created }), {
             status: 201,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -221,7 +221,7 @@ Deno.serve(async (req: Request) => {
 
           return new Response(JSON.stringify({ ok: true, campanhas: campanhas || [] }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -235,7 +235,7 @@ Deno.serve(async (req: Request) => {
           const config = Array.isArray(configs) && configs.length > 0 ? configs[0] : DEFAULT_AUTH_CONFIG;
           return new Response(JSON.stringify({ ok: true, config }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -270,7 +270,7 @@ Deno.serve(async (req: Request) => {
             message: 'Configurações do Portal salvas com sucesso!',
           }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -280,7 +280,7 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), {
               status: 400,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -288,7 +288,7 @@ Deno.serve(async (req: Request) => {
           if (!campanha) {
             return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
               status: 404,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -393,7 +393,7 @@ Deno.serve(async (req: Request) => {
             militares: relacaoNominal,
           }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -403,7 +403,7 @@ Deno.serve(async (req: Request) => {
           if (!resposta_id || !status) {
             return new Response(JSON.stringify({ error: 'ID da resposta e status são obrigatórios.' }), {
               status: 400,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -416,7 +416,7 @@ Deno.serve(async (req: Request) => {
 
           return new Response(JSON.stringify({ ok: true, resposta: resp, message: 'Resposta avaliada com sucesso.' }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -427,7 +427,7 @@ Deno.serve(async (req: Request) => {
             message: 'Disparo de lembretes processado com sucesso para os militares com pendência nesta campanha.',
           }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -435,7 +435,7 @@ Deno.serve(async (req: Request) => {
         case 'CAMPANHA_EDITAR': {
           const { campanha_id, campanha_payload } = payload;
           if (!campanha_id) {
-            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
@@ -453,7 +453,7 @@ Deno.serve(async (req: Request) => {
             exigir_devolucao_arquivo: Boolean(campanha_payload.exigir_devolucao_arquivo),
             texto_termo_aceite: campanha_payload.texto_termo_aceite || '',
           });
-          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         // Decisão de Solicitação de Atualização Cadastral pelo RH (Aprovar / Rejeitar com suporte a Retificação pelo Gestor)
@@ -462,7 +462,7 @@ Deno.serve(async (req: Request) => {
           if (!solicitacao_id || !decisao) {
             return new Response(JSON.stringify({ error: 'ID da solicitação e decisão são obrigatórios.' }), {
               status: 400,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -470,7 +470,7 @@ Deno.serve(async (req: Request) => {
           if (!sol) {
             return new Response(JSON.stringify({ error: 'Solicitação não encontrada.' }), {
               status: 404,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -555,7 +555,7 @@ Deno.serve(async (req: Request) => {
             message: `Solicitação ${statusDecisao.toLowerCase()} com sucesso.`
           }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -565,7 +565,7 @@ Deno.serve(async (req: Request) => {
           if (!militar_id || !decisao) {
             return new Response(JSON.stringify({ error: 'ID do militar e decisão são obrigatórios.' }), {
               status: 400,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
 
@@ -662,7 +662,7 @@ Deno.serve(async (req: Request) => {
             message: `${solicitacoesAtualizadas.length} alterações ${statusDecisao.toLowerCase()}s com sucesso.`
           }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -670,7 +670,7 @@ Deno.serve(async (req: Request) => {
         case 'CAMPANHA_EXCLUIR': {
           const { campanha_id } = payload;
           if (!campanha_id) {
-            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
           await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
 
@@ -682,27 +682,27 @@ Deno.serve(async (req: Request) => {
             }
           } catch (_eDelOp) {}
 
-          return new Response(JSON.stringify({ ok: true, message: 'Campanha e opções associadas excluídas com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, message: 'Campanha e opções associadas excluídas com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         // Arquivar Campanha
         case 'CAMPANHA_ARQUIVAR': {
           const { campanha_id } = payload;
           if (!campanha_id) {
-            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Arquivada' });
-          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha arquivada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha arquivada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         // Desativar Campanha
         case 'CAMPANHA_DESATIVAR': {
           const { campanha_id } = payload;
           if (!campanha_id) {
-            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Desativada' });
-          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha desativada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha desativada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         // Encerrar Campanha
@@ -713,7 +713,7 @@ Deno.serve(async (req: Request) => {
           });
           return new Response(JSON.stringify({ ok: true, message: 'Campanha encerrada.' }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -746,7 +746,7 @@ Deno.serve(async (req: Request) => {
                 total_pendentes: 0,
               });
             }
-            return new Response(JSON.stringify({ ok: true, campanha }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ ok: true, campanha }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
@@ -826,7 +826,7 @@ Deno.serve(async (req: Request) => {
               ok: true,
               campanhas: campanhasFerias || [],
               opcoes: opcoes || [],
-            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
           if (acao === 'PLANO_DECISAO_CAMADA_1') {
@@ -843,7 +843,7 @@ Deno.serve(async (req: Request) => {
                 data_decisao_camada_1: new Date().toISOString(),
                 justificativa_ajuste_gestor: decisao_camada_1?.justificativa || 'Militar não contemplado neste plano de férias.',
               });
-              return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+              return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
             }
 
             const parcelas = decisao_camada_1?.parcelas || [];
@@ -853,7 +853,7 @@ Deno.serve(async (req: Request) => {
               if (mesesSet.size !== parcelas.length) {
                 return new Response(JSON.stringify({ error: 'Para férias fracionadas, cada fração deve ser escalada em um mês diferente.' }), {
                   status: 400,
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
                 });
               }
             }
@@ -869,7 +869,7 @@ Deno.serve(async (req: Request) => {
               data_decisao_camada_1: new Date().toISOString(),
               justificativa_ajuste_gestor: decisao_camada_1?.justificativa || '',
             });
-            return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
           if (acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
@@ -881,7 +881,7 @@ Deno.serve(async (req: Request) => {
               data_homologacao_superior: new Date().toISOString(),
               observacao_superior: homologacao_camada_2?.observacao || '',
             });
-            return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
           if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
@@ -1015,7 +1015,7 @@ Deno.serve(async (req: Request) => {
               ok: true,
               message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas no SGP e campanha encerrada.`,
               total_geradas: geradasCount,
-            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
           break;
         }
@@ -1023,7 +1023,7 @@ Deno.serve(async (req: Request) => {
         default:
           return new Response(JSON.stringify({ error: 'Ação administrativa não reconhecida.' }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
       }
     }
@@ -1037,7 +1037,7 @@ Deno.serve(async (req: Request) => {
     if (!sessionAuth.ok || !sessionAuth.context) {
       return new Response(JSON.stringify({ error: sessionAuth.error || 'Sessão inválida ou expirada.' }), {
         status: sessionAuth.status || 401,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
 
@@ -1046,7 +1046,7 @@ Deno.serve(async (req: Request) => {
     if (!militar) {
       return new Response(JSON.stringify({ error: 'Militar não encontrado.' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
 
@@ -1272,7 +1272,7 @@ Deno.serve(async (req: Request) => {
           },
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1345,7 +1345,7 @@ Deno.serve(async (req: Request) => {
             campos_pendentes: pendencias,
           }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1371,7 +1371,7 @@ Deno.serve(async (req: Request) => {
           data_conferencia: nowIso,
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1380,7 +1380,7 @@ Deno.serve(async (req: Request) => {
         if (!campo_chave || !valor_proposto?.trim()) {
           return new Response(JSON.stringify({ error: 'Campo e novo valor são obrigatórios.' }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1415,7 +1415,7 @@ Deno.serve(async (req: Request) => {
           solicitacao: novaSolicitacao,
         }), {
           status: 201,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1558,7 +1558,7 @@ Deno.serve(async (req: Request) => {
           },
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1614,7 +1614,7 @@ Deno.serve(async (req: Request) => {
               error: 'É obrigatório concluir a Atualização Cadastral antes de enviar suas preferências de férias.'
             }), {
               status: 403,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
         }
@@ -1622,7 +1622,7 @@ Deno.serve(async (req: Request) => {
         if (!periodo_aquisitivo_id || !opcao_1?.parcelas?.length || !opcao_2?.parcelas?.length || !opcao_3?.parcelas?.length) {
           return new Response(JSON.stringify({ error: 'É obrigatório preencher as 3 opções de preferências de meses.' }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1630,7 +1630,7 @@ Deno.serve(async (req: Request) => {
         if (!periodo || periodo.militar_id !== militarId) {
           return new Response(JSON.stringify({ error: 'Período aquisitivo inválido para este militar.' }), {
             status: 403,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1693,7 +1693,7 @@ Deno.serve(async (req: Request) => {
           opcao: salvoRecord,
         }), {
           status: 201,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1768,7 +1768,7 @@ Deno.serve(async (req: Request) => {
           total_pendentes: campanhasEnriquecidas.filter((c) => c.status_resposta === 'Pendente' || c.status_resposta === 'Pendente_Correcao').length,
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1778,7 +1778,7 @@ Deno.serve(async (req: Request) => {
         if (!campanha_id) {
           return new Response(JSON.stringify({ error: 'ID da campanha é obrigatório.' }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1786,7 +1786,7 @@ Deno.serve(async (req: Request) => {
         if (!campanha) {
           return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
             status: 404,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1852,7 +1852,7 @@ Deno.serve(async (req: Request) => {
           } : null,
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
@@ -1871,7 +1871,7 @@ Deno.serve(async (req: Request) => {
         if (!campanha_id) {
           return new Response(JSON.stringify({ error: 'ID da campanha é obrigatório.' }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1879,7 +1879,7 @@ Deno.serve(async (req: Request) => {
         if (!campanha) {
           return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
             status: 404,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1900,7 +1900,7 @@ Deno.serve(async (req: Request) => {
             if (!arquivosObj[c.id]?.url && !arquivosObj[c.id]) {
               return new Response(JSON.stringify({ error: `O anexo da pergunta "${c.pergunta}" é obrigatório.` }), {
                 status: 400,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
           } else {
@@ -1908,7 +1908,7 @@ Deno.serve(async (req: Request) => {
             if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0)) {
               return new Response(JSON.stringify({ error: `A pergunta "${c.pergunta}" é de preenchimento obrigatório.` }), {
                 status: 400,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
           }
@@ -1919,7 +1919,7 @@ Deno.serve(async (req: Request) => {
           if (!arquivo_devolucao_url) {
             return new Response(JSON.stringify({ error: 'É obrigatório anexar o documento assinado para concluir o envio.' }), {
               status: 400,
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
         }
@@ -1928,7 +1928,7 @@ Deno.serve(async (req: Request) => {
         if (campanha.texto_termo_aceite && termo_aceite !== true) {
           return new Response(JSON.stringify({ error: 'Você deve marcar o termo de ciência e declaração para continuar.' }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
@@ -1982,14 +1982,14 @@ Deno.serve(async (req: Request) => {
           resposta: salvo,
         }), {
           status: 201,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
 
       default:
         return new Response(JSON.stringify({ error: 'Ação não reconhecida no endpoint de serviços.' }), {
           status: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
     }
   } catch (err: any) {
@@ -2000,7 +2000,7 @@ Deno.serve(async (req: Request) => {
       correlation_id: correlationId,
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
   }
 });

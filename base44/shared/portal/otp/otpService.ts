@@ -132,12 +132,26 @@ export function getAvailablePublicMethods(config: PortalAuthConfigData): PublicM
 export function resolveMilitarEmail(militar: any): { email: string | null; tipo: 'funcional' | 'particular' | null } {
   if (!militar) return { email: null, tipo: null };
 
-  const funcional = militar.email_funcional?.trim();
+  const funcional = (
+    militar.email_funcional ||
+    militar.email ||
+    militar.contato?.email_funcional ||
+    militar.dados_pessoais?.email_funcional ||
+    ''
+  ).trim();
   if (funcional && isValidEmail(funcional)) {
     return { email: funcional, tipo: 'funcional' };
   }
 
-  const particular = militar.email_particular?.trim();
+  const particular = (
+    militar.email_particular ||
+    militar.email_pessoal ||
+    militar.contato?.email ||
+    militar.contato?.email_particular ||
+    militar.dados_pessoais?.email ||
+    militar.dados_pessoais?.email_particular ||
+    ''
+  ).trim();
   if (particular && isValidEmail(particular)) {
     return { email: particular, tipo: 'particular' };
   }
@@ -151,7 +165,17 @@ export function resolveMilitarEmail(militar: any): { email: string | null; tipo:
 export function resolveMilitarTelefone(militar: any): { telefone: string | null; formatted: string | null } {
   if (!militar) return { telefone: null, formatted: null };
 
-  const rawPhone = militar.telefone_celular || militar.celular || militar.telefone || militar.telefone_recado;
+  const rawPhone =
+    militar.telefone_celular ||
+    militar.celular ||
+    militar.whatsapp ||
+    militar.telefone ||
+    militar.telefone_recado ||
+    militar.contato?.telefone ||
+    militar.contato?.celular ||
+    militar.dados_pessoais?.telefone ||
+    militar.dados_pessoais?.celular;
+
   if (!rawPhone) return { telefone: null, formatted: null };
 
   const formatted = normalizeWhatsAppNumber(rawPhone);
