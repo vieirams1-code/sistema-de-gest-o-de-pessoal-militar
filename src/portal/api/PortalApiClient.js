@@ -130,7 +130,11 @@ export async function portalFetch(functionName, data = {}) {
       clearPortalToken();
     }
     const body = sdkErr?.response?.data || sdkErr?.data || {};
-    const err = new Error(body?.error || sdkErr.message || 'Falha na comunicação com o servidor.');
+    let errorMsg = body?.error || sdkErr?.message || 'Falha na comunicação com o servidor.';
+    if (typeof errorMsg === 'string' && (errorMsg.toLowerCase() === 'user-exception' || errorMsg.toLowerCase().includes('user-exception'))) {
+      errorMsg = body?.error || 'Não foi possível processar a solicitação no momento. Tente novamente.';
+    }
+    const err = new Error(errorMsg);
     err.status = status;
     err.data = body;
     throw err;

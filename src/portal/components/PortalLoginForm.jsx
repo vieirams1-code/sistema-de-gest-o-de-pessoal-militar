@@ -76,6 +76,11 @@ export default function PortalLoginForm() {
       if (availableMethods.length === 1) {
         const singleChannel = availableMethods[0].canal;
         setSelectedChannel(singleChannel);
+        setStep('OTP');
+        setOtpDigits(['', '', '', '', '', '']);
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus();
+        }, 150);
         await triggerSendOtp(response.request_id, singleChannel);
       } else {
         // Mais de um método disponível: usuário escolhe
@@ -95,9 +100,9 @@ export default function PortalLoginForm() {
     setErrorMsg(null);
     try {
       const response = await enviarOtp(reqId, canal);
-      setSuccessMsg(response.message || 'Código enviado com sucesso.');
-      setResendCountdown(response.reenvio_em || 60);
-      setExpireCountdown(response.expira_em || 300);
+      setSuccessMsg(response?.message || 'Código enviado com sucesso.');
+      setResendCountdown(response?.reenvio_em || 60);
+      setExpireCountdown(response?.expira_em || 300);
       setOtpDigits(['', '', '', '', '', '']);
       setStep('OTP');
       // Foca no primeiro campo do OTP
@@ -105,7 +110,8 @@ export default function PortalLoginForm() {
         otpInputRefs.current[0]?.focus();
       }, 100);
     } catch (err) {
-      setErrorMsg(err.message || 'Falha ao enviar código de acesso.');
+      console.warn('Falha no envio do OTP:', err);
+      setErrorMsg(err.message || 'Se você possui cadastro ativo, o código foi enviado.');
     } finally {
       setLoading(false);
     }
