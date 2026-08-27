@@ -239,4 +239,32 @@ export async function submeterOpcaoFerias({
   });
 }
 
+/**
+ * Consulta todas as campanhas ativas aplicáveis ao militar e o status de resposta.
+ */
+export async function getCampanhasAtivas() {
+  return portalFetch('portal_servicos', { acao: 'CAMPANHAS_ATIVAS_MILITAR_GET' });
+}
+
+/**
+ * Consulta a definição completa e formulário dinâmico / documento de uma campanha.
+ */
+export async function getCampanhaFormulario(campanha_id) {
+  return portalFetch('portal_servicos', {
+    acao: 'CAMPANHA_FORMULARIO_OBTER',
+    campanha_id,
+  });
+}
+
+/**
+ * Submete a resposta de um formulário dinâmico ou documento assinado.
+ */
+export async function submeterRespostaCampanha(payload) {
+  return portalFetch('portal_servicos', {
+    acao: 'CAMPANHA_FORMULARIO_SUBMETER',
+    ...payload,
+  });
+}
+
+
 

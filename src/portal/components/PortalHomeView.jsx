@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../context/PortalAuthContext';
 import PortalCadastroView from './PortalCadastroView';
 import PortalFeriasView from './PortalFeriasView';
+import PortalCampanhaView from './PortalCampanhaView';
+import { getCampanhasAtivas } from '../api/PortalApiClient';
 import {
   UserCheck,
   Calendar,
@@ -12,20 +14,59 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
+  Megaphone,
+  CheckCircle2,
+  AlertCircle,
+  FileSignature,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-export default function PortalHomeView({ initialView }) {
+export default function PortalHomeView({ initialView, campanhaIdParam }) {
   const { militar, logout } = usePortalAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [campanhasAtivas, setCampanhasAtivas] = useState([]);
+  const [loadingCampanhas, setLoadingCampanhas] = useState(false);
+  const [selectedCampanhaId, setSelectedCampanhaId] = useState(campanhaIdParam || null);
+
+  useEffect(() => {
+    async function carregarCampanhas() {
+      if (!militar) return;
+      setLoadingCampanhas(true);
+      try {
+        const res = await getCampanhasAtivas();
+        setCampanhasAtivas(res?.campanhas || []);
+      } catch (err) {
+        console.warn('Falha ao carregar campanhas ativas:', err);
+      } finally {
+        setLoadingCampanhas(false);
+      }
+    }
+    carregarCampanhas();
+  }, [militar]);
 
   if (!militar) return null;
 
   const pathname = (location.pathname || '').toLowerCase();
 
   // Roteamento direto por URL ou prop initialView
+  if (selectedCampanhaId || pathname.includes('/campanha/')) {
+    const idFromPath = pathname.split('/campanha/')[1];
+    const targetId = selectedCampanhaId || idFromPath;
+    return (
+      <PortalCampanhaView
+        campanhaId={targetId}
+        onBack={() => {
+          setSelectedCampanhaId(null);
+          navigate('/portal');
+        }}
+      />
+    );
+  }
+
   if (initialView === 'CADASTRO' || pathname.includes('/cadastro') || pathname.includes('/conferencia') || pathname.includes('portalcadastro')) {
     return <PortalCadastroView onBack={() => navigate('/portal')} />;
   }
@@ -37,6 +78,10 @@ export default function PortalHomeView({ initialView }) {
   const initials = militar.nome_guerra
     ? militar.nome_guerra.slice(0, 2).toUpperCase()
     : (militar.nome_completo ? militar.nome_completo.slice(0, 2).toUpperCase() : 'BM');
+
+  const campanhasCustomizadas = campanhasAtivas.filter(
+    (c) => c.tipo === 'FORMULARIO_DINAMICO' || c.tipo === 'ASSINATURA_DOCUMENTO'
+  );
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -98,6 +143,76 @@ export default function PortalHomeView({ initialView }) {
           </div>
         </div>
       </div>
+
+      {/* SEÇÃO DE CAMPANHAS E FORMULÁRIOS DINÂMICOS EM ABERTO */}
+      {campanhasCustomizadas.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-base font-bold text-slate-800 flex items-center">
+              <Megaphone className="w-4 h-4 mr-2 text-indigo-600" />
+              Campanhas e Formulários Oficiais ({campanhasCustomizadas.length})
+            </h3>
+            <span className="text-xs text-slate-500 font-medium">Demandas da Gestão / Comando</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {campanhasCustomizadas.map((camp) => {
+              const isResp = camp.status_resposta === 'Respondido';
+              const isAssinatura = camp.tipo === 'ASSINATURA_DOCUMENTO';
+
+              return (
+                <Card
+                  key={camp.id}
+                  onClick={() => setSelectedCampanhaId(camp.id)}
+                  className={`hover:shadow-md transition-all border-slate-200 cursor-pointer group bg-white ${
+                    isResp ? 'hover:border-emerald-600/40' : 'hover:border-indigo-600/40'
+                  }`}
+                >
+                  <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform ${
+                        isAssinatura ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700'
+                      }`}>
+                        {isAssinatura ? <FileSignature className="w-5 h-5" /> : <Layers className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <CardTitle className="text-sm font-bold text-slate-800 group-hover:text-indigo-900 transition-colors line-clamp-1">
+                            {camp.titulo}
+                          </CardTitle>
+                        </div>
+                        <CardDescription className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                          {camp.instrucoes || (isAssinatura ? 'Assinatura e devolução de documento' : 'Preenchimento de formulário')}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-700 transition-colors shrink-0" />
+                  </CardHeader>
+
+                  <CardContent className="p-4 pt-1 sm:p-5 sm:pt-1 flex items-center justify-between text-xs border-t border-slate-50 mt-2">
+                    <span className="text-slate-400 text-[11px] flex items-center">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Prazo: <strong className="ml-1 text-slate-600">{formatarDataBR(camp.data_fim_militar)}</strong>
+                    </span>
+
+                    {isResp ? (
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-bold flex items-center">
+                        <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
+                        Respondido
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md text-[10px] font-bold flex items-center">
+                        <AlertCircle className="w-3 h-3 mr-1 text-amber-600" />
+                        Pendente
+                      </span>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* GRADE DE SERVIÇOS E AUTOATENDIMENTO */}
       <div>

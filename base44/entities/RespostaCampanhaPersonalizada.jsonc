@@ -1,0 +1,77 @@
+{
+  "name": "RespostaCampanhaPersonalizada",
+  "type": "object",
+  "title": "Resposta de Campanha e Formulário do Portal",
+  "description": "Armazena as respostas preenchidas pelos militares em campanhas de formulários dinâmicos e devolução de documentos assinados.",
+  "properties": {
+    "campanha_id": {
+      "type": "string",
+      "description": "ID da CampanhaPortal associada"
+    },
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar que respondeu"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "militar_lotacao": {
+      "type": "string"
+    },
+    "militar_celular": {
+      "type": "string"
+    },
+    "respostas_json": {
+      "type": "string",
+      "description": "JSON com as respostas de cada campo do formulário { [campo_id]: valor }"
+    },
+    "arquivos_anexados_json": {
+      "type": "string",
+      "description": "JSON com os arquivos anexados por campo { [campo_id]: { url, nome, tamanho } }"
+    },
+    "arquivo_devolucao_url": {
+      "type": "string",
+      "description": "URL do arquivo assinado devolvido pelo militar (campanhas de assinatura)"
+    },
+    "arquivo_devolucao_nome": {
+      "type": "string",
+      "description": "Nome do arquivo assinado devolvido"
+    },
+    "resposta_texto_geral": {
+      "type": "string",
+      "description": "Texto/justificativa geral fornecida pelo militar"
+    },
+    "termo_aceite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Confirmação do termo de ciência ou declaração"
+    },
+    "data_envio": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Enviado", "Homologado", "Rejeitado", "Pendente_Correcao"],
+      "default": "Enviado"
+    },
+    "observacao_gestor": {
+      "type": "string",
+      "description": "Despacho ou observação do gestor/RH"
+    },
+    "homologado_por_nome": {
+      "type": "string"
+    },
+    "data_homologacao": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["campanha_id", "militar_id"]
+}

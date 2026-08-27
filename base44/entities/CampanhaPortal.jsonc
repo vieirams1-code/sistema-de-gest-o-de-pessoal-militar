@@ -6,7 +6,7 @@
   "properties": {
     "tipo": {
       "type": "string",
-      "enum": ["PLANO_FERIAS", "ATUALIZACAO_CADASTRAL", "CONFERENCIA_GERAL"],
+      "enum": ["PLANO_FERIAS", "ATUALIZACAO_CADASTRAL", "CONFERENCIA_GERAL", "ASSINATURA_DOCUMENTO", "FORMULARIO_DINAMICO"],
       "description": "Tipo da ação atribuída ao militar"
     },
     "titulo": {
@@ -21,6 +21,27 @@
       "type": "string",
       "enum": ["Rascunho", "Aberta_Coleta", "Em_Homologacao", "Homologada", "Encerrada"],
       "default": "Aberta_Coleta"
+    },
+    "config_formulario": {
+      "type": "string",
+      "description": "JSON com a definição dos campos e perguntas do formulário dinâmico"
+    },
+    "arquivo_modelo_url": {
+      "type": "string",
+      "description": "URL do arquivo modelo disponibilizado pelo gestor para download"
+    },
+    "arquivo_modelo_nome": {
+      "type": "string",
+      "description": "Nome original do arquivo modelo disponibilizado"
+    },
+    "exigir_devolucao_arquivo": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se o militar é obrigado a enviar um arquivo assinado/comprovante"
+    },
+    "texto_termo_aceite": {
+      "type": "string",
+      "description": "Texto do termo de declaração/ciência a ser marcado pelo militar"
     },
     "tipo_escopo": {
       "type": "string",

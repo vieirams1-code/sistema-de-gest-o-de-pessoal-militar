@@ -193,6 +193,11 @@ Deno.serve(async (req: Request) => {
             data_fim_unidade: cp.data_fim_unidade || '',
             instrucoes: cp.instrucoes || '',
             config_regras: JSON.stringify(cp.config_regras || {}),
+            config_formulario: typeof cp.config_formulario === 'object' ? JSON.stringify(cp.config_formulario) : (cp.config_formulario || ''),
+            arquivo_modelo_url: cp.arquivo_modelo_url || '',
+            arquivo_modelo_nome: cp.arquivo_modelo_nome || '',
+            exigir_devolucao_arquivo: Boolean(cp.exigir_devolucao_arquivo),
+            texto_termo_aceite: cp.texto_termo_aceite || '',
             total_publico_alvo: militaresEscopo.length,
             total_respondidos: 0,
             total_pendentes: militaresEscopo.length,
@@ -318,6 +323,14 @@ Deno.serve(async (req: Request) => {
               ano_referencia: campanha.ano_referencia,
             });
             (opcoes || []).forEach((op: any) => respostasMap.set(op.militar_id, op));
+          } else if (campanha.tipo === 'FORMULARIO_DINAMICO' || campanha.tipo === 'ASSINATURA_DOCUMENTO') {
+            let resps: any[] = [];
+            try {
+              resps = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({
+                campanha_id: campanha.id,
+              });
+            } catch (_eResps) {}
+            (resps || []).forEach((r: any) => respostasMap.set(r.militar_id, r));
           } else {
             const solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.list();
             (solicitacoes || []).forEach((sol: any) => respostasMap.set(sol.militar_id, sol));
@@ -325,8 +338,24 @@ Deno.serve(async (req: Request) => {
 
           const relacaoNominal = militaresNoEscopo.map((m) => {
             const resposta = respostasMap.get(m.id);
-            const conferiuRecentemente = m.data_ultima_conferencia && campanha.data_inicio && m.data_ultima_conferencia >= campanha.data_inicio;
+            const isCadastral = campanha.tipo === 'ATUALIZACAO_CADASTRAL' || campanha.tipo === 'CONFERENCIA_GERAL';
+            const conferiuRecentemente = isCadastral && m.data_ultima_conferencia && campanha.data_inicio && m.data_ultima_conferencia >= campanha.data_inicio;
             const respondido = Boolean(resposta || conferiuRecentemente);
+
+            let detalhesTexto = null;
+            if (resposta) {
+              if (campanha.tipo === 'PLANO_FERIAS') {
+                detalhesTexto = resposta.opcao_1_meses;
+              } else if (campanha.tipo === 'ASSINATURA_DOCUMENTO') {
+                detalhesTexto = resposta.arquivo_devolucao_nome ? `Documento: ${resposta.arquivo_devolucao_nome}` : 'Documento assinado';
+              } else if (campanha.tipo === 'FORMULARIO_DINAMICO') {
+                detalhesTexto = resposta.resposta_texto_geral || 'Formulário respondido';
+              } else {
+                detalhesTexto = resposta.valor_proposto || 'Solicitação enviada';
+              }
+            } else if (conferiuRecentemente) {
+              detalhesTexto = 'Dados confirmados sem alteração';
+            }
 
             return {
               militar_id: m.id,
@@ -336,8 +365,10 @@ Deno.serve(async (req: Request) => {
               militar_lotacao: m.lotacao || m.estrutura_nome || 'Não informada',
               militar_celular: m.telefone_celular || m.telefone || '',
               status_resposta: respondido ? 'Respondido' : 'Pendente',
-              data_resposta: resposta?.data_envio_militar || resposta?.created_date || (conferiuRecentemente ? m.data_ultima_conferencia : null),
-              detalhes_resposta: resposta?.opcao_1_meses || resposta?.valor_proposto || (conferiuRecentemente ? 'Dados confirmados sem alteração' : null),
+              status_homologacao: resposta?.status || (respondido ? 'Enviado' : 'Pendente'),
+              data_resposta: resposta?.data_envio || resposta?.data_envio_militar || resposta?.created_date || (conferiuRecentemente ? m.data_ultima_conferencia : null),
+              detalhes_resposta: detalhesTexto,
+              resposta_completa: resposta || null,
             };
           });
 
@@ -361,6 +392,29 @@ Deno.serve(async (req: Request) => {
             percentual: relacaoNominal.length > 0 ? Math.round((totalRespondidos / relacaoNominal.length) * 100) : 0,
             militares: relacaoNominal,
           }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Homologação de Resposta de Campanha Personalizada / Documento
+        case 'CAMPANHA_HOMOLOGAR_RESPOSTA': {
+          const { resposta_id, status, observacao_gestor } = payload;
+          if (!resposta_id || !status) {
+            return new Response(JSON.stringify({ error: 'ID da resposta e status são obrigatórios.' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+
+          const resp = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.update(resposta_id, {
+            status,
+            observacao_gestor: observacao_gestor || '',
+            homologado_por_nome: user.email || 'Gestor / RH',
+            data_homologacao: new Date().toISOString(),
+          });
+
+          return new Response(JSON.stringify({ ok: true, resposta: resp, message: 'Resposta avaliada com sucesso.' }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -393,6 +447,11 @@ Deno.serve(async (req: Request) => {
             escopo_unidades_nomes: campanha_payload.escopo_unidades_nomes,
             escopo_quadros: campanha_payload.escopo_quadros,
             config_regras: JSON.stringify(campanha_payload.config_regras || {}),
+            config_formulario: typeof campanha_payload.config_formulario === 'object' ? JSON.stringify(campanha_payload.config_formulario) : (campanha_payload.config_formulario || ''),
+            arquivo_modelo_url: campanha_payload.arquivo_modelo_url || '',
+            arquivo_modelo_nome: campanha_payload.arquivo_modelo_nome || '',
+            exigir_devolucao_arquivo: Boolean(campanha_payload.exigir_devolucao_arquivo),
+            texto_termo_aceite: campanha_payload.texto_termo_aceite || '',
           });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
@@ -1632,6 +1691,295 @@ Deno.serve(async (req: Request) => {
           ok: true,
           message: `Suas 3 opções de férias para o plano de ${anoCampanha} foram registradas com sucesso!`,
           opcao: salvoRecord,
+        }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Consulta de Todas as Campanhas Ativas com Status de Resposta do Militar
+      case 'CAMPANHAS_ATIVAS_MILITAR_GET': {
+        let respostasPersonalizadas: any[] = [];
+        try {
+          respostasPersonalizadas = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ militar_id: militarId });
+        } catch (_e) {}
+
+        let opcoesFerias: any[] = [];
+        try {
+          opcoesFerias = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
+        } catch (_e) {}
+
+        const campanhasEnriquecidas = campanhasAtivasMilitar.map((cp: any) => {
+          let statusResposta = 'Pendente';
+          let dataResposta = null;
+          let respostaId = null;
+
+          if (cp.tipo === 'PLANO_FERIAS') {
+            const op = opcoesFerias.find((o: any) => o.campanha_id === cp.id || o.ano_referencia === cp.ano_referencia);
+            if (op) {
+              statusResposta = 'Respondido';
+              dataResposta = op.data_envio_militar || op.created_date;
+              respostaId = op.id;
+            }
+          } else if (cp.tipo === 'ATUALIZACAO_CADASTRAL' || cp.tipo === 'CONFERENCIA_GERAL') {
+            const conferiu = militar.data_ultima_conferencia && cp.data_inicio && militar.data_ultima_conferencia >= cp.data_inicio;
+            if (conferiu) {
+              statusResposta = 'Respondido';
+              dataResposta = militar.data_ultima_conferencia;
+            }
+          } else {
+            const resp = respostasPersonalizadas.find((r: any) => r.campanha_id === cp.id);
+            if (resp) {
+              statusResposta = resp.status === 'Rejeitado' ? 'Pendente_Correcao' : 'Respondido';
+              dataResposta = resp.data_envio || resp.created_date;
+              respostaId = resp.id;
+            }
+          }
+
+          let formConfig: any = null;
+          if (cp.config_formulario) {
+            try {
+              formConfig = typeof cp.config_formulario === 'string' ? JSON.parse(cp.config_formulario) : cp.config_formulario;
+            } catch (_eFmt) {}
+          }
+
+          return {
+            id: cp.id,
+            tipo: cp.tipo,
+            titulo: cp.titulo,
+            ano_referencia: cp.ano_referencia,
+            data_inicio: cp.data_inicio,
+            data_fim_militar: cp.data_fim_militar,
+            instrucoes: cp.instrucoes,
+            status_resposta: statusResposta,
+            data_resposta: dataResposta,
+            resposta_id: respostaId,
+            arquivo_modelo_url: cp.arquivo_modelo_url,
+            arquivo_modelo_nome: cp.arquivo_modelo_nome,
+            exigir_devolucao_arquivo: Boolean(cp.exigir_devolucao_arquivo),
+            texto_termo_aceite: cp.texto_termo_aceite,
+            total_perguntas: formConfig?.campos?.length || 0,
+          };
+        });
+
+        return new Response(JSON.stringify({
+          ok: true,
+          campanhas: campanhasEnriquecidas,
+          total_pendentes: campanhasEnriquecidas.filter((c) => c.status_resposta === 'Pendente' || c.status_resposta === 'Pendente_Correcao').length,
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Obter Detalhes de Campanha Dinâmica / Documento para o Militar
+      case 'CAMPANHA_FORMULARIO_OBTER': {
+        const { campanha_id } = payload;
+        if (!campanha_id) {
+          return new Response(JSON.stringify({ error: 'ID da campanha é obrigatório.' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+        if (!campanha) {
+          return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        let respostaExistente: any = null;
+        try {
+          const resps = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({
+            campanha_id,
+            militar_id: militarId,
+          });
+          if (Array.isArray(resps) && resps.length > 0) {
+            respostaExistente = resps[0];
+          }
+        } catch (_e) {}
+
+        let formConfig: any = { campos: [] };
+        if (campanha.config_formulario) {
+          try {
+            formConfig = typeof campanha.config_formulario === 'string' ? JSON.parse(campanha.config_formulario) : campanha.config_formulario;
+          } catch (_eFmt) {}
+        }
+
+        let respostasParsed: any = {};
+        if (respostaExistente?.respostas_json) {
+          try {
+            respostasParsed = typeof respostaExistente.respostas_json === 'string' ? JSON.parse(respostaExistente.respostas_json) : respostaExistente.respostas_json;
+          } catch (_eR) {}
+        }
+
+        let arquivosParsed: any = {};
+        if (respostaExistente?.arquivos_anexados_json) {
+          try {
+            arquivosParsed = typeof respostaExistente.arquivos_anexados_json === 'string' ? JSON.parse(respostaExistente.arquivos_anexados_json) : respostaExistente.arquivos_anexados_json;
+          } catch (_eA) {}
+        }
+
+        return new Response(JSON.stringify({
+          ok: true,
+          campanha: {
+            id: campanha.id,
+            tipo: campanha.tipo,
+            titulo: campanha.titulo,
+            ano_referencia: campanha.ano_referencia,
+            data_inicio: campanha.data_inicio,
+            data_fim_militar: campanha.data_fim_militar,
+            instrucoes: campanha.instrucoes,
+            arquivo_modelo_url: campanha.arquivo_modelo_url,
+            arquivo_modelo_nome: campanha.arquivo_modelo_nome,
+            exigir_devolucao_arquivo: Boolean(campanha.exigir_devolucao_arquivo),
+            texto_termo_aceite: campanha.texto_termo_aceite,
+            formulario: formConfig,
+          },
+          resposta_existente: respostaExistente ? {
+            id: respostaExistente.id,
+            status: respostaExistente.status,
+            data_envio: respostaExistente.data_envio,
+            resposta_texto_geral: respostaExistente.resposta_texto_geral,
+            arquivo_devolucao_url: respostaExistente.arquivo_devolucao_url,
+            arquivo_devolucao_nome: respostaExistente.arquivo_devolucao_nome,
+            termo_aceite: respostaExistente.termo_aceite,
+            observacao_gestor: respostaExistente.observacao_gestor,
+            respostas: respostasParsed,
+            arquivos_anexados: arquivosParsed,
+          } : null,
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Submeter Resposta de Campanha Dinâmica / Documento
+      case 'CAMPANHA_FORMULARIO_SUBMETER': {
+        const {
+          campanha_id,
+          respostas_json,
+          arquivos_anexados_json,
+          arquivo_devolucao_url,
+          arquivo_devolucao_nome,
+          resposta_texto_geral,
+          termo_aceite,
+        } = payload;
+
+        if (!campanha_id) {
+          return new Response(JSON.stringify({ error: 'ID da campanha é obrigatório.' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+        if (!campanha) {
+          return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Validação de Campos Obrigatórios para Formulário Dinâmico
+        let formConfig: any = { campos: [] };
+        if (campanha.config_formulario) {
+          try {
+            formConfig = typeof campanha.config_formulario === 'string' ? JSON.parse(campanha.config_formulario) : campanha.config_formulario;
+          } catch (_eFmt) {}
+        }
+
+        const camposObrigatorios = (formConfig?.campos || []).filter((c: any) => c.obrigatorio === true);
+        const respostasObj = typeof respostas_json === 'object' ? (respostas_json || {}) : (JSON.parse(respostas_json || '{}'));
+        const arquivosObj = typeof arquivos_anexados_json === 'object' ? (arquivos_anexados_json || {}) : (JSON.parse(arquivos_anexados_json || '{}'));
+
+        for (const c of camposObrigatorios) {
+          if (c.tipo === 'upload_arquivo') {
+            if (!arquivosObj[c.id]?.url && !arquivosObj[c.id]) {
+              return new Response(JSON.stringify({ error: `O anexo da pergunta "${c.pergunta}" é obrigatório.` }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            }
+          } else {
+            const val = respostasObj[c.id];
+            if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0)) {
+              return new Response(JSON.stringify({ error: `A pergunta "${c.pergunta}" é de preenchimento obrigatório.` }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            }
+          }
+        }
+
+        // Validação para Assinatura de Documento
+        if (campanha.tipo === 'ASSINATURA_DOCUMENTO' && campanha.exigir_devolucao_arquivo) {
+          if (!arquivo_devolucao_url) {
+            return new Response(JSON.stringify({ error: 'É obrigatório anexar o documento assinado para concluir o envio.' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        // Validação de Termo de Aceite
+        if (campanha.texto_termo_aceite && termo_aceite !== true) {
+          return new Response(JSON.stringify({ error: 'Você deve marcar o termo de ciência e declaração para continuar.' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        let existentes: any[] = [];
+        try {
+          existentes = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({
+            campanha_id,
+            militar_id: militarId,
+          });
+        } catch (_e) {}
+
+        const respostaPayload = {
+          campanha_id,
+          militar_id: militarId,
+          militar_nome: militar.nome_completo || militar.nome_guerra || '',
+          militar_matricula: militar.matricula || '',
+          militar_posto: militar.posto_graduacao || '',
+          militar_lotacao: militar.lotacao || militar.estrutura_nome || '',
+          militar_celular: militar.telefone_celular || militar.telefone || '',
+          respostas_json: JSON.stringify(respostasObj),
+          arquivos_anexados_json: JSON.stringify(arquivosObj),
+          arquivo_devolucao_url: arquivo_devolucao_url || '',
+          arquivo_devolucao_nome: arquivo_devolucao_nome || '',
+          resposta_texto_geral: resposta_texto_geral || '',
+          termo_aceite: Boolean(termo_aceite),
+          data_envio: new Date().toISOString(),
+          status: 'Enviado',
+        };
+
+        let salvo: any;
+        if (existentes?.[0]?.id) {
+          salvo = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.update(existentes[0].id, respostaPayload);
+        } else {
+          salvo = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.create(respostaPayload);
+        }
+
+        await registrarAuditoriaPortal(base44, {
+          sessao_id: sessionAuth.context.sessao_id,
+          militar_id: militarId,
+          acao: 'CAMPANHA_FORMULARIO_RESPONDIDO',
+          resultado: true,
+          motivo_falha_sanitizado: null,
+          ip_origem: extractClientIp(req),
+          user_agent: extractUserAgent(req),
+          correlation_id: correlationId,
+        });
+
+        return new Response(JSON.stringify({
+          ok: true,
+          message: 'Sua resposta foi enviada com sucesso ao Comando / RH!',
+          resposta: salvo,
         }), {
           status: 201,
           headers: { 'Content-Type': 'application/json' },
