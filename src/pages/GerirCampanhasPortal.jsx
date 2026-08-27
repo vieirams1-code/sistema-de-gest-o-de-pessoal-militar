@@ -26,9 +26,18 @@ import {
   Check,
   X,
   Play,
+  FolderDown,
+  Paperclip,
+  Clock,
+  Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  baixarAnexosCampanhaZip,
+  exportarPlanilhaCampanhaExcel,
+  exportarPlanilhaCampanhaCsv,
+} from '@/utils/portalCampanhasExport';
 
 const TIPOS_CAMPOS_FORMULARIO = [
   { tipo: 'texto_curto', label: 'Texto Curto', icone: '📝', desc: 'Para nomes, termos ou respostas pontuais' },
@@ -43,29 +52,43 @@ const TIPOS_CAMPOS_FORMULARIO = [
 ];
 
 export default function GerirCampanhasPortal() {
+  const [activeTab, setActiveTab] = useState('campanhas'); // 'campanhas' | 'respostas'
   const [campanhas, setCampanhas] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
 
-  // Filtros e Paginação (Tabela)
+  // Filtros e Paginação (Tabela de Campanhas)
   const [searchTerm, setSearchTerm] = useState('');
   const [mostrarArquivadas, setMostrarArquivadas] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
   const [buscaUnidade, setBuscaUnidade] = useState('');
+
+  // Estado da Central de Respostas & Entregas
+  const [campanhaSelecionadaRespostas, setCampanhaSelecionadaRespostas] = useState(null);
+  const [respostasData, setRespostasData] = useState(null);
+  const [loadingRespostas, setLoadingRespostas] = useState(false);
+  const [buscaRespostas, setBuscaRespostas] = useState('');
+  const [filtroStatusRespostas, setFiltroStatusRespostas] = useState('TODOS'); // 'TODOS' | 'Respondido' | 'Pendente'
+  const [filtroLotacaoRespostas, setFiltroLotacaoRespostas] = useState('');
+  const [paginaRespostas, setPaginaRespostas] = useState(1);
+  const respostasPorPagina = 15;
+
+  // Estado do Modal de Progresso do ZIP
+  const [zipProgress, setZipProgress] = useState(null); // { open, atual, total, texto, loading }
 
   // Modal de Criação / Edição de Campanha
   const [modalNovaCampanha, setModalNovaCampanha] = useState({
     open: false,
     isEditing: false,
     editId: null,
-    tipo: 'PLANO_FERIAS', // 'PLANO_FERIAS' | 'ATUALIZACAO_CADASTRAL' | 'ASSINATURA_DOCUMENTO' | 'FORMULARIO_DINAMICO'
+    tipo: 'PLANO_FERIAS',
+    status: 'Aberta_Coleta',
     titulo: 'Plano Anual de Férias 2027',
     ano_referencia: new Date().getFullYear() + 1,
-    tipo_escopo: 'TODOS', // 'TODOS' | 'UNIDADES' | 'QUADROS'
+    tipo_escopo: 'TODOS',
     escopo_unidades_ids: [],
     escopo_quadros: [],
     data_inicio: new Date().toISOString().split('T')[0],
@@ -77,16 +100,8 @@ export default function GerirCampanhasPortal() {
     arquivo_modelo_nome: '',
     exigir_devolucao_arquivo: true,
     texto_termo_aceite: '',
-    campos_formulario: [], // Perguntas do formulário dinâmico
+    campos_formulario: [],
     previewMode: false,
-  });
-
-  // Modal / Drawer de Retorno e Acompanhamento Nominal
-  const [detalhesRetorno, setDetalhesRetorno] = useState({
-    open: false,
-    campanha: null,
-    dados: null,
-    filtro: 'TODOS', // 'TODOS' | 'Pendente' | 'Respondido'
   });
 
   // Modal de Visualização da Resposta Completa de um Militar
@@ -102,7 +117,8 @@ export default function GerirCampanhasPortal() {
     setFeedback({ type: '', msg: '' });
     try {
       const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
-      setCampanhas(res.data?.campanhas || []);
+      const lista = res.data?.campanhas || [];
+      setCampanhas(lista);
 
       let unidades = [];
       try {
@@ -135,6 +151,19 @@ export default function GerirCampanhasPortal() {
       }
 
       setUnidadesList(unidades || []);
+
+      // Se houver campanha selecionada para respostas, atualiza os dados dela
+      if (campanhaSelecionadaRespostas) {
+        const atualizada = lista.find((c) => c.id === campanhaSelecionadaRespostas.id);
+        if (atualizada) {
+          setCampanhaSelecionadaRespostas(atualizada);
+          await carregarRespostasCampanha(atualizada);
+        }
+      } else if (lista.length > 0) {
+        // Pré-seleciona a primeira campanha ativa
+        const primeiraAtiva = lista.find((c) => c.status === 'Aberta_Coleta') || lista[0];
+        setCampanhaSelecionadaRespostas(primeiraAtiva);
+      }
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do painel.' });
     } finally {
@@ -146,6 +175,31 @@ export default function GerirCampanhasPortal() {
     carregarDados();
   }, []);
 
+  // Carrega respostas nominais de uma campanha para a aba Central de Respostas
+  const carregarRespostasCampanha = async (camp) => {
+    if (!camp?.id) return;
+    setLoadingRespostas(true);
+    try {
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_DETALHES_RETORNO',
+        campanha_id: camp.id,
+      });
+      setRespostasData(res.data);
+      setPaginaRespostas(1);
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar respostas da campanha.' });
+    } finally {
+      setLoadingRespostas(false);
+    }
+  };
+
+  const handleSelecionarCampanhaRespostas = async (campId) => {
+    const camp = campanhas.find((c) => c.id === campId);
+    if (!camp) return;
+    setCampanhaSelecionadaRespostas(camp);
+    await carregarRespostasCampanha(camp);
+  };
+
   const abrirCriacaoCampanha = (tipo) => {
     setBuscaUnidade('');
     const ano = new Date().getFullYear() + 1;
@@ -155,6 +209,7 @@ export default function GerirCampanhasPortal() {
         isEditing: false,
         editId: null,
         tipo: 'PLANO_FERIAS',
+        status: 'Aberta_Coleta',
         titulo: `Plano Anual de Férias ${ano}`,
         ano_referencia: ano,
         tipo_escopo: 'TODOS',
@@ -184,15 +239,16 @@ export default function GerirCampanhasPortal() {
         isEditing: false,
         editId: null,
         tipo: 'ATUALIZACAO_CADASTRAL',
+        status: 'Aberta_Coleta',
         titulo: `Recadastramento & Conferência Anual Obrigatória ${new Date().getFullYear()}`,
         ano_referencia: new Date().getFullYear(),
         tipo_escopo: 'TODOS',
         escopo_unidades_ids: [],
         escopo_quadros: [],
         data_inicio: new Date().toISOString().split('T')[0],
-        data_fim_militar: `${new Date().getFullYear()}-11-15`,
-        data_fim_unidade: `${new Date().getFullYear()}-11-30`,
-        instrucoes: 'Conferência cadastral obrigatória de dados pessoais, contatos, endereço, CNH e dependentes.',
+        data_fim_militar: `${new Date().getFullYear()}-12-15`,
+        data_fim_unidade: `${new Date().getFullYear()}-12-20`,
+        instrucoes: 'Prezados militares, revisem atentamente seus dados cadastrais no portal para assegurar a conformidade funcional.',
         config_regras: {},
         arquivo_modelo_url: '',
         arquivo_modelo_nome: '',
@@ -207,39 +263,41 @@ export default function GerirCampanhasPortal() {
         isEditing: false,
         editId: null,
         tipo: 'ASSINATURA_DOCUMENTO',
-        titulo: `Entrega de Declaração de Bens e Renda ${new Date().getFullYear()}`,
+        status: 'Aberta_Coleta',
+        titulo: 'Declaração e Termo de Ciência Funcional',
         ano_referencia: new Date().getFullYear(),
         tipo_escopo: 'TODOS',
         escopo_unidades_ids: [],
         escopo_quadros: [],
         data_inicio: new Date().toISOString().split('T')[0],
-        data_fim_militar: `${new Date().getFullYear()}-11-30`,
-        data_fim_unidade: `${new Date().getFullYear()}-12-15`,
-        instrucoes: 'Baixe o modelo oficial disponibilizado abaixo, preencha, assine e anexe de volta em formato PDF para conferência do RH.',
+        data_fim_militar: '',
+        data_fim_unidade: '',
+        instrucoes: 'Baixe o documento modelo anexo, preencha, assine digitalmente ou fisicamente e reenvie pelo Portal.',
         config_regras: {},
         arquivo_modelo_url: '',
         arquivo_modelo_nome: '',
         exigir_devolucao_arquivo: true,
-        texto_termo_aceite: 'Declaro sob as penas da lei a exatidão e autenticidade dos dados e documentos apresentados.',
+        texto_termo_aceite: 'Declaro para os devidos fins que as informações prestadas são verdadeiras.',
         campos_formulario: [],
         previewMode: false,
       });
     } else {
-      // FORMULARIO_DINAMICO (Google Forms)
+      // FORMULARIO_DINAMICO
       setModalNovaCampanha({
         open: true,
         isEditing: false,
         editId: null,
         tipo: 'FORMULARIO_DINAMICO',
-        titulo: `Formulário de Levantamento de Informações ${new Date().getFullYear()}`,
+        status: 'Aberta_Coleta',
+        titulo: 'Pesquisa / Formulário de Levantamento',
         ano_referencia: new Date().getFullYear(),
         tipo_escopo: 'TODOS',
         escopo_unidades_ids: [],
         escopo_quadros: [],
         data_inicio: new Date().toISOString().split('T')[0],
-        data_fim_militar: `${new Date().getFullYear()}-11-30`,
-        data_fim_unidade: `${new Date().getFullYear()}-12-15`,
-        instrucoes: 'Prezados militares, solicitamos o preenchimento das perguntas abaixo para atualização de cadastro e levantamento institucional.',
+        data_fim_militar: '',
+        data_fim_unidade: '',
+        instrucoes: 'Por favor, responda às perguntas abaixo conforme as orientações.',
         config_regras: {},
         arquivo_modelo_url: '',
         arquivo_modelo_nome: '',
@@ -247,12 +305,14 @@ export default function GerirCampanhasPortal() {
         texto_termo_aceite: '',
         campos_formulario: [
           {
-            id: 'campo_1',
+            id: 'campo_' + Date.now(),
             tipo: 'texto_curto',
-            pergunta: 'Qual sua principal área de atuação ou especialidade?',
-            descricao_ajuda: 'Ex: Resgate, Salvamento em Altura, Combate a Incêndio, Vistoria Técnica',
+            pergunta: 'Qual o seu curso de especialização prioritário?',
+            descricao_ajuda: '',
             obrigatorio: true,
             opcoes: [],
+            arquivo_modelo_url: '',
+            arquivo_modelo_nome: '',
           },
         ],
         previewMode: false,
@@ -308,7 +368,6 @@ export default function GerirCampanhasPortal() {
     });
   };
 
-  // Funções do Construtor de Perguntas do Formulário Dinâmico
   const handleAdicionarPergunta = (tipo = 'texto_curto') => {
     const novoId = 'campo_' + Date.now();
     const novoCampo = {
@@ -327,156 +386,136 @@ export default function GerirCampanhasPortal() {
     }));
   };
 
-  const handleEditarPergunta = (idx, chave, valor) => {
+  const handleEditarPergunta = (index, chave, valor) => {
     setModalNovaCampanha((prev) => {
       const novos = [...prev.campos_formulario];
-      novos[idx] = { ...novos[idx], [chave]: valor };
+      novos[index] = { ...novos[index], [chave]: valor };
       return { ...prev, campos_formulario: novos };
     });
   };
 
-  const handleRemoverPergunta = (idx) => {
+  const handleRemoverPergunta = (index) => {
+    setModalNovaCampanha((prev) => ({
+      ...prev,
+      campos_formulario: prev.campos_formulario.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleAdicionarOpcao = (perguntaIndex) => {
     setModalNovaCampanha((prev) => {
       const novos = [...prev.campos_formulario];
-      novos.splice(idx, 1);
+      const opcoesAtuais = novos[perguntaIndex].opcoes || [];
+      novos[perguntaIndex] = {
+        ...novos[perguntaIndex],
+        opcoes: [...opcoesAtuais, `Opção ${opcoesAtuais.length + 1}`],
+      };
       return { ...prev, campos_formulario: novos };
     });
   };
 
-  const handleMoverPergunta = (idx, direcao) => {
+  const handleEditarOpcao = (perguntaIndex, opcaoIndex, valor) => {
     setModalNovaCampanha((prev) => {
       const novos = [...prev.campos_formulario];
-      const targetIdx = idx + direcao;
-      if (targetIdx < 0 || targetIdx >= novos.length) return prev;
-      const temp = novos[idx];
-      novos[idx] = novos[targetIdx];
-      novos[targetIdx] = temp;
+      const opcoesAtuais = [...(novos[perguntaIndex].opcoes || [])];
+      opcoesAtuais[opcaoIndex] = valor;
+      novos[perguntaIndex] = { ...novos[perguntaIndex], opcoes: opcoesAtuais };
       return { ...prev, campos_formulario: novos };
     });
   };
 
-  const handleAdicionarOpcao = (campoIdx) => {
+  const handleRemoverOpcao = (perguntaIndex, opcaoIndex) => {
     setModalNovaCampanha((prev) => {
       const novos = [...prev.campos_formulario];
-      const c = novos[campoIdx];
-      const count = (c.opcoes || []).length + 1;
-      novos[campoIdx] = { ...c, opcoes: [...(c.opcoes || []), `Opção ${count}`] };
+      const opcoesAtuais = (novos[perguntaIndex].opcoes || []).filter((_, i) => i !== opcaoIndex);
+      novos[perguntaIndex] = { ...novos[perguntaIndex], opcoes: opcoesAtuais };
       return { ...prev, campos_formulario: novos };
     });
   };
 
-  const handleEditarOpcao = (campoIdx, opIdx, novoValor) => {
-    setModalNovaCampanha((prev) => {
-      const novos = [...prev.campos_formulario];
-      const c = novos[campoIdx];
-      const novasOpcoes = [...(c.opcoes || [])];
-      novasOpcoes[opIdx] = novoValor;
-      novos[campoIdx] = { ...c, opcoes: novasOpcoes };
-      return { ...prev, campos_formulario: novos };
-    });
-  };
-
-  const handleRemoverOpcao = (campoIdx, opIdx) => {
-    setModalNovaCampanha((prev) => {
-      const novos = [...prev.campos_formulario];
-      const c = novos[campoIdx];
-      const novasOpcoes = (c.opcoes || []).filter((_, i) => i !== opIdx);
-      novos[campoIdx] = { ...c, opcoes: novasOpcoes };
-      return { ...prev, campos_formulario: novos };
-    });
-  };
-
-  // Upload de arquivo modelo da campanha pelo Gestor
-  const handleUploadModeloGestor = async (file, campoIdx = null) => {
+  const handleUploadModeloGestor = async (file, perguntaIndex = null) => {
     if (!file) return;
     setActionLoading(true);
     try {
-      const uploadRes = await base44.integrations.Core.UploadFile({ file });
-      const fileUrl = uploadRes?.file_url || uploadRes?.url;
-      if (!fileUrl) throw new Error('Não foi possível obter URL do arquivo.');
-
-      if (campoIdx !== null) {
-        handleEditarPergunta(campoIdx, 'arquivo_modelo_url', fileUrl);
-        handleEditarPergunta(campoIdx, 'arquivo_modelo_nome', file.name);
-      } else {
-        setModalNovaCampanha((prev) => ({
-          ...prev,
-          arquivo_modelo_url: fileUrl,
-          arquivo_modelo_nome: file.name,
-        }));
+      const res = await base44.integrations.Core.UploadFile({ file });
+      if (res?.file_url) {
+        if (perguntaIndex !== null) {
+          handleEditarPergunta(perguntaIndex, 'arquivo_modelo_url', res.file_url);
+          handleEditarPergunta(perguntaIndex, 'arquivo_modelo_nome', file.name);
+        } else {
+          setModalNovaCampanha((prev) => ({
+            ...prev,
+            arquivo_modelo_url: res.file_url,
+            arquivo_modelo_nome: file.name,
+          }));
+        }
+        setFeedback({ type: 'success', msg: `Arquivo modelo "${file.name}" anexado com sucesso!` });
       }
-      setFeedback({ type: 'success', msg: `Arquivo modelo "${file.name}" anexado com sucesso!` });
     } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao anexar arquivo modelo.' });
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao enviar arquivo modelo.' });
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleToggleUnidadeEscopo = (uId) => {
-    const ids = [...modalNovaCampanha.escopo_unidades_ids];
-    if (ids.includes(uId)) {
-      setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: ids.filter((id) => id !== uId) });
-    } else {
-      setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: [...ids, uId] });
-    }
-  };
-
-  const handleSelecionarTodasUnidades = () => {
-    const allIds = unidadesList.map((u) => u.id);
-    setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: allIds });
-  };
-
-  const handleLimparSelecaoUnidades = () => {
-    setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: [] });
-  };
-
   const handleSalvarCampanha = async (e) => {
     e.preventDefault();
-    if (modalNovaCampanha.tipo_escopo === 'UNIDADES' && modalNovaCampanha.escopo_unidades_ids.length === 0) {
-      setFeedback({ type: 'error', msg: 'Por favor, selecione ao menos uma unidade para o escopo.' });
+    if (!modalNovaCampanha.titulo.trim()) {
+      alert('Por favor, informe o título da campanha.');
       return;
     }
 
-    if (modalNovaCampanha.tipo === 'FORMULARIO_DINAMICO' && modalNovaCampanha.campos_formulario.length === 0) {
-      setFeedback({ type: 'error', msg: 'Adicione ao menos uma pergunta no formulário dinâmico antes de salvar.' });
+    if (modalNovaCampanha.tipo_escopo === 'UNIDADES' && modalNovaCampanha.escopo_unidades_ids.length === 0) {
+      alert('Selecione ao menos uma unidade para o escopo.');
       return;
     }
 
     setActionLoading(true);
     setFeedback({ type: '', msg: '' });
 
-    let unidadesNomes = 'Toda a Corporação';
-    if (modalNovaCampanha.tipo_escopo === 'UNIDADES' && modalNovaCampanha.escopo_unidades_ids.length > 0) {
-      const nomes = unidadesList
-        .filter((u) => modalNovaCampanha.escopo_unidades_ids.includes(u.id))
-        .map((u) => u.nome || u.sigla || u.id);
-      unidadesNomes = nomes.slice(0, 3).join(', ') + (nomes.length > 3 ? ` (+${nomes.length - 3} unidades)` : '');
-    }
-
-    const payloadCampanha = {
-      ...modalNovaCampanha,
-      escopo_unidades_nomes: unidadesNomes,
-      config_formulario: JSON.stringify({ campos: modalNovaCampanha.campos_formulario || [] }),
-    };
-
     try {
+      const nomesUnidades = modalNovaCampanha.escopo_unidades_ids
+        .map((id) => unidadesList.find((u) => u.id === id)?.nome || id)
+        .join(', ');
+
+      const payload = {
+        titulo: modalNovaCampanha.titulo,
+        tipo: modalNovaCampanha.tipo,
+        status: modalNovaCampanha.status || 'Aberta_Coleta',
+        ano_referencia: Number(modalNovaCampanha.ano_referencia) || undefined,
+        tipo_escopo: modalNovaCampanha.tipo_escopo,
+        escopo_unidades_ids: modalNovaCampanha.escopo_unidades_ids,
+        escopo_unidades_nomes: nomesUnidades,
+        escopo_quadros: modalNovaCampanha.escopo_quadros,
+        data_inicio: modalNovaCampanha.data_inicio,
+        data_fim_militar: modalNovaCampitar || modalNovaCampanha.data_fim_militar,
+        data_fim_unidade: modalNovaCampanha.data_fim_unidade,
+        instrucoes: modalNovaCampanha.instrucoes,
+        config_regras: modalNovaCampanha.config_regras,
+        arquivo_modelo_url: modalNovaCampanha.arquivo_modelo_url,
+        arquivo_modelo_nome: modalNovaCampanha.arquivo_modelo_nome,
+        exigir_devolucao_arquivo: modalNovaCampanha.exigir_devolucao_arquivo,
+        texto_termo_aceite: modalNovaCampanha.texto_termo_aceite,
+        config_formulario: {
+          campos: modalNovaCampanha.campos_formulario,
+        },
+      };
+
       if (modalNovaCampanha.isEditing) {
         await base44.functions.invoke('portal_servicos', {
           acao: 'CAMPANHA_EDITAR',
           campanha_id: modalNovaCampanha.editId,
-          campanha_payload: payloadCampanha,
+          campanha_payload: payload,
         });
-        setFeedback({ type: 'success', msg: `Campanha "${modalNovaCampanha.titulo}" atualizada com sucesso!` });
+        setFeedback({ type: 'success', msg: 'Campanha atualizada com sucesso!' });
       } else {
-        const res = await base44.functions.invoke('portal_servicos', {
+        await base44.functions.invoke('portal_servicos', {
           acao: 'CAMPANHA_CRIAR',
-          campanha_payload: payloadCampanha,
+          campanha_payload: payload,
         });
-        setFeedback({ type: 'success', msg: `Campanha "${res.data?.campanha?.titulo}" lançada com sucesso no Portal!` });
+        setFeedback({ type: 'success', msg: 'Campanha criada e aberta aos militares com sucesso!' });
       }
 
-      setModalNovaCampanha({ ...modalNovaCampanha, open: false });
+      setModalNovaCampanha((prev) => ({ ...prev, open: false }));
       await carregarDados();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar campanha.' });
@@ -486,7 +525,9 @@ export default function GerirCampanhasPortal() {
   };
 
   const handleExcluirCampanha = async (camp) => {
-    if (!window.confirm(`Tem certeza que deseja EXCLUIR permanentemente a campanha "${camp.titulo}"?`)) return;
+    if (!window.confirm(`Tem certeza que deseja excluir a campanha "${camp.titulo}"? Esta ação removerá a campanha do portal.`)) {
+      return;
+    }
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
@@ -503,7 +544,6 @@ export default function GerirCampanhasPortal() {
   };
 
   const handleArquivarCampanha = async (camp) => {
-    if (!window.confirm(`Deseja arquivar a campanha "${camp.titulo}"?`)) return;
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
@@ -536,25 +576,10 @@ export default function GerirCampanhasPortal() {
     }
   };
 
-  const handleAbrirRetorno = async (camp) => {
-    setActionLoading(true);
-    try {
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_DETALHES_RETORNO',
-        campanha_id: camp.id,
-      });
-
-      setDetalhesRetorno({
-        open: true,
-        campanha: camp,
-        dados: res.data,
-        filtro: 'TODOS',
-      });
-    } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao buscar retorno da campanha.' });
-    } finally {
-      setActionLoading(false);
-    }
+  const handleAbrirCentralRespostas = async (camp) => {
+    setCampanhaSelecionadaRespostas(camp);
+    setActiveTab('respostas');
+    await carregarRespostasCampanha(camp);
   };
 
   const handleDispararLembretes = async (campId) => {
@@ -573,101 +598,64 @@ export default function GerirCampanhasPortal() {
     }
   };
 
-  // Exportação de Dados para CSV com suporte UTF-8 BOM
-  const handleExportarPlanilha = () => {
-    const campanha = detalhesRetorno.campanha;
-    const militares = detalhesRetorno.dados?.militares || [];
-    if (!campanha || militares.length === 0) {
-      alert('Não há dados disponíveis para exportação.');
+  // Funções de Exportação Avançada da Central de Respostas
+  const handleBaixarZipLote = async () => {
+    if (!campanhaSelecionadaRespostas || !respostasData?.militares) {
+      alert('Não há dados carregados para download de anexos.');
       return;
     }
-
-    let formCampos = [];
-    if (campanha.config_formulario) {
-      try {
-        const parsed = typeof campanha.config_formulario === 'string' ? JSON.parse(campanha.config_formulario) : campanha.config_formulario;
-        formCampos = parsed?.campos || [];
-      } catch (_e) {}
-    }
-
-    // Monta Cabeçalhos do CSV
-    let headers = ['Matrícula', 'Posto/Graduação', 'Nome Completo', 'Lotação', 'Celular', 'Status Resposta', 'Data Resposta'];
-
-    if (campanha.tipo === 'FORMULARIO_DINAMICO') {
-      formCampos.forEach((c) => {
-        headers.push(`"${c.pergunta.replace(/"/g, '""')}"`);
+    setZipProgress({ open: true, atual: 0, total: 0, texto: 'Iniciando preparação do pacote...', loading: true });
+    try {
+      const res = await baixarAnexosCampanhaZip(
+        campanhaSelecionadaRespostas,
+        respostasData.militares,
+        (atual, total, texto) => {
+          setZipProgress({ open: true, atual, total, texto, loading: true });
+        }
+      );
+      setZipProgress({
+        open: true,
+        atual: res.totalBaixados,
+        total: res.totalEsperados,
+        texto: `Sucesso! ${res.totalBaixados} arquivo(s) compactado(s) e renomeados no padrão militar.`,
+        loading: false,
       });
-    } else if (campanha.tipo === 'ASSINATURA_DOCUMENTO') {
-      headers.push('Arquivo Devolvido URL', 'Arquivo Devolvido Nome', 'Termo Ciência');
-    } else if (campanha.tipo === 'PLANO_FERIAS') {
-      headers.push('Opção 1', 'Opção 2', 'Opção 3');
-    } else {
-      headers.push('Detalhes');
+      setTimeout(() => {
+        setZipProgress(null);
+      }, 4000);
+    } catch (err) {
+      setZipProgress(null);
+      alert(err.message || 'Erro ao gerar pacote ZIP de anexos.');
     }
-
-    // Linhas
-    const rows = militares.map((m) => {
-      const resp = m.resposta_completa || {};
-      let respostasObj = {};
-      let arquivosObj = {};
-      if (resp.respostas_json) {
-        try {
-          respostasObj = typeof resp.respostas_json === 'string' ? JSON.parse(resp.respostas_json) : resp.respostas_json;
-        } catch (_e) {}
-      }
-      if (resp.arquivos_anexados_json) {
-        try {
-          arquivosObj = typeof resp.arquivos_anexados_json === 'string' ? JSON.parse(resp.arquivos_anexados_json) : resp.arquivos_anexados_json;
-        } catch (_e) {}
-      }
-
-      const row = [
-        `"${m.militar_matricula || ''}"`,
-        `"${m.militar_posto || ''}"`,
-        `"${m.militar_nome || ''}"`,
-        `"${m.militar_lotacao || ''}"`,
-        `"${m.militar_celular || ''}"`,
-        `"${m.status_resposta || 'Pendente'}"`,
-        `"${m.data_resposta || ''}"`,
-      ];
-
-      if (campanha.tipo === 'FORMULARIO_DINAMICO') {
-        formCampos.forEach((c) => {
-          if (c.tipo === 'upload_arquivo') {
-            const anexo = arquivosObj[c.id];
-            row.push(`"${anexo?.url || ''}"`);
-          } else {
-            const val = respostasObj[c.id];
-            const strVal = Array.isArray(val) ? val.join(', ') : (val !== undefined && val !== null ? String(val) : '');
-            row.push(`"${strVal.replace(/"/g, '""')}"`);
-          }
-        });
-      } else if (campanha.tipo === 'ASSINATURA_DOCUMENTO') {
-        row.push(
-          `"${resp.arquivo_devolucao_url || ''}"`,
-          `"${resp.arquivo_devolucao_nome || ''}"`,
-          `"${resp.termo_aceite ? 'Sim' : 'Não'}"`
-        );
-      } else if (campanha.tipo === 'PLANO_FERIAS') {
-        row.push(`"${m.detalhes_resposta || ''}"`, '""', '""');
-      } else {
-        row.push(`"${m.detalhes_resposta || ''}"`);
-      }
-
-      return row.join(';');
-    });
-
-    const csvContent = '\uFEFF' + headers.join(';') + '\n' + rows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `retorno_${campanha.titulo.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
+  const handleExportarExcel = () => {
+    if (!campanhaSelecionadaRespostas || !respostasData?.militares) {
+      alert('Não há dados para exportação.');
+      return;
+    }
+    try {
+      exportarPlanilhaCampanhaExcel(campanhaSelecionadaRespostas, respostasData.militares);
+      setFeedback({ type: 'success', msg: 'Planilha Excel gerada e baixada com sucesso!' });
+    } catch (err) {
+      alert(err.message || 'Falha ao exportar planilha Excel.');
+    }
+  };
+
+  const handleExportarCsv = () => {
+    if (!campanhaSelecionadaRespostas || !respostasData?.militares) {
+      alert('Não há dados para exportação.');
+      return;
+    }
+    try {
+      exportarPlanilhaCampanhaCsv(campanhaSelecionadaRespostas, respostasData.militares);
+      setFeedback({ type: 'success', msg: 'Arquivo CSV (UTF-8) gerado com sucesso!' });
+    } catch (err) {
+      alert(err.message || 'Falha ao exportar CSV.');
+    }
+  };
+
+  // Filtros de Campanhas
   const campanhasFiltradas = useMemo(() => {
     return campanhas.filter((camp) => {
       if (!mostrarArquivadas && camp.status === 'Arquivada') return false;
@@ -681,59 +669,106 @@ export default function GerirCampanhasPortal() {
       }
       return true;
     });
-  }, [campanhas, searchTerm, mostrarArquivadas]);
+  }, [campanhas, mostrarArquivadas, searchTerm]);
 
-  const totalItems = campanhasFiltradas.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const validCurrentPage = Math.min(currentPage, totalPages);
-
+  // Paginação de Campanhas
+  const totalPages = Math.ceil(campanhasFiltradas.length / itemsPerPage) || 1;
   const currentItems = useMemo(() => {
-    const start = (validCurrentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return campanhasFiltradas.slice(start, end);
-  }, [campanhasFiltradas, validCurrentPage, itemsPerPage]);
+    const start = (currentPage - 1) * itemsPerPage;
+    return campanhasFiltradas.slice(start, start + itemsPerPage);
+  }, [campanhasFiltradas, currentPage]);
 
-  const handlePrevPage = () => setCurrentPage((p) => Math.max(1, p - 1));
-  const handleNextPage = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
+  // Filtro de Respostas Nominais na Central de Respostas
+  const militaresRespostasFiltrados = useMemo(() => {
+    const lista = respostasData?.militares || [];
+    const termo = (buscaRespostas || '').toLowerCase();
 
-  const unidadesFiltradas = unidadesList.filter((u) => {
-    if (!buscaUnidade.trim()) return true;
-    return (u.nome || u.id || '').toLowerCase().includes(buscaUnidade.toLowerCase().trim());
-  });
+    return lista.filter((m) => {
+      if (filtroStatusRespostas !== 'TODOS' && m.status_resposta !== filtroStatusRespostas) return false;
+      if (filtroLotacaoRespostas && m.militar_lotacao !== filtroLotacaoRespostas) return false;
+      if (termo) {
+        const matchNome = (m.militar_nome || '').toLowerCase().includes(termo);
+        const matchMat = (m.militar_matricula || '').toLowerCase().includes(termo);
+        const matchPosto = (m.militar_posto || '').toLowerCase().includes(termo);
+        const matchLot = (m.militar_lotacao || '').toLowerCase().includes(termo);
+        if (!matchNome && !matchMat && !matchPosto && !matchLot) return false;
+      }
+      return true;
+    });
+  }, [respostasData, buscaRespostas, filtroStatusRespostas, filtroLotacaoRespostas]);
 
-  const militaresFiltrados = (detalhesRetorno.dados?.militares || []).filter((m) => {
-    if (detalhesRetorno.filtro === 'TODOS') return true;
-    return m.status_resposta === detalhesRetorno.filtro;
-  });
+  // Paginação de Respostas Nominais
+  const totalPaginasRespostas = Math.ceil(militaresRespostasFiltrados.length / respostasPorPagina) || 1;
+  const currentRespostasItems = useMemo(() => {
+    const start = (paginaRespostas - 1) * respostasPorPagina;
+    return militaresRespostasFiltrados.slice(start, start + respostasPorPagina);
+  }, [militaresRespostasFiltrados, paginaRespostas]);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-500 font-medium">Carregando painel de campanhas...</p>
-      </div>
-    );
-  }
+  // Perguntas dinâmicas da campanha selecionada
+  const perguntasCampanhaSelecionada = useMemo(() => {
+    if (!campanhaSelecionadaRespostas?.config_formulario) return [];
+    try {
+      const p = typeof campanhaSelecionadaRespostas.config_formulario === 'string'
+        ? JSON.parse(campanhaSelecionadaRespostas.config_formulario)
+        : campanhaSelecionadaRespostas.config_formulario;
+      return p?.campos || [];
+    } catch (_e) {
+      return [];
+    }
+  }, [campanhaSelecionadaRespostas]);
+
+  // Contagem de anexos na campanha atual
+  const contagemAnexosCampanha = useMemo(() => {
+    if (!respostasData?.militares) return 0;
+    let count = 0;
+    respostasData.militares.forEach((m) => {
+      if (m.status_resposta !== 'Respondido' || !m.resposta_completa) return;
+      const resp = m.resposta_completa;
+      if (resp.arquivo_devolucao_url) count++;
+      if (resp.arquivos_anexados_json) {
+        try {
+          const arqObj = typeof resp.arquivos_anexados_json === 'string'
+            ? JSON.parse(resp.arquivos_anexados_json)
+            : resp.arquivos_anexados_json;
+          Object.values(arqObj || {}).forEach((item) => {
+            if (item && (typeof item === 'string' || item.url)) count++;
+          });
+        } catch (_e) {}
+      }
+    });
+    return count;
+  }, [respostasData]);
+
+  // Lista de lotações únicas para o filtro da Central de Respostas
+  const lotacoesDisponiveisRespostas = useMemo(() => {
+    const distinct = new Set();
+    (respostasData?.militares || []).forEach((m) => {
+      if (m.militar_lotacao) distinct.add(m.militar_lotacao);
+    });
+    return Array.from(distinct).sort();
+  }, [respostasData]);
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* CABEÇALHO PRINCIPAL COM BOTÕES DE AÇÃO */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* HEADER PRINCIPAL */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-[#1e3a5f] text-white flex items-center justify-center shadow-md">
               <Megaphone className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-extrabold text-[#1e3a5f] tracking-tight">
-                Gestor de Campanhas & Formulários do Portal
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Gestor de Campanhas & Portal do Militar
               </h1>
               <p className="text-xs text-slate-500">
-                Lance planos de férias, atualizações cadastrais, devolução de documentos e formulários dinâmicos com adesão nominal em tempo real
+                Gerencie planos de férias, conferências cadastrais, formulários com anexo e auditoria nominal
               </p>
             </div>
           </div>
 
+          {/* BOTÕES DE NOVA CAMPANHA */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -759,7 +794,7 @@ export default function GerirCampanhasPortal() {
               className="bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
               <FileSignature className="w-3.5 h-3.5 mr-1" />
-              Nova Assinatura de Documento
+              Nova Assinatura Doc
             </Button>
 
             <Button
@@ -768,9 +803,48 @@ export default function GerirCampanhasPortal() {
               className="bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
               <Layers className="w-3.5 h-3.5 mr-1" />
-              Novo Formulário Dinâmico
+              Novo Formulário
             </Button>
           </div>
+        </div>
+
+        {/* NAVEGAÇÃO ENTRE ABAS */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('campanhas')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'campanhas'
+                ? 'bg-[#1e3a5f] text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Megaphone className="w-4 h-4" />
+            Campanhas & Configuração ({campanhas.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('respostas');
+              if (!campanhaSelecionadaRespostas && campanhas.length > 0) {
+                handleSelecionarCampanhaRespostas(campanhas[0].id);
+              }
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'respostas'
+                ? 'bg-[#1e3a5f] text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Central de Respostas & Entregas
+            {campanhaSelecionadaRespostas && (
+              <span className="px-2 py-0.5 rounded-md bg-blue-100 text-[#1e3a5f] text-[10px] font-extrabold max-w-[180px] truncate">
+                {campanhaSelecionadaRespostas.titulo}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* FEEDBACK ALERTS */}
@@ -783,315 +857,816 @@ export default function GerirCampanhasPortal() {
           </div>
         )}
 
-        {/* LISTA DE CAMPANHAS ATIVAS & HISTÓRICO */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          {/* TOOLBAR DA TABELA */}
-          <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm gap-3">
-            <div className="flex items-center gap-3">
-              <div className="relative">
+        {/* ========================================================================= */}
+        {/* ABA 1: LISTA DE CAMPANHAS & CONFIGURAÇÕES */}
+        {/* ========================================================================= */}
+        {activeTab === 'campanhas' && (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
+            {/* TOOLBAR DA TABELA */}
+            <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm gap-3">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Filtrar campanhas..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-9 pr-4 py-1.5 border border-slate-300 rounded-lg text-xs w-64 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
+                <button
+                  type="button"
+                  onClick={carregarDados}
+                  disabled={loading}
+                  className="flex items-center gap-1 hover:text-slate-900 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </button>
+
+                <label className="flex items-center gap-2 cursor-pointer hover:text-slate-900">
+                  <input
+                    type="checkbox"
+                    checked={mostrarArquivadas}
+                    onChange={(e) => {
+                      setMostrarArquivadas(e.target.checked);
+                      setCurrentPage(1);
+                    }}
+                    className="rounded text-[#1e3a5f] focus:ring-[#1e3a5f] border-slate-300"
+                  />
+                  Mostrar arquivadas
+                </label>
+              </div>
+            </div>
+
+            {/* CORPO DA TABELA DE CAMPANHAS */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider border-b border-slate-200">
+                    <th className="p-4 font-semibold min-w-[220px]">Nome da Campanha</th>
+                    <th className="p-4 font-semibold">Tipo</th>
+                    <th className="p-4 font-semibold">Status</th>
+                    <th className="p-4 font-semibold">Público Alvo</th>
+                    <th className="p-4 font-semibold min-w-[120px]">Período</th>
+                    <th className="p-4 font-semibold w-48">Adesão</th>
+                    <th className="p-4 font-semibold text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-sm">
+                  {currentItems.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="p-8 text-center text-slate-500">
+                        Nenhuma campanha encontrada com os filtros atuais.
+                      </td>
+                    </tr>
+                  ) : (
+                    currentItems.map((camp) => {
+                      const totalAlvo = camp.total_publico_alvo || 0;
+                      const respondidos = camp.total_respondidos || 0;
+                      const percentual = totalAlvo > 0 ? Math.round((respondidos / totalAlvo) * 100) : 0;
+                      const isFerias = camp.tipo === 'PLANO_FERIAS';
+                      const isCadastro = camp.tipo === 'ATUALIZACAO_CADASTRAL' || camp.tipo === 'CONFERENCIA_GERAL';
+                      const isAssinatura = camp.tipo === 'ASSINATURA_DOCUMENTO';
+                      const isEncerrada = camp.status === 'Encerrada';
+                      const isArquivada = camp.status === 'Arquivada';
+
+                      let statusStyles = { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500 animate-pulse', label: 'Ativa' };
+                      if (isArquivada) statusStyles = { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300', label: 'Arquivada' };
+                      else if (isEncerrada) statusStyles = { bg: 'bg-slate-100', text: 'text-slate-800', dot: 'bg-slate-500', label: 'Encerrada' };
+                      else if (camp.status === 'Aberta_Coleta') statusStyles = { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500 animate-pulse', label: 'Aberta' };
+
+                      return (
+                        <tr key={camp.id} className="hover:bg-blue-50/50 transition-colors bg-white">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                isFerias ? 'bg-emerald-50 text-emerald-700' :
+                                isCadastro ? 'bg-blue-50 text-blue-700' :
+                                isAssinatura ? 'bg-amber-50 text-amber-700' :
+                                'bg-purple-50 text-purple-700'
+                              }`}>
+                                {isFerias ? <Calendar className="w-4 h-4" /> :
+                                 isCadastro ? <UserCheck className="w-4 h-4" /> :
+                                 isAssinatura ? <FileSignature className="w-4 h-4" /> :
+                                 <Layers className="w-4 h-4" />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-bold text-slate-800">{camp.titulo}</p>
+                                  {(() => {
+                                    let cr = {};
+                                    try {
+                                      cr = typeof camp.config_regras === 'string' ? JSON.parse(camp.config_regras) : (camp.config_regras || {});
+                                    } catch (_e) {}
+                                    return cr?.exigir_atualizacao_cadastral ? (
+                                      <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold inline-flex items-center gap-0.5" title="Exige Atualização Cadastral prévia">
+                                        <Link2 className="w-2.5 h-2.5" />
+                                        Cascata
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                </div>
+                                <p className="text-xs text-slate-500 truncate max-w-[200px]" title={camp.instrucoes}>{camp.instrucoes}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              isFerias ? 'bg-emerald-100 text-emerald-800' :
+                              isCadastro ? 'bg-blue-100 text-blue-800' :
+                              isAssinatura ? 'bg-amber-100 text-amber-900' :
+                              'bg-purple-100 text-purple-900'
+                            }`}>
+                              {isFerias ? 'Férias' :
+                               isCadastro ? 'Cadastro' :
+                               isAssinatura ? 'Assinatura Doc' :
+                               'Formulário'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles.bg} ${statusStyles.text}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`}></span>
+                              {statusStyles.label}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-600">
+                            <div className="line-clamp-2 max-w-[200px]" title={camp.escopo_unidades_nomes || 'Toda a Corporação'}>
+                              {camp.escopo_unidades_nomes || 'Toda a Corporação'}
+                            </div>
+                            <span className="text-xs font-medium text-slate-400">({totalAlvo})</span>
+                          </td>
+                          <td className="p-4 text-slate-600">
+                            <div className="flex flex-col">
+                              <span className="text-xs">Início: {camp.data_inicio || '-'}</span>
+                              <span className={`font-medium text-xs mt-0.5 ${isArquivada ? 'text-slate-500' : 'text-[#1e3a5f]'}`}>
+                                Prazo: {camp.data_fim_militar || 'Não definido'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-between mb-1 text-xs">
+                              <span className="font-medium text-slate-700">{respondidos}/{totalAlvo}</span>
+                              <span className={`font-bold ${isArquivada ? 'text-slate-500' : 'text-[#1e3a5f]'}`}>
+                                {percentual}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-1.5">
+                              <div
+                                className={`${isArquivada ? 'bg-slate-400' : percentual >= 80 ? 'bg-emerald-500' : percentual >= 40 ? 'bg-blue-500' : 'bg-amber-500'} h-1.5 rounded-full transition-all duration-500`}
+                                style={{ width: `${percentual}%` }}
+                              ></div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-end gap-1">
+                              {camp.status !== 'Aberta_Coleta' && (
+                                <button
+                                  onClick={() => handleReabrirCampanha(camp)}
+                                  disabled={actionLoading}
+                                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                  title="Reabrir Coleta no Portal"
+                                >
+                                  <Play className="w-4 h-4" />
+                                </button>
+                              )}
+                              {camp.status === 'Aberta_Coleta' && (
+                                <button
+                                  onClick={() => handleDispararLembretes(camp.id)}
+                                  disabled={actionLoading}
+                                  className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                                  title="Disparar Lembretes"
+                                >
+                                  <Bell className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleAbrirCentralRespostas(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-[#1e3a5f] hover:bg-blue-50 rounded transition-colors"
+                                title="Abrir Central de Respostas & Entregas"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => abrirEdicaoCampanha(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
+                                title="Editar"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+
+                              {!isArquivada && <div className="w-px h-4 bg-slate-300 mx-1"></div>}
+
+                              {!isArquivada && (
+                                <button
+                                  onClick={() => handleArquivarCampanha(camp)}
+                                  disabled={actionLoading}
+                                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
+                                  title="Arquivar"
+                                >
+                                  <Archive className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {!isArquivada && (
+                                <button
+                                  onClick={() => handleExcluirCampanha(camp)}
+                                  disabled={actionLoading}
+                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* PAGINAÇÃO DE CAMPANHAS */}
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+                <div>
+                  Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, campanhasFiltradas.length)} de {campanhasFiltradas.length} campanhas
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-2"
+                  >
+                    Anterior
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <Button
+                      key={p}
+                      type="button"
+                      variant={currentPage === p ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(p)}
+                      className={`h-8 w-8 p-0 ${currentPage === p ? 'bg-[#1e3a5f] text-white' : ''}`}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-2"
+                  >
+                    Próximo
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ABA 2: CENTRAL DE RESPOSTAS & ENTREGAS (RESULTADOS NOMINAIS & EXPORTAÇÃO) */}
+        {/* ========================================================================= */}
+        {activeTab === 'respostas' && (
+          <div className="space-y-5">
+            
+            {/* SELETOR DE CAMPANHA & AÇÕES DE EXPORTAÇÃO */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto flex-1">
+                <span className="text-xs font-bold text-slate-500 uppercase shrink-0 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-[#1e3a5f]" />
+                  Campanha:
+                </span>
+                <select
+                  value={campanhaSelecionadaRespostas?.id || ''}
+                  onChange={(e) => handleSelecionarCampanhaRespostas(e.target.value)}
+                  className="w-full md:max-w-md h-10 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-[#1e3a5f] outline-none focus:ring-2 focus:ring-[#1e3a5f]"
+                >
+                  {campanhas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.tipo === 'PLANO_FERIAS' ? '🏖️ ' : c.tipo === 'ASSINATURA_DOCUMENTO' ? '📁 ' : c.tipo === 'ATUALIZACAO_CADASTRAL' ? '🪪 ' : '📋 '}
+                      {c.titulo} ({c.status || 'Aberta'})
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex items-center gap-2 mt-1 sm:mt-0">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    {campanhaSelecionadaRespostas?.tipo === 'PLANO_FERIAS' ? 'Plano de Férias' :
+                     campanhaSelecionadaRespostas?.tipo === 'ASSINATURA_DOCUMENTO' ? 'Assinatura Documento' :
+                     campanhaSelecionadaRespostas?.tipo === 'ATUALIZACAO_CADASTRAL' ? 'Atualização Cadastral' : 'Formulário Dinâmico'}
+                  </span>
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center gap-1.5 ${
+                    campanhaSelecionadaRespostas?.status === 'Aberta_Coleta' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${campanhaSelecionadaRespostas?.status === 'Aberta_Coleta' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                    {campanhaSelecionadaRespostas?.status === 'Aberta_Coleta' ? 'Aberta' : (campanhaSelecionadaRespostas?.status || 'Ativa')}
+                  </span>
+                </div>
+              </div>
+
+              {/* BOTÕES DE EXPORTAÇÃO */}
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+                <Button
+                  type="button"
+                  onClick={() => carregarRespostasCampanha(campanhaSelecionadaRespostas)}
+                  disabled={loadingRespostas}
+                  variant="outline"
+                  className="h-10 text-xs font-semibold rounded-xl"
+                  title="Recarregar Respostas"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loadingRespostas ? 'animate-spin' : ''}`} />
+                  Recarregar
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleExportarExcel}
+                  disabled={loadingRespostas || !respostasData?.militares?.length}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white h-10 text-xs font-bold rounded-xl shadow-xs px-3.5"
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+                  Excel (.xlsx)
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleExportarCsv}
+                  disabled={loadingRespostas || !respostasData?.militares?.length}
+                  variant="outline"
+                  className="h-10 text-xs font-semibold rounded-xl"
+                >
+                  CSV
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleBaixarZipLote}
+                  disabled={loadingRespostas || contagemAnexosCampanha === 0}
+                  className="bg-blue-700 hover:bg-blue-800 text-white h-10 text-xs font-bold rounded-xl shadow-xs px-3.5 disabled:opacity-40"
+                  title={contagemAnexosCampanha === 0 ? 'Esta campanha não possui uploads de arquivos' : 'Baixar todos os anexos renomeados'}
+                >
+                  <FolderDown className="w-4 h-4 mr-1.5" />
+                  Baixar Todos Anexos (ZIP)
+                </Button>
+              </div>
+            </div>
+
+            {/* KPI CARDS RESUMO */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-500 uppercase">Público Alvo</p>
+                  <h3 className="text-2xl font-black text-slate-900 mt-0.5">
+                    {loadingRespostas ? '...' : respostasData?.total_alvo || 0}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {campanhaSelecionadaRespostas?.escopo_unidades_nomes || 'Toda a Corporação'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1e3a5f] flex items-center justify-center font-bold">
+                  <Users className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-500 uppercase">Respondidos</p>
+                  <h3 className="text-2xl font-black text-emerald-600 mt-0.5">
+                    {loadingRespostas ? '...' : respostasData?.total_respondidos || 0}
+                  </h3>
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                    {loadingRespostas ? '' : `${respostasData?.percentual || 0}% de adesão`}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-500 uppercase">Pendentes</p>
+                  <h3 className="text-2xl font-black text-amber-600 mt-0.5">
+                    {loadingRespostas ? '...' : respostasData?.total_pendentes || 0}
+                  </h3>
+                  <p className="text-[11px] text-amber-600 font-semibold mt-0.5">
+                    Aguardando submissão
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                  <Clock className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-500 uppercase">Arquivos Anexados</p>
+                  <h3 className="text-2xl font-black text-purple-700 mt-0.5">
+                    {loadingRespostas ? '...' : contagemAnexosCampanha}
+                  </h3>
+                  <p className="text-[11px] text-purple-700 font-semibold mt-0.5">
+                    {contagemAnexosCampanha > 0 ? 'Prontos para ZIP renomeado' : 'Sem uploads'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                  <Paperclip className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
+            {/* PAINEL DE CONTROLE DE FILTROS & BUSCA */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Filtrar campanhas..."
-                  value={searchTerm}
+                  placeholder="Buscar por Nome, Matrícula, Posto ou Lotação..."
+                  value={buscaRespostas}
                   onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
+                    setBuscaRespostas(e.target.value);
+                    setPaginaRespostas(1);
                   }}
-                  className="pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] shadow-sm w-full sm:w-64 transition-all"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-[#1e3a5f] focus:bg-white"
                 />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={carregarDados}
-                className="h-9 rounded-md px-3 border-slate-300"
-                title="Atualizar"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
 
-            <div className="flex items-center gap-4 text-slate-600">
-              <span className="font-medium">{totalItems} resultados</span>
-              <div className="h-4 w-px bg-slate-300"></div>
-              <label className="flex items-center gap-2 cursor-pointer hover:text-slate-900">
-                <input
-                  type="checkbox"
-                  checked={mostrarArquivadas}
-                  onChange={(e) => {
-                    setMostrarArquivadas(e.target.checked);
-                    setCurrentPage(1);
+              <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroStatusRespostas('TODOS');
+                    setPaginaRespostas(1);
                   }}
-                  className="rounded text-[#1e3a5f] focus:ring-[#1e3a5f] border-slate-300"
-                />
-                Mostrar arquivadas
-              </label>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    filtroStatusRespostas === 'TODOS' ? 'bg-[#1e3a5f] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Todos ({respostasData?.total_alvo || 0})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroStatusRespostas('Respondido');
+                    setPaginaRespostas(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    filtroStatusRespostas === 'Respondido' ? 'bg-[#1e3a5f] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Respondidos ({respostasData?.total_respondidos || 0})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroStatusRespostas('Pendente');
+                    setPaginaRespostas(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    filtroStatusRespostas === 'Pendente' ? 'bg-[#1e3a5f] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Pendentes ({respostasData?.total_pendentes || 0})
+                </button>
+
+                {lotacoesDisponiveisRespostas.length > 0 && (
+                  <select
+                    value={filtroLotacaoRespostas}
+                    onChange={(e) => {
+                      setFiltroLotacaoRespostas(e.target.value);
+                      setPaginaRespostas(1);
+                    }}
+                    className="h-8 px-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none"
+                  >
+                    <option value="">Todas as Lotações</option>
+                    {lotacoesDisponiveisRespostas.map((lot) => (
+                      <option key={lot} value={lot}>{lot}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* CORPO DA TABELA */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider border-b border-slate-200">
-                  <th className="p-4 font-semibold min-w-[220px]">Nome da Campanha</th>
-                  <th className="p-4 font-semibold">Tipo</th>
-                  <th className="p-4 font-semibold">Status</th>
-                  <th className="p-4 font-semibold">Público Alvo</th>
-                  <th className="p-4 font-semibold min-w-[120px]">Período</th>
-                  <th className="p-4 font-semibold w-48">Adesão</th>
-                  <th className="p-4 font-semibold text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-sm">
-                {currentItems.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="p-8 text-center text-slate-500">
-                      Nenhuma campanha encontrada com os filtros atuais.
-                    </td>
-                  </tr>
-                ) : (
-                  currentItems.map((camp) => {
-                    const totalAlvo = camp.total_publico_alvo || 0;
-                    const respondidos = camp.total_respondidos || 0;
-                    const percentual = totalAlvo > 0 ? Math.round((respondidos / totalAlvo) * 100) : 0;
-                    const isFerias = camp.tipo === 'PLANO_FERIAS';
-                    const isCadastro = camp.tipo === 'ATUALIZACAO_CADASTRAL' || camp.tipo === 'CONFERENCIA_GERAL';
-                    const isAssinatura = camp.tipo === 'ASSINATURA_DOCUMENTO';
-                    const isEncerrada = camp.status === 'Encerrada';
-                    const isArquivada = camp.status === 'Arquivada';
+            {/* TABELA DINÂMICA DE RESPOSTAS NOMINAIS */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+              <div className="p-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700 uppercase">Relação Nominal de Militares</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800">
+                    {militaresRespostasFiltrados.length} registros
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 hidden sm:block">
+                  💡 Clique na linha ou no ícone de visualização para auditar a submissão completa
+                </div>
+              </div>
 
-                    let statusStyles = { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500 animate-pulse', label: 'Ativa' };
-                    if (isArquivada) statusStyles = { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-300', label: 'Arquivada' };
-                    else if (isEncerrada) statusStyles = { bg: 'bg-slate-100', text: 'text-slate-800', dot: 'bg-slate-500', label: 'Encerrada' };
-                    else if (camp.status === 'Aberta_Coleta') statusStyles = { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500 animate-pulse', label: 'Aberta' };
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-100 text-slate-600 uppercase font-bold tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="p-3 pl-4 min-w-[200px]">Militar</th>
+                      <th className="p-3 min-w-[140px]">Lotação</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 min-w-[110px]">Data Envio</th>
 
-                    return (
-                      <tr key={camp.id} className="hover:bg-blue-50/50 transition-colors bg-white">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                              isFerias ? 'bg-emerald-50 text-emerald-700' :
-                              isCadastro ? 'bg-blue-50 text-blue-700' :
-                              isAssinatura ? 'bg-amber-50 text-amber-700' :
-                              'bg-purple-50 text-purple-700'
-                            }`}>
-                              {isFerias ? <Calendar className="w-4 h-4" /> :
-                               isCadastro ? <UserCheck className="w-4 h-4" /> :
-                               isAssinatura ? <FileSignature className="w-4 h-4" /> :
-                               <Layers className="w-4 h-4" />}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="font-bold text-slate-800">{camp.titulo}</p>
-                                {(() => {
-                                  let cr = {};
-                                  try {
-                                    cr = typeof camp.config_regras === 'string' ? JSON.parse(camp.config_regras) : (camp.config_regras || {});
-                                  } catch (_e) {}
-                                  return cr?.exigir_atualizacao_cadastral ? (
-                                    <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold inline-flex items-center gap-0.5" title="Exige Atualização Cadastral prévia">
-                                      <Link2 className="w-2.5 h-2.5" />
-                                      Cascata
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </div>
-                              <p className="text-xs text-slate-500 truncate max-w-[200px]" title={camp.instrucoes}>{camp.instrucoes}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            isFerias ? 'bg-emerald-100 text-emerald-800' :
-                            isCadastro ? 'bg-blue-100 text-blue-800' :
-                            isAssinatura ? 'bg-amber-100 text-amber-900' :
-                            'bg-purple-100 text-purple-900'
-                          }`}>
-                            {isFerias ? 'Férias' :
-                             isCadastro ? 'Cadastro' :
-                             isAssinatura ? 'Assinatura Doc' :
-                             'Formulário'}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles.bg} ${statusStyles.text}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${statusStyles.dot}`}></span>
-                            {statusStyles.label}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-600">
-                          <div className="line-clamp-2 max-w-[200px]" title={camp.escopo_unidades_nomes || 'Toda a Corporação'}>
-                            {camp.escopo_unidades_nomes || 'Toda a Corporação'}
-                          </div>
-                          <span className="text-xs font-medium text-slate-400">({totalAlvo})</span>
-                        </td>
-                        <td className="p-4 text-slate-600">
-                          <div className="flex flex-col">
-                            <span className="text-xs">Início: {camp.data_inicio || '-'}</span>
-                            <span className={`font-medium text-xs mt-0.5 ${isArquivada ? 'text-slate-500' : 'text-[#1e3a5f]'}`}>
-                              Prazo: {camp.data_fim_militar || 'Não definido'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-between mb-1 text-xs">
-                            <span className="font-medium text-slate-700">{respondidos}/{totalAlvo}</span>
-                            <span className={`font-bold ${isArquivada ? 'text-slate-500' : 'text-[#1e3a5f]'}`}>
-                              {percentual}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-200 rounded-full h-1.5">
-                            <div
-                              className={`${isArquivada ? 'bg-slate-400' : percentual >= 80 ? 'bg-emerald-500' : percentual >= 40 ? 'bg-blue-500' : 'bg-amber-500'} h-1.5 rounded-full transition-all duration-500`}
-                              style={{ width: `${percentual}%` }}
-                            ></div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-1">
-                            {camp.status !== 'Aberta_Coleta' && (
-                              <button
-                                onClick={() => handleReabrirCampanha(camp)}
-                                disabled={actionLoading}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                                title="Reabrir Coleta no Portal"
-                              >
-                                <Play className="w-4 h-4" />
-                              </button>
-                            )}
-                            {camp.status === 'Aberta_Coleta' && (
-                              <button
-                                onClick={() => handleDispararLembretes(camp.id)}
-                                disabled={actionLoading}
-                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition-colors"
-                                title="Disparar Lembretes"
-                              >
-                                <Bell className="w-4 h-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleAbrirRetorno(camp)}
-                              disabled={actionLoading}
-                              className="p-1.5 text-[#1e3a5f] hover:bg-blue-50 rounded transition-colors"
-                              title="Acompanhamento Nominal"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirEdicaoCampanha(camp)}
-                              disabled={actionLoading}
-                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
-                              title="Editar"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
+                      {/* Colunas Específicas conforme o tipo da Campanha */}
+                      {campanhaSelecionadaRespostas?.tipo === 'PLANO_FERIAS' && (
+                        <>
+                          <th className="p-3">1ª Opção</th>
+                          <th className="p-3">2ª Opção</th>
+                          <th className="p-3">3ª Opção</th>
+                          <th className="p-3">Parcelamento</th>
+                        </>
+                      )}
 
-                            {!isArquivada && <div className="w-px h-4 bg-slate-300 mx-1"></div>}
+                      {campanhaSelecionadaRespostas?.tipo === 'ASSINATURA_DOCUMENTO' && (
+                        <>
+                          <th className="p-3">Documento Assinado</th>
+                          <th className="p-3">Termo Ciência</th>
+                        </>
+                      )}
 
-                            {!isArquivada && (
-                              <button
-                                onClick={() => handleArquivarCampanha(camp)}
-                                disabled={actionLoading}
-                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
-                                title="Arquivar"
-                              >
-                                <Archive className="w-4 h-4" />
-                              </button>
-                            )}
+                      {campanhaSelecionadaRespostas?.tipo === 'FORMULARIO_DINAMICO' && (
+                        perguntasCampanhaSelecionada.map((p) => (
+                          <th key={p.id} className="p-3 min-w-[160px] max-w-[240px]">
+                            {p.pergunta}
+                          </th>
+                        ))
+                      )}
 
-                            {!isArquivada && (
-                              <button
-                                onClick={() => handleExcluirCampanha(camp)}
-                                disabled={actionLoading}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors"
-                                title="Excluir"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
+                      {campanhaSelecionadaRespostas?.tipo === 'ATUALIZACAO_CADASTRAL' && (
+                        <th className="p-3">Detalhes / Alterações</th>
+                      )}
+
+                      <th className="p-3 pr-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {loadingRespostas ? (
+                      <tr>
+                        <td colSpan="10" className="p-8 text-center text-slate-500">
+                          <RefreshCw className="w-5 h-5 animate-spin inline mr-2 text-[#1e3a5f]" />
+                          Carregando respostas da campanha...
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : currentRespostasItems.length === 0 ? (
+                      <tr>
+                        <td colSpan="10" className="p-8 text-center text-slate-400">
+                          Nenhum militar encontrado com os filtros selecionados.
+                        </td>
+                      </tr>
+                    ) : (
+                      currentRespostasItems.map((m) => {
+                        const isResp = m.status_resposta === 'Respondido';
+                        const resp = m.resposta_completa || {};
 
-          {/* PAGINAÇÃO */}
-          <div className="p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between text-sm gap-4">
-            <span className="text-slate-500">
-              Mostrando {totalItems === 0 ? 0 : (validCurrentPage - 1) * itemsPerPage + 1} a {Math.min(validCurrentPage * itemsPerPage, totalItems)} de {totalItems} registros
-            </span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={handlePrevPage}
-                disabled={validCurrentPage === 1}
-                className={`px-3 py-1 border rounded font-medium transition-colors ${
-                  validCurrentPage === 1
-                    ? 'border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50'
-                    : 'border-slate-300 text-slate-600 hover:bg-slate-50 bg-white'
-                }`}
-              >
-                Anterior
-              </button>
+                        let respostasObj = {};
+                        let arquivosObj = {};
+                        if (resp.respostas_json) {
+                          try {
+                            respostasObj = typeof resp.respostas_json === 'string' ? JSON.parse(resp.respostas_json) : resp.respostas_json;
+                          } catch (_e) {}
+                        }
+                        if (resp.arquivos_anexados_json) {
+                          try {
+                            arquivosObj = typeof resp.arquivos_anexados_json === 'string' ? JSON.parse(resp.arquivos_anexados_json) : resp.arquivos_anexados_json;
+                          } catch (_e) {}
+                        }
 
-              {Array.from({ length: totalPages }).map((_, idx) => {
-                const page = idx + 1;
-                const isCurrent = page === validCurrentPage;
-                if (totalPages > 5) {
-                  if (page !== 1 && page !== totalPages && Math.abs(page - validCurrentPage) > 1) {
-                    if (page === 2 || page === totalPages - 1) return <span key={page} className="px-2 py-1">...</span>;
-                    return null;
-                  }
-                }
+                        return (
+                          <tr
+                            key={m.militar_id}
+                            onClick={() => {
+                              if (isResp) {
+                                setModalRespostaMilitar({
+                                  open: true,
+                                  militar: m,
+                                  resposta: resp,
+                                  observacaoRH: resp.observacao_gestor || '',
+                                });
+                              }
+                            }}
+                            className={`hover:bg-blue-50/50 transition-colors bg-white ${isResp ? 'cursor-pointer' : ''}`}
+                          >
+                            <td className="p-3 pl-4">
+                              <span className="font-bold text-slate-900 block">{m.militar_posto} {m.militar_nome}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">Mat: {m.militar_matricula}</span>
+                            </td>
+                            <td className="p-3 text-slate-600 font-semibold">{m.militar_lotacao}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isResp ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {isResp ? 'Respondido' : 'Pendente'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-500 font-mono text-[11px]">
+                              {m.data_resposta ? m.data_resposta.replace('T', ' ').slice(0, 16) : '-'}
+                            </td>
 
-                return (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 border rounded transition-colors font-medium ${
-                      isCurrent
-                        ? 'border-[#1e3a5f] bg-blue-50 text-[#1e3a5f]'
-                        : 'border-slate-300 text-slate-600 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
+                            {/* Células Plano de Férias */}
+                            {campanhaSelecionadaRespostas?.tipo === 'PLANO_FERIAS' && (
+                              <>
+                                <td className="p-3">
+                                  <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-800 font-bold text-[11px]">
+                                    {resp.opcao_1_meses || m.detalhes_resposta || '-'}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-slate-700">{resp.opcao_2_meses || '-'}</td>
+                                <td className="p-3 text-slate-700">{resp.opcao_3_meses || '-'}</td>
+                                <td className="p-3 text-slate-600">{resp.modo_parcelamento || '-'}</td>
+                              </>
+                            )}
 
-              <button
-                type="button"
-                onClick={handleNextPage}
-                disabled={validCurrentPage === totalPages || totalPages === 0}
-                className={`px-3 py-1 border rounded font-medium transition-colors ${
-                  validCurrentPage === totalPages || totalPages === 0
-                    ? 'border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50'
-                    : 'border-slate-300 text-slate-600 hover:bg-slate-50 bg-white'
-                }`}
-              >
-                Próximo
-              </button>
+                            {/* Células Assinatura de Documento */}
+                            {campanhaSelecionadaRespostas?.tipo === 'ASSINATURA_DOCUMENTO' && (
+                              <>
+                                <td className="p-3">
+                                  {resp.arquivo_devolucao_url ? (
+                                    <div className="flex items-center gap-1.5 text-purple-900 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-200 max-w-[200px]">
+                                      <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                      <span className="truncate text-[11px]" title={resp.arquivo_devolucao_nome || 'Arquivo Assinado'}>
+                                        {resp.arquivo_devolucao_nome || 'Arquivo Assinado'}
+                                      </span>
+                                      <a
+                                        href={resp.arquivo_devolucao_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-purple-700 hover:text-purple-900 ml-auto"
+                                        title="Baixar Anexo"
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 italic">Sem anexo</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${resp.termo_aceite ? 'bg-emerald-100 text-emerald-800' : 'text-slate-400'}`}>
+                                    {resp.termo_aceite ? 'Confirmado' : '-'}
+                                  </span>
+                                </td>
+                              </>
+                            )}
+
+                            {/* Células Formulário Dinâmico */}
+                            {campanhaSelecionadaRespostas?.tipo === 'FORMULARIO_DINAMICO' && (
+                              perguntasCampanhaSelecionada.map((p) => {
+                                if (p.tipo === 'upload_arquivo') {
+                                  const item = arquivosObj[p.id];
+                                  const url = typeof item === 'object' ? item?.url : item;
+                                  const nome = typeof item === 'object' ? item?.nome || item?.nome_original : 'Arquivo Anexo';
+
+                                  return (
+                                    <td key={p.id} className="p-3">
+                                      {url ? (
+                                        <div className="flex items-center gap-1.5 text-purple-900 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-200 max-w-[200px]">
+                                          <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                          <span className="truncate text-[11px]" title={nome}>{nome}</span>
+                                          <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-purple-700 hover:text-purple-900 ml-auto"
+                                            title="Baixar Anexo"
+                                          >
+                                            <Download className="w-3.5 h-3.5" />
+                                          </a>
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                }
+
+                                const val = respostasObj[p.id];
+                                const strVal = Array.isArray(val) ? val.join(', ') : (val !== undefined && val !== null ? String(val) : '-');
+                                return (
+                                  <td key={p.id} className="p-3 text-slate-700 max-w-xs truncate" title={strVal}>
+                                    {strVal}
+                                  </td>
+                                );
+                              })
+                            )}
+
+                            {/* Células Atualização Cadastral */}
+                            {campanhaSelecionadaRespostas?.tipo === 'ATUALIZACAO_CADASTRAL' && (
+                              <td className="p-3 text-slate-700 max-w-xs truncate">
+                                {m.detalhes_resposta || (isResp ? 'Dados conferidos sem alteração' : 'Pendente')}
+                              </td>
+                            )}
+
+                            <td className="p-3 pr-4 text-right" onClick={(e) => e.stopPropagation()}>
+                              {isResp ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setModalRespostaMilitar({
+                                    open: true,
+                                    militar: m,
+                                    resposta: resp,
+                                    observacaoRH: resp.observacao_gestor || '',
+                                  })}
+                                  className="text-[11px] h-7 px-2.5 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Auditar
+                                </Button>
+                              ) : (
+                                <span className="text-slate-400 text-[11px] italic">Pendente</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PAGINAÇÃO DE RESPOSTAS NOMINAIS */}
+              {totalPaginasRespostas > 1 && (
+                <div className="p-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+                  <div>
+                    Mostrando {((paginaRespostas - 1) * respostasPorPagina) + 1} a {Math.min(paginaRespostas * respostasPorPagina, militaresRespostasFiltrados.length)} de {militaresRespostasFiltrados.length} registros
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPaginaRespostas((p) => Math.max(p - 1, 1))}
+                      disabled={paginaRespostas === 1}
+                      className="h-8 px-2"
+                    >
+                      Anterior
+                    </Button>
+                    {Array.from({ length: totalPaginasRespostas }, (_, i) => i + 1).slice(0, 7).map((p) => (
+                      <Button
+                        key={p}
+                        type="button"
+                        variant={paginaRespostas === p ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setPaginaRespostas(p)}
+                        className={`h-8 w-8 p-0 ${paginaRespostas === p ? 'bg-[#1e3a5f] text-white' : ''}`}
+                      >
+                        {p}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPaginaRespostas((p) => Math.min(p + 1, totalPaginasRespostas))}
+                      disabled={paginaRespostas === totalPaginasRespostas}
+                      className="h-8 px-2"
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
 
-        {/* MODAL: NOVA / EDITAR CAMPANHA COM FORM BUILDER */}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL DE CRIAÇÃO / EDIÇÃO DE CAMPANHA */}
+        {/* ========================================================================= */}
         {modalNovaCampanha.open && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full p-5 sm:p-7 space-y-5 text-xs animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-extrabold text-slate-800 text-base flex items-center">
-                  <Megaphone className="w-5 h-5 mr-2 text-[#1e3a5f]" />
                   {modalNovaCampanha.isEditing
-                    ? `Editar: ${modalNovaCampanha.titulo}`
+                    ? `Editar Campanha: ${modalNovaCampanha.titulo}`
                     : modalNovaCampanha.tipo === 'PLANO_FERIAS'
                     ? 'Novo Plano Anual de Férias'
                     : modalNovaCampanha.tipo === 'ATUALIZACAO_CADASTRAL'
@@ -1207,63 +1782,85 @@ export default function GerirCampanhasPortal() {
                   </div>
 
                   {modalNovaCampanha.tipo_escopo === 'UNIDADES' && (
-                    <div className="pt-2 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700">Selecione as Unidades Participantes:</span>
+                        <div className="space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: unidadesList.map((u) => u.id) })}
+                            className="text-[11px] text-[#1e3a5f] font-bold hover:underline"
+                          >
+                            Marcar Todas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: [] })}
+                            className="text-[11px] text-slate-500 font-bold hover:underline"
+                          >
+                            Desmarcar
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400" />
                         <Input
                           type="text"
                           placeholder="Buscar unidade..."
                           value={buscaUnidade}
                           onChange={(e) => setBuscaUnidade(e.target.value)}
-                          className="h-8 text-xs max-w-xs"
+                          className="h-8 text-xs pl-8 rounded-lg"
                         />
-                        <div className="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={handleSelecionarTodasUnidades}
-                            className="text-[11px] font-bold text-blue-700 hover:underline"
-                          >
-                            Marcar Todas ({unidadesList.length})
-                          </button>
-                          <span className="text-slate-300">|</span>
-                          <button
-                            type="button"
-                            onClick={handleLimparSelecaoUnidades}
-                            className="text-[11px] font-bold text-slate-500 hover:underline"
-                          >
-                            Limpar
-                          </button>
-                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
-                        {unidadesFiltradas.map((u) => {
-                          const checked = modalNovaCampanha.escopo_unidades_ids.includes(u.id);
-                          return (
-                            <label
-                              key={u.id}
-                              className={`p-1.5 rounded-lg border text-[11px] flex items-center space-x-1.5 cursor-pointer transition-colors ${
-                                checked ? 'bg-blue-50 border-blue-200 text-[#1e3a5f] font-bold' : 'border-slate-100 hover:bg-slate-50 text-slate-700'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => handleToggleUnidadeEscopo(u.id)}
-                                className="accent-[#1e3a5f] rounded"
-                              />
-                              <span className="truncate">{u.nome}</span>
-                            </label>
-                          );
-                        })}
+                      <div className="max-h-36 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+                        {unidadesList
+                          .filter((u) => u.nome.toLowerCase().includes(buscaUnidade.toLowerCase()))
+                          .map((unidade) => {
+                            const selected = modalNovaCampanha.escopo_unidades_ids.includes(unidade.id);
+                            return (
+                              <label
+                                key={unidade.id}
+                                className={`p-1.5 rounded-lg border text-[11px] flex items-center gap-1.5 cursor-pointer truncate ${
+                                  selected ? 'bg-blue-50 border-[#1e3a5f] font-bold text-[#1e3a5f]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() => {
+                                    const novos = selected
+                                      ? modalNovaCampanha.escopo_unidades_ids.filter((id) => id !== unidade.id)
+                                      : [...modalNovaCampanha.escopo_unidades_ids, unidade.id];
+                                    setModalNovaCampanha({ ...modalNovaCampanha, escopo_unidades_ids: novos });
+                                  }}
+                                  className="accent-[#1e3a5f]"
+                                />
+                                <span className="truncate" title={unidade.nome}>{unidade.nome}</span>
+                              </label>
+                            );
+                          })}
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* PRAZOS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Prazo Limite para o Militar</label>
+                    <label className="font-bold text-slate-700 block">Data de Abertura / Início *</label>
+                    <Input
+                      type="date"
+                      value={modalNovaCampanha.data_inicio}
+                      onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, data_inicio: e.target.value })}
+                      required
+                      className="h-10 text-xs rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block">Prazo Militar (Portal) *</label>
                     <Input
                       type="date"
                       value={modalNovaCampanha.data_fim_militar}
@@ -1274,12 +1871,11 @@ export default function GerirCampanhasPortal() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Prazo Limite para a Unidade</label>
+                    <label className="font-bold text-slate-700 block">Prazo Unidade / Homologação</label>
                     <Input
                       type="date"
                       value={modalNovaCampanha.data_fim_unidade}
                       onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, data_fim_unidade: e.target.value })}
-                      required
                       className="h-10 text-xs rounded-xl"
                     />
                   </div>
@@ -1287,34 +1883,51 @@ export default function GerirCampanhasPortal() {
 
                 {/* INSTRUÇÕES */}
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-700 block">Instruções aos Militares</label>
+                  <label className="font-bold text-slate-700 block">Instruções / Orientação aos Militares</label>
                   <textarea
                     rows={3}
                     value={modalNovaCampanha.instrucoes}
                     onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, instrucoes: e.target.value })}
-                    required
-                    className="w-full p-3 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-[#1e3a5f]"
+                    placeholder="Orientações que serão exibidas em destaque para o militar na tela inicial do portal..."
+                    className="w-full p-3 border border-slate-300 rounded-xl text-xs outline-none focus:border-[#1e3a5f]"
                   />
                 </div>
 
-                {/* CONFIGURAÇÃO ESPECÍFICA DE ASSINATURA DE DOCUMENTO */}
-                {modalNovaCampanha.tipo === 'ASSINATURA_DOCUMENTO' && (
-                  <div className="space-y-3 p-4 bg-amber-50/70 rounded-2xl border border-amber-200">
-                    <label className="font-bold text-amber-950 block flex items-center">
-                      <FileSignature className="w-4 h-4 mr-1.5 text-amber-700" />
-                      Configurações do Documento & Devolução Assinada
+                {/* REGRAS ESPECÍFICAS DE FÉRIAS (CASCATA) */}
+                {modalNovaCampanha.tipo === 'PLANO_FERIAS' && (
+                  <div className="p-3 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-2">
+                    <strong className="block text-emerald-950 font-bold flex items-center">
+                      <Link2 className="w-4 h-4 mr-1 text-emerald-700" />
+                      Regras de Negócio e Cascata do Plano de Férias
+                    </strong>
+                    <label className="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={modalNovaCampanha.config_regras?.exigir_atualizacao_cadastral}
+                        onChange={(e) => setModalNovaCampanha({
+                          ...modalNovaCampanha,
+                          config_regras: { ...modalNovaCampanha.config_regras, exigir_atualizacao_cadastral: e.target.checked },
+                        })}
+                        className="w-4 h-4 accent-emerald-600 rounded"
+                      />
+                      <span><strong>Exigir Atualização Cadastral Prévia:</strong> O militar só consegue submeter opções de férias após validar seus dados no portal.</span>
                     </label>
+                  </div>
+                )}
 
-                    {/* UPLOAD DE MODELO PELO GESTOR */}
-                    <div className="space-y-1.5">
-                      <span className="font-semibold text-slate-700 block text-[11px]">
-                        Arquivo Modelo Oficial (Disponibilizado para os militares baixarem):
-                      </span>
+                {/* CONFIGURAÇÃO DE MODELO PARA ASSINATURA DE DOCUMENTO */}
+                {modalNovaCampanha.tipo === 'ASSINATURA_DOCUMENTO' && (
+                  <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-3">
+                    <strong className="block text-amber-950 font-bold flex items-center">
+                      <FileSignature className="w-4 h-4 mr-1 text-amber-700" />
+                      Arquivo Modelo e Termo de Ciência
+                    </strong>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 block text-xs">Arquivo Modelo para Download pelo Militar (Opcional):</label>
                       {modalNovaCampanha.arquivo_modelo_url ? (
-                        <div className="p-2.5 bg-white border border-amber-300 rounded-xl flex items-center justify-between">
-                          <span className="font-bold text-slate-800 truncate max-w-sm">
-                            {modalNovaCampanha.arquivo_modelo_nome || 'Arquivo modelo anexado'}
-                          </span>
+                        <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-amber-200">
+                          <span className="font-bold text-amber-950 truncate max-w-sm">{modalNovaCampanha.arquivo_modelo_nome || 'Arquivo Modelo Anexado'}</span>
                           <button
                             type="button"
                             onClick={() => setModalNovaCampanha({ ...modalNovaCampanha, arquivo_modelo_url: '', arquivo_modelo_nome: '' })}
@@ -1324,133 +1937,108 @@ export default function GerirCampanhasPortal() {
                           </button>
                         </div>
                       ) : (
-                        <div className="border border-dashed border-amber-300 rounded-xl p-3 text-center bg-white">
-                          <input
-                            type="file"
-                            onChange={(e) => handleUploadModeloGestor(e.target.files?.[0])}
-                            className="text-xs"
-                          />
-                          <p className="text-[10px] text-slate-500 mt-1">Anexe o modelo em PDF ou DOCX para os militares baixarem no portal</p>
-                        </div>
+                        <input
+                          type="file"
+                          onChange={(e) => handleUploadModeloGestor(e.target.files?.[0])}
+                          className="text-xs"
+                        />
                       )}
                     </div>
 
-                    <label className="flex items-center space-x-2 cursor-pointer p-2 bg-white rounded-xl border border-amber-200">
+                    <label className="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer pt-1">
                       <input
                         type="checkbox"
                         checked={modalNovaCampanha.exigir_devolucao_arquivo}
                         onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, exigir_devolucao_arquivo: e.target.checked })}
                         className="w-4 h-4 accent-amber-600 rounded"
                       />
-                      <span className="font-semibold text-slate-800 text-xs">
-                        Exigir que o militar anexe o documento assinado para concluir o envio
-                      </span>
+                      <span><strong>Exigir Upload do Documento Assinado:</strong> O militar deve reenviar o PDF assinado pelo portal.</span>
                     </label>
 
                     <div className="space-y-1">
-                      <span className="font-semibold text-slate-700 block text-[11px]">
-                        Texto do Termo de Declaração / Ciência do Militar:
-                      </span>
+                      <label className="font-bold text-slate-700 block text-xs">Texto do Termo de Ciência / Declaração:</label>
                       <Input
                         type="text"
                         value={modalNovaCampanha.texto_termo_aceite}
                         onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, texto_termo_aceite: e.target.value })}
-                        placeholder="Ex: Declaro sob as penas da lei a exatidão das informações..."
-                        className="text-xs rounded-xl bg-white"
+                        placeholder="Ex: Declaro estar ciente das obrigações funcionais aqui descritas."
+                        className="h-9 text-xs rounded-xl"
                       />
                     </div>
                   </div>
                 )}
 
-                {/* VISUAL FORM BUILDER (PARA FORMULARIO_DINAMICO - GOOGLE FORMS STYLE) */}
+                {/* CONSTRUTOR DE FORMULÁRIO DINÂMICO */}
                 {modalNovaCampanha.tipo === 'FORMULARIO_DINAMICO' && (
-                  <div className="space-y-4 p-4 bg-purple-50/60 rounded-2xl border border-purple-200">
-                    <div className="flex items-center justify-between border-b border-purple-200 pb-2">
+                  <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-200 space-y-4">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <label className="font-extrabold text-purple-950 block flex items-center text-sm">
-                          <Layers className="w-4 h-4 mr-1.5 text-purple-700" />
-                          Construtor de Formulário ({modalNovaCampanha.campos_formulario.length} perguntas)
-                        </label>
-                        <p className="text-[11px] text-purple-800">
-                          Adicione perguntas, seleções, caixas de texto e uploads de arquivos
-                        </p>
+                        <strong className="block text-purple-950 font-bold text-sm flex items-center">
+                          <Layers className="w-4 h-4 mr-1 text-purple-700" />
+                          Construtor de Perguntas do Formulário
+                        </strong>
+                        <p className="text-[11px] text-purple-700">Adicione perguntas personalizadas de texto, múltipla escolha, upload ou ciência.</p>
                       </div>
 
-                      {/* MENU RÁPIDO DE ADIÇÃO DE CAMPOS */}
-                      <div className="flex items-center space-x-1.5">
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleAdicionarPergunta(e.target.value);
-                              e.target.value = '';
-                            }
-                          }}
-                          className="h-8 px-2.5 bg-purple-700 text-white rounded-lg text-xs font-bold outline-none cursor-pointer"
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Button
+                          type="button"
+                          onClick={() => handleAdicionarPergunta('texto_curto')}
+                          className="h-8 text-[11px] bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-bold"
                         >
-                          <option value="">+ Adicionar Pergunta...</option>
-                          {TIPOS_CAMPOS_FORMULARIO.map((t) => (
-                            <option key={t.tipo} value={t.tipo}>
-                              {t.icone} {t.label}
-                            </option>
-                          ))}
-                        </select>
+                          <Plus className="w-3 h-3 mr-1" /> Texto
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleAdicionarPergunta('multipla_escolha')}
+                          variant="outline"
+                          className="h-8 text-[11px] rounded-lg font-bold border-purple-200 text-purple-900"
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Opções
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleAdicionarPergunta('upload_arquivo')}
+                          variant="outline"
+                          className="h-8 text-[11px] rounded-lg font-bold border-purple-200 text-purple-900"
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Upload Anexo
+                        </Button>
                       </div>
                     </div>
 
-                    {/* LISTA DE PERGUNTAS */}
                     {modalNovaCampanha.campos_formulario.length === 0 ? (
-                      <div className="p-6 text-center bg-white rounded-xl border border-purple-200 text-slate-500">
-                        Nenhuma pergunta adicionada. Use o menu acima para adicionar a primeira pergunta.
+                      <div className="p-6 text-center border-2 border-dashed border-purple-200 rounded-2xl text-purple-600 bg-white/50 font-medium">
+                        Nenhuma pergunta adicionada ainda. Clique nos botões acima para adicionar campos.
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                         {modalNovaCampanha.campos_formulario.map((campo, cIdx) => (
-                          <div key={campo.id || cIdx} className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs space-y-3">
-                            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div key={campo.id || cIdx} className="p-3.5 bg-white rounded-2xl border border-purple-100 shadow-xs space-y-3">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                               <div className="flex items-center space-x-2">
-                                <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-900 font-bold flex items-center justify-center text-xs">
+                                <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px] flex items-center justify-center">
                                   {cIdx + 1}
                                 </span>
-                                <span className="font-bold text-slate-800">
+                                <span className="font-bold text-slate-800 text-xs">
                                   {TIPOS_CAMPOS_FORMULARIO.find((t) => t.tipo === campo.tipo)?.icone}{' '}
                                   {TIPOS_CAMPOS_FORMULARIO.find((t) => t.tipo === campo.tipo)?.label}
                                 </span>
                               </div>
 
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoverPergunta(cIdx, -1)}
-                                  disabled={cIdx === 0}
-                                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                                  title="Mover para cima"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoverPergunta(cIdx, 1)}
-                                  disabled={cIdx === modalNovaCampanha.campos_formulario.length - 1}
-                                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                                  title="Mover para baixo"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoverPergunta(cIdx)}
-                                  className="p-1 text-red-500 hover:text-red-700 ml-1"
-                                  title="Excluir pergunta"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoverPergunta(cIdx)}
+                                className="text-red-500 hover:text-red-700 p-1 text-xs font-bold"
+                                title="Remover Pergunta"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
 
-                            {/* TÍTULO E AJUDA */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                              <div className="sm:col-span-2 space-y-1">
-                                <label className="text-[11px] font-bold text-slate-700 block">Título da Pergunta *</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                              <div className="sm:col-span-3 space-y-1">
+                                <label className="text-[11px] font-bold text-slate-700 block">Enunciado da Pergunta *</label>
                                 <Input
                                   type="text"
                                   value={campo.pergunta}
@@ -1486,7 +2074,7 @@ export default function GerirCampanhasPortal() {
                               />
                             </div>
 
-                            {/* CONFIGURAÇÃO DE OPÇÕES PARA ESCOLHAS (RÁDIO / CHECKBOX / SELECT) */}
+                            {/* OPÇÕES PARA ESCOLHAS */}
                             {(campo.tipo === 'multipla_escolha' || campo.tipo === 'checkbox' || campo.tipo === 'select') && (
                               <div className="p-3 bg-purple-50/40 rounded-xl border border-purple-100 space-y-2">
                                 <div className="flex items-center justify-between">
@@ -1525,7 +2113,7 @@ export default function GerirCampanhasPortal() {
                               </div>
                             )}
 
-                            {/* ANEXO DE MODELO ESPECÍFICO DESTA PERGUNTA (UPLOAD DE ARQUIVO) */}
+                            {/* ANEXO DE MODELO ESPECÍFICO DESTA PERGUNTA */}
                             {campo.tipo === 'upload_arquivo' && (
                               <div className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-200 text-[11px] space-y-1.5">
                                 <span className="font-bold text-blue-950 block">Arquivo Modelo Específico desta Pergunta (Opcional):</span>
@@ -1583,169 +2171,9 @@ export default function GerirCampanhasPortal() {
           </div>
         )}
 
-        {/* MODAL / DRAWER DE ACOMPANHAMENTO NOMINAL & EXPORTAÇÃO */}
-        {detalhesRetorno.open && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full p-5 sm:p-7 space-y-4 text-xs animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-base flex items-center">
-                    <Users className="w-5 h-5 mr-2 text-[#1e3a5f]" />
-                    Retorno Nominal: {detalhesRetorno.campanha?.titulo}
-                  </h3>
-                  <p className="text-slate-500 text-[11px]">
-                    Acompanhamento individual de cada militar atribuído ao escopo desta campanha
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDetalhesRetorno({ ...detalhesRetorno, open: false })}
-                  className="text-slate-400 hover:text-slate-600 font-bold text-base"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* STATS RÁPIDOS & BOTÃO EXPORTAR */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 shrink-0">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
-                  <span className="text-slate-500 block text-[11px]">Total Alvo</span>
-                  <strong className="text-lg text-slate-900">{detalhesRetorno.dados?.total_alvo || 0}</strong>
-                </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
-                  <span className="text-emerald-700 block text-[11px]">Respondidos</span>
-                  <strong className="text-lg text-emerald-800">{detalhesRetorno.dados?.total_respondidos || 0} ({detalhesRetorno.dados?.percentual || 0}%)</strong>
-                </div>
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-center">
-                  <span className="text-amber-700 block text-[11px]">Pendentes</span>
-                  <strong className="text-lg text-amber-800">{detalhesRetorno.dados?.total_pendentes || 0}</strong>
-                </div>
-                <div className="flex items-center justify-center p-2 bg-blue-50/60 rounded-xl border border-blue-200">
-                  <Button
-                    type="button"
-                    onClick={handleExportarPlanilha}
-                    className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold h-full rounded-lg shadow-xs"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 mr-1.5" />
-                    Exportar Planilha (CSV)
-                  </Button>
-                </div>
-              </div>
-
-              {/* FILTRO DE STATUS */}
-              <div className="flex items-center space-x-2 shrink-0">
-                <span className="font-bold text-slate-700">Filtrar:</span>
-                {['TODOS', 'Respondido', 'Pendente'].map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setDetalhesRetorno({ ...detalhesRetorno, filtro: f })}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                      detalhesRetorno.filtro === f
-                        ? 'bg-[#1e3a5f] text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {f === 'TODOS' ? 'Todos' : f}
-                  </button>
-                ))}
-              </div>
-
-              {/* TABELA DE MILITARES */}
-              <div className="flex-1 overflow-y-auto border border-slate-200 rounded-2xl">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-slate-50 text-slate-700 font-bold sticky top-0 border-b border-slate-200">
-                    <tr>
-                      <th className="p-3">Militar</th>
-                      <th className="p-3">Lotação</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Data / Detalhes</th>
-                      <th className="p-3 text-right">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {militaresFiltrados.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="p-6 text-center text-slate-400">
-                          Nenhum militar correspondente ao filtro.
-                        </td>
-                      </tr>
-                    ) : (
-                      militaresFiltrados.map((m) => {
-                        const hasRespObj = Boolean(m.resposta_completa);
-
-                        return (
-                          <tr key={m.militar_id} className="hover:bg-slate-50">
-                            <td className="p-3">
-                              <span className="font-bold text-slate-900 block">{m.militar_posto} {m.militar_nome}</span>
-                              <span className="text-[10px] text-slate-400 font-mono">Mat: {m.militar_matricula}</span>
-                            </td>
-                            <td className="p-3 text-slate-600">{m.militar_lotacao}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                m.status_resposta === 'Respondido'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {m.status_resposta}
-                              </span>
-                            </td>
-                            <td className="p-3 text-slate-600">
-                              {m.data_resposta ? (
-                                <div>
-                                  <span className="font-medium">{m.data_resposta.split('T')[0]}</span>
-                                  {m.detalhes_resposta && (
-                                    <p className="text-[11px] text-slate-500 italic mt-0.5 truncate max-w-xs">
-                                      {m.detalhes_resposta}
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 italic">Pendente de resposta</span>
-                              )}
-                            </td>
-                            <td className="p-3 text-right">
-                              {hasRespObj && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setModalRespostaMilitar({
-                                    open: true,
-                                    militar: m,
-                                    resposta: m.resposta_completa,
-                                    observacaoRH: m.resposta_completa?.observacao_gestor || '',
-                                  })}
-                                  className="text-[11px] h-7 px-2.5 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50"
-                                >
-                                  <Eye className="w-3 h-3 mr-1" />
-                                  Ver Respostas
-                                </Button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end pt-2 border-t border-slate-100 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDetalhesRetorno({ ...detalhesRetorno, open: false })}
-                  className="text-xs h-9 rounded-xl"
-                >
-                  Fechar
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* ========================================================================= */}
         {/* MODAL DE RESPOSTA INDIVIDUAL DO MILITAR */}
+        {/* ========================================================================= */}
         {modalRespostaMilitar.open && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-5 sm:p-7 space-y-4 text-xs animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
@@ -1796,9 +2224,11 @@ export default function GerirCampanhasPortal() {
                 {/* Perguntas e Respostas do Formulário Dinâmico */}
                 {(() => {
                   let formCampos = [];
-                  if (detalhesRetorno.campanha?.config_formulario) {
+                  if (campanhaSelecionadaRespostas?.config_formulario) {
                     try {
-                      const p = typeof detalhesRetorno.campanha.config_formulario === 'string' ? JSON.parse(detalhesRetorno.campanha.config_formulario) : detalhesRetorno.campanha.config_formulario;
+                      const p = typeof campanhaSelecionadaRespostas.config_formulario === 'string'
+                        ? JSON.parse(campanhaSelecionadaRespostas.config_formulario)
+                        : campanhaSelecionadaRespostas.config_formulario;
                       formCampos = p?.campos || [];
                     } catch (_e) {}
                   }
@@ -1807,12 +2237,16 @@ export default function GerirCampanhasPortal() {
                   let arquivosObj = {};
                   if (modalRespostaMilitar.resposta?.respostas_json) {
                     try {
-                      respostasObj = typeof modalRespostaMilitar.resposta.respostas_json === 'string' ? JSON.parse(modalRespostaMilitar.resposta.respostas_json) : modalRespostaMilitar.resposta.respostas_json;
+                      respostasObj = typeof modalRespostaMilitar.resposta.respostas_json === 'string'
+                        ? JSON.parse(modalRespostaMilitar.resposta.respostas_json)
+                        : modalRespostaMilitar.resposta.respostas_json;
                     } catch (_e) {}
                   }
                   if (modalRespostaMilitar.resposta?.arquivos_anexados_json) {
                     try {
-                      arquivosObj = typeof modalRespostaMilitar.resposta.arquivos_anexados_json === 'string' ? JSON.parse(modalRespostaMilitar.resposta.arquivos_anexados_json) : modalRespostaMilitar.resposta.arquivos_anexados_json;
+                      arquivosObj = typeof modalRespostaMilitar.resposta.arquivos_anexados_json === 'string'
+                        ? JSON.parse(modalRespostaMilitar.resposta.arquivos_anexados_json)
+                        : modalRespostaMilitar.resposta.arquivos_anexados_json;
                     } catch (_e) {}
                   }
 
@@ -1824,6 +2258,8 @@ export default function GerirCampanhasPortal() {
                       {formCampos.map((c, i) => {
                         const val = respostasObj[c.id];
                         const anexo = arquivosObj[c.id];
+                        const anexoUrl = typeof anexo === 'object' ? anexo?.url : anexo;
+                        const anexoNome = typeof anexo === 'object' ? anexo?.nome || anexo?.nome_original : 'Arquivo Anexo';
 
                         return (
                           <div key={c.id || i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
@@ -1831,11 +2267,11 @@ export default function GerirCampanhasPortal() {
                               {i + 1}. {c.pergunta}
                             </span>
                             {c.tipo === 'upload_arquivo' ? (
-                              anexo?.url ? (
+                              anexoUrl ? (
                                 <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 mt-1">
-                                  <span className="font-semibold text-slate-800 truncate">{anexo.nome || 'Arquivo anexado'}</span>
+                                  <span className="font-semibold text-slate-800 truncate">{anexoNome}</span>
                                   <a
-                                    href={anexo.url}
+                                    href={anexoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-700 font-bold hover:underline flex items-center"
@@ -1893,7 +2329,9 @@ export default function GerirCampanhasPortal() {
                         });
                         setFeedback({ type: 'success', msg: 'Resposta homologada com sucesso!' });
                         setModalRespostaMilitar({ open: false, militar: null, resposta: null, observacaoRH: '' });
-                        await handleAbrirRetorno(detalhesRetorno.campanha);
+                        if (campanhaSelecionadaRespostas) {
+                          await carregarRespostasCampanha(campanhaSelecionadaRespostas);
+                        }
                       } catch (err) {
                         setFeedback({ type: 'error', msg: err.message || 'Falha ao homologar.' });
                       } finally {
@@ -1910,6 +2348,58 @@ export default function GerirCampanhasPortal() {
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* MODAL DE PROGRESSO DO DOWNLOAD DE ANEXOS (ZIP) */}
+        {/* ========================================================================= */}
+        {zipProgress?.open && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-100 text-[#1e3a5f] flex items-center justify-center font-bold">
+                  <FolderDown className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Download em Lote de Anexos</h3>
+                  <p className="text-[11px] text-slate-500">Compactação e renomeação institucional</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold">
+                  <span className="text-slate-700">{zipProgress.texto}</span>
+                  {zipProgress.total > 0 && (
+                    <span className="text-[#1e3a5f] font-mono">
+                      {zipProgress.atual}/{zipProgress.total}
+                    </span>
+                  )}
+                </div>
+
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                  <div
+                    className="bg-[#1e3a5f] h-full transition-all duration-300 rounded-full"
+                    style={{
+                      width: zipProgress.total > 0 ? `${Math.round((zipProgress.atual / zipProgress.total) * 100)}%` : '100%',
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                {!zipProgress.loading && (
+                  <Button
+                    type="button"
+                    onClick={() => setZipProgress(null)}
+                    className="bg-[#1e3a5f] text-white text-xs h-8 rounded-lg font-bold"
+                  >
+                    Fechar
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
