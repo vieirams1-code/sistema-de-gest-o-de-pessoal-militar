@@ -176,6 +176,21 @@ const AuthenticatedAppWrapper = ({ children, currentPageName }) => {
 };
 
 
+const RootRoute = () => {
+  const { isAuthenticated, isLoadingAuth } = useAuth();
+  if (isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  if (isAuthenticated) {
+    return <Navigate to={homeRoute} replace />;
+  }
+  return <Navigate to="/portal" replace />;
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
@@ -186,9 +201,13 @@ function App() {
             {/* Rotas Públicas e Seguras do Portal do Militar */}
             <Route path="/portal/*" element={<PortalApp />} />
             <Route path="/portal" element={<PortalApp />} />
+            <Route path="/Portal/*" element={<PortalApp />} />
+            <Route path="/Portal" element={<PortalApp />} />
+            <Route path="/autoatendimento/*" element={<Navigate to="/portal" replace />} />
+            <Route path="/autoatendimento" element={<Navigate to="/portal" replace />} />
 
-            {/* Rotas Administrativas do SGP */}
-            <Route path="/" element={<Navigate to={homeRoute} replace />} />
+            {/* Redirecionamento Inteligente da Raiz */}
+            <Route path="/" element={<RootRoute />} />
             {Object.entries(Pages).map(([path, Page]) => {
               let pageContent = <Page />;
 
