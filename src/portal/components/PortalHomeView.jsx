@@ -23,6 +23,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
+function formatarDataBR(dataStr) {
+  if (!dataStr) return 'Não informado';
+  const clean = String(dataStr).split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dataStr;
+}
+
 export default function PortalHomeView({ initialView, campanhaIdParam }) {
   const { militar, logout } = usePortalAuth();
   const location = useLocation();
