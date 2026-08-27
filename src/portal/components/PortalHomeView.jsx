@@ -90,8 +90,11 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
     : (militar.nome_completo ? militar.nome_completo.slice(0, 2).toUpperCase() : 'BM');
 
   const campanhasCustomizadas = campanhasAtivas.filter(
-    (c) => c.tipo === 'FORMULARIO_DINAMICO' || c.tipo === 'ASSINATURA_DOCUMENTO'
+    (c) => c.tipo !== 'ATUALIZACAO_CADASTRAL' && c.tipo !== 'CONFERENCIA_GERAL' && c.tipo !== 'PLANO_FERIAS'
   );
+  
+  console.log("Todas as campanhas ativas:", campanhasAtivas);
+  console.log("Campanhas customizadas filtradas:", campanhasCustomizadas);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
