@@ -27,7 +27,7 @@ import {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id, Base44-Functions-Version',
 };
 
 function jsonResponse(data: any, status = 200) {
