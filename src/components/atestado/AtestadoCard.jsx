@@ -440,23 +440,28 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     return { icon: CheckCircle, text: `Retorna em ${diasRestantes} dias`, color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' };
   };
 
-  const handleSaveJiso = async () => {
-    if (!jisoDate) return;
-    if (savingJiso) return;
+  const persistirAgendamentoJiso = async ({ fecharEdicao = true } = {}) => {
+    if (!jisoDate || !jisoTime) {
+      alert('Informe a data e o horário da JISO.');
+      return false;
+    }
+    if (savingJiso) return false;
     if (!canAccessAction('registrar_decisao_jiso')) {
       alert('Ação negada: você não tem permissão para agendar/registrar JISO.');
-      return;
+      return false;
     }
     setSavingJiso(true);
     try {
       await atualizarEscopado('Atestado', atestado.id, {
         data_jiso_agendada: jisoDate,
+        hora_jiso_agendada: jisoTime,
         ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
       });
       try {
         await sincronizarAtestadoJisoNoQuadro({
           ...atestado,
           data_jiso_agendada: jisoDate,
+          hora_jiso_agendada: jisoTime,
         });
       } catch (syncError) {
         if (syncError?.message?.includes('Rate limit')) {
@@ -468,15 +473,97 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
-      setEditingJiso(false);
+      if (fecharEdicao) setEditingJiso(false);
+      return true;
     } catch (error) {
       if (error?.message?.includes('Rate limit')) {
         alert('Muitas requisições em sequência. Aguarde alguns segundos e tente novamente.');
       } else {
         alert(error?.message || 'Não foi possível salvar o agendamento da JISO.');
       }
+      return false;
     } finally {
       setSavingJiso(false);
+    }
+  };
+
+  const handleSaveJiso = () => persistirAgendamentoJiso();
+
+  const gerarMensagemWhatsAppJiso = () => {
+    const templateWhatsApp = getTemplateAtivoPorTipo(
+      TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
+      MODULO_WHATSAPP_NOTIFICACOES,
+      templates,
+      {
+        grupamento_id: militarAtestado?.grupamento_id,
+        subgrupamento_id: militarAtestado?.subgrupamento_id,
+        subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
+        unidade_id: militarAtestado?.unidade_id,
+      }
+    );
+
+    if (!templateWhatsApp?.template) return null;
+
+    return aplicarTemplate(templateWhatsApp.template, {
+      ...varsContratoTemplate,
+      posto_graduacao: militarAtestado?.posto_graduacao || atestado.militar_posto || '',
+      nome_guerra: militarAtestado?.nome_guerra || '',
+      data_jiso: formatarDataExtenso(jisoDate),
+      hora_jiso: jisoTime,
+      dias_atestado: String(atestado.dias || ''),
+      tipo_afastamento: atestado.tipo_afastamento || '',
+      data_inicio: formatarDataExtenso(atestado.data_inicio),
+      data_termino: formatarDataExtenso(atestado.data_termino),
+    });
+  };
+
+  const abrirPreviaWhatsAppJiso = () => {
+    if (!jisoDate || !jisoTime) {
+      alert('Informe a data e o horário da JISO antes de preparar a notificação.');
+      return;
+    }
+
+    const texto = gerarMensagemWhatsAppJiso();
+    if (texto === null) {
+      alert(`Template obrigatório não encontrado. Cadastre "${TIPO_TEMPLATE_NOTIFICACAO_JISO_WA}" em Templates de Texto > WhatsApp Notificações.`);
+      return;
+    }
+
+    const variaveisPendentes = texto.match(/\{\{[^}]+\}\}/g) || [];
+    if (variaveisPendentes.length > 0) {
+      alert(`A mensagem não pode ser enviada porque ainda há variáveis sem valor: ${[...new Set(variaveisPendentes)].join(', ')}`);
+      return;
+    }
+
+    setWhatsappMessage(texto);
+    setShowWhatsAppPreview(true);
+  };
+
+  const confirmarEnvioWhatsAppJiso = async () => {
+    const mensagemFinal = whatsappMessage.trim();
+    if (!mensagemFinal || sendingWhatsApp) return;
+
+    setSendingWhatsApp(true);
+    try {
+      const agendamentoSalvo = await persistirAgendamentoJiso({ fecharEdicao: false });
+      if (!agendamentoSalvo) return;
+
+      const response = await base44.functions.invoke('notificarJisoWhatsApp', {
+        militar_id: atestado.militar_id,
+        mensagem: mensagemFinal,
+      });
+      const data = response?.data || response;
+      if (!data?.success) {
+        throw new Error(data?.error || 'Falha ao enviar a notificação por WhatsApp.');
+      }
+
+      setShowWhatsAppPreview(false);
+      setEditingJiso(false);
+      alert('Notificação de JISO enviada por WhatsApp com sucesso.');
+    } catch (error) {
+      alert(error?.message || 'Não foi possível enviar a notificação por WhatsApp.');
+    } finally {
+      setSendingWhatsApp(false);
     }
   };
 
