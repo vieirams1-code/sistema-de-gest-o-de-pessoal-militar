@@ -146,7 +146,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 const AuthenticatedAppWrapper = ({ children, currentPageName }) => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -166,6 +166,12 @@ const AuthenticatedAppWrapper = ({ children, currentPageName }) => {
       navigateToLogin();
       return null;
     }
+  }
+
+  // Se o usuário não está autenticado no SGP, redireciona para a tela de login do SGP
+  if (!isAuthenticated) {
+    navigateToLogin();
+    return null;
   }
 
   return (
