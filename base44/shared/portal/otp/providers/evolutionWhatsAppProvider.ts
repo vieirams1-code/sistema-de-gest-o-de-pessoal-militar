@@ -145,6 +145,80 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
         provider: 'evolution_api',
         error: err.name === 'AbortError' ? 'Timeout na conexão com o WhatsApp.' : 'Erro de conexão com o servidor do WhatsApp.',
       };
+  }
+
+  async sendTextMessage(
+    params: { to: string; text: string },
+    base44: any
+  ): Promise<{ success: boolean; provider: string; error?: string }> {
+    const config = await this.getConfig(base44);
+    if (!config) {
+      return {
+        success: false,
+        provider: 'evolution_api',
+        error: 'Configuração da API não encontrada.',
+      };
+    }
+
+    const { url, key, instance } = config;
+
+    const normalizedNumber = this.normalizeWhatsAppNumber(params.to);
+    if (!normalizedNumber) {
+      return {
+        success: false,
+        provider: 'evolution_api',
+        error: 'Número de telefone inválido.',
+      };
+    }
+
+    try {
+      const sanitizedBaseUrl = url.replace(/\/+$/, '');
+      const endpoint = `${sanitizedBaseUrl}/message/sendText/${instance}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'apikey': key,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          number: normalizedNumber,
+          text: params.text,
+          options: {
+            delay: 1200,
+            presence: 'composing',
+            linkPreview: false,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        console.error(`[EvolutionWhatsAppProvider] Falha HTTP ${response.status} no sendTextMessage:`, errorBody.slice(0, 200));
+        return {
+          success: false,
+          provider: 'evolution_api',
+          error: `Falha no envio (HTTP ${response.status}).`,
+        };
+      }
+
+      return {
+        success: true,
+        provider: 'evolution_api',
+      };
+    } catch (err: any) {
+      console.error('[EvolutionWhatsAppProvider] Erro no sendTextMessage:', err?.message || err);
+      return {
+        success: false,
+        provider: 'evolution_api',
+        error: err.name === 'AbortError' ? 'Timeout na conexão.' : 'Erro de conexão.',
+      };
     }
   }
 }

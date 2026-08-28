@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Save, Calendar, FileText, AlertTriangle, MessageCircle } from 'lucide-react';
 import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -58,6 +59,9 @@ export default function EditarJISO() {
     hora_jiso: '',
     local_jiso: ''
   });
+
+  const [notificarWhatsApp, setNotificarWhatsApp] = useState(true);
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
 
   const { data: atestado, isLoading: loadingAtestado } = useQuery({
     queryKey: ['atestado', atestadoId],
@@ -162,6 +166,32 @@ export default function EditarJISO() {
   );
   const militarMesclado = isMilitarMesclado(militarAtestado || {});
 
+  const dispararNotificacaoWhatsApp = async () => {
+    setLoadingWhatsApp(true);
+    try {
+      const response = await base44.functions.invoke('notificarJisoWhatsApp', {
+        militar_id: atestado.militar_id,
+        data_jiso: formData.data_jiso,
+        hora_jiso: formData.hora_jiso,
+        local_jiso: formData.local_jiso,
+        secao_jiso: formData.secao_jiso,
+        finalidade_jiso: formData.finalidade_jiso,
+        dias_atestado: formData.dias_jiso || atestado.dias,
+      });
+      const data = response?.data || response;
+      if (data.success) {
+        alert(`✅ Notificação WhatsApp enviada com sucesso para ${data.telefone}`);
+      } else {
+        alert(`⚠️ Erro ao notificar WhatsApp: ${data.error || 'Falha no envio'}`);
+      }
+    } catch (error) {
+      console.error('Erro ao enviar WhatsApp:', error);
+      alert('⚠️ Erro ao enviar notificação por WhatsApp.');
+    } finally {
+      setLoadingWhatsApp(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -237,6 +267,23 @@ export default function EditarJISO() {
         data_retorno_jiso: formatDate(dataRetornoJiso, 'yyyy-MM-dd'),
         jiso_id: jiso?.id || jisoSalva?.id || jisoSalva?.data?.id
       });
+    }
+
+    // Notificar WhatsApp se a opção estiver marcada
+    if (notificarWhatsApp && formData.data_jiso) {
+      try {
+        await base44.functions.invoke('notificarJisoWhatsApp', {
+          militar_id: atestado.militar_id,
+          data_jiso: formData.data_jiso,
+          hora_jiso: formData.hora_jiso,
+          local_jiso: formData.local_jiso,
+          secao_jiso: formData.secao_jiso,
+          finalidade_jiso: formData.finalidade_jiso,
+          dias_atestado: formData.dias_jiso || atestado.dias,
+        });
+      } catch (err) {
+        console.warn('Falha silenciosa ao notificar WhatsApp no salvamento:', err);
+      }
     }
 
     queryClient.invalidateQueries({ queryKey: ['atestados-jiso'] });
@@ -359,10 +406,35 @@ export default function EditarJISO() {
 
           {/* Dados da JISO */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Dados da JISO
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#1e3a5f] flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Dados da JISO
+              </h3>
+              
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <Checkbox 
+                    checked={notificarWhatsApp} 
+                    onCheckedChange={setNotificarWhatsApp} 
+                  />
+                  Notificar via WhatsApp
+                </label>
+
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-green-700 border-green-600 bg-green-50 hover:bg-green-100"
+                  onClick={dispararNotificacaoWhatsApp}
+                  disabled={loadingWhatsApp || !formData.data_jiso}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  {loadingWhatsApp ? 'Enviando...' : 'Disparar Agora'}
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
