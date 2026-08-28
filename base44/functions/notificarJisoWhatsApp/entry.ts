@@ -1,9 +1,18 @@
-import { Base44Client, jsonResponse } from 'base44';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { evolutionWhatsAppProvider } from '../../shared/portal/otp/providers/evolutionWhatsAppProvider.ts';
 
-const base44 = new Base44Client();
+function jsonResponse(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    },
+  });
+}
 
 Deno.serve(async (req) => {
+  const base44 = createClientFromRequest(req);
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405);
   }

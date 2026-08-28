@@ -145,6 +145,7 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
         provider: 'evolution_api',
         error: err.name === 'AbortError' ? 'Timeout na conexão com o WhatsApp.' : 'Erro de conexão com o servidor do WhatsApp.',
       };
+    }
   }
 
   async sendTextMessage(
