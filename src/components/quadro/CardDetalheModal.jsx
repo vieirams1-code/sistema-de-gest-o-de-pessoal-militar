@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
@@ -678,7 +677,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     etiqueta_cor: card.etiqueta_cor || '#6366f1',
   });
   const [salvandoClassificacao, setSalvandoClassificacao] = useState(false);
-  const [notificarWhatsApp, setNotificarWhatsApp] = useState(true);
 
   const { data: vinculos = [] } = useQuery({
     queryKey: ['vinculos', card.id],
@@ -805,18 +803,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         atestadoId: vinculoAtestado.referencia_id,
         dataJiso: jisoDate,
       });
-
-      if (notificarWhatsApp && jisoDate && atestadoVinculado?.militar_id) {
-        try {
-          await base44.functions.invoke('notificarJisoWhatsApp', {
-            militar_id: atestadoVinculado.militar_id,
-            data_jiso: jisoDate,
-            dias_atestado: atestadoVinculado.dias,
-          });
-        } catch (err) {
-          console.warn('Falha silenciosa ao notificar WhatsApp no card:', err);
-        }
-      }
 
       onCardUpdate?.({
         id: card.id,
@@ -1172,16 +1158,9 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                     {savingJisoDate ? 'Salvando...' : 'Salvar data'}
                   </Button>
                 </div>
-                {jisoDate && (
-                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer pt-1">
-                    <Checkbox 
-                      checked={notificarWhatsApp} 
-                      onCheckedChange={setNotificarWhatsApp} 
-                      className="w-4 h-4"
-                    />
-                    Notificar via WhatsApp
-                  </label>
-                )}
+                <p className="text-[11px] text-slate-500">
+                  A notificação por WhatsApp é enviada pelo card do atestado, com data, horário e prévia editável antes da confirmação.
+                </p>
               </div>
             </SectionCard>
           )}
