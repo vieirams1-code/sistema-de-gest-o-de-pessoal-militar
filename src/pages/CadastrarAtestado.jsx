@@ -137,10 +137,6 @@ export default function CadastrarAtestado() {
   const canEditar = canAccessAction('editar_atestados');
   const hasActionPermission = editId ? canEditar : canAdicionar;
 
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
   const { data: editingAtestado, isLoading: loadingEdit } = useQuery({
     queryKey: ['atestado', editId],
     queryFn: async () => {
