@@ -455,7 +455,7 @@ export default function GerirCampanhasPortal() {
   };
 
   const handleExcluirCampanha = async (camp) => {
-    if (!window.confirm(`Tem certeza que deseja excluir a campanha "${camp.titulo}"? Esta ação removerá a campanha do portal.`)) {
+    if (!window.confirm(`Tem certeza que deseja excluir a campanha "${camp.titulo}"? Esta ação removerá a campanha e as respostas enviadas a ela. (Férias já geradas na escala e alterações cadastrais aprovadas na ficha dos militares NÃO serão afetadas).`)) {
       return;
     }
     setActionLoading(true);

@@ -344,7 +344,7 @@ Deno.serve(async (req: Request) => {
 
           if (campanha.tipo === 'PLANO_FERIAS') {
             const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-              ano_referencia: campanha.ano_referencia,
+              campanha_id: campanha.id,
             });
             (opcoes || []).forEach((op: any) => respostasMap.set(op.militar_id, op));
           } else if (campanha.tipo === 'FORMULARIO_DINAMICO' || campanha.tipo === 'ASSINATURA_DOCUMENTO') {
@@ -698,9 +698,11 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+
+          // 1. Exclui a campanha
           await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
 
-          // Remove também todas as opções que foram registradas para essa campanha específica
+          // 2. Remove todas as opções de férias que foram registradas para essa campanha específica
           try {
             const opcoesDaCampanha = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id });
             for (const op of (opcoesDaCampanha || [])) {
@@ -708,7 +710,25 @@ Deno.serve(async (req: Request) => {
             }
           } catch (_eDelOp) {}
 
-          return new Response(JSON.stringify({ ok: true, message: 'Campanha e opções associadas excluídas com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          // 3. Remove respostas de formulários dinâmicos e assinaturas vinculadas a essa campanha
+          try {
+            const respsPersonalizadas = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ campanha_id });
+            for (const r of (respsPersonalizadas || [])) {
+              await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.delete(r.id);
+            }
+          } catch (_eDelResp) {}
+
+          // Observação de Integridade:
+          // Férias efetivas geradas na escala oficial (entidade Ferias) e solicitações cadastrais
+          // já registradas/aprovadas na ficha dos militares NÃO são apagadas nem revertidas.
+
+          return new Response(JSON.stringify({
+            ok: true,
+            message: 'Campanha e respostas associadas excluídas com sucesso. Férias geradas e cadastros permanecem preservados.',
+          }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
         }
 
         // Arquivar Campanha
@@ -817,7 +837,7 @@ Deno.serve(async (req: Request) => {
             try {
               const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
               for (const op of (allOpcoes || [])) {
-                if (op.campanha_id && !campanhasIdsValidos.has(op.campanha_id)) {
+                if (!op.campanha_id || !campanhasIdsValidos.has(op.campanha_id)) {
                   await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
                 }
               }

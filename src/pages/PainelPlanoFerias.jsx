@@ -404,7 +404,7 @@ export default function PainelPlanoFerias() {
   };
 
   const handleExcluirCampanhaAdmin = async (camp) => {
-    if (!window.confirm(`ALERTA MODO ADMIN: Tem certeza que deseja EXCLUIR a campanha "${camp.titulo}"? Todas as opções já registradas pelos militares permanecem protegidas no sistema.`)) return;
+    if (!window.confirm(`ALERTA MODO ADMIN: Tem certeza que deseja EXCLUIR a campanha "${camp.titulo}"? As opções de preferência desta campanha serão apagadas. (Férias já geradas na escala oficial NÃO serão afetadas).`)) return;
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
