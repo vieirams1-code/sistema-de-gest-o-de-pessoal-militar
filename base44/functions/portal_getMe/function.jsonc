@@ -1,0 +1,4 @@
+{
+  "name": "portal_getMe",
+  "entry": "base44/functions/portal_getMe/entry.ts"
+}
