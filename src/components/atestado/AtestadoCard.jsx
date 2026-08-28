@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -11,12 +11,15 @@ import {
   Save,
   ChevronRight,
   RefreshCw,
-  Pencil
+  Pencil,
+  MessageCircle,
+  Send
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
@@ -42,6 +45,10 @@ import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { buildAtestadoTemplateVarsContrato, getTipoTemplateHomologacaoAtestado } from './atestadoTemplateVars';
+import {
+  MODULO_WHATSAPP_NOTIFICACOES,
+  TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
+} from '@/constants/whatsappTemplates';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -63,13 +70,22 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
+  const [jisoTime, setJisoTime] = useState(atestado.hora_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
+  const [showWhatsAppPreview, setShowWhatsAppPreview] = useState(false);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [showJisoModal, setShowJisoModal] = useState(false);
   const [showHomologacaoModal, setShowHomologacaoModal] = useState(false);
   const [showAtaJisoModal, setShowAtaJisoModal] = useState(false);
   const [savingPublicacao, setSavingPublicacao] = useState(false);
   const [uploadingAtaJiso, setUploadingAtaJiso] = useState(false);
   const [arquivoAtaJisoNome, setArquivoAtaJisoNome] = useState('');
+
+  useEffect(() => {
+    setJisoDate(atestado.data_jiso_agendada || '');
+    setJisoTime(atestado.hora_jiso_agendada || '');
+  }, [atestado.id, atestado.data_jiso_agendada, atestado.hora_jiso_agendada]);
 
   // Estado do formulário de homologação
   const [homologacaoForm, setHomologacaoForm] = useState({
