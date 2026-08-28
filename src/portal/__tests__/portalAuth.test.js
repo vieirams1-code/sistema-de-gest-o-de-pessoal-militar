@@ -447,4 +447,21 @@ describe('Portal OTP Multicanal & Anti-Enumeração — Testes de Produção (Fa
     assert.equal(metodos.some((m) => m.canal === 'EMAIL'), true);
     assert.equal(metodos.some((m) => m.canal === 'WHATSAPP'), true);
   });
+
+  it('35. PortalApiClient deve propagar Base44-Functions-Version no fetch direto', () => {
+    const source = fs.readFileSync(path.resolve('src/portal/api/PortalApiClient.js'), 'utf8');
+    assert.equal(source.includes("'Base44-Functions-Version': appParams.functionsVersion"), true);
+  });
+
+  it('36. portal_auth deve aceitar o header de versão no preflight CORS', () => {
+    const source = fs.readFileSync(path.resolve('base44/functions/portal_auth/entry.ts'), 'utf8');
+    assert.equal(source.includes('Base44-Functions-Version'), true);
+    assert.equal(source.includes("req.method === 'OPTIONS'"), true);
+  });
+
+  it('37. portal_getMe deve aceitar o header de versão no preflight CORS', () => {
+    const source = fs.readFileSync(path.resolve('base44/functions/portal_getMe/entry.ts'), 'utf8');
+    assert.equal(source.includes('Base44-Functions-Version'), true);
+    assert.equal(source.includes("req.method === 'OPTIONS'"), true);
+  });
 });
