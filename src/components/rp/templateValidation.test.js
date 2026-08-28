@@ -273,3 +273,33 @@ test('homologação de atestado continua bloqueando variável desconhecida', () 
   assert.equal(result.ok, false);
   assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA' && f.severity === 'ERRO'), true);
 });
+
+test('notificação JISO WhatsApp aceita data, horário e variáveis do atestado', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'WhatsApp Notificações',
+    tipoRegistro: 'Notificação de JISO WA',
+    template:
+      'Olá {{posto_nome}} {{nome_completo}}. Sua JISO será em {{data_jiso}} às {{hora_jiso}}. Atestado: {{dias_atestado}} dias, de {{data_inicio}} a {{data_termino}}.',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
+test('notificação JISO WhatsApp respeita prioridade de escopo', () => {
+  const base = {
+    ativo: true,
+    modulo: 'WhatsApp Notificações',
+    tipo_registro: 'Notificação de JISO WA',
+    template: 'Mensagem {{nome_completo}} {{data_jiso}} {{hora_jiso}}',
+  };
+  const templates = [
+    { ...base, id: 'wa-global', escopo: 'GLOBAL' },
+    { ...base, id: 'wa-setor', escopo: 'SETOR', setor_id: 'g1' },
+  ];
+
+  const escolhido = getTemplateAtivoPorTipo('Notificação de JISO WA', 'WhatsApp Notificações', templates, {
+    grupamento_id: 'g1',
+  });
+
+  assert.equal(escolhido?.id, 'wa-setor');
+});
