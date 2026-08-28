@@ -76,9 +76,25 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
     loadCampanha();
   }, [campanhaId]);
 
-  // Manipulador de upload de arquivo via Base44 Storage
+  // Manipulador de upload de arquivo via Base44 Storage com validação
   const handleUploadFile = async (file, campoId = 'geral') => {
     if (!file) return;
+
+    // Validação de tamanho (máx 15MB)
+    const MAX_MB = 15;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setErrorMsg(`O arquivo "${file.name}" excede o tamanho máximo de ${MAX_MB}MB. Selecione um arquivo menor.`);
+      return;
+    }
+
+    // Validação de extensões permitidas
+    const allowed = ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx'];
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!allowed.includes(ext)) {
+      setErrorMsg(`Formato de arquivo .${ext} não suportado. Formatos aceitos: PDF, PNG, JPG, JPEG, DOC, DOCX, XLS, XLSX.`);
+      return;
+    }
+
     setUploadingFiles((prev) => ({ ...prev, [campoId]: true }));
     setErrorMsg(null);
 
@@ -227,9 +243,23 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
         {/* STATUS DA SUBMISSÃO */}
         <div className="flex items-center space-x-2">
           {isRespondido ? (
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center shadow-xs">
-              <CheckCircle2 className="w-4 h-4 mr-1 text-emerald-600" />
-              Respondido
+            <span className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center shadow-xs ${
+              respostaExistente?.status === 'Homologado'
+                ? 'bg-emerald-100 text-emerald-800'
+                : respostaExistente?.status === 'Pendente_Correcao'
+                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                : respostaExistente?.status === 'Rejeitado'
+                ? 'bg-red-100 text-red-800 border border-red-300'
+                : 'bg-blue-100 text-blue-800'
+            }`}>
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+              {respostaExistente?.status === 'Homologado'
+                ? 'Homologado'
+                : respostaExistente?.status === 'Pendente_Correcao'
+                ? 'Correção Solicitada'
+                : respostaExistente?.status === 'Rejeitado'
+                ? 'Rejeitado'
+                : 'Enviado / Em Análise'}
             </span>
           ) : (
             <span className="px-3 py-1 bg-amber-100 text-amber-900 rounded-xl text-xs font-bold flex items-center shadow-xs">
@@ -255,8 +285,26 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
         </div>
       )}
 
-      {/* COMPROVANTE SE JÁ ENVIADO */}
-      {isRespondido && (
+      {/* ALERTA DE RETIFICAÇÃO OU REJEIÇÃO */}
+      {isRespondido && (respostaExistente?.status === 'Pendente_Correcao' || respostaExistente?.status === 'Rejeitado') && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-start space-x-3 text-xs text-amber-950 shadow-sm animate-in fade-in">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="block text-sm font-black text-amber-900">
+              {respostaExistente.status === 'Pendente_Correcao' ? 'Correção Solicitada pelo Gestor / RH' : 'Resposta Rejeitada / Ajuste Necessário'}
+            </strong>
+            <p className="text-amber-800 font-medium">
+              {respostaExistente.observacao_gestor || 'O gestor solicitou a revisão dos dados preenchidos ou o reenvio de novo documento comprobatório.'}
+            </p>
+            <span className="text-[11px] text-amber-700 block font-semibold">
+              Você pode alterar as respostas ou anexos abaixo e clicar em "Enviar Resposta Corrigida" para reenviar.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* COMPROVANTE SE JÁ ENVIADO E REGULAR */}
+      {isRespondido && respostaExistente?.status !== 'Pendente_Correcao' && respostaExistente?.status !== 'Rejeitado' && (
         <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-start space-x-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
@@ -495,6 +543,7 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                         <div className="border-2 border-dashed border-slate-300 hover:border-[#1e3a5f] rounded-xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50 relative">
                           <input
                             type="file"
+                            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
                             onChange={(e) => handleUploadFile(e.target.files?.[0], campo.id)}
                             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                           />
@@ -507,7 +556,7 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                             <div className="flex flex-col items-center justify-center space-x-1 py-1">
                               <Upload className="w-5 h-5 text-slate-400 mb-1" />
                               <span className="text-xs font-semibold text-slate-700">Clique ou arraste para anexar o arquivo</span>
-                              <span className="text-[10px] text-slate-400">Formatos aceitos: PDF, Imagens (PNG, JPG)</span>
+                              <span className="text-[10px] text-slate-400">Formatos aceitos: PDF, Imagens (PNG, JPG), DOCX, XLSX (máx. 15MB)</span>
                             </div>
                           )}
                         </div>
@@ -543,7 +592,7 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                 Anexo do Documento Assinado {campanha?.exigir_devolucao_arquivo && <span className="text-red-500 ml-1">*</span>}
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Faça o upload do documento preenchido e assinado para conferência do RH
+                Faça o upload do documento preenchido e assinado para conferência do RH (máx. 15MB)
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 sm:p-5 text-xs space-y-3">
@@ -582,6 +631,7 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                 <div className="border-2 border-dashed border-slate-300 hover:border-emerald-600 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-50/50 relative">
                   <input
                     type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
                     onChange={(e) => handleUploadFile(e.target.files?.[0], 'devolucao')}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
@@ -594,7 +644,7 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                     <div className="flex flex-col items-center justify-center py-2">
                       <Upload className="w-6 h-6 text-emerald-600 mb-2" />
                       <span className="text-xs font-bold text-slate-800">Clique ou arraste seu documento assinado</span>
-                      <span className="text-[11px] text-slate-400 mt-0.5">Formato PDF ou Imagem digitalizada</span>
+                      <span className="text-[11px] text-slate-400 mt-0.5">Formato PDF ou Imagem digitalizada (máx. 15MB)</span>
                     </div>
                   )}
                 </div>
@@ -636,7 +686,11 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
             ) : (
               <Send className="w-4 h-4 mr-2" />
             )}
-            {isRespondido ? 'Atualizar Minha Resposta' : 'Enviar Resposta ao Comando'}
+            {respostaExistente?.status === 'Pendente_Correcao' || respostaExistente?.status === 'Rejeitado'
+              ? 'Enviar Resposta Corrigida'
+              : isRespondido
+              ? 'Atualizar Minha Resposta'
+              : 'Enviar Resposta ao Comando'}
           </Button>
         </div>
       </form>

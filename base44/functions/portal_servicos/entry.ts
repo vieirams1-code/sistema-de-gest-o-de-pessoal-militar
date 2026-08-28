@@ -15,11 +15,23 @@ export function assertNoClientSuppliedMilitarId(body: unknown): void {
   }
 }
 
+function normalizeText(text: string): string {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean {
   if (!Array.isArray(escopoUnidadesIds) || escopoUnidadesIds.length === 0) return true;
 
   const lotacaoMilitar = (m.lotacao || '').trim().toLowerCase();
   const estruturaMilitar = (m.estrutura_nome || '').trim().toLowerCase();
+  const lotacaoNorm = normalizeText(m.lotacao);
+  const estruturaNorm = normalizeText(m.estrutura_nome);
   const lotacaoId = String(m.lotacao_id || '').trim();
   const grupamentoId = String(m.grupamento_id || '').trim();
   const estruturaId = String(m.estrutura_id || '').trim();
@@ -28,6 +40,7 @@ function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean
     const id = String(idRaw || '').trim();
     if (!id) return false;
     const idLower = id.toLowerCase();
+    const idNorm = normalizeText(id);
 
     return (
       id === lotacaoId ||
@@ -36,7 +49,10 @@ function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean
       idLower === lotacaoMilitar ||
       idLower === estruturaMilitar ||
       (lotacaoMilitar && lotacaoMilitar.includes(idLower)) ||
-      (estruturaMilitar && estruturaMilitar.includes(idLower))
+      (estruturaMilitar && estruturaMilitar.includes(idLower)) ||
+      (idLower && (idLower.includes(lotacaoMilitar) || idLower.includes(estruturaMilitar))) ||
+      (idNorm && (lotacaoNorm.includes(idNorm) || idNorm.includes(lotacaoNorm))) ||
+      (idNorm && (estruturaNorm.includes(idNorm) || idNorm.includes(estruturaNorm)))
     );
   });
 }

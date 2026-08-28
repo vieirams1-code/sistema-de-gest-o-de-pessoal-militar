@@ -89,12 +89,15 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
     ? militar.nome_guerra.slice(0, 2).toUpperCase()
     : (militar.nome_completo ? militar.nome_completo.slice(0, 2).toUpperCase() : 'BM');
 
-  const campanhasCustomizadas = campanhasAtivas.filter(
-    (c) => c.tipo !== 'ATUALIZACAO_CADASTRAL' && c.tipo !== 'CONFERENCIA_GERAL' && c.tipo !== 'PLANO_FERIAS'
-  );
-  
-  console.log("Todas as campanhas ativas:", campanhasAtivas);
-  console.log("Campanhas customizadas filtradas:", campanhasCustomizadas);
+  const handleAbrirCampanha = (camp) => {
+    if (camp.tipo === 'PLANO_FERIAS') {
+      navigate('/portal/ferias');
+    } else if (camp.tipo === 'ATUALIZACAO_CADASTRAL' || camp.tipo === 'CONFERENCIA_GERAL') {
+      navigate('/portal/cadastro');
+    } else {
+      setSelectedCampanhaId(camp.id);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -157,26 +160,28 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
         </div>
       </div>
 
-      {/* SEÇÃO DE CAMPANHAS E FORMULÁRIOS DINÂMICOS EM ABERTO */}
-      {campanhasCustomizadas.length > 0 && (
+      {/* SEÇÃO DE CAMPANHAS E DEMANDAS EM ABERTO */}
+      {campanhasAtivas.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-base font-bold text-slate-800 flex items-center">
               <Megaphone className="w-4 h-4 mr-2 text-indigo-600" />
-              Campanhas e Formulários Oficiais ({campanhasCustomizadas.length})
+              Campanhas e Demandas em Aberto ({campanhasAtivas.length})
             </h3>
             <span className="text-xs text-slate-500 font-medium">Demandas da Gestão / Comando</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {campanhasCustomizadas.map((camp) => {
+            {campanhasAtivas.map((camp) => {
               const isResp = camp.status_resposta === 'Respondido';
               const isAssinatura = camp.tipo === 'ASSINATURA_DOCUMENTO';
+              const isFerias = camp.tipo === 'PLANO_FERIAS';
+              const isCadastral = camp.tipo === 'ATUALIZACAO_CADASTRAL' || camp.tipo === 'CONFERENCIA_GERAL';
 
               return (
                 <Card
                   key={camp.id}
-                  onClick={() => setSelectedCampanhaId(camp.id)}
+                  onClick={() => handleAbrirCampanha(camp)}
                   className={`hover:shadow-md transition-all border-slate-200 cursor-pointer group bg-white ${
                     isResp ? 'hover:border-emerald-600/40' : 'hover:border-indigo-600/40'
                   }`}
@@ -184,9 +189,23 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
                   <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform ${
-                        isAssinatura ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700'
+                        isFerias
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : isCadastral
+                          ? 'bg-blue-50 text-[#1e3a5f]'
+                          : isAssinatura
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-indigo-50 text-indigo-700'
                       }`}>
-                        {isAssinatura ? <FileSignature className="w-5 h-5" /> : <Layers className="w-5 h-5" />}
+                        {isFerias ? (
+                          <Calendar className="w-5 h-5" />
+                        ) : isCadastral ? (
+                          <UserCheck className="w-5 h-5" />
+                        ) : isAssinatura ? (
+                          <FileSignature className="w-5 h-5" />
+                        ) : (
+                          <Layers className="w-5 h-5" />
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
@@ -195,7 +214,15 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
                           </CardTitle>
                         </div>
                         <CardDescription className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                          {camp.instrucoes || (isAssinatura ? 'Assinatura e devolução de documento' : 'Preenchimento de formulário')}
+                          {camp.instrucoes || (
+                            isFerias
+                              ? 'Definição de opções de meses do plano de férias'
+                              : isCadastral
+                              ? 'Conferência e atualização cadastral'
+                              : isAssinatura
+                              ? 'Assinatura e devolução de documento'
+                              : 'Preenchimento de formulário'
+                          )}
                         </CardDescription>
                       </div>
                     </div>
