@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Save, ArrowLeft, Upload, FileText, User as UserIcon, Calendar, Clipboard, BookOpen, Download, Trash2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
@@ -124,7 +123,6 @@ export default function CadastrarAtestado() {
   const queryClient = useQueryClient();
   
   const [formData, setFormData] = useState(initialFormData);
-  const [notificarWhatsApp, setNotificarWhatsApp] = useState(true);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -304,18 +302,6 @@ export default function CadastrarAtestado() {
     }
 
     await sincronizarAtestadoJisoNoQuadro(atestadoSalvo);
-
-    if (notificarWhatsApp && (formData.fluxo_homologacao === 'jiso' || parseInt(formData.dias) > 15) && formData.data_jiso_agendada) {
-      try {
-        await base44.functions.invoke('notificarJisoWhatsApp', {
-          militar_id: dataToSave.militar_id,
-          data_jiso: formData.data_jiso_agendada,
-          dias_atestado: dataToSave.dias,
-        });
-      } catch (err) {
-        console.warn('Falha silenciosa ao notificar WhatsApp no salvamento:', err);
-      }
-    }
 
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['cards'] });
@@ -533,26 +519,9 @@ export default function CadastrarAtestado() {
                   <p className="text-xs text-blue-600 mt-1">
                     A publicação será gerada pelo módulo de Ata JISO após a realização da inspeção.
                   </p>
-                  {formData.data_jiso_agendada !== undefined && (
-                    <div className="mt-3 space-y-3">
-                      <FormField
-                        label="Data JISO Agendada"
-                        name="data_jiso_agendada"
-                        value={formData.data_jiso_agendada || ''}
-                        onChange={handleChange}
-                        type="date"
-                      />
-                      {formData.data_jiso_agendada && (
-                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
-                          <Checkbox 
-                            checked={notificarWhatsApp} 
-                            onCheckedChange={setNotificarWhatsApp} 
-                          />
-                          Notificar via WhatsApp
-                        </label>
-                      )}
-                    </div>
-                  )}
+                  <p className="text-xs text-blue-600 mt-2">
+                    Após salvar o atestado, defina a data e o horário da JISO diretamente no card do atestado.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -590,23 +559,10 @@ export default function CadastrarAtestado() {
                     </button>
                   </div>
                   {formData.fluxo_homologacao === 'jiso' && (
-                    <div className="space-y-3">
-                      <FormField
-                        label="Data JISO Agendada"
-                        name="data_jiso_agendada"
-                        value={formData.data_jiso_agendada || ''}
-                        onChange={handleChange}
-                        type="date"
-                      />
-                      {formData.data_jiso_agendada && (
-                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
-                          <Checkbox 
-                            checked={notificarWhatsApp} 
-                            onCheckedChange={setNotificarWhatsApp} 
-                          />
-                          Notificar via WhatsApp
-                        </label>
-                      )}
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs text-blue-700">
+                        Após salvar, defina a data e o horário da JISO no card do atestado. A notificação por WhatsApp também será enviada por esse card, sempre com prévia editável antes da confirmação.
+                      </p>
                     </div>
                   )}
                   {formData.fluxo_homologacao === 'comandante' && (
