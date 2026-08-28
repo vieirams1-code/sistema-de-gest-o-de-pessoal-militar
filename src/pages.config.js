@@ -126,6 +126,7 @@ import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
 import PainelPlanoFerias from './pages/PainelPlanoFerias';
 import GerirCampanhasPortal from './pages/GerirCampanhasPortal';
+import CentralRespostasCampanhas from './pages/CentralRespostasCampanhas';
 import Portal from './pages/Portal';
 import PortalFerias from './pages/PortalFerias';
 import PortalCadastro from './pages/PortalCadastro';
@@ -136,6 +137,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "SistemaFeriasPreviewPage": SistemaFeriasPreviewPage,
     "GerirCampanhasPortal": GerirCampanhasPortal,
+    "CentralRespostasCampanhas": CentralRespostasCampanhas,
     "Portal": Portal,
     "PortalFerias": PortalFerias,
     "PortalCadastro": PortalCadastro,
