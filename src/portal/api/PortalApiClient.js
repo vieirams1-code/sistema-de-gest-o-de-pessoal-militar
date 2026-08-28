@@ -57,6 +57,9 @@ export async function portalFetch(functionName, data = {}) {
       const headers = {
         'Content-Type': 'application/json',
         'X-App-Id': appId,
+        ...(appParams.functionsVersion
+          ? { 'Base44-Functions-Version': appParams.functionsVersion }
+          : {}),
       };
 
       if (token) {
