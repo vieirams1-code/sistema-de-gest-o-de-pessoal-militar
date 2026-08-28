@@ -122,6 +122,13 @@ export default function CadastrarAtestado() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
+  
+  const [formData, setFormData] = useState(initialFormData);
+  const [notificarWhatsApp, setNotificarWhatsApp] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
@@ -130,7 +137,6 @@ export default function CadastrarAtestado() {
   const canEditar = canAccessAction('editar_atestados');
   const hasActionPermission = editId ? canEditar : canAdicionar;
 
-  const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -302,6 +308,18 @@ export default function CadastrarAtestado() {
     }
 
     await sincronizarAtestadoJisoNoQuadro(atestadoSalvo);
+
+    if (notificarWhatsApp && (formData.fluxo_homologacao === 'jiso' || parseInt(formData.dias) > 15) && formData.data_jiso_agendada) {
+      try {
+        await base44.functions.invoke('notificarJisoWhatsApp', {
+          militar_id: dataToSave.militar_id,
+          data_jiso: formData.data_jiso_agendada,
+          dias_atestado: dataToSave.dias,
+        });
+      } catch (err) {
+        console.warn('Falha silenciosa ao notificar WhatsApp no salvamento:', err);
+      }
+    }
 
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['cards'] });
@@ -520,7 +538,7 @@ export default function CadastrarAtestado() {
                     A publicação será gerada pelo módulo de Ata JISO após a realização da inspeção.
                   </p>
                   {formData.data_jiso_agendada !== undefined && (
-                    <div className="mt-3">
+                    <div className="mt-3 space-y-3">
                       <FormField
                         label="Data JISO Agendada"
                         name="data_jiso_agendada"
@@ -528,6 +546,15 @@ export default function CadastrarAtestado() {
                         onChange={handleChange}
                         type="date"
                       />
+                      {formData.data_jiso_agendada && (
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
+                          <Checkbox 
+                            checked={notificarWhatsApp} 
+                            onCheckedChange={setNotificarWhatsApp} 
+                          />
+                          Notificar via WhatsApp
+                        </label>
+                      )}
                     </div>
                   )}
                 </div>
@@ -567,13 +594,24 @@ export default function CadastrarAtestado() {
                     </button>
                   </div>
                   {formData.fluxo_homologacao === 'jiso' && (
-                    <FormField
-                      label="Data JISO Agendada"
-                      name="data_jiso_agendada"
-                      value={formData.data_jiso_agendada || ''}
-                      onChange={handleChange}
-                      type="date"
-                    />
+                    <div className="space-y-3">
+                      <FormField
+                        label="Data JISO Agendada"
+                        name="data_jiso_agendada"
+                        value={formData.data_jiso_agendada || ''}
+                        onChange={handleChange}
+                        type="date"
+                      />
+                      {formData.data_jiso_agendada && (
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
+                          <Checkbox 
+                            checked={notificarWhatsApp} 
+                            onCheckedChange={setNotificarWhatsApp} 
+                          />
+                          Notificar via WhatsApp
+                        </label>
+                      )}
+                    </div>
                   )}
                   {formData.fluxo_homologacao === 'comandante' && (
                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
