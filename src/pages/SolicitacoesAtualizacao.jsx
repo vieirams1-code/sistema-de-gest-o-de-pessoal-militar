@@ -37,7 +37,7 @@ export default function SolicitacoesAtualizacao() {
   const [buscaTermo, setBuscaTermo] = useState('');
   const [valoresEditados, setValoresEditados] = useState({}); // { [solId]: valorCorrigido }
   const [modosEdicao, setModosEdicao] = useState({}); // { [solId]: boolean }
-  const [expandidos, setExpandidos] = useState({}); // { [militarKey]: boolean }
+  const [militarExpandidoKey, setMilitarExpandidoKey] = useState(null); // Apenas um militar expandido por vez (todos iniciam recolhidos)
   const [processing, setProcessing] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -73,19 +73,7 @@ export default function SolicitacoesAtualizacao() {
   };
 
   const handleToggleExpansao = (key) => {
-    setExpandidos((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const handleExpandirTodos = (grupos, expandir) => {
-    const novoEstado = {};
-    grupos.forEach((g) => {
-      const key = g.militar_id || g.militar_matricula || g.militar_nome || 'desconhecido';
-      novoEstado[key] = expandir;
-    });
-    setExpandidos(novoEstado);
+    setMilitarExpandidoKey((prev) => (prev === key ? null : key));
   };
 
   const handleDecidirItem = async (sol, novoStatus) => {
@@ -280,23 +268,22 @@ export default function SolicitacoesAtualizacao() {
               ))}
             </div>
 
-            {/* BOTÕES EXPANDIR / RECOLHER TODOS */}
-            <div className="flex items-center gap-1.5 w-full md:w-auto justify-end">
-              <button
-                type="button"
-                onClick={() => handleExpandirTodos(gruposMilitares, true)}
-                className="text-xs font-bold text-[#1e3a5f] hover:underline px-2 py-1 rounded-lg hover:bg-blue-50"
-              >
-                Expandir Todos
-              </button>
-              <span className="text-slate-300">•</span>
-              <button
-                type="button"
-                onClick={() => handleExpandirTodos(gruposMilitares, false)}
-                className="text-xs font-bold text-slate-500 hover:underline px-2 py-1 rounded-lg hover:bg-slate-100"
-              >
-                Recolher Todos
-              </button>
+            {/* INFORMAÇÃO / BOTÃO RECOLHER */}
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end text-xs text-slate-500">
+              {militarExpandidoKey ? (
+                <button
+                  type="button"
+                  onClick={() => setMilitarExpandidoKey(null)}
+                  className="text-xs font-bold text-[#1e3a5f] hover:underline px-2 py-1 rounded-lg hover:bg-blue-50 flex items-center gap-1"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  Recolher militar aberto
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400 italic">
+                  Clique no militar para expandir
+                </span>
+              )}
             </div>
           </div>
 
@@ -313,7 +300,7 @@ export default function SolicitacoesAtualizacao() {
             </div>
           )}
 
-          {/* LISTA AGRUPADA POR MILITAR COM ACCORDION */}
+          {/* LISTA AGRUPADA POR MILITAR COM ACCORDION (1 EXPANDIDO POR VEZ) */}
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-4">
               <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
@@ -331,7 +318,7 @@ export default function SolicitacoesAtualizacao() {
             <div className="space-y-3">
               {gruposMilitares.map((grupo) => {
                 const key = grupo.key;
-                const isExpandido = expandidos[key] !== false; // expandido por padrão na primeira carga ou conforme toggle
+                const isExpandido = militarExpandidoKey === key; // Apenas o selecionado fica aberto
                 const totalItens = grupo.itens.length;
                 const itensPendentes = grupo.itens.filter((i) => i.status === 'Pendente');
                 const itensAprovados = grupo.itens.filter((i) => i.status === 'Aprovada');
