@@ -150,10 +150,13 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
 
   async sendTextMessage(
     params: { to: string; text: string },
-    base44: any
+    _base44Client?: any
   ): Promise<{ success: boolean; provider: string; error?: string }> {
-    const config = await this.getConfig(base44);
-    if (!config) {
+    const url = this.apiUrl || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_URL') || Deno.env.get('WHATSAPP_API_URL') : undefined);
+    const key = this.apiKey || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_KEY') || Deno.env.get('WHATSAPP_API_KEY') : undefined);
+    const instance = this.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'cbmms_portal';
+
+    if (!url || !key) {
       return {
         success: false,
         provider: 'evolution_api',
@@ -161,9 +164,7 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
       };
     }
 
-    const { url, key, instance } = config;
-
-    const normalizedNumber = this.normalizeWhatsAppNumber(params.to);
+    const normalizedNumber = normalizeWhatsAppNumber(params.to);
     if (!normalizedNumber) {
       return {
         success: false,
