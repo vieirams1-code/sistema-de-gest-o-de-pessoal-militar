@@ -694,11 +694,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
             <div className="flex-1">
               <p className="text-amber-900 font-semibold text-sm leading-tight mb-1">JISO não agendada</p>
-              <p className="text-amber-700 text-xs">É necessário definir uma data para a junta.</p>
+              <p className="text-amber-700 text-xs">É necessário definir a data e o horário da junta.</p>
             </div>
             <button
               onClick={() => {
                 setJisoDate(atestado.data_jiso_agendada || '');
+                setJisoTime(atestado.hora_jiso_agendada || '');
                 setEditingJiso(true);
               }}
               className="text-amber-700 font-bold text-xs uppercase hover:bg-amber-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
@@ -715,26 +716,64 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
               <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
             </div>
             {editingJiso ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={jisoDate}
-                  onChange={e => setJisoDate(e.target.value)}
-                  className="border border-slate-300 rounded px-2 py-1 text-xs flex-1"
-                />
-                <Button size="sm" className="h-7 px-2 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={handleSaveJiso} disabled={savingJiso}>
-                  {savingJiso ? '...' : 'OK'}
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); }}>
-                  Cancelar
-                </Button>
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_120px] gap-2">
+                  <div>
+                    <Label className="text-[11px] text-slate-500">Data</Label>
+                    <input
+                      type="date"
+                      value={jisoDate}
+                      onChange={e => setJisoDate(e.target.value)}
+                      className="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-xs bg-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] text-slate-500">Horário</Label>
+                    <input
+                      type="time"
+                      value={jisoTime}
+                      onChange={e => setJisoTime(e.target.value)}
+                      className="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-xs bg-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" className="h-8 px-3 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={handleSaveJiso} disabled={savingJiso || !jisoDate || !jisoTime}>
+                    {savingJiso ? 'Salvando...' : 'Salvar agendamento'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-3 text-xs border-green-600 bg-green-50 text-green-700 hover:bg-green-100"
+                    onClick={abrirPreviaWhatsAppJiso}
+                    disabled={savingJiso || sendingWhatsApp || !jisoDate || !jisoTime}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+                    WhatsApp
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); setJisoTime(atestado.hora_jiso_agendada || ''); }}>
+                    Cancelar
+                  </Button>
+                </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-700 font-medium">{formatDate(atestado.data_jiso_agendada)}</span>
-                <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data JISO">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-slate-700 font-medium">
+                  {formatDate(atestado.data_jiso_agendada)} · {atestado.hora_jiso_agendada || 'horário não definido'}
+                </span>
+                <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setJisoTime(atestado.hora_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data e horário da JISO">
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3 text-xs border-green-600 bg-green-50 text-green-700 hover:bg-green-100"
+                  onClick={abrirPreviaWhatsAppJiso}
+                  disabled={sendingWhatsApp || !jisoDate || !jisoTime}
+                >
+                  <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+                  WhatsApp
+                </Button>
               </div>
             )}
           </div>
