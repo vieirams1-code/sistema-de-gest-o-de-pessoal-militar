@@ -247,15 +247,15 @@ const menuGroups = [
     ],
   },
   {
-    title: 'PORTAL HOMOLOGAÇÃO',
+    title: 'CAMPANHAS',
     sections: [
       {
-        title: 'Autoatendimento & Campanhas',
+        title: 'Campanhas',
         icon: Megaphone,
-        description: 'Módulo de Gestão do Portal do Militar, Campanhas, Escala e Autoatendimento',
+        description: 'Módulo de Gestão de Campanhas e Validações do Portal',
         items: [
           {
-            name: '1. Gestor de Campanhas',
+            name: '1. Gestão de Campanhas',
             page: 'GerirCampanhasPortal',
             icon: Megaphone,
             menuGroup: 'Gestão RH / Comando',
@@ -279,43 +279,10 @@ const menuGroups = [
             menuGroup: 'Gestão RH / Comando',
           },
           {
-            name: '5. Mesa de Conferências',
-            page: 'ConferenciasMilitares',
-            icon: ShieldCheck,
-            menuGroup: 'Gestão RH / Comando',
-          },
-          {
-            name: '6. Solicitações Cadastrais',
+            name: '5. Solicitações Cadastrais',
             page: 'SolicitacoesAtualizacao',
             icon: ClipboardList,
             menuGroup: 'Gestão RH / Comando',
-          },
-          {
-            name: '7. Portal Militar (Hub Geral)',
-            page: 'Portal',
-            path: '/portal',
-            icon: Smartphone,
-            menuGroup: 'Autoatendimento Militar',
-          },
-          {
-            name: '8. Portal: Opção de Férias',
-            page: 'PortalFerias',
-            path: '/portal/ferias',
-            icon: CalendarClock,
-            menuGroup: 'Autoatendimento Militar',
-          },
-          {
-            name: '9. Portal: Ficha & Cadastro',
-            page: 'PortalCadastro',
-            path: '/portal/cadastro',
-            icon: Users,
-            menuGroup: 'Autoatendimento Militar',
-          },
-          {
-            name: '9. Preview Novo Sistema Férias',
-            page: 'SistemaFeriasPreviewPage',
-            icon: Layers,
-            menuGroup: 'Autoatendimento Militar',
           },
         ],
       },
