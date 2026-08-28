@@ -820,6 +820,61 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
         )}
       </div>
 
+      {/* Prévia da notificação JISO por WhatsApp */}
+      <Dialog open={showWhatsAppPreview} onOpenChange={(open) => { if (!sendingWhatsApp) setShowWhatsAppPreview(open); }}>
+        <DialogContent className="w-[96vw] max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-green-600" />
+              Prévia da notificação JISO por WhatsApp
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+              <p className="font-semibold">{atestado.militar_posto} {atestado.militar_nome}</p>
+              <p className="mt-1 text-xs">
+                JISO em {formatDate(jisoDate)}, às {jisoTime}. Revise o texto abaixo antes de confirmar o envio.
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Mensagem</Label>
+              <Textarea
+                value={whatsappMessage}
+                onChange={(e) => setWhatsappMessage(e.target.value)}
+                rows={14}
+                className="mt-1.5 resize-y whitespace-pre-wrap"
+                disabled={sendingWhatsApp}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Você pode editar livremente esta mensagem. Somente o texto exibido aqui será enviado.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowWhatsAppPreview(false)}
+                disabled={sendingWhatsApp}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmarEnvioWhatsAppJiso}
+                disabled={sendingWhatsApp || savingJiso || !whatsappMessage.trim()}
+                className="bg-green-600 text-white hover:bg-green-700"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {sendingWhatsApp ? 'Enviando...' : 'Confirmar e enviar mensagem'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Homologação pelo Comandante */}
       <Dialog open={showHomologacaoModal} onOpenChange={setShowHomologacaoModal}>
         <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-hidden p-0">
