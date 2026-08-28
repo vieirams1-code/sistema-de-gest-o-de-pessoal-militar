@@ -130,6 +130,10 @@
       "type": "string",
       "format": "date"
     },
+    "hora_jiso_agendada": {
+      "type": "string",
+      "description": "Hor\u00e1rio agendado da JISO no formato HH:MM."
+    },
     "jiso_id": {
       "type": "string"
     },
