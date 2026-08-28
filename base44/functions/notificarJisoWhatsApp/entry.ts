@@ -19,18 +19,18 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const {
-      militar_id,
-      data_jiso,
-      hora_jiso,
-      local_jiso,
-      secao_jiso,
-      finalidade_jiso,
-      dias_atestado,
-    } = payload;
+    const { militar_id, mensagem } = payload;
 
     if (!militar_id) {
       return jsonResponse({ success: false, error: 'militar_id obrigatório' }, 400);
+    }
+
+    const text = String(mensagem || '').trim();
+    if (!text) {
+      return jsonResponse({
+        success: false,
+        error: 'mensagem obrigatória: revise e confirme a notificação antes do envio.'
+      }, 400);
     }
 
     const militarResult = await base44.asServiceRole.entities.Militar.filter({ id: militar_id });
@@ -43,22 +43,6 @@ Deno.serve(async (req) => {
     if (!rawTelefone) {
       return jsonResponse({ success: false, error: 'Militar não possui telefone cadastrado' });
     }
-
-    const dataFormatada = data_jiso ? new Date(data_jiso + 'T12:00:00Z').toLocaleDateString('pt-BR') : 'A definir';
-    const horaFormatada = hora_jiso || 'Conforme escala da Junta';
-    const localFormatado = local_jiso || 'Junta Médica';
-    const secaoFormatada = secao_jiso || 'JISO';
-    const finalidadeFormatada = finalidade_jiso || 'Inspeção de Saúde';
-    
-    let atestadoInfo = '';
-    if (dias_atestado) {
-      atestadoInfo = '\n📄 *Atestado:* Referente a afastamento de ' + dias_atestado + ' dia(s)';
-    }
-
-    const postoGraduacao = militar.posto_graduacao || '';
-    const nomeIdentificacao = militar.nome_guerra || militar.nome_completo || '';
-
-    const text = '🚨 *COMUNICADO OFICIAL — CBMMS*\n*Junta de Inspeção de Saúde Ordinária (JISO)*\n\nPrezado(a) *' + postoGraduacao + ' ' + nomeIdentificacao + '*,\n\nInformamos que foi agendada sua apresentação perante a Junta Médica:\n\n📅 *Data:* ' + dataFormatada + '\n⏰ *Horário:* ' + horaFormatada + '\n📍 *Local:* ' + localFormatado + '\n🩺 *Seção:* ' + secaoFormatada + '\n📋 *Finalidade:* ' + finalidadeFormatada + atestadoInfo + '\n\n⚠️ *Orientações:*\n• Comparecer com 15 minutos de antecedência.\n• Portar documento de identificação oficial com foto e cópia do atestado/laudos médicos pertinentes.\n• Em caso de impossibilidade de locomoção, comunicar o setor de saúde da sua unidade imediatamente.\n\n_Mensagem automática. Por favor, não responda._';
 
     const dispatchRes = await evolutionWhatsAppProvider.sendTextMessage(
       { to: rawTelefone, text },
