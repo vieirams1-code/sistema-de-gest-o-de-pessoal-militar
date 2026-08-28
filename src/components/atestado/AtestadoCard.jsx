@@ -689,7 +689,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           </div>
         </div>
 
-        {isFluxoJiso && !atestado.data_jiso_agendada && !editingJiso && (
+        {isFluxoJiso && !jisoDate && !editingJiso && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2.5 mb-4">
             <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
             <div className="flex-1">
@@ -709,7 +709,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           </div>
         )}
 
-        {isFluxoJiso && (editingJiso || atestado.data_jiso_agendada) && (
+        {isFluxoJiso && (editingJiso || jisoDate) && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
@@ -759,7 +759,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-slate-700 font-medium">
-                  {formatDate(atestado.data_jiso_agendada)} · {atestado.hora_jiso_agendada || 'horário não definido'}
+                  {formatDate(jisoDate)} · {jisoTime || 'horário não definido'}
                 </span>
                 <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setJisoTime(atestado.hora_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data e horário da JISO">
                   <Pencil className="w-3.5 h-3.5" />
