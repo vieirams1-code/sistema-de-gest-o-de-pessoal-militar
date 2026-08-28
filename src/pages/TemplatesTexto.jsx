@@ -49,6 +49,12 @@ import {
 } from '@/services/documentosMilitares/documentoMilitarTemplateService';
 import { normalizarTextoDocumentoMilitar } from '@/services/documentosMilitares/normalizarTextoDocumentoMilitar';
 import { TIPO_TEMPLATE_COMPORTAMENTO } from '@/utils/comportamentoTemplateUtils';
+import {
+  MODULO_WHATSAPP_NOTIFICACOES,
+  PREVIEW_TEMPLATE_NOTIFICACAO_JISO_WA,
+  TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
+  VARIAVEIS_TEMPLATE_NOTIFICACAO_JISO_WA,
+} from '@/constants/whatsappTemplates';
 
 const FERIAS_CANONICAL_TYPES = Object.values(FERIAS_TIPO_CANONICO);
 const TIPOS_TEMPLATE_COMPORTAMENTO_CALCULADO = [
@@ -60,10 +66,16 @@ const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
   [MODULO_EX_OFFICIO]: 'Ex Offício',
   [MODULO_DOCUMENTOS_MILITARES]: 'Documentos Militares',
+  [MODULO_WHATSAPP_NOTIFICACOES]: 'WhatsApp Notificações',
 };
 
 const TIPOS_TEMPLATE_ADICIONAIS = [
   DOCUMENTOS_MILITARES_TEMPLATE_OPTION,
+  {
+    value: TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
+    label: TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
+    modulo: MODULO_WHATSAPP_NOTIFICACOES,
+  },
   {
     value: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
     label: TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO,
@@ -97,6 +109,11 @@ const TIPO_LABEL_OVERRIDES = {
 };
 
 const TIPO_REGISTRO_CATEGORIAS = [
+  {
+    key: 'whatsapp_notificacoes',
+    label: 'WhatsApp Notificações',
+    tipos: [TIPO_TEMPLATE_NOTIFICACAO_JISO_WA],
+  },
   {
     key: 'documentos_militares',
     label: 'Documentos Militares',
@@ -650,6 +667,11 @@ const VARS_POR_TIPO = {
       { v: '{{fundamento_legal}}', desc: 'Fundamento legal da elevação' },
     ],
   },
+  [TIPO_TEMPLATE_NOTIFICACAO_JISO_WA]: {
+    grupo: 'Notificação de JISO por WhatsApp',
+    cor: 'green',
+    variaveis: VARIAVEIS_TEMPLATE_NOTIFICACAO_JISO_WA,
+  },
   'Ata JISO': {
     grupo: 'Ata JISO',
     cor: 'purple',
@@ -894,6 +916,7 @@ export default function TemplatesTexto() {
     [MODULO_LIVRO]: 'bg-blue-100 text-blue-700',
     [MODULO_EX_OFFICIO]: 'bg-purple-100 text-purple-700',
     [MODULO_DOCUMENTOS_MILITARES]: 'bg-emerald-100 text-emerald-700',
+    [MODULO_WHATSAPP_NOTIFICACOES]: 'bg-green-100 text-green-700',
   };
 
   const tiposRegistroOptions = useMemo(() => (
@@ -1209,9 +1232,12 @@ export default function TemplatesTexto() {
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words [word-break:break-word]">
                     {(() => {
+                      const previewVars = editingTemplate.tipo_registro === TIPO_TEMPLATE_NOTIFICACAO_JISO_WA
+                        ? buildPreviewTemplateVars(PREVIEW_TEMPLATE_NOTIFICACAO_JISO_WA)
+                        : buildPreviewTemplateVars();
                       const textoPreviewBruto = normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES
                         ? previewTemplateDocumentoMilitar(editingTemplate.template)
-                        : aplicarTemplate(editingTemplate.template, buildPreviewTemplateVars());
+                        : aplicarTemplate(editingTemplate.template, previewVars);
                       const textoPreview = normalizarTextoDocumentoMilitar(textoPreviewBruto);
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
