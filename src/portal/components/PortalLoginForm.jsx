@@ -4,7 +4,7 @@ import { iniciarAuth, enviarOtp, validarOtp } from '../api/PortalApiClient';
 import { Shield, Smartphone, Mail, ArrowRight, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 // Máscara de CPF: 000.000.000-00
 function maskCpf(value) {
@@ -218,7 +218,7 @@ export default function PortalLoginForm() {
             PORTAL DO MILITAR
           </CardTitle>
           <CardDescription className="text-slate-600 text-xs sm:text-sm mt-1">
-            Corpo de Bombeiros Militar de Mato Grosso do Sul
+            VIVICAS - SGP Militar
           </CardDescription>
         </CardHeader>
 
@@ -441,12 +441,6 @@ export default function PortalLoginForm() {
           )}
         </CardContent>
 
-        <CardFooter className="bg-slate-50/70 border-t border-slate-100 py-3 px-6 rounded-b-xl flex items-center justify-center">
-          <span className="text-[11px] text-slate-500 flex items-center">
-            <Lock className="w-3 h-3 mr-1 text-slate-400" />
-            Ambiente Seguro CBMMS • Criptografia de Ponta a Ponta
-          </span>
-        </CardFooter>
       </Card>
     </div>
   );
