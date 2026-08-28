@@ -1,6 +1,7 @@
 import { resolverTipoFeriasCanonico } from '../ferias/feriasTipoResolver.js';
 import { MODULO_DOCUMENTOS_MILITARES } from '../../services/documentosMilitares/documentoMilitarVarsService.js';
 import { lintTemplateDocumentoMilitar } from '../../services/documentosMilitares/documentoMilitarTemplateService.js';
+import { TIPO_TEMPLATE_NOTIFICACAO_JISO_WA } from '../../constants/whatsappTemplates.js';
 
 export const TEMPLATE_BLOQUEIO_MENSAGEM =
   'Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.';
@@ -462,6 +463,23 @@ const TEMPLATE_VAR_CONTRACT = {
       'data_ata',
       'nup',
       'parecer_jiso',
+    ],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+    },
+  },
+  [resolveTipoRegistroTemplate(TIPO_TEMPLATE_NOTIFICACAO_JISO_WA)]: {
+    obrigatorias: ['nome_completo', 'data_jiso', 'hora_jiso'],
+    opcionais: [
+      'posto_nome',
+      'posto_graduacao',
+      'nome_guerra',
+      'matricula',
+      'dias_atestado',
+      'tipo_afastamento',
+      'data_inicio',
+      'data_termino',
     ],
     aliases: {
       posto: 'posto_nome',
