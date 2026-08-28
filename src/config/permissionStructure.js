@@ -312,6 +312,21 @@ export const permissionStructure = [
     ]
   },
   {
+    category: 'Campanhas e Autoatendimento',
+    modules: [
+      {
+        key: 'acesso_campanhas',
+        label: 'Gestão de Campanhas',
+        actions: [
+          { key: 'perm_visualizar_campanhas', label: 'Visualizar Campanhas' },
+          { key: 'perm_gerir_campanhas', label: 'Gerir Campanhas', sensitive: true },
+          { key: 'perm_gerir_respostas', label: 'Gerir Respostas e Painéis', sensitive: true },
+          { key: 'perm_configurar_portal', label: 'Configurar Regras do Portal', sensitive: true }
+        ]
+      }
+    ]
+  },
+  {
     category: 'Administração do Sistema',
     modules: [
       {
