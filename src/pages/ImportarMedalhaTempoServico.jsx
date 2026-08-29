@@ -189,7 +189,7 @@ export default function ImportarMedalhaTempoServico() {
                   <div className="flex items-center gap-2">
                     <Input type="file" accept=".xlsx" onChange={handleFileChange} />
                   </div>
-                  <p className="text-[10px] text-slate-500">Colunas obrigatórias: MILITARES DO CBMMS, DOEMS, DATA.</p>
+                  <p className="text-[10px] text-slate-500">Colunas obrigatórias: MILITAR, DOEMS, DATA.</p>
                 </div>
 
                 <Button
