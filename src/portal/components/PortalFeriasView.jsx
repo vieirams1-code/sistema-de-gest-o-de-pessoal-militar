@@ -441,7 +441,9 @@ export default function PortalFeriasView({ onBack }) {
                 <div className="p-3 bg-emerald-50/60 rounded-xl text-[11px] text-emerald-900 border border-emerald-100">
                   <span>
                     Modalidade selecionada: <strong>
-                      {opcaoEnviada.modalidade === '1_ETAPA_30'
+                      {opcaoEnviada.modalidade === 'CUSTOM'
+                        ? `Saldo remanescente (${opcaoEnviada.dias_direito || 0} dias)`
+                        : opcaoEnviada.modalidade === '1_ETAPA_30'
                         ? 'Integral (30 dias)'
                         : opcaoEnviada.modalidade === '2_ETAPAS_15'
                         ? '2 Frações (15 + 15 dias)'
