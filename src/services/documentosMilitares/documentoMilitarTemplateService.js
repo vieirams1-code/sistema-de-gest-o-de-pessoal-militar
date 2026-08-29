@@ -124,7 +124,7 @@ export function buildPreviewDocumentoMilitarVars() {
       postoGraduacaoSignatario: '2º TEN',
       quadroSignatario: 'QOBM',
       matriculaSignatario: '108.747-021',
-      funcaoSignatario: 'Chefe da B1/1ºGBM/CBMMS',
+      funcaoSignatario: 'Chefe de Seção/Unidade Militar',
     }),
   };
 }
