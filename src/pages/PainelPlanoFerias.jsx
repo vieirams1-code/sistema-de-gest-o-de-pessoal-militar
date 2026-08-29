@@ -262,9 +262,20 @@ export default function PainelPlanoFerias() {
     const anoCampanha = campanhaSelecionada?.ano_referencia || (new Date().getFullYear() + 1);
 
     let parcelas = [];
+    const criarParcela = (etapa, dias, mes) => {
+      const regra = getRegraMesPlano(op, mes, anoCampanha);
+      if (!regra.permitido || !regra.dataInicio) return null;
+      return { etapa, dias, mes, data_inicio: regra.dataInicio };
+    };
+
     if (mod === '1_ETAPA_30') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
-      parcelas = [{ etapa: 1, dias: 30, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` }];
+      const p1 = criarParcela(1, 30, m1);
+      if (!p1) {
+        setFeedback({ type: 'error', msg: `O mês escolhido é anterior à aquisição do direito. Primeira data legal: ${formatarDataBR(adicionarUmDia(op.periodo_fim))}.` });
+        return;
+      }
+      parcelas = [p1];
     } else if (mod === '2_ETAPAS_15') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
       const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
@@ -273,10 +284,13 @@ export default function PainelPlanoFerias() {
         alert('Atenção: A 1ª e 2ª fração não podem ser no mesmo mês. Por favor, escolha meses distintos.');
         return;
       }
-      parcelas = [
-        { etapa: 1, dias: 15, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` },
-        { etapa: 2, dias: 15, mes: m2, data_inicio: `${anoCampanha}-${m2}-01` },
-      ];
+      const p1 = criarParcela(1, 15, m1);
+      const p2 = criarParcela(2, 15, m2);
+      if (!p1 || !p2) {
+        setFeedback({ type: 'error', msg: `Uma das frações está antes da aquisição do direito. Primeira data legal: ${formatarDataBR(adicionarUmDia(op.periodo_fim))}.` });
+        return;
+      }
+      parcelas = [p1, p2];
     } else if (mod === '3_ETAPAS_10') {
       const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
       const m2 = selecao.fracao2 || extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
@@ -286,11 +300,23 @@ export default function PainelPlanoFerias() {
         alert('Atenção: Não é permitido repetir meses entre as frações de férias. Por favor, escolha meses distintos.');
         return;
       }
-      parcelas = [
-        { etapa: 1, dias: 10, mes: m1, data_inicio: `${anoCampanha}-${m1}-01` },
-        { etapa: 2, dias: 10, mes: m2, data_inicio: `${anoCampanha}-${m2}-01` },
-        { etapa: 3, dias: 10, mes: m3, data_inicio: `${anoCampanha}-${m3}-01` },
-      ];
+      const p1 = criarParcela(1, 10, m1);
+      const p2 = criarParcela(2, 10, m2);
+      const p3 = criarParcela(3, 10, m3);
+      if (!p1 || !p2 || !p3) {
+        setFeedback({ type: 'error', msg: `Uma das frações está antes da aquisição do direito. Primeira data legal: ${formatarDataBR(adicionarUmDia(op.periodo_fim))}.` });
+        return;
+      }
+      parcelas = [p1, p2, p3];
+    } else if (mod === 'CUSTOM') {
+      const m1 = selecao.fracao1 || extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
+      const dias = Math.max(1, Number(op.dias_direito || 0));
+      const p1 = criarParcela(1, dias, m1);
+      if (!p1) {
+        setFeedback({ type: 'error', msg: `O mês escolhido é anterior à aquisição do direito. Primeira data legal: ${formatarDataBR(adicionarUmDia(op.periodo_fim))}.` });
+        return;
+      }
+      parcelas = [p1];
     }
 
     const mesesResumoFormatado = parcelas.map((p) => `${getNomeMesPorVal(p.mes)} (${p.dias}d)`).join(' + ');
