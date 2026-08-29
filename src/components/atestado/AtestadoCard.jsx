@@ -50,6 +50,8 @@ import {
   TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
 } from '@/constants/whatsappTemplates';
 
+const JISO_WHATSAPP_ATIVACAO = '2026-08-29';
+
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'Encerrado': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -452,9 +454,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     }
     setSavingJiso(true);
     try {
+      const statusWhatsAppAgendamento = atestado.jiso_whatsapp_enviado_em
+        ? (atestado.jiso_whatsapp_status || 'enviado')
+        : jisoDate < JISO_WHATSAPP_ATIVACAO
+          ? 'legado'
+          : 'pendente';
+
       await atualizarEscopado('Atestado', atestado.id, {
         data_jiso_agendada: jisoDate,
         hora_jiso_agendada: jisoTime,
+        jiso_whatsapp_status: statusWhatsAppAgendamento,
         ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
       });
       try {
@@ -589,15 +598,21 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const statusInfo = getStatusInfo();
   const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15;
   const whatsappJisoJaEnviado = !!atestado.jiso_whatsapp_enviado_em;
+  const whatsappJisoLegado = !whatsappJisoJaEnviado && (
+    atestado.jiso_whatsapp_status === 'legado' ||
+    (!!atestado.data_jiso_agendada && atestado.data_jiso_agendada < JISO_WHATSAPP_ATIVACAO)
+  );
   const whatsappJisoAgendamentoAlterado = whatsappJisoJaEnviado && (
     atestado.jiso_whatsapp_data_agendada_snapshot !== atestado.data_jiso_agendada ||
     atestado.jiso_whatsapp_hora_agendada_snapshot !== atestado.hora_jiso_agendada
   );
-  const whatsappJisoStatus = !whatsappJisoJaEnviado
-    ? 'pendente'
-    : whatsappJisoAgendamentoAlterado
-      ? 'reenviar'
-      : 'enviado';
+  const whatsappJisoStatus = whatsappJisoLegado
+    ? 'legado'
+    : !whatsappJisoJaEnviado
+      ? 'pendente'
+      : whatsappJisoAgendamentoAlterado
+        ? 'reenviar'
+        : 'enviado';
   const formatarDataHoraEnvioWhatsApp = (value) => {
     if (!value) return '';
     const data = new Date(value);
@@ -769,11 +784,22 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                   Reenvio necessário
                 </Badge>
               )}
+              {whatsappJisoStatus === 'legado' && (
+                <Badge className="bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1" title="JISO anterior à adoção do WhatsApp como canal principal de agendamento">
+                  <CheckCircle className="w-3 h-3" />
+                  Comunicação histórica
+                </Badge>
+              )}
             </div>
             {whatsappJisoJaEnviado && (
               <p className={`text-[11px] mb-2 ${whatsappJisoStatus === 'reenviar' ? 'text-orange-700' : 'text-green-700'}`}>
                 Última comunicação enviada em {formatarDataHoraEnvioWhatsApp(atestado.jiso_whatsapp_enviado_em) || 'data não disponível'}.
                 {whatsappJisoStatus === 'reenviar' && ' A data ou o horário da JISO foi alterado após esse envio.'}
+              </p>
+            )}
+            {whatsappJisoStatus === 'legado' && (
+              <p className="text-[11px] mb-2 text-slate-600">
+                JISO anterior à implantação do controle de comunicação por WhatsApp. Não há pendência de envio.
               </p>
             )}
             {editingJiso ? (
