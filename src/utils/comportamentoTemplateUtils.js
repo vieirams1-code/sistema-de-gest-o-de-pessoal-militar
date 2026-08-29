@@ -41,7 +41,7 @@ matrícula {{matricula}},
 passou a integrar o comportamento {{comportamento}}
 a contar de {{data_inicio_comportamento}},
 nos termos do Decreto nº 1.260/1981.`,
-  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `A Comandante do 1º Grupamento de Bombeiros Militar, com base no Art. 51, §1º e Art. 52 do Decreto nº 1.260, de 02 de outubro de 1981, resolve tornar público, para fins de registro funcional, que o(a) {{posto_nome}}, matrícula n. {{matricula}}, encontra-se no comportamento {{comportamento}} a contar de {{data_inicio_comportamento}}.`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.REGISTRO_FUNCIONAL_COMPORTAMENTO]: `O(A) Comandante da Unidade Militar, com base no Art. 51, §1º e Art. 52 do Decreto nº 1.260, de 02 de outubro de 1981, resolve tornar público, para fins de registro funcional, que o(a) {{posto_nome}}, matrícula n. {{matricula}}, encontra-se no comportamento {{comportamento}} a contar de {{data_inicio_comportamento}}.`, 
 };
 
 const CAMPOS_ESSENCIAIS_POR_TIPO = {
