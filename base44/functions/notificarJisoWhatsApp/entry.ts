@@ -18,6 +18,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authUser = await base44.auth.me();
+    if (!authUser?.email) {
+      return jsonResponse({ success: false, error: 'Usuário não autenticado' }, 401);
+    }
+
     const payload = await req.json();
     const { atestado_id, militar_id, mensagem_final } = payload;
 
@@ -64,7 +69,33 @@ Deno.serve(async (req) => {
     );
 
     if (dispatchRes.success) {
-      return jsonResponse({ success: true, message: 'Notificação enviada com sucesso.', telefone: rawTelefone });
+      const enviadoEm = new Date().toISOString();
+      try {
+        await base44.asServiceRole.entities.Atestado.update(atestado_id, {
+          jiso_whatsapp_status: 'enviado',
+          jiso_whatsapp_enviado_em: enviadoEm,
+          jiso_whatsapp_enviado_por: authUser.email,
+          jiso_whatsapp_mensagem: text,
+          jiso_whatsapp_data_agendada_snapshot: atestado.data_jiso_agendada || '',
+          jiso_whatsapp_hora_agendada_snapshot: atestado.hora_jiso_agendada || '',
+        });
+      } catch (trackingError: any) {
+        console.error('[notificarJisoWhatsApp] Mensagem enviada, mas falhou o registro no Atestado:', trackingError);
+        return jsonResponse({
+          success: true,
+          tracking_saved: false,
+          message: 'Notificação enviada, mas o comprovante não pôde ser gravado no atestado.',
+          telefone: rawTelefone,
+        });
+      }
+
+      return jsonResponse({
+        success: true,
+        tracking_saved: true,
+        enviado_em: enviadoEm,
+        message: 'Notificação enviada com sucesso e registrada no atestado.',
+        telefone: rawTelefone,
+      });
     } else {
       return jsonResponse({ success: false, error: dispatchRes.error || 'Falha ao enviar WhatsApp', telefone: rawTelefone });
     }
