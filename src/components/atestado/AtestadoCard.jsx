@@ -45,10 +45,6 @@ import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { buildAtestadoTemplateVarsContrato, getTipoTemplateHomologacaoAtestado } from './atestadoTemplateVars';
-import {
-  MODULO_WHATSAPP_NOTIFICACOES,
-  TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
-} from '@/constants/whatsappTemplates';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -74,6 +70,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const [savingJiso, setSavingJiso] = useState(false);
   const [showWhatsAppPreview, setShowWhatsAppPreview] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [whatsappTemplatePreview, setWhatsappTemplatePreview] = useState(null);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsappTrackingLocal, setWhatsappTrackingLocal] = useState(null);
   const [showJisoModal, setShowJisoModal] = useState(false);
@@ -490,34 +487,6 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const handleSaveJiso = () => persistirAgendamentoJiso();
 
-  const gerarMensagemWhatsAppJiso = (templatesDisponiveis = templates) => {
-    const templateWhatsApp = getTemplateAtivoPorTipo(
-      TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
-      MODULO_WHATSAPP_NOTIFICACOES,
-      templatesDisponiveis,
-      {
-        grupamento_id: militarAtestado?.grupamento_id,
-        subgrupamento_id: militarAtestado?.subgrupamento_id,
-        subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
-        unidade_id: militarAtestado?.unidade_id,
-      }
-    );
-
-    if (!templateWhatsApp?.template) return null;
-
-    return aplicarTemplate(templateWhatsApp.template, {
-      ...varsContratoTemplate,
-      posto_graduacao: militarAtestado?.posto_graduacao || atestado.militar_posto || '',
-      nome_guerra: militarAtestado?.nome_guerra || '',
-      data_jiso: formatarDataExtenso(jisoDate),
-      hora_jiso: jisoTime,
-      dias_atestado: String(atestado.dias || ''),
-      tipo_afastamento: atestado.tipo_afastamento || '',
-      data_inicio: formatarDataExtenso(atestado.data_inicio),
-      data_termino: formatarDataExtenso(atestado.data_termino),
-    });
-  };
-
   const abrirPreviaWhatsAppJiso = async () => {
     if (!jisoDate || !jisoTime) {
       alert('Informe a data e o horário da JISO antes de preparar a notificação.');
@@ -525,34 +494,51 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     }
 
     setWhatsappMessage('');
+    setWhatsappTemplatePreview(null);
     try {
-      // Busca novamente no servidor para que uma alteração recém-salva no cadastro
-      // de Templates seja usada imediatamente, sem depender do cache do card.
-      const templatesAtualizados = await base44.entities.TemplateTexto.list();
-      queryClient.setQueryData(['templates-texto'], templatesAtualizados);
-      const texto = gerarMensagemWhatsAppJiso(templatesAtualizados);
-      if (texto === null) {
-        alert(`Template obrigatório não encontrado. Cadastre "${TIPO_TEMPLATE_NOTIFICACAO_JISO_WA}" em Templates de Texto > WhatsApp Notificações.`);
-        return;
+      // A prévia passa a ser montada no backend a partir do TemplateTexto ativo.
+      // Assim o texto exibido ao usuário e o template validado no envio têm a mesma fonte de verdade.
+      const response = await base44.functions.invoke('notificarJisoWhatsAppTemplate', {
+        action: 'preview',
+        atestado_id: atestado.id,
+        militar_id: atestado.militar_id,
+        data_jiso: jisoDate,
+        hora_jiso: jisoTime,
+      });
+      const data = response?.data || response;
+      if (!data?.success) {
+        throw new Error(data?.error || 'Não foi possível gerar a prévia do template da JISO.');
+      }
+      if (data.function_version !== 'jiso-template-v3-2026-08-29') {
+        throw new Error('A função publicada de WhatsApp ainda não está na versão do template JISO. Atualize a aplicação antes de enviar.');
+      }
+      if (!data?.mensagem || !data?.template_id || !data?.template_hash) {
+        throw new Error('A prévia retornou sem identificação válida do template ativo.');
       }
 
-      const variaveisPendentes = texto.match(/\{\{[^}]+\}\}/g) || [];
-      if (variaveisPendentes.length > 0) {
-        alert(`A mensagem não pode ser enviada porque ainda há variáveis sem valor: ${[...new Set(variaveisPendentes)].join(', ')}`);
-        return;
-      }
-
-      setWhatsappMessage(texto);
+      setWhatsappTemplatePreview({
+        template_id: data.template_id,
+        template_nome: data.template_nome || 'Notificação de JISO WA',
+        template_hash: data.template_hash,
+        template_updated_date: data.template_updated_date || '',
+        data_jiso_snapshot: data.data_jiso_snapshot || jisoDate,
+        hora_jiso_snapshot: data.hora_jiso_snapshot || jisoTime,
+      });
+      setWhatsappMessage(data.mensagem);
       setShowWhatsAppPreview(true);
     } catch (error) {
       console.error('Erro ao carregar o template WhatsApp da JISO:', error);
-      alert('Não foi possível carregar o template atualizado da notificação JISO. Tente novamente.');
+      alert(error?.message || 'Não foi possível carregar o template atualizado da notificação JISO. Tente novamente.');
     }
   };
 
   const confirmarEnvioWhatsAppJiso = async () => {
     const mensagemFinal = whatsappMessage.trim();
     if (!mensagemFinal || sendingWhatsApp) return;
+    if (!whatsappTemplatePreview?.template_id || !whatsappTemplatePreview?.template_hash) {
+      alert('A prévia do template expirou ou não foi carregada corretamente. Feche e gere uma nova prévia antes de enviar.');
+      return;
+    }
 
     setSendingWhatsApp(true);
     try {
@@ -560,21 +546,28 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       if (!agendamentoSalvo) return;
 
       const response = await base44.functions.invoke('notificarJisoWhatsAppTemplate', {
+        action: 'send',
         atestado_id: atestado.id,
         militar_id: atestado.militar_id,
         mensagem_final: mensagemFinal,
+        template_id: whatsappTemplatePreview.template_id,
+        template_hash: whatsappTemplatePreview.template_hash,
+        data_jiso_snapshot: whatsappTemplatePreview.data_jiso_snapshot,
+        hora_jiso_snapshot: whatsappTemplatePreview.hora_jiso_snapshot,
       });
       const data = response?.data || response;
       if (!data?.success) {
         throw new Error(data?.error || 'Falha ao enviar a notificação por WhatsApp.');
       }
-      if (data.function_version !== 'jiso-template-v2-2026-08-29') {
-        throw new Error('A função de WhatsApp publicada não corresponde à versão segura de templates. O envio não será considerado concluído.');
+      if (data.function_version !== 'jiso-template-v3-2026-08-29') {
+        throw new Error('A função de WhatsApp publicada não corresponde à versão atual do template JISO.');
       }
-      if (data.tracking_saved !== true || !data.enviado_em) {
-        throw new Error('O WhatsApp respondeu, mas o comprovante de envio não foi gravado no atestado.');
+      if (!data.enviado_em) {
+        throw new Error('O provedor confirmou o envio sem retornar o horário do comprovante.');
       }
 
+      // O card muda imediatamente para "WhatsApp enviado". A persistência no Atestado
+      // continua sendo a fonte definitiva após o próximo carregamento.
       setWhatsappTrackingLocal({
         enviado_em: data.enviado_em,
         enviado_por: data.enviado_por || user?.email || '',
@@ -587,9 +580,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       setShowWhatsAppPreview(false);
+      setWhatsappTemplatePreview(null);
       setEditingJiso(false);
 
-      alert('Notificação de JISO enviada pelo template e registrada no atestado.');
+      if (data.tracking_saved === false) {
+        alert('A mensagem foi enviada pelo WhatsApp, mas o comprovante não pôde ser persistido no atestado. O card foi atualizado nesta tela para evitar reenvio acidental; não envie novamente apenas para corrigir o marcador.');
+        return;
+      }
+
+      alert(`Notificação de JISO enviada pelo template "${data.template_nome || whatsappTemplatePreview.template_nome}" e registrada no atestado.`);
     } catch (error) {
       alert(error?.message || 'Não foi possível enviar a notificação por WhatsApp.');
     } finally {
