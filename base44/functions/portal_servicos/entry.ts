@@ -1828,6 +1828,63 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        // Revalida no servidor qual é o período mais antigo com dias ainda sem previsão.
+        // Isso impede manipulação do payload e impede reaproveitar período já integralmente comprometido.
+        const [todosPeriodosSubmissao, feriasMilitarSubmissao, ajustesMilitarSubmissao] = await Promise.all([
+          base44.asServiceRole.entities.PeriodoAquisitivo.filter({ militar_id: militarId }),
+          base44.asServiceRole.entities.Ferias.filter({ militar_id: militarId }),
+          base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: militarId }),
+        ]);
+        const ordenadosSubmissao = (todosPeriodosSubmissao || []).sort((a: any, b: any) =>
+          String(a.inicio_aquisitivo || '').localeCompare(String(b.inicio_aquisitivo || ''))
+        );
+        const resumosSubmissao = ordenadosSubmissao.map((p: any) => ({
+          periodo: p,
+          resumo: calcularResumoPeriodoPlano(p, feriasMilitarSubmissao, ajustesMilitarSubmissao, Number(anoCampanha)),
+        }));
+        const maisAntigoElegivelSubmissao = resumosSubmissao.find((item: any) => item.resumo.elegivel_plano && item.resumo.dias_sem_previsao > 0);
+        if (!maisAntigoElegivelSubmissao || maisAntigoElegivelSubmissao.periodo.id !== periodo.id) {
+          return new Response(JSON.stringify({
+            error: 'O período aquisitivo informado não é o período mais antigo com férias ainda sem previsão para este plano. Atualize a página e tente novamente.',
+            periodo_correto_id: maisAntigoElegivelSubmissao?.periodo?.id || null,
+          }), {
+            status: 409,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const resumoPeriodoSubmissao = maisAntigoElegivelSubmissao.resumo;
+        const diasPlanejar = Number(resumoPeriodoSubmissao.dias_sem_previsao || 0);
+        if (diasPlanejar <= 0) {
+          return new Response(JSON.stringify({ error: 'Este período não possui dias sem previsão disponíveis para o plano.' }), {
+            status: 409,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const preferenciasNormalizadas = [
+          normalizarPreferenciaMes(opcao_1, resumoPeriodoSubmissao, diasPlanejar),
+          normalizarPreferenciaMes(opcao_2, resumoPeriodoSubmissao, diasPlanejar),
+          normalizarPreferenciaMes(opcao_3, resumoPeriodoSubmissao, diasPlanejar),
+        ];
+        if (preferenciasNormalizadas.some((op: any) => !op)) {
+          return new Response(JSON.stringify({
+            error: `Uma ou mais opções estão antes da aquisição do direito. A primeira data legal de gozo deste período é ${resumoPeriodoSubmissao.primeira_data_legal_gozo}.`,
+          }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+        const mesesPreferidos = preferenciasNormalizadas.map((op: any) => op.parcelas[0].mes);
+        if (new Set(mesesPreferidos).size !== 3) {
+          return new Response(JSON.stringify({ error: 'As 3 opções de meses devem ser diferentes entre si.' }), {
+            status: 400,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const modalidadeEfetiva = diasPlanejar === 30 ? (modalidade || '2_ETAPAS_15') : 'CUSTOM';
+
         let existentes: any[] = [];
         if (campanhaId) {
           existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
