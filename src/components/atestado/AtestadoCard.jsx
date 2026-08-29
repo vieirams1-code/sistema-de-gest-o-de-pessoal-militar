@@ -75,6 +75,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const [showWhatsAppPreview, setShowWhatsAppPreview] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsappTrackingLocal, setWhatsappTrackingLocal] = useState(null);
   const [showJisoModal, setShowJisoModal] = useState(false);
   const [showHomologacaoModal, setShowHomologacaoModal] = useState(false);
   const [showAtaJisoModal, setShowAtaJisoModal] = useState(false);
@@ -564,7 +565,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       const agendamentoSalvo = await persistirAgendamentoJiso({ fecharEdicao: false });
       if (!agendamentoSalvo) return;
 
-      const response = await base44.functions.invoke('notificarJisoWhatsApp', {
+      const response = await base44.functions.invoke('notificarJisoWhatsAppTemplate', {
         atestado_id: atestado.id,
         militar_id: atestado.militar_id,
         mensagem_final: mensagemFinal,
@@ -573,6 +574,20 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       if (!data?.success) {
         throw new Error(data?.error || 'Falha ao enviar a notificação por WhatsApp.');
       }
+      if (data.function_version !== 'jiso-template-v2-2026-08-29') {
+        throw new Error('A função de WhatsApp publicada não corresponde à versão segura de templates. O envio não será considerado concluído.');
+      }
+      if (data.tracking_saved !== true || !data.enviado_em) {
+        throw new Error('O WhatsApp respondeu, mas o comprovante de envio não foi gravado no atestado.');
+      }
+
+      setWhatsappTrackingLocal({
+        enviado_em: data.enviado_em,
+        enviado_por: data.enviado_por || user?.email || '',
+        mensagem: mensagemFinal,
+        data_jiso_snapshot: data.data_jiso_snapshot || jisoDate,
+        hora_jiso_snapshot: data.hora_jiso_snapshot || jisoTime,
+      });
 
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
@@ -580,12 +595,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       setShowWhatsAppPreview(false);
       setEditingJiso(false);
 
-      if (data.tracking_saved === false) {
-        alert('A mensagem foi enviada pelo WhatsApp, mas o sistema não conseguiu registrar o comprovante no atestado. Não reenvie a mensagem apenas para corrigir o marcador; atualize a página e comunique o erro ao administrador.');
-        return;
-      }
-
-      alert('Notificação de JISO enviada por WhatsApp e registrada no atestado.');
+      alert('Notificação de JISO enviada pelo template e registrada no atestado.');
     } catch (error) {
       alert(error?.message || 'Não foi possível enviar a notificação por WhatsApp.');
     } finally {
@@ -595,11 +605,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const statusInfo = getStatusInfo();
   const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15;
-  const whatsappJisoJaEnviado = !!atestado.jiso_whatsapp_enviado_em;
+  const whatsappJisoEnviadoEm = whatsappTrackingLocal?.enviado_em || atestado.jiso_whatsapp_enviado_em;
+  const whatsappJisoEnviadoPor = whatsappTrackingLocal?.enviado_por || atestado.jiso_whatsapp_enviado_por;
+  const whatsappJisoDataSnapshot = whatsappTrackingLocal?.data_jiso_snapshot || atestado.jiso_whatsapp_data_agendada_snapshot;
+  const whatsappJisoHoraSnapshot = whatsappTrackingLocal?.hora_jiso_snapshot || atestado.jiso_whatsapp_hora_agendada_snapshot;
+  const whatsappJisoJaEnviado = !!whatsappJisoEnviadoEm;
   const whatsappJisoLegado = !whatsappJisoJaEnviado && atestado.jiso_whatsapp_status === 'legado';
   const whatsappJisoAgendamentoAlterado = whatsappJisoJaEnviado && (
-    atestado.jiso_whatsapp_data_agendada_snapshot !== atestado.data_jiso_agendada ||
-    atestado.jiso_whatsapp_hora_agendada_snapshot !== atestado.hora_jiso_agendada
+    whatsappJisoDataSnapshot !== jisoDate ||
+    whatsappJisoHoraSnapshot !== jisoTime
   );
   const whatsappJisoStatus = whatsappJisoLegado
     ? 'legado'
@@ -762,7 +776,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
               </div>
               {whatsappJisoStatus === 'enviado' && (
-                <Badge className="bg-green-100 text-green-700 border border-green-200 flex items-center gap-1" title={`Último envio por ${atestado.jiso_whatsapp_enviado_por || 'usuário não identificado'}`}>
+                <Badge className="bg-green-100 text-green-700 border border-green-200 flex items-center gap-1" title={`Último envio por ${whatsappJisoEnviadoPor || 'usuário não identificado'}`}>
                   <CheckCircle className="w-3 h-3" />
                   WhatsApp enviado
                 </Badge>
@@ -788,7 +802,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             </div>
             {whatsappJisoJaEnviado && (
               <p className={`text-[11px] mb-2 ${whatsappJisoStatus === 'reenviar' ? 'text-orange-700' : 'text-green-700'}`}>
-                Última comunicação enviada em {formatarDataHoraEnvioWhatsApp(atestado.jiso_whatsapp_enviado_em) || 'data não disponível'}.
+                Última comunicação enviada em {formatarDataHoraEnvioWhatsApp(whatsappJisoEnviadoEm) || 'data não disponível'}.
                 {whatsappJisoStatus === 'reenviar' && ' A data ou o horário da JISO foi alterado após esse envio.'}
               </p>
             )}
