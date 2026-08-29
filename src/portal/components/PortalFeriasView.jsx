@@ -591,6 +591,14 @@ export default function PortalFeriasView({ onBack }) {
                   <i className="ph ph-calendar-star text-green-600 text-xl"></i> Passo 2: Preferência de Meses no Ano de {anoCampanha}
                 </h4>
 
+                {periodoMaisAntigo?.primeira_data_legal_gozo && (
+                  <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900">
+                    <strong>Regra de aquisição do direito:</strong> suas férias deste período só podem iniciar a partir de{' '}
+                    <strong>{formatarDataBR(periodoMaisAntigo.primeira_data_legal_gozo)}</strong>.
+                    Meses anteriores ficam indisponíveis. Se o próprio mês da aquisição estiver disponível, a data será ajustada automaticamente do dia 01 para a primeira data legal.
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">1ª Opção (Preferencial)</label>
