@@ -549,17 +549,38 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       if (!agendamentoSalvo) return;
 
       const response = await base44.functions.invoke('notificarJisoWhatsApp', {
+        atestado_id: atestado.id,
         militar_id: atestado.militar_id,
-        mensagem: mensagemFinal,
+        mensagem_final: mensagemFinal,
       });
       const data = response?.data || response;
       if (!data?.success) {
         throw new Error(data?.error || 'Falha ao enviar a notificação por WhatsApp.');
       }
 
+      const enviadoEm = new Date().toISOString();
+      const enviadoPor = user?.email || user?.full_name || user?.name || user?.id || 'usuário autenticado';
+      try {
+        await atualizarEscopado('Atestado', atestado.id, {
+          jiso_whatsapp_status: 'enviado',
+          jiso_whatsapp_enviado_em: enviadoEm,
+          jiso_whatsapp_enviado_por: String(enviadoPor),
+          jiso_whatsapp_mensagem: mensagemFinal,
+          jiso_whatsapp_data_agendada_snapshot: jisoDate,
+          jiso_whatsapp_hora_agendada_snapshot: jisoTime,
+        });
+      } catch (trackingError) {
+        console.error('WhatsApp enviado, mas falhou o registro do comprovante no atestado:', trackingError);
+        alert('A mensagem foi enviada, porém não foi possível registrar o comprovante de envio no atestado. Atualize a página e registre novamente o status antes de reenviar a mensagem.');
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
       setShowWhatsAppPreview(false);
       setEditingJiso(false);
-      alert('Notificação de JISO enviada por WhatsApp com sucesso.');
+      alert('Notificação de JISO enviada por WhatsApp e registrada no atestado.');
     } catch (error) {
       alert(error?.message || 'Não foi possível enviar a notificação por WhatsApp.');
     } finally {
@@ -569,6 +590,22 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const statusInfo = getStatusInfo();
   const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15;
+  const whatsappJisoJaEnviado = !!atestado.jiso_whatsapp_enviado_em;
+  const whatsappJisoAgendamentoAlterado = whatsappJisoJaEnviado && (
+    atestado.jiso_whatsapp_data_agendada_snapshot !== atestado.data_jiso_agendada ||
+    atestado.jiso_whatsapp_hora_agendada_snapshot !== atestado.hora_jiso_agendada
+  );
+  const whatsappJisoStatus = !whatsappJisoJaEnviado
+    ? 'pendente'
+    : whatsappJisoAgendamentoAlterado
+      ? 'reenviar'
+      : 'enviado';
+  const formatarDataHoraEnvioWhatsApp = (value) => {
+    if (!value) return '';
+    const data = new Date(value);
+    if (Number.isNaN(data.getTime())) return '';
+    return format(data, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+  };
 
   const getProgressPercent = () => {
     if (!atestado.data_inicio || !atestado.data_retorno) return 0;
