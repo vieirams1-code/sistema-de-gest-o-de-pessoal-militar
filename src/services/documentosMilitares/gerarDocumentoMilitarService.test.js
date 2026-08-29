@@ -145,7 +145,7 @@ test('renderização final injeta título e assinatura canônica do signatário'
         postoGraduacaoSignatario: '2º TEN',
         quadroSignatario: 'QOBM',
         matriculaSignatario: '108.747-021',
-        funcaoSignatario: 'Chefe da B1/1ºGBM/CBMMS',
+        funcaoSignatario: 'Chefe de Seção/Unidade Militar',
       },
     },
   });
@@ -155,7 +155,7 @@ test('renderização final injeta título e assinatura canônica do signatário'
     ASSINATURA_SIGNATARIO_MARKER_START,
     'Edson Vieira de Souza - 2º TEN QOBM',
     'Matrícula 108.747-021',
-    'Chefe da B1/1ºGBM/CBMMS',
+    'Chefe de Seção/Unidade Militar',
     ASSINATURA_SIGNATARIO_MARKER_END,
   ].join('\n'));
 });
