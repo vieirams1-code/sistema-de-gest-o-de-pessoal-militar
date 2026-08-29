@@ -1310,9 +1310,12 @@ Deno.serve(async (req: Request) => {
 
               try {
                 if (pa) {
+                  const novosDiasPrevistos = Number(resumoGeracao.dias_previstos_calculados || 0) + totalDias;
+                  const diasGozadosAtuais = Number(resumoGeracao.dias_gozados_calculados || 0);
                   await base44.asServiceRole.entities.PeriodoAquisitivo.update(pa.id, {
-                    dias_previstos: (pa.dias_previstos || 0) + totalDias,
-                    status: 'Previsto',
+                    dias_gozados: diasGozadosAtuais,
+                    dias_previstos: novosDiasPrevistos,
+                    status: diasGozadosAtuais > 0 ? 'Parcialmente Gozado' : 'Previsto',
                   });
                 }
               } catch (_err) {}
