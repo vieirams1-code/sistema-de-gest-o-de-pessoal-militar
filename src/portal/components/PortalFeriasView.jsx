@@ -73,13 +73,12 @@ export default function PortalFeriasView({ onBack }) {
 
       if (res?.periodo_mais_antigo_id) {
         setSelectedPeriodoId(res.periodo_mais_antigo_id);
-      } else {
-        const periodosDisponiveis = (res?.periodos || []).filter(
-          (p) => p.status !== 'Inativo' && (p.saldo_disponivel > 0 || (p.dias_direito || 30) > (p.dias_gozados || 0))
-        );
-        if (periodosDisponiveis.length > 0) {
-          setSelectedPeriodoId(periodosDisponiveis[0].id);
+        const periodoPlano = (res?.periodos || []).find((p) => p.id === res.periodo_mais_antigo_id);
+        if (periodoPlano && Number(periodoPlano.dias_sem_previsao || 0) !== 30) {
+          setModalidade('CUSTOM');
         }
+      } else {
+        setSelectedPeriodoId('');
       }
 
       // Se o militar já havia enviado opções
@@ -120,23 +119,14 @@ export default function PortalFeriasView({ onBack }) {
   };
 
   const buildParcelasForMes = (mesVal, ano) => {
-    const dataInicio = `${ano}-${mesVal}-01`;
+    const periodoPlano = (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
+    const regraMes = (periodoPlano?.meses_elegiveis || []).find((m) => m.mes === mesVal);
+    const diasPlanejar = Number(periodoPlano?.dias_sem_previsao || periodoPlano?.saldo_disponivel || 30);
+    const dataInicio = regraMes?.data_inicio || `${ano}-${mesVal}-01`;
 
-    if (modalidade === '1_ETAPA_30') {
-      return [{ etapa: 1, dias: 30, mes: mesVal, data_inicio: dataInicio }];
-    } else if (modalidade === '2_ETAPAS_15') {
-      return [
-        { etapa: 1, dias: 15, mes: mesVal, data_inicio: dataInicio },
-        { etapa: 2, dias: 15, mes: mesVal, data_inicio: dataInicio },
-      ];
-    } else if (modalidade === '3_ETAPAS_10') {
-      return [
-        { etapa: 1, dias: 10, mes: mesVal, data_inicio: dataInicio },
-        { etapa: 2, dias: 10, mes: mesVal, data_inicio: dataInicio },
-        { etapa: 3, dias: 10, mes: mesVal, data_inicio: dataInicio },
-      ];
-    }
-    return [{ etapa: 1, dias: 30, mes: mesVal, data_inicio: dataInicio }];
+    // Cada opção representa uma preferência alternativa de mês. O fracionamento
+    // (30, 15+15 ou 10+10+10) será efetivamente distribuído pelo gestor na escala.
+    return [{ etapa: 1, dias: diasPlanejar, mes: mesVal, data_inicio: dataInicio }];
   };
 
   const handleSubmeter = async (e) => {
