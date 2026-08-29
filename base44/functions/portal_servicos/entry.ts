@@ -1056,12 +1056,85 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            const mesesResumo = parcelas.map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
+            const opcaoGestao = await base44.asServiceRole.entities.OpcaoFeriasMilitar.get(opcao_id);
+            if (!opcaoGestao?.periodo_aquisitivo_id) {
+              return new Response(JSON.stringify({ error: 'Opção de férias sem período aquisitivo válido.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            const periodoGestao = await base44.asServiceRole.entities.PeriodoAquisitivo.get(opcaoGestao.periodo_aquisitivo_id);
+            const [feriasGestao, ajustesGestao] = await Promise.all([
+              base44.asServiceRole.entities.Ferias.filter({ militar_id: opcaoGestao.militar_id }),
+              base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: opcaoGestao.militar_id }),
+            ]);
+            const anoPlanoGestao = Number(opcaoGestao.ano_referencia || new Date().getFullYear() + 1);
+            const resumoGestao = calcularResumoPeriodoPlano(periodoGestao, feriasGestao, ajustesGestao, anoPlanoGestao);
+            const diasEsperados = Math.max(0, numeroSeguro(opcaoGestao.dias_direito, resumoGestao.dias_sem_previsao));
+            const parcelasNormalizadas = parcelas.map((p: any, idx: number) => {
+              const mes = textoId(p?.mes || p?.data_inicio?.slice?.(5, 7));
+              const regraMes = (resumoGestao.meses_elegiveis || []).find((m: any) => m.mes === mes);
+              const dias = Math.max(0, numeroSeguro(p?.dias, 0));
+              return {
+                etapa: numeroSeguro(p?.etapa, idx + 1),
+                dias,
+                mes,
+                data_inicio: regraMes?.permitido ? regraMes.data_inicio : '',
+              };
+            });
+
+            if (parcelasNormalizadas.some((p: any) => !p.mes || !p.data_inicio || p.dias <= 0)) {
+              return new Response(JSON.stringify({
+                error: `Há fração em mês indisponível. A primeira data legal de gozo deste período é ${resumoGestao.primeira_data_legal_gozo}.`,
+              }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+
+            const totalDiasEscala = parcelasNormalizadas.reduce((acc: number, p: any) => acc + p.dias, 0);
+            if (totalDiasEscala !== diasEsperados || totalDiasEscala > resumoGestao.dias_sem_previsao) {
+              return new Response(JSON.stringify({
+                error: `A escala deve totalizar exatamente ${diasEsperados} dia(s) e não pode exceder o saldo sem previsão de ${resumoGestao.dias_sem_previsao} dia(s).`,
+              }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+
+            const feriasImpactantes = (feriasGestao || []).filter((f: any) => STATUS_FERIAS_IMPACTO_PLANO.has(String(f.status || '')));
+            for (let i = 0; i < parcelasNormalizadas.length; i += 1) {
+              const parcela = parcelasNormalizadas[i];
+              const fimParcela = calcularFimParcela(parcela.data_inicio, parcela.dias);
+              const conflitoExistente = feriasImpactantes.find((f: any) =>
+                intervalosSobrepostos(parcela.data_inicio, fimParcela, f.data_inicio, f.data_fim)
+              );
+              if (conflitoExistente) {
+                return new Response(JSON.stringify({
+                  error: `A fração iniciada em ${parcela.data_inicio} conflita com férias já cadastradas de ${conflitoExistente.data_inicio} a ${conflitoExistente.data_fim}.`,
+                }), {
+                  status: 409,
+                  headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+                });
+              }
+              for (let j = i + 1; j < parcelasNormalizadas.length; j += 1) {
+                const outra = parcelasNormalizadas[j];
+                const fimOutra = calcularFimParcela(outra.data_inicio, outra.dias);
+                if (intervalosSobrepostos(parcela.data_inicio, fimParcela, outra.data_inicio, fimOutra)) {
+                  return new Response(JSON.stringify({ error: 'As frações definidas para o plano se sobrepõem. Ajuste os meses escolhidos.' }), {
+                    status: 400,
+                    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+                  });
+                }
+              }
+            }
+
+            const mesesResumo = parcelasNormalizadas.map((p: any) => p.mes || p.data_inicio?.slice(5, 7)).join(' / ');
             const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
               status_camada_1: 'Escala_Salva',
               decisao_camada_1_opcao: decisao_camada_1?.opcao_escolhida || 'ESCALA_VALIDADA',
               decisao_camada_1_meses: decisao_camada_1?.resumo_meses || mesesResumo,
-              decisao_camada_1_detalhes: JSON.stringify(parcelas),
+              decisao_camada_1_detalhes: JSON.stringify(parcelasNormalizadas),
               gestor_unidade_id: user.id,
               gestor_unidade_nome: decisao_camada_1?.gestor_nome || user.email,
               data_decisao_camada_1: new Date().toISOString(),
