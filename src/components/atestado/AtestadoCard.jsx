@@ -925,6 +925,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
               <p className="mt-1 text-xs">
                 JISO em {formatDate(jisoDate)}, às {jisoTime}. Revise o texto abaixo antes de confirmar o envio.
               </p>
+              <p className="mt-1 text-[11px] text-green-700">
+                Template ativo: {whatsappTemplatePreview?.template_nome || 'carregando...'}
+              </p>
             </div>
 
             <div>
