@@ -786,7 +786,9 @@ export default function PainelPlanoFerias() {
 
                   <div className="col-span-6 md:col-span-3">
                     <p className="text-sm font-medium text-slate-800">
-                      {modalidade === '1_ETAPA_30'
+                      {modalidade === 'CUSTOM'
+                        ? `Saldo remanescente (${op.dias_direito || 0}d)`
+                        : modalidade === '1_ETAPA_30'
                         ? 'Integral (30d)'
                         : modalidade === '3_ETAPAS_10'
                         ? '3 Frações (10+10+10d)'
@@ -906,8 +908,14 @@ export default function PainelPlanoFerias() {
         {militarModalAberto && (() => {
           const op = militarModalAberto;
           const modalidade = op.modalidade || '2_ETAPAS_15';
-          const numFracoes = modalidade === '1_ETAPA_30' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
-          const diasPorFracao = modalidade === '1_ETAPA_30' ? [30] : modalidade === '3_ETAPAS_10' ? [10, 10, 10] : [15, 15];
+          const numFracoes = modalidade === '1_ETAPA_30' || modalidade === 'CUSTOM' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
+          const diasPorFracao = modalidade === 'CUSTOM'
+            ? [Math.max(1, Number(op.dias_direito || 0))]
+            : modalidade === '1_ETAPA_30'
+              ? [30]
+              : modalidade === '3_ETAPAS_10'
+                ? [10, 10, 10]
+                : [15, 15];
 
           const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
           const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
@@ -975,7 +983,9 @@ export default function PainelPlanoFerias() {
                     <div>
                       <p className="text-xs font-bold text-blue-600 uppercase mb-1">Modalidade Solicitada</p>
                       <p className="text-lg font-extrabold text-blue-900">
-                        {modalidade === '1_ETAPA_30'
+                        {modalidade === 'CUSTOM'
+                          ? `Saldo remanescente (${op.dias_direito || 0} dias)`
+                          : modalidade === '1_ETAPA_30'
                           ? 'Integral (30 dias)'
                           : modalidade === '3_ETAPAS_10'
                           ? '3 Frações (10 + 10 + 10 dias)'
