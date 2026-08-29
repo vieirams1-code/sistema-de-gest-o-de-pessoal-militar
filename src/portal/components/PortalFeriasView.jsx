@@ -522,8 +522,17 @@ export default function PortalFeriasView({ onBack }) {
                   )}
                 </div>
 
+                {saldoParcial && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <strong>Saldo remanescente: {diasPlanejar} dia(s).</strong>
+                    <p className="mt-1 text-xs leading-relaxed">
+                      Como este período possui saldo diferente de 30 dias ainda sem previsão, o plano tratará esse saldo como parcela remanescente única. As três escolhas abaixo continuam sendo apenas preferências alternativas de mês.
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {(data?.config?.permitir_1_etapa !== false) && (
+                  {!saldoParcial && (data?.config?.permitir_1_etapa !== false) && (
                     <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
                       <input
                         type="radio"
@@ -540,7 +549,7 @@ export default function PortalFeriasView({ onBack }) {
                     </label>
                   )}
 
-                  {(data?.config?.permitir_2_etapas !== false) && (
+                  {!saldoParcial && (data?.config?.permitir_2_etapas !== false) && (
                     <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
                       <input
                         type="radio"
@@ -557,7 +566,7 @@ export default function PortalFeriasView({ onBack }) {
                     </label>
                   )}
 
-                  {(data?.config?.permitir_3_etapas !== false) && (
+                  {!saldoParcial && (data?.config?.permitir_3_etapas !== false) && (
                     <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
                       <input
                         type="radio"
