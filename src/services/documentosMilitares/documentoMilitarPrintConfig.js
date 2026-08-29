@@ -7,9 +7,9 @@ export const DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS = Object.freeze({
   mostrarRodape: true,
   orgaoLinha1: 'ESTADO DE MATO GROSSO DO SUL',
   orgaoLinha2: 'SECRETARIA DE ESTADO DE JUSTIÇA E SEGURANÇA PÚBLICA',
-  orgaoLinha3: 'CORPO DE BOMBEIROS MILITAR',
-  orgaoLinha4: 'COMANDO METROPOLITANO DE BOMBEIROS',
-  orgaoLinha5: '1º GRUPAMENTO DE BOMBEIROS MILITAR',
+  orgaoLinha3: 'ORGANIZAÇÃO MILITAR',
+  orgaoLinha4: 'COMANDO / DIREÇÃO',
+  orgaoLinha5: 'UNIDADE MILITAR',
   tituloDocumentoPadrao: 'DOCUMENTO MILITAR',
   imagemCabecalhoSrc: '',
   cidadePadrao: '',
@@ -19,8 +19,8 @@ export const DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS = Object.freeze({
   funcaoSignatario: '',
   cargoSignatario: '',
   matriculaSignatario: '',
-  rodapeLinha1: '1º GRUPAMENTO DE BOMBEIROS MILITAR',
-  rodapeLinha2: 'Av. Costa e Silva, 901 - Vila Progresso, Campo Grande - MS, 79080-000',
+  rodapeLinha1: 'UNIDADE MILITAR',
+  rodapeLinha2: '',
 });
 
 const CAMPOS_BOOLEANOS = new Set(['mostrarCabecalho', 'mostrarBrasao', 'mostrarAssinatura', 'mostrarRodape']);
