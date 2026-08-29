@@ -558,28 +558,17 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
         throw new Error(data?.error || 'Falha ao enviar a notificação por WhatsApp.');
       }
 
-      const enviadoEm = new Date().toISOString();
-      const enviadoPor = user?.email || user?.full_name || user?.name || user?.id || 'usuário autenticado';
-      try {
-        await atualizarEscopado('Atestado', atestado.id, {
-          jiso_whatsapp_status: 'enviado',
-          jiso_whatsapp_enviado_em: enviadoEm,
-          jiso_whatsapp_enviado_por: String(enviadoPor),
-          jiso_whatsapp_mensagem: mensagemFinal,
-          jiso_whatsapp_data_agendada_snapshot: jisoDate,
-          jiso_whatsapp_hora_agendada_snapshot: jisoTime,
-        });
-      } catch (trackingError) {
-        console.error('WhatsApp enviado, mas falhou o registro do comprovante no atestado:', trackingError);
-        alert('A mensagem foi enviada, porém não foi possível registrar o comprovante de envio no atestado. Atualize a página e registre novamente o status antes de reenviar a mensagem.');
-        return;
-      }
-
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       setShowWhatsAppPreview(false);
       setEditingJiso(false);
+
+      if (data.tracking_saved === false) {
+        alert('A mensagem foi enviada pelo WhatsApp, mas o sistema não conseguiu registrar o comprovante no atestado. Não reenvie a mensagem apenas para corrigir o marcador; atualize a página e comunique o erro ao administrador.');
+        return;
+      }
+
       alert('Notificação de JISO enviada por WhatsApp e registrada no atestado.');
     } catch (error) {
       alert(error?.message || 'Não foi possível enviar a notificação por WhatsApp.');
