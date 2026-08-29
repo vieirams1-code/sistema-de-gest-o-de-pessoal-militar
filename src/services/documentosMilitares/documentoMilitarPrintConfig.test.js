@@ -49,12 +49,12 @@ test('defaults do papel timbrado incluem 5 linhas institucionais', () => {
   assert.deepEqual(dados.linhasInstitucionais, [
     'ESTADO DE MATO GROSSO DO SUL',
     'SECRETARIA DE ESTADO DE JUSTIÇA E SEGURANÇA PÚBLICA',
-    'CORPO DE BOMBEIROS MILITAR',
-    'COMANDO METROPOLITANO DE BOMBEIROS',
-    '1º GRUPAMENTO DE BOMBEIROS MILITAR',
+    'ORGANIZAÇÃO MILITAR',
+    'COMANDO / DIREÇÃO',
+    'UNIDADE MILITAR',
   ]);
-  assert.equal(dados.orgaoLinha4, 'COMANDO METROPOLITANO DE BOMBEIROS');
-  assert.equal(dados.orgaoLinha5, '1º GRUPAMENTO DE BOMBEIROS MILITAR');
+  assert.equal(dados.orgaoLinha4, 'COMANDO / DIREÇÃO');
+  assert.equal(dados.orgaoLinha5, 'UNIDADE MILITAR');
   assert.equal(dados.tituloDocumentoPadrao, 'DOCUMENTO MILITAR');
 });
 
