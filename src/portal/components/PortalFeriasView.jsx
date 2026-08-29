@@ -507,8 +507,22 @@ export default function PortalFeriasView({ onBack }) {
             </Card>
           )}
 
+          {!periodoMaisAntigo && (
+            <Card className="border-amber-200 bg-amber-50/60 shadow-sm">
+              <CardContent className="p-5 flex items-start gap-3 text-sm text-amber-900">
+                <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                <div>
+                  <strong>Nenhum período aquisitivo elegível para novas opções neste plano.</strong>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    O sistema considera direito líquido, dias já gozados e dias que já possuem previsão. Períodos integralmente gozados ou já totalmente previstos não são reutilizados em uma nova campanha.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* FORMULÁRIO DE ESCOLHA DOS 3 MESES DE FÉRIAS (EXIBE SE NÃO TEM OPÇÃO OU CLICOU EM ALTERAR) */}
-          {(isEditing || !opcaoEnviada) && (
+          {(isEditing || !opcaoEnviada) && periodoMaisAntigo && (
             <form onSubmit={handleSubmeter} className="space-y-6">
               {/* PASSO 1: ESCOLHA A MODALIDADE */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
