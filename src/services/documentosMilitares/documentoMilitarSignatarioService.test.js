@@ -31,8 +31,8 @@ test('monta assinatura institucional do signatário em até três linhas sem cam
     postoGraduacao: '2º TEN',
     quadro: 'QOBM',
     matricula: '108.747-021',
-    funcao: 'Chefe da B1/1ºGBM/CBMMS',
-  }), 'Edson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe da B1/1ºGBM/CBMMS');
+    funcao: 'Chefe de Seção/Unidade Militar',
+  }), 'Edson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe de Seção/Unidade Militar');
 
   assert.equal(montarAssinaturaSignatario({
     nome: 'Edson Vieira de Souza',
@@ -48,13 +48,13 @@ test('monta variáveis canônicas do signatário preservando aliases antigos da 
     postoGraduacaoSignatario: '2º TEN',
     quadroSignatario: 'QOBM',
     matriculaSignatario: '108.747-021',
-    funcaoSignatario: 'Chefe da B1/1ºGBM/CBMMS',
+    funcaoSignatario: 'Chefe de Seção/Unidade Militar',
   }), {
     signatario_nome: 'Edson Vieira de Souza',
     signatario_posto_graduacao: '2º TEN',
     signatario_quadro: 'QOBM',
     signatario_matricula: '108.747-021',
-    signatario_funcao: 'Chefe da B1/1ºGBM/CBMMS',
-    assinatura_signatario: 'Edson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe da B1/1ºGBM/CBMMS',
+    signatario_funcao: 'Chefe de Seção/Unidade Militar',
+    assinatura_signatario: 'Edson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe de Seção/Unidade Militar',
   });
 });
