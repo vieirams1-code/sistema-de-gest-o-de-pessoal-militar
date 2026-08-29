@@ -748,10 +748,36 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
         {isFluxoJiso && (editingJiso || jisoDate) && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
-              <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
+              </div>
+              {whatsappJisoStatus === 'enviado' && (
+                <Badge className="bg-green-100 text-green-700 border border-green-200 flex items-center gap-1" title={`Último envio por ${atestado.jiso_whatsapp_enviado_por || 'usuário não identificado'}`}>
+                  <CheckCircle className="w-3 h-3" />
+                  WhatsApp enviado
+                </Badge>
+              )}
+              {whatsappJisoStatus === 'pendente' && (
+                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  WhatsApp pendente
+                </Badge>
+              )}
+              {whatsappJisoStatus === 'reenviar' && (
+                <Badge className="bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" />
+                  Reenvio necessário
+                </Badge>
+              )}
             </div>
+            {whatsappJisoJaEnviado && (
+              <p className={`text-[11px] mb-2 ${whatsappJisoStatus === 'reenviar' ? 'text-orange-700' : 'text-green-700'}`}>
+                Última comunicação enviada em {formatarDataHoraEnvioWhatsApp(atestado.jiso_whatsapp_enviado_em) || 'data não disponível'}.
+                {whatsappJisoStatus === 'reenviar' && ' A data ou o horário da JISO foi alterado após esse envio.'}
+              </p>
+            )}
             {editingJiso ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_120px] gap-2">
