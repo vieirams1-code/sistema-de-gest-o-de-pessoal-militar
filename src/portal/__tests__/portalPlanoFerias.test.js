@@ -3,40 +3,28 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automática em Lote', () => {
-  it('1. Validação de payload com as 3 opções de preferências do militar', () => {
+  it('1. As 3 opções do militar são preferências alternativas de mês, não frações duplicadas', () => {
     const opcao1 = {
-      meses_resumo: 'Janeiro (15d) + Julho (15d)',
-      parcelas: [
-        { etapa: 1, dias: 15, mes: '01', data_inicio: '2027-01-05' },
-        { etapa: 2, dias: 15, mes: '07', data_inicio: '2027-07-05' },
-      ],
+      meses_resumo: 'Janeiro',
+      parcelas: [{ etapa: 1, dias: 30, mes: '01', data_inicio: '2027-01-15' }],
     };
     const opcao2 = {
-      meses_resumo: 'Fevereiro (15d) + Agosto (15d)',
-      parcelas: [
-        { etapa: 1, dias: 15, mes: '02', data_inicio: '2027-02-05' },
-        { etapa: 2, dias: 15, mes: '08', data_inicio: '2027-08-05' },
-      ],
+      meses_resumo: 'Julho',
+      parcelas: [{ etapa: 1, dias: 30, mes: '07', data_inicio: '2027-07-01' }],
     };
     const opcao3 = {
-      meses_resumo: 'Março (15d) + Setembro (15d)',
-      parcelas: [
-        { etapa: 1, dias: 15, mes: '03', data_inicio: '2027-03-05' },
-        { etapa: 2, dias: 15, mes: '09', data_inicio: '2027-09-05' },
-      ],
+      meses_resumo: 'Setembro',
+      parcelas: [{ etapa: 1, dias: 30, mes: '09', data_inicio: '2027-09-01' }],
     };
 
-    assert.equal(opcao1.parcelas.length, 2);
-    assert.equal(opcao2.parcelas.length, 2);
-    assert.equal(opcao3.parcelas.length, 2);
-
-    const total1 = opcao1.parcelas.reduce((acc, p) => acc + p.dias, 0);
-    const total2 = opcao2.parcelas.reduce((acc, p) => acc + p.dias, 0);
-    const total3 = opcao3.parcelas.reduce((acc, p) => acc + p.dias, 0);
-
-    assert.equal(total1, 30);
-    assert.equal(total2, 30);
-    assert.equal(total3, 30);
+    assert.equal(opcao1.parcelas.length, 1);
+    assert.equal(opcao2.parcelas.length, 1);
+    assert.equal(opcao3.parcelas.length, 1);
+    assert.deepEqual(
+      new Set([opcao1.parcelas[0].mes, opcao2.parcelas[0].mes, opcao3.parcelas[0].mes]).size,
+      3
+    );
+    assert.equal(opcao1.parcelas[0].data_inicio, '2027-01-15');
   });
 
   it('2. Camada 1: S1/Gestor aprova Opção 2 e formata os dados para homologação', () => {
@@ -125,5 +113,38 @@ describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automáti
     assert.equal(contagem[6], 1); // 1 militar em Julho
     assert.equal(contagem[7], 1); // 1 militar em Agosto
     assert.equal(contagem[11], 0); // 0 militares em Dezembro
+  });
+
+  it('6. Período mais antigo totalmente comprometido é ignorado no plano seguinte', () => {
+    const periodos = [
+      { id: 'antigo', inicio: '2025-01-15', direito: 30, gozados: 15, previstos: 15 },
+      { id: 'seguinte', inicio: '2026-01-15', direito: 30, gozados: 0, previstos: 0 },
+    ];
+
+    const elegivel = periodos
+      .map((p) => ({ ...p, sem_previsao: Math.max(0, p.direito - p.gozados - p.previstos) }))
+      .sort((a, b) => a.inicio.localeCompare(b.inicio))
+      .find((p) => p.sem_previsao > 0);
+
+    assert.equal(elegivel.id, 'seguinte');
+    assert.equal(elegivel.sem_previsao, 30);
+  });
+
+  it('7. Mês de aquisição permanece disponível, com início ajustado para o dia seguinte ao fim do período', () => {
+    const fimAquisitivo = '2027-11-12';
+    const dt = new Date(`${fimAquisitivo}T00:00:00Z`);
+    dt.setUTCDate(dt.getUTCDate() + 1);
+    const primeiraDataLegal = dt.toISOString().slice(0, 10);
+
+    const regraMes = (mes) => {
+      const inicioMes = `2027-${mes}-01`;
+      const fimMes = new Date(Date.UTC(2027, Number(mes), 0)).toISOString().slice(0, 10);
+      const dataInicio = primeiraDataLegal > inicioMes ? primeiraDataLegal : inicioMes;
+      return { permitido: dataInicio <= fimMes, dataInicio };
+    };
+
+    assert.equal(regraMes('10').permitido, false);
+    assert.deepEqual(regraMes('11'), { permitido: true, dataInicio: '2027-11-13' });
+    assert.deepEqual(regraMes('12'), { permitido: true, dataInicio: '2027-12-01' });
   });
 });
