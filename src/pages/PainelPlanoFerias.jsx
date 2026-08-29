@@ -1090,10 +1090,13 @@ export default function PainelPlanoFerias() {
                                   const outroNum = Array.from({ length: numFracoes })
                                     .map((_, fIdx) => fIdx + 1)
                                     .find((outro) => outro !== numFracao && militarSelecao[`fracao${outro}`] === opt.val);
+                                  const regra = getRegraMesPlano(op, opt.val, anoCampanhaModal);
 
                                   return (
-                                    <option key={oIdx} value={opt.val} disabled={Boolean(outroNum)}>
-                                      {opt.label} {outroNum ? `(Em uso na ${outroNum}ª fração)` : ''}
+                                    <option key={oIdx} value={opt.val} disabled={Boolean(outroNum) || !regra.permitido}>
+                                      {opt.label}
+                                      {!regra.permitido ? ' (Antes da aquisição do direito)' : regra.inicioAjustado ? ` (início ${formatarDataBR(regra.dataInicio)})` : ''}
+                                      {outroNum ? ` (Em uso na ${outroNum}ª fração)` : ''}
                                     </option>
                                   );
                                 })}
@@ -1102,10 +1105,13 @@ export default function PainelPlanoFerias() {
                                   const outroNum = Array.from({ length: numFracoes })
                                     .map((_, fIdx) => fIdx + 1)
                                     .find((outro) => outro !== numFracao && militarSelecao[`fracao${outro}`] === m.val);
+                                  const regra = getRegraMesPlano(op, m.val, anoCampanhaModal);
 
                                   return (
-                                    <option key={m.val} value={m.val} disabled={Boolean(outroNum)}>
-                                      {m.nome} {outroNum ? `(Em uso na ${outroNum}ª fração)` : ''}
+                                    <option key={m.val} value={m.val} disabled={Boolean(outroNum) || !regra.permitido}>
+                                      {m.nome}
+                                      {!regra.permitido ? ' (Antes da aquisição do direito)' : regra.inicioAjustado ? ` (início ${formatarDataBR(regra.dataInicio)})` : ''}
+                                      {outroNum ? ` (Em uso na ${outroNum}ª fração)` : ''}
                                     </option>
                                   );
                                 })}
