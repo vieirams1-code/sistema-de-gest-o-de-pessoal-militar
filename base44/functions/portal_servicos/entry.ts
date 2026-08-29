@@ -99,6 +99,48 @@ interface PortalServicosPayload {
   };
 }
 
+const STATUS_FERIAS_IMPACTO_PLANO = new Set(['Gozada', 'Prevista', 'Autorizada', 'Em Curso', 'Interrompida']);
+const STATUS_FERIAS_PREVISAO_PLANO = new Set(['Prevista', 'Autorizada', 'Em Curso', 'Interrompida']);
+
+function numeroSeguro(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function textoId(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function adicionarDiasData(data: string, dias: number): string {
+  if (!data) return '';
+  const dt = new Date(`${data}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return '';
+  dt.setUTCDate(dt.getUTCDate() + dias);
+  return dt.toISOString().slice(0, 10);
+}
+
+function ultimoDiaMes(ano: number, mes: number): string {
+  return new Date(Date.UTC(ano, mes, 0)).toISOString().slice(0, 10);
+}
+
+function feriasPertencePeriodoPlano(ferias: any, periodo: any): boolean {
+  const feriasPeriodoId = textoId(ferias?.periodo_aquisitivo_id);
+  const periodoId = textoId(periodo?.id);
+  if (feriasPeriodoId) return Boolean(periodoId && feriasPeriodoId === periodoId);
+  const feriasRef = textoId(ferias?.periodo_aquisitivo_ref);
+  const periodoRef = textoId(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref);
+  return Boolean(feriasRef && periodoRef && feriasRef === periodoRef);
+}
+
+function ajustePertencePeriodoPlano(ajuste: any, periodo: any): boolean {
+  const ajustePeriodoId = textoId(ajuste?.periodo_aquisitivo_id);
+  const periodoId = textoId(periodo?.id);
+  if (ajustePeriodoId) return Boolean(periodoId && ajustePeriodoId === periodoId);
+  const ajusteRef = textoId(ajuste?.periodo_aquisitivo_ref || ajuste?.ano_referencia);
+  const periodoRef = textoId(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref);
+  return Boolean(ajusteRef && periodoRef && ajusteRef === periodoRef);
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
