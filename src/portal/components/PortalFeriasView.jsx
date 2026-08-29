@@ -144,6 +144,13 @@ export default function PortalFeriasView({ onBack }) {
       return;
     }
 
+    const periodoPlano = (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
+    const mesesPermitidos = new Set((periodoPlano?.meses_elegiveis || []).filter((m) => m.permitido).map((m) => m.mes));
+    if (![mesOpcao1, mesOpcao2, mesOpcao3].every((mes) => mesesPermitidos.has(mes))) {
+      setErrorMsg(`Uma das opções escolhidas é anterior à aquisição do direito. A primeira data legal deste período é ${formatarDataBR(periodoPlano?.primeira_data_legal_gozo)}.`);
+      return;
+    }
+
     // Validação: os 3 meses de preferência devem ser diferentes
     if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
       setErrorMsg('As 3 opções de preferência de meses devem ser diferentes entre si (1ª, 2ª e 3ª opção).');
