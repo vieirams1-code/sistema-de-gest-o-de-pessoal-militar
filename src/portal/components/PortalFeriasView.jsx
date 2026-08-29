@@ -690,7 +690,7 @@ export default function PortalFeriasView({ onBack }) {
 
                 <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
                   <p className="text-xs text-slate-500">
-                    * Ao confirmar, suas opções serão enviadas para a homologação do gestor (início no dia 01).
+                    * Regra geral: início no dia 01. No mês em que o direito é adquirido, o sistema ajusta automaticamente para o primeiro dia legal após o fim do período aquisitivo.
                   </p>
                   <button
                     type="submit"
