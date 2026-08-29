@@ -359,7 +359,7 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
             <span>Sessão autenticada e protegida com criptografia de 256 bits.</span>
           </div>
           <span className="font-semibold text-slate-500 hidden sm:inline">
-            CBMMS Digital
+            VIVICAS - SGP Militar
           </span>
         </CardContent>
       </Card>
