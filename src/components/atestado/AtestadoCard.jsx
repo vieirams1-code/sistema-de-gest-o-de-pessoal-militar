@@ -453,16 +453,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     }
     setSavingJiso(true);
     try {
-      const statusWhatsAppAgendamento = atestado.jiso_whatsapp_enviado_em
-        ? (atestado.jiso_whatsapp_status || 'enviado')
-        : atestado.jiso_whatsapp_status === 'legado'
-          ? 'legado'
-          : 'pendente';
-
       await atualizarEscopado('Atestado', atestado.id, {
         data_jiso_agendada: jisoDate,
         hora_jiso_agendada: jisoTime,
-        jiso_whatsapp_status: statusWhatsAppAgendamento,
         ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
       });
       try {
@@ -531,6 +524,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return;
     }
 
+    setWhatsappMessage('');
     try {
       // Busca novamente no servidor para que uma alteração recém-salva no cadastro
       // de Templates seja usada imediatamente, sem depender do cache do card.

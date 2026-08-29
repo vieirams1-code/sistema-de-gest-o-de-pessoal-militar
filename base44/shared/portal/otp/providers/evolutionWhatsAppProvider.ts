@@ -64,7 +64,7 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
   constructor(options?: EvolutionProviderOptions) {
     this.apiUrl = options?.apiUrl || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_URL') || Deno.env.get('WHATSAPP_API_URL') : undefined);
     this.apiKey = options?.apiKey || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_KEY') || Deno.env.get('WHATSAPP_API_KEY') : undefined);
-    this.instanceName = options?.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'cbmms_portal';
+    this.instanceName = options?.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'vivicas_portal';
   }
 
   isOperational(config: PortalAuthConfigData): boolean {
@@ -74,7 +74,7 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
   async sendOtp(params: OtpDeliveryParams, _base44Client?: any): Promise<OtpDeliveryResult> {
     const url = this.apiUrl || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_URL') || Deno.env.get('WHATSAPP_API_URL') : undefined);
     const key = this.apiKey || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_KEY') || Deno.env.get('WHATSAPP_API_KEY') : undefined);
-    const instance = this.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'cbmms_portal';
+    const instance = this.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'vivicas_portal';
 
     if (!url || !key) {
       console.error('[EvolutionWhatsAppProvider] EVOLUTION_API_URL ou EVOLUTION_API_KEY não configuradas nos secrets.');
@@ -154,7 +154,7 @@ export class EvolutionWhatsAppProvider implements OtpDeliveryProvider {
   ): Promise<{ success: boolean; provider: string; error?: string }> {
     const url = this.apiUrl || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_URL') || Deno.env.get('WHATSAPP_API_URL') : undefined);
     const key = this.apiKey || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_API_KEY') || Deno.env.get('WHATSAPP_API_KEY') : undefined);
-    const instance = this.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'cbmms_portal';
+    const instance = this.instanceName || (typeof Deno !== 'undefined' ? Deno.env.get('EVOLUTION_INSTANCE_NAME') || Deno.env.get('WHATSAPP_INSTANCE_NAME') : undefined) || 'vivicas_portal';
 
     if (!url || !key) {
       return {
