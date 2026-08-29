@@ -618,7 +618,7 @@ export default function FolhaAlteracoes() {
                 </div>
                 <div className="space-y-1">
                   <Label>Linha 2 (fixa)</Label>
-                  <Input value="CORPO DE BOMBEIROS MILITAR" disabled />
+                  <Input value="ORGANIZAÇÃO MILITAR" disabled />
                 </div>
                 <div className="space-y-1">
                   <Label>Linha 3 (editável)</Label>
