@@ -134,6 +134,37 @@
       "type": "string",
       "description": "Hor\u00e1rio agendado da JISO no formato HH:MM."
     },
+    "jiso_whatsapp_status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "enviado"
+      ],
+      "default": "pendente",
+      "description": "Status da \u00faltima comunica\u00e7\u00e3o do agendamento da JISO por WhatsApp."
+    },
+    "jiso_whatsapp_enviado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora do \u00faltimo envio confirmado da comunica\u00e7\u00e3o JISO por WhatsApp."
+    },
+    "jiso_whatsapp_enviado_por": {
+      "type": "string",
+      "description": "Identifica\u00e7\u00e3o do usu\u00e1rio que confirmou o \u00faltimo envio da comunica\u00e7\u00e3o JISO por WhatsApp."
+    },
+    "jiso_whatsapp_mensagem": {
+      "type": "string",
+      "description": "Texto final efetivamente enviado na \u00faltima comunica\u00e7\u00e3o JISO por WhatsApp."
+    },
+    "jiso_whatsapp_data_agendada_snapshot": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da JISO comunicada no \u00faltimo envio por WhatsApp."
+    },
+    "jiso_whatsapp_hora_agendada_snapshot": {
+      "type": "string",
+      "description": "Hor\u00e1rio da JISO comunicado no \u00faltimo envio por WhatsApp."
+    },
     "jiso_id": {
       "type": "string"
     },
