@@ -50,8 +50,6 @@ import {
   TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
 } from '@/constants/whatsappTemplates';
 
-const JISO_WHATSAPP_ATIVACAO = '2026-08-29';
-
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'Encerrado': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -456,7 +454,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     try {
       const statusWhatsAppAgendamento = atestado.jiso_whatsapp_enviado_em
         ? (atestado.jiso_whatsapp_status || 'enviado')
-        : jisoDate < JISO_WHATSAPP_ATIVACAO
+        : atestado.jiso_whatsapp_status === 'legado'
           ? 'legado'
           : 'pendente';
 
@@ -598,10 +596,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const statusInfo = getStatusInfo();
   const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15;
   const whatsappJisoJaEnviado = !!atestado.jiso_whatsapp_enviado_em;
-  const whatsappJisoLegado = !whatsappJisoJaEnviado && (
-    atestado.jiso_whatsapp_status === 'legado' ||
-    (!!atestado.data_jiso_agendada && atestado.data_jiso_agendada < JISO_WHATSAPP_ATIVACAO)
-  );
+  const whatsappJisoLegado = !whatsappJisoJaEnviado && atestado.jiso_whatsapp_status === 'legado';
   const whatsappJisoAgendamentoAlterado = whatsappJisoJaEnviado && (
     atestado.jiso_whatsapp_data_agendada_snapshot !== atestado.data_jiso_agendada ||
     atestado.jiso_whatsapp_hora_agendada_snapshot !== atestado.hora_jiso_agendada
