@@ -156,7 +156,7 @@ export default function ImportarMedalhaDomPedroII() {
               </div>
               <div className="max-w-xs mx-auto">
                 <p className="text-sm font-medium text-slate-700">Upload da Planilha</p>
-                <p className="text-xs text-slate-500 mt-1">Selecione o arquivo .xlsx contendo as colunas: MILITARES DO CBMMS, DOEMS, DATA.</p>
+                <p className="text-xs text-slate-500 mt-1">Selecione o arquivo .xlsx contendo as colunas: MILITAR, DOEMS, DATA.</p>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <Input type="file" accept=".xlsx" onChange={handleFileChange} className="max-w-xs" />
