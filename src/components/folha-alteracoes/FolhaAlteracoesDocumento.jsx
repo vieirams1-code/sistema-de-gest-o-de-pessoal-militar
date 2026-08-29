@@ -36,7 +36,7 @@ function DocHeader({ impressaoConfig, militar }) {
   return (
     <header className="text-center">
       <p className="text-[11pt] font-semibold uppercase tracking-wide">ESTADO DE MATO GROSSO DO SUL</p>
-      <p className="text-[11pt] font-semibold uppercase tracking-wide">CORPO DE BOMBEIROS MILITAR</p>
+      <p className="text-[11pt] font-semibold uppercase tracking-wide">ORGANIZAÇÃO MILITAR</p>
       <p className="text-[10.5pt] uppercase tracking-wide">{valorComFallback(impressaoConfig?.cabecalhoLinha3, obterObm(militar))}</p>
       <p className="text-[10.5pt] uppercase tracking-wide">{valorComFallback(impressaoConfig?.cabecalhoLinha4)}</p>
       <div className="my-2 border-t border-black" />
