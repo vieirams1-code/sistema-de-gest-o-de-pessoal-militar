@@ -138,10 +138,11 @@
       "type": "string",
       "enum": [
         "pendente",
-        "enviado"
+        "enviado",
+        "legado"
       ],
       "default": "pendente",
-      "description": "Status da \u00faltima comunica\u00e7\u00e3o do agendamento da JISO por WhatsApp."
+      "description": "Status da comunica\u00e7\u00e3o do agendamento da JISO por WhatsApp. 'legado' identifica JISOs anteriores \u00e0 ado\u00e7\u00e3o deste canal, sem pend\u00eancia de envio."
     },
     "jiso_whatsapp_enviado_em": {
       "type": "string",
