@@ -1081,7 +1081,8 @@ Deno.serve(async (req: Request) => {
                 mes,
                 data_inicio: regraMes?.permitido ? regraMes.data_inicio : '',
               };
-            });
+            }).sort((a: any, b: any) => String(a.data_inicio).localeCompare(String(b.data_inicio)))
+              .map((p: any, idx: number) => ({ ...p, etapa: idx + 1 }));
 
             if (parcelasNormalizadas.some((p: any) => !p.mes || !p.data_inicio || p.dias <= 0)) {
               return new Response(JSON.stringify({
@@ -1244,7 +1245,8 @@ Deno.serve(async (req: Request) => {
                   mes,
                   data_inicio: regraMes?.permitido ? regraMes.data_inicio : '',
                 };
-              });
+              }).sort((a: any, b: any) => String(a.data_inicio).localeCompare(String(b.data_inicio)))
+                .map((p: any, idx: number) => ({ ...p, etapa: idx + 1 }));
               if (parcelasGeracao.some((p: any) => !p.data_inicio || p.dias <= 0)) {
                 console.warn('[PLANO_GERAR_LOTE_FERIAS] opção ignorada por data anterior à aquisição/fora do limite', { opcao_id: op.id });
                 continue;
