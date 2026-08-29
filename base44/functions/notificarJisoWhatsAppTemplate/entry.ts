@@ -265,10 +265,6 @@ Deno.serve(async (req) => {
         jiso_whatsapp_mensagem: mensagemFinal,
         jiso_whatsapp_data_agendada_snapshot: atestado.data_jiso_agendada || '',
         jiso_whatsapp_hora_agendada_snapshot: atestado.hora_jiso_agendada || '',
-        jiso_whatsapp_template_id: template.id || '',
-        jiso_whatsapp_template_nome: template.nome || template.tipo_registro || '',
-        jiso_whatsapp_template_hash: templateHash,
-        jiso_whatsapp_function_version: FUNCTION_VERSION,
       });
     } catch (trackingError: any) {
       console.error('[notificarJisoWhatsAppTemplate] Mensagem enviada, mas tracking falhou:', trackingError);
