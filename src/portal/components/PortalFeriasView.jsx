@@ -230,7 +230,7 @@ export default function PortalFeriasView({ onBack }) {
             {campanha ? campanha.titulo : 'Plano Anual de Férias'}
           </h2>
           <p className="text-xs text-slate-500">
-            {campanha ? `Prazo para envio: até ${campanha.data_fim_militar || 'o encerramento da campanha'}` : 'Autoatendimento CBMMS'}
+            {campanha ? `Prazo para envio: até ${campanha.data_fim_militar || 'o encerramento da campanha'}` : 'Autoatendimento VIVICAS'}
           </p>
         </div>
       </div>
