@@ -226,6 +226,15 @@ function normalizarPreferenciaMes(opcao: any, resumoPeriodo: any, diasPlanejar: 
   };
 }
 
+function intervalosSobrepostos(inicioA: string, fimA: string, inicioB: string, fimB: string): boolean {
+  if (!inicioA || !fimA || !inicioB || !fimB) return false;
+  return inicioA <= fimB && inicioB <= fimA;
+}
+
+function calcularFimParcela(dataInicio: string, dias: number): string {
+  return adicionarDiasData(dataInicio, Math.max(0, dias - 1));
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
