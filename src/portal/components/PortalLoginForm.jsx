@@ -220,6 +220,9 @@ export default function PortalLoginForm() {
           <CardDescription className="text-slate-600 text-xs sm:text-sm mt-1">
             VIVICAS - SGP Militar
           </CardDescription>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+            Plataforma independente, desenvolvida por usuários para usuários, sem vínculo institucional com órgãos públicos.
+          </p>
         </CardHeader>
 
         <CardContent className="space-y-4 px-4 sm:px-6">
