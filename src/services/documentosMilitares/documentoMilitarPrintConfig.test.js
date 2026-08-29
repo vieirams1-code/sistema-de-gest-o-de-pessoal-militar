@@ -159,7 +159,6 @@ test('dados do preview respeitam cabeçalho, assinatura, brasão disponível e c
     tituloDocumento: 'DOCUMENTO MILITAR',
     rodapeLinhas: [
       DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS.rodapeLinha1,
-      DOCUMENTO_MILITAR_PRINT_CONFIG_DEFAULTS.rodapeLinha2,
     ],
     localAssinatura: 'Brasília.',
   });
