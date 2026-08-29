@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Save, ArrowLeft, Upload, FileText, User as UserIcon, Calendar, Clipboard, BookOpen, Download, Trash2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
