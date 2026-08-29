@@ -225,7 +225,7 @@ export const OPCOES_PREDEFINIDAS = {
     { valor: 'Soldado', label: 'Soldado' },
   ],
   quadro: [
-    { valor: 'QOBM', label: 'QOBM (Quadro de Oficiais Bombeiros Militares)' },
+    { valor: 'QOBM', label: 'QOBM (Quadro de Oficiais)' },
     { valor: 'QAOBM', label: 'QAOBM (Quadro de Administração)' },
     { valor: 'QOEBM', label: 'QOEBM (Quadro de Especialistas)' },
     { valor: 'QOSAU', label: 'QOSAU (Quadro de Saúde)' },
