@@ -489,11 +489,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const handleSaveJiso = () => persistirAgendamentoJiso();
 
-  const gerarMensagemWhatsAppJiso = () => {
+  const gerarMensagemWhatsAppJiso = (templatesDisponiveis = templates) => {
     const templateWhatsApp = getTemplateAtivoPorTipo(
       TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
       MODULO_WHATSAPP_NOTIFICACOES,
-      templates,
+      templatesDisponiveis,
       {
         grupamento_id: militarAtestado?.grupamento_id,
         subgrupamento_id: militarAtestado?.subgrupamento_id,
@@ -517,26 +517,35 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     });
   };
 
-  const abrirPreviaWhatsAppJiso = () => {
+  const abrirPreviaWhatsAppJiso = async () => {
     if (!jisoDate || !jisoTime) {
       alert('Informe a data e o horário da JISO antes de preparar a notificação.');
       return;
     }
 
-    const texto = gerarMensagemWhatsAppJiso();
-    if (texto === null) {
-      alert(`Template obrigatório não encontrado. Cadastre "${TIPO_TEMPLATE_NOTIFICACAO_JISO_WA}" em Templates de Texto > WhatsApp Notificações.`);
-      return;
-    }
+    try {
+      // Busca novamente no servidor para que uma alteração recém-salva no cadastro
+      // de Templates seja usada imediatamente, sem depender do cache do card.
+      const templatesAtualizados = await base44.entities.TemplateTexto.list();
+      queryClient.setQueryData(['templates-texto'], templatesAtualizados);
+      const texto = gerarMensagemWhatsAppJiso(templatesAtualizados);
+      if (texto === null) {
+        alert(`Template obrigatório não encontrado. Cadastre "${TIPO_TEMPLATE_NOTIFICACAO_JISO_WA}" em Templates de Texto > WhatsApp Notificações.`);
+        return;
+      }
 
-    const variaveisPendentes = texto.match(/\{\{[^}]+\}\}/g) || [];
-    if (variaveisPendentes.length > 0) {
-      alert(`A mensagem não pode ser enviada porque ainda há variáveis sem valor: ${[...new Set(variaveisPendentes)].join(', ')}`);
-      return;
-    }
+      const variaveisPendentes = texto.match(/\{\{[^}]+\}\}/g) || [];
+      if (variaveisPendentes.length > 0) {
+        alert(`A mensagem não pode ser enviada porque ainda há variáveis sem valor: ${[...new Set(variaveisPendentes)].join(', ')}`);
+        return;
+      }
 
-    setWhatsappMessage(texto);
-    setShowWhatsAppPreview(true);
+      setWhatsappMessage(texto);
+      setShowWhatsAppPreview(true);
+    } catch (error) {
+      console.error('Erro ao carregar o template WhatsApp da JISO:', error);
+      alert('Não foi possível carregar o template atualizado da notificação JISO. Tente novamente.');
+    }
   };
 
   const confirmarEnvioWhatsAppJiso = async () => {
