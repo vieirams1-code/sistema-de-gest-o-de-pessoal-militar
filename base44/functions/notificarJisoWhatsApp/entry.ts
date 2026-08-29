@@ -19,18 +19,32 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { militar_id, mensagem } = payload;
+    const { atestado_id, militar_id, mensagem_final } = payload;
 
+    if (!atestado_id) {
+      return jsonResponse({ success: false, error: 'atestado_id obrigatório' }, 400);
+    }
     if (!militar_id) {
       return jsonResponse({ success: false, error: 'militar_id obrigatório' }, 400);
     }
 
-    const text = String(mensagem || '').trim();
+    // Não existe fallback ou texto padrão neste endpoint. A única mensagem
+    // permitida é exatamente aquela revisada/confirmada na prévia do card.
+    const text = String(mensagem_final || '').trim();
     if (!text) {
       return jsonResponse({
         success: false,
-        error: 'mensagem obrigatória: revise e confirme a notificação antes do envio.'
+        error: 'mensagem_final obrigatória: revise e confirme a notificação antes do envio.'
       }, 400);
+    }
+
+    const atestadoResult = await base44.asServiceRole.entities.Atestado.filter({ id: atestado_id });
+    if (!atestadoResult || atestadoResult.length === 0) {
+      return jsonResponse({ success: false, error: 'Atestado não encontrado' }, 404);
+    }
+    const atestado = atestadoResult[0];
+    if (atestado.militar_id !== militar_id) {
+      return jsonResponse({ success: false, error: 'O atestado informado não pertence ao militar selecionado.' }, 400);
     }
 
     const militarResult = await base44.asServiceRole.entities.Militar.filter({ id: militar_id });
