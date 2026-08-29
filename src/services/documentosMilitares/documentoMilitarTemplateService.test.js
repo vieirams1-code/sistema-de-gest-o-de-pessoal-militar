@@ -122,6 +122,6 @@ test('preview administrativo substitui campos dinâmicos simulados e preserva os
 test('preview administrativo resolve variáveis canônicas do signatário e título', () => {
   assert.equal(
     previewTemplateDocumentoMilitar('{{titulo_documento}}\n{{assinatura_signatario}}'),
-    'DOCUMENTO MILITAR\nEdson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe da B1/1ºGBM/CBMMS'
+    'DOCUMENTO MILITAR\nEdson Vieira de Souza - 2º TEN QOBM\nMatrícula 108.747-021\nChefe de Seção/Unidade Militar'
   );
 });
