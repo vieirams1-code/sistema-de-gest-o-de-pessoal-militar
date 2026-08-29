@@ -47,7 +47,7 @@ export const CONFIG_MEDALHAS = {
 };
 
 const HEADER_ALIAS = {
-  militar_nome: ['militares do cbmms', 'militar', 'nome', 'nome completo', 'militar_nome'],
+  militar_nome: ['militar', 'militares', 'nome', 'nome completo', 'militar_nome'],
   doems: ['doems', 'doems numero', 'numero doems', 'publicacao', 'publicação'],
   data: ['data', 'data doems', 'data da publicacao', 'data da publicação'],
 };
@@ -284,7 +284,7 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
   };
 
   if (colIndex.militar_nome === -1 || colIndex.doems === -1 || colIndex.data === -1) {
-    throw new Error('Colunas obrigatórias não encontradas. Certifique-se de que a planilha possui as colunas: MILITARES DO CBMMS, DOEMS, DATA.');
+    throw new Error('Colunas obrigatórias não encontradas. Certifique-se de que a planilha possui as colunas: MILITAR, DOEMS, DATA.');
   }
 
   const rows = tabela.slice(1).filter(r => r.some(c => limparTexto(c)));
