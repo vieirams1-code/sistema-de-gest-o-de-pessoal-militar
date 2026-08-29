@@ -453,15 +453,32 @@ export default function PortalFeriasView({ onBack }) {
                 <div className="flex items-center space-x-2">
                   <span className="px-2.5 py-1 rounded-full bg-emerald-700 text-white font-bold text-xs flex items-center shadow-xs">
                     <Star className="w-3.5 h-3.5 mr-1 fill-white" />
-                    Período Aquisitivo Vinculado a este Plano (Mais Antigo)
+                    Período Aquisitivo Vinculado a este Plano (Mais Antigo sem Previsão)
                   </span>
                 </div>
                 <span className="text-xs font-bold text-emerald-900">
-                  Saldo: {periodoMaisAntigo.saldo_disponivel || 30} dias de direito
+                  A planejar: {periodoMaisAntigo.dias_sem_previsao ?? periodoMaisAntigo.saldo_disponivel ?? 0} dias
                 </span>
               </CardHeader>
               <CardContent className="p-4 sm:p-5 pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs">
+                <div className="flex flex-wrap gap-2 mb-3 text-[11px]">
+                  <span className="px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 font-bold">
+                    Situação aquisitiva: {periodoMaisAntigo.situacao_aquisitiva || '—'}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-violet-800 font-bold">
+                    Previsão: {periodoMaisAntigo.situacao_previsao || '—'}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                    Direito líquido: {periodoMaisAntigo.direito_liquido ?? periodoMaisAntigo.dias_direito ?? 30}d
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                    Gozados: {periodoMaisAntigo.dias_gozados_calculados ?? periodoMaisAntigo.dias_gozados ?? 0}d
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-700 font-semibold">
+                    Já previstos: {periodoMaisAntigo.dias_previstos_calculados ?? periodoMaisAntigo.dias_previstos ?? 0}d
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
                   <div className="p-3 bg-white rounded-xl border border-emerald-200">
                     <span className="text-slate-500 block text-[11px]">Início do Período</span>
                     <strong className="text-slate-800 text-sm">{formatarDataBR(periodoMaisAntigo.inicio_aquisitivo)}</strong>
@@ -471,8 +488,12 @@ export default function PortalFeriasView({ onBack }) {
                     <strong className="text-slate-800 text-sm">{formatarDataBR(periodoMaisAntigo.fim_aquisitivo)}</strong>
                   </div>
                   <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                    <span className="text-slate-500 block text-[11px]">Primeira Data Legal de Gozo</span>
+                    <strong className="text-blue-800 text-sm font-extrabold">{formatarDataBR(periodoMaisAntigo.primeira_data_legal_gozo)}</strong>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-emerald-200">
                     <span className="text-slate-500 block text-[11px]">Data Limite para Fruição</span>
-                    <strong className="text-emerald-800 text-sm font-extrabold">{formatarDataBR(periodoMaisAntigo.limite_fruicao || `${anoCampanha}-12-31`)}</strong>
+                    <strong className="text-emerald-800 text-sm font-extrabold">{formatarDataBR(periodoMaisAntigo.limite_fruicao || periodoMaisAntigo.data_limite_gozo || `${anoCampanha}-12-31`)}</strong>
                   </div>
                 </div>
               </CardContent>
