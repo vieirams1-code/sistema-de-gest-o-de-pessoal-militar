@@ -1213,6 +1213,67 @@ Deno.serve(async (req: Request) => {
                 periodoRef = `${y1}/${y2}`;
               }
 
+              // Gate final antes da escrita: recalcula saldo, aquisição e conflitos no momento da geração.
+              // Mesmo que a escala tenha sido salva anteriormente, uma mudança posterior não pode gerar férias inválidas.
+              if (!pa) continue;
+              const [feriasAtuaisGeracao, ajustesAtuaisGeracao] = await Promise.all([
+                base44.asServiceRole.entities.Ferias.filter({ militar_id: op.militar_id }),
+                base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: op.militar_id }),
+              ]);
+              const resumoGeracao = calcularResumoPeriodoPlano(pa, feriasAtuaisGeracao, ajustesAtuaisGeracao, Number(op.ano_referencia || ano));
+              const totalSolicitadoGeracao = parcelas.reduce((acc: number, p: any) => acc + Math.max(0, numeroSeguro(p?.dias, 0)), 0);
+              const diasEsperadosGeracao = Math.max(0, numeroSeguro(op.dias_direito, resumoGeracao.dias_sem_previsao));
+              if (totalSolicitadoGeracao !== diasEsperadosGeracao || totalSolicitadoGeracao > resumoGeracao.dias_sem_previsao) {
+                console.warn('[PLANO_GERAR_LOTE_FERIAS] opção ignorada por saldo insuficiente', {
+                  opcao_id: op.id,
+                  militar_id: op.militar_id,
+                  totalSolicitadoGeracao,
+                  diasEsperadosGeracao,
+                  saldoSemPrevisao: resumoGeracao.dias_sem_previsao,
+                });
+                continue;
+              }
+
+              const parcelasGeracao = parcelas.map((p: any, idx: number) => {
+                const mes = textoId(p?.mes || p?.data_inicio?.slice?.(5, 7));
+                const regraMes = (resumoGeracao.meses_elegiveis || []).find((m: any) => m.mes === mes);
+                return {
+                  ...p,
+                  etapa: numeroSeguro(p?.etapa, idx + 1),
+                  dias: Math.max(0, numeroSeguro(p?.dias, 0)),
+                  mes,
+                  data_inicio: regraMes?.permitido ? regraMes.data_inicio : '',
+                };
+              });
+              if (parcelasGeracao.some((p: any) => !p.data_inicio || p.dias <= 0)) {
+                console.warn('[PLANO_GERAR_LOTE_FERIAS] opção ignorada por data anterior à aquisição/fora do limite', { opcao_id: op.id });
+                continue;
+              }
+
+              const feriasImpactantesGeracao = (feriasAtuaisGeracao || []).filter((f: any) => STATUS_FERIAS_IMPACTO_PLANO.has(String(f.status || '')));
+              let conflitoGeracao = false;
+              for (let i = 0; i < parcelasGeracao.length && !conflitoGeracao; i += 1) {
+                const atual = parcelasGeracao[i];
+                const fimAtual = calcularFimParcela(atual.data_inicio, atual.dias);
+                conflitoGeracao = feriasImpactantesGeracao.some((f: any) =>
+                  intervalosSobrepostos(atual.data_inicio, fimAtual, f.data_inicio, f.data_fim)
+                );
+                for (let j = i + 1; j < parcelasGeracao.length && !conflitoGeracao; j += 1) {
+                  const outra = parcelasGeracao[j];
+                  conflitoGeracao = intervalosSobrepostos(
+                    atual.data_inicio,
+                    fimAtual,
+                    outra.data_inicio,
+                    calcularFimParcela(outra.data_inicio, outra.dias)
+                  );
+                }
+              }
+              if (conflitoGeracao) {
+                console.warn('[PLANO_GERAR_LOTE_FERIAS] opção ignorada por sobreposição', { opcao_id: op.id, militar_id: op.militar_id });
+                continue;
+              }
+
+              parcelas = parcelasGeracao;
               const feriasIds: string[] = [];
               let totalDias = 0;
 
