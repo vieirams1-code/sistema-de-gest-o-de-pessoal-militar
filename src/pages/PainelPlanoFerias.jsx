@@ -41,6 +41,23 @@ function formatarDataBR(dataStr) {
   return str;
 }
 
+function adicionarUmDia(dataStr) {
+  if (!dataStr) return '';
+  const dt = new Date(`${dataStr}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return '';
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+function getRegraMesPlano(op, mes, ano) {
+  const inicioMes = `${ano}-${mes}-01`;
+  const fimMes = new Date(Date.UTC(Number(ano), Number(mes), 0)).toISOString().slice(0, 10);
+  const primeiraDataLegal = adicionarUmDia(op?.periodo_fim || '');
+  const dataInicio = primeiraDataLegal && primeiraDataLegal > inicioMes ? primeiraDataLegal : inicioMes;
+  const permitido = !primeiraDataLegal || (dataInicio >= inicioMes && dataInicio <= fimMes);
+  return { permitido, dataInicio: permitido ? dataInicio : '', primeiraDataLegal, inicioAjustado: permitido && dataInicio !== inicioMes };
+}
+
 function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
   if (!detalhesStr) return fallbackVal;
   try {
