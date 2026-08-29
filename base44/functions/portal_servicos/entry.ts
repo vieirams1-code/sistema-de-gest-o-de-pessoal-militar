@@ -1613,10 +1613,17 @@ Deno.serve(async (req: Request) => {
         const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
         const anoCampanha = campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
-        // Busca períodos aquisitivos do militar
+        // O plano usa a mesma ideia do saldo operacional: direito líquido menos férias
+        // já gozadas/previstas. Não basta olhar apenas dias_gozados persistidos no período.
         let rawPeriodos: any[] = [];
+        let feriasMilitarPlano: any[] = [];
+        let ajustesMilitarPlano: any[] = [];
         try {
-          rawPeriodos = await base44.asServiceRole.entities.PeriodoAquisitivo.filter({ militar_id: militarId });
+          [rawPeriodos, feriasMilitarPlano, ajustesMilitarPlano] = await Promise.all([
+            base44.asServiceRole.entities.PeriodoAquisitivo.filter({ militar_id: militarId }),
+            base44.asServiceRole.entities.Ferias.filter({ militar_id: militarId }),
+            base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: militarId }),
+          ]);
         } catch (_e) {}
 
         const periodosOrdenados = (rawPeriodos || []).sort((a: any, b: any) => {
@@ -1625,19 +1632,17 @@ Deno.serve(async (req: Request) => {
           return dtA - dtB;
         });
 
-        let maisAntigoId: string | null = null;
-        for (const p of periodosOrdenados) {
-          const saldo = (p.dias_direito || 30) - (p.dias_gozados || 0);
-          if (saldo > 0 && p.status !== 'Inativo') {
-            maisAntigoId = p.id;
-            break;
-          }
-        }
+        const periodosComResumo = periodosOrdenados.map((p: any) => ({
+          ...p,
+          ...calcularResumoPeriodoPlano(p, feriasMilitarPlano, ajustesMilitarPlano, Number(anoCampanha)),
+        }));
+        const periodoMaisAntigoElegivel = periodosComResumo.find((p: any) => p.elegivel_plano && p.dias_sem_previsao > 0) || null;
+        const maisAntigoId: string | null = periodoMaisAntigoElegivel?.id || null;
 
-        const periodosFormatados = periodosOrdenados.map((p: any) => ({
+        const periodosFormatados = periodosComResumo.map((p: any) => ({
           ...p,
           is_mais_antigo_pendente: p.id === maisAntigoId,
-          saldo_disponivel: Math.max(0, (p.dias_direito || 30) - (p.dias_gozados || 0)),
+          is_periodo_plano_selecionavel: p.id === maisAntigoId,
         }));
 
         // Busca opção de férias já enviada pelo militar para esta campanha específica
