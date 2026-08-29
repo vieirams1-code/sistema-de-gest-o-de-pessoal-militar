@@ -120,7 +120,7 @@ export default function RPSpecificFieldsLivro({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="1ºSGBM/3°GBM" required />
-              <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="1° Grupamento de Bombeiros Militar" required />
+              <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade militar de destino" required />
             </div>
             <FormField label="Data da Transferência" name="data_transferencia" value={formData.data_transferencia} onChange={handleChange} type="date" required />
             <div>
