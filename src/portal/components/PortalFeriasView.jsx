@@ -199,6 +199,16 @@ export default function PortalFeriasView({ onBack }) {
   const opcaoEnviada = data?.opcao_militar_enviada;
   const anoCampanha = campanha?.ano_referencia || (new Date().getFullYear() + 1);
   const isBloqueadoPorDependencia = Boolean(data?.bloqueado_por_dependencia);
+  const diasPlanejar = Number(periodoMaisAntigo?.dias_sem_previsao || 0);
+  const saldoParcial = diasPlanejar > 0 && diasPlanejar !== 30;
+  const regraMes = (mes) => (periodoMaisAntigo?.meses_elegiveis || []).find((item) => item.mes === mes);
+  const mesPermitido = (mes) => Boolean(regraMes(mes)?.permitido);
+  const labelAjusteMes = (mes) => {
+    const regra = regraMes(mes);
+    return regra?.inicio_ajustado && regra?.data_inicio
+      ? ` — início em ${formatarDataBR(regra.data_inicio)}`
+      : '';
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
