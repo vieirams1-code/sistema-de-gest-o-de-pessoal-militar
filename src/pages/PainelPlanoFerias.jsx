@@ -916,6 +916,7 @@ export default function PainelPlanoFerias() {
               : modalidade === '3_ETAPAS_10'
                 ? [10, 10, 10]
                 : [15, 15];
+          const anoCampanhaModal = campanhaSelecionada?.ano_referencia || op.ano_referencia || (new Date().getFullYear() + 1);
 
           const mesOpcao1 = extrairMesDeDetalhes(op.opcao_1_detalhes, '01');
           const mesOpcao2 = extrairMesDeDetalhes(op.opcao_2_detalhes, '07');
