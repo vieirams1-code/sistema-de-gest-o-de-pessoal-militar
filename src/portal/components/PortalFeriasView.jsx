@@ -600,9 +600,13 @@ export default function PortalFeriasView({ onBack }) {
                         <option
                           key={m.valor}
                           value={m.valor}
-                          disabled={m.valor === mesOpcao2 || m.valor === mesOpcao3}
+                          disabled={!mesPermitido(m.valor) || m.valor === mesOpcao2 || m.valor === mesOpcao3}
                         >
-                          {m.nome} {m.valor === mesOpcao2 ? '(Em uso na 2ª Opção)' : m.valor === mesOpcao3 ? '(Em uso na 3ª Opção)' : ''}
+                          {m.nome}
+                          {!mesPermitido(m.valor)
+                            ? ' (Indisponível antes da aquisição do direito)'
+                            : labelAjusteMes(m.valor)}
+                          {m.valor === mesOpcao2 ? ' (Em uso na 2ª Opção)' : m.valor === mesOpcao3 ? ' (Em uso na 3ª Opção)' : ''}
                         </option>
                       ))}
                     </select>
@@ -625,9 +629,13 @@ export default function PortalFeriasView({ onBack }) {
                         <option
                           key={m.valor}
                           value={m.valor}
-                          disabled={m.valor === mesOpcao1 || m.valor === mesOpcao3}
+                          disabled={!mesPermitido(m.valor) || m.valor === mesOpcao1 || m.valor === mesOpcao3}
                         >
-                          {m.nome} {m.valor === mesOpcao1 ? '(Em uso na 1ª Opção)' : m.valor === mesOpcao3 ? '(Em uso na 3ª Opção)' : ''}
+                          {m.nome}
+                          {!mesPermitido(m.valor)
+                            ? ' (Indisponível antes da aquisição do direito)'
+                            : labelAjusteMes(m.valor)}
+                          {m.valor === mesOpcao1 ? ' (Em uso na 1ª Opção)' : m.valor === mesOpcao3 ? ' (Em uso na 3ª Opção)' : ''}
                         </option>
                       ))}
                     </select>
@@ -650,9 +658,13 @@ export default function PortalFeriasView({ onBack }) {
                         <option
                           key={m.valor}
                           value={m.valor}
-                          disabled={m.valor === mesOpcao1 || m.valor === mesOpcao2}
+                          disabled={!mesPermitido(m.valor) || m.valor === mesOpcao1 || m.valor === mesOpcao2}
                         >
-                          {m.nome} {m.valor === mesOpcao1 ? '(Em uso na 1ª Opção)' : m.valor === mesOpcao2 ? '(Em uso na 2ª Opção)' : ''}
+                          {m.nome}
+                          {!mesPermitido(m.valor)
+                            ? ' (Indisponível antes da aquisição do direito)'
+                            : labelAjusteMes(m.valor)}
+                          {m.valor === mesOpcao1 ? ' (Em uso na 1ª Opção)' : m.valor === mesOpcao2 ? ' (Em uso na 2ª Opção)' : ''}
                         </option>
                       ))}
                     </select>
