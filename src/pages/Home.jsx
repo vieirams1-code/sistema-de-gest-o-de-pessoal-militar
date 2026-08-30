@@ -487,6 +487,22 @@ export default function Home() {
     });
   }, [jisoBundle, hoje]);
 
+  const jisosProximos7Dias = React.useMemo(() => {
+    return jisosAgendadas.filter((jiso) => {
+      if (!jiso?.data_jiso) return false;
+      const data = new Date(`${jiso.data_jiso}T00:00:00`);
+      const dias = differenceInDays(data, hoje);
+      return dias >= 0 && dias <= 7;
+    });
+  }, [jisosAgendadas, hoje]);
+
+  const feriasCriticas = React.useMemo(
+    () => periodosAlerta.filter((periodo) => periodo.nivel === 'critico'),
+    [periodosAlerta],
+  );
+
+  const prioridadesImediatas = feriasCriticas.length + publicacoesUrgentes.length + inconsistenciasCadastrais.length;
+
   const formatarHoraJiso = (jiso) => {
     const horaRaw = jiso.horario_jiso || jiso.horario || jiso.hora_jiso;
     if (!horaRaw) return null;
