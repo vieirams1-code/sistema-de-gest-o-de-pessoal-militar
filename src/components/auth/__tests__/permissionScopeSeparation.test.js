@@ -16,8 +16,10 @@ test('impersonação exige administrador real da plataforma', () => {
   assert.doesNotMatch(backendSource, /const authIsAdmin = authIsAdminByRole \|\| authIsAdminByAccess;/);
 });
 
-test('frontend mantém bypass funcional somente para isAdmin real', () => {
+test('frontend mantém bypass funcional somente para role administrativa real', () => {
+  assert.match(frontendSource, /const isAdmin = isAdminByRole;/);
   assert.match(frontendSource, /const hasAbsoluteAccess = isAdmin;/);
+  assert.doesNotMatch(frontendSource, /const isAdmin = Boolean\(data\?\.isAdmin\);/);
   assert.match(frontendSource, /if \(hasAbsoluteAccess\) return true;/);
 });
 
