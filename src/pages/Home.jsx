@@ -472,7 +472,10 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <h1 className="text-3xl font-bold text-[#1e3a5f]">{saudacao} 👋</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-3xl font-bold text-[#1e3a5f]">{saudacao} 👋</h1>
+                <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">V.00</span>
+              </div>
               <p className="text-slate-500 capitalize">{dataFormatada}</p>
             </div>
             {totalAlertas > 0 && (
