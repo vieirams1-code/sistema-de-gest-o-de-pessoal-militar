@@ -235,6 +235,69 @@ function calcularFimParcela(dataInicio: string, dias: number): string {
   return adicionarDiasData(dataInicio, Math.max(0, dias - 1));
 }
 
+function normalizarTipoAcesso(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function extrairMatrizPermissoesPerfil(descricao: unknown): Record<string, unknown> {
+  if (typeof descricao !== 'string' || !descricao) return {};
+  const inicio = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
+  const fim = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
+  if (inicio === -1 || fim === -1 || fim <= inicio) return {};
+  const jsonRaw = descricao.slice(inicio + '[SGP_PERMISSIONS_MATRIX]'.length, fim).trim();
+  if (!jsonRaw) return {};
+  try {
+    const parsed = JSON.parse(jsonRaw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Set<string> {
+  const permitidas = new Set<string>();
+  const aplicar = (source: any) => {
+    if (!source || typeof source !== 'object') return;
+    for (const [key, value] of Object.entries(source)) {
+      if ((key.startsWith('perm_') || key.startsWith('acesso_')) && value === true) permitidas.add(key);
+    }
+  };
+  for (const perfil of perfis || []) {
+    aplicar(perfil);
+    aplicar(extrairMatrizPermissoesPerfil(perfil?.descricao));
+  }
+  for (const acesso of acessos || []) aplicar(acesso);
+  return permitidas;
+}
+
+function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
+  if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
+  if (acao.startsWith('CADASTRO_DECIDIR_')) return ['perm_gerir_respostas'];
+  if (acao.startsWith('PLANO_')) return ['perm_gerir_respostas'];
+  if (acao === 'CAMPANHA_LISTAR') return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
+  if (['CAMPANHA_DETALHES_RETORNO', 'CAMPANHA_HOMOLOGAR_RESPOSTA', 'CAMPANHA_DISPARAR_LEMBRETES'].includes(acao)) {
+    return ['perm_gerir_respostas'];
+  }
+  if (acao.startsWith('CAMPANHA_')) return ['perm_gerir_campanhas'];
+  return [];
+}
+
+async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string): Promise<boolean> {
+  if (!user?.email) return false;
+  if (String(user.role || '').trim().toLowerCase() === 'admin') return true;
+
+  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true });
+  if ((acessos || []).some((a: any) => normalizarTipoAcesso(a?.tipo_acesso) === 'admin')) return true;
+
+  const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
+  const perfis = perfilIds.length
+    ? await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true })
+    : [];
+  const permissoes = consolidarPermissoesPortal(perfis || [], acessos || []);
+  const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
+  return necessarias.length > 0 && necessarias.some((key) => permissoes.has(key));
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
