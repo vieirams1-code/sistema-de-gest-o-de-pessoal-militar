@@ -134,8 +134,15 @@ export function useCurrentUser() {
   // isAdminByAccess significa escopo organizacional global (tipo_acesso=admin),
   // NÃO privilégio absoluto. Mantido no retorno para diagnóstico/compatibilidade.
   const isAdminByAccess = Boolean(data?.isAdminByAccess);
-  const isAdmin = Boolean(data?.isAdmin);
-  const hasGlobalScope = Boolean(data?.hasGlobalScope || isAdminByAccess || isAdmin);
+
+  // HARDENING CLIENT-SIDE: nunca confiar em `data.isAdmin` para conceder bypass.
+  // Versões antigas da função getUserPermissions tratavam tipo_acesso=admin como
+  // administrador absoluto. A autoridade funcional máxima vem exclusivamente
+  // de isAdminByRole, que representa a role administrativa real da plataforma.
+  // Isso também garante o comportamento correto durante impersonação mesmo se
+  // o backend publicado ainda estiver temporariamente em versão anterior.
+  const isAdmin = isAdminByRole;
+  const hasGlobalScope = Boolean(data?.hasGlobalScope || isAdminByAccess || data?.isAdmin || isAdmin);
   const accessMode = data?.accessMode || (isAdmin ? 'admin' : 'restricted');
   const permissionsResolvedAs = data?.permissionsResolvedAs || (isAdmin ? 'admin' : 'profiles');
 
