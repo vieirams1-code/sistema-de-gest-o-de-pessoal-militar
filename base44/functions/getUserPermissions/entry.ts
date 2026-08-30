@@ -95,22 +95,20 @@ function extrairMatrizPermissoes(descricao) {
     }
 }
 
-// Consolida modules e actions a partir dos perfis ativos E dos UsuarioAcesso.
+// Consolida modules e actions EXCLUSIVAMENTE a partir dos perfis ativos.
 // Estratégia: prefixos "acesso_" => modules, "perm_" => actions.
 //
-// Regra de consolidação (OR aditivo):
-//   - Qualquer fonte (PerfilPermissao OU UsuarioAcesso) com acesso_x === true habilita modules.x.
-//   - Qualquer fonte (PerfilPermissao OU UsuarioAcesso) com perm_y === true habilita actions.y.
-//   - Valores false NUNCA sobrescrevem um true já consolidado.
-//   - Chaves não vistas em nenhuma fonte ficam como false (apenas se vistas como false em alguma fonte).
-//
-// Importante: PerfilPermissao é a fonte principal das permissões; UsuarioAcesso
-// pode apenas ADICIONAR permissões quando seus campos acesso_*/perm_* forem true.
-// Campos false em UsuarioAcesso são ignorados em termos de bloqueio.
+// REGRA CANÔNICA DE AUTORIZAÇÃO FUNCIONAL:
+//   - UsuarioAcesso define identidade, vínculo e ESCOPO organizacional.
+//   - PerfilPermissao define módulos e ações autorizados.
+//   - Campos legado acesso_*/perm_* existentes em UsuarioAcesso NÃO participam
+//     mais da autorização. Eles podem conter snapshots antigos e divergentes.
+//   - Se houver necessidade de exceção individual, ela deve ser representada
+//     por um perfil personalizado explicitamente vinculado ao usuário.
 //
 // Para PerfilPermissao, lemos tanto os campos booleanos da raiz quanto a matriz
 // completa serializada em `descricao` ([SGP_PERMISSIONS_MATRIX]{...}[/...]).
-function consolidarModulesActions(perfis, acessos = []) {
+function consolidarModulesActions(perfis) {
     const modules = {};
     const actions = {};
 
@@ -146,8 +144,6 @@ function consolidarModulesActions(perfis, acessos = []) {
         const matriz = extrairMatrizPermissoes(p.descricao);
         aplicarFonte(matriz);
     });
-
-    (acessos || []).forEach(aplicarFonte);
 
     return { modules, actions };
 }
@@ -357,8 +353,9 @@ Deno.serve(async (req) => {
         const isAdmin = isAdminByRole;
         const hasGlobalScope = isAdminByRole || isAdminByAccess;
 
-        // 5. modules/actions (consolida perfis + acessos por OR aditivo)
-        const { modules, actions } = consolidarModulesActions(perfis, acessos);
+        // 5. modules/actions: autorização funcional vem SOMENTE do perfil.
+        // UsuarioAcesso participa apenas da resolução do escopo organizacional.
+        const { modules, actions } = consolidarModulesActions(perfis);
 
         // 6. scope estável. Escopo global não equivale a permissão total.
         const scope = descreverScope(acessos || [], hasGlobalScope);
