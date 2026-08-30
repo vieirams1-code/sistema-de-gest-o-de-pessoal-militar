@@ -87,10 +87,7 @@ const menuGroups = [
             name: 'Contratos Designados',
             page: 'ContratosDesignacao',
             icon: ClipboardList,
-            anyOf: [
-              { type: 'action', key: 'visualizar_contratos_designacao' },
-              { type: 'action', key: 'gerir_contratos_designacao' },
-            ],
+            actionKey: 'visualizar_contratos_designacao',
           },
           { name: 'Gratificação de Função', page: 'GratificacoesFuncao', icon: Medal, viewPermission: 'visualizar_gratificacoes_funcao' },
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes', actionKey: 'perm_visualizar_folha_alteracoes' },
