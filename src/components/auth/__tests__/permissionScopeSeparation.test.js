@@ -29,3 +29,9 @@ test('escopo Administrador Global continua abrangendo todos os registros sem lib
   assert.match(frontendSource, /return modules\[modulo\] === true;/);
   assert.match(frontendSource, /return actions\[acao\] === true;/);
 });
+
+test('campos legado de UsuarioAcesso não participam mais da autorização funcional', () => {
+  assert.match(backendSource, /function consolidarModulesActions\(perfis\)/);
+  assert.match(backendSource, /const \{ modules, actions \} = consolidarModulesActions\(perfis\);/);
+  assert.doesNotMatch(backendSource, /\(acessos \|\| \[\]\)\.forEach\(aplicarFonte\)/);
+});
