@@ -278,10 +278,13 @@ Deno.serve(async (req) => {
         );
 
         const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-        const authIsAdminByAccess = (acessosAuth || []).some(
+        const authHasGlobalScope = (acessosAuth || []).some(
             (a) => normalizeTipo(a.tipo_acesso) === 'admin'
         );
-        const authIsAdmin = authIsAdminByRole || authIsAdminByAccess;
+        // Somente o papel administrativo REAL da plataforma concede poderes
+        // absolutos (inclusive impersonação). `tipo_acesso: admin` representa
+        // escopo organizacional global, não bypass de permissões.
+        const authIsAdmin = authIsAdminByRole;
 
         // ----- Validação de impersonação -----
         if (wantsImpersonation && !authIsAdmin) {
@@ -339,28 +342,30 @@ Deno.serve(async (req) => {
             if (p?.id) perfisMap[p.id] = p;
         });
 
-        // SEGURANÇA: Quando impersonando, isAdminByRole é FALSE.
-        // Não temos acesso seguro à role real do usuário efetivo a partir do
-        // SDK (auth.me retorna o autenticado), e não podemos deixar a role do
-        // admin autenticado contaminar as permissões do usuário efetivo.
-        // O único sinal confiável de admin para o usuário efetivo é a
-        // presença de UsuarioAcesso com tipo_acesso === 'admin'.
+        // SEGURANÇA: separar privilégio absoluto de escopo organizacional.
+        // - role Base44 "admin": administração real do sistema, com bypass.
+        // - UsuarioAcesso.tipo_acesso "admin": acesso GLOBAL aos registros,
+        //   porém módulos/ações continuam limitados pelo perfil atribuído.
+        // Quando há impersonação, não inferimos a role Base44 do usuário-alvo;
+        // portanto ele nunca herda o privilégio do administrador autenticado.
         const isAdminByRole = isImpersonating
             ? false
             : (String(authUser.role || '').toLowerCase() === 'admin');
         const isAdminByAccess = (acessos || []).some(
             (a) => normalizeTipo(a.tipo_acesso) === 'admin'
         );
-        const isAdmin = isAdminByRole || isAdminByAccess;
+        const isAdmin = isAdminByRole;
+        const hasGlobalScope = isAdminByRole || isAdminByAccess;
 
         // 5. modules/actions (consolida perfis + acessos por OR aditivo)
         const { modules, actions } = consolidarModulesActions(perfis, acessos);
 
-        // 6. scope estável
-        const scope = descreverScope(acessos || [], isAdmin);
+        // 6. scope estável. Escopo global não equivale a permissão total.
+        const scope = descreverScope(acessos || [], hasGlobalScope);
 
-        // 7. accessMode / permissionsResolvedAs
-        const accessMode = isAdmin ? 'admin' : 'restricted';
+        // 7. accessMode descreve ESCOPO; permissionsResolvedAs descreve a
+        // origem da autorização funcional.
+        const accessMode = hasGlobalScope ? 'admin' : 'restricted';
         const permissionsResolvedAs = isAdmin ? 'admin' : 'profiles';
 
         // 8. Montar user representando o usuário efetivo
@@ -386,6 +391,7 @@ Deno.serve(async (req) => {
             isAdminByRole,
             isAdminByAccess,
             isAdmin,
+            hasGlobalScope,
             accessMode,
             permissionsResolvedAs,
             acessos: acessos || [],
@@ -400,6 +406,7 @@ Deno.serve(async (req) => {
                 generatedAt: new Date().toISOString(),
                 impersonationRequested: wantsImpersonation,
                 authIsAdmin,
+                authHasGlobalScope,
             },
         });
     } catch (error) {
