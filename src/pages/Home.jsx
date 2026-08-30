@@ -2,11 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Users, Award, AlertTriangle, Calendar, Star,
+  Users, Award, Shield, AlertTriangle, Calendar, Star,
   FileText, BookOpen, ClipboardList, Gavel, Activity,
   ChevronRight, Clock, CheckCircle, Stethoscope, CalendarClock
 } from 'lucide-react';
@@ -120,41 +121,10 @@ function ShortcutButton({ icon: Icon, label, to, navigate }) {
   );
 }
 
-function PriorityCard({ icon: Icon, title, value, description, tone = 'slate', actionLabel, onAction }) {
-  const tones = {
-    red: 'border-red-200 bg-red-50/70 text-red-700',
-    amber: 'border-amber-200 bg-amber-50/70 text-amber-700',
-    blue: 'border-blue-200 bg-blue-50/70 text-blue-700',
-    emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-700',
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
-  };
-
-  return (
-    <div className={`rounded-xl border p-4 ${tones[tone] || tones.slate}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className="mt-0.5 rounded-lg bg-white/80 p-2 shadow-sm">
-            <Icon className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800">{title}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{description}</p>
-          </div>
-        </div>
-        <span className="text-2xl font-bold tabular-nums">{value}</span>
-      </div>
-      {onAction && (
-        <Button type="button" variant="ghost" size="sm" className="mt-3 h-8 px-0 text-xs hover:bg-transparent" onClick={onAction}>
-          {actionLabel || 'Abrir'} <ChevronRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      )}
-    </div>
-  );
-}
-
 export default function Home() {
   const navigate = useNavigate();
   const [afastamentosPanelOpen, setAfastamentosPanelOpen] = React.useState(false);
+  const punicaoEntity = getPunicaoEntity();
   const {
     isAdmin,
     modoAcesso,
@@ -274,6 +244,48 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
       } catch (_error) {
         const lista = await base44.entities.Atestado.list();
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
+    },
+    enabled: dashboardEnabled,
+  });
+
+  const { data: punicoes = [] } = useQuery({
+    queryKey: ['punicoes-ativas', scopeKey],
+    queryFn: async () => {
+      if (scopedIsAdmin || scopedIds === null) {
+        return punicaoEntity.list();
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await punicaoEntity.filter({
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await punicaoEntity.list();
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
+    },
+    enabled: dashboardEnabled,
+  });
+
+  const { data: armamentos = [] } = useQuery({
+    queryKey: ['armamentos', scopeKey],
+    queryFn: async () => {
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.Armamento.list();
+      }
+      if (!scopedIds?.length) return [];
+      try {
+        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
+        const listaEscopo = await base44.entities.Armamento.filter({
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.Armamento.list();
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
@@ -413,6 +425,8 @@ export default function Home() {
     };
   }).sort((a, b) => a.diasRestantes - b.diasRestantes);
 
+  const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
+  const punicoesAtivas = punicoes.filter(p => p.status_punicao === 'Ativa' || p.status_punicao === 'Em Curso');
   const publicacoesUrgentes = React.useMemo(() => {
     return [...publicacoesExOfficio, ...registrosLivro]
       .filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
@@ -441,22 +455,6 @@ export default function Home() {
     });
   }, [jisoBundle, hoje]);
 
-  const jisosProximos7Dias = React.useMemo(() => {
-    return jisosAgendadas.filter((jiso) => {
-      if (!jiso?.data_jiso) return false;
-      const data = new Date(`${jiso.data_jiso}T00:00:00`);
-      const dias = differenceInDays(data, hoje);
-      return dias >= 0 && dias <= 7;
-    });
-  }, [jisosAgendadas, hoje]);
-
-  const feriasCriticas = React.useMemo(
-    () => periodosAlerta.filter((periodo) => periodo.nivel === 'critico'),
-    [periodosAlerta],
-  );
-
-  const prioridadesImediatas = feriasCriticas.length + publicacoesUrgentes.length + inconsistenciasCadastrais.length;
-
   const formatarHoraJiso = (jiso) => {
     const horaRaw = jiso.horario_jiso || jiso.horario || jiso.hora_jiso;
     if (!horaRaw) return null;
@@ -471,106 +469,49 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-8">
 
         {/* Cabeçalho */}
-        <div className="mb-6">
-          <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="mb-8">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-3xl font-bold text-[#1e3a5f]">Painel de Gestão</h1>
-                <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">V.02</span>
+                <h1 className="text-3xl font-bold text-[#1e3a5f]">{saudacao} 👋</h1>
+                <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">V.01</span>
               </div>
-              <p className="mt-1 text-sm text-slate-500">{saudacao}. Aqui estão os pontos que merecem atenção hoje.</p>
-              <p className="mt-0.5 text-xs text-slate-400 capitalize">{dataFormatada}</p>
+              <p className="text-slate-500 capitalize">{dataFormatada}</p>
             </div>
-            <div className="flex items-center gap-2">
-              {prioridadesImediatas > 0 ? (
-                <Badge className="bg-red-100 text-red-700 border border-red-200 text-sm px-3 py-1.5">
-                  <AlertTriangle className="w-4 h-4 mr-1 inline" />
-                  {prioridadesImediatas} prioridade{prioridadesImediatas > 1 ? 's' : ''}
-                </Badge>
-              ) : (
-                <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm px-3 py-1.5">
-                  <CheckCircle className="w-4 h-4 mr-1 inline" />
-                  Sem prioridade crítica
-                </Badge>
-              )}
-            </div>
+            {totalAlertas > 0 && (
+              <Badge className="bg-red-100 text-red-700 border border-red-200 text-sm px-3 py-1">
+                <AlertTriangle className="w-4 h-4 mr-1 inline" />
+                {totalAlertas} alerta{totalAlertas > 1 ? 's' : ''} pendente{totalAlertas > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
         </div>
 
-        {/* Visão rápida */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Stat Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
-            icon={Users} value={militares.length} label="Efetivo ativo"
+            icon={Users} value={militares.length} label="Militares Ativos"
             color="bg-[#1e3a5f]/10 text-[#1e3a5f]"
             onClick={() => navigate(createPageUrl('Militares'))}
           />
           <StatCard
-            icon={CalendarClock} value={afastamentosParciais} label="Afastamentos na prévia"
-            color="bg-amber-100 text-amber-700"
-            onClick={() => setAfastamentosPanelOpen(true)}
+            icon={Stethoscope} value={atestadosAtivos.length} label="Atestados Ativos"
+            color="bg-blue-100 text-blue-600"
+            onClick={() => navigate(createPageUrl('Atestados'))}
           />
           <StatCard
-            icon={Stethoscope} value={jisosProximos7Dias.length} label="JISO nos próximos 7 dias"
-            color="bg-blue-100 text-blue-700"
-            onClick={() => navigate(createPageUrl('AgendarJISO'))}
+            icon={Gavel} value={punicoesAtivas.length} label="Punições Ativas"
+            color="bg-red-100 text-red-600"
+            onClick={() => navigate(createPageUrl('Punicoes'))}
           />
           <StatCard
-            icon={Calendar} value={periodosAlerta.length} label="Férias com prazo em até 180 dias"
-            color="bg-orange-100 text-orange-700"
-            onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
+            icon={Shield} value={armamentos.length} label="Armamentos"
+            color="bg-slate-100 text-slate-600"
+            onClick={() => navigate(createPageUrl('Armamentos'))}
           />
         </div>
 
-        {/* Central de prioridades */}
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">O que precisa de atenção</h2>
-              <p className="text-xs text-slate-500">Resumo operacional para decidir onde começar o trabalho.</p>
-            </div>
-            <span className="text-xs font-medium text-slate-400">Atualizado com os dados carregados do seu escopo</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <PriorityCard
-              icon={Calendar}
-              title="Férias críticas"
-              value={feriasCriticas.length}
-              description="Períodos com prazo de gozo em até 30 dias."
-              tone={feriasCriticas.length ? 'red' : 'emerald'}
-              actionLabel="Ver períodos"
-              onAction={() => navigate(createPageUrl('PeriodosAquisitivos'))}
-            />
-            <PriorityCard
-              icon={FileText}
-              title="Publicações prioritárias"
-              value={publicacoesUrgentes.length}
-              description="Registros importantes ou urgentes ainda não publicados."
-              tone={publicacoesUrgentes.length ? 'amber' : 'emerald'}
-              actionLabel="Abrir publicações"
-              onAction={() => navigate(createPageUrl('Publicacoes'))}
-            />
-            <PriorityCard
-              icon={Stethoscope}
-              title="JISO próxima"
-              value={jisosProximos7Dias.length}
-              description="Agendamentos previstos para os próximos sete dias."
-              tone={jisosProximos7Dias.length ? 'blue' : 'emerald'}
-              actionLabel="Ver agenda"
-              onAction={() => navigate(createPageUrl('AgendarJISO'))}
-            />
-            <PriorityCard
-              icon={AlertTriangle}
-              title="Cadastro incompleto"
-              value={inconsistenciasCadastrais.length}
-              description="Pendências cadastrais que podem afetar outros módulos."
-              tone={inconsistenciasCadastrais.length ? 'amber' : 'emerald'}
-              actionLabel="Revisar abaixo"
-              onAction={() => document.getElementById('dashboard-inconsistencias')?.scrollIntoView({ behavior: 'smooth' })}
-            />
-          </div>
-        </div>
-
-        <div className="mb-6">
+        <div className="mb-8">
           {afastamentosPanelOpen ? (
             <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
           ) : (
@@ -685,7 +626,7 @@ export default function Home() {
             )}
 
             {inconsistenciasCadastrais.length > 0 && (
-              <div id="dashboard-inconsistencias" className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-rose-500" />
