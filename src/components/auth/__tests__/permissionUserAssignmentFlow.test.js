@@ -33,3 +33,8 @@ test('segundo salvamento reutiliza o perfil personalizado já persistido antes d
 test('perfil personalizado arquivado não é reutilizado em uma nova exceção individual', () => {
   assert.match(source, /perfilPersistidoAntesDoSave\?\.ativo !== false/);
 });
+
+test('retorno ao perfil base arquiva o personalizado anterior e nunca o perfil base recarregado', () => {
+  assert.match(source, /markProfileAsLegacy\(perfilPersistidoAntesDoSave\)/);
+  assert.doesNotMatch(source, /markProfileAsLegacy\(perfilAtualDoUsuario\)/);
+});
