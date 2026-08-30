@@ -17,7 +17,7 @@ export default function CursosFormacao() {
   const { user, canAccessModule, canAccessAction } = useCurrentUser();
   const { toast } = useToast();
 
-  const podeVer = canAccessModule('cursos_formacao') || canAccessAction('visualizar_cursos_formacao');
+  const podeVer = canAccessModule('cursos_formacao') && canAccessAction('visualizar_cursos_formacao');
   const podeGerir = canAccessAction('gerir_cursos_formacao');
 
   const [tab, setTab] = useState('cursos');
