@@ -430,9 +430,10 @@ export default function PermissoesUsuarios() {
       const normalizedPermissions = targetIsSuperAdmin
         ? fullAccessPermissions
         : buildPermissionsFromSource(userPermissions);
-      const perfilBaseId = selectedProfileId !== '_nenhum'
-        ? selectedProfileId
-        : (resolveBaseProfileIdFromSource(selectedProfileSource) || appliedProfileState.id || '');
+      // Somente o perfil efetivamente APLICADO entra no salvamento.
+      // A seleção do dropdown é apenas prévia e não pode trocar silenciosamente
+      // a base do usuário caso o operador clique em Salvar sem "Aplicar Perfil".
+      const perfilBaseId = appliedProfileState.id || '';
       const perfilBaseSelecionado = perfilBaseId
         ? (perfis.find((perfil) => perfil.id === perfilBaseId) || await getProfileWithPermissions(perfilBaseId))
         : null;
@@ -1107,8 +1108,13 @@ export default function PermissoesUsuarios() {
                       </Button>
                     </div>
                     <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
-                      <Info className="w-4 h-4" /> Selecionar um perfil apenas exibe a prévia abaixo. As permissões do formulário só mudam ao clicar em <b>Aplicar Perfil</b>.
+                      <Info className="w-4 h-4" /> Selecionar um perfil apenas exibe a prévia abaixo. Ele só passa a ser a base a salvar quando você clicar em <b>Aplicar Perfil</b>.
                     </p>
+                    {appliedProfileState.id && (
+                      <p className="text-xs text-emerald-700 mt-2 font-medium">
+                        Base preparada para salvar: {appliedProfileState.nome || appliedProfileState.id}
+                      </p>
+                    )}
                     {technicalWarning && (
                       <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
                         <BadgeAlert className="w-4 h-4" /> Aviso técnico: {technicalWarning}
@@ -1120,7 +1126,7 @@ export default function PermissoesUsuarios() {
                       </p>
                     )}
                     <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-xs text-slate-500">Perfil atual</p>
+                      <p className="text-xs text-slate-500">Perfil atualmente salvo</p>
                       <p className="text-sm font-semibold text-slate-800">
                         {currentPerfilSelecionado?.nome_perfil || currentPerfilSelecionado?.nome || 'Sem perfil vinculado'}
                       </p>
