@@ -131,14 +131,17 @@ export function useCurrentUser() {
   const meta = data?.meta || {};
 
   const isAdminByRole = Boolean(data?.isAdminByRole);
+  // isAdminByAccess significa escopo organizacional global (tipo_acesso=admin),
+  // NÃO privilégio absoluto. Mantido no retorno para diagnóstico/compatibilidade.
   const isAdminByAccess = Boolean(data?.isAdminByAccess);
   const isAdmin = Boolean(data?.isAdmin);
+  const hasGlobalScope = Boolean(data?.hasGlobalScope || isAdminByAccess || isAdmin);
   const accessMode = data?.accessMode || (isAdmin ? 'admin' : 'restricted');
   const permissionsResolvedAs = data?.permissionsResolvedAs || (isAdmin ? 'admin' : 'profiles');
 
-  // Compatibilidade com consumidores que tratam superadmin como "acesso total".
-  // No backend, isAdmin engloba role admin + acesso admin. Não temos mais um
-  // "superadmin" separado: para fins de UI, isAdmin é o nível máximo.
+  // Somente o administrador real da plataforma possui bypass funcional.
+  // Um usuário com escopo "Administrador Global" pode enxergar registros de
+  // toda a organização, mas continua obedecendo ao perfil de permissões.
   const superAdmin = isAdmin;
   const hasAbsoluteAccess = isAdmin;
 
@@ -268,7 +271,7 @@ export function useCurrentUser() {
   // Verificação de escopo por registro (mantida da API anterior).
   const hasAccess = (registro) => {
     if (!registro) return false;
-    if (isAdmin) return true;
+    if (hasAbsoluteAccess || modoAcesso === 'admin') return true;
 
     if (modoAcesso === 'setor') {
       return (
@@ -322,7 +325,7 @@ export function useCurrentUser() {
   // MilitarSelector e demais consumidores até que cada um migre para
   // getScopedMilitares (lotes 1B em diante).
   const getMilitarScopeFilters = () => {
-    if (isAdmin) return [];
+    if (hasAbsoluteAccess || modoAcesso === 'admin') return [];
 
     if (modoAcesso === 'setor' && subgrupamentoId) {
       return [{ grupamento_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }];
