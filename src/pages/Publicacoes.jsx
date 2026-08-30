@@ -392,7 +392,9 @@ export default function Publicacoes() {
   } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasPublicacoesAccess = canAccessModule('controle_publicacoes');
-  const canCriarPublicacoes = canAccessAction('adicionar_publicacoes') || canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+  // Permissão estrita: criar publicação depende somente da ação de criação.
+  // editar_publicacoes e admin_mode não podem conceder criação por efeito colateral.
+  const canCriarPublicacoes = canAccessAction('adicionar_publicacoes');
   const publicacoesScopeKey = useMemo(() => buildPublicacoesScopeKey({
     isAdmin,
     modoAcesso,
