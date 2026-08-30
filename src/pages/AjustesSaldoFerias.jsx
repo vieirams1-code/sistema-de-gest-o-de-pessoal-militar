@@ -122,9 +122,10 @@ export default function AjustesSaldoFerias() {
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, user = {}, modoAcesso = null } = useCurrentUser();
   const effectiveEmail = getEffectiveEmail();
 
-  const canVisualizar = canAccessModule('ferias') && (canAccessAction('visualizar_creditos_ferias') || canAccessAction('visualizar_ferias'));
-  const canCriar = canAccessAction('criar_credito_extra_ferias') || canAccessAction('editar_credito_extra_ferias');
-  const canCancelar = canAccessAction('cancelar_credito_extra_ferias') || canAccessAction('editar_credito_extra_ferias');
+  // Permissões estritas: cada capacidade depende da sua própria action.
+  const canVisualizar = canAccessModule('ferias') && canAccessAction('visualizar_creditos_ferias');
+  const canCriar = canAccessAction('criar_credito_extra_ferias');
+  const canCancelar = canAccessAction('cancelar_credito_extra_ferias');
 
   const [filtros, setFiltros] = useState({ militar_id: ALL, periodo_id: ALL, tipo: ALL, status: ALL, origem: ALL });
   const [form, setForm] = useState(formInicial);
