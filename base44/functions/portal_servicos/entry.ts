@@ -357,11 +357,22 @@ Deno.serve(async (req: Request) => {
         user = await base44.auth.me();
       } catch (_eAuth) {}
 
-      // Fallback: se executado internamente ou autenticado no SGP
-      const autorizacaoOk = Boolean(user || req.headers.get('Authorization') || req.headers.get('X-App-Id'));
-      if (!autorizacaoOk && !user) {
-        return new Response(JSON.stringify({ error: 'Acesso restrito ao administrador do sistema.' }), {
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Usuário não autenticado.' }), {
           status: 401,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
+
+      let autorizado = false;
+      try {
+        autorizado = await autorizarAcaoAdminPortal(base44, user, acao);
+      } catch (_ePerm) {
+        autorizado = false;
+      }
+      if (!autorizado) {
+        return new Response(JSON.stringify({ error: 'Usuário sem permissão para executar esta ação administrativa.' }), {
+          status: 403,
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
       }
