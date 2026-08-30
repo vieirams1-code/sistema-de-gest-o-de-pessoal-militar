@@ -211,8 +211,10 @@ export default function CadastrarRegistroRP() {
   } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAccess = canAccessModule('rp');
-  const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
-  const canPublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
+  // Permissões estritas: Modo Admin é apenas um estado operacional adicional,
+  // nunca uma permissão substituta para editar ou publicar.
+  const canGerirPublicacoes = canAccessAction('editar_publicacoes');
+  const canPublicarBg = canAccessAction('publicar_bg');
 
   const [step, setStep] = useState(1);
   const [tipoSearch, setTipoSearch] = useState('');
