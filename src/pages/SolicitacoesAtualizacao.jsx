@@ -19,7 +19,6 @@ import {
   ClipboardList,
   AlertCircle,
   CheckCircle2,
-  ChevronsUpDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
