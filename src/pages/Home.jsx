@@ -517,49 +517,106 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-8">
 
         {/* Cabeçalho */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="mb-6">
+          <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-3xl font-bold text-[#1e3a5f]">{saudacao} 👋</h1>
-                <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">V.01</span>
+                <h1 className="text-3xl font-bold text-[#1e3a5f]">Painel de Gestão</h1>
+                <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">V.02</span>
               </div>
-              <p className="text-slate-500 capitalize">{dataFormatada}</p>
+              <p className="mt-1 text-sm text-slate-500">{saudacao}. Aqui estão os pontos que merecem atenção hoje.</p>
+              <p className="mt-0.5 text-xs text-slate-400 capitalize">{dataFormatada}</p>
             </div>
-            {totalAlertas > 0 && (
-              <Badge className="bg-red-100 text-red-700 border border-red-200 text-sm px-3 py-1">
-                <AlertTriangle className="w-4 h-4 mr-1 inline" />
-                {totalAlertas} alerta{totalAlertas > 1 ? 's' : ''} pendente{totalAlertas > 1 ? 's' : ''}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {prioridadesImediatas > 0 ? (
+                <Badge className="bg-red-100 text-red-700 border border-red-200 text-sm px-3 py-1.5">
+                  <AlertTriangle className="w-4 h-4 mr-1 inline" />
+                  {prioridadesImediatas} prioridade{prioridadesImediatas > 1 ? 's' : ''}
+                </Badge>
+              ) : (
+                <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm px-3 py-1.5">
+                  <CheckCircle className="w-4 h-4 mr-1 inline" />
+                  Sem prioridade crítica
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* Visão rápida */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCard
-            icon={Users} value={militares.length} label="Militares Ativos"
+            icon={Users} value={militares.length} label="Efetivo ativo"
             color="bg-[#1e3a5f]/10 text-[#1e3a5f]"
             onClick={() => navigate(createPageUrl('Militares'))}
           />
           <StatCard
-            icon={Stethoscope} value={atestadosAtivos.length} label="Atestados Ativos"
-            color="bg-blue-100 text-blue-600"
-            onClick={() => navigate(createPageUrl('Atestados'))}
+            icon={CalendarClock} value={afastamentosParciais} label="Afastamentos na prévia"
+            color="bg-amber-100 text-amber-700"
+            onClick={() => setAfastamentosPanelOpen(true)}
           />
           <StatCard
-            icon={Gavel} value={punicoesAtivas.length} label="Punições Ativas"
-            color="bg-red-100 text-red-600"
-            onClick={() => navigate(createPageUrl('Punicoes'))}
+            icon={Stethoscope} value={jisosProximos7Dias.length} label="JISO nos próximos 7 dias"
+            color="bg-blue-100 text-blue-700"
+            onClick={() => navigate(createPageUrl('AgendarJISO'))}
           />
           <StatCard
-            icon={Shield} value={armamentos.length} label="Armamentos"
-            color="bg-slate-100 text-slate-600"
-            onClick={() => navigate(createPageUrl('Armamentos'))}
+            icon={Calendar} value={periodosAlerta.length} label="Férias com prazo em até 180 dias"
+            color="bg-orange-100 text-orange-700"
+            onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
           />
         </div>
 
-        <div className="mb-8">
+        {/* Central de prioridades */}
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">O que precisa de atenção</h2>
+              <p className="text-xs text-slate-500">Resumo operacional para decidir onde começar o trabalho.</p>
+            </div>
+            <span className="text-xs font-medium text-slate-400">Atualizado com os dados carregados do seu escopo</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <PriorityCard
+              icon={Calendar}
+              title="Férias críticas"
+              value={feriasCriticas.length}
+              description="Períodos com prazo de gozo em até 30 dias."
+              tone={feriasCriticas.length ? 'red' : 'emerald'}
+              actionLabel="Ver períodos"
+              onAction={() => navigate(createPageUrl('PeriodosAquisitivos'))}
+            />
+            <PriorityCard
+              icon={FileText}
+              title="Publicações prioritárias"
+              value={publicacoesUrgentes.length}
+              description="Registros importantes ou urgentes ainda não publicados."
+              tone={publicacoesUrgentes.length ? 'amber' : 'emerald'}
+              actionLabel="Abrir publicações"
+              onAction={() => navigate(createPageUrl('Publicacoes'))}
+            />
+            <PriorityCard
+              icon={Stethoscope}
+              title="JISO próxima"
+              value={jisosProximos7Dias.length}
+              description="Agendamentos previstos para os próximos sete dias."
+              tone={jisosProximos7Dias.length ? 'blue' : 'emerald'}
+              actionLabel="Ver agenda"
+              onAction={() => navigate(createPageUrl('AgendarJISO'))}
+            />
+            <PriorityCard
+              icon={AlertTriangle}
+              title="Cadastro incompleto"
+              value={inconsistenciasCadastrais.length}
+              description="Pendências cadastrais que podem afetar outros módulos."
+              tone={inconsistenciasCadastrais.length ? 'amber' : 'emerald'}
+              actionLabel="Revisar abaixo"
+              onAction={() => document.getElementById('dashboard-inconsistencias')?.scrollIntoView({ behavior: 'smooth' })}
+            />
+          </div>
+        </div>
+
+        <div className="mb-6">
           {afastamentosPanelOpen ? (
             <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
           ) : (
