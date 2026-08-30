@@ -1239,7 +1239,15 @@ export default function PermissoesUsuarios() {
                                         setTechnicalWarning('Conta superadmin: matriz permanece com acesso total.');
                                         return;
                                       }
-                                      setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }));
+                                      setUserPermissions((prev) => {
+                                        const ativarModulo = prev[mod.key] !== true;
+                                        if (ativarModulo) return { ...prev, [mod.key]: true };
+                                        const next = { ...prev, [mod.key]: false };
+                                        // Desligar o módulo elimina também as ações filhas.
+                                        // Ativar o módulo NÃO concede nenhuma ação automaticamente.
+                                        (mod.actions || []).forEach((act) => { next[act.key] = false; });
+                                        return next;
+                                      });
                                     }}
                                   >
                                     <div className="flex items-center gap-3">
