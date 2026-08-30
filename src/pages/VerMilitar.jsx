@@ -178,11 +178,11 @@ export default function VerMilitar() {
 
   const effectiveEmail = getEffectiveEmail();
   const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
-  const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
-  const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
-  const podeEditarContratoDesignacao = isAdmin || canAccessAction('editar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
-  const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
-  const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao');
+  const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao');
+  const podeEditarContratoDesignacao = isAdmin || canAccessAction('editar_metadados_contrato_designacao');
+  const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao');
+  const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao');
   const podeExcluirContratoDesignacao = isAdmin || canAccessAction('excluir_contrato_designacao');
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showGerarDocumento, setShowGerarDocumento] = useState(false);
