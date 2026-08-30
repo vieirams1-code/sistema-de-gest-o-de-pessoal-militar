@@ -242,8 +242,11 @@ function extrairMatriculasDisponiveis(militaresDisponiveis = []) {
 export default function ContratosDesignacao() {
   const { isAdmin, canAccessAction, canAccessAll, permissions, userEmail, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
-  const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
-  const canCreate = hasAbsoluteAccess || isAdmin || canAccessAction('gerir_contratos_designacao');
+  const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_contratos_designacao');
+  const canCreate = hasAbsoluteAccess || isAdmin || canAccessAction('criar_contrato_designacao');
+  const canEdit = hasAbsoluteAccess || isAdmin || canAccessAction('editar_metadados_contrato_designacao');
+  const canFinish = hasAbsoluteAccess || isAdmin || canAccessAction('encerrar_contrato_designacao');
+  const canDelete = hasAbsoluteAccess || isAdmin || canAccessAction('excluir_contrato_designacao');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -592,7 +595,7 @@ export default function ContratosDesignacao() {
                         </td>
                         <td className="px-4 py-4 text-right">
                           <div className="flex justify-end gap-2">
-                            {canCreate && (
+                            {canEdit && (
                               <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => handleAbrirEdicaoContrato(contrato)} aria-label="Editar contrato">
                                 <Edit3 className="h-4 w-4" />
                               </Button>
@@ -607,12 +610,12 @@ export default function ContratosDesignacao() {
                                 <DropdownMenuItem onSelect={() => setContratoDetalhe(contrato)}>
                                   <Eye className="h-4 w-4" />Detalhes
                                 </DropdownMenuItem>
-                                {situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO && situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.CANCELADO && (
+                                {canFinish && situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO && situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.CANCELADO && (
                                   <DropdownMenuItem onSelect={() => setFinalizandoContrato(contrato)}>
                                     <CheckCircle2 className="h-4 w-4" />Finalizar contrato
                                   </DropdownMenuItem>
                                 )}
-                                {canCreate && modoAdmin && (
+                                {canDelete && modoAdmin && (
                                   <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
