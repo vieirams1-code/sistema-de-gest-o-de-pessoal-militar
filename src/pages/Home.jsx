@@ -164,7 +164,16 @@ export default function Home() {
     hasSelfAccess,
     getMilitarScopeFilters,
     isAccessResolved,
+    canAccessModule,
+    canAccessAction,
   } = useCurrentUser();
+
+  const podeVerMilitares = canAccessModule('militares') && canAccessAction('visualizar_militares');
+  const podeVerFerias = canAccessModule('ferias') && canAccessAction('visualizar_ferias');
+  const podeVerPublicacoes = canAccessModule('controle_publicacoes') && canAccessAction('visualizar_controle_publicacoes');
+  const podeVerAtestados = canAccessModule('atestados') && canAccessAction('visualizar_atestados');
+  const podeVerComportamento = canAccessModule('controle_comportamento') && canAccessAction('visualizar_controle_comportamento');
+  const podeEditarMilitares = canAccessAction('editar_militares');
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
@@ -175,7 +184,7 @@ export default function Home() {
   const { data: militares = [] } = useQuery({
     queryKey: ['militares-ativos', isAdmin, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
-      if (isAdmin) {
+      if (isAdmin || modoAcesso === 'admin') {
         const lista = await base44.entities.Militar.list('-created_date');
         const enriquecidos = await carregarMilitaresComMatriculas(lista);
         return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
@@ -222,7 +231,7 @@ export default function Home() {
       const enriquecidos = await carregarMilitaresComMatriculas(merged);
       return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
     },
-    enabled: isAccessResolved,
+    enabled: isAccessResolved && podeVerMilitares,
   });
 
   const scopedSeedIds = React.useMemo(() => militares.map((militar) => String(militar.id)), [militares]);
@@ -256,7 +265,7 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerFerias,
   });
 
   const { data: atestados = [] } = useQuery({
@@ -277,7 +286,7 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerAtestados,
   });
 
   const { data: registrosLivro = [] } = useQuery({
@@ -298,7 +307,7 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerPublicacoes,
   });
 
   const { data: publicacoesExOfficio = [] } = useQuery({
@@ -320,7 +329,7 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerPublicacoes,
   });
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['dashboard-pendencias-comportamento', scopeKey],
@@ -341,14 +350,14 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerComportamento,
   });
   const { data: jisoBundle = { atestados: [], jisos: [], meta: {} } } = useQuery({
     queryKey: ['dashboard-jisos', scopeKey],
     queryFn: async () => {
       return fetchScopedAtestadosBundle();
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerAtestados,
   });
   const { data: ferias = [] } = useQuery({
     queryKey: ['dashboard-ferias', scopeKey],
@@ -369,7 +378,7 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
-    enabled: dashboardEnabled,
+    enabled: dashboardEnabled && podeVerFerias,
   });
 
   // Alertas de férias por nível
