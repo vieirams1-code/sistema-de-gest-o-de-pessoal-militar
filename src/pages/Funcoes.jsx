@@ -5,8 +5,8 @@ import FuncoesTagsManager from '@/components/funcoes-tags/FuncoesTagsManager';
 
 export default function Funcoes() {
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-  const hasFuncoesAccess = canAccessModule('adicoes_personalizacoes') || canAccessAction('gerir_adicoes_personalizacoes');
-  const canEditFuncoes = canAccessAction('gerir_configuracoes') || canAccessAction('gerir_adicoes_personalizacoes');
+  const hasFuncoesAccess = canAccessModule('adicoes_personalizacoes') && canAccessAction('gerir_adicoes_personalizacoes');
+  const canEditFuncoes = canAccessAction('gerir_adicoes_personalizacoes');
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasFuncoesAccess) return <AccessDenied modulo="Funções" />;
