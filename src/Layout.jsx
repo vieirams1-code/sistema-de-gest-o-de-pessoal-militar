@@ -320,7 +320,13 @@ export default function Layout({ children, currentPageName }) {
     updateWidgetPreferences,
   } = useQuickAccessPreferences(userEmail);
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
-  const temPermissao = (actionKey) => canAccessAction(actionKey);
+  const normalizeMenuPermissionKey = (key, type) => {
+    const value = String(key || '').trim();
+    if (!value) return '';
+    if (type === 'module') return value.replace(/^acesso_/, '');
+    return value.replace(/^perm_/, '');
+  };
+  const temPermissao = (actionKey) => canAccessAction(normalizeMenuPermissionKey(actionKey, 'action'));
   useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
 
   const toggleExpanded = (sectionTitle) => {
@@ -369,13 +375,13 @@ export default function Layout({ children, currentPageName }) {
     if (hasAbsoluteAccess) return true;
 
     if (entry.viewPermission && !temPermissao(entry.viewPermission)) return false;
-    if (entry.actionKey && !canAccessAction(entry.actionKey)) return false;
-    if (entry.moduleKey && !canAccessModule(entry.moduleKey)) return false;
+    if (entry.actionKey && !canAccessAction(normalizeMenuPermissionKey(entry.actionKey, 'action'))) return false;
+    if (entry.moduleKey && !canAccessModule(normalizeMenuPermissionKey(entry.moduleKey, 'module'))) return false;
     if (entry.anyOf?.length) {
       const hasAnyPermission = entry.anyOf.some((permission) => (
         permission.type === 'module'
-          ? canAccessModule(permission.key)
-          : canAccessAction(permission.key)
+          ? canAccessModule(normalizeMenuPermissionKey(permission.key, 'module'))
+          : canAccessAction(normalizeMenuPermissionKey(permission.key, 'action'))
       ));
       if (!hasAnyPermission) return false;
     }
