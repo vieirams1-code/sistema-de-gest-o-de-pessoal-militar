@@ -1168,17 +1168,17 @@ Deno.serve(async (req) => {
         let allowed = false;
         let requiredPermission = null;
         if (operation === 'create') {
-          requiredPermission = 'criar_contrato_designacao ou gerir_contratos_designacao';
-          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'criar_contrato_designacao', 'gerir_contratos_designacao');
+          requiredPermission = 'criar_contrato_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'criar_contrato_designacao');
         } else if (operation === 'update' && statusContratoPayload === 'encerrado') {
-          requiredPermission = 'encerrar_contrato_designacao ou gerir_contratos_designacao';
-          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'encerrar_contrato_designacao', 'gerir_contratos_designacao');
+          requiredPermission = 'encerrar_contrato_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'encerrar_contrato_designacao');
         } else if (operation === 'update' && statusContratoPayload === 'cancelado') {
-          requiredPermission = 'cancelar_contrato_designacao ou gerir_contratos_designacao';
-          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'cancelar_contrato_designacao', 'gerir_contratos_designacao');
+          requiredPermission = 'cancelar_contrato_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'cancelar_contrato_designacao');
         } else if (operation === 'update') {
-          requiredPermission = 'editar_metadados_contrato_designacao ou gerir_contratos_designacao';
-          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'editar_metadados_contrato_designacao', 'gerir_contratos_designacao');
+          requiredPermission = 'editar_metadados_contrato_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'editar_metadados_contrato_designacao');
         } else if (operation === 'delete') {
           requiredPermission = 'excluir_contrato_designacao';
           allowed = possuiActionContratoDesignacao(targetPerms.actions, 'excluir_contrato_designacao');
