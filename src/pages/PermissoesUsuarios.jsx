@@ -483,6 +483,18 @@ export default function PermissoesUsuarios() {
         };
       }
 
+      // Captura o perfil efetivamente persistido ANTES de atualizar UsuarioAcesso.
+      // Isso é essencial quando o usuário já usa um perfil personalizado: o primeiro
+      // update abaixo aponta temporariamente UsuarioAcesso para o perfil-base aplicado,
+      // portanto não podemos tentar descobrir depois se havia um personalizado a reutilizar.
+      const perfilPersistidoAntesDoSave = persistedProfileSource?.id
+        ? await getProfileWithPermissions(persistedProfileSource.id)
+        : null;
+      const perfilPersonalizadoReutilizavel = isLegacyCustomProfile(perfilPersistidoAntesDoSave)
+        && perfilPersistidoAntesDoSave?.ativo !== false
+        ? perfilPersistidoAntesDoSave
+        : null;
+
       const dataToSave = {
         ...baseData,
         ...roleData,
@@ -505,22 +517,14 @@ export default function PermissoesUsuarios() {
       const perfilAtualDoUsuario = reloadedAccess?.perfil_id
         ? (await getProfileWithPermissions(reloadedAccess.perfil_id))
         : null;
-      // Perfis personalizados antigos não possuem metadados de vínculo no schema.
-      // Se o perfil atualmente atribuído ao usuário já é personalizado, ele é a
-      // fonte correta a ser atualizada — não criamos outra cópia a cada salvamento.
-      const perfilAtualEhCustomDoUsuario = isLegacyCustomProfile(perfilAtualDoUsuario);
+      const perfilAtualEhCustomDoUsuario = isLegacyCustomProfile(perfilPersistidoAntesDoSave);
 
       let perfilFinal = perfilAtualDoUsuario;
 
       if (possuiAjusteManual) {
-        // Não dependemos mais dos campos is_personalizado/usuario_vinculado_id,
-        // que não existem no schema atual. O perfil personalizado atualmente
-        // atribuído ao UsuarioAcesso é a identidade durável da exceção individual.
-        const perfilPersonalizadoSelecionadoAtual = perfilAtualEhCustomDoUsuario
-          ? perfilAtualDoUsuario
-          : null;
-
-        let perfilPersonalizadoSelecionado = perfilPersonalizadoSelecionadoAtual;
+        // Um usuário que já estava personalizado deve reutilizar exatamente o mesmo
+        // PerfilPermissao. Não criamos uma nova cópia a cada salvamento.
+        let perfilPersonalizadoSelecionado = perfilPersonalizadoReutilizavel;
 
         const perfilOrigemDuravel = perfilOrigemId || resolveBaseProfileIdFromSource(perfilAtualDoUsuario) || '';
         const descricaoComOrigem = mergeProfileOriginIntoDescription(
