@@ -121,6 +121,38 @@ function ShortcutButton({ icon: Icon, label, to, navigate }) {
   );
 }
 
+function PriorityCard({ icon: Icon, title, value, description, tone = 'slate', actionLabel, onAction }) {
+  const tones = {
+    red: 'border-red-200 bg-red-50/70 text-red-700',
+    amber: 'border-amber-200 bg-amber-50/70 text-amber-700',
+    blue: 'border-blue-200 bg-blue-50/70 text-blue-700',
+    emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-700',
+    slate: 'border-slate-200 bg-slate-50 text-slate-700',
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 ${tones[tone] || tones.slate}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="mt-0.5 rounded-lg bg-white/80 p-2 shadow-sm">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{description}</p>
+          </div>
+        </div>
+        <span className="text-2xl font-bold tabular-nums">{value}</span>
+      </div>
+      {onAction && (
+        <Button type="button" variant="ghost" size="sm" className="mt-3 h-8 px-0 text-xs hover:bg-transparent" onClick={onAction}>
+          {actionLabel || 'Abrir'} <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const [afastamentosPanelOpen, setAfastamentosPanelOpen] = React.useState(false);
