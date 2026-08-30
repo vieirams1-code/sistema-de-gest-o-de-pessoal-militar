@@ -34,7 +34,8 @@ export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast, dismiss } = useToast();
   const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin } = useCurrentUser();
-  const hasLotacaoAccess = canAccessModule('lotacao_militares');
+  const hasLotacaoAccess = canAccessModule('lotacao_militares') && canAccessAction('visualizar_lotacao_militares');
+  const canManageLotacao = canAccessAction('gerir_lotacao_militares');
   const effectiveEmail = getEffectiveEmailMilitares() || 'self';
 
   const [searchMilitar, setSearchMilitar] = useState('');
@@ -418,9 +419,9 @@ export default function LotacaoMilitares() {
   const handleMove = () => {
     if (!selectedNode || selectedMilitares.length === 0) return;
 
-    if (!canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
+    if (!canManageLotacao) {
       dismiss();
-      toast({ title: "Ação negada", description: "Permissão insuficiente para mover militares.", variant: "destructive", duration: 3000 });
+      toast({ title: "Ação negada", description: "É necessária a permissão Gerir Lotação de Militares.", variant: "destructive", duration: 3000 });
       return;
     }
     moveMutation.mutate({ militaresIds: selectedMilitares, targetNode: selectedNode });
@@ -429,11 +430,8 @@ export default function LotacaoMilitares() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasLotacaoAccess) return <AccessDenied modulo="Lotação de Militares" />;
 
-  // Acesso à página: gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
-  const canAccess = canAccessAction('gerir_estrutura') || canAccessAction('gerir_permissoes');
-  if (!canAccess) {
-    return <AccessDenied modulo="Lotação de Militares" />;
-  }
+  // Visualização e gestão são capacidades independentes.
+  // A página exige somente Visualizar Lotação; movimentações exigem Gerir Lotação.
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
