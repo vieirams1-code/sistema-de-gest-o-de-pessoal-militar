@@ -298,7 +298,16 @@ export default function PerfisPermissao() {
                             <div key={mod.key} className={`rounded-lg border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-slate-50'}`}>
                               <div
                                 className="p-3 flex flex-wrap items-center gap-2 justify-between cursor-pointer"
-                                onClick={() => setFormData((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                                onClick={() => setFormData((prev) => {
+                                  const ativarModulo = prev[mod.key] !== true;
+                                  if (ativarModulo) return { ...prev, [mod.key]: true };
+                                  const next = { ...prev, [mod.key]: false };
+                                  // Ao desligar um módulo, limpamos todas as ações filhas.
+                                  // Assim nenhuma permissão antiga fica escondida para reaparecer
+                                  // quando o módulo for ativado novamente.
+                                  (mod.actions || []).forEach((act) => { next[act.key] = false; });
+                                  return next;
+                                })}
                               >
                                 <div className="flex items-center gap-3">
                                   <input
