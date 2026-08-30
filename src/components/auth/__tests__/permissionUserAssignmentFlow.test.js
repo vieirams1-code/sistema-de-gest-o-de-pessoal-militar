@@ -20,3 +20,16 @@ test('perfil personalizado compara permissões com a base de origem, não com el
   assert.match(source, /perfilBase \? resolveProfilePermissions\(\{ profileSource: perfilBase \}\)\.permissions : null/);
   assert.match(source, /profileSource: perfilAtual \|\| \{\}/);
 });
+
+test('segundo salvamento reutiliza o perfil personalizado já persistido antes de sobrescrever UsuarioAcesso', () => {
+  const captura = source.indexOf('const perfilPersistidoAntesDoSave = persistedProfileSource?.id');
+  const primeiroUpdateUsuario = source.indexOf("const savedAccess = isNewAcesso");
+  assert.ok(captura >= 0, 'deve capturar o perfil persistido antes do salvamento');
+  assert.ok(primeiroUpdateUsuario > captura, 'a captura deve ocorrer antes do update temporário de UsuarioAcesso');
+  assert.match(source, /const perfilPersonalizadoReutilizavel = isLegacyCustomProfile\(perfilPersistidoAntesDoSave\)/);
+  assert.match(source, /let perfilPersonalizadoSelecionado = perfilPersonalizadoReutilizavel;/);
+});
+
+test('perfil personalizado arquivado não é reutilizado em uma nova exceção individual', () => {
+  assert.match(source, /perfilPersistidoAntesDoSave\?\.ativo !== false/);
+});
