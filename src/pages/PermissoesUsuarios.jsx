@@ -557,8 +557,10 @@ export default function PermissoesUsuarios() {
         });
         perfilFinal = perfilPersonalizadoSelecionado;
       } else {
-        if (perfilAtualEhCustomDoUsuario && perfilAtualDoUsuario?.id) {
-          await markProfileAsLegacy(perfilAtualDoUsuario);
+        // Ao remover todas as exceções individuais, arquivamos SOMENTE o perfil
+        // personalizado que estava persistido antes do salvamento. Nunca o perfil-base.
+        if (perfilAtualEhCustomDoUsuario && perfilPersistidoAntesDoSave?.id) {
+          await markProfileAsLegacy(perfilPersistidoAntesDoSave);
         }
         await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
           perfil_id: perfilOrigemId || '',
