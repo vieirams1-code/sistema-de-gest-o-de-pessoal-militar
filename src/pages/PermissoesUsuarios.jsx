@@ -19,7 +19,9 @@ import {
   isSuperAdmin,
   isLegacyCustomProfile,
   isBasePermissionProfile,
+  extractProfileOriginIdFromDescription,
   mergeProfileDescriptionWithMatrix,
+  mergeProfileOriginIntoDescription,
   resolveProfilePermissions,
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
@@ -67,7 +69,9 @@ const deleteEscopadoEntity = (entityName, id) => {
 const resolveBaseProfileIdFromSource = (profileSource) => {
   if (!profileSource) return '';
   if (isBasePermissionProfile(profileSource)) return profileSource.id || '';
-  return profileSource.perfil_origem_id || '';
+  return profileSource.perfil_origem_id
+    || extractProfileOriginIdFromDescription(profileSource.descricao)
+    || '';
 };
 
 const markProfileAsLegacy = async (profile) => {
@@ -476,7 +480,6 @@ export default function PermissoesUsuarios() {
       const dataToSave = {
         ...baseData,
         ...roleData,
-        permissoes_override: null,
       };
 
       const savedAccess = isNewAcesso
@@ -496,30 +499,31 @@ export default function PermissoesUsuarios() {
       const perfilAtualDoUsuario = reloadedAccess?.perfil_id
         ? (await getProfileWithPermissions(reloadedAccess.perfil_id))
         : null;
-      const perfilAtualEhCustomDoUsuario = isLegacyCustomProfile(perfilAtualDoUsuario)
-        && String(perfilAtualDoUsuario?.usuario_vinculado_id || '') === String(usuarioVinculadoId);
+      // Perfis personalizados antigos não possuem metadados de vínculo no schema.
+      // Se o perfil atualmente atribuído ao usuário já é personalizado, ele é a
+      // fonte correta a ser atualizada — não criamos outra cópia a cada salvamento.
+      const perfilAtualEhCustomDoUsuario = isLegacyCustomProfile(perfilAtualDoUsuario);
 
       let perfilFinal = perfilAtualDoUsuario;
 
       if (possuiAjusteManual) {
-        const perfisPersonalizadosRemotos = await base44.entities.PerfilPermissao.filter({
-          usuario_vinculado_id: usuarioVinculadoId,
-          is_personalizado: true,
-        }, '-updated_date');
-        const perfisPersonalizadosDoUsuario = (perfisPersonalizadosRemotos || perfis)
-          .filter((perfil) => String(perfil.usuario_vinculado_id || '') === String(usuarioVinculadoId))
-          .sort((a, b) => new Date(b.updated_date || b.created_date || 0).getTime() - new Date(a.updated_date || a.created_date || 0).getTime());
-
-        let perfilPersonalizadoSelecionado = perfilAtualEhCustomDoUsuario
+        // Não dependemos mais dos campos is_personalizado/usuario_vinculado_id,
+        // que não existem no schema atual. O perfil personalizado atualmente
+        // atribuído ao UsuarioAcesso é a identidade durável da exceção individual.
+        const perfilPersonalizadoSelecionadoAtual = perfilAtualEhCustomDoUsuario
           ? perfilAtualDoUsuario
-          : (perfisPersonalizadosDoUsuario[0] || null);
+          : null;
 
+        let perfilPersonalizadoSelecionado = perfilPersonalizadoSelecionadoAtual;
+
+        const perfilOrigemDuravel = perfilOrigemId || resolveBaseProfileIdFromSource(perfilAtualDoUsuario) || '';
+        const descricaoComOrigem = mergeProfileOriginIntoDescription(
+          CUSTOM_PROFILE_DESCRIPTION,
+          perfilOrigemDuravel,
+        );
         const payloadPerfilPersonalizado = {
           nome_perfil: `Personalizado - ${userNomeUsuario || reloadedAccess?.nome_usuario || reloadedAccess?.user_email || 'Usuário'}`,
-          descricao: mergeProfileDescriptionWithMatrix(CUSTOM_PROFILE_DESCRIPTION, normalizedPermissions),
-          is_personalizado: true,
-          usuario_vinculado_id: usuarioVinculadoId,
-          perfil_origem_id: perfilOrigemId || resolveBaseProfileIdFromSource(perfilAtualDoUsuario) || null,
+          descricao: mergeProfileDescriptionWithMatrix(descricaoComOrigem, normalizedPermissions),
           ativo: true,
           ...buildPermissionPayload(normalizedPermissions),
         };
@@ -535,12 +539,6 @@ export default function PermissoesUsuarios() {
         }
         if (!perfilPersonalizadoSelecionado?.id) {
           throw new Error('Falha ao criar/atualizar perfil personalizado do usuário.');
-        }
-
-        const perfisDuplicados = perfisPersonalizadosDoUsuario
-          .filter((perfil) => perfil.id && perfil.id !== perfilPersonalizadoSelecionado.id);
-        for (const perfilDuplicado of perfisDuplicados) {
-          await markProfileAsLegacy(perfilDuplicado);
         }
 
         await updateEscopadoEntity('UsuarioAcesso', resolvedRecordId, {
