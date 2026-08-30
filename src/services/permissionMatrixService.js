@@ -98,6 +98,8 @@ export const nestedMatrixKeys = [
 
 export const PROFILE_MATRIX_START_MARKER = '[SGP_PERMISSIONS_MATRIX]';
 export const PROFILE_MATRIX_END_MARKER = '[/SGP_PERMISSIONS_MATRIX]';
+export const PROFILE_ORIGIN_START_MARKER = '[SGP_PROFILE_ORIGIN]';
+export const PROFILE_ORIGIN_END_MARKER = '[/SGP_PROFILE_ORIGIN]';
 
 export const ADMIN_RECOVERY_MODULE_KEYS = [
   'acesso_militares',
@@ -176,6 +178,28 @@ export const mergeProfileDescriptionWithMatrix = (cleanDescricao = '', matrix = 
   const matrixBlock = `${PROFILE_MATRIX_START_MARKER}${serialized}${PROFILE_MATRIX_END_MARKER}`;
 
   return sanitizedDescricao ? `${sanitizedDescricao}\n\n${matrixBlock}` : matrixBlock;
+};
+
+export const extractProfileOriginIdFromDescription = (rawDescricao = '') => {
+  const descricao = typeof rawDescricao === 'string' ? rawDescricao : '';
+  const startIdx = descricao.indexOf(PROFILE_ORIGIN_START_MARKER);
+  const endIdx = descricao.indexOf(PROFILE_ORIGIN_END_MARKER);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return '';
+  return descricao
+    .slice(startIdx + PROFILE_ORIGIN_START_MARKER.length, endIdx)
+    .trim();
+};
+
+export const mergeProfileOriginIntoDescription = (rawDescricao = '', perfilOrigemId = '') => {
+  const descricao = typeof rawDescricao === 'string' ? rawDescricao.trim() : '';
+  const semOrigem = descricao.replace(
+    /\[SGP_PROFILE_ORIGIN\][\s\S]*?\[\/SGP_PROFILE_ORIGIN\]/g,
+    '',
+  ).trim();
+  const origem = String(perfilOrigemId || '').trim();
+  if (!origem) return semOrigem;
+  const bloco = `${PROFILE_ORIGIN_START_MARKER}${origem}${PROFILE_ORIGIN_END_MARKER}`;
+  return semOrigem ? `${semOrigem}\n\n${bloco}` : bloco;
 };
 
 export const extractUserMatrixFromOverrides = (permissoes_override = {}) => {
