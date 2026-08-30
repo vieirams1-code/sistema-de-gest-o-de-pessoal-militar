@@ -70,6 +70,34 @@ export default function PerfisPermissao() {
     () => perfis.filter((perfil) => isLegacyCustomProfile(perfil)),
     [perfis]
   );
+  const auditoriaPerfisPersonalizados = useMemo(() => {
+    const acessoPorPerfil = new Map(
+      (acessosUsuarios || [])
+        .filter((acesso) => acesso?.perfil_id)
+        .map((acesso) => [String(acesso.perfil_id), acesso])
+    );
+
+    const itens = perfisPersonalizados.map((perfil) => {
+      const acesso = acessoPorPerfil.get(String(perfil.id)) || null;
+      return {
+        perfil,
+        acesso,
+        referenciado: Boolean(acesso),
+        usuarioAtivo: acesso?.ativo !== false,
+      };
+    });
+
+    return {
+      itens: itens.sort((a, b) => {
+        if (a.referenciado !== b.referenciado) return a.referenciado ? -1 : 1;
+        return new Date(b.perfil.updated_date || b.perfil.created_date || 0).getTime()
+          - new Date(a.perfil.updated_date || a.perfil.created_date || 0).getTime();
+      }),
+      vinculadosAtivos: itens.filter((item) => item.referenciado && item.usuarioAtivo).length,
+      vinculadosInativos: itens.filter((item) => item.referenciado && !item.usuarioAtivo).length,
+      orfaos: itens.filter((item) => !item.referenciado).length,
+    };
+  }, [perfisPersonalizados, acessosUsuarios]);
   const perfisLegadosOcultos = perfisPersonalizados.length;
 
 
@@ -404,18 +432,47 @@ export default function PerfisPermissao() {
 
         {!showForm && perfisPersonalizados.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-            <div className="p-4 border-b border-slate-100">
-              <h2 className="text-base font-bold text-[#1e3a5f]">Perfis personalizados</h2>
-              <p className="text-xs text-slate-500">Exibidos apenas para auditoria; aplicação manual bloqueada.</p>
+            <div className="p-4 border-b border-slate-100 space-y-3">
+              <div>
+                <h2 className="text-base font-bold text-[#1e3a5f]">Perfis personalizados — auditoria</h2>
+                <p className="text-xs text-slate-500">Diagnóstico somente leitura. A vinculação é determinada pelo perfil_id atualmente salvo em UsuarioAcesso.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                  {auditoriaPerfisPersonalizados.vinculadosAtivos} vinculados a usuários ativos
+                </Badge>
+                {auditoriaPerfisPersonalizados.vinculadosInativos > 0 && (
+                  <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                    {auditoriaPerfisPersonalizados.vinculadosInativos} vinculados a usuários inativos
+                  </Badge>
+                )}
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                  {auditoriaPerfisPersonalizados.orfaos} órfãos legados
+                </Badge>
+              </div>
             </div>
-            <div className="divide-y divide-slate-100">
-              {perfisPersonalizados.slice(0, 20).map((perfil) => (
+            <div className="divide-y divide-slate-100 max-h-[520px] overflow-y-auto">
+              {auditoriaPerfisPersonalizados.itens.map(({ perfil, acesso, referenciado }) => (
                 <div key={perfil.id} className="p-4 text-sm flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-slate-700">{perfil.nome_perfil || 'Perfil personalizado'}</p>
-                    <p className="text-xs text-slate-500">Usuário vinculado: {perfil.usuario_vinculado_id || 'não informado'}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-700 truncate">{perfil.nome_perfil || 'Perfil personalizado'}</p>
+                    {referenciado ? (
+                      <p className="text-xs text-slate-500 truncate">
+                        Vinculado a {acesso.nome_usuario || acesso.user_email || 'usuário'} · {acesso.ativo === false ? 'usuário inativo' : 'usuário ativo'}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-700">Sem referência em UsuarioAcesso — candidato a legado órfão.</p>
+                    )}
+                    <p className="text-[11px] text-slate-400 font-mono truncate">{perfil.id}</p>
                   </div>
-                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">Exclusivo</Badge>
+                  <Badge
+                    variant="outline"
+                    className={referenciado
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'}
+                  >
+                    {referenciado ? 'Em uso' : 'Órfão'}
+                  </Badge>
                 </div>
               ))}
             </div>
