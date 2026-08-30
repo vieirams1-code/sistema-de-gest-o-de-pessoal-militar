@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { atualizarCadastroMilitar } from '../../../base44/functions/utils';
+import { atualizarCadastroMilitar } from '../../../base44/functions/utils.ts';
 import { getPostoGraduacaoOficial } from '../../utils/militarPostoGraduacao';
 
 describe('Sincronização Rafael Stort Zulli', () => {
