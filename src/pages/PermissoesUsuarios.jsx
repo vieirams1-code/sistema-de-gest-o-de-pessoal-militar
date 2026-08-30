@@ -130,6 +130,7 @@ export default function PermissoesUsuarios() {
   const [activeEditTab, setActiveEditTab] = useState('dados');
   const [loadedProfilePermissions, setLoadedProfilePermissions] = useState(null);
   const [selectedProfileSource, setSelectedProfileSource] = useState(null);
+  const [persistedProfileSource, setPersistedProfileSource] = useState(null);
   const [appliedProfileState, setAppliedProfileState] = useState({ id: '', nome: '' });
   const [technicalWarning, setTechnicalWarning] = useState('');
 
@@ -169,10 +170,7 @@ export default function PermissoesUsuarios() {
     return perfis.filter((perfil) => isBasePermissionProfile(perfil));
   }, [perfis]);
 
-  const currentPerfilSelecionado = useMemo(
-    () => (selectedProfileSource || selectedProfilePreview || null),
-    [selectedProfileSource, selectedProfilePreview]
-  );
+  const currentPerfilSelecionado = persistedProfileSource;
   const currentPerfilCustomizado = isLegacyCustomProfile(currentPerfilSelecionado);
   const selectedUserIsSuperAdmin = useMemo(
     () => isSuperAdmin(null, selectedUser),
@@ -302,22 +300,28 @@ export default function PermissoesUsuarios() {
     setTechnicalWarning('');
     const perfilIdOriginal = fullAcesso.perfil_id || '';
     const perfilNomeOriginal = fullAcesso.perfil_nome || '';
-    const perfilCompleto = await getProfileWithPermissions(perfilIdOriginal);
-    const profileSource = perfilCompleto || null;
+    const perfilAtual = await getProfileWithPermissions(perfilIdOriginal);
+    const perfilBaseId = resolveBaseProfileIdFromSource(perfilAtual);
+    const perfilBase = perfilBaseId
+      ? (isBasePermissionProfile(perfilAtual) && perfilAtual?.id === perfilBaseId
+        ? perfilAtual
+        : await getProfileWithPermissions(perfilBaseId))
+      : null;
     const resolvedUserSource = fullAcesso;
 
-    setSelectedProfileId((isBasePermissionProfile(profileSource) ? profileSource?.id : profileSource?.perfil_origem_id) || '_nenhum');
+    setPersistedProfileSource(perfilAtual || null);
+    setSelectedProfileId(perfilBase?.id || '_nenhum');
     setAppliedProfileState({
-      id: (isBasePermissionProfile(profileSource) ? profileSource?.id : profileSource?.perfil_origem_id) || '',
-      nome: (isBasePermissionProfile(profileSource) ? profileSource?.nome_perfil : perfilNomeOriginal) || '',
+      id: perfilBase?.id || '',
+      nome: perfilBase?.nome_perfil || perfilNomeOriginal || '',
     });
-    setSelectedProfileSource(profileSource || null);
+    setSelectedProfileSource(perfilBase || null);
     setLoadedProfilePermissions(
-      profileSource ? resolveProfilePermissions({ profileSource }).permissions : null
+      perfilBase ? resolveProfilePermissions({ profileSource: perfilBase }).permissions : null
     );
     const resolved = await resolveUserPermissions({
       userSource: resolvedUserSource,
-      profileSource: profileSource || {},
+      profileSource: perfilAtual || {},
       preferProfilePermissions: true,
     });
     setUserPermissions(isSuperAdmin(null, resolvedUserSource) ? fullAccessPermissions : resolved.permissions);
@@ -345,6 +349,7 @@ export default function PermissoesUsuarios() {
     setUserPermissions(initialPermissions);
     setLoadedProfilePermissions(null);
     setSelectedProfileSource(null);
+    setPersistedProfileSource(null);
     setTechnicalWarning('');
     setActiveEditTab('dados');
   };
@@ -569,8 +574,9 @@ export default function PermissoesUsuarios() {
         id: reloadedBaseProfile?.id || '',
         nome: reloadedBaseProfile?.nome_perfil || '',
       });
-      setSelectedProfileSource(reloadedProfile || null);
-      setLoadedProfilePermissions(reloadedProfile ? resolveProfilePermissions({ profileSource: reloadedProfile }).permissions : null);
+      setPersistedProfileSource(reloadedProfile || null);
+      setSelectedProfileSource(reloadedBaseProfile || null);
+      setLoadedProfilePermissions(reloadedBaseProfile ? resolveProfilePermissions({ profileSource: reloadedBaseProfile }).permissions : null);
       // O retorno do update pode não refletir integralmente o estado persistido.
       // Recarregamos o UsuarioAcesso após todas as alterações de escopo/perfil para
       // impedir que selectedUser mantenha campos antigos em memória.
@@ -1124,7 +1130,7 @@ export default function PermissoesUsuarios() {
                         </Badge>
                         {currentPerfilCustomizado && (
                           <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
-                            Origem: {currentPerfilSelecionado?.perfil_origem_id || 'não informada'}
+                            Origem: {resolveBaseProfileIdFromSource(currentPerfilSelecionado) || 'não informada'}
                           </Badge>
                         )}
                       </div>
