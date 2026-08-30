@@ -174,6 +174,10 @@ export default function Home() {
   const podeVerAtestados = canAccessModule('atestados') && canAccessAction('visualizar_atestados');
   const podeVerComportamento = canAccessModule('controle_comportamento') && canAccessAction('visualizar_controle_comportamento');
   const podeEditarMilitares = canAccessAction('editar_militares');
+  const podeVerPunicoes = canAccessModule('punicoes') && canAccessAction('visualizar_punicoes');
+  const podeVerMedalhas = canAccessModule('medalhas') && canAccessAction('visualizar_medalhas');
+  const podeVerQuadro = canAccessModule('quadro_operacional') && canAccessAction('visualizar_quadro_operacional');
+  const temPainelOperacional = podeVerFerias || podeVerPublicacoes || podeVerAtestados || podeVerComportamento || podeEditarMilitares;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
@@ -491,7 +495,11 @@ export default function Home() {
               <p className="mt-0.5 text-xs text-slate-400 capitalize">{dataFormatada}</p>
             </div>
             <div className="flex items-center gap-2">
-              {prioridadesImediatas > 0 ? (
+              {!temPainelOperacional ? (
+                <Badge className="bg-slate-100 text-slate-600 border border-slate-200 text-sm px-3 py-1.5">
+                  Visão de consulta
+                </Badge>
+              ) : prioridadesImediatas > 0 ? (
                 <Badge className="bg-red-100 text-red-700 border border-red-200 text-sm px-3 py-1.5">
                   <AlertTriangle className="w-4 h-4 mr-1 inline" />
                   {prioridadesImediatas} prioridade{prioridadesImediatas > 1 ? 's' : ''}
@@ -513,24 +521,31 @@ export default function Home() {
             color="bg-[#1e3a5f]/10 text-[#1e3a5f]"
             onClick={() => navigate(createPageUrl('Militares'))}
           />
-          <StatCard
-            icon={CalendarClock} value={afastamentosParciais} label="Afastamentos na prévia"
-            color="bg-amber-100 text-amber-700"
-            onClick={() => setAfastamentosPanelOpen(true)}
-          />
-          <StatCard
-            icon={Stethoscope} value={jisosProximos7Dias.length} label="JISO nos próximos 7 dias"
-            color="bg-blue-100 text-blue-700"
-            onClick={() => navigate(createPageUrl('AgendarJISO'))}
-          />
-          <StatCard
-            icon={Calendar} value={periodosAlerta.length} label="Férias com prazo em até 180 dias"
-            color="bg-orange-100 text-orange-700"
-            onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
-          />
+          {(podeVerAtestados || podeVerPublicacoes) && (
+            <StatCard
+              icon={CalendarClock} value={afastamentosParciais} label="Afastamentos na prévia"
+              color="bg-amber-100 text-amber-700"
+              onClick={() => setAfastamentosPanelOpen(true)}
+            />
+          )}
+          {podeVerAtestados && (
+            <StatCard
+              icon={Stethoscope} value={jisosProximos7Dias.length} label="JISO nos próximos 7 dias"
+              color="bg-blue-100 text-blue-700"
+              onClick={() => navigate(createPageUrl('AgendarJISO'))}
+            />
+          )}
+          {podeVerFerias && (
+            <StatCard
+              icon={Calendar} value={periodosAlerta.length} label="Férias com prazo em até 180 dias"
+              color="bg-orange-100 text-orange-700"
+              onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
+            />
+          )}
         </div>
 
         {/* Central de prioridades */}
+        {temPainelOperacional && (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -540,7 +555,7 @@ export default function Home() {
             <span className="text-xs font-medium text-slate-400">Atualizado com os dados carregados do seu escopo</span>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <PriorityCard
+            {podeVerFerias && <PriorityCard
               icon={Calendar}
               title="Férias críticas"
               value={feriasCriticas.length}
@@ -548,8 +563,8 @@ export default function Home() {
               tone={feriasCriticas.length ? 'red' : 'emerald'}
               actionLabel="Ver períodos"
               onAction={() => navigate(createPageUrl('PeriodosAquisitivos'))}
-            />
-            <PriorityCard
+            />}
+            {podeVerPublicacoes && <PriorityCard
               icon={FileText}
               title="Publicações prioritárias"
               value={publicacoesUrgentes.length}
@@ -557,8 +572,8 @@ export default function Home() {
               tone={publicacoesUrgentes.length ? 'amber' : 'emerald'}
               actionLabel="Abrir publicações"
               onAction={() => navigate(createPageUrl('Publicacoes'))}
-            />
-            <PriorityCard
+            />}
+            {podeVerAtestados && <PriorityCard
               icon={Stethoscope}
               title="JISO próxima"
               value={jisosProximos7Dias.length}
@@ -566,8 +581,8 @@ export default function Home() {
               tone={jisosProximos7Dias.length ? 'blue' : 'emerald'}
               actionLabel="Ver agenda"
               onAction={() => navigate(createPageUrl('AgendarJISO'))}
-            />
-            <PriorityCard
+            />}
+            {podeEditarMilitares && <PriorityCard
               icon={AlertTriangle}
               title="Cadastro incompleto"
               value={inconsistenciasCadastrais.length}
@@ -575,11 +590,12 @@ export default function Home() {
               tone={inconsistenciasCadastrais.length ? 'amber' : 'emerald'}
               actionLabel="Revisar abaixo"
               onAction={() => document.getElementById('dashboard-inconsistencias')?.scrollIntoView({ behavior: 'smooth' })}
-            />
+            />}
           </div>
         </div>
+        )}
 
-        <div className="mb-6">
+        {(podeVerAtestados || podeVerPublicacoes) && <div className="mb-6">
           {afastamentosPanelOpen ? (
             <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
           ) : (
@@ -588,7 +604,7 @@ export default function Home() {
               onOpen={() => setAfastamentosPanelOpen(true)}
             />
           )}
-        </div>
+        </div>}
 
         {isAdmin && (
           <div className="mb-8">
@@ -693,7 +709,7 @@ export default function Home() {
               </div>
             )}
 
-            {inconsistenciasCadastrais.length > 0 && (
+            {podeEditarMilitares && inconsistenciasCadastrais.length > 0 && (
               <div id="dashboard-inconsistencias" className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -723,7 +739,7 @@ export default function Home() {
             )}
 
             {/* Próximas datas de JISO */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            {podeVerAtestados && <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-blue-500" />
@@ -761,10 +777,10 @@ export default function Home() {
                   })}
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Estado limpo */}
-            {totalAlertas === 0 && (
+            {temPainelOperacional && totalAlertas === 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
                 <CheckCircle className="w-12 h-12 text-green-400 mb-3" />
                 <h2 className="font-semibold text-slate-700 text-lg">Tudo em dia!</h2>
@@ -774,7 +790,7 @@ export default function Home() {
           </div>
 
           {/* Atividade Recente */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          {podeVerPublicacoes && <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-5 h-5 text-[#1e3a5f]" />
               <h2 className="font-semibold text-slate-800">Atividade Recente</h2>
@@ -807,21 +823,21 @@ export default function Home() {
             <Button variant="ghost" size="sm" className="w-full mt-4 text-[#1e3a5f]" onClick={() => navigate(createPageUrl('Livro'))}>
               Ver Livro completo <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
-          </div>
+          </div>}
         </div>
 
         {/* Atalhos Rápidos */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-[#1e3a5f] mb-4">Atalhos Rápidos</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            <ShortcutButton icon={Users}         label="Efetivo"       to="Militares"              navigate={navigate} />
-            <ShortcutButton icon={BookOpen}      label="Livro"         to="Livro"                  navigate={navigate} />
-            <ShortcutButton icon={Calendar}      label="Férias"        to="Ferias"                 navigate={navigate} />
-            <ShortcutButton icon={FileText}      label="Publicações"   to="Publicacoes"            navigate={navigate} />
-            <ShortcutButton icon={Stethoscope}   label="Atestados"     to="Atestados"              navigate={navigate} />
-            <ShortcutButton icon={Gavel}         label="Punições"      to="Punicoes"               navigate={navigate} />
-            <ShortcutButton icon={Award}         label="Medalhas"      to="Medalhas"               navigate={navigate} />
-            <ShortcutButton icon={ClipboardList} label="Qd. Operac."   to="QuadroOperacional"      navigate={navigate} />
+            {podeVerMilitares && <ShortcutButton icon={Users} label="Efetivo" to="Militares" navigate={navigate} />}
+            {podeVerPublicacoes && <ShortcutButton icon={BookOpen} label="Livro" to="Livro" navigate={navigate} />}
+            {podeVerFerias && <ShortcutButton icon={Calendar} label="Férias" to="Ferias" navigate={navigate} />}
+            {podeVerPublicacoes && <ShortcutButton icon={FileText} label="Publicações" to="Publicacoes" navigate={navigate} />}
+            {podeVerAtestados && <ShortcutButton icon={Stethoscope} label="Atestados" to="Atestados" navigate={navigate} />}
+            {podeVerPunicoes && <ShortcutButton icon={Gavel} label="Punições" to="Punicoes" navigate={navigate} />}
+            {podeVerMedalhas && <ShortcutButton icon={Award} label="Medalhas" to="Medalhas" navigate={navigate} />}
+            {podeVerQuadro && <ShortcutButton icon={ClipboardList} label="Qd. Operac." to="QuadroOperacional" navigate={navigate} />}
           </div>
         </div>
 
