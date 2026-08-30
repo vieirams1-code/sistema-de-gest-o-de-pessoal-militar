@@ -2,12 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Users, Award, Shield, AlertTriangle, Calendar, Star,
+  Users, Award, AlertTriangle, Calendar, Star,
   FileText, BookOpen, ClipboardList, Gavel, Activity,
   ChevronRight, Clock, CheckCircle, Stethoscope, CalendarClock
 } from 'lucide-react';
@@ -156,7 +155,6 @@ function PriorityCard({ icon: Icon, title, value, description, tone = 'slate', a
 export default function Home() {
   const navigate = useNavigate();
   const [afastamentosPanelOpen, setAfastamentosPanelOpen] = React.useState(false);
-  const punicaoEntity = getPunicaoEntity();
   const {
     isAdmin,
     modoAcesso,
@@ -276,48 +274,6 @@ export default function Home() {
         return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
       } catch (_error) {
         const lista = await base44.entities.Atestado.list();
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
-    },
-    enabled: dashboardEnabled,
-  });
-
-  const { data: punicoes = [] } = useQuery({
-    queryKey: ['punicoes-ativas', scopeKey],
-    queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return punicaoEntity.list();
-      }
-      if (!scopedIds?.length) return [];
-      try {
-        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
-        const listaEscopo = await punicaoEntity.filter({
-          militar_id: { in: scopedIds },
-        });
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await punicaoEntity.list();
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
-    },
-    enabled: dashboardEnabled,
-  });
-
-  const { data: armamentos = [] } = useQuery({
-    queryKey: ['armamentos', scopeKey],
-    queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return base44.entities.Armamento.list();
-      }
-      if (!scopedIds?.length) return [];
-      try {
-        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
-        const listaEscopo = await base44.entities.Armamento.filter({
-          militar_id: { in: scopedIds },
-        });
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await base44.entities.Armamento.list();
         return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
       }
     },
@@ -457,8 +413,6 @@ export default function Home() {
     };
   }).sort((a, b) => a.diasRestantes - b.diasRestantes);
 
-  const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
-  const punicoesAtivas = punicoes.filter(p => p.status_punicao === 'Ativa' || p.status_punicao === 'Em Curso');
   const publicacoesUrgentes = React.useMemo(() => {
     return [...publicacoesExOfficio, ...registrosLivro]
       .filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
@@ -731,7 +685,7 @@ export default function Home() {
             )}
 
             {inconsistenciasCadastrais.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div id="dashboard-inconsistencias" className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-rose-500" />
