@@ -67,7 +67,11 @@ export default function PerfisPermissao() {
     [perfis]
   );
   const perfisPersonalizados = useMemo(
-    () => perfis.filter((perfil) => isLegacyCustomProfile(perfil)),
+    () => perfis.filter((perfil) => isLegacyCustomProfile(perfil) && perfil.ativo !== false),
+    [perfis]
+  );
+  const perfisPersonalizadosArquivados = useMemo(
+    () => perfis.filter((perfil) => isLegacyCustomProfile(perfil) && perfil.ativo === false),
     [perfis]
   );
   const auditoriaPerfisPersonalizados = useMemo(() => {
@@ -476,6 +480,12 @@ export default function PerfisPermissao() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {!showForm && perfisPersonalizadosArquivados.length > 0 && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <strong>{perfisPersonalizadosArquivados.length}</strong> perfis personalizados legados foram arquivados no saneamento e não participam mais da atribuição de permissões.
           </div>
         )}
 
