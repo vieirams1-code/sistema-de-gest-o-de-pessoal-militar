@@ -790,9 +790,9 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const salvarDataJiso = async () => {
     if (!permiteEditarDataJiso || savingJisoDate) return;
-    // Revalidação explícita: editar data JISO exige permissão de gerir JISO
-    if (!canAccessAction('gerir_jiso') && !canAccessAction('registrar_decisao_jiso')) {
-      alert('Ação negada: você não tem permissão para editar a data da JISO.');
+    // Revalidação explícita: agendamento é uma operação de gestão da JISO.
+    if (!canAccessAction('gerir_jiso')) {
+      alert('Ação negada: você não tem permissão para gerir o agendamento da JISO.');
       return;
     }
 
