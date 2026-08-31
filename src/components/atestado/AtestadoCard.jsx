@@ -12,7 +12,8 @@ import {
   MessageCircle,
   Send,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CalendarDays
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -811,7 +812,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             </div>
           )}
 
-          <div className={`${expanded ? 'grid' : 'hidden'} grid-cols-3 gap-2 mt-2.5 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5`}>
+          <div className={`${expanded && !embedded ? 'grid' : 'hidden'} grid-cols-3 gap-2 mt-2.5 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5`}>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Período</p>
               <p className="text-xs font-semibold text-slate-700 mt-0.5">{formatDate(atestado.data_inicio)}</p>
@@ -829,7 +830,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             </div>
           </div>
 
-          {isFluxoJiso && (
+          {isFluxoJiso && !embedded && (
             <div className={`${expanded ? 'block' : 'hidden'} mt-2.5 rounded-lg border px-3 py-2.5 ${jisoDate ? 'border-purple-100 bg-purple-50/60' : 'border-amber-200 bg-amber-50'}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -887,7 +888,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           )}
         </div>
 
-        <div className={`${expanded ? 'flex' : 'hidden'} px-3 py-2 border-t border-slate-100 bg-slate-50/70 items-center justify-between gap-2`}>
+        <div className={`${expanded && !embedded ? 'flex' : 'hidden'} px-3 py-2 border-t border-slate-100 bg-slate-50/70 items-center justify-between gap-2`}>
           <button type="button" onClick={() => onView(atestado)} className="text-xs font-medium text-[#1e3a5f] hover:underline">
             Ver detalhes
           </button>
