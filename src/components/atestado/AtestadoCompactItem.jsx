@@ -126,6 +126,8 @@ export default function AtestadoCompactItem({
             onView={onView}
             canEdit={canEdit}
             canDelete={canDelete}
+            embedded
+            defaultExpanded
           />
         </div>
       )}
