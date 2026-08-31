@@ -41,7 +41,7 @@ export default function EditarJISO() {
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, user } = useCurrentUser();
   const { validar: validarEscopoMilitar, podeAgirSobre, isReady: isScopeReady } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
-  const canGerirJiso = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
+  const canRegistrarDecisaoJiso = canAccessAction('registrar_decisao_jiso');
 
   const [formData, setFormData] = useState({
     data_jiso: '',
@@ -166,8 +166,8 @@ export default function EditarJISO() {
     e.preventDefault();
     
     // Rechecagem defensiva de permissão
-    if (!canGerirJiso) {
-      alert('Acesso negado: permissão insuficiente para registrar decisão JISO.');
+    if (!canRegistrarDecisaoJiso) {
+      alert('Acesso negado: você não tem permissão para registrar decisão JISO.');
       return;
     }
 
@@ -251,7 +251,7 @@ export default function EditarJISO() {
   if (loadingUser || !isAccessResolved || !isScopeReady) {
     return null;
   }
-  if (!hasAtestadosAccess || !canGerirJiso) {
+  if (!hasAtestadosAccess || !canRegistrarDecisaoJiso) {
     return <AccessDenied modulo="JISO / Atestados" />;
   }
 
