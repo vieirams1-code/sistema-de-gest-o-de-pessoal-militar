@@ -64,6 +64,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const { canAccessAction, user } = useCurrentUser();
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const canManageJiso = canAccessAction('gerir_jiso');
+  const canRegisterJisoDecision = canAccessAction('registrar_decisao_jiso');
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [jisoTime, setJisoTime] = useState(atestado.hora_jiso_agendada || '');
