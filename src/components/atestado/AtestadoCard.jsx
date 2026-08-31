@@ -10,7 +10,9 @@ import {
   Save,
   RefreshCw,
   MessageCircle,
-  Send
+  Send,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const [savingPublicacao, setSavingPublicacao] = useState(false);
   const [uploadingAtaJiso, setUploadingAtaJiso] = useState(false);
   const [arquivoAtaJisoNome, setArquivoAtaJisoNome] = useState('');
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     setJisoDate(atestado.data_jiso_agendada || '');
