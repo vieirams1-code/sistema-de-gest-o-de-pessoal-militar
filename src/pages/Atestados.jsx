@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
-import AtestadoCard from '@/components/atestado/AtestadoCard';
+import AtestadoCompactItem from '@/components/atestado/AtestadoCompactItem';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -347,9 +347,9 @@ export default function Atestados() {
                     <p className="text-slate-500">{hasFilters ? 'Nenhum atestado vigente com esses filtros' : 'Nenhum atestado vigente no momento'}</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-2">
                     {vigentes.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
+                      <AtestadoCompactItem key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 )
@@ -377,9 +377,9 @@ export default function Atestados() {
                     <p className="text-slate-400">Nenhum atestado encerrado</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-2">
                     {finalizados.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
+                      <AtestadoCompactItem key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 )
