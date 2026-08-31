@@ -19,6 +19,10 @@ const perfis = read('../../../pages/PerfisPermissao.jsx');
 const permissoesUsuarios = read('../../../pages/PermissoesUsuarios.jsx');
 const atestados = read('../../../pages/Atestados.jsx');
 const permissionStructure = read('../../../config/permissionStructure.js');
+const agendarJiso = read('../../../pages/AgendarJISO.jsx');
+const editarJiso = read('../../../pages/EditarJISO.jsx');
+const centralAtestado = read('../../central-pendencias/CentralPendenciaAtestadoModal.jsx');
+const quadroCard = read('../../quadro/CardDetalheModal.jsx');
 
 test('criação de publicação depende somente de adicionar_publicacoes', () => {
   assert.match(publicacoes, /const canCriarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
@@ -82,4 +86,22 @@ test('Atestados possui uma única permissão canônica de exclusão', () => {
   assert.match(atestados, /const canExcluirAtestado = canAccessAction\('excluir_atestado'\);/);
   assert.doesNotMatch(permissionStructure, /perm_excluir_atestados/);
   assert.match(permissionStructure, /perm_excluir_atestado/);
+});
+
+test('JISO separa gestão administrativa de registro da decisão', () => {
+  assert.match(agendarJiso, /const canViewJisoAgenda = canAccessAction\('gerir_jiso'\) \|\| canAccessAction\('registrar_decisao_jiso'\);/);
+  assert.match(editarJiso, /const canRegistrarDecisaoJiso = canAccessAction\('registrar_decisao_jiso'\);/);
+  assert.doesNotMatch(editarJiso, /canAccessAction\('gerir_jiso'\) \|\| canAccessAction\('registrar_decisao_jiso'\)/);
+  assert.match(centralAtestado, /&& canAccessAction\('gerir_jiso'\)/);
+  assert.match(quadroCard, /permiteEditarDataJiso = !!vinculoAtestado\?\.referencia_id && canAccessAction\('gerir_jiso'\)/);
+  assert.match(backendCud, /requiredPermission = 'registrar_decisao_jiso';\s*allowed = targetPerms\.actions\?\.\['registrar_decisao_jiso'\] === true;/s);
+  assert.doesNotMatch(backendCud, /registrar_decisao_jiso ou gerir_jiso/);
+});
+
+test('ações JISO independentes conseguem persistir apenas seus próprios reflexos', () => {
+  assert.match(backendCud, /const camposGestaoJiso = new Set\(\['necessita_jiso', 'status_jiso', 'data_jiso_agendada', 'hora_jiso_agendada'\]\);/);
+  assert.match(backendCud, /requiredPermission = 'gerir_jiso';\s*allowed = targetPerms\.actions\?\.\['gerir_jiso'\] === true;/s);
+  assert.match(backendCud, /const camposDecisaoJiso = new Set\(\['dias_original', 'dias_jiso', 'data_termino_jiso', 'data_retorno_jiso', 'jiso_id'\]\);/);
+  assert.match(backendCud, /if \(tipoPublicacao === 'Ata JISO'\) requiredPermission = 'publicar_ata_jiso';/);
+  assert.match(backendCud, /if \(tipoPublicacao === 'Homologação de Atestado'\) requiredPermission = 'publicar_homologacao';/);
 });
