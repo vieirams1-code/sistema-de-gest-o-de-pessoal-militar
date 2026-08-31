@@ -50,7 +50,7 @@ const statusColors = {
   'Prorrogado': 'bg-blue-100 text-blue-700 border-blue-200'
 };
 
-export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
+export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEdit = true, canDelete = true, embedded = false, defaultExpanded = false }) {
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
   // edit_mode = hibrido
@@ -77,6 +77,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const [savingPublicacao, setSavingPublicacao] = useState(false);
   const [uploadingAtaJiso, setUploadingAtaJiso] = useState(false);
   const [arquivoAtaJisoNome, setArquivoAtaJisoNome] = useState('');
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
     setJisoDate(atestado.data_jiso_agendada || '');
@@ -626,9 +627,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       animate={{ opacity: 1, y: 0 }}
       className="contents"
     >
-      <article className="bg-white rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors overflow-hidden">
+      <article className={embedded ? 'bg-transparent overflow-hidden' : 'bg-white rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors overflow-hidden'}>
         <div className="px-3 py-2.5">
-          <div className="flex items-start justify-between gap-3">
+          <div className={`${embedded ? 'hidden' : 'flex'} items-start justify-between gap-3`}>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
@@ -680,7 +681,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          <div className={`${embedded ? 'hidden' : 'flex'} flex-wrap items-center gap-1.5 mt-1.5`}>
             <Badge className={`${statusColors[atestado.status] || statusColors['Ativo']} border text-[10px] px-2 py-0.5`}>
               {atestado.status || 'Ativo'}
             </Badge>
