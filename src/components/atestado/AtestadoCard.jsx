@@ -64,6 +64,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const queryClient = useQueryClient();
   const { canAccessAction, user } = useCurrentUser();
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
+  const canManageJiso = canAccessAction('gerir_jiso');
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [jisoTime, setJisoTime] = useState(atestado.hora_jiso_agendada || '');
@@ -444,8 +445,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return false;
     }
     if (savingJiso) return false;
-    if (!canAccessAction('registrar_decisao_jiso')) {
-      alert('Ação negada: você não tem permissão para agendar/registrar JISO.');
+    if (!canManageJiso) {
+      alert('Ação negada: você não tem permissão para gerir o agendamento da JISO.');
       return false;
     }
     setSavingJiso(true);
