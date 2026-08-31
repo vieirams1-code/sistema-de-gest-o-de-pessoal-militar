@@ -16,9 +16,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp, List, LayoutGrid } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCompactItem from '@/components/atestado/AtestadoCompactItem';
+import AtestadoCard from '@/components/atestado/AtestadoCard';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -76,6 +77,7 @@ export default function Atestados() {
   const [vigentesCollapsed, setVigentesCollapsed] = useState(false);
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
   const [verificandoEdicao, setVerificandoEdicao] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
 
   const { data: atestadosBundle, isLoading } = useQuery({
     queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
@@ -235,11 +237,33 @@ export default function Atestados() {
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Atestados Médicos</h1>
             <p className="text-slate-500">Controle de afastamentos e atestados</p>
           </div>
-          {canAdicionarAtestado && (
-            <Button onClick={() => navigate(createPageUrl('CadastrarAtestado'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-              <Plus className="w-5 h-5 mr-2" />Novo Atestado
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-1" aria-label="Modo de visualização">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setViewMode('list')}
+                className={`h-8 px-2.5 text-xs ${viewMode === 'list' ? 'bg-white text-[#1e3a5f] shadow-sm hover:bg-white' : 'text-slate-500'}`}
+              >
+                <List className="w-4 h-4 mr-1.5" /> Lista
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setViewMode('cards')}
+                className={`h-8 px-2.5 text-xs ${viewMode === 'cards' ? 'bg-white text-[#1e3a5f] shadow-sm hover:bg-white' : 'text-slate-500'}`}
+              >
+                <LayoutGrid className="w-4 h-4 mr-1.5" /> Cards
+              </Button>
+            </div>
+            {canAdicionarAtestado && (
+              <Button onClick={() => navigate(createPageUrl('CadastrarAtestado'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                <Plus className="w-5 h-5 mr-2" />Novo Atestado
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stats */}
