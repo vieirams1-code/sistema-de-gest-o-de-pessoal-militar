@@ -228,9 +228,9 @@ export default function Atestados() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
           <div>
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Atestados Médicos</h1>
             <p className="text-slate-500">Controle de afastamentos e atestados</p>
@@ -243,14 +243,14 @@ export default function Atestados() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {[
             { label: 'Total', value: stats.total, icon: FileText, color: 'text-[#1e3a5f]', bg: 'bg-[#1e3a5f]/10' },
             { label: 'Ativos', value: stats.ativos, icon: FileText, color: 'text-emerald-600', bg: 'bg-emerald-100' },
             { label: 'Retorno em 7 dias', value: stats.retornoProximo, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-100' },
             { label: 'Atrasados', value: stats.atrasados, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100' },
           ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <div key={s.label} className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center`}>
                   <s.icon className={`w-5 h-5 ${s.color}`} />
@@ -265,7 +265,7 @@ export default function Atestados() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-3 mb-5">
           <div className="flex flex-col md:flex-row gap-3 flex-wrap">
             <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -322,7 +322,7 @@ export default function Atestados() {
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* Grupo: Vigentes */}
             <div>
               <div className="flex items-center justify-between gap-3 mb-4">
