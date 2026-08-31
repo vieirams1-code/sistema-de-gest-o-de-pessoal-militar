@@ -1193,13 +1193,70 @@ Deno.serve(async (req) => {
         let allowed = false;
         let requiredPermission = null;
         if (operation === 'create' || operation === 'update') {
-          requiredPermission = 'registrar_decisao_jiso ou gerir_jiso';
-          allowed = targetPerms.actions?.['registrar_decisao_jiso'] === true || targetPerms.actions?.['gerir_jiso'] === true;
+          requiredPermission = 'registrar_decisao_jiso';
+          allowed = targetPerms.actions?.['registrar_decisao_jiso'] === true;
         } else if (operation === 'delete') {
           requiredPermission = 'gerir_jiso';
           allowed = targetPerms.actions?.['gerir_jiso'] === true;
         }
         if (!allowed) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'Atestado' && operation === 'update') {
+        const chaves = Object.keys(data || {});
+        const apenas = (permitidas) => chaves.length > 0 && chaves.every((chave) => permitidas.has(chave));
+
+        const camposGestaoJiso = new Set(['necessita_jiso', 'status_jiso', 'data_jiso_agendada', 'hora_jiso_agendada']);
+        const statusGestaoPermitidos = new Set(['Aguardando JISO', 'Em análise']);
+        const ehGestaoJiso = apenas(camposGestaoJiso)
+          && (data?.necessita_jiso === undefined || data?.necessita_jiso === true)
+          && (data?.status_jiso === undefined || statusGestaoPermitidos.has(String(data.status_jiso)));
+
+        const camposDecisaoJiso = new Set(['dias_original', 'dias_jiso', 'data_termino_jiso', 'data_retorno_jiso', 'jiso_id']);
+        const ehReflexoDecisaoJiso = apenas(camposDecisaoJiso);
+
+        const camposAtaJiso = new Set(['status_jiso', 'status_publicacao', 'arquivo_ata_jiso']);
+        const ehPublicacaoAtaJiso = apenas(camposAtaJiso)
+          && data?.status_jiso === 'Homologado pela JISO';
+
+        const camposHomologacao = new Set(['homologado_comandante', 'status_jiso', 'status_publicacao']);
+        const ehPublicacaoHomologacao = apenas(camposHomologacao)
+          && data?.homologado_comandante === true
+          && data?.status_jiso === 'Homologado pelo Comandante';
+
+        let allowed = false;
+        let requiredPermission = 'editar_atestados';
+        if (ehGestaoJiso) {
+          requiredPermission = 'gerir_jiso';
+          allowed = targetPerms.actions?.['gerir_jiso'] === true;
+        } else if (ehReflexoDecisaoJiso) {
+          requiredPermission = 'registrar_decisao_jiso';
+          allowed = targetPerms.actions?.['registrar_decisao_jiso'] === true;
+        } else if (ehPublicacaoAtaJiso) {
+          requiredPermission = 'publicar_ata_jiso';
+          allowed = targetPerms.actions?.['publicar_ata_jiso'] === true;
+        } else if (ehPublicacaoHomologacao) {
+          requiredPermission = 'publicar_homologacao';
+          allowed = targetPerms.actions?.['publicar_homologacao'] === true;
+        } else {
+          allowed = targetPerms.actions?.['editar_atestados'] === true;
+        }
+
+        if (!allowed) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'PublicacaoExOfficio' && operation === 'create') {
+        const tipoPublicacao = String(data?.tipo || '').trim();
+        let requiredPermission = 'adicionar_publicacoes';
+        if (tipoPublicacao === 'Ata JISO') requiredPermission = 'publicar_ata_jiso';
+        if (tipoPublicacao === 'Homologação de Atestado') requiredPermission = 'publicar_homologacao';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
           return Response.json(
             { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
             { status: 403 },
