@@ -20,6 +20,7 @@ export default function AgendarJISO() {
   const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
+  const canViewJisoAgenda = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
   const isAccessPending = loadingUser || !isAccessResolved;
 
 
@@ -70,8 +71,8 @@ export default function AgendarJISO() {
     return null;
   }
 
-  if (!hasAtestadosAccess) {
-    return <AccessDenied modulo="Atestados" />;
+  if (!hasAtestadosAccess || !canViewJisoAgenda) {
+    return <AccessDenied modulo="JISO / Atestados" />;
   }
 
   return (
