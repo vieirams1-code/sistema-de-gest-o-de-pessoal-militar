@@ -698,7 +698,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   }, [card.id, card.prioridade, card.tipo, card.etiqueta_texto, card.etiqueta_cor]);
 
   const vinculoAtestado = useMemo(() => obterVinculoAtestado(vinculos), [vinculos]);
-  const permiteEditarDataJiso = !!vinculoAtestado?.referencia_id;
+  const permiteEditarDataJiso = !!vinculoAtestado?.referencia_id && canAccessAction('gerir_jiso');
 
   const { data: atestadoVinculado } = useQuery({
     queryKey: ['atestado', vinculoAtestado?.referencia_id],
