@@ -100,7 +100,7 @@ export default function AtestadoCompactItem({
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') setExpanded((value) => !value);
         }}
-        className="grid grid-cols-1 lg:grid-cols-[32px_minmax(250px,1.55fr)_minmax(205px,1fr)_70px_minmax(180px,0.95fr)_150px] items-center gap-2 lg:gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+        className="grid grid-cols-1 lg:grid-cols-[32px_minmax(280px,1.45fr)_minmax(250px,1.15fr)_minmax(220px,1fr)_150px] items-center gap-2 lg:gap-3 px-3 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
       >
         <div className="hidden lg:flex items-center justify-center text-slate-400">
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -119,18 +119,11 @@ export default function AtestadoCompactItem({
         <div className="min-w-0 flex items-center gap-2">
           <CalendarDays className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <div className="min-w-0">
-            <p className="text-xs font-medium text-slate-800 truncate">
-              {formatDate(atestado?.data_inicio)} → {formatDate(periodoFinal)}
-            </p>
+            <p className="text-sm font-semibold text-slate-800 truncate">{atestado?.dias || 0} dias</p>
             <p className="text-[11px] text-slate-500 truncate">
-              Retorno: {formatDate(atestado?.data_retorno)}
+              {formatDate(atestado?.data_inicio)} à {formatDate(periodoFinal)}
             </p>
           </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-slate-800">{atestado?.dias || 0}</p>
-          <p className="text-[10px] text-slate-400">dias</p>
         </div>
 
         <div className="min-w-0 flex flex-wrap items-center gap-1.5">
