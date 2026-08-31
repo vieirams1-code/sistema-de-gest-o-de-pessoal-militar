@@ -641,247 +641,161 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 flex flex-col h-full overflow-hidden"
+      className="contents"
     >
-      <div className="p-5 pb-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="bg-slate-100 p-2.5 rounded-full flex items-center justify-center h-12 w-12 text-slate-600 flex-shrink-0">
-              <FileText className="w-5 h-5" />
-            </div>
+      <article className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <div className="px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h3 className="font-bold text-gray-900 text-[17px] leading-tight mb-0.5 truncate">
-                {atestado.militar_posto && `${atestado.militar_posto} `}
-                {atestado.militar_nome}
-              </h3>
-              {(matriculaOperacional || atestado.militar_matricula) && (
-                <p className="text-gray-500 text-sm flex items-center gap-1.5">
-                  {atestado.militar_posto || 'Militar'} <span className="w-1 h-1 bg-gray-300 rounded-full" /> Mat: {matriculaOperacional || '—'}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <AtestadoActionsMenu
-            atestado={atestado}
-            handlers={{
-              onView,
-              onEdit,
-              onDelete,
-              onOpenHomologacao: handleOpenHomologacao,
-              onOpenAtaJiso: handleOpenAtaJiso,
-              onOpenJisoModal: () => setShowJisoModal(true),
-            }}
-            permissoes={{ canEdit, canDelete }}
-            estados={{
-              hasPublicacaoVinculada,
-              mensagemBloqueioPublicacao,
-              podePublicarHomologacao,
-              hasHomologacaoAtiva,
-              isFluxoJiso,
-              statusDocumentalAtaJiso,
-              bloquearEdicaoPublicacaoNoCard: true,
-            }}
-            publicacoesVinculadas={publicacoesVinculadas}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 mb-5">
-          <Badge className={`${statusColors[atestado.status] || statusColors['Ativo']} border`}>
-            {atestado.status || 'Ativo'}
-          </Badge>
-          {atestado.tipo_afastamento && (
-            <Badge className="bg-blue-100 text-blue-700">{atestado.tipo_afastamento}</Badge>
-          )}
-          {isFluxoJiso && (
-            <Badge className={`flex items-center gap-1 ${
-              atestado.status_jiso === 'Homologado pela JISO'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-purple-100 text-purple-700'
-            }`}>
-              <Shield className="w-3 h-3" />
-              {atestado.status_jiso === 'Homologado pela JISO' ? 'JISO Homologado' : 'Aguardando JISO'}
-            </Badge>
-          )}
-          {isFluxoJiso && (
-            <Badge className="bg-indigo-100 text-indigo-700 truncate max-w-full" title={statusDocumentalAtaJiso.texto}>
-              {statusDocumentalAtaJiso.texto}
-            </Badge>
-          )}
-          {atestado.status_jiso === 'Homologado pelo Comandante' && (
-            <Badge className="bg-blue-100 text-blue-700 flex items-center gap-1">
-              <Shield className="w-3 h-3" />
-              Homologado Cmt
-            </Badge>
-          )}
-          {atestado.acompanhado && (
-            <Badge variant="outline" className="border-pink-200 text-pink-700">
-              Acompanhamento
-            </Badge>
-          )}
-        </div>
-
-        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 mb-4">
-          <div className="flex flex-wrap justify-between text-xs font-medium mb-2 gap-2">
-            <span className="text-slate-500">Início: {formatDate(atestado.data_inicio)}</span>
-            {statusInfo && (
-              <span className={`px-2 py-0.5 rounded-full flex items-center gap-1 ${statusInfo.color} ${statusInfo.bgColor}`}>
-                <statusInfo.icon className="w-3 h-3" /> {statusInfo.text}
-              </span>
-            )}
-            <span className="text-slate-700">Retorno: {formatDate(atestado.data_retorno)}</span>
-          </div>
-          <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1">
-            <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${progressPercent}%` }} />
-          </div>
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>{atestado.dias || 0} dias de afastamento</span>
-            {atestado.cid_10 && <span>CID-10: {canViewSensitive ? atestado.cid_10 : "Restrito"}</span>}
-          </div>
-        </div>
-
-        {isFluxoJiso && !jisoDate && !editingJiso && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2.5 mb-4">
-            <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <p className="text-amber-900 font-semibold text-sm leading-tight mb-1">JISO não agendada</p>
-              <p className="text-amber-700 text-xs">É necessário definir a data e o horário da junta.</p>
-            </div>
-            <button
-              onClick={() => {
-                setJisoDate(atestado.data_jiso_agendada || '');
-                setJisoTime(atestado.hora_jiso_agendada || '');
-                setEditingJiso(true);
-              }}
-              className="text-amber-700 font-bold text-xs uppercase hover:bg-amber-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
-            >
-              Agendar
-            </button>
-          </div>
-        )}
-
-        {isFluxoJiso && (editingJiso || jisoDate) && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
-              </div>
-              {whatsappJisoStatus === 'enviado' && (
-                <Badge className="bg-green-100 text-green-700 border border-green-200 flex items-center gap-1" title={`Último envio por ${whatsappJisoEnviadoPor || 'usuário não identificado'}`}>
-                  <CheckCircle className="w-3 h-3" />
-                  WhatsApp enviado
-                </Badge>
-              )}
-              {whatsappJisoStatus === 'pendente' && (
-                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  WhatsApp pendente
-                </Badge>
-              )}
-              {whatsappJisoStatus === 'reenviar' && (
-                <Badge className="bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" />
-                  Reenvio necessário
-                </Badge>
-              )}
-              {whatsappJisoStatus === 'legado' && (
-                <Badge className="bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1" title="JISO anterior à adoção do WhatsApp como canal principal de agendamento">
-                  <CheckCircle className="w-3 h-3" />
-                  Comunicação histórica
-                </Badge>
-              )}
-            </div>
-            {whatsappJisoJaEnviado && (
-              <p className={`text-[11px] mb-2 ${whatsappJisoStatus === 'reenviar' ? 'text-orange-700' : 'text-green-700'}`}>
-                Última comunicação enviada em {formatarDataHoraEnvioWhatsApp(whatsappJisoEnviadoEm) || 'data não disponível'}.
-                {whatsappJisoStatus === 'reenviar' && ' A data ou o horário da JISO foi alterado após esse envio.'}
-              </p>
-            )}
-            {whatsappJisoStatus === 'legado' && (
-              <p className="text-[11px] mb-2 text-slate-600">
-                JISO anterior à implantação do controle de comunicação por WhatsApp. Não há pendência de envio.
-              </p>
-            )}
-            {editingJiso ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_120px] gap-2">
-                  <div>
-                    <Label className="text-[11px] text-slate-500">Data</Label>
-                    <input
-                      type="date"
-                      value={jisoDate}
-                      onChange={e => setJisoDate(e.target.value)}
-                      className="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-xs bg-white"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] text-slate-500">Horário</Label>
-                    <input
-                      type="time"
-                      value={jisoTime}
-                      onChange={e => setJisoTime(e.target.value)}
-                      className="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-xs bg-white"
-                    />
-                  </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" className="h-8 px-3 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={handleSaveJiso} disabled={savingJiso || !jisoDate || !jisoTime}>
-                    {savingJiso ? 'Salvando...' : 'Salvar agendamento'}
-                  </Button>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-slate-900 text-sm leading-tight truncate">
+                    {atestado.militar_posto && `${atestado.militar_posto} `}{atestado.militar_nome}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Mat. {matriculaOperacional || '—'}
+                    {atestado.tipo_afastamento ? ` · ${atestado.tipo_afastamento}` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <AtestadoActionsMenu
+              atestado={atestado}
+              handlers={{
+                onView,
+                onEdit,
+                onDelete,
+                onOpenHomologacao: handleOpenHomologacao,
+                onOpenAtaJiso: handleOpenAtaJiso,
+                onOpenJisoModal: () => setShowJisoModal(true),
+              }}
+              permissoes={{ canEdit, canDelete }}
+              estados={{
+                hasPublicacaoVinculada,
+                mensagemBloqueioPublicacao,
+                podePublicarHomologacao,
+                hasHomologacaoAtiva,
+                isFluxoJiso,
+                statusDocumentalAtaJiso,
+                bloquearEdicaoPublicacaoNoCard: true,
+              }}
+              publicacoesVinculadas={publicacoesVinculadas}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+            <Badge className={`${statusColors[atestado.status] || statusColors['Ativo']} border text-[10px] px-2 py-0.5`}>
+              {atestado.status || 'Ativo'}
+            </Badge>
+            {isFluxoJiso && (
+              <Badge className={`text-[10px] px-2 py-0.5 ${atestado.status_jiso === 'Homologado pela JISO' ? 'bg-emerald-100 text-emerald-700' : 'bg-purple-100 text-purple-700'}`}>
+                {atestado.status_jiso || 'JISO pendente'}
+              </Badge>
+            )}
+            {atestado.acompanhado && (
+              <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-pink-200 text-pink-700">Acompanhamento</Badge>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-3 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Período</p>
+              <p className="text-xs font-semibold text-slate-700 mt-0.5">{formatDate(atestado.data_inicio)}</p>
+              <p className="text-[10px] text-slate-500">até {formatDate(atestado.data_termino || atestado.data_retorno)}</p>
+            </div>
+            <div className="border-l border-slate-200 pl-2">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Duração</p>
+              <p className="text-xs font-semibold text-slate-700 mt-0.5">{atestado.dias || 0} dias</p>
+              {atestado.cid_10 && <p className="text-[10px] text-slate-500">CID {canViewSensitive ? atestado.cid_10 : 'restrito'}</p>}
+            </div>
+            <div className="border-l border-slate-200 pl-2">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Retorno</p>
+              <p className="text-xs font-semibold text-slate-700 mt-0.5">{formatDate(atestado.data_retorno)}</p>
+              {statusInfo && <p className={`text-[10px] font-medium ${statusInfo.color}`}>{statusInfo.text}</p>}
+            </div>
+          </div>
+
+          {isFluxoJiso && (
+            <div className={`mt-2.5 rounded-lg border px-3 py-2.5 ${jisoDate ? 'border-purple-100 bg-purple-50/60' : 'border-amber-200 bg-amber-50'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Shield className={`w-3.5 h-3.5 ${jisoDate ? 'text-purple-600' : 'text-amber-600'}`} />
+                    <span className={`text-xs font-semibold ${jisoDate ? 'text-purple-800' : 'text-amber-800'}`}>
+                      {jisoDate ? `JISO ${formatDate(jisoDate)} · ${jisoTime || 'horário pendente'}` : 'JISO ainda não agendada'}
+                    </span>
+                  </div>
+                  {jisoDate && (
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {whatsappJisoStatus === 'enviado' && 'WhatsApp enviado'}
+                      {whatsappJisoStatus === 'pendente' && 'WhatsApp pendente'}
+                      {whatsappJisoStatus === 'reenviar' && 'Alteração após envio — reenviar WhatsApp'}
+                      {whatsappJisoStatus === 'legado' && 'Comunicação histórica'}
+                    </p>
+                  )}
+                </div>
+
+                {canManageJiso && !editingJiso && (
                   <Button
+                    type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 px-3 text-xs border-green-600 bg-green-50 text-green-700 hover:bg-green-100"
-                    onClick={abrirPreviaWhatsAppJiso}
-                    disabled={savingJiso || sendingWhatsApp || !jisoDate || !jisoTime}
+                    className="h-7 px-2.5 text-[11px] shrink-0 bg-white"
+                    onClick={() => {
+                      setJisoDate(atestado.data_jiso_agendada || '');
+                      setJisoTime(atestado.hora_jiso_agendada || '');
+                      setEditingJiso(true);
+                    }}
                   >
-                    <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
-                    WhatsApp
+                    {jisoDate ? 'Alterar' : 'Agendar'}
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); setJisoTime(atestado.hora_jiso_agendada || ''); }}>
-                    Cancelar
-                  </Button>
-                </div>
+                )}
               </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-slate-700 font-medium">
-                  {formatDate(jisoDate)} · {jisoTime || 'horário não definido'}
-                </span>
-                <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setJisoTime(atestado.hora_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data e horário da JISO">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs border-green-600 bg-green-50 text-green-700 hover:bg-green-100"
-                  onClick={abrirPreviaWhatsAppJiso}
-                  disabled={sendingWhatsApp || !jisoDate || !jisoTime}
-                >
-                  <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
-                  WhatsApp
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
 
-        {((atestado.medico_nome_snapshot || atestado.medico) || (atestado.medico_crm_snapshot || atestado.crm_medico) || atestado.observacoes) && (
-          <div className="grid grid-cols-1 gap-2 text-sm">
-            {(atestado.medico_nome_snapshot || atestado.medico) && (
-              <p className="text-slate-700"><span className="text-slate-500">Médico:</span> {atestado.medico_nome_snapshot || atestado.medico}</p>
+              {editingJiso && canManageJiso && (
+                <div className="mt-2.5 pt-2.5 border-t border-purple-100 space-y-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_110px] gap-2">
+                    <Input type="date" value={jisoDate} onChange={(e) => setJisoDate(e.target.value)} className="h-8 text-xs bg-white" />
+                    <Input type="time" value={jisoTime} onChange={(e) => setJisoTime(e.target.value)} className="h-8 text-xs bg-white" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button size="sm" className="h-7 px-2.5 text-[11px] bg-[#1e3a5f]" onClick={handleSaveJiso} disabled={savingJiso || !jisoDate || !jisoTime}>
+                      {savingJiso ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] bg-white text-green-700 border-green-200" onClick={abrirPreviaWhatsAppJiso} disabled={savingJiso || sendingWhatsApp || !jisoDate || !jisoTime}>
+                      <MessageCircle className="w-3 h-3 mr-1" /> WhatsApp
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); setJisoTime(atestado.hora_jiso_agendada || ''); }}>Cancelar</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => onView(atestado)} className="text-xs font-medium text-[#1e3a5f] hover:underline">
+            Ver detalhes
+          </button>
+          <div className="flex items-center gap-2">
+            {isFluxoJiso && (
+              <button type="button" onClick={() => setShowJisoModal(true)} className="text-[11px] text-slate-500 hover:text-purple-700">
+                Histórico JISO
+              </button>
             )}
-            {(atestado.medico_crm_snapshot || atestado.crm_medico) && (
-              <p className="text-slate-700"><span className="text-slate-500">CRM:</span> {atestado.medico_crm_snapshot || atestado.crm_medico}</p>
-            )}
-            {atestado.observacoes && (
-              <p className="text-slate-700 whitespace-pre-wrap"><span className="text-slate-500">Observações:</span> {canViewSensitive ? atestado.observacoes : "Dado sensível restrito"}</p>
+            {jisoDate && canManageJiso && !editingJiso && (
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px] text-green-700" onClick={abrirPreviaWhatsAppJiso} disabled={sendingWhatsApp}>
+                <MessageCircle className="w-3 h-3 mr-1" /> WhatsApp
+              </Button>
             )}
           </div>
-        )}
+        </div>
 
         {showJisoModal && (
           <JisoHistoricoModal
@@ -890,25 +804,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             onClose={() => setShowJisoModal(false)}
           />
         )}
-      </div>
-
-      <div className="bg-slate-50 p-4 border-t border-slate-200 mt-auto flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-slate-600 text-xs font-medium">
-          <ShieldCheck size={16} className="text-emerald-600" />
-          {atestado.status_jiso === 'Homologado pela JISO' || atestado.status_jiso === 'Homologado pelo Comandante'
-            ? 'Homologado'
-            : 'Em análise'}
-        </div>
-        {isFluxoJiso && (
-          <button
-            onClick={() => setShowJisoModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm"
-          >
-            Registrar Decisão
-            <ChevronRight size={16} />
-          </button>
-        )}
-      </div>
+      </article>
 
       {/* Prévia da notificação JISO por WhatsApp */}
       <Dialog open={showWhatsAppPreview} onOpenChange={(open) => { if (!sendingWhatsApp) setShowWhatsAppPreview(open); }}>
