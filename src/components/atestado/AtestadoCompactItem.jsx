@@ -28,7 +28,7 @@ function getStatusOperacional(atestado, isFluxoJiso) {
   if (atestado?.status_jiso === 'Homologado pela JISO') return { label: 'Homologado JISO', variant: 'success' };
   if (atestado?.homologado_comandante || atestado?.status_jiso === 'Homologado pelo Comandante') return { label: 'Homologado Cmt', variant: 'success' };
   if (isFluxoJiso && atestado?.data_jiso_agendada) return { label: 'JISO agendada', variant: 'purple' };
-  if (isFluxoJiso) return { label: 'Aguardando JISO', variant: 'warning' };
+  if (isFluxoJiso) return { label: 'Aguardando Agendamento', variant: 'warning' };
   return { label: atestado?.status || 'Ativo', variant: 'default' };
 }
 
