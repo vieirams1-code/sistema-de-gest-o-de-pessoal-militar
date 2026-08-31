@@ -697,6 +697,52 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             )}
           </div>
 
+          {embedded && (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 mb-3">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 mb-1">Dados do afastamento</p>
+                <p className="text-xs text-slate-700"><span className="text-slate-500">Tipo:</span> {atestado.tipo_afastamento || '—'}</p>
+                <p className="text-xs text-slate-700 mt-1"><span className="text-slate-500">CID:</span> {atestado.cid_10 ? (canViewSensitive ? atestado.cid_10 : 'restrito') : '—'}</p>
+              </div>
+              <div className="min-w-0 lg:border-l lg:border-slate-200 lg:pl-3">
+                <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 mb-1">Dados médicos</p>
+                <p className="text-xs text-slate-700 truncate"><span className="text-slate-500">Médico:</span> {canViewSensitive ? (atestado.medico_nome_snapshot || atestado.medico || '—') : 'restrito'}</p>
+                <p className="text-xs text-slate-700 mt-1 truncate"><span className="text-slate-500">CRM:</span> {canViewSensitive ? (atestado.medico_crm_snapshot || atestado.crm_medico || '—') : 'restrito'}</p>
+              </div>
+              <div className="min-w-0 lg:border-l lg:border-slate-200 lg:pl-3">
+                <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 mb-1">Situação administrativa</p>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-700 truncate">{isFluxoJiso ? (atestado.status_jiso || 'JISO pendente') : (atestado.status_publicacao || atestado.status || 'Ativo')}</p>
+                    <p className="text-[11px] text-slate-500 mt-1">{isFluxoJiso && jisoDate ? `JISO ${formatDate(jisoDate)}${jisoTime ? ` · ${jisoTime}` : ''}` : 'Use o menu para ações administrativas'}</p>
+                  </div>
+                  <AtestadoActionsMenu
+                    atestado={atestado}
+                    handlers={{
+                      onView,
+                      onEdit,
+                      onDelete,
+                      onOpenHomologacao: handleOpenHomologacao,
+                      onOpenAtaJiso: handleOpenAtaJiso,
+                      onOpenJisoModal: () => setShowJisoModal(true),
+                    }}
+                    permissoes={{ canEdit, canDelete }}
+                    estados={{
+                      hasPublicacaoVinculada,
+                      mensagemBloqueioPublicacao,
+                      podePublicarHomologacao,
+                      hasHomologacaoAtiva,
+                      isFluxoJiso,
+                      statusDocumentalAtaJiso,
+                      bloquearEdicaoPublicacaoNoCard: true,
+                    }}
+                    publicacoesVinculadas={publicacoesVinculadas}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className={`${expanded ? 'grid' : 'hidden'} grid-cols-3 gap-2 mt-2.5 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5`}>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Período</p>
