@@ -10,7 +10,9 @@ import {
   Save,
   RefreshCw,
   MessageCircle,
-  Send
+  Send,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
