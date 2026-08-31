@@ -372,13 +372,12 @@ export default function Atestados() {
                   </div>
                 ) : viewMode === 'list' ? (
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="hidden lg:grid grid-cols-[32px_minmax(250px,1.55fr)_minmax(205px,1fr)_70px_minmax(180px,0.95fr)_150px] gap-3 items-center px-3 py-2.5 bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wide font-semibold text-slate-500">
+                    <div className="hidden lg:grid grid-cols-[32px_minmax(280px,1.45fr)_minmax(250px,1.15fr)_minmax(220px,1fr)_150px] gap-3 items-center px-3 py-2.5 bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wide font-semibold text-slate-500">
                       <span />
                       <span>Militar</span>
                       <span>Período</span>
-                      <span>Dias</span>
-                      <span>Situação</span>
-                      <span className="text-right">Próxima ação</span>
+                      <span>Status atual</span>
+                      <span className="text-right">Ação rápida</span>
                     </div>
                     {vigentes.map(a => (
                       <AtestadoCompactItem key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
@@ -416,13 +415,12 @@ export default function Atestados() {
                   </div>
                 ) : viewMode === 'list' ? (
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="hidden lg:grid grid-cols-[32px_minmax(250px,1.55fr)_minmax(205px,1fr)_70px_minmax(180px,0.95fr)_150px] gap-3 items-center px-3 py-2.5 bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wide font-semibold text-slate-500">
+                    <div className="hidden lg:grid grid-cols-[32px_minmax(280px,1.45fr)_minmax(250px,1.15fr)_minmax(220px,1fr)_150px] gap-3 items-center px-3 py-2.5 bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wide font-semibold text-slate-500">
                       <span />
                       <span>Militar</span>
                       <span>Período</span>
-                      <span>Dias</span>
-                      <span>Situação</span>
-                      <span className="text-right">Próxima ação</span>
+                      <span>Status atual</span>
+                      <span className="text-right">Ação rápida</span>
                     </div>
                     {finalizados.map(a => (
                       <AtestadoCompactItem key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
