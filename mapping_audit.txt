@@ -1,0 +1,55 @@
+Route Guards (App.jsx):
+- SolicitacoesAtualizacao: RequireAdmin
+- AuditoriaComportamento: RequireAdmin
+- AntiguidadeConfigQuadros: RequireAdmin, module: antiguidade
+- AntiguidadeImportarPromocoes: RequireAdmin, module: antiguidade
+- AntiguidadePrevia: RequireAdmin, module: antiguidade
+- Medicos: RequireAdmin, module: atestados
+- SubtiposDOEMS: RequireAdmin, module: rp
+- Home: module: militares
+- ConferenciasMilitares: module: acesso_conferencias_militares, action: perm_visualizar_conferencias_militares
+- ControleAtestadosTemporarios: module: controle_atestados_temporarios, action: visualizar_controle_atestados_temporarios
+- ContratosDesignacao: module: militares, actions: [visualizar_contratos_designacao, gerir_contratos_designacao]
+- GratificacoesFuncao: action: visualizar_gratificacoes_funcao
+- Tags: module: efetivo, action: gerir_configuracoes
+- PermissoesUsuarios: modules: [permissoes_usuarios], actions: [gerir_permissoes_usuarios]
+- PerfisPermissao: modules: [perfis_permissao], actions: [gerir_perfis_permissao]
+- TemplatesTexto: module: templates, action: gerir_templates
+- MigracaoMilitares: modules: [migracao_militares], actions: [visualizar_importacao_militares]
+- HistoricoImportacoesMilitares: modules: [migracao_militares], actions: [ver_historico_importacoes]
+- DashboardAcervo: action: visualizar_acervo_historico
+- CursosFormacao: module: cursos_formacao, action: visualizar_cursos_formacao
+
+Menu Visibility (Layout.jsx):
+- Dashboard: viewPermission: visualizar_militares
+- Consulta Militar: moduleKey: militares, actionKey: visualizar_militares
+- Organograma: moduleKey: militares, actionKey: visualizar_militares
+- Contratos Designados: anyOf: [{type: action, key: visualizar_contratos_designacao}, {type: action, key: gerir_contratos_designacao}]
+- Gratificação de Função: viewPermission: visualizar_gratificacoes_funcao
+- Folha Alterações: viewPermission: perm_visualizar_folha_alteracoes
+- Registros Militar: viewPermission: perm_visualizar_registros_militar
+- Conferência Cadastral: moduleKey: acesso_conferencias_militares, actionKey: perm_visualizar_conferencias_militares
+- Armamentos: viewPermission: perm_visualizar_armamentos
+- RP: viewPermission: visualizar_rp
+- Publicações: viewPermission: visualizar_controle_publicacoes
+- Conciliação: viewPermission: visualizar_conciliacao_boletim
+- Documentos Históricos: actionKey: visualizar_acervo_historico
+- Atestados: viewPermission: visualizar_atestados
+- Extrato de Atestados: viewPermission: visualizar_atestados
+- Cadastro de Médicos: adminOnly: true, moduleKey: atestados
+- Promoções: moduleKey: antiguidade, actionKey: visualizar_rastreamento_promocoes
+- Antiguidade: moduleKey: antiguidade, actionKey: visualizar_rastreamento_promocoes, anyOf: [{type: module, key: antiguidade}, {type: action, key: visualizar_rastreamento_promocoes}]
+- Medalhas: viewPermission: visualizar_medalhas
+- Cursos de Formação: moduleKey: cursos_formacao, actionKey: visualizar_cursos_formacao
+- Configuração de Quadros: adminOnly: true, moduleKey: antiguidade
+- Comportamento: viewPermission: visualizar_controle_comportamento
+- Punições: viewPermission: visualizar_punicoes
+- Auditar Comportamento: adminOnly: true
+- Quadros: viewPermission: visualizar_quadro_operacional
+- Tarefas: viewPermission: visualizar_quadro_operacional
+- Tags: moduleKey: efetivo, actionKey: gerir_configuracoes
+- Funções: anyOf: [{type: module, key: adicoes_personalizacoes}, {type: action, key: gerir_adicoes_personalizacoes}]
+- Permissões: anyOf: [{type: module, key: permissoes_usuarios}, {type: action, key: gerir_permissoes_usuarios}]
+- Perfis de Permissão: anyOf: [{type: module, key: perfis_permissao}, {type: action, key: gerir_perfis_permissao}]
+- Estrutura: viewPermission: visualizar_estrutura_organizacional
+- Lotação: viewPermission: visualizar_lotacao_militares
