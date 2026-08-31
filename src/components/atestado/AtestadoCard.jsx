@@ -79,6 +79,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const [savingPublicacao, setSavingPublicacao] = useState(false);
   const [uploadingAtaJiso, setUploadingAtaJiso] = useState(false);
   const [arquivoAtaJisoNome, setArquivoAtaJisoNome] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
