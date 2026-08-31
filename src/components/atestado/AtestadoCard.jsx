@@ -7,11 +7,8 @@ import {
   AlertCircle,
   CheckCircle,
   Shield,
-  ShieldCheck,
   Save,
-  ChevronRight,
   RefreshCw,
-  Pencil,
   MessageCircle,
   Send
 } from 'lucide-react';
@@ -636,8 +633,6 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
     return Math.round((decorrido / total) * 100);
   };
-
-  const progressPercent = getProgressPercent();
 
   return (
     <motion.div
