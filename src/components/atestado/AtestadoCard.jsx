@@ -620,20 +620,6 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     return format(data, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
   };
 
-  const getProgressPercent = () => {
-    if (!atestado.data_inicio || !atestado.data_retorno) return 0;
-
-    const inicio = new Date(`${atestado.data_inicio}T00:00:00`);
-    const retorno = new Date(`${atestado.data_retorno}T00:00:00`);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    const total = Math.max(differenceInDays(retorno, inicio), 1);
-    const decorrido = Math.min(Math.max(differenceInDays(hoje, inicio), 0), total);
-
-    return Math.round((decorrido / total) * 100);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
