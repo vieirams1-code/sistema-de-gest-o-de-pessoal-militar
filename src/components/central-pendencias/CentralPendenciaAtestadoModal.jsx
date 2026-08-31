@@ -86,7 +86,7 @@ export default function CentralPendenciaAtestadoModal({
     && !atestadoBloqueado
     && precisaFluxoJiso
     && !jaEncaminhadoParaJiso
-    && (canAccessAction('registrar_decisao_jiso') || canAccessAction('gerir_jiso'))
+    && canAccessAction('gerir_jiso')
   );
 
   const existeStatusLeve = atestadoDetalhado && Object.prototype.hasOwnProperty.call(atestadoDetalhado, 'status_jiso');
@@ -96,7 +96,7 @@ export default function CentralPendenciaAtestadoModal({
     && existeStatusLeve
     && !atestadoBloqueado
     && !statusJisoNormalizado.includes('em análise')
-    && (canAccessAction('editar_atestados') || canAccessAction('registrar_decisao_jiso') || canAccessAction('gerir_jiso'))
+    && canAccessAction('gerir_jiso')
   );
 
   const linkModuloCompleto = useMemo(() => {
