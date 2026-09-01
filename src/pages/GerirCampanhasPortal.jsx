@@ -1042,6 +1042,43 @@ export default function GerirCampanhasPortal() {
                   </div>
                 </div>
 
+                {modalNovaCampanha.tipo === 'PLANO_FERIAS' && (
+                  <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                      <div className="flex-1 space-y-1">
+                        <label className="font-bold text-slate-700 block">Plano Institucional de Férias *</label>
+                        <select
+                          value={modalNovaCampanha.plano_ferias_institucional_id || ''}
+                          onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, plano_ferias_institucional_id: e.target.value })}
+                          className="w-full h-10 px-3 border border-blue-300 rounded-xl text-xs bg-white outline-none focus:border-[#1e3a5f] font-semibold"
+                        >
+                          <option value="">Selecione o plano que agrupará esta campanha...</option>
+                          {planosInstitucionais
+                            .filter((p) => Number(p.ano_referencia) === Number(modalNovaCampanha.ano_referencia))
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.titulo} — {p.ano_referencia} ({p.total_campanhas || 0} campanha(s))
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCriarPlanoInstitucional}
+                        disabled={actionLoading}
+                        className="h-10 text-xs border-blue-300 text-blue-800 bg-white hover:bg-blue-100"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Criar novo Plano
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-blue-800">
+                      Campanhas piloto, gerais e complementares vinculadas ao mesmo plano serão consolidadas no Painel do Plano de Férias.
+                    </p>
+                  </div>
+                )}
+
                 {/* ESCOPO */}
                 <div className="space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
                   <label className="font-bold text-slate-700 block flex items-center">
