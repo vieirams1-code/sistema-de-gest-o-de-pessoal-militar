@@ -394,6 +394,39 @@ export default function GerirCampanhasPortal() {
     }
   };
 
+  const handleCriarPlanoInstitucional = async () => {
+    const ano = Number(modalNovaCampanha.ano_referencia) || (new Date().getFullYear() + 1);
+    const tituloSugerido = `Plano de Férias ${ano}`;
+    const titulo = window.prompt('Nome do novo Plano Institucional de Férias:', tituloSugerido);
+    if (!titulo?.trim()) return;
+
+    setActionLoading(true);
+    try {
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_INSTITUCIONAL_CRIAR',
+        plano_payload: {
+          titulo: titulo.trim(),
+          ano_referencia: ano,
+          status: 'ATIVO',
+        },
+      });
+      const novoPlano = res.data?.plano;
+      const planosRes = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' });
+      setPlanosInstitucionais(planosRes.data?.planos || []);
+      if (novoPlano?.id) {
+        setModalNovaCampanha((prev) => ({
+          ...prev,
+          plano_ferias_institucional_id: novoPlano.id,
+        }));
+      }
+      setFeedback({ type: 'success', msg: `Plano Institucional "${titulo.trim()}" criado. Agora esta campanha pode ser vinculada a ele.` });
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao criar Plano Institucional de Férias.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSalvarCampanha = async (e) => {
     e.preventDefault();
     if (!modalNovaCampanha.titulo.trim()) {
@@ -414,9 +447,17 @@ export default function GerirCampanhasPortal() {
         .map((id) => unidadesList.find((u) => u.id === id)?.nome || id)
         .join(', ');
 
+      if (modalNovaCampanha.tipo === 'PLANO_FERIAS' && !modalNovaCampanha.plano_ferias_institucional_id) {
+        alert('Selecione ou crie um Plano Institucional de Férias antes de salvar esta nova campanha. Campanhas antigas continuam compatíveis, mas novas campanhas devem ser agrupadas.');
+        return;
+      }
+
       const payload = {
         titulo: modalNovaCampanha.titulo,
         tipo: modalNovaCampanha.tipo,
+        plano_ferias_institucional_id: modalNovaCampanha.tipo === 'PLANO_FERIAS'
+          ? modalNovaCampanha.plano_ferias_institucional_id
+          : undefined,
         status: modalNovaCampanha.status || 'Aberta_Coleta',
         ano_referencia: Number(modalNovaCampanha.ano_referencia) || undefined,
         tipo_escopo: modalNovaCampanha.tipo_escopo,
