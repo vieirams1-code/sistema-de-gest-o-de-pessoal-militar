@@ -43,6 +43,7 @@ const TIPOS_CAMPOS_FORMULARIO = [
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
   const [campanhas, setCampanhas] = useState([]);
+  const [planosInstitucionais, setPlanosInstitucionais] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -61,6 +62,7 @@ export default function GerirCampanhasPortal() {
     isEditing: false,
     editId: null,
     tipo: 'PLANO_FERIAS',
+    plano_ferias_institucional_id: '',
     status: 'Aberta_Coleta',
     titulo: 'Plano Anual de Férias 2027',
     ano_referencia: new Date().getFullYear() + 1,
@@ -84,8 +86,12 @@ export default function GerirCampanhasPortal() {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
+      const [res, planosRes] = await Promise.all([
+        base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' }),
+        base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' }),
+      ]);
       setCampanhas(res.data?.campanhas || []);
+      setPlanosInstitucionais(planosRes.data?.planos || []);
 
       let unidades = [];
       try {
