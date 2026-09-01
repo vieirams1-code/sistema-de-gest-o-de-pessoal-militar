@@ -73,9 +73,12 @@ function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
 }
 
 export default function PainelPlanoFerias() {
-  // Lista de Campanhas e Campanha Selecionada
+  // Plano Institucional é a unidade principal; campanha é apenas filtro/origem da coleta.
+  const [planos, setPlanos] = useState([]);
+  const [planoSelecionado, setPlanoSelecionado] = useState(null);
   const [campanhas, setCampanhas] = useState([]);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
+  const [filtroCampanhaId, setFiltroCampanhaId] = useState('TODAS');
   const [opcoes, setOpcoes] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -131,31 +134,45 @@ export default function PainelPlanoFerias() {
     };
   }, []);
 
-  // Carrega lista de campanhas e opções da campanha selecionada
-  const carregarPainel = async (campanhaAlvoId = null) => {
+  // Carrega o Plano Institucional consolidado; campanhaAlvoId funciona como filtro secundário.
+  const carregarPainel = async (planoAlvoId = null, campanhaAlvoId = null) => {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      // 1. Carrega todas as campanhas de férias
+      // 1. Carrega planos, campanhas e opções (consolidadas por plano quando não há filtro de campanha).
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_ESCALA_LISTAR',
+        plano_ferias_institucional_id: planoAlvoId || undefined,
         campanha_id: campanhaAlvoId || undefined,
       });
 
+      const listaPlanos = res.data?.planos || [];
       const listaCampanhas = res.data?.campanhas || [];
+      setPlanos(listaPlanos);
       setCampanhas(listaCampanhas);
 
-      // Define campanha ativa/selecionada
-      let selected = null;
-      if (campanhaAlvoId) {
-        selected = listaCampanhas.find((c) => c.id === campanhaAlvoId) || null;
+      let planoAtual = planoAlvoId
+        ? listaPlanos.find((p) => p.id === planoAlvoId) || null
+        : null;
+      if (!planoAtual && listaPlanos.length > 0) {
+        planoAtual = listaPlanos.find((p) => p.status === 'ATIVO') || listaPlanos[0];
       }
-      if (!selected && listaCampanhas.length > 0) {
-        selected = listaCampanhas.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || listaCampanhas[0];
+      setPlanoSelecionado(planoAtual);
+
+      const campanhasDoPlano = planoAtual
+        ? listaCampanhas.filter((c) => c.plano_ferias_institucional_id === planoAtual.id)
+        : listaCampanhas.filter((c) => !c.plano_ferias_institucional_id);
+
+      let selected = campanhaAlvoId
+        ? listaCampanhas.find((c) => c.id === campanhaAlvoId) || null
+        : null;
+      if (!selected && campanhasDoPlano.length > 0) {
+        selected = campanhasDoPlano.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasDoPlano[0];
       }
       setCampanhaSelecionada(selected);
+      setFiltroCampanhaId(campanhaAlvoId || 'TODAS');
 
-      // 2. Opções da campanha selecionada
+      // 2. Opções da campanha filtrada ou consolidadas do Plano
       const listaOpcoes = res.data?.opcoes || [];
       setOpcoes(listaOpcoes);
 
@@ -226,9 +243,24 @@ export default function PainelPlanoFerias() {
     carregarPainel();
   }, []);
 
-  const handleSelecionarCampanha = (camp) => {
-    setCampanhaSelecionada(camp);
-    carregarPainel(camp.id);
+  const handleSelecionarPlano = (plano) => {
+    setPlanoSelecionado(plano);
+    setFiltroCampanhaId('TODAS');
+    carregarPainel(plano.id, null);
+  };
+
+  const handleSelecionarCampanha = (campanhaId) => {
+    if (campanhaId === 'TODAS') {
+      setFiltroCampanhaId('TODAS');
+      carregarPainel(planoSelecionado?.id || null, null);
+      return;
+    }
+    const camp = campanhas.find((item) => item.id === campanhaId);
+    if (camp) {
+      setCampanhaSelecionada(camp);
+      setFiltroCampanhaId(camp.id);
+      carregarPainel(planoSelecionado?.id || camp.plano_ferias_institucional_id || null, camp.id);
+    }
   };
 
   const handleMudarMesFracao = (opId, numFracao, novoMes) => {
