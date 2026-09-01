@@ -84,9 +84,6 @@ interface PortalServicosPayload {
   // Gestão de Campanhas
   campanha_id?: string;
   campanha_payload?: any;
-  plano_ferias_institucional_id?: string;
-  plano_id?: string;
-  plano_payload?: any;
   ano_referencia?: number;
   opcao_id?: string;
   decisao_camada_1?: {
@@ -276,7 +273,6 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
 function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
   if (acao.startsWith('CADASTRO_DECIDIR_')) return ['perm_gerir_respostas'];
-  if (acao.startsWith('PLANO_INSTITUCIONAL_')) return ['perm_gerir_campanhas', 'perm_gerir_respostas'];
   if (acao.startsWith('PLANO_')) return ['perm_gerir_respostas'];
   if (acao === 'CAMPANHA_LISTAR') return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
   if (['CAMPANHA_DETALHES_RETORNO', 'CAMPANHA_HOMOLOGAR_RESPOSTA', 'CAMPANHA_DISPARAR_LEMBRETES'].includes(acao)) {
@@ -416,41 +412,10 @@ Deno.serve(async (req: Request) => {
             return true;
           });
 
-          let planoInstitucionalId = cp.plano_ferias_institucional_id || null;
-          if (cp.tipo === 'PLANO_FERIAS') {
-            if (!planoInstitucionalId) {
-              return new Response(JSON.stringify({ error: 'Toda nova campanha de férias deve estar vinculada a um Plano de Férias aberto.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            const planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoInstitucionalId);
-            if (!planoInstitucional) {
-              return new Response(JSON.stringify({ error: 'Plano institucional de férias não encontrado.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (String(planoInstitucional.status || 'ATIVO') !== 'ATIVO') {
-              return new Response(JSON.stringify({ error: 'O Plano de Férias precisa estar aberto para receber novas campanhas.' }), {
-                status: 409,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (cp.ano_referencia && Number(planoInstitucional.ano_referencia) !== Number(cp.ano_referencia)) {
-              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser o mesmo ano do Plano Institucional de Férias selecionado.' }), {
-                status: 409,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-          }
-          if (cp.tipo !== 'PLANO_FERIAS') planoInstitucionalId = null;
-
           const created = await base44.asServiceRole.entities.CampanhaPortal.create({
             tipo: cp.tipo,
             titulo: cp.titulo,
             ano_referencia: cp.ano_referencia || (new Date().getFullYear() + 1),
-            plano_ferias_institucional_id: planoInstitucionalId || undefined,
             status: cp.status || 'Aberta_Coleta',
             tipo_escopo: cp.tipo_escopo || 'TODOS',
             escopo_unidades_ids: cp.escopo_unidades_ids || [],
@@ -706,22 +671,9 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
-          let planoInstitucionalEdicao = campanha_payload.plano_ferias_institucional_id || null;
-          if (campanha_payload.tipo === 'PLANO_FERIAS' && planoInstitucionalEdicao) {
-            const planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoInstitucionalEdicao);
-            if (!planoInstitucional) {
-              return new Response(JSON.stringify({ error: 'Plano institucional de férias não encontrado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-            if (campanha_payload.ano_referencia && Number(planoInstitucional.ano_referencia) !== Number(campanha_payload.ano_referencia)) {
-              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser o mesmo ano do Plano Institucional de Férias selecionado.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-          }
-          if (campanha_payload.tipo !== 'PLANO_FERIAS') planoInstitucionalEdicao = null;
-
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
             ano_referencia: Number(campanha_payload.ano_referencia) || undefined,
-            plano_ferias_institucional_id: planoInstitucionalEdicao || undefined,
             status: campanha_payload.status || 'Aberta_Coleta',
             instrucoes: campanha_payload.instrucoes,
             data_fim_militar: campanha_payload.data_fim_militar,
@@ -1037,103 +989,6 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        // Planos Institucionais de Férias — agrupam múltiplas campanhas do mesmo plano administrativo
-        case 'PLANO_INSTITUCIONAL_LISTAR': {
-          let planos: any[] = [];
-          let campanhas: any[] = [];
-          try {
-            planos = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
-          } catch (_e) {
-            planos = [];
-          }
-          try {
-            campanhas = await base44.asServiceRole.entities.CampanhaPortal.list();
-          } catch (_e) {
-            campanhas = [];
-          }
-          const campanhasFerias = (campanhas || []).filter((c: any) => c.tipo === 'PLANO_FERIAS');
-          const enriquecidos = (planos || []).map((plano: any) => {
-            const campanhasPlano = campanhasFerias.filter((c: any) => c.plano_ferias_institucional_id === plano.id);
-            return {
-              ...plano,
-              total_campanhas: campanhasPlano.length,
-              campanhas_ids: campanhasPlano.map((c: any) => c.id),
-            };
-          });
-          return new Response(JSON.stringify({
-            ok: true,
-            planos: enriquecidos,
-            campanhas_sem_plano: campanhasFerias.filter((c: any) => !c.plano_ferias_institucional_id),
-          }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-        }
-
-        case 'PLANO_INSTITUCIONAL_CRIAR': {
-          const pp = payload.plano_payload || payload;
-          const titulo = String(pp.titulo || '').trim();
-          const anoReferencia = Number(pp.ano_referencia);
-          if (!titulo || !anoReferencia) {
-            return new Response(JSON.stringify({ error: 'Título e ano de referência do Plano Institucional são obrigatórios.' }), {
-              status: 400,
-              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-            });
-          }
-          const existentes = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
-          const duplicado = (existentes || []).find((p: any) =>
-            Number(p.ano_referencia) === anoReferencia &&
-            String(p.titulo || '').trim().toLowerCase() === titulo.toLowerCase() &&
-            String(p.status || '') !== 'ARQUIVADO'
-          );
-          if (duplicado) {
-            return new Response(JSON.stringify({ error: 'Já existe um Plano Institucional ativo com este título e ano.', plano: duplicado }), {
-              status: 409,
-              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-            });
-          }
-          const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.create({
-            titulo,
-            ano_referencia: anoReferencia,
-            descricao: pp.descricao || '',
-            estrutura_id: pp.estrutura_id || '',
-            estrutura_nome: pp.estrutura_nome || '',
-            status: pp.status || 'ATIVO',
-            observacoes: pp.observacoes || '',
-          });
-          return new Response(JSON.stringify({ ok: true, plano }), {
-            status: 201,
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          });
-        }
-
-        case 'PLANO_INSTITUCIONAL_ATUALIZAR': {
-          const { plano_id, plano_payload } = payload;
-          if (!plano_id) {
-            return new Response(JSON.stringify({ error: 'ID do Plano Institucional não informado.' }), {
-              status: 400,
-              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-            });
-          }
-          const atual = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(plano_id);
-          if (!atual) {
-            return new Response(JSON.stringify({ error: 'Plano Institucional não encontrado.' }), {
-              status: 404,
-              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-            });
-          }
-          const atualizado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(plano_id, {
-            titulo: plano_payload?.titulo ?? atual.titulo,
-            ano_referencia: Number(plano_payload?.ano_referencia ?? atual.ano_referencia),
-            descricao: plano_payload?.descricao ?? atual.descricao ?? '',
-            estrutura_id: plano_payload?.estrutura_id ?? atual.estrutura_id ?? '',
-            estrutura_nome: plano_payload?.estrutura_nome ?? atual.estrutura_nome ?? '',
-            status: plano_payload?.status ?? atual.status ?? 'ATIVO',
-            observacoes: plano_payload?.observacoes ?? atual.observacoes ?? '',
-          });
-          return new Response(JSON.stringify({ ok: true, plano: atualizado }), {
-            status: 200,
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          });
-        }
-
         // Rotas legadas de compatibilidade
         case 'PLANO_CAMPANHA_OBTER_OU_CRIAR':
         case 'PLANO_CAMPANHA_SALVAR':
@@ -1167,76 +1022,36 @@ Deno.serve(async (req: Request) => {
           }
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
-            // 1. Carrega Planos Institucionais e campanhas de férias cadastradas.
-            // Campanhas legadas sem plano continuam válidas e são mantidas separadamente.
+            // 1. Carrega todas as campanhas de férias cadastradas
             let todasCampanhasPortal: any[] = [];
-            let planosInstitucionais: any[] = [];
             try {
               todasCampanhasPortal = await base44.asServiceRole.entities.CampanhaPortal.list();
             } catch (_e) {
               todasCampanhasPortal = [];
             }
-            try {
-              planosInstitucionais = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
-            } catch (_e) {
-              planosInstitucionais = [];
-            }
             const campanhasFerias = (todasCampanhasPortal || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS');
+            const campanhasIdsValidos = new Set(campanhasFerias.map((c: any) => c.id));
 
-            // 2. Busca opções com isolamento explícito por campanha ou consolidação por Plano Institucional.
-            // Nunca inferimos equivalência entre campanhas apenas pelo ano de referência.
-            const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+            // 2. Busca opções de férias de forma estritamente isolada pela campanha
             let opcoes: any[] = [];
             if (payload.campanha_id) {
+              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
               opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === payload.campanha_id);
-            } else if (payload.plano_ferias_institucional_id) {
-              const campanhasDoPlanoIds = new Set(
-                campanhasFerias
-                  .filter((c: any) => c.plano_ferias_institucional_id === payload.plano_ferias_institucional_id)
-                  .map((c: any) => c.id)
-              );
-              const candidatas = (allOpcoes || []).filter((op: any) =>
-                op.plano_ferias_institucional_id
-                  ? op.plano_ferias_institucional_id === payload.plano_ferias_institucional_id
-                  : Boolean(op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
-              );
-              const porMilitarPeriodo = new Map<string, any>();
-              for (const op of candidatas) {
-                const chave = `${op.militar_id || ''}::${op.periodo_aquisitivo_id || ''}`;
-                const anterior = porMilitarPeriodo.get(chave);
-                if (!anterior || String(op.data_envio_militar || op.updated_date || op.created_date || '') > String(anterior.data_envio_militar || anterior.updated_date || anterior.created_date || '')) {
-                  porMilitarPeriodo.set(chave, op);
-                }
-              }
-              opcoes = Array.from(porMilitarPeriodo.values());
-            } else if (planosInstitucionais.length > 0) {
-              const planoPadrao = planosInstitucionais.find((p: any) => p.status === 'ATIVO') || planosInstitucionais[0];
-              const campanhasDoPlanoIds = new Set(
-                campanhasFerias
-                  .filter((c: any) => c.plano_ferias_institucional_id === planoPadrao.id)
-                  .map((c: any) => c.id)
-              );
-              const candidatas = (allOpcoes || []).filter((op: any) =>
-                op.plano_ferias_institucional_id
-                  ? op.plano_ferias_institucional_id === planoPadrao.id
-                  : Boolean(op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
-              );
-              const porMilitarPeriodo = new Map<string, any>();
-              for (const op of candidatas) {
-                const chave = `${op.militar_id || ''}::${op.periodo_aquisitivo_id || ''}`;
-                const anterior = porMilitarPeriodo.get(chave);
-                if (!anterior || String(op.data_envio_militar || op.updated_date || op.created_date || '') > String(anterior.data_envio_militar || anterior.updated_date || anterior.created_date || '')) {
-                  porMilitarPeriodo.set(chave, op);
-                }
-              }
-              opcoes = Array.from(porMilitarPeriodo.values());
             } else if (campanhasFerias.length > 0) {
               const primeiraCamp = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0];
+              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
               opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === primeiraCamp.id);
             }
 
-            // Não excluir opções automaticamente nesta consulta. Registros legados ou sem campanha
-            // precisam ser preservados para saneamento explícito e auditável.
+            // 3. Purga opções órfãs de campanhas que foram excluídas
+            try {
+              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+              for (const op of (allOpcoes || [])) {
+                if (!op.campanha_id || !campanhasIdsValidos.has(op.campanha_id)) {
+                  await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
+                }
+              }
+            } catch (_ePurge) {}
 
             // Rotina de reparo/sincronização automática para férias já geradas
             try {
@@ -1281,9 +1096,7 @@ Deno.serve(async (req: Request) => {
 
             return new Response(JSON.stringify({
               ok: true,
-              planos: planosInstitucionais || [],
               campanhas: campanhasFerias || [],
-              campanhas_sem_plano: campanhasFerias.filter((c: any) => !c.plano_ferias_institucional_id),
               opcoes: opcoes || [],
             }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
@@ -1418,7 +1231,7 @@ Deno.serve(async (req: Request) => {
           }
 
           if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
-            const { campanha_id, plano_ferias_institucional_id } = payload;
+            const { campanha_id } = payload;
             let todasOpcoes: any[] = [];
 
             if (campanha_id) {
@@ -1426,29 +1239,13 @@ Deno.serve(async (req: Request) => {
                 campanha_id: campanha_id,
                 gerado_ferias_efetivas: false,
               });
-            } else if (plano_ferias_institucional_id) {
-              const [campanhasPlano, todasOpcoesPlano] = await Promise.all([
-                base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id }),
-                base44.asServiceRole.entities.OpcaoFeriasMilitar.list(),
-              ]);
-              const campanhasPlanoIds = new Set((campanhasPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
-              const candidatas = (todasOpcoesPlano || []).filter((op: any) =>
-                op.gerado_ferias_efetivas !== true &&
-                (op.plano_ferias_institucional_id
-                  ? op.plano_ferias_institucional_id === plano_ferias_institucional_id
-                  : campanhasPlanoIds.has(op.campanha_id))
-              );
-              const porMilitarPeriodo = new Map<string, any>();
-              for (const op of candidatas) {
-                const chave = `${op.militar_id || ''}::${op.periodo_aquisitivo_id || ''}`;
-                const anterior = porMilitarPeriodo.get(chave);
-                if (!anterior || String(op.data_envio_militar || op.updated_date || op.created_date || '') > String(anterior.data_envio_militar || anterior.updated_date || anterior.created_date || '')) {
-                  porMilitarPeriodo.set(chave, op);
-                }
+              if (!todasOpcoes || todasOpcoes.length === 0) {
+                todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+                  ano_referencia: ano,
+                  gerado_ferias_efetivas: false,
+                });
               }
-              todasOpcoes = Array.from(porMilitarPeriodo.values());
             } else {
-              // Compatibilidade legada: sem campanha/plano explícito, mantém busca pelo ano.
               todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
                 ano_referencia: ano,
                 gerado_ferias_efetivas: false,
@@ -1608,23 +1405,26 @@ Deno.serve(async (req: Request) => {
               geradasCount++;
             }
 
-            if (plano_ferias_institucional_id) {
-              try {
-                const planoAtual = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(plano_ferias_institucional_id);
-                await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(plano_ferias_institucional_id, {
-                  data_ultima_geracao: new Date().toISOString(),
-                  total_gerados_acumulado: Number(planoAtual?.total_gerados_acumulado || 0) + geradasCount,
-                  quantidade_geracoes: Number(planoAtual?.quantidade_geracoes || 0) + 1,
+            // ENCERRAMENTO AUTOMÁTICO DA CAMPANHA ESPECÍFICA
+            try {
+              if (campanha_id) {
+                await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
+                  status: 'Encerrada',
                 });
-              } catch (_errPlanoGeracao) {}
-            }
-
-            // A geração é incremental: não encerra campanha nem plano.
-            // O gestor pode abrir campanhas complementares e executar novos lotes no mesmo plano.
+              } else {
+                const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
+                const campsAno = (allCamp || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS' && cp.ano_referencia === Number(ano));
+                for (const cp of campsAno) {
+                  await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, {
+                    status: 'Encerrada',
+                  });
+                }
+              }
+            } catch (_errClose) {}
 
             return new Response(JSON.stringify({
               ok: true,
-              message: `Geração incremental concluída com sucesso! ${geradasCount} escala(s) de férias nova(s) gerada(s) no SGP. O Plano permanece aberto para campanhas complementares.`,
+              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas no SGP e campanha encerrada.`,
               total_geradas: geradasCount,
             }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
@@ -2067,22 +1867,14 @@ Deno.serve(async (req: Request) => {
           is_periodo_plano_selecionavel: p.id === maisAntigoId,
         }));
 
-        // Busca opção já enviada. Em campanhas vinculadas a um Plano Institucional,
-        // uma resposta do mesmo militar/período em qualquer rodada do mesmo plano é a resposta efetiva.
+        // Busca opção de férias já enviada pelo militar para esta campanha específica
         let opcoesEnviadas: any[] = [];
         try {
-          const opcoesMilitar = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
-          if (campanhaFeriasAtiva?.plano_ferias_institucional_id) {
-            const campanhasMesmoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
-              plano_ferias_institucional_id: campanhaFeriasAtiva.plano_ferias_institucional_id,
+          if (campanhaFeriasAtiva?.id) {
+            opcoesEnviadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+              militar_id: militarId,
+              campanha_id: campanhaFeriasAtiva.id,
             });
-            const idsMesmoPlano = new Set((campanhasMesmoPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
-            opcoesEnviadas = (opcoesMilitar || []).filter((op: any) =>
-              op.plano_ferias_institucional_id === campanhaFeriasAtiva.plano_ferias_institucional_id ||
-              idsMesmoPlano.has(op.campanha_id)
-            );
-          } else if (campanhaFeriasAtiva?.id) {
-            opcoesEnviadas = (opcoesMilitar || []).filter((op: any) => op.campanha_id === campanhaFeriasAtiva.id);
           }
         } catch (_e) {}
 
@@ -2188,20 +1980,9 @@ Deno.serve(async (req: Request) => {
 
       case 'FERIAS_SUBMETER_OPCAO': {
         const { periodo_aquisitivo_id, modalidade, opcao_1, opcao_2, opcao_3 } = payload;
-        const campanhasFeriasAplicaveis = campanhasAtivasMilitar.filter((c) => c.tipo === 'PLANO_FERIAS');
-        const campanhaSolicitada = payload.campanha_id
-          ? campanhasFeriasAplicaveis.find((c: any) => c.id === payload.campanha_id)
-          : null;
-        if (payload.campanha_id && !campanhaSolicitada) {
-          return new Response(JSON.stringify({ error: 'Campanha de férias inválida ou não aplicável a este militar.' }), {
-            status: 403,
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          });
-        }
-        const campanhaFeriasAtiva = campanhaSolicitada || campanhasFeriasAplicaveis[0] || null;
-        const campanhaId = campanhaFeriasAtiva?.id || null;
-        const planoInstitucionalId = campanhaFeriasAtiva?.plano_ferias_institucional_id || null;
-        const anoCampanha = campanhaFeriasAtiva?.ano_referencia || payload.ano_referencia || (new Date().getFullYear() + 1);
+        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
+        const campanhaId = payload.campanha_id || campanhaFeriasAtiva?.id || null;
+        const anoCampanha = payload.ano_referencia || campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
         // Guard de Dependência em Cascata
         let regrasCampanhaSubmissao: any = {};
@@ -2327,38 +2108,15 @@ Deno.serve(async (req: Request) => {
         const modalidadeEfetiva = diasPlanejar === 30 ? (modalidade || '2_ETAPAS_15') : 'CUSTOM';
 
         let existentes: any[] = [];
-        let existenteMesmoPlanoOutraCampanha: any = null;
-        const opcoesMilitarExistentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
-        if (planoInstitucionalId) {
-          const campanhasMesmoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
-            plano_ferias_institucional_id: planoInstitucionalId,
-          });
-          const idsMesmoPlano = new Set((campanhasMesmoPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
-          const equivalentesPlano = (opcoesMilitarExistentes || []).filter((op: any) =>
-            op.periodo_aquisitivo_id === periodo.id &&
-            (op.plano_ferias_institucional_id === planoInstitucionalId || idsMesmoPlano.has(op.campanha_id))
-          );
-          existentes = equivalentesPlano.filter((op: any) => op.campanha_id === campanhaId);
-          existenteMesmoPlanoOutraCampanha = equivalentesPlano.find((op: any) => op.campanha_id !== campanhaId) || null;
-        } else if (campanhaId) {
-          existentes = (opcoesMilitarExistentes || []).filter((op: any) =>
-            op.campanha_id === campanhaId && op.periodo_aquisitivo_id === periodo.id
-          );
-        }
-
-        if (existenteMesmoPlanoOutraCampanha) {
-          return new Response(JSON.stringify({
-            error: 'Você já registrou sua preferência para este período aquisitivo em outra campanha vinculada ao mesmo Plano de Férias.',
-            ja_respondido_no_plano: true,
-          }), {
-            status: 409,
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        if (campanhaId) {
+          existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+            militar_id: militarId,
+            campanha_id: campanhaId,
           });
         }
 
         const opcaoPayload = {
           campanha_id: campanhaId,
-          plano_ferias_institucional_id: planoInstitucionalId || undefined,
           ano_referencia: anoCampanha,
           militar_id: militarId,
           militar_nome: militar.nome_completo || militar.nome_guerra || '',
@@ -2424,32 +2182,13 @@ Deno.serve(async (req: Request) => {
           opcoesFerias = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
         } catch (_e) {}
 
-        let todasCampanhasFerias: any[] = [];
-        try {
-          const todasCampanhas = await base44.asServiceRole.entities.CampanhaPortal.list();
-          todasCampanhasFerias = (todasCampanhas || []).filter((c: any) => c.tipo === 'PLANO_FERIAS');
-        } catch (_e) {}
-
         const campanhasEnriquecidas = campanhasAtivasMilitar.map((cp: any) => {
           let statusResposta = 'Pendente';
           let dataResposta = null;
           let respostaId = null;
 
           if (cp.tipo === 'PLANO_FERIAS') {
-            let op: any = null;
-            if (cp.plano_ferias_institucional_id) {
-              const campanhasMesmoPlanoIds = new Set(
-                todasCampanhasFerias
-                  .filter((c: any) => c.plano_ferias_institucional_id === cp.plano_ferias_institucional_id)
-                  .map((c: any) => c.id)
-              );
-              op = opcoesFerias.find((o: any) =>
-                o.plano_ferias_institucional_id === cp.plano_ferias_institucional_id ||
-                campanhasMesmoPlanoIds.has(o.campanha_id)
-              );
-            } else {
-              op = opcoesFerias.find((o: any) => o.campanha_id === cp.id);
-            }
+            const op = opcoesFerias.find((o: any) => o.campanha_id === cp.id || o.ano_referencia === cp.ano_referencia);
             if (op) {
               statusResposta = 'Respondido';
               dataResposta = op.data_envio_militar || op.created_date;
@@ -2482,7 +2221,6 @@ Deno.serve(async (req: Request) => {
             tipo: cp.tipo,
             titulo: cp.titulo,
             ano_referencia: cp.ano_referencia,
-            plano_ferias_institucional_id: cp.plano_ferias_institucional_id || null,
             data_inicio: cp.data_inicio,
             data_fim_militar: cp.data_fim_militar,
             instrucoes: cp.instrucoes,

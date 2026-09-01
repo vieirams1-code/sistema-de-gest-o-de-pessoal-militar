@@ -73,12 +73,9 @@ function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
 }
 
 export default function PainelPlanoFerias() {
-  // Plano Institucional é a unidade principal; campanha é apenas filtro/origem da coleta.
-  const [planos, setPlanos] = useState([]);
-  const [planoSelecionado, setPlanoSelecionado] = useState(null);
+  // Lista de Campanhas e Campanha Selecionada
   const [campanhas, setCampanhas] = useState([]);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
-  const [filtroCampanhaId, setFiltroCampanhaId] = useState('TODAS');
   const [opcoes, setOpcoes] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -134,45 +131,31 @@ export default function PainelPlanoFerias() {
     };
   }, []);
 
-  // Carrega o Plano Institucional consolidado; campanhaAlvoId funciona como filtro secundário.
-  const carregarPainel = async (planoAlvoId = null, campanhaAlvoId = null) => {
+  // Carrega lista de campanhas e opções da campanha selecionada
+  const carregarPainel = async (campanhaAlvoId = null) => {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      // 1. Carrega planos, campanhas e opções (consolidadas por plano quando não há filtro de campanha).
+      // 1. Carrega todas as campanhas de férias
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_ESCALA_LISTAR',
-        plano_ferias_institucional_id: planoAlvoId || undefined,
         campanha_id: campanhaAlvoId || undefined,
       });
 
-      const listaPlanos = res.data?.planos || [];
       const listaCampanhas = res.data?.campanhas || [];
-      setPlanos(listaPlanos);
       setCampanhas(listaCampanhas);
 
-      let planoAtual = planoAlvoId
-        ? listaPlanos.find((p) => p.id === planoAlvoId) || null
-        : null;
-      if (!planoAtual && listaPlanos.length > 0) {
-        planoAtual = listaPlanos.find((p) => p.status === 'ATIVO') || listaPlanos[0];
+      // Define campanha ativa/selecionada
+      let selected = null;
+      if (campanhaAlvoId) {
+        selected = listaCampanhas.find((c) => c.id === campanhaAlvoId) || null;
       }
-      setPlanoSelecionado(planoAtual);
-
-      const campanhasDoPlano = planoAtual
-        ? listaCampanhas.filter((c) => c.plano_ferias_institucional_id === planoAtual.id)
-        : listaCampanhas.filter((c) => !c.plano_ferias_institucional_id);
-
-      let selected = campanhaAlvoId
-        ? listaCampanhas.find((c) => c.id === campanhaAlvoId) || null
-        : null;
-      if (!selected && campanhasDoPlano.length > 0) {
-        selected = campanhasDoPlano.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasDoPlano[0];
+      if (!selected && listaCampanhas.length > 0) {
+        selected = listaCampanhas.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || listaCampanhas[0];
       }
       setCampanhaSelecionada(selected);
-      setFiltroCampanhaId(campanhaAlvoId || 'TODAS');
 
-      // 2. Opções da campanha filtrada ou consolidadas do Plano
+      // 2. Opções da campanha selecionada
       const listaOpcoes = res.data?.opcoes || [];
       setOpcoes(listaOpcoes);
 
@@ -243,30 +226,10 @@ export default function PainelPlanoFerias() {
     carregarPainel();
   }, []);
 
-  const handleSelecionarPlano = (plano) => {
-    setPlanoSelecionado(plano);
-    setFiltroCampanhaId('TODAS');
-    carregarPainel(plano.id, null);
+  const handleSelecionarCampanha = (camp) => {
+    setCampanhaSelecionada(camp);
+    carregarPainel(camp.id);
   };
-
-  const handleSelecionarCampanha = (campanhaId) => {
-    if (campanhaId === 'TODAS') {
-      setFiltroCampanhaId('TODAS');
-      carregarPainel(planoSelecionado?.id || null, null);
-      return;
-    }
-    const camp = campanhas.find((item) => item.id === campanhaId);
-    if (camp) {
-      setCampanhaSelecionada(camp);
-      setFiltroCampanhaId(camp.id);
-      carregarPainel(planoSelecionado?.id || camp.plano_ferias_institucional_id || null, camp.id);
-    }
-  };
-
-  const recarregarContextoAtual = () => carregarPainel(
-    planoSelecionado?.id || campanhaSelecionada?.plano_ferias_institucional_id || null,
-    filtroCampanhaId === 'TODAS' ? null : (campanhaSelecionada?.id || null)
-  );
 
   const handleMudarMesFracao = (opId, numFracao, novoMes) => {
     setSelecoesMilitares((prev) => {
@@ -374,7 +337,7 @@ export default function PainelPlanoFerias() {
 
       setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
       setFeedback({ type: 'success', msg: `Escala salva para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
-      await recarregarContextoAtual();
+      await carregarPainel(campanhaSelecionada?.id);
       handleFecharPopupLateral(op.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar escala.' });
@@ -405,7 +368,7 @@ export default function PainelPlanoFerias() {
       setModalNaoContemplado({ open: false, opcao: null, justificativa: '' });
       setMilitaresEmEdicao((prev) => ({ ...prev, [opId]: false }));
       setFeedback({ type: 'success', msg: `${op.militar_posto} ${op.militar_nome} registrado como NÃO CONTEMPLADO.` });
-      await recarregarContextoAtual();
+      await carregarPainel(campanhaSelecionada?.id);
       handleFecharPopupLateral(opId);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao registrar não contemplado.' });
@@ -414,24 +377,20 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  // Geração de Férias do contexto atual: campanha filtrada ou Plano Institucional consolidado.
+  // Geração de Férias Específica desta Campanha
   const handleGerarLoteFerias = async () => {
-    if (!planoSelecionado?.id || filtroCampanhaId !== 'TODAS') {
-      alert('Selecione o plano completo (Todas as campanhas) para gerar férias. A geração é feita somente no nível do Plano.');
-      return;
-    }
+    if (!campanhaSelecionada) return;
 
     const totalContemplados = opcoes.filter(
       (o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && !o.gerado_ferias_efetivas
     ).length;
 
     if (totalContemplados === 0) {
-      alert('Não há militares com escala salva prontos para geração de férias neste contexto.');
+      alert('Não há militares com escala salva prontos para geração de férias nesta campanha.');
       return;
     }
 
-    const contextoNome = planoSelecionado.titulo;
-    if (!window.confirm(`Confirma a geração incremental de férias para os ${totalContemplados} militares contemplados do Plano "${contextoNome}"? Somente férias ainda não geradas serão cadastradas no SGP.`)) {
+    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados da campanha "${campanhaSelecionada.titulo}"? A campanha será encerrada e as férias cadastradas no SGP.`)) {
       return;
     }
 
@@ -439,12 +398,12 @@ export default function PainelPlanoFerias() {
     try {
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_GERAR_LOTE_FERIAS',
-        plano_ferias_institucional_id: planoSelecionado.id,
-        ano_referencia: Number(planoSelecionado.ano_referencia),
+        campanha_id: campanhaSelecionada.id,
+        ano_referencia: Number(campanhaSelecionada.ano_referencia),
       });
 
-      setFeedback({ type: 'success', msg: res.data?.message || 'Geração incremental concluída no Plano de Férias.' });
-      await recarregarContextoAtual();
+      setFeedback({ type: 'success', msg: res.data?.message || 'Férias geradas no SGP e campanha encerrada com sucesso!' });
+      await carregarPainel(campanhaSelecionada.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha na geração em lote.' });
     } finally {
@@ -462,7 +421,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" desativada.` });
-      await recarregarContextoAtual();
+      await carregarPainel();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao desativar campanha.' });
     } finally {
@@ -479,7 +438,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" arquivada.` });
-      await recarregarContextoAtual();
+      await carregarPainel();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao arquivar campanha.' });
     } finally {
@@ -496,7 +455,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" excluída com sucesso.` });
-      await recarregarContextoAtual();
+      await carregarPainel();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao excluir campanha.' });
     } finally {
@@ -504,19 +463,14 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  const campanhasDoPlanoSelecionado = useMemo(() => {
-    if (!planoSelecionado?.id) return campanhas.filter((c) => !c.plano_ferias_institucional_id);
-    return campanhas.filter((c) => c.plano_ferias_institucional_id === planoSelecionado.id);
-  }, [campanhas, planoSelecionado]);
-
-  // Separação de Campanhas Ativas vs Histórico dentro do Plano selecionado
+  // Separação de Campanhas Ativas vs Histórico (Desativadas/Encerradas/Arquivadas)
   const campanhasAtivas = useMemo(() => {
-    return campanhasDoPlanoSelecionado.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
-  }, [campanhasDoPlanoSelecionado]);
+    return campanhas.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
+  }, [campanhas]);
 
   const campanhasHistorico = useMemo(() => {
-    return campanhasDoPlanoSelecionado.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
-  }, [campanhasDoPlanoSelecionado]);
+    return campanhas.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
+  }, [campanhas]);
 
   // Unidades únicas
   const unidadesDisponiveis = useMemo(() => {
@@ -548,9 +502,7 @@ export default function PainelPlanoFerias() {
   const totalNaoContemplados = opcoes.filter((o) => o.status_camada_1 === 'Nao_Contemplado' || o.decisao_camada_1_opcao === 'NAO_CONTEMPLADO').length;
   const totalGeradas = opcoes.filter((o) => o.gerado_ferias_efetivas).length;
 
-  const isCampanhaEncerradaOuDesativada = filtroCampanhaId === 'TODAS'
-    ? campanhasAtivas.length === 0
-    : Boolean(campanhaSelecionada && (campanhaSelecionada.status === 'Encerrada' || campanhaSelecionada.status === 'Desativada' || campanhaSelecionada.status === 'Arquivada'));
+  const isCampanhaEncerradaOuDesativada = campanhaSelecionada && (campanhaSelecionada.status === 'Encerrada' || campanhaSelecionada.status === 'Desativada' || campanhaSelecionada.status === 'Arquivada');
 
   // Filtragem dos Militares
   const opcoesFiltradas = useMemo(() => {
@@ -615,50 +567,35 @@ export default function PainelPlanoFerias() {
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900">
-                {planoSelecionado ? planoSelecionado.titulo : (campanhaSelecionada ? campanhaSelecionada.titulo : 'Gestão de Férias')}
+                {campanhaSelecionada ? campanhaSelecionada.titulo : 'Gestão de Férias'}
               </h1>
-              {(planoSelecionado || campanhaSelecionada) && (
+              {campanhaSelecionada && (
                 <span className="bg-green-100 text-green-700 text-xs px-2.5 py-0.5 rounded-full border border-green-200 uppercase font-bold tracking-wide">
-                  {planoSelecionado?.status || (campanhaSelecionada?.status === 'Aberta_Coleta' ? 'Coleta Aberta' : campanhaSelecionada?.status)}
+                  {campanhaSelecionada.status === 'Aberta_Coleta' ? 'Coleta Aberta' : campanhaSelecionada.status}
                 </span>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 mt-1.5">
-              {planos.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-medium">Plano:</span>
-                  <select
-                    value={planoSelecionado?.id || ''}
-                    onChange={(e) => {
-                      const p = planos.find((item) => item.id === e.target.value);
-                      if (p) handleSelecionarPlano(p);
-                    }}
-                    className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-1 font-bold text-slate-800 outline-none cursor-pointer"
-                  >
-                    {planos.map((p) => (
-                      <option key={p.id} value={p.id}>{p.titulo} — {p.ano_referencia}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {campanhasDoPlanoSelecionado.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-medium">Visualizar:</span>
-                  <select
-                    value={filtroCampanhaId}
-                    onChange={(e) => handleSelecionarCampanha(e.target.value)}
-                    className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-1 font-bold text-slate-800 outline-none cursor-pointer"
-                  >
-                    {planoSelecionado && <option value="TODAS">Todas as campanhas ({campanhasDoPlanoSelecionado.length})</option>}
-                    {campanhasDoPlanoSelecionado.map((c) => (
-                      <option key={c.id} value={c.id}>{c.titulo} ({c.status})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
+            {/* SELETOR DE CAMPANHA QUANDO HOUVER MÚLTIPLAS */}
+            {campanhas.length > 1 && (
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-xs text-slate-500 font-medium">Campanha:</span>
+                <select
+                  value={campanhaSelecionada?.id || ''}
+                  onChange={(e) => {
+                    const c = campanhas.find((item) => item.id === e.target.value);
+                    if (c) handleSelecionarCampanha(c);
+                  }}
+                  className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-0.5 font-bold text-slate-800 outline-none cursor-pointer"
+                >
+                  {campanhas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.titulo} ({c.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -677,7 +614,7 @@ export default function PainelPlanoFerias() {
             <span>{modoAdmin ? 'Admin ON' : 'Admin'}</span>
           </button>
 
-          {planoSelecionado && filtroCampanhaId === 'TODAS' && (
+          {!isCampanhaEncerradaOuDesativada && (
             <button
               type="button"
               onClick={handleGerarLoteFerias}
@@ -691,8 +628,8 @@ export default function PainelPlanoFerias() {
               <i className="ph ph-lightning text-base"></i>
               <span>
                 {totalGeradas > 0 && totalGeradas === totalSalvos
-                  ? 'Férias elegíveis deste Plano já foram geradas'
-                  : `Gerar Férias Incrementais do Plano (${totalSalvos})`}
+                  ? 'Férias Desta Campanha Já Geradas'
+                  : `Gerar Férias no Sistema SGP (${totalSalvos})`}
               </span>
             </button>
           )}
@@ -718,7 +655,7 @@ export default function PainelPlanoFerias() {
       {/* CORPO DO PAINEL */}
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
         {/* PAINEL SUPERIOR DE COTAS MENSAIS E TETO DE 10% */}
-        {(planoSelecionado || campanhaSelecionada) && (
+        {campanhaSelecionada && (
           <ResumoCotasMensais
             totalEfetivo={
               campanhaSelecionada?.total_militares_escopo ||
@@ -726,7 +663,7 @@ export default function PainelPlanoFerias() {
               (totalEfetivoGeral > 0 ? totalEfetivoGeral : Math.max(opcoes.length, 100))
             }
             solicitacoes={opcoes}
-            titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${planoSelecionado?.titulo || campanhaSelecionada?.titulo}`}
+            titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${campanhaSelecionada.titulo}`}
           />
         )}
 
@@ -923,7 +860,7 @@ export default function PainelPlanoFerias() {
                 return (
                   <div
                     key={camp.id}
-                    onClick={() => handleSelecionarCampanha(camp.id)}
+                    onClick={() => handleSelecionarCampanha(camp)}
                     className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
                       isSelected
                         ? 'bg-slate-200/90 border-slate-400 shadow-sm ring-2 ring-slate-400'

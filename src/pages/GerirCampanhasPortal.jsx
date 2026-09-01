@@ -43,7 +43,6 @@ const TIPOS_CAMPOS_FORMULARIO = [
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
   const [campanhas, setCampanhas] = useState([]);
-  const [planosInstitucionais, setPlanosInstitucionais] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -62,7 +61,6 @@ export default function GerirCampanhasPortal() {
     isEditing: false,
     editId: null,
     tipo: 'PLANO_FERIAS',
-    plano_ferias_institucional_id: '',
     status: 'Aberta_Coleta',
     titulo: 'Plano Anual de Férias 2027',
     ano_referencia: new Date().getFullYear() + 1,
@@ -86,12 +84,8 @@ export default function GerirCampanhasPortal() {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      const [res, planosRes] = await Promise.all([
-        base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' }),
-        base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' }),
-      ]);
+      const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
       setCampanhas(res.data?.campanhas || []);
-      setPlanosInstitucionais(planosRes.data?.planos || []);
 
       let unidades = [];
       try {
@@ -144,7 +138,6 @@ export default function GerirCampanhasPortal() {
         isEditing: false,
         editId: null,
         tipo: 'PLANO_FERIAS',
-        plano_ferias_institucional_id: '',
         status: 'Aberta_Coleta',
         titulo: `Plano Anual de Férias ${ano}`,
         ano_referencia: ano,
@@ -284,7 +277,6 @@ export default function GerirCampanhasPortal() {
       isEditing: true,
       editId: camp.id,
       tipo: camp.tipo || 'PLANO_FERIAS',
-      plano_ferias_institucional_id: camp.plano_ferias_institucional_id || '',
       status: camp.status || 'Aberta_Coleta',
       titulo: camp.titulo || '',
       ano_referencia: camp.ano_referencia || (new Date().getFullYear() + 1),
@@ -394,59 +386,6 @@ export default function GerirCampanhasPortal() {
     }
   };
 
-  const handleCriarPlanoInstitucionalRapido = async () => {
-    const ano = Number(window.prompt('Ano de referência do novo Plano de Férias:', String(new Date().getFullYear() + 1)));
-    if (!ano) return;
-    const titulo = window.prompt('Nome do novo Plano de Férias:', `Plano de Férias ${ano}`);
-    if (!titulo?.trim()) return;
-    setActionLoading(true);
-    try {
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_INSTITUCIONAL_CRIAR',
-        plano_payload: { titulo: titulo.trim(), ano_referencia: ano, status: 'ATIVO' },
-      });
-      await carregarDados();
-      setFeedback({ type: 'success', msg: `Plano de Férias "${titulo.trim()}" cadastrado. Agora crie as campanhas dentro dele.` });
-    } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao criar Plano de Férias.' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleCriarPlanoInstitucional = async () => {
-    const ano = Number(modalNovaCampanha.ano_referencia) || (new Date().getFullYear() + 1);
-    const tituloSugerido = `Plano de Férias ${ano}`;
-    const titulo = window.prompt('Nome do novo Plano Institucional de Férias:', tituloSugerido);
-    if (!titulo?.trim()) return;
-
-    setActionLoading(true);
-    try {
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_INSTITUCIONAL_CRIAR',
-        plano_payload: {
-          titulo: titulo.trim(),
-          ano_referencia: ano,
-          status: 'ATIVO',
-        },
-      });
-      const novoPlano = res.data?.plano;
-      const planosRes = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' });
-      setPlanosInstitucionais(planosRes.data?.planos || []);
-      if (novoPlano?.id) {
-        setModalNovaCampanha((prev) => ({
-          ...prev,
-          plano_ferias_institucional_id: novoPlano.id,
-        }));
-      }
-      setFeedback({ type: 'success', msg: `Plano Institucional "${titulo.trim()}" criado. Agora esta campanha pode ser vinculada a ele.` });
-    } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao criar Plano Institucional de Férias.' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleSalvarCampanha = async (e) => {
     e.preventDefault();
     if (!modalNovaCampanha.titulo.trim()) {
@@ -467,17 +406,9 @@ export default function GerirCampanhasPortal() {
         .map((id) => unidadesList.find((u) => u.id === id)?.nome || id)
         .join(', ');
 
-      if (modalNovaCampanha.tipo === 'PLANO_FERIAS' && !modalNovaCampanha.plano_ferias_institucional_id) {
-        alert('Selecione ou crie um Plano Institucional de Férias antes de salvar esta nova campanha. Campanhas antigas continuam compatíveis, mas novas campanhas devem ser agrupadas.');
-        return;
-      }
-
       const payload = {
         titulo: modalNovaCampanha.titulo,
         tipo: modalNovaCampanha.tipo,
-        plano_ferias_institucional_id: modalNovaCampanha.tipo === 'PLANO_FERIAS'
-          ? modalNovaCampanha.plano_ferias_institucional_id
-          : undefined,
         status: modalNovaCampanha.status || 'Aberta_Coleta',
         ano_referencia: Number(modalNovaCampanha.ano_referencia) || undefined,
         tipo_escopo: modalNovaCampanha.tipo_escopo,
@@ -650,20 +581,11 @@ export default function GerirCampanhasPortal() {
 
             <Button
               type="button"
-              onClick={handleCriarPlanoInstitucionalRapido}
+              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
               className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
               <Calendar className="w-3.5 h-3.5 mr-1" />
               Novo Plano de Férias
-            </Button>
-
-            <Button
-              type="button"
-              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
-              className="bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
-            >
-              <Megaphone className="w-3.5 h-3.5 mr-1" />
-              Nova Campanha de Férias
             </Button>
 
             <Button
@@ -1070,43 +992,6 @@ export default function GerirCampanhasPortal() {
                     />
                   </div>
                 </div>
-
-                {modalNovaCampanha.tipo === 'PLANO_FERIAS' && (
-                  <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-                      <div className="flex-1 space-y-1">
-                        <label className="font-bold text-slate-700 block">Plano Institucional de Férias *</label>
-                        <select
-                          value={modalNovaCampanha.plano_ferias_institucional_id || ''}
-                          onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, plano_ferias_institucional_id: e.target.value })}
-                          className="w-full h-10 px-3 border border-blue-300 rounded-xl text-xs bg-white outline-none focus:border-[#1e3a5f] font-semibold"
-                        >
-                          <option value="">Selecione o plano que agrupará esta campanha...</option>
-                          {planosInstitucionais
-                            .filter((p) => Number(p.ano_referencia) === Number(modalNovaCampanha.ano_referencia) && String(p.status || 'ATIVO') === 'ATIVO')
-                            .map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.titulo} — {p.ano_referencia} ({p.total_campanhas || 0} campanha(s))
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCriarPlanoInstitucional}
-                        disabled={actionLoading}
-                        className="h-10 text-xs border-blue-300 text-blue-800 bg-white hover:bg-blue-100"
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        Criar novo Plano
-                      </Button>
-                    </div>
-                    <p className="text-[11px] text-blue-800">
-                      Campanhas piloto, gerais e complementares vinculadas ao mesmo plano serão consolidadas no Painel do Plano de Férias.
-                    </p>
-                  </div>
-                )}
 
                 {/* ESCOPO */}
                 <div className="space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
