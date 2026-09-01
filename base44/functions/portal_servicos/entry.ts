@@ -741,8 +741,20 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          const campanhaAtual = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+          const planoIdEditado = String(campanha_payload?.plano_ferias_institucional_id || '').trim();
+          if (campanhaAtual?.tipo === 'PLANO_FERIAS' && planoIdEditado) {
+            const planoEditado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoIdEditado);
+            if (!planoEditado) {
+              return new Response(JSON.stringify({ error: 'Plano de Férias informado não foi encontrado.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+            if (Number(planoEditado.ano_referencia) !== Number(campanha_payload.ano_referencia)) {
+              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser igual ao ano do Plano de Férias.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+          }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
+            plano_ferias_institucional_id: planoIdEditado,
             ano_referencia: Number(campanha_payload.ano_referencia) || undefined,
             status: campanha_payload.status || 'Aberta_Coleta',
             instrucoes: campanha_payload.instrucoes,
