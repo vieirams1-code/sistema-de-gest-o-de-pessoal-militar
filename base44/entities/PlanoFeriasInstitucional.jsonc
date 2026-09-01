@@ -1,0 +1,60 @@
+{
+  "name": "PlanoFeriasInstitucional",
+  "type": "object",
+  "title": "Plano de F\u00e9rias Institucional",
+  "description": "Cont\u00eainer hist\u00f3rico para reunir campanhas de coleta e gerar f\u00e9rias de forma consolidada.",
+  "properties": {
+    "ano_referencia": {
+      "type": "number",
+      "description": "Ano de frui\u00e7\u00e3o das f\u00e9rias."
+    },
+    "titulo": {
+      "type": "string",
+      "description": "Nome identificador do plano."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ATIVO",
+        "ENCERRADO",
+        "ARQUIVADO"
+      ],
+      "default": "ATIVO",
+      "description": "ATIVO permite novas campanhas complementares e gera\u00e7\u00e3o."
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es administrativas do plano."
+    },
+    "data_abertura": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de abertura do plano."
+    },
+    "data_encerramento": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de encerramento administrativo do plano."
+    },
+    "data_ultima_geracao": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima gera\u00e7\u00e3o consolidada realizada no plano."
+    },
+    "total_gerados_acumulado": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade acumulada de registros de f\u00e9rias gerados pelo plano."
+    },
+    "quantidade_geracoes": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de execu\u00e7\u00f5es de gera\u00e7\u00e3o do plano."
+    }
+  },
+  "required": [
+    "ano_referencia",
+    "titulo",
+    "status"
+  ]
+}

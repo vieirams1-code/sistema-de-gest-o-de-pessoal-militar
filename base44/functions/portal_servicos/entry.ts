@@ -83,6 +83,8 @@ interface PortalServicosPayload {
   opcao_3?: OpcaoPreferencia;
   // Gestão de Campanhas
   campanha_id?: string;
+  plano_ferias_institucional_id?: string;
+  plano_payload?: any;
   campanha_payload?: any;
   ano_referencia?: number;
   opcao_id?: string;
@@ -271,6 +273,9 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
 }
 
 function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
+  if (['PLANO_INSTITUCIONAL_LISTAR', 'PLANO_INSTITUCIONAL_CRIAR'].includes(acao)) {
+    return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
+  }
   if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
   if (acao.startsWith('CADASTRO_DECIDIR_')) return ['perm_gerir_respostas'];
   if (acao.startsWith('PLANO_')) return ['perm_gerir_respostas'];
@@ -378,6 +383,40 @@ Deno.serve(async (req: Request) => {
       }
 
       switch (acao) {
+        case 'PLANO_INSTITUCIONAL_LISTAR': {
+          const planos = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
+          return new Response(JSON.stringify({ ok: true, planos: planos || [] }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        case 'PLANO_INSTITUCIONAL_CRIAR': {
+          const pp = payload.plano_payload || {};
+          const ano = Number(pp.ano_referencia);
+          const titulo = String(pp.titulo || '').trim();
+          if (!Number.isInteger(ano) || ano < 2000 || ano > 2200 || !titulo) {
+            return new Response(JSON.stringify({ error: 'Ano e título do plano são obrigatórios.' }), {
+              status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const criado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.create({
+            ano_referencia: ano,
+            titulo,
+            status: 'ATIVO',
+            descricao: String(pp.descricao || ''),
+            data_abertura: pp.data_abertura || new Date().toISOString().slice(0, 10),
+            data_encerramento: '',
+            total_gerados_acumulado: 0,
+            quantidade_geracoes: 0,
+          });
+          return new Response(JSON.stringify({ ok: true, plano: criado }), {
+            status: 201,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
         // Criar Nova Campanha (Férias ou Cadastral com Escopo)
         case 'CAMPANHA_CRIAR': {
           const cp = payload.campanha_payload || {};
@@ -416,6 +455,7 @@ Deno.serve(async (req: Request) => {
             tipo: cp.tipo,
             titulo: cp.titulo,
             ano_referencia: cp.ano_referencia || (new Date().getFullYear() + 1),
+            plano_ferias_institucional_id: cp.plano_ferias_institucional_id || '',
             status: cp.status || 'Aberta_Coleta',
             tipo_escopo: cp.tipo_escopo || 'TODOS',
             escopo_unidades_ids: cp.escopo_unidades_ids || [],
