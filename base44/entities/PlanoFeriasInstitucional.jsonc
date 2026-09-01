@@ -1,0 +1,54 @@
+{
+  "name": "PlanoFeriasInstitucional",
+  "type": "object",
+  "title": "Plano Institucional de F\u00e9rias",
+  "description": "Agrupador administrativo que consolida uma ou mais campanhas do Portal do Militar referentes ao mesmo plano institucional de f\u00e9rias.",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "description": "Nome do plano institucional (ex: Plano de F\u00e9rias - Campo Grande - 2027)"
+    },
+    "ano_referencia": {
+      "type": "number",
+      "description": "Ano de frui\u00e7\u00e3o das f\u00e9rias"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o ou observa\u00e7\u00f5es gerais do plano"
+    },
+    "estrutura_id": {
+      "type": "string",
+      "description": "ID opcional da estrutura/unidade de refer\u00eancia do plano"
+    },
+    "estrutura_nome": {
+      "type": "string",
+      "description": "Nome denormalizado da estrutura/unidade de refer\u00eancia"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "RASCUNHO",
+        "ATIVO",
+        "ENCERRADO",
+        "ARQUIVADO"
+      ],
+      "default": "ATIVO"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "titulo",
+    "ano_referencia",
+    "status"
+  ]
+}
