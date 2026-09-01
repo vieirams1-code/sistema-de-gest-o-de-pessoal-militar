@@ -2393,7 +2393,20 @@ Deno.serve(async (req: Request) => {
           let respostaId = null;
 
           if (cp.tipo === 'PLANO_FERIAS') {
-            const op = opcoesFerias.find((o: any) => o.campanha_id === cp.id || o.ano_referencia === cp.ano_referencia);
+            let op: any = null;
+            if (cp.plano_ferias_institucional_id) {
+              const campanhasMesmoPlanoIds = new Set(
+                campanhasAtivasMilitar
+                  .filter((c: any) => c.tipo === 'PLANO_FERIAS' && c.plano_ferias_institucional_id === cp.plano_ferias_institucional_id)
+                  .map((c: any) => c.id)
+              );
+              op = opcoesFerias.find((o: any) =>
+                o.plano_ferias_institucional_id === cp.plano_ferias_institucional_id ||
+                campanhasMesmoPlanoIds.has(o.campanha_id)
+              );
+            } else {
+              op = opcoesFerias.find((o: any) => o.campanha_id === cp.id);
+            }
             if (op) {
               statusResposta = 'Respondido';
               dataResposta = op.data_envio_militar || op.created_date;
