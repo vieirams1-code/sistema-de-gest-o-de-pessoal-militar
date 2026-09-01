@@ -1604,27 +1604,12 @@ Deno.serve(async (req: Request) => {
               geradasCount++;
             }
 
-            // ENCERRAMENTO AUTOMÁTICO apenas do escopo explicitamente processado.
-            // Nunca encerrar campanhas diferentes só porque possuem o mesmo ano.
-            try {
-              if (campanha_id) {
-                await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
-                  status: 'Encerrada',
-                });
-              } else if (plano_ferias_institucional_id) {
-                const campanhasPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id });
-                for (const cp of (campanhasPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS')) {
-                  await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, { status: 'Encerrada' });
-                }
-                try {
-                  await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(plano_ferias_institucional_id, { status: 'ENCERRADO' });
-                } catch (_ePlano) {}
-              }
-            } catch (_errClose) {}
+            // A geração é incremental: não encerra campanha nem plano.
+            // O gestor pode abrir campanhas complementares e executar novos lotes no mesmo plano.
 
             return new Response(JSON.stringify({
               ok: true,
-              message: `Geração automática concluída com sucesso! ${geradasCount} escalas de férias geradas no SGP e campanha encerrada.`,
+              message: `Geração incremental concluída com sucesso! ${geradasCount} escala(s) de férias nova(s) gerada(s) no SGP. O Plano permanece aberto para campanhas complementares.`,
               total_geradas: geradasCount,
             }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
