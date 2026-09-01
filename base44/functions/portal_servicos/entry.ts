@@ -1608,6 +1608,17 @@ Deno.serve(async (req: Request) => {
               geradasCount++;
             }
 
+            if (plano_ferias_institucional_id) {
+              try {
+                const planoAtual = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(plano_ferias_institucional_id);
+                await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(plano_ferias_institucional_id, {
+                  data_ultima_geracao: new Date().toISOString(),
+                  total_gerados_acumulado: Number(planoAtual?.total_gerados_acumulado || 0) + geradasCount,
+                  quantidade_geracoes: Number(planoAtual?.quantidade_geracoes || 0) + 1,
+                });
+              } catch (_errPlanoGeracao) {}
+            }
+
             // A geração é incremental: não encerra campanha nem plano.
             // O gestor pode abrir campanhas complementares e executar novos lotes no mesmo plano.
 
