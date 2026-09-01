@@ -412,10 +412,29 @@ Deno.serve(async (req: Request) => {
             return true;
           });
 
+          let planoInstitucionalId = cp.plano_ferias_institucional_id || null;
+          if (cp.tipo === 'PLANO_FERIAS' && planoInstitucionalId) {
+            const planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoInstitucionalId);
+            if (!planoInstitucional) {
+              return new Response(JSON.stringify({ error: 'Plano institucional de férias não encontrado.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (cp.ano_referencia && Number(planoInstitucional.ano_referencia) !== Number(cp.ano_referencia)) {
+              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser o mesmo ano do Plano Institucional de Férias selecionado.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+          }
+          if (cp.tipo !== 'PLANO_FERIAS') planoInstitucionalId = null;
+
           const created = await base44.asServiceRole.entities.CampanhaPortal.create({
             tipo: cp.tipo,
             titulo: cp.titulo,
             ano_referencia: cp.ano_referencia || (new Date().getFullYear() + 1),
+            plano_ferias_institucional_id: planoInstitucionalId || undefined,
             status: cp.status || 'Aberta_Coleta',
             tipo_escopo: cp.tipo_escopo || 'TODOS',
             escopo_unidades_ids: cp.escopo_unidades_ids || [],
@@ -671,9 +690,22 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          let planoInstitucionalEdicao = campanha_payload.plano_ferias_institucional_id || null;
+          if (campanha_payload.tipo === 'PLANO_FERIAS' && planoInstitucionalEdicao) {
+            const planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoInstitucionalEdicao);
+            if (!planoInstitucional) {
+              return new Response(JSON.stringify({ error: 'Plano institucional de férias não encontrado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+            if (campanha_payload.ano_referencia && Number(planoInstitucional.ano_referencia) !== Number(campanha_payload.ano_referencia)) {
+              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser o mesmo ano do Plano Institucional de Férias selecionado.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+          }
+          if (campanha_payload.tipo !== 'PLANO_FERIAS') planoInstitucionalEdicao = null;
+
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
             ano_referencia: Number(campanha_payload.ano_referencia) || undefined,
+            plano_ferias_institucional_id: planoInstitucionalEdicao || undefined,
             status: campanha_payload.status || 'Aberta_Coleta',
             instrucoes: campanha_payload.instrucoes,
             data_fim_militar: campanha_payload.data_fim_militar,
