@@ -615,35 +615,50 @@ export default function PainelPlanoFerias() {
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900">
-                {campanhaSelecionada ? campanhaSelecionada.titulo : 'Gestão de Férias'}
+                {planoSelecionado ? planoSelecionado.titulo : (campanhaSelecionada ? campanhaSelecionada.titulo : 'Gestão de Férias')}
               </h1>
-              {campanhaSelecionada && (
+              {(planoSelecionado || campanhaSelecionada) && (
                 <span className="bg-green-100 text-green-700 text-xs px-2.5 py-0.5 rounded-full border border-green-200 uppercase font-bold tracking-wide">
-                  {campanhaSelecionada.status === 'Aberta_Coleta' ? 'Coleta Aberta' : campanhaSelecionada.status}
+                  {planoSelecionado?.status || (campanhaSelecionada?.status === 'Aberta_Coleta' ? 'Coleta Aberta' : campanhaSelecionada?.status)}
                 </span>
               )}
             </div>
 
-            {/* SELETOR DE CAMPANHA QUANDO HOUVER MÚLTIPLAS */}
-            {campanhas.length > 1 && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-xs text-slate-500 font-medium">Campanha:</span>
-                <select
-                  value={campanhaSelecionada?.id || ''}
-                  onChange={(e) => {
-                    const c = campanhas.find((item) => item.id === e.target.value);
-                    if (c) handleSelecionarCampanha(c);
-                  }}
-                  className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-0.5 font-bold text-slate-800 outline-none cursor-pointer"
-                >
-                  {campanhas.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.titulo} ({c.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3 mt-1.5">
+              {planos.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-medium">Plano:</span>
+                  <select
+                    value={planoSelecionado?.id || ''}
+                    onChange={(e) => {
+                      const p = planos.find((item) => item.id === e.target.value);
+                      if (p) handleSelecionarPlano(p);
+                    }}
+                    className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-1 font-bold text-slate-800 outline-none cursor-pointer"
+                  >
+                    {planos.map((p) => (
+                      <option key={p.id} value={p.id}>{p.titulo} — {p.ano_referencia}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {campanhasDoPlanoSelecionado.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-medium">Visualizar:</span>
+                  <select
+                    value={filtroCampanhaId}
+                    onChange={(e) => handleSelecionarCampanha(e.target.value)}
+                    className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-1 font-bold text-slate-800 outline-none cursor-pointer"
+                  >
+                    {planoSelecionado && <option value="TODAS">Todas as campanhas ({campanhasDoPlanoSelecionado.length})</option>}
+                    {campanhasDoPlanoSelecionado.map((c) => (
+                      <option key={c.id} value={c.id}>{c.titulo} ({c.status})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
