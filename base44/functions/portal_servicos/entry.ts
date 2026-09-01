@@ -1380,7 +1380,7 @@ Deno.serve(async (req: Request) => {
           }
 
           if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
-            const { campanha_id } = payload;
+            const { campanha_id, plano_ferias_institucional_id } = payload;
             let todasOpcoes: any[] = [];
 
             if (campanha_id) {
@@ -1388,13 +1388,27 @@ Deno.serve(async (req: Request) => {
                 campanha_id: campanha_id,
                 gerado_ferias_efetivas: false,
               });
-              if (!todasOpcoes || todasOpcoes.length === 0) {
-                todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-                  ano_referencia: ano,
-                  gerado_ferias_efetivas: false,
-                });
+            } else if (plano_ferias_institucional_id) {
+              const [campanhasPlano, todasOpcoesPlano] = await Promise.all([
+                base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id }),
+                base44.asServiceRole.entities.OpcaoFeriasMilitar.list(),
+              ]);
+              const campanhasPlanoIds = new Set((campanhasPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
+              const candidatas = (todasOpcoesPlano || []).filter((op: any) =>
+                op.gerado_ferias_efetivas !== true &&
+                (op.plano_ferias_institucional_id === plano_ferias_institucional_id || campanhasPlanoIds.has(op.campanha_id))
+              );
+              const porMilitarPeriodo = new Map<string, any>();
+              for (const op of candidatas) {
+                const chave = `${op.militar_id || ''}::${op.periodo_aquisitivo_id || ''}`;
+                const anterior = porMilitarPeriodo.get(chave);
+                if (!anterior || String(op.data_envio_militar || op.updated_date || op.created_date || '') > String(anterior.data_envio_militar || anterior.updated_date || anterior.created_date || '')) {
+                  porMilitarPeriodo.set(chave, op);
+                }
               }
+              todasOpcoes = Array.from(porMilitarPeriodo.values());
             } else {
+              // Compatibilidade legada: sem campanha/plano explícito, mantém busca pelo ano.
               todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
                 ano_referencia: ano,
                 gerado_ferias_efetivas: false,
