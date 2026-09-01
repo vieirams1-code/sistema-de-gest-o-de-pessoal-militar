@@ -650,11 +650,20 @@ export default function GerirCampanhasPortal() {
 
             <Button
               type="button"
-              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
+              onClick={handleCriarPlanoInstitucionalRapido}
               className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
               <Calendar className="w-3.5 h-3.5 mr-1" />
               Novo Plano de Férias
+            </Button>
+
+            <Button
+              type="button"
+              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
+              className="bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
+            >
+              <Megaphone className="w-3.5 h-3.5 mr-1" />
+              Nova Campanha de Férias
             </Button>
 
             <Button
