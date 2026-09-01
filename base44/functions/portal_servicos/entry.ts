@@ -417,11 +417,23 @@ Deno.serve(async (req: Request) => {
           });
 
           let planoInstitucionalId = cp.plano_ferias_institucional_id || null;
-          if (cp.tipo === 'PLANO_FERIAS' && planoInstitucionalId) {
+          if (cp.tipo === 'PLANO_FERIAS') {
+            if (!planoInstitucionalId) {
+              return new Response(JSON.stringify({ error: 'Toda nova campanha de férias deve estar vinculada a um Plano de Férias aberto.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
             const planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoInstitucionalId);
             if (!planoInstitucional) {
               return new Response(JSON.stringify({ error: 'Plano institucional de férias não encontrado.' }), {
                 status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (String(planoInstitucional.status || 'ATIVO') !== 'ATIVO') {
+              return new Response(JSON.stringify({ error: 'O Plano de Férias precisa estar aberto para receber novas campanhas.' }), {
+                status: 409,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
