@@ -1021,6 +1021,103 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        // Planos Institucionais de Férias — agrupam múltiplas campanhas do mesmo plano administrativo
+        case 'PLANO_INSTITUCIONAL_LISTAR': {
+          let planos: any[] = [];
+          let campanhas: any[] = [];
+          try {
+            planos = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
+          } catch (_e) {
+            planos = [];
+          }
+          try {
+            campanhas = await base44.asServiceRole.entities.CampanhaPortal.list();
+          } catch (_e) {
+            campanhas = [];
+          }
+          const campanhasFerias = (campanhas || []).filter((c: any) => c.tipo === 'PLANO_FERIAS');
+          const enriquecidos = (planos || []).map((plano: any) => {
+            const campanhasPlano = campanhasFerias.filter((c: any) => c.plano_ferias_institucional_id === plano.id);
+            return {
+              ...plano,
+              total_campanhas: campanhasPlano.length,
+              campanhas_ids: campanhasPlano.map((c: any) => c.id),
+            };
+          });
+          return new Response(JSON.stringify({
+            ok: true,
+            planos: enriquecidos,
+            campanhas_sem_plano: campanhasFerias.filter((c: any) => !c.plano_ferias_institucional_id),
+          }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
+        case 'PLANO_INSTITUCIONAL_CRIAR': {
+          const pp = payload.plano_payload || payload;
+          const titulo = String(pp.titulo || '').trim();
+          const anoReferencia = Number(pp.ano_referencia);
+          if (!titulo || !anoReferencia) {
+            return new Response(JSON.stringify({ error: 'Título e ano de referência do Plano Institucional são obrigatórios.' }), {
+              status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const existentes = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
+          const duplicado = (existentes || []).find((p: any) =>
+            Number(p.ano_referencia) === anoReferencia &&
+            String(p.titulo || '').trim().toLowerCase() === titulo.toLowerCase() &&
+            String(p.status || '') !== 'ARQUIVADO'
+          );
+          if (duplicado) {
+            return new Response(JSON.stringify({ error: 'Já existe um Plano Institucional ativo com este título e ano.', plano: duplicado }), {
+              status: 409,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.create({
+            titulo,
+            ano_referencia: anoReferencia,
+            descricao: pp.descricao || '',
+            estrutura_id: pp.estrutura_id || '',
+            estrutura_nome: pp.estrutura_nome || '',
+            status: pp.status || 'ATIVO',
+            observacoes: pp.observacoes || '',
+          });
+          return new Response(JSON.stringify({ ok: true, plano }), {
+            status: 201,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        case 'PLANO_INSTITUCIONAL_ATUALIZAR': {
+          const { plano_id, plano_payload } = payload;
+          if (!plano_id) {
+            return new Response(JSON.stringify({ error: 'ID do Plano Institucional não informado.' }), {
+              status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const atual = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(plano_id);
+          if (!atual) {
+            return new Response(JSON.stringify({ error: 'Plano Institucional não encontrado.' }), {
+              status: 404,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const atualizado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(plano_id, {
+            titulo: plano_payload?.titulo ?? atual.titulo,
+            ano_referencia: Number(plano_payload?.ano_referencia ?? atual.ano_referencia),
+            descricao: plano_payload?.descricao ?? atual.descricao ?? '',
+            estrutura_id: plano_payload?.estrutura_id ?? atual.estrutura_id ?? '',
+            estrutura_nome: plano_payload?.estrutura_nome ?? atual.estrutura_nome ?? '',
+            status: plano_payload?.status ?? atual.status ?? 'ATIVO',
+            observacoes: plano_payload?.observacoes ?? atual.observacoes ?? '',
+          });
+          return new Response(JSON.stringify({ ok: true, plano: atualizado }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
         // Rotas legadas de compatibilidade
         case 'PLANO_CAMPANHA_OBTER_OU_CRIAR':
         case 'PLANO_CAMPANHA_SALVAR':
