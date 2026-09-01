@@ -414,29 +414,33 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  // Geração de Férias Específica desta Campanha
+  // Geração de Férias do contexto atual: campanha filtrada ou Plano Institucional consolidado.
   const handleGerarLoteFerias = async () => {
-    if (!campanhaSelecionada) return;
+    if (!campanhaSelecionada && !planoSelecionado) return;
 
     const totalContemplados = opcoes.filter(
       (o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && !o.gerado_ferias_efetivas
     ).length;
 
     if (totalContemplados === 0) {
-      alert('Não há militares com escala salva prontos para geração de férias nesta campanha.');
+      alert('Não há militares com escala salva prontos para geração de férias neste contexto.');
       return;
     }
 
-    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados da campanha "${campanhaSelecionada.titulo}"? A campanha será encerrada e as férias cadastradas no SGP.`)) {
+    const gerandoPlanoCompleto = filtroCampanhaId === 'TODAS' && Boolean(planoSelecionado?.id);
+    const contextoNome = gerandoPlanoCompleto ? planoSelecionado.titulo : campanhaSelecionada?.titulo;
+    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados de "${contextoNome}"? As férias serão cadastradas no SGP.`)) {
       return;
     }
 
     setActionLoading(true);
     try {
+      const gerandoPlanoCompleto = filtroCampanhaId === 'TODAS' && Boolean(planoSelecionado?.id);
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_GERAR_LOTE_FERIAS',
-        campanha_id: campanhaSelecionada.id,
-        ano_referencia: Number(campanhaSelecionada.ano_referencia),
+        campanha_id: gerandoPlanoCompleto ? undefined : campanhaSelecionada?.id,
+        plano_ferias_institucional_id: gerandoPlanoCompleto ? planoSelecionado.id : undefined,
+        ano_referencia: Number(planoSelecionado?.ano_referencia || campanhaSelecionada?.ano_referencia),
       });
 
       setFeedback({ type: 'success', msg: res.data?.message || 'Férias geradas no SGP e campanha encerrada com sucesso!' });
