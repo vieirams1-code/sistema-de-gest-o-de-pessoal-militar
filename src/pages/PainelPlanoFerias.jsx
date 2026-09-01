@@ -923,7 +923,7 @@ export default function PainelPlanoFerias() {
                 return (
                   <div
                     key={camp.id}
-                    onClick={() => handleSelecionarCampanha(camp)}
+                    onClick={() => handleSelecionarCampanha(camp.id)}
                     className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
                       isSelected
                         ? 'bg-slate-200/90 border-slate-400 shadow-sm ring-2 ring-slate-400'
