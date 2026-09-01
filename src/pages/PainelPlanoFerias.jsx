@@ -677,7 +677,7 @@ export default function PainelPlanoFerias() {
             <span>{modoAdmin ? 'Admin ON' : 'Admin'}</span>
           </button>
 
-          {planoSelecionado && filtroCampanhaId === 'TODAS' && !isCampanhaEncerradaOuDesativada && (
+          {planoSelecionado && filtroCampanhaId === 'TODAS' && (
             <button
               type="button"
               onClick={handleGerarLoteFerias}
