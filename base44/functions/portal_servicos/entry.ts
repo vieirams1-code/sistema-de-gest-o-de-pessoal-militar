@@ -427,6 +427,36 @@ Deno.serve(async (req: Request) => {
             });
           }
 
+          let planoInstitucional: any = null;
+          if (cp.tipo === 'PLANO_FERIAS') {
+            const planoId = String(cp.plano_ferias_institucional_id || '').trim();
+            if (!planoId) {
+              return new Response(JSON.stringify({ error: 'Toda campanha de férias deve estar vinculada a um Plano de Férias aberto.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
+            if (!planoInstitucional) {
+              return new Response(JSON.stringify({ error: 'Plano de Férias informado não foi encontrado.' }), {
+                status: 404,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (String(planoInstitucional.status || 'ATIVO') !== 'ATIVO') {
+              return new Response(JSON.stringify({ error: 'Somente Planos de Férias abertos podem receber novas campanhas.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (Number(planoInstitucional.ano_referencia) !== Number(cp.ano_referencia)) {
+              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser igual ao ano do Plano de Férias.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+          }
+
           // Busca militares para calcular o total do público-alvo
           let todosMilitares: any[] = [];
           try {
