@@ -2153,9 +2153,20 @@ Deno.serve(async (req: Request) => {
 
       case 'FERIAS_SUBMETER_OPCAO': {
         const { periodo_aquisitivo_id, modalidade, opcao_1, opcao_2, opcao_3 } = payload;
-        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
-        const campanhaId = payload.campanha_id || campanhaFeriasAtiva?.id || null;
-        const anoCampanha = payload.ano_referencia || campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
+        const campanhasFeriasAplicaveis = campanhasAtivasMilitar.filter((c) => c.tipo === 'PLANO_FERIAS');
+        const campanhaSolicitada = payload.campanha_id
+          ? campanhasFeriasAplicaveis.find((c: any) => c.id === payload.campanha_id)
+          : null;
+        if (payload.campanha_id && !campanhaSolicitada) {
+          return new Response(JSON.stringify({ error: 'Campanha de férias inválida ou não aplicável a este militar.' }), {
+            status: 403,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+        const campanhaFeriasAtiva = campanhaSolicitada || campanhasFeriasAplicaveis[0] || null;
+        const campanhaId = campanhaFeriasAtiva?.id || null;
+        const planoInstitucionalId = campanhaFeriasAtiva?.plano_ferias_institucional_id || null;
+        const anoCampanha = campanhaFeriasAtiva?.ano_referencia || payload.ano_referencia || (new Date().getFullYear() + 1);
 
         // Guard de Dependência em Cascata
         let regrasCampanhaSubmissao: any = {};
