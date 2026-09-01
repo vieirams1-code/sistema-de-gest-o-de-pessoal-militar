@@ -416,7 +416,10 @@ export default function PainelPlanoFerias() {
 
   // Geração de Férias do contexto atual: campanha filtrada ou Plano Institucional consolidado.
   const handleGerarLoteFerias = async () => {
-    if (!campanhaSelecionada && !planoSelecionado) return;
+    if (!planoSelecionado?.id || filtroCampanhaId !== 'TODAS') {
+      alert('Selecione o plano completo (Todas as campanhas) para gerar férias. A geração é feita somente no nível do Plano.');
+      return;
+    }
 
     const totalContemplados = opcoes.filter(
       (o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && !o.gerado_ferias_efetivas
@@ -427,23 +430,20 @@ export default function PainelPlanoFerias() {
       return;
     }
 
-    const gerandoPlanoCompleto = filtroCampanhaId === 'TODAS' && Boolean(planoSelecionado?.id);
-    const contextoNome = gerandoPlanoCompleto ? planoSelecionado.titulo : campanhaSelecionada?.titulo;
-    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados de "${contextoNome}"? As férias serão cadastradas no SGP.`)) {
+    const contextoNome = planoSelecionado.titulo;
+    if (!window.confirm(`Confirma a geração incremental de férias para os ${totalContemplados} militares contemplados do Plano "${contextoNome}"? Somente férias ainda não geradas serão cadastradas no SGP.`)) {
       return;
     }
 
     setActionLoading(true);
     try {
-      const gerandoPlanoCompleto = filtroCampanhaId === 'TODAS' && Boolean(planoSelecionado?.id);
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_GERAR_LOTE_FERIAS',
-        campanha_id: gerandoPlanoCompleto ? undefined : campanhaSelecionada?.id,
-        plano_ferias_institucional_id: gerandoPlanoCompleto ? planoSelecionado.id : undefined,
-        ano_referencia: Number(planoSelecionado?.ano_referencia || campanhaSelecionada?.ano_referencia),
+        plano_ferias_institucional_id: planoSelecionado.id,
+        ano_referencia: Number(planoSelecionado.ano_referencia),
       });
 
-      setFeedback({ type: 'success', msg: res.data?.message || 'Férias geradas no SGP e campanha encerrada com sucesso!' });
+      setFeedback({ type: 'success', msg: res.data?.message || 'Geração incremental concluída no Plano de Férias.' });
       await recarregarContextoAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha na geração em lote.' });
@@ -677,7 +677,7 @@ export default function PainelPlanoFerias() {
             <span>{modoAdmin ? 'Admin ON' : 'Admin'}</span>
           </button>
 
-          {!isCampanhaEncerradaOuDesativada && (
+          {planoSelecionado && filtroCampanhaId === 'TODAS' && !isCampanhaEncerradaOuDesativada && (
             <button
               type="button"
               onClick={handleGerarLoteFerias}
@@ -691,8 +691,8 @@ export default function PainelPlanoFerias() {
               <i className="ph ph-lightning text-base"></i>
               <span>
                 {totalGeradas > 0 && totalGeradas === totalSalvos
-                  ? (filtroCampanhaId === 'TODAS' ? 'Férias Deste Plano Já Geradas' : 'Férias Desta Campanha Já Geradas')
-                  : `Gerar Férias no Sistema SGP (${totalSalvos})`}
+                  ? 'Férias elegíveis deste Plano já foram geradas'
+                  : `Gerar Férias Incrementais do Plano (${totalSalvos})`}
               </span>
             </button>
           )}
