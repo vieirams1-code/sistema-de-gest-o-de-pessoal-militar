@@ -1196,8 +1196,9 @@ Deno.serve(async (req: Request) => {
                   .map((c: any) => c.id)
               );
               const candidatas = (allOpcoes || []).filter((op: any) =>
-                op.plano_ferias_institucional_id === payload.plano_ferias_institucional_id ||
-                (op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
+                op.plano_ferias_institucional_id
+                  ? op.plano_ferias_institucional_id === payload.plano_ferias_institucional_id
+                  : Boolean(op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
               );
               const porMilitarPeriodo = new Map<string, any>();
               for (const op of candidatas) {
@@ -1216,8 +1217,9 @@ Deno.serve(async (req: Request) => {
                   .map((c: any) => c.id)
               );
               const candidatas = (allOpcoes || []).filter((op: any) =>
-                op.plano_ferias_institucional_id === planoPadrao.id ||
-                (op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
+                op.plano_ferias_institucional_id
+                  ? op.plano_ferias_institucional_id === planoPadrao.id
+                  : Boolean(op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
               );
               const porMilitarPeriodo = new Map<string, any>();
               for (const op of candidatas) {
@@ -1432,7 +1434,9 @@ Deno.serve(async (req: Request) => {
               const campanhasPlanoIds = new Set((campanhasPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
               const candidatas = (todasOpcoesPlano || []).filter((op: any) =>
                 op.gerado_ferias_efetivas !== true &&
-                (op.plano_ferias_institucional_id === plano_ferias_institucional_id || campanhasPlanoIds.has(op.campanha_id))
+                (op.plano_ferias_institucional_id
+                  ? op.plano_ferias_institucional_id === plano_ferias_institucional_id
+                  : campanhasPlanoIds.has(op.campanha_id))
               );
               const porMilitarPeriodo = new Map<string, any>();
               for (const op of candidatas) {
