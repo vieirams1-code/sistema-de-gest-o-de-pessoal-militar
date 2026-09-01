@@ -2292,15 +2292,36 @@ Deno.serve(async (req: Request) => {
         const modalidadeEfetiva = diasPlanejar === 30 ? (modalidade || '2_ETAPAS_15') : 'CUSTOM';
 
         let existentes: any[] = [];
-        if (campanhaId) {
-          existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-            militar_id: militarId,
-            campanha_id: campanhaId,
+        let existenteMesmoPlanoOutraCampanha: any = null;
+        const opcoesMilitarExistentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
+        if (planoInstitucionalId) {
+          const campanhasMesmoPlano = campanhasFeriasAplicaveis.filter((c: any) => c.plano_ferias_institucional_id === planoInstitucionalId);
+          const idsMesmoPlano = new Set(campanhasMesmoPlano.map((c: any) => c.id));
+          const equivalentesPlano = (opcoesMilitarExistentes || []).filter((op: any) =>
+            op.periodo_aquisitivo_id === periodo.id &&
+            (op.plano_ferias_institucional_id === planoInstitucionalId || idsMesmoPlano.has(op.campanha_id))
+          );
+          existentes = equivalentesPlano.filter((op: any) => op.campanha_id === campanhaId);
+          existenteMesmoPlanoOutraCampanha = equivalentesPlano.find((op: any) => op.campanha_id !== campanhaId) || null;
+        } else if (campanhaId) {
+          existentes = (opcoesMilitarExistentes || []).filter((op: any) =>
+            op.campanha_id === campanhaId && op.periodo_aquisitivo_id === periodo.id
+          );
+        }
+
+        if (existenteMesmoPlanoOutraCampanha) {
+          return new Response(JSON.stringify({
+            error: 'Você já registrou sua preferência para este período aquisitivo em outra campanha vinculada ao mesmo Plano de Férias.',
+            ja_respondido_no_plano: true,
+          }), {
+            status: 409,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
         const opcaoPayload = {
           campanha_id: campanhaId,
+          plano_ferias_institucional_id: planoInstitucionalId || undefined,
           ano_referencia: anoCampanha,
           militar_id: militarId,
           militar_nome: militar.nome_completo || militar.nome_guerra || '',
