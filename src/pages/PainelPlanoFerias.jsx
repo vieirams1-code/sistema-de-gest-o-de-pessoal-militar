@@ -691,7 +691,7 @@ export default function PainelPlanoFerias() {
               <i className="ph ph-lightning text-base"></i>
               <span>
                 {totalGeradas > 0 && totalGeradas === totalSalvos
-                  ? 'Férias Desta Campanha Já Geradas'
+                  ? (filtroCampanhaId === 'TODAS' ? 'Férias Deste Plano Já Geradas' : 'Férias Desta Campanha Já Geradas')
                   : `Gerar Férias no Sistema SGP (${totalSalvos})`}
               </span>
             </button>
@@ -718,7 +718,7 @@ export default function PainelPlanoFerias() {
       {/* CORPO DO PAINEL */}
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
         {/* PAINEL SUPERIOR DE COTAS MENSAIS E TETO DE 10% */}
-        {campanhaSelecionada && (
+        {(planoSelecionado || campanhaSelecionada) && (
           <ResumoCotasMensais
             totalEfetivo={
               campanhaSelecionada?.total_militares_escopo ||
@@ -726,7 +726,7 @@ export default function PainelPlanoFerias() {
               (totalEfetivoGeral > 0 ? totalEfetivoGeral : Math.max(opcoes.length, 100))
             }
             solicitacoes={opcoes}
-            titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${campanhaSelecionada.titulo}`}
+            titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${planoSelecionado?.titulo || campanhaSelecionada?.titulo}`}
           />
         )}
 
