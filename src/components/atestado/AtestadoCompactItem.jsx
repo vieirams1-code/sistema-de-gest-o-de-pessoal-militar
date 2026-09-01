@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle, ChevronDown, ChevronRight, Shield } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle, ChevronDown, ChevronRight, MessageCircle, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,11 @@ export default function AtestadoCompactItem({
   );
   const periodoFinal = atestado?.data_retorno || atestado?.data_termino;
   const statusOperacional = useMemo(() => getStatusOperacional(atestado, isFluxoJiso), [atestado, isFluxoJiso]);
+  const whatsappJisoEnviado = Boolean(atestado?.jiso_whatsapp_enviado_em);
+  const whatsappJisoPrecisaReenvio = whatsappJisoEnviado && Boolean(
+    atestado?.jiso_whatsapp_data_agendada_snapshot !== atestado?.data_jiso_agendada
+    || atestado?.jiso_whatsapp_hora_agendada_snapshot !== atestado?.hora_jiso_agendada
+  );
 
   const quickAction = useMemo(() => {
     if (isFluxoJiso && !atestado?.data_jiso_agendada && canAccessAction('gerir_jiso')) {
@@ -134,6 +139,12 @@ export default function AtestadoCompactItem({
             <span className="text-[10px] text-purple-600 inline-flex items-center gap-1 truncate">
               <Shield className="w-3 h-3 shrink-0" />
               {formatDate(atestado.data_jiso_agendada)}{atestado?.hora_jiso_agendada ? ` · ${atestado.hora_jiso_agendada}` : ''}
+            </span>
+          )}
+          {whatsappJisoEnviado && (
+            <span className={`text-[10px] inline-flex items-center gap-1 truncate ${whatsappJisoPrecisaReenvio ? 'text-orange-600' : 'text-emerald-600'}`}>
+              <MessageCircle className="w-3 h-3 shrink-0" />
+              {whatsappJisoPrecisaReenvio ? 'Reenviar WhatsApp' : 'WhatsApp enviado'}
             </span>
           )}
         </div>
