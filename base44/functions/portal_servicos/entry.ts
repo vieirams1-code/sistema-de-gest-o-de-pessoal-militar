@@ -2392,6 +2392,12 @@ Deno.serve(async (req: Request) => {
           opcoesFerias = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
         } catch (_e) {}
 
+        let todasCampanhasFerias: any[] = [];
+        try {
+          const todasCampanhas = await base44.asServiceRole.entities.CampanhaPortal.list();
+          todasCampanhasFerias = (todasCampanhas || []).filter((c: any) => c.tipo === 'PLANO_FERIAS');
+        } catch (_e) {}
+
         const campanhasEnriquecidas = campanhasAtivasMilitar.map((cp: any) => {
           let statusResposta = 'Pendente';
           let dataResposta = null;
@@ -2400,11 +2406,10 @@ Deno.serve(async (req: Request) => {
           if (cp.tipo === 'PLANO_FERIAS') {
             let op: any = null;
             if (cp.plano_ferias_institucional_id) {
-              const campanhasMesmoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
-                plano_ferias_institucional_id: cp.plano_ferias_institucional_id,
-              });
               const campanhasMesmoPlanoIds = new Set(
-                (campanhasMesmoPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id)
+                todasCampanhasFerias
+                  .filter((c: any) => c.plano_ferias_institucional_id === cp.plano_ferias_institucional_id)
+                  .map((c: any) => c.id)
               );
               op = opcoesFerias.find((o: any) =>
                 o.plano_ferias_institucional_id === cp.plano_ferias_institucional_id ||
