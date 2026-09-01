@@ -1196,6 +1196,26 @@ Deno.serve(async (req: Request) => {
                 }
               }
               opcoes = Array.from(porMilitarPeriodo.values());
+            } else if (planosInstitucionais.length > 0) {
+              const planoPadrao = planosInstitucionais.find((p: any) => p.status === 'ATIVO') || planosInstitucionais[0];
+              const campanhasDoPlanoIds = new Set(
+                campanhasFerias
+                  .filter((c: any) => c.plano_ferias_institucional_id === planoPadrao.id)
+                  .map((c: any) => c.id)
+              );
+              const candidatas = (allOpcoes || []).filter((op: any) =>
+                op.plano_ferias_institucional_id === planoPadrao.id ||
+                (op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
+              );
+              const porMilitarPeriodo = new Map<string, any>();
+              for (const op of candidatas) {
+                const chave = `${op.militar_id || ''}::${op.periodo_aquisitivo_id || ''}`;
+                const anterior = porMilitarPeriodo.get(chave);
+                if (!anterior || String(op.data_envio_militar || op.updated_date || op.created_date || '') > String(anterior.data_envio_militar || anterior.updated_date || anterior.created_date || '')) {
+                  porMilitarPeriodo.set(chave, op);
+                }
+              }
+              opcoes = Array.from(porMilitarPeriodo.values());
             } else if (campanhasFerias.length > 0) {
               const primeiraCamp = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0];
               opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === primeiraCamp.id);
