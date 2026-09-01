@@ -1568,20 +1568,21 @@ Deno.serve(async (req: Request) => {
               geradasCount++;
             }
 
-            // ENCERRAMENTO AUTOMÁTICO DA CAMPANHA ESPECÍFICA
+            // ENCERRAMENTO AUTOMÁTICO apenas do escopo explicitamente processado.
+            // Nunca encerrar campanhas diferentes só porque possuem o mesmo ano.
             try {
               if (campanha_id) {
                 await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
                   status: 'Encerrada',
                 });
-              } else {
-                const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
-                const campsAno = (allCamp || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS' && cp.ano_referencia === Number(ano));
-                for (const cp of campsAno) {
-                  await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, {
-                    status: 'Encerrada',
-                  });
+              } else if (plano_ferias_institucional_id) {
+                const campanhasPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id });
+                for (const cp of (campanhasPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS')) {
+                  await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, { status: 'Encerrada' });
                 }
+                try {
+                  await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(plano_ferias_institucional_id, { status: 'ENCERRADO' });
+                } catch (_ePlano) {}
               }
             } catch (_errClose) {}
 
