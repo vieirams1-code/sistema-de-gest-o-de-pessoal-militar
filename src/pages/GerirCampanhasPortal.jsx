@@ -43,6 +43,7 @@ const TIPOS_CAMPOS_FORMULARIO = [
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
   const [campanhas, setCampanhas] = useState([]);
+  const [planos, setPlanos] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -78,6 +79,7 @@ export default function GerirCampanhasPortal() {
     texto_termo_aceite: '',
     campos_formulario: [],
     previewMode: false,
+    plano_ferias_institucional_id: '',
   });
 
   const carregarDados = async () => {
@@ -86,6 +88,12 @@ export default function GerirCampanhasPortal() {
     try {
       const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
       setCampanhas(res.data?.campanhas || []);
+      try {
+        const planosRes = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' });
+        setPlanos(planosRes.data?.planos || []);
+      } catch (_errPlanos) {
+        setPlanos([]);
+      }
 
       let unidades = [];
       try {
@@ -129,6 +137,31 @@ export default function GerirCampanhasPortal() {
     carregarDados();
   }, []);
 
+  const handleCriarPlanoRapido = async () => {
+    const anoInformado = window.prompt('Ano de referência do plano:', String(new Date().getFullYear() + 1));
+    if (anoInformado === null) return;
+    const ano = Number(anoInformado);
+    if (!Number.isInteger(ano) || ano < 2000 || ano > 2200) {
+      alert('Informe um ano válido.');
+      return;
+    }
+    const titulo = window.prompt('Nome do plano:', `Plano de Férias ${ano}`);
+    if (titulo === null || !titulo.trim()) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_INSTITUCIONAL_CRIAR',
+        plano_payload: { ano_referencia: ano, titulo: titulo.trim() },
+      });
+      setFeedback({ type: 'success', msg: 'Plano de Férias criado com sucesso.' });
+      await carregarDados();
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao criar plano.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const abrirCriacaoCampanha = (tipo) => {
     setBuscaUnidade('');
     const ano = new Date().getFullYear() + 1;
@@ -148,6 +181,7 @@ export default function GerirCampanhasPortal() {
         data_fim_militar: `${new Date().getFullYear()}-10-31`,
         data_fim_unidade: `${new Date().getFullYear()}-11-30`,
         instrucoes: `Prezados militares, registrem suas 3 opções de preferências de meses para o Plano de Férias de ${ano}.`,
+        plano_ferias_institucional_id: '',
         config_regras: {
           permitir_1_etapa_30d: true,
           permitir_2_etapas_15d: true,
@@ -280,6 +314,7 @@ export default function GerirCampanhasPortal() {
       status: camp.status || 'Aberta_Coleta',
       titulo: camp.titulo || '',
       ano_referencia: camp.ano_referencia || (new Date().getFullYear() + 1),
+      plano_ferias_institucional_id: camp.plano_ferias_institucional_id || '',
       tipo_escopo: camp.tipo_escopo || 'TODOS',
       escopo_unidades_ids: camp.escopo_unidades_ids || [],
       escopo_quadros: camp.escopo_quadros || [],
@@ -398,6 +433,11 @@ export default function GerirCampanhasPortal() {
       return;
     }
 
+    if (modalNovaCampanha.tipo === 'PLANO_FERIAS' && !modalNovaCampanha.plano_ferias_institucional_id) {
+      alert('Selecione o Plano de Férias aberto ao qual esta campanha pertencerá.');
+      return;
+    }
+
     setActionLoading(true);
     setFeedback({ type: '', msg: '' });
 
@@ -411,6 +451,7 @@ export default function GerirCampanhasPortal() {
         tipo: modalNovaCampanha.tipo,
         status: modalNovaCampanha.status || 'Aberta_Coleta',
         ano_referencia: Number(modalNovaCampanha.ano_referencia) || undefined,
+        plano_ferias_institucional_id: modalNovaCampanha.plano_ferias_institucional_id || '',
         tipo_escopo: modalNovaCampanha.tipo_escopo,
         escopo_unidades_ids: modalNovaCampanha.escopo_unidades_ids,
         escopo_unidades_nomes: nomesUnidades,
@@ -581,7 +622,7 @@ export default function GerirCampanhasPortal() {
 
             <Button
               type="button"
-              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
+              onClick={handleCriarPlanoRapido}
               className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
               <Calendar className="w-3.5 h-3.5 mr-1" />
@@ -948,6 +989,22 @@ export default function GerirCampanhasPortal() {
                       <option value="ATUALIZACAO_CADASTRAL">🪪 Atualização Cadastral (Fixo)</option>
                       <option value="ASSINATURA_DOCUMENTO">✍️ Assinatura de Documentos (Fixo)</option>
                       <option value="FORMULARIO_DINAMICO">📋 Formulário Dinâmico (Google Forms)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block">Plano Institucional *</label>
+                    <select
+                      value={modalNovaCampanha.plano_ferias_institucional_id || ''}
+                      onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, plano_ferias_institucional_id: e.target.value })}
+                      disabled={modalNovaCampanha.tipo !== 'PLANO_FERIAS'}
+                      required={modalNovaCampanha.tipo === 'PLANO_FERIAS'}
+                      className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white outline-none focus:border-[#1e3a5f] font-semibold disabled:bg-slate-100"
+                    >
+                      <option value="">Selecione um plano aberto</option>
+                      {planos
+                        .filter((p) => String(p.status || 'ATIVO') === 'ATIVO' && Number(p.ano_referencia) === Number(modalNovaCampanha.ano_referencia))
+                        .map((p) => <option key={p.id} value={p.id}>{p.titulo} ({p.ano_referencia})</option>)}
                     </select>
                   </div>
 
