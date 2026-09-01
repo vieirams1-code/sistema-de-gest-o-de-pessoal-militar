@@ -726,6 +726,31 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                     <p className={`mt-1 text-xs ${jisoDate ? 'text-purple-700' : 'text-amber-700'}`}>
                       {jisoDate ? `Status atual: ${atestado.status_jiso || 'Aguardando JISO'}` : 'É necessário definir data e horário.'}
                     </p>
+                    {jisoDate && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {whatsappJisoStatus === 'enviado' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            WhatsApp enviado{formatarDataHoraEnvioWhatsApp(whatsappJisoEnviadoEm) ? ` em ${formatarDataHoraEnvioWhatsApp(whatsappJisoEnviadoEm)}` : ''}
+                          </span>
+                        )}
+                        {whatsappJisoStatus === 'pendente' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+                            <AlertCircle className="w-3.5 h-3.5" /> WhatsApp pendente
+                          </span>
+                        )}
+                        {whatsappJisoStatus === 'reenviar' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-[11px] font-medium text-orange-700">
+                            <AlertCircle className="w-3.5 h-3.5" /> Agendamento alterado após envio — reenviar
+                          </span>
+                        )}
+                        {whatsappJisoStatus === 'legado' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600">
+                            Comunicação histórica
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {editingJiso && canManageJiso ? (
                       <div className="mt-3 space-y-2">
