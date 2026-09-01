@@ -2439,6 +2439,7 @@ Deno.serve(async (req: Request) => {
             tipo: cp.tipo,
             titulo: cp.titulo,
             ano_referencia: cp.ano_referencia,
+            plano_ferias_institucional_id: cp.plano_ferias_institucional_id || null,
             data_inicio: cp.data_inicio,
             data_fim_militar: cp.data_fim_militar,
             instrucoes: cp.instrucoes,
