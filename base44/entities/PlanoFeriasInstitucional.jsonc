@@ -50,5 +50,11 @@
     "titulo",
     "ano_referencia",
     "status"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
