@@ -263,6 +263,11 @@ export default function PainelPlanoFerias() {
     }
   };
 
+  const recarregarContextoAtual = () => carregarPainel(
+    planoSelecionado?.id || campanhaSelecionada?.plano_ferias_institucional_id || null,
+    filtroCampanhaId === 'TODAS' ? null : (campanhaSelecionada?.id || null)
+  );
+
   const handleMudarMesFracao = (opId, numFracao, novoMes) => {
     setSelecoesMilitares((prev) => {
       const atual = { ...(prev[opId] || {}) };
@@ -369,7 +374,7 @@ export default function PainelPlanoFerias() {
 
       setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
       setFeedback({ type: 'success', msg: `Escala salva para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
-      await carregarPainel(campanhaSelecionada?.id);
+      await recarregarContextoAtual();
       handleFecharPopupLateral(op.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar escala.' });
@@ -400,7 +405,7 @@ export default function PainelPlanoFerias() {
       setModalNaoContemplado({ open: false, opcao: null, justificativa: '' });
       setMilitaresEmEdicao((prev) => ({ ...prev, [opId]: false }));
       setFeedback({ type: 'success', msg: `${op.militar_posto} ${op.militar_nome} registrado como NÃO CONTEMPLADO.` });
-      await carregarPainel(campanhaSelecionada?.id);
+      await recarregarContextoAtual();
       handleFecharPopupLateral(opId);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao registrar não contemplado.' });
@@ -435,7 +440,7 @@ export default function PainelPlanoFerias() {
       });
 
       setFeedback({ type: 'success', msg: res.data?.message || 'Férias geradas no SGP e campanha encerrada com sucesso!' });
-      await carregarPainel(campanhaSelecionada.id);
+      await recarregarContextoAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha na geração em lote.' });
     } finally {
@@ -453,7 +458,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" desativada.` });
-      await carregarPainel();
+      await recarregarContextoAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao desativar campanha.' });
     } finally {
@@ -470,7 +475,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" arquivada.` });
-      await carregarPainel();
+      await recarregarContextoAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao arquivar campanha.' });
     } finally {
@@ -487,7 +492,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" excluída com sucesso.` });
-      await carregarPainel();
+      await recarregarContextoAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao excluir campanha.' });
     } finally {
