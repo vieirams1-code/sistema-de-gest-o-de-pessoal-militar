@@ -277,7 +277,6 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
   if (acao.startsWith('CADASTRO_DECIDIR_')) return ['perm_gerir_respostas'];
   if (acao.startsWith('PLANO_INSTITUCIONAL_')) return ['perm_gerir_campanhas', 'perm_gerir_respostas'];
-  if (acao.startsWith('PLANO_INSTITUCIONAL_')) return ['perm_gerir_campanhas'];
   if (acao.startsWith('PLANO_')) return ['perm_gerir_respostas'];
   if (acao === 'CAMPANHA_LISTAR') return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
   if (['CAMPANHA_DETALHES_RETORNO', 'CAMPANHA_HOMOLOGAR_RESPOSTA', 'CAMPANHA_DISPARAR_LEMBRETES'].includes(acao)) {
