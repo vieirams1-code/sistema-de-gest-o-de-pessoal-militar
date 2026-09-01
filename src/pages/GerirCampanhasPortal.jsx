@@ -395,7 +395,7 @@ export default function GerirCampanhasPortal() {
   };
 
   const handleCriarPlanoInstitucionalRapido = async () => {
-    const ano = Number(window.prompt('Ano de referência do novo Plano de Férias:', new Date().getFullYear() + 1));
+    const ano = Number(window.prompt('Ano de referência do novo Plano de Férias:', String(new Date().getFullYear() + 1)));
     if (!ano) return;
     const titulo = window.prompt('Nome do novo Plano de Férias:', `Plano de Férias ${ano}`);
     if (!titulo?.trim()) return;
