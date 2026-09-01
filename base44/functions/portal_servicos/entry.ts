@@ -1151,36 +1151,54 @@ Deno.serve(async (req: Request) => {
           }
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
-            // 1. Carrega todas as campanhas de férias cadastradas
+            // 1. Carrega Planos Institucionais e campanhas de férias cadastradas.
+            // Campanhas legadas sem plano continuam válidas e são mantidas separadamente.
             let todasCampanhasPortal: any[] = [];
+            let planosInstitucionais: any[] = [];
             try {
               todasCampanhasPortal = await base44.asServiceRole.entities.CampanhaPortal.list();
             } catch (_e) {
               todasCampanhasPortal = [];
             }
+            try {
+              planosInstitucionais = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
+            } catch (_e) {
+              planosInstitucionais = [];
+            }
             const campanhasFerias = (todasCampanhasPortal || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS');
-            const campanhasIdsValidos = new Set(campanhasFerias.map((c: any) => c.id));
 
-            // 2. Busca opções de férias de forma estritamente isolada pela campanha
+            // 2. Busca opções com isolamento explícito por campanha ou consolidação por Plano Institucional.
+            // Nunca inferimos equivalência entre campanhas apenas pelo ano de referência.
+            const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
             let opcoes: any[] = [];
             if (payload.campanha_id) {
-              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
               opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === payload.campanha_id);
+            } else if (payload.plano_ferias_institucional_id) {
+              const campanhasDoPlanoIds = new Set(
+                campanhasFerias
+                  .filter((c: any) => c.plano_ferias_institucional_id === payload.plano_ferias_institucional_id)
+                  .map((c: any) => c.id)
+              );
+              const candidatas = (allOpcoes || []).filter((op: any) =>
+                op.plano_ferias_institucional_id === payload.plano_ferias_institucional_id ||
+                (op.campanha_id && campanhasDoPlanoIds.has(op.campanha_id))
+              );
+              const porMilitarPeriodo = new Map<string, any>();
+              for (const op of candidatas) {
+                const chave = `${op.militar_id || ''}::${op.periodo_aquisitivo_id || ''}`;
+                const anterior = porMilitarPeriodo.get(chave);
+                if (!anterior || String(op.data_envio_militar || op.updated_date || op.created_date || '') > String(anterior.data_envio_militar || anterior.updated_date || anterior.created_date || '')) {
+                  porMilitarPeriodo.set(chave, op);
+                }
+              }
+              opcoes = Array.from(porMilitarPeriodo.values());
             } else if (campanhasFerias.length > 0) {
               const primeiraCamp = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0];
-              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
               opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === primeiraCamp.id);
             }
 
-            // 3. Purga opções órfãs de campanhas que foram excluídas
-            try {
-              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-              for (const op of (allOpcoes || [])) {
-                if (!op.campanha_id || !campanhasIdsValidos.has(op.campanha_id)) {
-                  await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
-                }
-              }
-            } catch (_ePurge) {}
+            // Não excluir opções automaticamente nesta consulta. Registros legados ou sem campanha
+            // precisam ser preservados para saneamento explícito e auditável.
 
             // Rotina de reparo/sincronização automática para férias já geradas
             try {
