@@ -276,6 +276,7 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
 function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
   if (acao.startsWith('CADASTRO_DECIDIR_')) return ['perm_gerir_respostas'];
+  if (acao.startsWith('PLANO_INSTITUCIONAL_')) return ['perm_gerir_campanhas', 'perm_gerir_respostas'];
   if (acao.startsWith('PLANO_')) return ['perm_gerir_respostas'];
   if (acao === 'CAMPANHA_LISTAR') return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
   if (['CAMPANHA_DETALHES_RETORNO', 'CAMPANHA_HOMOLOGAR_RESPOSTA', 'CAMPANHA_DISPARAR_LEMBRETES'].includes(acao)) {
@@ -2040,11 +2041,10 @@ Deno.serve(async (req: Request) => {
         try {
           const opcoesMilitar = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
           if (campanhaFeriasAtiva?.plano_ferias_institucional_id) {
-            const campanhasMesmoPlano = (campanhasAtivasMilitar || []).filter((c: any) =>
-              c.tipo === 'PLANO_FERIAS' &&
-              c.plano_ferias_institucional_id === campanhaFeriasAtiva.plano_ferias_institucional_id
-            );
-            const idsMesmoPlano = new Set(campanhasMesmoPlano.map((c: any) => c.id));
+            const campanhasMesmoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
+              plano_ferias_institucional_id: campanhaFeriasAtiva.plano_ferias_institucional_id,
+            });
+            const idsMesmoPlano = new Set((campanhasMesmoPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
             opcoesEnviadas = (opcoesMilitar || []).filter((op: any) =>
               op.plano_ferias_institucional_id === campanhaFeriasAtiva.plano_ferias_institucional_id ||
               idsMesmoPlano.has(op.campanha_id)
@@ -2298,8 +2298,10 @@ Deno.serve(async (req: Request) => {
         let existenteMesmoPlanoOutraCampanha: any = null;
         const opcoesMilitarExistentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
         if (planoInstitucionalId) {
-          const campanhasMesmoPlano = campanhasFeriasAplicaveis.filter((c: any) => c.plano_ferias_institucional_id === planoInstitucionalId);
-          const idsMesmoPlano = new Set(campanhasMesmoPlano.map((c: any) => c.id));
+          const campanhasMesmoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
+            plano_ferias_institucional_id: planoInstitucionalId,
+          });
+          const idsMesmoPlano = new Set((campanhasMesmoPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id));
           const equivalentesPlano = (opcoesMilitarExistentes || []).filter((op: any) =>
             op.periodo_aquisitivo_id === periodo.id &&
             (op.plano_ferias_institucional_id === planoInstitucionalId || idsMesmoPlano.has(op.campanha_id))
@@ -2398,10 +2400,11 @@ Deno.serve(async (req: Request) => {
           if (cp.tipo === 'PLANO_FERIAS') {
             let op: any = null;
             if (cp.plano_ferias_institucional_id) {
+              const campanhasMesmoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
+                plano_ferias_institucional_id: cp.plano_ferias_institucional_id,
+              });
               const campanhasMesmoPlanoIds = new Set(
-                campanhasAtivasMilitar
-                  .filter((c: any) => c.tipo === 'PLANO_FERIAS' && c.plano_ferias_institucional_id === cp.plano_ferias_institucional_id)
-                  .map((c: any) => c.id)
+                (campanhasMesmoPlano || []).filter((c: any) => c.tipo === 'PLANO_FERIAS').map((c: any) => c.id)
               );
               op = opcoesFerias.find((o: any) =>
                 o.plano_ferias_institucional_id === cp.plano_ferias_institucional_id ||
