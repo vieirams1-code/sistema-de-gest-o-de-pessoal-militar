@@ -2064,6 +2064,7 @@ Deno.serve(async (req: Request) => {
         const { periodo_aquisitivo_id, modalidade, opcao_1, opcao_2, opcao_3 } = payload;
         const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
         const campanhaId = payload.campanha_id || campanhaFeriasAtiva?.id || null;
+        const planoIdAtivo = textoId(campanhaFeriasAtiva?.plano_ferias_institucional_id);
         const anoCampanha = payload.ano_referencia || campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
         // Guard de Dependência em Cascata
@@ -2190,15 +2191,26 @@ Deno.serve(async (req: Request) => {
         const modalidadeEfetiva = diasPlanejar === 30 ? (modalidade || '2_ETAPAS_15') : 'CUSTOM';
 
         let existentes: any[] = [];
-        if (campanhaId) {
-          existentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-            militar_id: militarId,
-            campanha_id: campanhaId,
+        const opcoesMesmoMilitarPeriodo = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
+          militar_id: militarId,
+          periodo_aquisitivo_id: periodo.id,
+        });
+        existentes = (opcoesMesmoMilitarPeriodo || []).filter((opcao: any) => {
+          const mesmoPlano = planoIdAtivo && textoId(opcao?.plano_ferias_institucional_id) === planoIdAtivo;
+          const mesmaCampanhaLegada = !planoIdAtivo && campanhaId && textoId(opcao?.campanha_id) === textoId(campanhaId);
+          return Boolean(mesmoPlano || mesmaCampanhaLegada);
+        });
+
+        if (existentes?.[0]?.gerado_ferias_efetivas === true) {
+          return new Response(JSON.stringify({ error: 'As férias deste período já foram geradas e a resposta não pode mais ser substituída.' }), {
+            status: 409,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
 
         const opcaoPayload = {
           campanha_id: campanhaId,
+          plano_ferias_institucional_id: planoIdAtivo,
           ano_referencia: anoCampanha,
           militar_id: militarId,
           militar_nome: militar.nome_completo || militar.nome_guerra || '',
