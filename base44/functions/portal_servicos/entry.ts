@@ -2031,14 +2031,23 @@ Deno.serve(async (req: Request) => {
           is_periodo_plano_selecionavel: p.id === maisAntigoId,
         }));
 
-        // Busca opção de férias já enviada pelo militar para esta campanha específica
+        // Busca opção já enviada. Em campanhas vinculadas a um Plano Institucional,
+        // uma resposta do mesmo militar/período em qualquer rodada do mesmo plano é a resposta efetiva.
         let opcoesEnviadas: any[] = [];
         try {
-          if (campanhaFeriasAtiva?.id) {
-            opcoesEnviadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-              militar_id: militarId,
-              campanha_id: campanhaFeriasAtiva.id,
-            });
+          const opcoesMilitar = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
+          if (campanhaFeriasAtiva?.plano_ferias_institucional_id) {
+            const campanhasMesmoPlano = (campanhasAtivasMilitar || []).filter((c: any) =>
+              c.tipo === 'PLANO_FERIAS' &&
+              c.plano_ferias_institucional_id === campanhaFeriasAtiva.plano_ferias_institucional_id
+            );
+            const idsMesmoPlano = new Set(campanhasMesmoPlano.map((c: any) => c.id));
+            opcoesEnviadas = (opcoesMilitar || []).filter((op: any) =>
+              op.plano_ferias_institucional_id === campanhaFeriasAtiva.plano_ferias_institucional_id ||
+              idsMesmoPlano.has(op.campanha_id)
+            );
+          } else if (campanhaFeriasAtiva?.id) {
+            opcoesEnviadas = (opcoesMilitar || []).filter((op: any) => op.campanha_id === campanhaFeriasAtiva.id);
           }
         } catch (_e) {}
 
