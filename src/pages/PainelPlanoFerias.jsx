@@ -504,14 +504,19 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  // Separação de Campanhas Ativas vs Histórico (Desativadas/Encerradas/Arquivadas)
+  const campanhasDoPlanoSelecionado = useMemo(() => {
+    if (!planoSelecionado?.id) return campanhas.filter((c) => !c.plano_ferias_institucional_id);
+    return campanhas.filter((c) => c.plano_ferias_institucional_id === planoSelecionado.id);
+  }, [campanhas, planoSelecionado]);
+
+  // Separação de Campanhas Ativas vs Histórico dentro do Plano selecionado
   const campanhasAtivas = useMemo(() => {
-    return campanhas.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
-  }, [campanhas]);
+    return campanhasDoPlanoSelecionado.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
+  }, [campanhasDoPlanoSelecionado]);
 
   const campanhasHistorico = useMemo(() => {
-    return campanhas.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
-  }, [campanhas]);
+    return campanhasDoPlanoSelecionado.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
+  }, [campanhasDoPlanoSelecionado]);
 
   // Unidades únicas
   const unidadesDisponiveis = useMemo(() => {
@@ -543,7 +548,9 @@ export default function PainelPlanoFerias() {
   const totalNaoContemplados = opcoes.filter((o) => o.status_camada_1 === 'Nao_Contemplado' || o.decisao_camada_1_opcao === 'NAO_CONTEMPLADO').length;
   const totalGeradas = opcoes.filter((o) => o.gerado_ferias_efetivas).length;
 
-  const isCampanhaEncerradaOuDesativada = campanhaSelecionada && (campanhaSelecionada.status === 'Encerrada' || campanhaSelecionada.status === 'Desativada' || campanhaSelecionada.status === 'Arquivada');
+  const isCampanhaEncerradaOuDesativada = filtroCampanhaId === 'TODAS'
+    ? campanhasAtivas.length === 0
+    : Boolean(campanhaSelecionada && (campanhaSelecionada.status === 'Encerrada' || campanhaSelecionada.status === 'Desativada' || campanhaSelecionada.status === 'Arquivada'));
 
   // Filtragem dos Militares
   const opcoesFiltradas = useMemo(() => {
