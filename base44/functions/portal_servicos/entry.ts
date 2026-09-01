@@ -1243,7 +1243,9 @@ Deno.serve(async (req: Request) => {
 
             return new Response(JSON.stringify({
               ok: true,
+              planos: planosInstitucionais || [],
               campanhas: campanhasFerias || [],
+              campanhas_sem_plano: campanhasFerias.filter((c: any) => !c.plano_ferias_institucional_id),
               opcoes: opcoes || [],
             }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
