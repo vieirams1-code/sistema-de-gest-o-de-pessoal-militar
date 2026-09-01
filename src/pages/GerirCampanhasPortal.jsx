@@ -1083,7 +1083,7 @@ export default function GerirCampanhasPortal() {
                         >
                           <option value="">Selecione o plano que agrupará esta campanha...</option>
                           {planosInstitucionais
-                            .filter((p) => Number(p.ano_referencia) === Number(modalNovaCampanha.ano_referencia))
+                            .filter((p) => Number(p.ano_referencia) === Number(modalNovaCampanha.ano_referencia) && String(p.status || 'ATIVO') === 'ATIVO')
                             .map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.titulo} — {p.ano_referencia} ({p.total_campanhas || 0} campanha(s))
