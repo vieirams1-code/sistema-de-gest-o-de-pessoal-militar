@@ -394,6 +394,26 @@ export default function GerirCampanhasPortal() {
     }
   };
 
+  const handleCriarPlanoInstitucionalRapido = async () => {
+    const ano = Number(window.prompt('Ano de referência do novo Plano de Férias:', new Date().getFullYear() + 1));
+    if (!ano) return;
+    const titulo = window.prompt('Nome do novo Plano de Férias:', `Plano de Férias ${ano}`);
+    if (!titulo?.trim()) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_INSTITUCIONAL_CRIAR',
+        plano_payload: { titulo: titulo.trim(), ano_referencia: ano, status: 'ATIVO' },
+      });
+      await carregarDados();
+      setFeedback({ type: 'success', msg: `Plano de Férias "${titulo.trim()}" cadastrado. Agora crie as campanhas dentro dele.` });
+    } catch (err) {
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao criar Plano de Férias.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleCriarPlanoInstitucional = async () => {
     const ano = Number(modalNovaCampanha.ano_referencia) || (new Date().getFullYear() + 1);
     const tituloSugerido = `Plano de Férias ${ano}`;
