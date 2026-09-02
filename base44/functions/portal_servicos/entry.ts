@@ -1592,20 +1592,26 @@ Deno.serve(async (req: Request) => {
               geradasCount++;
             }
 
-            // ENCERRAMENTO AUTOMÁTICO DA CAMPANHA ESPECÍFICA
+            if (acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS' && planoInstitucional) {
+              await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoInstitucional.id, {
+                data_ultima_geracao: new Date().toISOString(),
+                total_gerados_acumulado: Number(planoInstitucional.total_gerados_acumulado || 0) + geradasCount,
+                quantidade_geracoes: Number(planoInstitucional.quantidade_geracoes || 0) + 1,
+              });
+              return new Response(JSON.stringify({
+                ok: true,
+                message: geradasCount > 0
+                  ? `Geração complementar concluída: ${geradasCount} escala(s) nova(s) foram incluídas neste Plano de Férias.`
+                  : 'Nenhuma nova escala elegível foi encontrada neste Plano de Férias.',
+                total_geradas: geradasCount,
+                tipo_geracao: 'PLANO_INSTITUCIONAL',
+              }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+
+            // Compatibilidade para a operação antiga: somente a campanha informada é encerrada.
             try {
               if (campanha_id) {
-                await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
-                  status: 'Encerrada',
-                });
-              } else {
-                const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
-                const campsAno = (allCamp || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS' && cp.ano_referencia === Number(ano));
-                for (const cp of campsAno) {
-                  await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, {
-                    status: 'Encerrada',
-                  });
-                }
+                await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Encerrada' });
               }
             } catch (_errClose) {}
 
