@@ -40,8 +40,6 @@ async function usuarioPodeGerirPlanos(base44: any, user: any): Promise<boolean> 
     user_email: user.email,
     ativo: true,
   });
-  if ((acessos || []).some((a: any) => normalizar(a?.tipo_acesso) === 'admin')) return true;
-
   const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
   const perfis = perfilIds.length
     ? await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true })
