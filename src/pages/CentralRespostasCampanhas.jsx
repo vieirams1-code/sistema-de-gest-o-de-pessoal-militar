@@ -103,6 +103,10 @@ export default function CentralRespostasCampanhas() {
     carregarCampanhas();
   }, []);
 
+  // A página é sempre aberta por uma campanha específica. O seletor legado permanece
+  // temporariamente invisível na próxima revisão visual, sem permitir troca de contexto.
+  const handleSelecionarCampanha = () => {};
+
   // Download em Lote de Anexos com Renomeação Institucional
   const handleBaixarZipLote = async () => {
     if (!campanhaSelecionada || !respostasData?.militares) {
