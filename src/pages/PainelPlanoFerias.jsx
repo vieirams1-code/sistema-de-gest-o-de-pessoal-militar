@@ -75,6 +75,8 @@ function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
 export default function PainelPlanoFerias() {
   // Lista de Campanhas e Campanha Selecionada
   const [campanhas, setCampanhas] = useState([]);
+  const [planos, setPlanos] = useState([]);
+  const [planoSelecionadoId, setPlanoSelecionadoId] = useState('');
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
 
@@ -144,6 +146,15 @@ export default function PainelPlanoFerias() {
 
       const listaCampanhas = res.data?.campanhas || [];
       setCampanhas(listaCampanhas);
+      let listaPlanos = [];
+      try {
+        const planosRes = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' });
+        listaPlanos = planosRes.data?.planos || [];
+        setPlanos(listaPlanos);
+      } catch (_errPlanos) {
+        listaPlanos = [];
+        setPlanos([]);
+      }
 
       // Define campanha ativa/selecionada
       let selected = null;
@@ -154,6 +165,8 @@ export default function PainelPlanoFerias() {
         selected = listaCampanhas.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || listaCampanhas[0];
       }
       setCampanhaSelecionada(selected);
+      const planoDaCampanha = selected?.plano_ferias_institucional_id || '';
+      setPlanoSelecionadoId(planoDaCampanha);
 
       // 2. Opções da campanha selecionada
       const listaOpcoes = res.data?.opcoes || [];
@@ -228,7 +241,20 @@ export default function PainelPlanoFerias() {
 
   const handleSelecionarCampanha = (camp) => {
     setCampanhaSelecionada(camp);
+    setPlanoSelecionadoId(camp?.plano_ferias_institucional_id || '');
     carregarPainel(camp.id);
+  };
+
+  const handleSelecionarPlano = (planoId) => {
+    setPlanoSelecionadoId(planoId);
+    const primeiraCampanha = campanhas.find((camp) => camp.plano_ferias_institucional_id === planoId);
+    if (primeiraCampanha) {
+      setCampanhaSelecionada(primeiraCampanha);
+      carregarPainel(primeiraCampanha.id);
+    } else {
+      setCampanhaSelecionada(null);
+      setOpcoes([]);
+    }
   };
 
   const handleMudarMesFracao = (opId, numFracao, novoMes) => {
@@ -464,13 +490,18 @@ export default function PainelPlanoFerias() {
   };
 
   // Separação de Campanhas Ativas vs Histórico (Desativadas/Encerradas/Arquivadas)
+  const campanhasDoPlano = useMemo(() => {
+    if (!planoSelecionadoId) return campanhas.filter((c) => !c.plano_ferias_institucional_id);
+    return campanhas.filter((c) => c.plano_ferias_institucional_id === planoSelecionadoId);
+  }, [campanhas, planoSelecionadoId]);
+
   const campanhasAtivas = useMemo(() => {
-    return campanhas.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
-  }, [campanhas]);
+    return campanhasDoPlano.filter((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa');
+  }, [campanhasDoPlano]);
 
   const campanhasHistorico = useMemo(() => {
-    return campanhas.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
-  }, [campanhas]);
+    return campanhasDoPlano.filter((c) => c.status !== 'Aberta_Coleta' && c.status !== 'Ativa');
+  }, [campanhasDoPlano]);
 
   // Unidades únicas
   const unidadesDisponiveis = useMemo(() => {
@@ -576,19 +607,33 @@ export default function PainelPlanoFerias() {
               )}
             </div>
 
-            {/* SELETOR DE CAMPANHA QUANDO HOUVER MÚLTIPLAS */}
-            {campanhas.length > 1 && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-xs text-slate-500 font-medium">Campanha:</span>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className="text-xs text-slate-500 font-medium">Plano:</span>
+              <select
+                value={planoSelecionadoId}
+                onChange={(e) => handleSelecionarPlano(e.target.value)}
+                className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-0.5 font-bold text-slate-800 outline-none cursor-pointer"
+              >
+                <option value="">Campanhas legadas sem plano</option>
+                {planos.filter((p) => String(p.status || 'ATIVO') !== 'ARQUIVADO').map((p) => (
+                  <option key={p.id} value={p.id}>{p.titulo} ({p.ano_referencia})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* SELETOR DE CAMPANHA DENTRO DO PLANO */}
+            {campanhasDoPlano.length > 0 && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="text-xs text-slate-500 font-medium">Coleta:</span>
                 <select
                   value={campanhaSelecionada?.id || ''}
                   onChange={(e) => {
-                    const c = campanhas.find((item) => item.id === e.target.value);
+                    const c = campanhasDoPlano.find((item) => item.id === e.target.value);
                     if (c) handleSelecionarCampanha(c);
                   }}
                   className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-0.5 font-bold text-slate-800 outline-none cursor-pointer"
                 >
-                  {campanhas.map((c) => (
+                  {campanhasDoPlano.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.status})
                     </option>
