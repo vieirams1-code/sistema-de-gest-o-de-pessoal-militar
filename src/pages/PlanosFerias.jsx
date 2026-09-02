@@ -6,7 +6,8 @@ import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Trash
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-// Página sincronizada para a prévia do Base44.
+const mensagemErro = (erro, fallback) =>
+  erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
 const novoPlano = () => ({
   titulo: '',
@@ -31,16 +32,13 @@ export default function PlanosFerias() {
     setLoading(true);
     setFeedback({ tipo: '', texto: '' });
     try {
-      const [planosRes, campanhasRes] = await Promise.all([
-        base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' }),
-        base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' }),
-      ]);
-      const listaPlanos = planosRes.data?.planos || [];
+      const resposta = await base44.functions.invoke('planos_ferias_servicos', { acao: 'LISTAR' });
+      const listaPlanos = resposta.data?.planos || [];
       setPlanos(listaPlanos);
-      setCampanhas(campanhasRes.data?.campanhas || []);
+      setCampanhas(resposta.data?.campanhas || []);
       setSelecionado((atual) => atual ? listaPlanos.find((p) => p.id === atual.id) || null : null);
     } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erro.message || 'Não foi possível carregar os Planos de Férias.' });
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível carregar os Planos de Férias.') });
     } finally {
       setLoading(false);
     }
@@ -53,7 +51,7 @@ export default function PlanosFerias() {
       setMetricas(null);
       return;
     }
-    base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_DETALHES', plano_id: selecionado.id })
+    base44.functions.invoke('planos_ferias_servicos', { acao: 'DETALHES', plano_id: selecionado.id })
       .then((res) => setMetricas(res.data?.metricas || null))
       .catch(() => setMetricas(null));
   }, [selecionado?.id]);
@@ -94,15 +92,15 @@ export default function PlanosFerias() {
         data_encerramento: form.data_encerramento || '',
       };
       if (modoFormulario === 'editar') {
-        await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_ATUALIZAR', plano_id: selecionado.id, plano_payload: payload });
+        await base44.functions.invoke('planos_ferias_servicos', { acao: 'ATUALIZAR', plano_id: selecionado.id, plano: payload });
       } else {
-        await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_CRIAR', plano_payload: payload });
+        await base44.functions.invoke('planos_ferias_servicos', { acao: 'CRIAR', plano: payload });
       }
       setModoFormulario(null);
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: 'Plano de Férias salvo com sucesso.' });
     } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erro.message || 'Não foi possível salvar o plano.' });
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível salvar o plano.') });
     } finally {
       setSalvando(false);
     }
@@ -112,12 +110,12 @@ export default function PlanosFerias() {
     if (!window.confirm(`Arquivar o plano "${plano.titulo}"? O histórico será preservado e novas campanhas não poderão ser incluídas.`)) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_ARQUIVAR', plano_id: plano.id });
+      await base44.functions.invoke('planos_ferias_servicos', { acao: 'ARQUIVAR', plano_id: plano.id });
       setSelecionado(null);
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: 'Plano arquivado. O histórico foi preservado.' });
     } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erro.message || 'Não foi possível arquivar o plano.' });
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível arquivar o plano.') });
     } finally {
       setSalvando(false);
     }
@@ -136,7 +134,7 @@ export default function PlanosFerias() {
       setFeedback({ tipo: 'sucesso', texto: resultado.data?.message || 'Geração complementar concluída.' });
       await carregar();
     } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erro.message || 'Não foi possível gerar as férias deste plano.' });
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível gerar as férias deste plano.') });
     } finally {
       setSalvando(false);
     }
@@ -146,12 +144,12 @@ export default function PlanosFerias() {
     if (!window.confirm(`Excluir o plano vazio "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_EXCLUIR', plano_id: plano.id });
+      await base44.functions.invoke('planos_ferias_servicos', { acao: 'EXCLUIR', plano_id: plano.id });
       setSelecionado(null);
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: 'Plano excluído.' });
     } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erro.message || 'Não foi possível excluir o plano.' });
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível excluir o plano.') });
     } finally {
       setSalvando(false);
     }
