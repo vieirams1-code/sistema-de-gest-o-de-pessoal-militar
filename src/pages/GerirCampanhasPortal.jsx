@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
@@ -42,6 +42,8 @@ const TIPOS_CAMPOS_FORMULARIO = [
 
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preselectedPlanHandled = useRef(false);
   const [campanhas, setCampanhas] = useState([]);
   const [planos, setPlanos] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
@@ -89,8 +91,15 @@ export default function GerirCampanhasPortal() {
       const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
       setCampanhas(res.data?.campanhas || []);
       try {
-        const planosRes = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' });
-        setPlanos(planosRes.data?.planos || []);
+        const planosRes = await base44.functions.invoke('planos_ferias_servicos', { acao: 'LISTAR' });
+        const listaPlanos = planosRes.data?.planos || [];
+        setPlanos(listaPlanos);
+        const planoIdInicial = new URLSearchParams(location.search).get('planoId');
+        const planoInicial = listaPlanos.find((plano) => String(plano.id) === String(planoIdInicial));
+        if (planoInicial && String(planoInicial.status || 'ATIVO') === 'ATIVO' && !preselectedPlanHandled.current) {
+          preselectedPlanHandled.current = true;
+          abrirCriacaoCampanha('PLANO_FERIAS', planoInicial.id);
+        }
       } catch (_errPlanos) {
         setPlanos([]);
       }
@@ -162,7 +171,7 @@ export default function GerirCampanhasPortal() {
     }
   };
 
-  const abrirCriacaoCampanha = (tipo) => {
+  const abrirCriacaoCampanha = (tipo, planoId = '') => {
     setBuscaUnidade('');
     const ano = new Date().getFullYear() + 1;
     if (tipo === 'PLANO_FERIAS') {
@@ -181,7 +190,7 @@ export default function GerirCampanhasPortal() {
         data_fim_militar: `${new Date().getFullYear()}-10-31`,
         data_fim_unidade: `${new Date().getFullYear()}-11-30`,
         instrucoes: `Prezados militares, registrem suas 3 opções de preferências de meses para o Plano de Férias de ${ano}.`,
-        plano_ferias_institucional_id: '',
+        plano_ferias_institucional_id: planoId,
         config_regras: {
           permitir_1_etapa_30d: true,
           permitir_2_etapas_15d: true,
@@ -613,6 +622,15 @@ export default function GerirCampanhasPortal() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
+              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
+            >
+              <Calendar className="w-3.5 h-3.5 mr-1" />
+              Nova Campanha de Férias
+            </Button>
+
+            <Button
+              type="button"
               onClick={() => abrirCriacaoCampanha('ATUALIZACAO_CADASTRAL')}
               className="bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
@@ -940,7 +958,7 @@ export default function GerirCampanhasPortal() {
                   {modalNovaCampanha.isEditing
                     ? `Editar Campanha: ${modalNovaCampanha.titulo}`
                     : modalNovaCampanha.tipo === 'PLANO_FERIAS'
-                    ? 'Novo Plano Anual de Férias'
+                    ? 'Nova Campanha de Férias'
                     : modalNovaCampanha.tipo === 'ATUALIZACAO_CADASTRAL'
                     ? 'Nova Campanha de Atualização Cadastral'
                     : modalNovaCampanha.tipo === 'ASSINATURA_DOCUMENTO'
