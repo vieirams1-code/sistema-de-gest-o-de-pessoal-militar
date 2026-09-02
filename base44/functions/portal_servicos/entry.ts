@@ -498,6 +498,48 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        case 'PLANO_INSTITUCIONAL_DETALHES': {
+          const planoId = textoId(payload.plano_id);
+          const plano = planoId ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId) : null;
+          if (!plano) {
+            return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
+              status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const campanhas = (await base44.asServiceRole.entities.CampanhaPortal.filter({
+            plano_ferias_institucional_id: planoId,
+          })).filter((campanha: any) => campanha.tipo === 'PLANO_FERIAS');
+          const militares = await base44.asServiceRole.entities.Militar.list();
+          const publicoIds = new Set<string>();
+          for (const campanha of campanhas) {
+            for (const militar of (militares || [])) {
+              if (militar.status === 'Inativo' || militar.status === 'Falecido') continue;
+              const noEscopo = campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo ||
+                (campanha.tipo_escopo === 'UNIDADES' && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
+                (campanha.tipo_escopo === 'QUADROS' && (campanha.escopo_quadros || []).includes(militar.quadro)) ||
+                (campanha.tipo_escopo === 'SELECAO_MILITARES' && (campanha.escopo_militares_ids || []).includes(militar.id));
+              if (noEscopo && militar.id) publicoIds.add(militar.id);
+            }
+          }
+          const campanhasIds = new Set(campanhas.map((campanha: any) => campanha.id));
+          const opcoes = (await base44.asServiceRole.entities.OpcaoFeriasMilitar.list())
+            .filter((opcao: any) => campanhasIds.has(opcao.campanha_id));
+          const respondidosIds = new Set(opcoes.map((opcao: any) => textoId(opcao.militar_id)).filter(Boolean));
+          const geradosIds = new Set(opcoes.filter((opcao: any) => opcao.gerado_ferias_efetivas).map((opcao: any) => textoId(opcao.militar_id)).filter(Boolean));
+          return new Response(JSON.stringify({
+            ok: true,
+            plano,
+            campanhas,
+            metricas: {
+              efetivo_unico: publicoIds.size,
+              respondidos_unicos: respondidosIds.size,
+              pendentes_unicos: Math.max(0, publicoIds.size - respondidosIds.size),
+              ferias_geradas_unicas: geradosIds.size,
+              percentual_adesao: publicoIds.size ? Math.round((respondidosIds.size / publicoIds.size) * 100) : 0,
+            },
+          }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
         // Criar Nova Campanha (Férias ou Cadastral com Escopo)
         case 'CAMPANHA_CRIAR': {
           const cp = payload.campanha_payload || {};
