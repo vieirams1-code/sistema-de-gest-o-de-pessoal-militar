@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/utils';
 import {
   FileSpreadsheet,
   FolderDown,
@@ -15,6 +16,7 @@ import {
   Download,
   Check,
   FileSignature,
+  ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,7 +26,8 @@ import {
 } from '@/utils/portalCampanhasExport';
 
 export default function CentralRespostasCampanhas() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const campanhaParamId = searchParams.get('campanhaId');
 
   const [campanhas, setCampanhas] = useState([]);
@@ -61,17 +64,15 @@ export default function CentralRespostasCampanhas() {
       const lista = res.data?.campanhas || [];
       setCampanhas(lista);
 
-      if (lista.length > 0) {
-        let selecionada = null;
-        if (campanhaParamId) {
-          selecionada = lista.find((c) => c.id === campanhaParamId);
-        }
-        if (!selecionada) {
-          selecionada = lista.find((c) => c.status === 'Aberta_Coleta') || lista[0];
-        }
-        setCampanhaSelecionada(selecionada);
-        await carregarRespostas(selecionada);
+      const selecionada = campanhaParamId ? lista.find((c) => c.id === campanhaParamId) : null;
+      if (!selecionada) {
+        setCampanhaSelecionada(null);
+        setRespostasData(null);
+        setFeedback({ type: 'error', msg: 'Abra uma campanha pela tela Campanhas para consultar suas respostas.' });
+        return;
       }
+      setCampanhaSelecionada(selecionada);
+      await carregarRespostas(selecionada);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar campanhas.' });
     } finally {
