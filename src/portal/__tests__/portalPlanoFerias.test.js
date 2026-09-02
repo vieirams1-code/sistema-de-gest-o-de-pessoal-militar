@@ -1,6 +1,11 @@
 /* global process */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+const paginaPlanosSource = await readFile(new URL('../../pages/PlanosFerias.jsx', import.meta.url), 'utf8');
+const campanhaSchemaSource = await readFile(new URL('../../../base44/entities/CampanhaPortal.jsonc', import.meta.url), 'utf8');
+const opcaoSchemaSource = await readFile(new URL('../../../base44/entities/OpcaoFeriasMilitar.jsonc', import.meta.url), 'utf8');
 
 describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automática em Lote', () => {
   it('1. As 3 opções do militar são preferências alternativas de mês, não frações duplicadas', () => {
@@ -146,5 +151,17 @@ describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automáti
     assert.equal(regraMes('10').permitido, false);
     assert.deepEqual(regraMes('11'), { permitido: true, dataInicio: '2027-11-13' });
     assert.deepEqual(regraMes('12'), { permitido: true, dataInicio: '2027-12-01' });
+  });
+});
+
+describe('Plano de Férias Institucional — integração da tela e vínculos', () => {
+  it('carrega a tela pelo serviço administrativo exclusivo de planos', () => {
+    assert.match(paginaPlanosSource, /functions\.invoke\('planos_ferias_servicos', \{ acao: 'LISTAR' \}\)/);
+    assert.doesNotMatch(paginaPlanosSource, /PLANO_INSTITUCIONAL_LISTAR/);
+  });
+
+  it('persiste o vínculo do plano tanto na campanha quanto na resposta do militar', () => {
+    assert.match(campanhaSchemaSource, /"plano_ferias_institucional_id"/);
+    assert.match(opcaoSchemaSource, /"plano_ferias_institucional_id"/);
   });
 });
