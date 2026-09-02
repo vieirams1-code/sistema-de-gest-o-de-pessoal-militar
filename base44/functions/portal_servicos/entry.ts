@@ -385,6 +385,7 @@ Deno.serve(async (req: Request) => {
 
       switch (acao) {
         case 'PLANO_INSTITUCIONAL_LISTAR': {
+          // Ações do Plano de Férias Institucional: sincronizadas com a prévia sem tocar no portal.
           const planos = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
           return new Response(JSON.stringify({ ok: true, planos: planos || [] }), {
             status: 200,
