@@ -305,14 +305,15 @@ export default function CentralRespostasCampanhas() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto flex-1">
             <span className="text-xs font-bold text-slate-500 uppercase shrink-0 flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5 text-[#1e3a5f]" />
-              Selecionar Campanha:
+              Campanha aberta:
             </span>
             <select
               value={campanhaSelecionada?.id || ''}
-              onChange={(e) => handleSelecionarCampanha(e.target.value)}
+              disabled
+              aria-label="Campanha aberta"
               className="w-full md:max-w-md h-10 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-[#1e3a5f] outline-none focus:ring-2 focus:ring-[#1e3a5f]"
             >
-              {campanhas.map((c) => (
+              {(campanhaSelecionada ? [campanhaSelecionada] : []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.tipo === 'PLANO_FERIAS' ? '🏖️ ' : c.tipo === 'ASSINATURA_DOCUMENTO' ? '📁 ' : c.tipo === 'ATUALIZACAO_CADASTRAL' ? '🪪 ' : '📋 '}
                   {c.titulo} ({c.status || 'Aberta'})
