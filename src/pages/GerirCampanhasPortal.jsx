@@ -601,34 +601,16 @@ export default function GerirCampanhasPortal() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Gestor de Campanhas do Portal
+                Campanhas
               </h1>
               <p className="text-xs text-slate-500">
-                Configure planos de férias, atualizações cadastrais, devolução de documentos e formulários dinâmicos
+                Crie e administre campanhas; abra cada uma para consultar respostas, filtros e exportações.
               </p>
             </div>
           </div>
 
-          {/* BOTÕES DE NOVA CAMPANHA & LINK DIRETO PARA CENTRAL DE RESPOSTAS */}
+          {/* CRIAÇÃO DE CAMPANHAS */}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              onClick={() => handleAbrirCentralRespostas(null)}
-              className="bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3.5"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
-              Central de Respostas & Entregas
-            </Button>
-
-            <Button
-              type="button"
-              onClick={handleCriarPlanoRapido}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
-            >
-              <Calendar className="w-3.5 h-3.5 mr-1" />
-              Novo Plano de Férias
-            </Button>
-
             <Button
               type="button"
               onClick={() => abrirCriacaoCampanha('ATUALIZACAO_CADASTRAL')}
