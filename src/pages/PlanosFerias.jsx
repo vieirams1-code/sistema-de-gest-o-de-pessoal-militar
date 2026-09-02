@@ -174,6 +174,7 @@ export default function PlanosFerias() {
               {selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
             </div>
           </div>
+          {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{feedback.texto}</div>}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="p-5 border-b border-slate-200 flex items-center justify-between gap-3">
               <div>
