@@ -103,14 +103,6 @@ export default function CentralRespostasCampanhas() {
     carregarCampanhas();
   }, []);
 
-  const handleSelecionarCampanha = async (campId) => {
-    const camp = campanhas.find((c) => c.id === campId);
-    if (!camp) return;
-    setCampanhaSelecionada(camp);
-    setSearchParams({ campanhaId: camp.id });
-    await carregarRespostas(camp);
-  };
-
   // Download em Lote de Anexos com Renomeação Institucional
   const handleBaixarZipLote = async () => {
     if (!campanhaSelecionada || !respostasData?.militares) {
@@ -253,10 +245,10 @@ export default function CentralRespostasCampanhas() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2.5">
               <FileSpreadsheet className="w-7 h-7 text-blue-300" />
-              Central de Respostas & Entregas de Campanhas
+              {campanhaSelecionada?.titulo || 'Respostas da campanha'}
             </h1>
             <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-2xl">
-              Acompanhamento nominal unificado, auditoria de dados enviados, exportação em planilha e download em lote de anexos renomeados no padrão militar.
+              Respostas, filtros, auditoria e exportações desta campanha.
             </p>
           </div>
 
