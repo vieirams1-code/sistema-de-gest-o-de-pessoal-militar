@@ -1158,7 +1158,8 @@ Deno.serve(async (req: Request) => {
         case 'PLANO_ESCALA_LISTAR':
         case 'PLANO_DECISAO_CAMADA_1':
         case 'PLANO_HOMOLOGACAO_CAMADA_2':
-        case 'PLANO_GERAR_LOTE_FERIAS': {
+        case 'PLANO_GERAR_LOTE_FERIAS':
+        case 'PLANO_INSTITUCIONAL_GERAR_FERIAS': {
           const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
 
           if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR') {
@@ -1393,25 +1394,48 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
-          if (acao === 'PLANO_GERAR_LOTE_FERIAS') {
+          if (acao === 'PLANO_GERAR_LOTE_FERIAS' || acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
             const { campanha_id } = payload;
+            const planoId = textoId(payload.plano_id);
             let todasOpcoes: any[] = [];
+            let planoInstitucional: any = null;
 
-            if (campanha_id) {
-              todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-                campanha_id: campanha_id,
-                gerado_ferias_efetivas: false,
-              });
-              if (!todasOpcoes || todasOpcoes.length === 0) {
-                todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-                  ano_referencia: ano,
-                  gerado_ferias_efetivas: false,
+            if (acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
+              if (!planoId) {
+                return new Response(JSON.stringify({ error: 'Informe o Plano de Férias a ser gerado.' }), {
+                  status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
                 });
               }
-            } else {
+              planoInstitucional = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
+              if (!planoInstitucional) {
+                return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
+                  status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+                });
+              }
+              const campanhasDoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
+                plano_ferias_institucional_id: planoId,
+              });
+              const campanhasIds = new Set((campanhasDoPlano || [])
+                .filter((campanha: any) => campanha.tipo === 'PLANO_FERIAS')
+                .map((campanha: any) => campanha.id));
+              const opcoesDoPlano = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+              const unicas = new Map<string, any>();
+              for (const opcao of (opcoesDoPlano || [])) {
+                if (!campanhasIds.has(opcao.campanha_id) || opcao.gerado_ferias_efetivas) continue;
+                const chave = `${textoId(opcao.militar_id)}:${textoId(opcao.periodo_aquisitivo_id)}`;
+                if (chave !== ':' && !unicas.has(chave)) unicas.set(chave, opcao);
+              }
+              todasOpcoes = Array.from(unicas.values());
+            } else if (campanha_id) {
+              // Compatibilidade: geração isolada continua restrita à campanha informada.
+              // Não existe fallback por ano, pois planos do mesmo ano podem coexistir.
               todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-                ano_referencia: ano,
+                campanha_id,
                 gerado_ferias_efetivas: false,
+              });
+            } else {
+              return new Response(JSON.stringify({ error: 'A geração legada exige uma campanha específica.' }), {
+                status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
 
