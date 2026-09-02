@@ -273,7 +273,7 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
 }
 
 function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
-  if (['PLANO_INSTITUCIONAL_LISTAR', 'PLANO_INSTITUCIONAL_CRIAR'].includes(acao)) {
+  if (acao.startsWith('PLANO_INSTITUCIONAL_')) {
     return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
   }
   if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
@@ -413,6 +413,86 @@ Deno.serve(async (req: Request) => {
           });
           return new Response(JSON.stringify({ ok: true, plano: criado }), {
             status: 201,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        case 'PLANO_INSTITUCIONAL_ATUALIZAR': {
+          const planoId = String(payload.plano_id || '').trim();
+          const pp = payload.plano_payload || {};
+          const ano = Number(pp.ano_referencia);
+          const titulo = String(pp.titulo || '').trim();
+          if (!planoId || !Number.isInteger(ano) || ano < 2000 || ano > 2200 || !titulo) {
+            return new Response(JSON.stringify({ error: 'Plano, ano e título são obrigatórios.' }), {
+              status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const existente = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
+          if (!existente) {
+            return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
+              status: 404,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const campanhasVinculadas = await base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id: planoId });
+          if (campanhasVinculadas.length > 0 && Number(existente.ano_referencia) !== ano) {
+            return new Response(JSON.stringify({ error: 'O ano não pode ser alterado depois que o plano possui campanhas.' }), {
+              status: 409,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const atualizado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
+            ano_referencia: ano,
+            titulo,
+            descricao: String(pp.descricao || ''),
+            data_abertura: pp.data_abertura || existente.data_abertura || new Date().toISOString().slice(0, 10),
+            data_encerramento: pp.data_encerramento || '',
+          });
+          return new Response(JSON.stringify({ ok: true, plano: atualizado }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        case 'PLANO_INSTITUCIONAL_ARQUIVAR': {
+          const planoId = String(payload.plano_id || '').trim();
+          const existente = planoId ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId) : null;
+          if (!existente) {
+            return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
+              status: 404,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const atualizado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
+            status: 'ARQUIVADO',
+            data_encerramento: existente.data_encerramento || new Date().toISOString().slice(0, 10),
+          });
+          return new Response(JSON.stringify({ ok: true, plano: atualizado }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        case 'PLANO_INSTITUCIONAL_EXCLUIR': {
+          const planoId = String(payload.plano_id || '').trim();
+          const existente = planoId ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId) : null;
+          if (!existente) {
+            return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
+              status: 404,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const campanhasVinculadas = await base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id: planoId });
+          if (campanhasVinculadas.length > 0) {
+            return new Response(JSON.stringify({ error: 'Este plano possui campanhas vinculadas e não pode ser excluído. Arquive-o para preservar o histórico.' }), {
+              status: 409,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          await base44.asServiceRole.entities.PlanoFeriasInstitucional.delete(planoId);
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
