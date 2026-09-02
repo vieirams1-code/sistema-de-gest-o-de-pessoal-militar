@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const paginaPlanosSource = await readFile(new URL('../../pages/PlanosFerias.jsx', import.meta.url), 'utf8');
+const paginaCampanhasSource = await readFile(new URL('../../pages/GerirCampanhasPortal.jsx', import.meta.url), 'utf8');
 const campanhaSchemaSource = await readFile(new URL('../../../base44/entities/CampanhaPortal.jsonc', import.meta.url), 'utf8');
 const opcaoSchemaSource = await readFile(new URL('../../../base44/entities/OpcaoFeriasMilitar.jsonc', import.meta.url), 'utf8');
 
@@ -163,5 +164,13 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
   it('persiste o vínculo do plano tanto na campanha quanto na resposta do militar', () => {
     assert.match(campanhaSchemaSource, /"plano_ferias_institucional_id"/);
     assert.match(opcaoSchemaSource, /"plano_ferias_institucional_id"/);
+  });
+
+  it('abre campanha de férias com plano pré-selecionado e mantém criação visível em Campanhas', () => {
+    assert.match(paginaPlanosSource, /GerirCampanhasPortal.*planoId=|planoId=.*GerirCampanhasPortal/s);
+    assert.match(paginaCampanhasSource, /Nova Campanha de Férias/);
+    assert.match(paginaCampanhasSource, /new URLSearchParams\(location\.search\)/);
+    assert.match(paginaCampanhasSource, /abrirCriacaoCampanha\('PLANO_FERIAS', planoInicial\.id\)/);
+    assert.match(paginaCampanhasSource, /plano_ferias_institucional_id: planoId/);
   });
 });
