@@ -18,6 +18,7 @@ export default function PlanosFerias() {
   const [planos, setPlanos] = useState([]);
   const [campanhas, setCampanhas] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
+  const [metricas, setMetricas] = useState(null);
   const [form, setForm] = useState(novoPlano());
   const [modoFormulario, setModoFormulario] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,16 @@ export default function PlanosFerias() {
   };
 
   useEffect(() => { carregar(); }, []);
+
+  useEffect(() => {
+    if (!selecionado?.id) {
+      setMetricas(null);
+      return;
+    }
+    base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_DETALHES', plano_id: selecionado.id })
+      .then((res) => setMetricas(res.data?.metricas || null))
+      .catch(() => setMetricas(null));
+  }, [selecionado?.id]);
 
   const campanhasDoPlano = useMemo(
     () => selecionado ? campanhas.filter((c) => c.plano_ferias_institucional_id === selecionado.id) : [],
@@ -110,6 +121,25 @@ export default function PlanosFerias() {
     }
   };
 
+  const gerarFeriasDoPlano = async () => {
+    if (!selecionado) return;
+    if (!window.confirm(`Gerar férias pendentes no plano "${selecionado.titulo}"? Somente novas respostas com escala salva serão incluídas; férias já geradas não serão alteradas.`)) return;
+    setSalvando(true);
+    try {
+      const resultado = await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_INSTITUCIONAL_GERAR_FERIAS',
+        plano_id: selecionado.id,
+        ano_referencia: Number(selecionado.ano_referencia),
+      });
+      setFeedback({ tipo: 'sucesso', texto: resultado.data?.message || 'Geração complementar concluída.' });
+      await carregar();
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: erro.message || 'Não foi possível gerar as férias deste plano.' });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const excluir = async (plano) => {
     if (!window.confirm(`Excluir o plano vazio "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
@@ -165,8 +195,20 @@ export default function PlanosFerias() {
               </div>
             )}
           </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            A geração consolidada de férias será executada neste plano, nunca em uma campanha isolada. Ela permanece bloqueada nesta etapa até a consolidação e as salvaguardas de geração complementar estarem concluídas.
+          <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <h2 className="font-bold text-slate-900">Resumo consolidado</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+              {[
+                ['Efetivo único', metricas?.efetivo_unico ?? '-'],
+                ['Respondidos', metricas?.respondidos_unicos ?? '-'],
+                ['Pendentes', metricas?.pendentes_unicos ?? '-'],
+                ['Férias geradas', metricas?.ferias_geradas_unicas ?? '-'],
+              ].map(([rotulo, valor]) => <div key={rotulo} className="rounded-xl bg-slate-50 border border-slate-200 p-3"><p className="text-xs text-slate-500">{rotulo}</p><p className="text-xl font-black text-slate-900 mt-1">{valor}</p></div>)}
+            </div>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 pt-4">
+              <p className="text-xs text-slate-500">A geração inclui somente respostas novas, com escala salva, e preserva tudo o que já foi gerado.</p>
+              <Button type="button" onClick={gerarFeriasDoPlano} disabled={salvando || selecionado.status === 'ARQUIVADO'} className="bg-emerald-700 hover:bg-emerald-800"><CalendarDays className="w-4 h-4 mr-1.5" />{salvando ? 'Gerando...' : 'Gerar férias do plano'}</Button>
+            </div>
           </div>
         </div>
       </div>
