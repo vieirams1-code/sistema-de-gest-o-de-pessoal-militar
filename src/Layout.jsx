@@ -250,7 +250,7 @@ const menuGroups = [
         description: 'Módulo de Gestão de Campanhas e Validações do Portal',
         items: [
           {
-            name: '1. Gestão de Campanhas',
+            name: '1. Campanhas',
             page: 'GerirCampanhasPortal',
             icon: Megaphone,
             moduleKey: 'acesso_campanhas',
@@ -258,16 +258,8 @@ const menuGroups = [
             menuGroup: 'Gestão RH / Comando',
           },
           {
-            name: '2. Central de Respostas & Entregas',
-            page: 'CentralRespostasCampanhas',
-            icon: FileSpreadsheet,
-            moduleKey: 'acesso_campanhas',
-            actionKey: 'perm_gerir_respostas',
-            menuGroup: 'Gestão RH / Comando',
-          },
-          {
-            name: '3. Painel Plano de Férias',
-            page: 'PainelPlanoFerias',
+            name: '2. Plano de Férias',
+            page: 'PlanosFerias',
             icon: CalendarDays,
             moduleKey: 'acesso_campanhas',
             actionKey: 'perm_gerir_respostas',
