@@ -1,61 +1,159 @@
 {
   "name": "OpcaoFeriasMilitar",
   "type": "object",
-  "title": "Opção e Escalação de Férias do Militar",
-  "description": "Registro das 3 opções de meses/datas do militar, workflow de aprovação em 2 camadas e geração de férias.",
+  "title": "Op\u00e7\u00e3o e Escala\u00e7\u00e3o de F\u00e9rias do Militar",
+  "description": "Registro das 3 op\u00e7\u00f5es de meses/datas do militar, workflow de aprova\u00e7\u00e3o em 2 camadas e gera\u00e7\u00e3o de f\u00e9rias.",
   "properties": {
-    "campanha_id": { "type": "string" },
-    "ano_referencia": { "type": "number" },
-    "militar_id": { "type": "string" },
-    "militar_nome": { "type": "string" },
-    "militar_posto": { "type": "string" },
-    "militar_matricula": { "type": "string" },
-    "militar_quadro": { "type": "string" },
-    "lotacao_id": { "type": "string" },
-    "lotacao_nome": { "type": "string" },
-    "periodo_aquisitivo_id": { "type": "string" },
-    "periodo_inicio": { "type": "string" },
-    "periodo_fim": { "type": "string" },
-    "dias_direito": { "type": "number", "default": 30 },
+    "campanha_id": {
+      "type": "string"
+    },
+    "plano_ferias_institucional_id": {
+      "type": "string",
+      "description": "Plano de F\u00e9rias que consolida esta resposta"
+    },
+    "ano_referencia": {
+      "type": "number"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "militar_quadro": {
+      "type": "string"
+    },
+    "lotacao_id": {
+      "type": "string"
+    },
+    "lotacao_nome": {
+      "type": "string"
+    },
+    "periodo_aquisitivo_id": {
+      "type": "string"
+    },
+    "periodo_inicio": {
+      "type": "string"
+    },
+    "periodo_fim": {
+      "type": "string"
+    },
+    "dias_direito": {
+      "type": "number",
+      "default": 30
+    },
     "modalidade": {
       "type": "string",
-      "enum": ["1_ETAPA_30", "2_ETAPAS_15", "3_ETAPAS_10", "CUSTOM"],
+      "enum": [
+        "1_ETAPA_30",
+        "2_ETAPAS_15",
+        "3_ETAPAS_10",
+        "CUSTOM"
+      ],
       "default": "2_ETAPAS_15"
     },
-    "opcao_1_meses": { "type": "string" },
-    "opcao_1_detalhes": { "type": "string" },
-    "opcao_2_meses": { "type": "string" },
-    "opcao_2_detalhes": { "type": "string" },
-    "opcao_3_meses": { "type": "string" },
-    "opcao_3_detalhes": { "type": "string" },
-    "data_envio_militar": { "type": "string", "format": "date-time" },
+    "opcao_1_meses": {
+      "type": "string"
+    },
+    "opcao_1_detalhes": {
+      "type": "string"
+    },
+    "opcao_2_meses": {
+      "type": "string"
+    },
+    "opcao_2_detalhes": {
+      "type": "string"
+    },
+    "opcao_3_meses": {
+      "type": "string"
+    },
+    "opcao_3_detalhes": {
+      "type": "string"
+    },
+    "data_envio_militar": {
+      "type": "string",
+      "format": "date-time"
+    },
     "status_camada_1": {
       "type": "string",
-      "enum": ["Pendente", "Opcao_1_Aprovada", "Opcao_2_Aprovada", "Opcao_3_Aprovada", "Ajustado_Pelo_Gestor", "Homologado_Unidade"],
+      "enum": [
+        "Pendente",
+        "Opcao_1_Aprovada",
+        "Opcao_2_Aprovada",
+        "Opcao_3_Aprovada",
+        "Ajustado_Pelo_Gestor",
+        "Homologado_Unidade"
+      ],
       "default": "Pendente"
     },
-    "decisao_camada_1_opcao": { "type": "string" },
-    "decisao_camada_1_meses": { "type": "string" },
-    "decisao_camada_1_detalhes": { "type": "string" },
-    "gestor_unidade_id": { "type": "string" },
-    "gestor_unidade_nome": { "type": "string" },
-    "data_decisao_camada_1": { "type": "string", "format": "date-time" },
-    "justificativa_ajuste_gestor": { "type": "string" },
+    "decisao_camada_1_opcao": {
+      "type": "string"
+    },
+    "decisao_camada_1_meses": {
+      "type": "string"
+    },
+    "decisao_camada_1_detalhes": {
+      "type": "string"
+    },
+    "gestor_unidade_id": {
+      "type": "string"
+    },
+    "gestor_unidade_nome": {
+      "type": "string"
+    },
+    "data_decisao_camada_1": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "justificativa_ajuste_gestor": {
+      "type": "string"
+    },
     "status_camada_2": {
       "type": "string",
-      "enum": ["Pendente", "Homologado_Superior", "Rejeitado_Para_Revisao"],
+      "enum": [
+        "Pendente",
+        "Homologado_Superior",
+        "Rejeitado_Para_Revisao"
+      ],
       "default": "Pendente"
     },
-    "superior_homologador_id": { "type": "string" },
-    "superior_homologador_nome": { "type": "string" },
-    "data_homologacao_superior": { "type": "string", "format": "date-time" },
-    "observacao_superior": { "type": "string" },
-    "gerado_ferias_efetivas": { "type": "boolean", "default": false },
-    "data_geracao_ferias": { "type": "string", "format": "date-time" },
+    "superior_homologador_id": {
+      "type": "string"
+    },
+    "superior_homologador_nome": {
+      "type": "string"
+    },
+    "data_homologacao_superior": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observacao_superior": {
+      "type": "string"
+    },
+    "gerado_ferias_efetivas": {
+      "type": "boolean",
+      "default": false
+    },
+    "data_geracao_ferias": {
+      "type": "string",
+      "format": "date-time"
+    },
     "ferias_ids_geradas": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     }
   },
-  "required": ["ano_referencia", "militar_id", "periodo_aquisitivo_id"]
+  "required": [
+    "ano_referencia",
+    "militar_id",
+    "periodo_aquisitivo_id"
+  ]
 }
