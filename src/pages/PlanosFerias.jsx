@@ -6,6 +6,8 @@ import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Trash
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+// Página sincronizada para a prévia do Base44.
+
 const novoPlano = () => ({
   titulo: '',
   ano_referencia: new Date().getFullYear() + 1,
