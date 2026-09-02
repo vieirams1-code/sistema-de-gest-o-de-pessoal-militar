@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../../../base44/functions/portal_servicos/entry.ts', import.meta.url), 'utf8');
+const planosSource = await readFile(new URL('../../../base44/functions/planos_ferias_servicos/entry.ts', import.meta.url), 'utf8');
 
 test('rotas administrativas do Portal exigem usuário autenticado real', () => {
   assert.match(source, /user\s*=\s*await base44\.auth\.me\(\)/);
@@ -24,4 +25,20 @@ test('headers X-App-Id e Authorization não funcionam como autorização adminis
   const adminBlock = source.slice(adminBlockStart, adminBlockEnd);
   assert.doesNotMatch(adminBlock, /req\.headers\.get\('X-App-Id'\)/);
   assert.doesNotMatch(adminBlock, /req\.headers\.get\('Authorization'\)/);
+});
+
+test('serviço exclusivo de Planos de Férias exige autenticação e permissão funcional', () => {
+  assert.match(planosSource, /user\s*=\s*await base44\.auth\.me\(\)/);
+  assert.match(planosSource, /if \(!user\)/);
+  assert.match(planosSource, /usuarioPodeGerirPlanos\(base44, user\)/);
+  assert.match(planosSource, /perm_gerir_campanhas/);
+  assert.match(planosSource, /perm_gerir_respostas/);
+  assert.match(planosSource, /perm_configurar_portal/);
+  assert.match(planosSource, /403/);
+});
+
+test('serviço de Planos não usa cabeçalhos nem tipo_acesso como atalho administrativo', () => {
+  assert.doesNotMatch(planosSource, /req\.headers\.get\('X-App-Id'\)/);
+  assert.doesNotMatch(planosSource, /req\.headers\.get\('Authorization'\)/);
+  assert.doesNotMatch(planosSource, /tipo_acesso.*admin/);
 });
