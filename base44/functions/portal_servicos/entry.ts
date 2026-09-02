@@ -2173,9 +2173,17 @@ Deno.serve(async (req: Request) => {
 
       case 'FERIAS_SUBMETER_OPCAO': {
         const { periodo_aquisitivo_id, modalidade, opcao_1, opcao_2, opcao_3 } = payload;
-        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
-        const campanhaId = payload.campanha_id || campanhaFeriasAtiva?.id || null;
-        const planoIdAtivo = textoId(campanhaFeriasAtiva?.plano_ferias_institucional_id);
+        const campanhaSolicitada = payload.campanha_id
+          ? campanhasAtivasMilitar.find((c) => c.id === payload.campanha_id && c.tipo === 'PLANO_FERIAS')
+          : null;
+        const campanhaFeriasAtiva = campanhaSolicitada || campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
+        if (!campanhaFeriasAtiva?.id) {
+          return new Response(JSON.stringify({ error: 'Não há campanha de férias aberta para receber esta resposta.' }), {
+            status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+        const campanhaId = campanhaFeriasAtiva.id;
+        const planoIdAtivo = textoId(campanhaFeriasAtiva.plano_ferias_institucional_id);
         const anoCampanha = payload.ano_referencia || campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
         // Guard de Dependência em Cascata
@@ -2393,7 +2401,11 @@ Deno.serve(async (req: Request) => {
           let respostaId = null;
 
           if (cp.tipo === 'PLANO_FERIAS') {
-            const op = opcoesFerias.find((o: any) => o.campanha_id === cp.id || o.ano_referencia === cp.ano_referencia);
+            const op = opcoesFerias.find((o: any) =>
+              cp.plano_ferias_institucional_id
+                ? textoId(o.plano_ferias_institucional_id) === textoId(cp.plano_ferias_institucional_id)
+                : o.campanha_id === cp.id
+            );
             if (op) {
               statusResposta = 'Respondido';
               dataResposta = op.data_envio_militar || op.created_date;
