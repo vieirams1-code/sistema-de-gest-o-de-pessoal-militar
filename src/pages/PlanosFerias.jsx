@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
-import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Trash2, Users } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -14,6 +14,7 @@ const novoPlano = () => ({
   ano_referencia: new Date().getFullYear() + 1,
   descricao: '',
   data_abertura: new Date().toISOString().slice(0, 10),
+  data_encerramento: '',
 });
 
 export default function PlanosFerias() {
