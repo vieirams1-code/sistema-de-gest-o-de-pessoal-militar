@@ -259,6 +259,15 @@ export default function CentralRespostasCampanhas() {
           <div className="flex items-center gap-2.5 flex-wrap">
             <Button
               type="button"
+              variant="outline"
+              onClick={() => navigate(createPageUrl('GerirCampanhasPortal'))}
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-bold rounded-xl h-10 px-3.5"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1.5" />
+              Fechar
+            </Button>
+            <Button
+              type="button"
               onClick={handleExportarExcel}
               disabled={loadingRespostas || !respostasData?.militares?.length}
               className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md h-10 px-4"
