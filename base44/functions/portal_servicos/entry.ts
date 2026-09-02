@@ -84,6 +84,7 @@ interface PortalServicosPayload {
   // Gestão de Campanhas
   campanha_id?: string;
   plano_ferias_institucional_id?: string;
+  plano_id?: string;
   plano_payload?: any;
   campanha_payload?: any;
   ano_referencia?: number;
