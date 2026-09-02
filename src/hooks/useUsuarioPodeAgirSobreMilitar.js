@@ -34,7 +34,8 @@ export function useUsuarioPodeAgirSobreMilitar() {
    * @returns {{ permitido: boolean, motivo: string|null }}
    */
   const validar = useCallback((militarId) => {
-    if (isAdmin) return { permitido: true, motivo: null };
+    // Escopo sem restrição (role admin ou escopo geral): scopedIds === null.
+    if (isAdmin || scopedIds === null) return { permitido: true, motivo: null };
 
     if (!isReady) {
       return { permitido: false, motivo: ESCOPO_CARREGANDO_MSG };

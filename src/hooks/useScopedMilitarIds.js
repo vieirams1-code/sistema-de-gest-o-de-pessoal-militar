@@ -37,9 +37,16 @@ export function useScopedMilitarIds(options = {}) {
     isAccessResolved,
   } = useCurrentUser();
 
+  // Escopo geral (UsuarioAcesso.tipo_acesso = 'admin' em usuário sem role
+  // de plataforma admin) também é "sem restrição": o backend (cudEscopado,
+  // getUserPermissions) trata isAdminByAccess como bypass de escopo militar.
+  // Sem este tratamento, o escopo geral caía no branch de filtros vazios e
+  // era interpretado como "nenhum militar permitido", negando acesso indevidamente.
+  const semRestricao = isAdmin || modoAcesso === 'admin';
+
   const queryKey = [
     'scoped-militar-ids',
-    isAdmin ? 'admin' : modoAcesso || 'sem-escopo',
+    semRestricao ? 'admin' : modoAcesso || 'sem-escopo',
     userEmail || 'self',
     linkedMilitarId || null,
   ];
@@ -83,25 +90,27 @@ export function useScopedMilitarIds(options = {}) {
       }
       return Array.from(ids);
     },
-    enabled: isAccessResolved && !hasSeedIds,
+    enabled: isAccessResolved && !hasSeedIds && !semRestricao,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const resolvedIds = hasSeedIds
     ? Array.from(new Set((seedIds || []).map(String)))
-    : isAdmin
+    : semRestricao
       ? null
       : query.data === undefined
         ? []
         : query.data;
 
-  const isLoading = !isAccessResolved || (!hasSeedIds && query.isLoading);
-  const isReady = isAccessResolved && (isAdmin || hasSeedIds || query.data !== undefined) && !isLoading;
+  const isLoading = !isAccessResolved || (!hasSeedIds && !semRestricao && query.isLoading);
+  const isReady = isAccessResolved && (semRestricao || hasSeedIds || query.data !== undefined) && !isLoading;
 
   return {
     ids: resolvedIds,
-    isAdmin,
+    // isAdmin aqui significa "escopo sem restrição" (role admin OU escopo geral),
+    // espelhando o bypass de escopo aplicado pelo backend.
+    isAdmin: semRestricao,
     isLoading,
     isReady,
   };
