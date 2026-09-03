@@ -77,6 +77,7 @@ export default function Medalhas() {
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
+  const podeExcluirMedalha = canAccessAction('excluir_medalhas');
   const podeGerirDomPedro = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,7 +99,7 @@ export default function Medalhas() {
   };
 
   const handleAbrirExcluirMedalha = (medalha) => {
-    if (!podeIndicar) return;
+    if (!podeExcluirMedalha) return;
     const escopo = validarEscopoMilitar(medalha?.militar_id);
     if (!escopo.permitido) {
       alert(escopo.motivo);
@@ -134,7 +135,7 @@ export default function Medalhas() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => {
-      if (!podeIndicar) throw new Error('Sem permissão para excluir indicação.');
+      if (!podeExcluirMedalha) throw new Error('Sem permissão para excluir indicação.');
       return excluirEscopado('Medalha', id);
     },
     onSuccess: () => {
