@@ -1030,7 +1030,7 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
 
 const ENTIDADES_FILHAS_CARD = new Set(['CardComentario', 'CardChecklistItem', 'CardVinculo', 'CardAcao']);
 
-async function resolverMilitarIdPorCard(base44, cardId) {
+async function buscarCardPaiQuadro(base44, cardId) {
   const id = String(cardId || '').trim();
   if (!id) return null;
   const cards = await base44.asServiceRole.entities.CardOperacional.filter(
@@ -1038,10 +1038,22 @@ async function resolverMilitarIdPorCard(base44, cardId) {
     undefined,
     1,
     0,
-    ['id', 'militar_id'],
+    ['id', 'militar_id', 'origem_tipo', 'criado_automaticamente'],
   ).catch(() => []);
-  const card = cards?.[0] || null;
+  return cards?.[0] || null;
+}
+
+async function resolverMilitarIdPorCard(base44, cardId) {
+  const card = await buscarCardPaiQuadro(base44, cardId);
   return card?.militar_id ? String(card.militar_id) : null;
+}
+
+function ehCardJisoAutomatico(card) {
+  return Boolean(card?.criado_automaticamente && String(card?.origem_tipo || '') === 'Atestado/JISO');
+}
+
+function possuiAlgumaAction(actions, ...chaves) {
+  return chaves.some((chave) => actions?.[chave] === true);
 }
 
 function getEntity(base44, entityName) {
@@ -1326,6 +1338,65 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
+      } else if (entityName === 'CardComentario' && operation === 'create') {
+        const cardPai = await buscarCardPaiQuadro(base44, data?.card_id);
+        const comentarioAutomatico = data?.origem_automatica === true;
+        const permitido = comentarioAutomatico
+          ? possuiAlgumaAction(
+              targetPerms.actions,
+              'visualizar_quadro_operacional',
+              'gerir_quadro',
+              'mover_card',
+              'arquivar_card',
+              'gerir_jiso',
+              'adicionar_atestados',
+              'editar_atestados',
+            )
+          : targetPerms.actions?.['visualizar_quadro_operacional'] === true;
+        if (!permitido) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: comentarioAutomatico ? 'ação compatível com a origem automática do card' : 'visualizar_quadro_operacional' },
+            { status: 403 },
+          );
+        }
+        if (comentarioAutomatico && !ehCardJisoAutomatico(cardPai) && targetPerms.actions?.['gerir_quadro'] !== true && targetPerms.actions?.['mover_card'] !== true && targetPerms.actions?.['arquivar_card'] !== true) {
+          return Response.json({ error: 'Acesso negado: comentário automático incompatível com a origem do card.' }, { status: 403 });
+        }
+      } else if (entityName === 'CardChecklistItem' && operation === 'create') {
+        const cardPai = await buscarCardPaiQuadro(base44, data?.card_id);
+        const permitido = targetPerms.actions?.['gerir_acoes_operacionais'] === true
+          || (ehCardJisoAutomatico(cardPai) && possuiAlgumaAction(targetPerms.actions, 'gerir_jiso', 'adicionar_atestados', 'editar_atestados'))
+          || targetPerms.actions?.['gerir_quadro'] === true;
+        if (!permitido) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: 'gerir_acoes_operacionais' },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'CardVinculo' && operation !== 'bulk') {
+        const cardIdVinculo = operation === 'create' ? data?.card_id : registroExistente?.card_id;
+        const cardPai = await buscarCardPaiQuadro(base44, cardIdVinculo);
+        const tipoVinculo = String((operation === 'create' ? data?.tipo_vinculo : registroExistente?.tipo_vinculo) || '');
+        const permitidoAutomacaoJiso = tipoVinculo === 'Atestado'
+          && ehCardJisoAutomatico(cardPai)
+          && possuiAlgumaAction(targetPerms.actions, 'gerir_jiso', 'adicionar_atestados', 'editar_atestados');
+        const permitido = targetPerms.actions?.['gerir_quadro'] === true || permitidoAutomacaoJiso;
+        if (!permitido) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: 'gerir_quadro' },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'CardOperacional' && operation === 'create') {
+        const ehAutomacaoJiso = data?.criado_automaticamente === true && String(data?.origem_tipo || '') === 'Atestado/JISO';
+        const permitido = targetPerms.actions?.['gerir_quadro'] === true
+          || (ehAutomacaoJiso && possuiAlgumaAction(targetPerms.actions, 'gerir_jiso', 'adicionar_atestados', 'editar_atestados'));
+        if (!permitido) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: ehAutomacaoJiso ? 'permissão de Atestados/JISO compatível' : 'gerir_quadro' },
+            { status: 403 },
+          );
+        }
       } else if (entityName === 'CardOperacional' && operation === 'update') {
         const chaves = Object.keys(data || {});
         const apenas = (permitidas) => chaves.length > 0 && chaves.every((chave) => permitidas.has(chave));
@@ -1334,7 +1405,29 @@ Deno.serve(async (req) => {
         else if (Object.prototype.hasOwnProperty.call(data || {}, 'arquivado')) requiredPermission = 'arquivar_card';
         else if (apenas(new Set(['coluna_id', 'ordem', 'comentarios_count']))) requiredPermission = 'mover_card';
         else if (apenas(new Set(['prazo']))) requiredPermission = 'gerir_jiso';
-        if (targetPerms.actions?.[requiredPermission] !== true) {
+
+        const cardAtual = registroExistente || {};
+        const camposSyncJiso = new Set([
+          'titulo', 'descricao', 'militar_nome_snapshot', 'prazo', 'protocolo',
+          'referencia_externa_id', 'origem_tipo', 'criado_automaticamente', 'coluna_id',
+          'status', 'origem_status', 'comentarios_count',
+        ]);
+        const ehSyncJiso = ehCardJisoAutomatico(cardAtual)
+          && chaves.length > 0
+          && chaves.every((chave) => camposSyncJiso.has(chave));
+        const possuiSyncJiso = ehSyncJiso
+          && possuiAlgumaAction(targetPerms.actions, 'gerir_jiso', 'adicionar_atestados', 'editar_atestados');
+
+        if (!possuiSyncJiso && targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+        if (possuiSyncJiso && data?.origem_tipo !== undefined && String(data.origem_tipo) !== 'Atestado/JISO') {
+          return Response.json({ error: 'Acesso negado: automação JISO não pode alterar a origem do card.' }, { status: 403 });
+        }
+        if (!possuiSyncJiso && targetPerms.actions?.[requiredPermission] !== true) {
           return Response.json(
             { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
             { status: 403 },
