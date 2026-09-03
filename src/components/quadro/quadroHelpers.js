@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { buildChecklistResumo } from './quadroFormatters';
 
 export { buildChecklistResumo };
@@ -91,7 +91,7 @@ export async function criarChecklistPreset(cardId, preset) {
 
   await Promise.all(
     itens.map((titulo, index) =>
-      base44.entities.CardChecklistItem.create({
+      criarEscopado('CardChecklistItem', {
         card_id: cardId,
         titulo,
         concluido: false,
@@ -100,7 +100,7 @@ export async function criarChecklistPreset(cardId, preset) {
     )
   );
 
-  await base44.entities.CardOperacional.update(cardId, {
+  await atualizarEscopado('CardOperacional', cardId, {
     checklist_resumo: `0/${itens.length}`,
   });
 }
@@ -159,7 +159,7 @@ export async function registrarExclusaoAtestadoNoCard(atestado) {
     .filter(Boolean)
     .join('\n');
 
-  await base44.entities.CardComentario.create({
+  await criarEscopado('CardComentario', {
     card_id: card.id,
     mensagem,
     tipo_registro: 'Sistema',
@@ -170,7 +170,7 @@ export async function registrarExclusaoAtestadoNoCard(atestado) {
 
   const novoComentariosCount = (card.comentarios_count || 0) + 1;
 
-  await base44.entities.CardOperacional.update(card.id, {
+  await atualizarEscopado('CardOperacional', card.id, {
     status: 'Origem Excluída',
     origem_status: 'Excluída',
     comentarios_count: novoComentariosCount,
@@ -214,7 +214,7 @@ async function garantirVinculoUnico({ cardId, tipoVinculo, referenciaId, tituloV
   );
 
   if (vinculosNoCard.length === 0) {
-    await base44.entities.CardVinculo.create({
+    await criarEscopado('CardVinculo', {
       card_id: cardId,
       tipo_vinculo: tipoVinculo,
       referencia_id: referenciaId,
@@ -226,13 +226,13 @@ async function garantirVinculoUnico({ cardId, tipoVinculo, referenciaId, tituloV
   const [vinculoPrincipal, ...duplicados] = vinculosNoCard;
 
   if (vinculoPrincipal.titulo_vinculo !== tituloVinculo) {
-    await base44.entities.CardVinculo.update(vinculoPrincipal.id, {
+    await atualizarEscopado('CardVinculo', vinculoPrincipal.id, {
       titulo_vinculo: tituloVinculo,
     });
   }
 
   if (duplicados.length > 0) {
-    await Promise.all(duplicados.map((vinculo) => base44.entities.CardVinculo.delete(vinculo.id)));
+    await Promise.all(duplicados.map((vinculo) => excluirEscopado('CardVinculo', vinculo.id)));
   }
 }
 
@@ -240,7 +240,7 @@ export async function sincronizarDataJisoCardAtestado({ cardId, atestadoId, data
   if (!cardId || !atestadoId) return;
 
   await Promise.all([
-    base44.entities.CardOperacional.update(cardId, { prazo: dataJiso || '' }),
+    atualizarEscopado('CardOperacional', cardId, { prazo: dataJiso || '' }),
     atualizarEscopado('Atestado', atestadoId, { data_jiso_agendada: dataJiso || '' }),
   ]);
 }
@@ -270,7 +270,7 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
       payloadAtualizacao.coluna_id = colunaJiso.id;
     }
 
-    await base44.entities.CardOperacional.update(cardExistente.id, payloadAtualizacao);
+    await atualizarEscopado('CardOperacional', cardExistente.id, payloadAtualizacao);
 
     await garantirVinculoUnico({
       cardId: cardExistente.id,
@@ -285,7 +285,7 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
   const cardsDaColuna = cards.filter((card) => card.coluna_id === colunaJiso.id);
   const ordem = cardsDaColuna.length + 1;
 
-  const card = await base44.entities.CardOperacional.create({
+  const card = await criarEscopado('CardOperacional', {
     ...payloadBase,
     coluna_id: colunaJiso.id,
     ordem,
@@ -296,7 +296,7 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
     comentarios_count: 1,
   });
 
-  await base44.entities.CardComentario.create({
+  await criarEscopado('CardComentario', {
     card_id: card.id,
     mensagem: 'Card criado automaticamente a partir de atestado com necessidade de JISO.',
     tipo_registro: 'Sistema',
