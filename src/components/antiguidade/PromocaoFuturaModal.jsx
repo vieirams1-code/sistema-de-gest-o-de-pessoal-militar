@@ -1,6 +1,7 @@
 import React from 'react';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,8 +70,8 @@ export default function PromocaoFuturaModal({ open, onOpenChange, militar, onSav
         status_registro: STATUS_PREVISTO,
       };
 
-      if (registroEdicao?.id) await base44.entities.HistoricoPromocaoMilitarV2.update(registroEdicao.id, payload);
-      else await base44.entities.HistoricoPromocaoMilitarV2.create(payload);
+      if (registroEdicao?.id) await atualizarEscopado('HistoricoPromocaoMilitarV2', registroEdicao.id, payload);
+      else await criarEscopado('HistoricoPromocaoMilitarV2', payload);
 
       await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
       await onSaved?.();
