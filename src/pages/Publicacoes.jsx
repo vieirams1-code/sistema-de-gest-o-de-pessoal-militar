@@ -377,6 +377,7 @@ export default function Publicacoes() {
   const {
     user,
     isAdmin,
+    hasGlobalScope,
     modoAcesso,
     userEmail,
     linkedMilitarId,
@@ -411,18 +412,18 @@ export default function Publicacoes() {
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: registrosLivroQueryKey,
-    queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
+    queryFn: () => getLivroRegistrosContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
     queryKey: publicacoesExOfficioQueryKey,
     queryFn: async () => {
-      const publicacoes = await listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
+      const publicacoes = await listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
       const sincronizadas = await sincronizarStatusPublicacoesComBgCompleto(publicacoes);
       if (sincronizadas > 0) {
         queryClient.invalidateQueries({ queryKey: rpListaQueryKey, exact: true });
-        return listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
+        return listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
       }
       return publicacoes;
     },
@@ -431,7 +432,7 @@ export default function Publicacoes() {
 
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
     queryKey: atestadosPublicacaoQueryKey,
-    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
+    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
