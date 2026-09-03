@@ -1,35 +1,7 @@
-function normalizeKeyPart(value) {
-  if (value === undefined || value === '') return null;
-  return value;
-}
+import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 
-function normalizeIds(values) {
-  if (!Array.isArray(values)) return [];
-  return values
-    .map((item) => (typeof item === 'object' && item !== null ? item.id : item))
-    .filter(Boolean)
-    .map(String)
-    .sort();
-}
-
-export function buildPublicacoesScopeKey({
-  isAdmin = false,
-  modoAcesso = null,
-  effectiveEmail = null,
-  linkedMilitarId = null,
-  subgrupamentoId = null,
-  subgrupamentoTipo = null,
-  unidadesFilhas = [],
-} = {}) {
-  return {
-    isAdmin: Boolean(isAdmin),
-    modoAcesso: normalizeKeyPart(modoAcesso),
-    effectiveEmail: normalizeKeyPart(typeof effectiveEmail === 'string' ? effectiveEmail.trim().toLowerCase() : effectiveEmail),
-    linkedMilitarId: normalizeKeyPart(linkedMilitarId),
-    subgrupamentoId: normalizeKeyPart(subgrupamentoId),
-    subgrupamentoTipo: normalizeKeyPart(subgrupamentoTipo),
-    unidadesFilhasIds: normalizeIds(unidadesFilhas),
-  };
+export function buildPublicacoesScopeKey(args = {}) {
+  return buildAccessScopeKey(args);
 }
 
 export const publicacoesQueryKeys = {
