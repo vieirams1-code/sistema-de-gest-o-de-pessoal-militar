@@ -24,6 +24,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
+import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import MedalhasTabNavigation from '@/components/medalhas/MedalhasTabNavigation';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
@@ -60,13 +61,39 @@ export default function IndicacoesDomPedroII() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user, isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const {
+    user,
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    getMilitarScopeFilters,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
+    canAccessModule,
+    canAccessAction,
+    isLoading: loadingUser,
+    isAccessResolved,
+  } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const hasDomPedroAccess = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
   const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
   const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
   const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
   const podeModoAdmin = canAccessAction(ACOES_MEDALHAS.ADMIN_OVERRIDE);
+  const accessScopeKey = useMemo(() => buildAccessScopeKey({
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, hasGlobalScope, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, user?.email, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -86,15 +113,15 @@ export default function IndicacoesDomPedroII() {
   });
 
   const militaresQuery = useQuery({
-    queryKey: ['dompedro-militares'],
-    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters }),
+    queryKey: ['dompedro-militares', accessScopeKey],
+    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
   });
   const medalhasQuery = useQuery({
-    queryKey: ['dompedro-medalhas'],
+    queryKey: ['dompedro-medalhas', accessScopeKey],
     queryFn: async () => {
-      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
-      return listarMedalhasEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, hasGlobalScope, getMilitarScopeFilters });
+      return listarMedalhasEscopo({ base44Client: base44, isAdmin, hasGlobalScope, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
     },
     enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
   });
@@ -104,10 +131,10 @@ export default function IndicacoesDomPedroII() {
     enabled: isAccessResolved && hasMedalhasAccess,
   });
   const impedimentosQuery = useQuery({
-    queryKey: ['dompedro-impedimentos'],
+    queryKey: ['dompedro-impedimentos', accessScopeKey],
     queryFn: async () => {
-      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
-      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, hasGlobalScope, getMilitarScopeFilters });
+      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, hasGlobalScope, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
     },
     enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
   });
@@ -206,7 +233,7 @@ export default function IndicacoesDomPedroII() {
   const indicarMutation = useMutation({
     mutationFn: async (militar) => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.DOM_PEDRO, mensagem: 'Sem permissão para indicar Dom Pedro II.' });
-      validarMilitarDentroEscopo({ isAdmin, militarId: militar?.id, militarIdsEscopo });
+      validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId: militar?.id, militarIdsEscopo });
       const existente = registroPorMilitar.get(militar.id);
       if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
         return base44.entities.Medalha.update(existente.id, adicionarAuditoriaMedalha({ status: 'INDICADA', data_indicacao: hojeISO() }, { userEmail, acao: 'indicacao' }));
@@ -224,7 +251,7 @@ export default function IndicacoesDomPedroII() {
   const indicarAdminMutation = useMutation({
     mutationFn: async ({ militar, justificativa }) => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.ADMIN_OVERRIDE, mensagem: 'Sem permissão para usar override administrativo.' });
-      validarMilitarDentroEscopo({ isAdmin, militarId: militar?.id, militarIdsEscopo });
+      validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId: militar?.id, militarIdsEscopo });
       if (!justificativa?.trim()) {
         throw new Error('A justificativa do override administrativo é obrigatória.');
       }
@@ -256,7 +283,7 @@ export default function IndicacoesDomPedroII() {
   const concederMutation = useMutation({
     mutationFn: ({ medalhaId, militarId, data_concessao, numero_publicacao }) => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.CONCEDER, mensagem: 'Sem permissão para conceder medalhas.' });
-      validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo });
+      validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId, militarIdsEscopo });
       return base44.entities.Medalha.update(medalhaId, adicionarAuditoriaMedalha({
         status: 'CONCEDIDA',
         data_concessao,
