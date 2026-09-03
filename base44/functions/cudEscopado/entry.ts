@@ -1028,6 +1028,22 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   return payloadFinal;
 }
 
+const ENTIDADES_FILHAS_CARD = new Set(['CardComentario', 'CardChecklistItem', 'CardVinculo', 'CardAcao']);
+
+async function resolverMilitarIdPorCard(base44, cardId) {
+  const id = String(cardId || '').trim();
+  if (!id) return null;
+  const cards = await base44.asServiceRole.entities.CardOperacional.filter(
+    { id },
+    undefined,
+    1,
+    0,
+    ['id', 'militar_id'],
+  ).catch(() => []);
+  const card = cards?.[0] || null;
+  return card?.militar_id ? String(card.militar_id) : null;
+}
+
 function getEntity(base44, entityName) {
   return base44.asServiceRole.entities[entityName];
 }
@@ -1146,6 +1162,9 @@ Deno.serve(async (req) => {
           militarAlvoId = f?.militar_id ? String(f.militar_id) : null;
         }
       }
+      if (!militarAlvoId && ENTIDADES_FILHAS_CARD.has(entityName)) {
+        militarAlvoId = await resolverMilitarIdPorCard(base44, data?.card_id);
+      }
     } else {
       // update / delete: buscar registro existente para obter militar_id canônico
       registroExistente = await buscarRegistroExistente(base44, entityName, registroId);
@@ -1163,19 +1182,28 @@ Deno.serve(async (req) => {
           militarAlvoId = f?.militar_id ? String(f.militar_id) : null;
         }
       }
+      if (!militarAlvoId && ENTIDADES_FILHAS_CARD.has(entityName)) {
+        militarAlvoId = await resolverMilitarIdPorCard(base44, registroExistente?.card_id);
+      }
     }
 
     // Operações 'bulk' não possuem um único militarAlvoId no topo;
     // a validação de escopo é realizada individualmente por item no loop bulk.
-    if (exigeEscopoMilitar && !militarAlvoId && operation !== 'bulk') {
+    if (
+      exigeEscopoMilitar
+      && !militarAlvoId
+      && operation !== 'bulk'
+      && !targetIsAdmin
+      && !targetPerms.isAdminByAccess
+    ) {
       return Response.json(
-        { error: 'Não foi possível identificar o militar_id alvo desta operação.' },
+        { error: 'Não foi possível identificar o militar_id alvo desta operação dentro de um escopo restrito.' },
         { status: 400 },
       );
     }
 
     // ---- Bloqueio de troca de militar_id em update por restrito ----
-    if (exigeEscopoMilitar && operation === 'update' && !targetIsAdmin) {
+    if (exigeEscopoMilitar && operation === 'update' && !targetIsAdmin && !targetPerms.isAdminByAccess) {
       if (data && Object.prototype.hasOwnProperty.call(data, 'militar_id')) {
         const militarIdNoPayload = data.militar_id ? String(data.militar_id) : null;
         if (militarIdNoPayload && militarIdNoPayload !== militarAlvoId) {
@@ -1298,6 +1326,20 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
+      } else if (entityName === 'CardOperacional' && operation === 'update') {
+        const chaves = Object.keys(data || {});
+        const apenas = (permitidas) => chaves.length > 0 && chaves.every((chave) => permitidas.has(chave));
+        let requiredPermission = 'gerir_quadro';
+        if (apenas(new Set(['comentarios_count']))) requiredPermission = 'visualizar_quadro_operacional';
+        else if (Object.prototype.hasOwnProperty.call(data || {}, 'arquivado')) requiredPermission = 'arquivar_card';
+        else if (apenas(new Set(['coluna_id', 'ordem', 'comentarios_count']))) requiredPermission = 'mover_card';
+        else if (apenas(new Set(['prazo']))) requiredPermission = 'gerir_jiso';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
       } else if (entityName === 'PublicacaoExOfficio' && operation === 'create') {
         const tipoPublicacao = String(data?.tipo || '').trim();
         let requiredPermission = 'adicionar_publicacoes';
@@ -1365,7 +1407,9 @@ Deno.serve(async (req) => {
           const subOp = itemAcao === 'aplicar' ? 'create' : (itemAcao === 'encerrar' || itemAcao === 'remover') ? 'update' : itemAcao;
 
           // 1) Permissão funcional do item
-          const requiredPermission = PERMISSIONS_MAP[entityName]?.[subOp];
+          const requiredPermission = entityName === 'CardOperacional' && subOp === 'update'
+            ? 'mover_card'
+            : PERMISSIONS_MAP[entityName]?.[subOp];
           if (!targetIsAdmin && (!requiredPermission || targetPerms.actions?.[requiredPermission] !== true)) {
             resultados.push({ ok: false, error: 'Sem permissão para esta ação no item.', item: raw });
             continue;
