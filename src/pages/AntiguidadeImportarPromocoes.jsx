@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import { gerarPreviaImportacao, parseArquivoPromocoes } from '@/utils/antiguidade/importarPromocoes';
 import {
   POSTOS_GRADUACOES,
@@ -44,6 +46,7 @@ const DEFAULT_FORM = {
 };
 
 export default function AntiguidadeImportarPromocoes() {
+  const { isAdmin, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [aba, setAba] = React.useState('importacao');
   const [arquivo, setArquivo] = React.useState(null);
   const [processando, setProcessando] = React.useState(false);
@@ -336,6 +339,9 @@ export default function AntiguidadeImportarPromocoes() {
       setGravandoColetiva(false);
     }
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!isAdmin) return <AccessDenied modulo="Gestão da Antiguidade" />;
 
   return <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
     <h1 className="text-2xl font-bold text-[#1e3a5f]">Promoções de Antiguidade</h1>
