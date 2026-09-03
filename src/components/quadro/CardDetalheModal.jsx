@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   sincronizarDataJisoCardAtestado,
@@ -196,7 +197,7 @@ function ChecklistSection({ cardId }) {
       window.alert('Ação negada: Sem permissão para gerir checklist.');
       return;
     }
-    await base44.entities.CardChecklistItem.update(item.id, {
+    await atualizarEscopado('CardChecklistItem', item.id, {
       concluido: !item.concluido,
       data_conclusao: !item.concluido ? new Date().toISOString().split('T')[0] : null,
     });
@@ -208,7 +209,7 @@ function ChecklistSection({ cardId }) {
       window.alert('Ação negada: Sem permissão para gerir checklist.');
       return;
     }
-    await base44.entities.CardChecklistItem.delete(id);
+    await excluirEscopado('CardChecklistItem', id);
     invalidateChecklist();
   };
 
@@ -219,7 +220,7 @@ function ChecklistSection({ cardId }) {
     }
     if (!novoItem.trim()) return;
 
-    await base44.entities.CardChecklistItem.create({
+    await criarEscopado('CardChecklistItem', {
       card_id: cardId,
       titulo: novoItem.trim(),
       ordem: itens.length + 1,
@@ -759,7 +760,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
     setSalvando(true);
     try {
-      await base44.entities.CardComentario.create({
+      await criarEscopado('CardComentario', {
         card_id: card.id,
         mensagem: mensagem.trim(),
         tipo_registro: 'Comentário',
@@ -771,7 +772,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
       const novoComentariosCount = (card.comentarios_count || 0) + 1;
 
-      await base44.entities.CardOperacional.update(card.id, {
+      await atualizarEscopado('CardOperacional', card.id, {
         comentarios_count: novoComentariosCount,
       });
 
@@ -834,7 +835,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         etiqueta_cor: etiquetaTexto ? (classificacao.etiqueta_cor || '#6366f1') : '',
       };
 
-      await base44.entities.CardOperacional.update(card.id, payload);
+      await atualizarEscopado('CardOperacional', card.id, payload);
       onCardUpdate?.({ id: card.id, ...payload });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
     } finally {
@@ -870,9 +871,9 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
             arquivado: true,
           };
 
-      await base44.entities.CardOperacional.update(card.id, payload);
+      await atualizarEscopado('CardOperacional', card.id, payload);
 
-      await base44.entities.CardComentario.create({
+      await criarEscopado('CardComentario', {
         card_id: card.id,
         mensagem: arquivado ? 'Card restaurado.' : 'Card arquivado.',
         tipo_registro: 'Sistema',
@@ -888,7 +889,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         comentarios_count: novoComentariosCount,
       };
 
-      await base44.entities.CardOperacional.update(card.id, {
+      await atualizarEscopado('CardOperacional', card.id, {
         comentarios_count: novoComentariosCount,
       });
 
