@@ -13,6 +13,7 @@ import NovoCardModal from '@/components/quadro/NovoCardModal';
 import { buildChecklistResumo, criarChecklistPreset } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 
 const QUADRO_NOME = 'Operacional';
 const ORDER_STEP = 1024;
@@ -117,12 +118,38 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
-  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, isAdmin, getMilitarScopeFilters } = useCurrentUser();
+  const {
+    canAccessModule,
+    canAccessAction,
+    isLoading: loadingUser,
+    isAccessResolved,
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
+    getMilitarScopeFilters,
+  } = useCurrentUser();
   
   const hasAccess = canAccessModule('quadro_operacional');
   const canMoverCard = canAccessAction('mover_card');
   const canGerirColunas = canAccessAction('gerir_colunas');
   const canGerirQuadro = canAccessAction('gerir_quadro');
+  const semRestricaoEscopo = Boolean(isAdmin || hasGlobalScope);
+  const accessScopeKey = useMemo(() => buildAccessScopeKey({
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, hasGlobalScope, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
 
   const [busca, setBusca] = useState('');
   const [mostrarArquivados, setMostrarArquivados] = useState(false);
@@ -134,7 +161,7 @@ export default function QuadroOperacionalPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const fetchAccessibleMilitarIds = async () => {
-    if (isAdmin) return null; // Admin sees all, no need to filter by militar_id
+    if (semRestricaoEscopo) return null; // escopo global: sem filtro por militar_id
 
     const militarScopeFilters = getMilitarScopeFilters();
     if (militarScopeFilters.length === 0) return []; // No accessible military members, so no cards
@@ -147,7 +174,7 @@ export default function QuadroOperacionalPage() {
     if (!colunas.length) return [];
     
     const filters = {};
-    if (!isAdmin) filters.militar_id = { $in: await fetchAccessibleMilitarIds() };
+    if (!semRestricaoEscopo) filters.militar_id = { $in: await fetchAccessibleMilitarIds() };
     const cardsBrutos = await base44.entities.CardOperacional.filter(filters, '-created_date', 500);
     const colunasIds = new Set(colunas.map((coluna) => coluna.id));
     return cardsBrutos.filter((card) =>
@@ -168,8 +195,9 @@ export default function QuadroOperacionalPage() {
     enabled: isAccessResolved && hasAccess && !!quadro?.id,
   });
 
+  const cardsQueryKey = ['cards', quadro?.id, accessScopeKey, mostrarArquivados];
   const { data: cards = [], isLoading: loadCards } = useQuery({
-    queryKey: ['cards', quadro?.id, mostrarArquivados],
+    queryKey: cardsQueryKey,
     queryFn: fetchCardsDoQuadro,
     enabled: isAccessResolved && hasAccess && !!quadro?.id && colunas.length > 0,
   });
@@ -290,7 +318,7 @@ export default function QuadroOperacionalPage() {
       ? [...sourceCards]
       : [...(grouped[destinationColunaId] || [])];
 
-    const previousCards = queryClient.getQueryData(['cards', quadro?.id, mostrarArquivados]);
+    const previousCards = queryClient.getQueryData(cardsQueryKey);
     let movedCard = null;
 
     try {
@@ -324,7 +352,7 @@ export default function QuadroOperacionalPage() {
           ordem: ordemNova,
         };
 
-        queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], (current = []) =>
+        queryClient.setQueryData(cardsQueryKey, (current = []) =>
           substituirCardNaLista(current, movedCardAtualizado)
         );
 
@@ -363,7 +391,7 @@ export default function QuadroOperacionalPage() {
         comentarios_count: (movedCard.comentarios_count || 0) + 1,
       };
 
-      queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], (current = []) =>
+      queryClient.setQueryData(cardsQueryKey, (current = []) =>
         substituirCardNaLista(current, movedCardAtualizado)
       );
 
@@ -393,7 +421,7 @@ export default function QuadroOperacionalPage() {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', movedCard.id] });
     } catch (error) {
-      queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], previousCards);
+      queryClient.setQueryData(cardsQueryKey, previousCards);
 
       if (cardAberto?.id === movedCard?.id) {
         const cardAnterior = Array.isArray(previousCards)
