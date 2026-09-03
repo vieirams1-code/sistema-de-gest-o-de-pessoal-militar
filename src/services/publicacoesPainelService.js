@@ -3,6 +3,10 @@ import { base44 } from '@/api/base44Client';
 
 const TAMANHO_LOTE_PADRAO = 20;
 
+function temEscopoSemRestricao({ isAdmin, hasGlobalScope } = {}) {
+  return Boolean(isAdmin || hasGlobalScope);
+}
+
 function deduplicarOrdenarPorCreatedDate(registros = []) {
   const map = new Map();
   (registros || []).forEach((item) => map.set(item.id, item));
@@ -47,8 +51,8 @@ async function expandirMilitarIdsComMesclados(militarIds = []) {
   return [...new Set([...idsBase, ...idsMesclados])];
 }
 
-export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }) {
-  if (isAdmin) return null;
+export async function listarMilitarIdsEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }) {
+  if (temEscopoSemRestricao({ isAdmin, hasGlobalScope })) return null;
 
   const scopeFilters = getMilitarScopeFilters();
   if (!scopeFilters.length) return [];
@@ -58,10 +62,12 @@ export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }
   return expandirMilitarIdsComMesclados(militarIdsEscopo);
 }
 
-export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail }) {
-  if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
+export async function listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail }) {
+  if (temEscopoSemRestricao({ isAdmin, hasGlobalScope })) {
+    return base44.entities.PublicacaoExOfficio.list('-created_date');
+  }
 
-  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+  const militarIds = await listarMilitarIdsEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters });
 
   const registrosEscopo = militarIds?.length
     ? await listarPorMilitarIdsComFallbackInOperator({
@@ -83,10 +89,12 @@ export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScop
   return deduplicarOrdenarPorCreatedDate([...registrosEscopo, ...registrosDoAutor]);
 }
 
-export async function listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }) {
-  if (isAdmin) return (await base44.entities.Atestado.list('-created_date')).filter((a) => a.nota_para_bg || a.numero_bg);
+export async function listarAtestadosPublicacaoEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }) {
+  if (temEscopoSemRestricao({ isAdmin, hasGlobalScope })) {
+    return (await base44.entities.Atestado.list('-created_date')).filter((a) => a.nota_para_bg || a.numero_bg);
+  }
 
-  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+  const militarIds = await listarMilitarIdsEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters });
   if (!militarIds?.length) return [];
 
   const registros = await listarPorMilitarIdsComFallbackInOperator({
