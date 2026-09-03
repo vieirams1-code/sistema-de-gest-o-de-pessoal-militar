@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
@@ -42,8 +42,6 @@ const TIPOS_CAMPOS_FORMULARIO = [
 
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const preselectedPlanHandled = useRef(false);
   const [campanhas, setCampanhas] = useState([]);
   const [planos, setPlanos] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
@@ -92,14 +90,7 @@ export default function GerirCampanhasPortal() {
       setCampanhas(res.data?.campanhas || []);
       try {
         const planosRes = await base44.functions.invoke('planos_ferias_servicos', { acao: 'LISTAR' });
-        const listaPlanos = planosRes.data?.planos || [];
-        setPlanos(listaPlanos);
-        const planoIdInicial = new URLSearchParams(location.search).get('planoId');
-        const planoInicial = listaPlanos.find((plano) => String(plano.id) === String(planoIdInicial));
-        if (planoInicial && String(planoInicial.status || 'ATIVO') === 'ATIVO' && !preselectedPlanHandled.current) {
-          preselectedPlanHandled.current = true;
-          abrirCriacaoCampanha('PLANO_FERIAS', planoInicial.id);
-        }
+        setPlanos(planosRes.data?.planos || []);
       } catch (_errPlanos) {
         setPlanos([]);
       }
@@ -622,15 +613,6 @@ export default function GerirCampanhasPortal() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              onClick={() => abrirCriacaoCampanha('PLANO_FERIAS')}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
-            >
-              <Calendar className="w-3.5 h-3.5 mr-1" />
-              Nova Campanha de Férias
-            </Button>
-
-            <Button
-              type="button"
               onClick={() => abrirCriacaoCampanha('ATUALIZACAO_CADASTRAL')}
               className="bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
             >
@@ -985,8 +967,7 @@ export default function GerirCampanhasPortal() {
                       disabled={modalNovaCampanha.isEditing}
                       className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white outline-none focus:border-[#1e3a5f] font-semibold"
                     >
-                      <option value="PLANO_FERIAS">🏖️ Plano de Férias (Fixo)</option>
-                      <option value="ATUALIZACAO_CADASTRAL">🪪 Atualização Cadastral (Fixo)</option>
+                                       <option value="ATUALIZACAO_CADASTRAL">🪪 Atualização Cadastral (Fixo)</option>
                       <option value="ASSINATURA_DOCUMENTO">✍️ Assinatura de Documentos (Fixo)</option>
                       <option value="FORMULARIO_DINAMICO">📋 Formulário Dinâmico (Google Forms)</option>
                     </select>
