@@ -1427,12 +1427,6 @@ Deno.serve(async (req) => {
         if (possuiSyncJiso && data?.origem_tipo !== undefined && String(data.origem_tipo) !== 'Atestado/JISO') {
           return Response.json({ error: 'Acesso negado: automação JISO não pode alterar a origem do card.' }, { status: 403 });
         }
-        if (!possuiSyncJiso && targetPerms.actions?.[requiredPermission] !== true) {
-          return Response.json(
-            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
-            { status: 403 },
-          );
-        }
       } else if (entityName === 'PublicacaoExOfficio' && operation === 'create') {
         const tipoPublicacao = String(data?.tipo || '').trim();
         let requiredPermission = 'adicionar_publicacoes';
