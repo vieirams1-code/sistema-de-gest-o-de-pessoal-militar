@@ -247,6 +247,27 @@ export default function PlanosFerias() {
     }
   };
 
+  const renderModaisDoPlano = () => (
+    <>
+      {modalCampanha && campanhaForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={salvarCampanha} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Nova campanha de férias</h2><p className="text-xs text-slate-500">Plano: {selecionado?.titulo}</p></div><button type="button" onClick={() => setModalCampanha(false)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>
+            <div><label className="text-xs font-bold text-slate-700">Nome da campanha *</label><Input required value={campanhaForm.titulo} onChange={(e) => setCampanhaForm({ ...campanhaForm, titulo: e.target.value })} /></div>
+            <div className="grid sm:grid-cols-3 gap-3"><div><label className="text-xs font-bold text-slate-700">Início *</label><Input required type="date" value={campanhaForm.data_inicio} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_inicio: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo militar *</label><Input required type="date" value={campanhaForm.data_fim_militar} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo unidade</label><Input type="date" value={campanhaForm.data_fim_unidade} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_unidade: e.target.value })} /></div></div>
+            <div><label className="text-xs font-bold text-slate-700">Escopo *</label><select value={campanhaForm.tipo_escopo} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.value, escopo_unidades_ids: [] })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Unidades selecionadas</option></select></div>
+            {campanhaForm.tipo_escopo === 'UNIDADES' && <div className="grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{unidades.length === 0 ? <p className="text-xs text-slate-500">Nenhuma unidade disponível para seleção.</p> : unidades.map((unidade) => <label key={unidade.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={campanhaForm.escopo_unidades_ids.includes(unidade.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_unidades_ids: e.target.checked ? [...campanhaForm.escopo_unidades_ids, unidade.id] : campanhaForm.escopo_unidades_ids.filter((id) => id !== unidade.id) })} />{unidade.nome}</label>)}</div>}
+            <div><label className="text-xs font-bold text-slate-700">Orientações aos militares</label><textarea value={campanhaForm.instrucoes} onChange={(e) => setCampanhaForm({ ...campanhaForm, instrucoes: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" rows={4} /></div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><Button type="button" variant="outline" onClick={() => setModalCampanha(false)}>Cancelar</Button><Button type="submit" disabled={salvandoCampanha} className="bg-emerald-700 hover:bg-emerald-800">{salvandoCampanha ? 'Criando...' : 'Criar campanha'}</Button></div>
+          </form>
+        </div>
+      )}
+      {modalRespostas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Respostas da campanha</h2><p className="text-xs text-slate-500">{modalRespostas.titulo}</p></div><button type="button" onClick={() => setModalRespostas(null)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>{carregandoRespostas ? <div className="p-10 text-center text-sm text-slate-500">Carregando respostas...</div> : <><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">{[['Público', respostasCampanha?.total_alvo ?? 0], ['Respondidos', respostasCampanha?.total_respondidos ?? 0], ['Pendentes', respostasCampanha?.total_pendentes ?? 0], ['Adesão', `${respostasCampanha?.percentual ?? 0}%`]].map(([rotulo, valor]) => <div key={rotulo} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs text-slate-500">{rotulo}</p><p className="text-xl font-black text-slate-900">{valor}</p></div>)}</div><div className="divide-y divide-slate-100 rounded-xl border border-slate-200">{(respostasCampanha?.militares || []).length === 0 ? <div className="p-8 text-center text-sm text-slate-500">Nenhuma resposta encontrada.</div> : (respostasCampanha.militares || []).map((militar) => <div key={militar.militar_id || militar.id || militar.militar_matricula} className="flex items-center justify-between gap-3 p-3"><div><p className="font-bold text-sm text-slate-800">{militar.militar_nome || 'Militar sem nome'}</p><p className="text-xs text-slate-500">{militar.militar_matricula || '-'} · {militar.militar_lotacao || '-'}</p></div><span className={`rounded-lg px-2 py-1 text-xs font-bold ${militar.status_resposta === 'Respondido' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{militar.status_resposta || 'Pendente'}</span></div>)}</div></>}</div></div>
+      )}
+    </>
+  );
+
   if (selecionado && !modoFormulario) {
     return (
       <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8">
@@ -303,6 +324,7 @@ export default function PlanosFerias() {
               <Button type="button" onClick={gerarFeriasDoPlano} disabled={salvando || selecionado.status === 'ARQUIVADO'} className="bg-emerald-700 hover:bg-emerald-800"><CalendarDays className="w-4 h-4 mr-1.5" />{salvando ? 'Gerando...' : 'Gerar férias do plano'}</Button>
             </div>
           </div>
+          {renderModaisDoPlano()}
         </div>
       </div>
     );
