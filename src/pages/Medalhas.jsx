@@ -2,6 +2,7 @@ import React, { useState, useMemo, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
@@ -134,7 +135,7 @@ export default function Medalhas() {
   const deleteMutation = useMutation({
     mutationFn: (id) => {
       if (!podeIndicar) throw new Error('Sem permissão para excluir indicação.');
-      return base44.entities.Medalha.delete(id);
+      return excluirEscopado('Medalha', id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medalhas'] });
