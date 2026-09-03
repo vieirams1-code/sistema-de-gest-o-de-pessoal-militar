@@ -48,6 +48,7 @@ export default function RP() {
     isAccessResolved,
     isLoading: loadingUser,
     isAdmin,
+    hasGlobalScope,
     modoAcesso,
     userEmail,
     linkedMilitarId,
@@ -73,9 +74,9 @@ export default function RP() {
     queryKey: publicacoesQueryKeys.rpLista(rpScopeKey),
     queryFn: async () => {
       const [contratoLivro, publicacoesExOfficio, atestados] = await Promise.all([
-        getLivroMetricasRPContrato({ isAdmin, getMilitarScopeFilters }),
-        listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail }),
-        listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
+        getLivroMetricasRPContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail }),
+        listarAtestadosPublicacaoEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
       ]);
 
       const registrosLivro = (contratoLivro?.registros_livro_metricas || []).map((registro) => ({
