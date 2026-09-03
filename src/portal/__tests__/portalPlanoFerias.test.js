@@ -172,7 +172,7 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(paginaPlanosSource, /plano_ferias_institucional_id: selecionado\.id/);
     assert.match(paginaPlanosSource, /const abrirRespostas = async/);
     assert.doesNotMatch(paginaPlanosSource, /GerirCampanhasPortal|CentralRespostasCampanhas/);
-    assert.doesNotMatch(paginaCampanhasSource, /Nova Campanha de Férias/);
+    assert.doesNotMatch(paginaCampanhasSource, /onClick=\{\(\) => abrirCriacaoCampanha\('PLANO_FERIAS'\)\}/);
     assert.doesNotMatch(paginaCampanhasSource, /option value="PLANO_FERIAS"/);
   });
 });
