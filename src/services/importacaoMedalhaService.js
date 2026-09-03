@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 import { strFromU8, unzipSync } from 'fflate';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { normalizarStatusMedalha, getChaveDuplicidadeMedalha } from './medalhasTempoServicoService';
@@ -421,7 +422,7 @@ export async function importarMedalhas(linhas, userEmail) {
       const observacoesDP = "Concessão informada oficialmente pela Diretoria de Pessoal. A publicação correspondente não foi localizada em razão da limitação de pesquisa textual dos DOEMS anteriores a 2007.";
 
       // 1. Criar Registro de Medalha
-      await base44.entities.Medalha.create({
+      await criarEscopado('Medalha', {
         militar_id: linha.militar_id,
         militar_nome: linha.militar_nome,
         militar_matricula: linha.militar_matricula,
@@ -443,7 +444,7 @@ export async function importarMedalhas(linhas, userEmail) {
       });
 
       // 2. Criar PublicacaoExOfficio (Alteração)
-      await base44.entities.PublicacaoExOfficio.create({
+      await criarEscopado('PublicacaoExOfficio', {
         militar_id: linha.militar_id,
         militar_nome: linha.militar_nome,
         militar_matricula: linha.militar_matricula,
