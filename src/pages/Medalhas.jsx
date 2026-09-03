@@ -1,7 +1,6 @@
 import React, { useState, useMemo, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
 import { createPageUrl } from '@/utils';
