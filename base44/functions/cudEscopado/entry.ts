@@ -1538,9 +1538,17 @@ Deno.serve(async (req) => {
           const subOp = itemAcao === 'aplicar' ? 'create' : (itemAcao === 'encerrar' || itemAcao === 'remover') ? 'update' : itemAcao;
 
           // 1) Permissão funcional do item
-          const requiredPermission = entityName === 'CardOperacional' && subOp === 'update'
+          let requiredPermission = entityName === 'CardOperacional' && subOp === 'update'
             ? 'mover_card'
             : PERMISSIONS_MAP[entityName]?.[subOp];
+          if (entityName === 'Medalha' && subOp === 'update') {
+            const statusItem = String(raw?.status || '').trim().toUpperCase();
+            requiredPermission = statusItem === 'CANCELADA' && String(raw?.observacoes || '').includes('[RESET]')
+              ? 'resetar_indicacoes_medalhas'
+              : statusItem === 'CONCEDIDA'
+                ? 'conceder_medalhas'
+                : 'editar_medalhas';
+          }
           if (!targetIsAdmin && (!requiredPermission || targetPerms.actions?.[requiredPermission] !== true)) {
             resultados.push({ ok: false, error: 'Sem permissão para esta ação no item.', item: raw });
             continue;
@@ -1550,15 +1558,15 @@ Deno.serve(async (req) => {
           let mid = raw?.militar_id;
           let registroBulkExistente = null;
           if (entityName === 'FeriasTag') mid = feriasPorId.get(String(raw?.ferias_id))?.militar_id;
-          if (entityName === 'CardOperacional' && subOp === 'update') {
+          if ((entityName === 'CardOperacional' || entityName === 'Medalha') && subOp === 'update') {
             const itemIdSeguro = String(raw?.id || '').trim();
             if (!itemIdSeguro) {
-              resultados.push({ ok: false, error: 'ID do card é obrigatório para atualização em lote.', item: raw });
+              resultados.push({ ok: false, error: 'ID do registro é obrigatório para atualização em lote.', item: raw });
               continue;
             }
             registroBulkExistente = await buscarRegistroExistente(base44, entityName, itemIdSeguro);
             if (!registroBulkExistente) {
-              resultados.push({ ok: false, error: 'Card não encontrado.', item: raw });
+              resultados.push({ ok: false, error: 'Registro não encontrado.', item: raw });
               continue;
             }
             mid = registroBulkExistente?.militar_id || null;
@@ -1575,7 +1583,7 @@ Deno.serve(async (req) => {
           delete itemData.acao;
           const itemId = itemData.id;
           delete itemData.id;
-          if (entityName === 'CardOperacional' && subOp === 'update') {
+          if ((entityName === 'CardOperacional' || entityName === 'Medalha') && subOp === 'update') {
             // Nunca aceitar troca de militar_id pelo payload do bulk; o vínculo
             // canônico vem exclusivamente do registro existente no backend.
             delete itemData.militar_id;
@@ -1615,7 +1623,11 @@ Deno.serve(async (req) => {
       }
       dataValidada = { ...data, user_email: emailNormalizado };
     }
-    if (entityName === 'ContratoDesignacaoMilitar') {
+    if (entityName === 'HistoricoPromocaoMilitarV2' && operation === 'create') {
+      dataValidada = { ...data, created_by: data?.created_by || targetEmail, updated_by: targetEmail };
+    } else if (entityName === 'HistoricoPromocaoMilitarV2' && operation === 'update') {
+      dataValidada = { ...data, updated_by: targetEmail };
+    } else if (entityName === 'ContratoDesignacaoMilitar') {
       dataValidada = await prepararContratoDesignacaoMilitar({
         base44,
         operation,
