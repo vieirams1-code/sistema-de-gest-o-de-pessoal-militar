@@ -52,6 +52,13 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ConferenciaMilitar',
   'ItemConferenciaMilitar',
   'JISO',
+  'QuadroOperacional',
+  'ColunaOperacional',
+  'CardOperacional',
+  'CardComentario',
+  'CardChecklistItem',
+  'CardVinculo',
+  'CardAcao',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -194,6 +201,8 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'TagGrupo',
   'Tag',
   'RepositorioDocumental',
+  'QuadroOperacional',
+  'ColunaOperacional',
 ]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
@@ -355,6 +364,41 @@ const PERMISSIONS_MAP = {
     create: 'registrar_decisao_jiso',
     update: 'registrar_decisao_jiso',
     delete: 'gerir_jiso',
+  },
+  QuadroOperacional: {
+    create: 'gerir_quadro',
+    update: 'gerir_quadro',
+    delete: 'excluir_quadro_operacional',
+  },
+  ColunaOperacional: {
+    create: 'gerir_colunas',
+    update: 'gerir_colunas',
+    delete: 'gerir_colunas',
+  },
+  CardOperacional: {
+    create: 'gerir_quadro',
+    update: 'gerir_quadro',
+    delete: 'excluir_quadro_operacional',
+  },
+  CardComentario: {
+    create: 'visualizar_quadro_operacional',
+    update: 'gerir_quadro',
+    delete: 'gerir_quadro',
+  },
+  CardChecklistItem: {
+    create: 'gerir_acoes_operacionais',
+    update: 'gerir_acoes_operacionais',
+    delete: 'gerir_acoes_operacionais',
+  },
+  CardVinculo: {
+    create: 'gerir_quadro',
+    update: 'gerir_quadro',
+    delete: 'gerir_quadro',
+  },
+  CardAcao: {
+    create: 'gerir_acoes_operacionais',
+    update: 'gerir_acoes_operacionais',
+    delete: 'excluir_acao_operacional',
   },
 };
 
@@ -1066,7 +1110,7 @@ Deno.serve(async (req) => {
 
     const authPerms = await resolverPermissoes(base44, authUser.email);
     const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-    const authIsAdmin = authIsAdminByRole || authPerms.isAdminByAccess;
+    const authIsAdmin = authIsAdminByRole;
 
     if (wantsImpersonation && !authIsAdmin) {
       return Response.json(
@@ -1080,7 +1124,10 @@ Deno.serve(async (req) => {
     const targetPerms = isImpersonating
       ? await resolverPermissoes(base44, targetEmail)
       : authPerms;
-    const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
+    // Escopo global (tipo_acesso=admin) NÃO é privilégio funcional absoluto.
+    // Bypass funcional cabe apenas ao administrador real da plataforma e
+    // nunca deve ser herdado pelo usuário efetivo durante impersonação.
+    const targetIsAdmin = !isImpersonating && authIsAdminByRole;
 
     // ---- Identificar militar_id alvo ----
     // Entidades administrativas não pertencem ao escopo de um militar específico.
