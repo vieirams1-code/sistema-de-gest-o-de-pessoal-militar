@@ -58,6 +58,10 @@ const ENTIDADES_PERMITIDAS = new Set([
   'CardChecklistItem',
   'CardVinculo',
   'CardAcao',
+  'HistoricoPromocaoMilitarV2',
+  'Militar',
+  'Medalha',
+  'ImpedimentoMedalha',
 ]);
 
 
