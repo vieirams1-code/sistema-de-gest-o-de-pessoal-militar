@@ -7,6 +7,7 @@ import { listarPublicacoesLegadoPendentesClassificacao } from '@/services/migrac
 import { listarPendenciasPossivelDuplicidade, STATUS_POSSIVEL_DUPLICIDADE } from '@/services/militarIdentidadeService';
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
 import { createPageUrl } from '@/utils';
+import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 import {
   calcularPrioridadePorPrazo,
   diferencaDias,
@@ -95,14 +96,14 @@ const criarPendenciaBase = (dados) => ({
   ...dados,
 });
 
-async function listarPorEscopo({ entidade, isAdmin, getMilitarScopeFilters, ordem = '-created_date' }) {
+async function listarPorEscopo({ entidade, isAdmin, hasGlobalScope, getMilitarScopeFilters, ordem = '-created_date' }) {
   if (!entidade) return [];
-  if (isAdmin) {
+  if (isAdmin || hasGlobalScope) {
     if (entidade.list) return entidade.list(ordem, LIMITE_PADRAO);
     return [];
   }
 
-  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+  const militarIds = await listarMilitarIdsEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters });
   if (!militarIds?.length || !entidade.filter) return [];
 
   const arrays = await Promise.all(militarIds.map((militarId) => entidade.filter({ militar_id: militarId }, ordem)));
@@ -113,12 +114,12 @@ async function listarPorEscopo({ entidade, isAdmin, getMilitarScopeFilters, orde
   return Array.from(mapa.values());
 }
 
-async function listarPublicacoesCentral({ isAdmin, getMilitarScopeFilters }) {
-  if (isAdmin) {
+async function listarPublicacoesCentral({ isAdmin, hasGlobalScope, getMilitarScopeFilters }) {
+  if (isAdmin || hasGlobalScope) {
     return base44?.entities?.PublicacaoExOfficio?.list?.('-created_date', LIMITE_PADRAO) || [];
   }
 
-  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+  const militarIds = await listarMilitarIdsEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters });
   if (!militarIds?.length) return [];
 
   const arrays = await Promise.all(
@@ -547,6 +548,14 @@ export default function useCentralPendencias() {
   const queryClient = useQueryClient();
   const {
     isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
     canAccessAll,
     getMilitarScopeFilters,
     isAccessResolved,
@@ -554,19 +563,29 @@ export default function useCentralPendencias() {
     user,
   } = useCurrentUser();
   const [filtros, setFiltros] = useState({ categoria: 'todas', prioridade: 'todas', situacao: 'todas', texto: '', ordenacao: 'prioridade_desc' });
+  const scopeKey = useMemo(() => buildAccessScopeKey({
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, hasGlobalScope, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, user?.email, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
   const query = useQuery({
-    queryKey: ['central-pendencias', isAdmin],
+    queryKey: ['central-pendencias', scopeKey],
     enabled: isAccessResolved,
     queryFn: async () => {
       const podeVerLegadoDuplicidade = Boolean(isAdmin || canAccessAll);
       const resultados = await Promise.allSettled([
-        listarPublicacoesCentral({ isAdmin, getMilitarScopeFilters }),
-        listarPorEscopo({ entidade: base44?.entities?.Atestado, isAdmin, getMilitarScopeFilters }),
-        listarPorEscopo({ entidade: base44?.entities?.Ferias, isAdmin, getMilitarScopeFilters, ordem: '-data_inicio' }),
-        listarPorEscopo({ entidade: base44?.entities?.RegistroLivro, isAdmin, getMilitarScopeFilters }),
-        listarPorEscopo({ entidade: base44?.entities?.PendenciaComportamento, isAdmin, getMilitarScopeFilters }),
-        listarPorEscopo({ entidade: base44?.entities?.HistoricoPromocaoMilitarV2, isAdmin, getMilitarScopeFilters }),
-        listarPorEscopo({ entidade: base44?.entities?.Militar, isAdmin, getMilitarScopeFilters }),
+        listarPublicacoesCentral({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.Atestado, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.Ferias, isAdmin, hasGlobalScope, getMilitarScopeFilters, ordem: '-data_inicio' }),
+        listarPorEscopo({ entidade: base44?.entities?.RegistroLivro, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.PendenciaComportamento, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.HistoricoPromocaoMilitarV2, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.Militar, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
         podeVerLegadoDuplicidade ? listarPublicacoesLegadoPendentesClassificacao() : Promise.resolve([]),
         podeVerLegadoDuplicidade ? listarPendenciasPossivelDuplicidade({ status: STATUS_POSSIVEL_DUPLICIDADE.PENDENTE }) : Promise.resolve([]),
       ]);
