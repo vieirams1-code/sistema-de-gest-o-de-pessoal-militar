@@ -1,6 +1,7 @@
 import React from 'react';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,7 +112,7 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
         return;
       }
 
-      await base44.entities.HistoricoPromocaoMilitarV2.create({
+      await criarEscopado('HistoricoPromocaoMilitarV2', {
         militar_id: militar.id,
         posto_graduacao_anterior: form.posto_graduacao_anterior || '',
         quadro_anterior: militar?.quadro || '',
