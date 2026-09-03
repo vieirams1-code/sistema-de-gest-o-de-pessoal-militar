@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Search } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -236,14 +237,14 @@ export default function IndicacoesDomPedroII() {
       validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId: militar?.id, militarIdsEscopo });
       const existente = registroPorMilitar.get(militar.id);
       if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
-        return base44.entities.Medalha.update(existente.id, adicionarAuditoriaMedalha({ status: 'INDICADA', data_indicacao: hojeISO() }, { userEmail, acao: 'indicacao' }));
+        return atualizarEscopado('Medalha', existente.id, adicionarAuditoriaMedalha({ status: 'INDICADA', data_indicacao: hojeISO() }, { userEmail, acao: 'indicacao' }));
       }
       const tipo = await resolverOuGarantirTipoMedalha(base44, 'DOM_PEDRO_II', tipos);
       if (!tipo?.id) throw new Error('Tipo DOM_PEDRO_II não encontrado.');
       const payload = criarIndicacaoAutomatica({ militar, medalhaDevida: 'DOM_PEDRO_II', tipoMedalha: tipo });
       payload.origem_registro = 'INDICACAO_MANUAL_DOM_PEDRO_II';
       payload.observacoes = 'Fluxo manual Dom Pedro II.';
-      return base44.entities.Medalha.create(adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+      return criarEscopado('Medalha', adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
     },
     onSuccess: () => { refresh(); toast({ title: 'Indicação registrada para Dom Pedro II.' }); },
   });
@@ -268,9 +269,9 @@ export default function IndicacoesDomPedroII() {
       payload.override_data = new Date().toISOString();
 
       if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
-        return base44.entities.Medalha.update(existente.id, adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+        return atualizarEscopado('Medalha', existente.id, adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
       }
-      return base44.entities.Medalha.create(adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+      return criarEscopado('Medalha', adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
     },
     onSuccess: () => {
       refresh();
@@ -284,7 +285,7 @@ export default function IndicacoesDomPedroII() {
     mutationFn: ({ medalhaId, militarId, data_concessao, numero_publicacao }) => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.CONCEDER, mensagem: 'Sem permissão para conceder medalhas.' });
       validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId, militarIdsEscopo });
-      return base44.entities.Medalha.update(medalhaId, adicionarAuditoriaMedalha({
+      return atualizarEscopado('Medalha', medalhaId, adicionarAuditoriaMedalha({
         status: 'CONCEDIDA',
         data_concessao,
         numero_publicacao,
