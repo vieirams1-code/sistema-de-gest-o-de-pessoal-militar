@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Download, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -419,7 +420,7 @@ export default function ApuracaoMedalhasTempoServico() {
         mensagem: 'Sem permissão para conceder medalhas.',
       });
       validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId, militarIdsEscopo });
-      return base44.entities.Medalha.update(
+      return atualizarEscopado('Medalha',
         medalhaId,
         adicionarAuditoriaMedalha(
           normalizarRegistroConcessao({}, { data_concessao, numero_publicacao }),
