@@ -209,6 +209,7 @@ export default function FolhaAlteracoes() {
   const {
     user,
     isAdmin,
+    hasGlobalScope,
     subgrupamentoId,
     subgrupamentoTipo,
     modoAcesso,
@@ -239,9 +240,9 @@ export default function FolhaAlteracoes() {
   const [impressaoConfig, setImpressaoConfig] = useState(getDefaultImpressaoConfig());
 
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
-    queryKey: ['folha-alteracoes-militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+    queryKey: ['folha-alteracoes-militares', isAdmin, hasGlobalScope, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
-      if (isAdmin) {
+      if (isAdmin || hasGlobalScope) {
         const listaAdmin = await base44.entities.Militar.list('-nome_completo');
         const militaresComMatricula = await carregarMilitaresComMatriculas(listaAdmin);
         return filtrarMilitaresOperacionais(militaresComMatricula);
