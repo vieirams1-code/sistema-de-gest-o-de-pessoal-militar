@@ -23,6 +23,13 @@ const agendarJiso = read('../../../pages/AgendarJISO.jsx');
 const editarJiso = read('../../../pages/EditarJISO.jsx');
 const centralAtestado = read('../../central-pendencias/CentralPendenciaAtestadoModal.jsx');
 const quadroCard = read('../../quadro/CardDetalheModal.jsx');
+const medalhasPage = read('../../../pages/Medalhas.jsx');
+const cadastroMedalha = read('../../../pages/CadastrarMedalha.jsx');
+const domPedro = read('../../../pages/IndicacoesDomPedroII.jsx');
+const apuracaoMedalhas = read('../../../pages/ApuracaoMedalhasTempoServico.jsx');
+const verMilitarPage = read('../../../pages/VerMilitar.jsx');
+const antiguidadeImportar = read('../../../pages/AntiguidadeImportarPromocoes.jsx');
+const carreiraAntiguidade = read('../../antiguidade/CarreiraAntiguidadePanel.jsx');
 
 test('criação de publicação depende somente de adicionar_publicacoes', () => {
   assert.match(publicacoes, /const canCriarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
@@ -96,6 +103,24 @@ test('JISO separa gestão administrativa de registro da decisão', () => {
   assert.match(quadroCard, /permiteEditarDataJiso = !!vinculoAtestado\?\.referencia_id && canAccessAction\('gerir_jiso'\)/);
   assert.match(backendCud, /requiredPermission = 'registrar_decisao_jiso';\s*allowed = targetPerms\.actions\?\.\['registrar_decisao_jiso'\] === true;/s);
   assert.doesNotMatch(backendCud, /registrar_decisao_jiso ou gerir_jiso/);
+});
+
+test('medalhas usam permissões específicas no backend e não gravam direto pelo SDK', () => {
+  assert.match(backendCud, /statusFinal === 'CONCEDIDA'.*requiredPermission = 'conceder_medalhas'/s);
+  assert.match(backendCud, /resetar_indicacoes_medalhas/);
+  assert.match(medalhasPage, /const podeExcluirMedalha = canAccessAction\('excluir_medalhas'\);/);
+  for (const source of [medalhasPage, cadastroMedalha, domPedro, apuracaoMedalhas, verMilitarPage]) {
+    assert.doesNotMatch(source, /base44\.entities\.(Medalha|ImpedimentoMedalha)\.(create|update|delete|bulkUpdate|bulkCreate)/);
+  }
+});
+
+test('histórico de promoções possui escrita administrativa server-side', () => {
+  assert.match(backendCud, /entityName === 'HistoricoPromocaoMilitarV2'/);
+  assert.match(backendCud, /alterações no histórico de promoções são restritas ao administrador da plataforma/);
+  assert.match(antiguidadeImportar, /if \(!isAdmin\) return <AccessDenied modulo="Gestão da Antiguidade" \/>/);
+  for (const source of [antiguidadeImportar, carreiraAntiguidade]) {
+    assert.doesNotMatch(source, /base44\.entities\.HistoricoPromocaoMilitarV2\.(create|update|delete)/);
+  }
 });
 
 test('ações JISO independentes conseguem persistir apenas seus próprios reflexos', () => {
