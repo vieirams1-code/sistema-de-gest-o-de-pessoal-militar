@@ -28,8 +28,8 @@ export function validarPermissaoAcaoMedalhas({ canAccessAction, acao, mensagem }
   }
 }
 
-export function validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo, mensagem }) {
-  if (isAdmin) return;
+export function validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId, militarIdsEscopo, mensagem }) {
+  if (isAdmin || hasGlobalScope) return;
   if (!militarId || !militarIdsEscopo?.has(militarId)) {
     throw new Error(mensagem || 'Ação negada: militar fora do escopo organizacional do usuário.');
   }
@@ -51,8 +51,8 @@ export function adicionarAuditoriaMedalha(payload = {}, { userEmail, acao, times
   return auditoria;
 }
 
-export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarScopeFilters }) {
-  if (isAdmin) {
+export async function listarMilitaresEscopo({ base44Client, isAdmin, hasGlobalScope, getMilitarScopeFilters }) {
+  if (isAdmin || hasGlobalScope) {
     const todos = await base44Client.entities.Militar.list();
     return ordenarMilitaresPorAntiguidadeInstitucional(todos || []);
   }
@@ -77,8 +77,8 @@ export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarS
   return ordenarMilitaresPorAntiguidadeInstitucional(Array.from(uniqueMilitares.values()));
 }
 
-export async function listarMedalhasEscopo({ base44Client, isAdmin, militarIds = [] }) {
-  if (isAdmin) return base44Client.entities.Medalha.list('-created_date');
+export async function listarMedalhasEscopo({ base44Client, isAdmin, hasGlobalScope, militarIds = [] }) {
+  if (isAdmin || hasGlobalScope) return base44Client.entities.Medalha.list('-created_date');
   if (!militarIds.length) return [];
 
   let registros = [];
@@ -124,8 +124,8 @@ export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userE
   return bulkUpdateMedalhas(base44Client, payloads);
 }
 
-export async function listarImpedimentosEscopo({ base44Client, isAdmin, militarIds = [] }) {
-  if (isAdmin) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
+export async function listarImpedimentosEscopo({ base44Client, isAdmin, hasGlobalScope, militarIds = [] }) {
+  if (isAdmin || hasGlobalScope) return base44Client.entities.ImpedimentoMedalha.list('-created_date');
   if (!militarIds.length) return [];
 
   let registros = [];
