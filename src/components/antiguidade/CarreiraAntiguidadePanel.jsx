@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -121,7 +122,7 @@ export default function CarreiraAntiguidadePanel(props) {
     setErroExclusao('');
 
     try {
-      await base44.entities.HistoricoPromocaoMilitarV2.delete(registroExclusao.id);
+      await excluirEscopado('HistoricoPromocaoMilitarV2', registroExclusao.id);
       fecharExclusaoRegistro();
       await onHistoricoChanged?.();
     } catch {
@@ -145,27 +146,27 @@ export default function CarreiraAntiguidadePanel(props) {
 
     try {
       if (tipo === ACAO_CORRIGIR) {
-        await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, {
+        await atualizarEscopado('HistoricoPromocaoMilitarV2', registro.id, {
           ...payloadCadastro,
           status_registro: registro.status_registro || STATUS_ATIVO,
           motivo_retificacao: registro.motivo_retificacao || '',
         });
 
       if (tipo === ACAO_CORRIGIR && valorTexto(registro.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && isPromocaoAtualUnicaUsadaNaPrevia(registro)) {
-        await base44.entities.Militar.update(militar.id, {
+        await atualizarEscopado('Militar', militar.id, {
           posto_graduacao: formRegistro.posto_graduacao_novo || '',
           quadro: formRegistro.quadro_novo || '',
         });
       }
       } else {
-        await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, {
+        await atualizarEscopado('HistoricoPromocaoMilitarV2', registro.id, {
           status_registro: STATUS_RETIFICADO,
           motivo_retificacao: motivo,
           observacoes: `${registro.observacoes || ''} | Retificado: ${motivo}`.trim(),
         });
 
         if (valorTexto(registro.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO) {
-          await base44.entities.HistoricoPromocaoMilitarV2.create({
+          await criarEscopado('HistoricoPromocaoMilitarV2', {
             ...payloadCadastro,
             status_registro: STATUS_ATIVO,
             motivo_retificacao: motivo,
