@@ -2,6 +2,7 @@ import React from 'react';
 import { MoreVertical } from 'lucide-react';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -115,7 +116,7 @@ export default function AntiguidadeImportarPromocoes() {
       let criados = 0;
       for (const item of previa.previas) {
         if (!item.podeImportar || !item.militar) continue;
-        await base44.entities.HistoricoPromocaoMilitarV2.create({ militar_id: item.militar.id, posto_graduacao_anterior: item.militar.posto_graduacao || '', quadro_anterior: item.militar.quadro || '', posto_graduacao_novo: item.row.posto_graduacao_novo || '', quadro_novo: item.row.quadro_novo || '', data_promocao: item.dataPromocao, data_publicacao: item.row.data_publicacao || null, boletim_referencia: item.row.boletim_referencia || '', ato_referencia: item.row.ato_referencia || '', antiguidade_referencia_ordem: item.row.antiguidade_referencia_ordem ? Number(item.row.antiguidade_referencia_ordem) : null, antiguidade_referencia_id: item.row.antiguidade_referencia_id || '', origem_dado: 'importacao', status_registro: STATUS_ATIVO, observacoes: item.row.observacoes || '' });
+        await criarEscopado('HistoricoPromocaoMilitarV2', { militar_id: item.militar.id, posto_graduacao_anterior: item.militar.posto_graduacao || '', quadro_anterior: item.militar.quadro || '', posto_graduacao_novo: item.row.posto_graduacao_novo || '', quadro_novo: item.row.quadro_novo || '', data_promocao: item.dataPromocao, data_publicacao: item.row.data_publicacao || null, boletim_referencia: item.row.boletim_referencia || '', ato_referencia: item.row.ato_referencia || '', antiguidade_referencia_ordem: item.row.antiguidade_referencia_ordem ? Number(item.row.antiguidade_referencia_ordem) : null, antiguidade_referencia_id: item.row.antiguidade_referencia_id || '', origem_dado: 'importacao', status_registro: STATUS_ATIVO, observacoes: item.row.observacoes || '' });
         criados += 1;
       }
       await atualizarDiagnostico();
@@ -138,7 +139,7 @@ export default function AntiguidadeImportarPromocoes() {
   const lancarManual = async () => {
     setFeedbackManual('');
     await validarManual();
-    await base44.entities.HistoricoPromocaoMilitarV2.create({
+    await criarEscopado('HistoricoPromocaoMilitarV2', {
       ...form,
       posto_graduacao_novo: militarSelecionado?.posto_graduacao || '',
       quadro_novo: militarSelecionado?.quadro || '',
@@ -153,8 +154,8 @@ export default function AntiguidadeImportarPromocoes() {
 
   const retificarRegistro = async (registro) => {
     if (!motivoRetificacao.trim()) throw new Error('Informe motivo da retificação/cancelamento.');
-    await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: 'retificado', observacoes: `${registro.observacoes || ''} | Retificado: ${motivoRetificacao}`.trim() });
-    await base44.entities.HistoricoPromocaoMilitarV2.create({ ...registro, id: undefined, status_registro: STATUS_ATIVO, origem_dado: 'manual', observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivoRetificacao}`.trim() });
+    await atualizarEscopado('HistoricoPromocaoMilitarV2', registro.id, { status_registro: 'retificado', observacoes: `${registro.observacoes || ''} | Retificado: ${motivoRetificacao}`.trim() });
+    await criarEscopado('HistoricoPromocaoMilitarV2', { ...registro, id: undefined, status_registro: STATUS_ATIVO, origem_dado: 'manual', observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivoRetificacao}`.trim() });
     setMotivoRetificacao('');
     await atualizarDiagnostico();
     await carregarHistorico(registro.militar_id);
@@ -162,7 +163,7 @@ export default function AntiguidadeImportarPromocoes() {
 
   const cancelarRegistro = async (registro) => {
     if (!motivoRetificacao.trim()) throw new Error('Informe motivo da retificação/cancelamento.');
-    await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: 'cancelado', observacoes: `${registro.observacoes || ''} | Cancelado: ${motivoRetificacao}`.trim() });
+    await atualizarEscopado('HistoricoPromocaoMilitarV2', registro.id, { status_registro: 'cancelado', observacoes: `${registro.observacoes || ''} | Cancelado: ${motivoRetificacao}`.trim() });
     setMotivoRetificacao('');
     await atualizarDiagnostico();
     await carregarHistorico(registro.militar_id);
@@ -303,7 +304,7 @@ export default function AntiguidadeImportarPromocoes() {
 
       for (const linha of aptas) {
         try {
-          await base44.entities.HistoricoPromocaoMilitarV2.create(prepararRegistroPromocaoColetiva({
+          await criarEscopado('HistoricoPromocaoMilitarV2', prepararRegistroPromocaoColetiva({
             militar: linha.militar,
             form: coletivaForm,
             historicos: historicosAtualizados,
