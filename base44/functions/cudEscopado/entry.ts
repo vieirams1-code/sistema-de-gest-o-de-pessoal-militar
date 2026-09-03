@@ -59,6 +59,10 @@ const ENTIDADES_PERMITIDAS = new Set([
   'CardChecklistItem',
   'CardVinculo',
   'CardAcao',
+  'HistoricoPromocaoMilitarV2',
+  'Militar',
+  'Medalha',
+  'ImpedimentoMedalha',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -399,6 +403,16 @@ const PERMISSIONS_MAP = {
     create: 'gerir_acoes_operacionais',
     update: 'gerir_acoes_operacionais',
     delete: 'excluir_acao_operacional',
+  },
+  Medalha: {
+    create: 'indicar_medalhas',
+    update: 'editar_medalhas',
+    delete: 'excluir_medalhas',
+  },
+  ImpedimentoMedalha: {
+    create: 'gerir_impedimentos_medalha',
+    update: 'gerir_impedimentos_medalha',
+    delete: 'gerir_impedimentos_medalha',
   },
 };
 
@@ -1426,6 +1440,36 @@ Deno.serve(async (req) => {
         }
         if (possuiSyncJiso && data?.origem_tipo !== undefined && String(data.origem_tipo) !== 'Atestado/JISO') {
           return Response.json({ error: 'Acesso negado: automação JISO não pode alterar a origem do card.' }, { status: 403 });
+        }
+      } else if (entityName === 'HistoricoPromocaoMilitarV2') {
+        if (!targetIsAdmin) {
+          return Response.json(
+            { error: 'Acesso negado: alterações no histórico de promoções são restritas ao administrador da plataforma.', requiredPermission: 'platform_admin' },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'Militar' && operation === 'update') {
+        const chaves = Object.keys(data || {});
+        const camposAntiguidadeAdmin = new Set(['posto_graduacao', 'quadro']);
+        const somenteAntiguidade = chaves.length > 0 && chaves.every((chave) => camposAntiguidadeAdmin.has(chave));
+        if (!targetIsAdmin || !somenteAntiguidade) {
+          return Response.json(
+            { error: 'Acesso negado: esta rota de Militar aceita somente correção administrativa de posto/quadro.', requiredPermission: 'platform_admin' },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'Medalha' && operation !== 'bulk') {
+        let requiredPermission = operation === 'delete' ? 'excluir_medalhas' : 'indicar_medalhas';
+        const statusFinal = String(data?.status || registroExistente?.status || '').trim().toUpperCase();
+        if (operation === 'update') requiredPermission = 'editar_medalhas';
+        if (statusFinal === 'CONCEDIDA') requiredPermission = 'conceder_medalhas';
+        if (statusFinal === 'CANCELADA' && String(data?.observacoes || '').includes('[RESET]')) requiredPermission = 'resetar_indicacoes_medalhas';
+        if (data?.override_admin === true) requiredPermission = 'editar_medalhas';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
         }
       } else if (entityName === 'PublicacaoExOfficio' && operation === 'create') {
         const tipoPublicacao = String(data?.tipo || '').trim();
