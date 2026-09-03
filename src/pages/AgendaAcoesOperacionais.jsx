@@ -229,7 +229,6 @@ export default function AgendaAcoesOperacionaisPage() {
     enabled: canFetch && !!quadro?.id && colunas.length > 0,
   });
 
-  const canManageAcoes = canAccessAction('gerir_acoes_operacionais');
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['acoes-consolidadas-quadro', scopeKey],
     queryFn: async () => {
