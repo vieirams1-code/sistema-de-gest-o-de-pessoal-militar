@@ -1504,7 +1504,21 @@ Deno.serve(async (req) => {
 
           // 2) Escopo do item
           let mid = raw?.militar_id;
+          let registroBulkExistente = null;
           if (entityName === 'FeriasTag') mid = feriasPorId.get(String(raw?.ferias_id))?.militar_id;
+          if (entityName === 'CardOperacional' && subOp === 'update') {
+            const itemIdSeguro = String(raw?.id || '').trim();
+            if (!itemIdSeguro) {
+              resultados.push({ ok: false, error: 'ID do card é obrigatório para atualização em lote.', item: raw });
+              continue;
+            }
+            registroBulkExistente = await buscarRegistroExistente(base44, entityName, itemIdSeguro);
+            if (!registroBulkExistente) {
+              resultados.push({ ok: false, error: 'Card não encontrado.', item: raw });
+              continue;
+            }
+            mid = registroBulkExistente?.militar_id || null;
+          }
 
           const exigeScope = !ENTIDADES_SEM_ESCOPO_MILITAR.has(entityName);
           if (exigeScope && !isInScope(mid)) {
@@ -1517,6 +1531,11 @@ Deno.serve(async (req) => {
           delete itemData.acao;
           const itemId = itemData.id;
           delete itemData.id;
+          if (entityName === 'CardOperacional' && subOp === 'update') {
+            // Nunca aceitar troca de militar_id pelo payload do bulk; o vínculo
+            // canônico vem exclusivamente do registro existente no backend.
+            delete itemData.militar_id;
+          }
 
           if (entityName === 'MilitarFuncao') {
             itemData = await prepararFuncaoMilitar({ base44, operation: subOp, id: itemId, data: itemData, militarId: mid });
