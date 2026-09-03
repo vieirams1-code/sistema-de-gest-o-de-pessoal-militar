@@ -400,7 +400,7 @@ export default function QuadroOperacionalPage() {
         setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
       }
 
-      await base44.entities.CardOperacional.update(movedCard.id, {
+      await atualizarEscopado('CardOperacional', movedCard.id, {
         coluna_id: destinationColunaId,
         ordem: ordemNova,
         comentarios_count: movedCardAtualizado.comentarios_count,
