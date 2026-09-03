@@ -1410,7 +1410,7 @@ Deno.serve(async (req) => {
         const camposSyncJiso = new Set([
           'titulo', 'descricao', 'militar_nome_snapshot', 'prazo', 'protocolo',
           'referencia_externa_id', 'origem_tipo', 'criado_automaticamente', 'coluna_id',
-          'status', 'origem_status', 'comentarios_count',
+          'status', 'origem_status', 'comentarios_count', 'checklist_resumo',
         ]);
         const ehSyncJiso = ehCardJisoAutomatico(cardAtual)
           && chaves.length > 0
