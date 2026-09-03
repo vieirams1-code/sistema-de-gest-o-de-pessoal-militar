@@ -1,6 +1,7 @@
 import React from 'react';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import {
   Dialog,
   DialogContent,
@@ -132,7 +133,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
 
       const divergente = ativosCompativeis[0] || null;
       if (!divergente) {
-        await base44.entities.HistoricoPromocaoMilitarV2.create(payloadBase);
+        await criarEscopado('HistoricoPromocaoMilitarV2', payloadBase);
         setMensagem('Promoção atual registrada com sucesso.');
         await atualizarDiagnostico();
         await onSaved?.();
@@ -145,13 +146,13 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
         return;
       }
 
-      await base44.entities.HistoricoPromocaoMilitarV2.update(divergente.id, {
+      await atualizarEscopado('HistoricoPromocaoMilitarV2', divergente.id, {
         status_registro: 'retificado',
         motivo_retificacao: form.motivo_retificacao,
         observacoes: `${divergente.observacoes || ''} | Retificado: ${form.motivo_retificacao}`.trim(),
       });
 
-      await base44.entities.HistoricoPromocaoMilitarV2.create({
+      await criarEscopado('HistoricoPromocaoMilitarV2', {
         ...payloadBase,
         motivo_retificacao: form.motivo_retificacao,
         observacoes: `${payloadBase.observacoes || ''} | Retificação: ${form.motivo_retificacao}`.trim(),
