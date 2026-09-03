@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -141,9 +142,9 @@ export default function CadastrarMedalha() {
         documento_referencia: formData.doems_numero ? `DOEMS ${formData.doems_numero}` : '',
       };
       if (medalhaId) {
-        await base44.entities.Medalha.update(medalhaId, adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+        await atualizarEscopado('Medalha', medalhaId, adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
       } else {
-        await base44.entities.Medalha.create(adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+        await criarEscopado('Medalha', adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
       }
       queryClient.invalidateQueries({ queryKey: ['medalhas'] });
       navigate(createPageUrl('Medalhas'));
