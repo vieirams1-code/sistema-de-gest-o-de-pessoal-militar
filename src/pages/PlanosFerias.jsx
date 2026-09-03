@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/utils';
-import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users } from 'lucide-react';
+import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users, X, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -18,7 +17,6 @@ const novoPlano = () => ({
 });
 
 export default function PlanosFerias() {
-  const navigate = useNavigate();
   const [planos, setPlanos] = useState([]);
   const [campanhas, setCampanhas] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
@@ -28,6 +26,13 @@ export default function PlanosFerias() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
+  const [unidades, setUnidades] = useState([]);
+  const [modalCampanha, setModalCampanha] = useState(false);
+  const [salvandoCampanha, setSalvandoCampanha] = useState(false);
+  const [campanhaForm, setCampanhaForm] = useState(null);
+  const [modalRespostas, setModalRespostas] = useState(null);
+  const [respostasCampanha, setRespostasCampanha] = useState(null);
+  const [carregandoRespostas, setCarregandoRespostas] = useState(false);
 
   const carregar = async () => {
     setLoading(true);
@@ -38,6 +43,15 @@ export default function PlanosFerias() {
       setPlanos(listaPlanos);
       setCampanhas(resposta.data?.campanhas || []);
       setSelecionado((atual) => atual ? listaPlanos.find((p) => p.id === atual.id) || null : null);
+      try {
+        const lotacoes = await fetchScopedLotacoes({});
+        setUnidades((lotacoes?.lotacoes || []).map((lotacao) => ({
+          id: String(lotacao.id || lotacao.nome || '').trim(),
+          nome: lotacao.nome || lotacao.sigla || lotacao.label || lotacao.id,
+        })).filter((lotacao) => lotacao.id));
+      } catch (_erroLotacoes) {
+        setUnidades([]);
+      }
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível carregar os Planos de Férias.') });
     } finally {
@@ -141,6 +155,83 @@ export default function PlanosFerias() {
     }
   };
 
+  const abrirNovaCampanha = () => {
+    if (!selecionado || selecionado.status === 'ARQUIVADO') return;
+    const ano = Number(selecionado.ano_referencia);
+    setCampanhaForm({
+      titulo: `Campanha de Férias — ${selecionado.titulo}`,
+      ano_referencia: ano,
+      tipo_escopo: 'TODOS',
+      escopo_unidades_ids: [],
+      data_inicio: new Date().toISOString().slice(0, 10),
+      data_fim_militar: `${ano}-10-31`,
+      data_fim_unidade: `${ano}-11-30`,
+      instrucoes: `Registre suas opções de férias para o plano ${selecionado.titulo}.`,
+    });
+    setModalCampanha(true);
+    setFeedback({ tipo: '', texto: '' });
+  };
+
+  const salvarCampanha = async (evento) => {
+    evento.preventDefault();
+    if (!selecionado || !campanhaForm?.titulo.trim()) return;
+    if (campanhaForm.tipo_escopo === 'UNIDADES' && campanhaForm.escopo_unidades_ids.length === 0) {
+      setFeedback({ tipo: 'erro', texto: 'Selecione ao menos uma unidade para o escopo da campanha.' });
+      return;
+    }
+    setSalvandoCampanha(true);
+    try {
+      const nomesUnidades = campanhaForm.escopo_unidades_ids
+        .map((id) => unidades.find((unidade) => unidade.id === id)?.nome || id)
+        .join(', ');
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_CRIAR',
+        campanha_payload: {
+          titulo: campanhaForm.titulo.trim(),
+          tipo: 'PLANO_FERIAS',
+          status: 'Aberta_Coleta',
+          ano_referencia: Number(selecionado.ano_referencia),
+          plano_ferias_institucional_id: selecionado.id,
+          tipo_escopo: campanhaForm.tipo_escopo,
+          escopo_unidades_ids: campanhaForm.escopo_unidades_ids,
+          escopo_unidades_nomes: nomesUnidades,
+          escopo_quadros: [],
+          data_inicio: campanhaForm.data_inicio,
+          data_fim_militar: campanhaForm.data_fim_militar,
+          data_fim_unidade: campanhaForm.data_fim_unidade,
+          instrucoes: campanhaForm.instrucoes,
+          config_regras: {},
+          config_formulario: { campos: [] },
+        },
+      });
+      setModalCampanha(false);
+      setCampanhaForm(null);
+      setFeedback({ tipo: 'sucesso', texto: 'Campanha de férias criada dentro do plano.' });
+      await carregar();
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível criar a campanha de férias.') });
+    } finally {
+      setSalvandoCampanha(false);
+    }
+  };
+
+  const abrirRespostas = async (campanha) => {
+    setModalRespostas(campanha);
+    setRespostasCampanha(null);
+    setCarregandoRespostas(true);
+    try {
+      const resposta = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_DETALHES_RETORNO',
+        campanha_id: campanha.id,
+      });
+      setRespostasCampanha(resposta.data || {});
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível carregar as respostas desta campanha.') });
+    } finally {
+      setCarregandoRespostas(false);
+    }
+  };
+
   const excluir = async (plano) => {
     if (!window.confirm(`Excluir o plano vazio "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
@@ -182,7 +273,7 @@ export default function PlanosFerias() {
                 <h2 className="font-bold text-slate-900">Campanhas deste plano</h2>
                 <p className="text-xs text-slate-500 mt-1">Cada campanha possui prazo e escopo próprios; todas fazem parte deste mesmo plano.</p>
               </div>
-              {selecionado.status !== 'ARQUIVADO' && <Button type="button" onClick={() => navigate(createPageUrl('GerirCampanhasPortal') + `?planoId=${selecionado.id}`)} className="bg-[#1e3a5f] hover:bg-[#2a4d7d]"><Plus className="w-4 h-4 mr-1.5" />Nova campanha</Button>}
+              {selecionado.status !== 'ARQUIVADO' && <Button type="button" onClick={abrirNovaCampanha} className="bg-[#1e3a5f] hover:bg-[#2a4d7d]"><Plus className="w-4 h-4 mr-1.5" />Nova campanha de férias</Button>}
             </div>
             {campanhasDoPlano.length === 0 ? (
               <div className="p-10 text-center text-sm text-slate-500">Ainda não há campanhas neste plano.</div>
@@ -191,7 +282,7 @@ export default function PlanosFerias() {
                 {campanhasDoPlano.map((campanha) => (
                   <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.escopo_unidades_nomes || 'Toda a Corporação'} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
-                    <Button type="button" variant="outline" onClick={() => navigate(createPageUrl('CentralRespostasCampanhas') + `?campanhaId=${campanha.id}`)}>Ver respostas</Button>
+                    <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>
                   </div>
                 ))}
               </div>
