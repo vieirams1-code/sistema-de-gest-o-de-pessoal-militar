@@ -5,6 +5,10 @@ import { readFileSync } from 'node:fs';
 const backendSource = readFileSync(new URL('../../../../base44/functions/getUserPermissions/entry.ts', import.meta.url), 'utf8');
 const frontendSource = readFileSync(new URL('../useCurrentUser.jsx', import.meta.url), 'utf8');
 const layoutSource = readFileSync(new URL('../../../Layout.jsx', import.meta.url), 'utf8');
+const publicacoesSource = readFileSync(new URL('../../../pages/Publicacoes.jsx', import.meta.url), 'utf8');
+const rpSource = readFileSync(new URL('../../../pages/RP.jsx', import.meta.url), 'utf8');
+const publicacoesPainelServiceSource = readFileSync(new URL('../../../services/publicacoesPainelService.js', import.meta.url), 'utf8');
+const livroServiceSource = readFileSync(new URL('../../livro/livroService.js', import.meta.url), 'utf8');
 
 test('tipo_acesso admin representa escopo global, não privilégio absoluto', () => {
   assert.match(backendSource, /const isAdmin = isAdminByRole;/);
@@ -29,6 +33,15 @@ test('escopo Administrador Global continua abrangendo todos os registros sem lib
   assert.match(frontendSource, /if \(hasAbsoluteAccess \|\| modoAcesso === 'admin'\) return \[\];/);
   assert.match(frontendSource, /return modules\[modulo\] === true;/);
   assert.match(frontendSource, /return actions\[acao\] === true;/);
+});
+
+test('escopo geral é propagado às consultas de Publicações/RP sem elevar privilégio funcional', () => {
+  assert.match(publicacoesPainelServiceSource, /Boolean\(isAdmin \|\| hasGlobalScope\)/);
+  assert.match(publicacoesSource, /getLivroRegistrosContrato\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
+  assert.match(publicacoesSource, /listarPublicacoesExOfficioEscopo\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters/);
+  assert.match(publicacoesSource, /listarAtestadosPublicacaoEscopo\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
+  assert.match(rpSource, /getLivroMetricasRPContrato\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
+  assert.match(livroServiceSource, /const semRestricaoEscopo = temEscopoSemRestricao\(\{ isAdmin, hasGlobalScope \}\);/);
 });
 
 test('campos legado de UsuarioAcesso não participam mais da autorização funcional', () => {
