@@ -1,4 +1,5 @@
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '../utils/antiguidade/ordenacaoMilitarInstitucional.js';
+import { bulkEscopado } from './cudEscopadoClient.js';
 
 export const ACOES_MEDALHAS = {
   INDICAR: 'indicar_medalhas',
@@ -121,7 +122,12 @@ export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userE
     }, { userEmail, acao: 'reset', timestamp }),
   }));
 
-  return bulkUpdateMedalhas(base44Client, payloads);
+  const itens = payloads.map((payload) => ({ acao: 'update', ...payload }));
+  const resultado = await bulkEscopado('Medalha', itens);
+  if (resultado?.sucesso !== itens.length) {
+    throw new Error('Nem todas as indicações puderam ser resetadas com segurança.');
+  }
+  return itens.length;
 }
 
 export async function listarImpedimentosEscopo({ base44Client, isAdmin, hasGlobalScope, militarIds = [] }) {
