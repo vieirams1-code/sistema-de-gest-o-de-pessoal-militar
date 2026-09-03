@@ -14,6 +14,7 @@ import { buildChecklistResumo, criarChecklistPreset } from '@/components/quadro/
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { buildAccessScopeKey } from '@/lib/accessScopeKey';
+import { criarEscopado, atualizarEscopado, bulkEscopado } from '@/services/cudEscopadoClient';
 
 const QUADRO_NOME = 'Operacional';
 const ORDER_STEP = 1024;
@@ -95,17 +96,17 @@ async function reindexarColunaComEspacos(colunaId, cardsDaColuna = []) {
       return !original || original.coluna_id !== card.coluna_id || toOrderNumber(original.ordem) !== card.ordem;
     })
     .map((card) => ({
+      acao: 'update',
       id: card.id,
+      militar_id: card.militar_id || '',
       coluna_id: colunaId,
       ordem: card.ordem,
     }));
 
   if (payloads.length > 0) {
-    const entity = base44.entities.CardOperacional;
-    if (entity.bulkUpdate) {
-      await entity.bulkUpdate(payloads);
-    } else {
-      await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+    const resultado = await bulkEscopado('CardOperacional', payloads);
+    if (resultado?.sucesso !== payloads.length) {
+      throw new Error('Não foi possível reindexar todos os cards da coluna com segurança.');
     }
   }
 
@@ -275,7 +276,7 @@ export default function QuadroOperacionalPage() {
         .filter((card) => card.coluna_id === colunaNovoCard.id)
         .sort((a, b) => toOrderNumber(a.ordem) - toOrderNumber(b.ordem));
 
-      const novoCard = await base44.entities.CardOperacional.create({
+      const novoCard = await criarEscopado('CardOperacional', {
         ...form,
         coluna_id: colunaNovoCard.id,
         ordem: calcularProximaOrdemAoCriar(cardsDaColuna),
@@ -360,7 +361,7 @@ export default function QuadroOperacionalPage() {
           setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
         }
 
-        await base44.entities.CardOperacional.update(movedCard.id, {
+        await atualizarEscopado('CardOperacional', movedCard.id, {
           coluna_id: sourceColunaId,
           ordem: ordemNova,
         });
@@ -408,7 +409,7 @@ export default function QuadroOperacionalPage() {
       const origem = colunas.find((coluna) => coluna.id === sourceColunaId);
       const destino = colunas.find((coluna) => coluna.id === destinationColunaId);
 
-      await base44.entities.CardComentario.create({
+      await criarEscopado('CardComentario', {
         card_id: movedCard.id,
         mensagem: `Card movido de [${origem?.nome || 'Origem'}] para [${destino?.nome || 'Destino'}]`,
         tipo_registro: 'Sistema',
@@ -460,14 +461,12 @@ export default function QuadroOperacionalPage() {
     try {
       const payloads = colunasComNovaOrdem
         .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem)
-        .map((coluna) => ({ id: coluna.id, ordem: coluna.ordem }));
+        .map((coluna) => ({ acao: 'update', id: coluna.id, ordem: coluna.ordem }));
 
       if (payloads.length) {
-        const entity = base44.entities.ColunaOperacional;
-        if (entity.bulkUpdate) {
-          await entity.bulkUpdate(payloads);
-        } else {
-          await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+        const resultado = await bulkEscopado('ColunaOperacional', payloads);
+        if (resultado?.sucesso !== payloads.length) {
+          throw new Error('Não foi possível persistir toda a nova ordem das colunas.');
         }
       }
 
@@ -496,7 +495,7 @@ export default function QuadroOperacionalPage() {
       return;
     }
 
-    await base44.entities.ColunaOperacional.create({
+    await criarEscopado('ColunaOperacional', {
       quadro_id: quadro.id,
       nome,
       cor: '#64748b',
@@ -535,7 +534,7 @@ export default function QuadroOperacionalPage() {
       return;
     }
 
-    await base44.entities.ColunaOperacional.update(coluna.id, { nome });
+    await atualizarEscopado('ColunaOperacional', coluna.id, { nome });
     queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
   };
 
@@ -564,7 +563,7 @@ export default function QuadroOperacionalPage() {
     const confirmar = window.confirm(`Excluir a coluna "${coluna.nome}"?`);
     if (!confirmar) return;
 
-    await base44.entities.ColunaOperacional.update(coluna.id, { ativa: false });
+    await atualizarEscopado('ColunaOperacional', coluna.id, { ativa: false });
     queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
   };
 
@@ -574,7 +573,7 @@ export default function QuadroOperacionalPage() {
       return;
     }
 
-    const q = await base44.entities.QuadroOperacional.create({
+    const q = await criarEscopado('QuadroOperacional', {
       nome: QUADRO_NOME,
       descricao: 'Quadro operacional da seção',
       ativo: true,
@@ -596,12 +595,10 @@ export default function QuadroOperacionalPage() {
       { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 11, fixa: false, origem_coluna: 'manual' },
     ];
 
-    const payloads = colunasPadrao.map((coluna) => ({ ...coluna, quadro_id: q.id, ativa: true }));
-    const entity = base44.entities.ColunaOperacional;
-    if (entity.bulkCreate) {
-      await entity.bulkCreate(payloads);
-    } else {
-      await Promise.all(payloads.map((p) => entity.create(p)));
+    const payloads = colunasPadrao.map((coluna) => ({ acao: 'create', ...coluna, quadro_id: q.id, ativa: true }));
+    const resultadoColunas = await bulkEscopado('ColunaOperacional', payloads);
+    if (resultadoColunas?.sucesso !== payloads.length) {
+      throw new Error('O quadro foi criado, mas nem todas as colunas padrão puderam ser persistidas.');
     }
 
     queryClient.invalidateQueries({ queryKey: ['quadros'] });
@@ -754,7 +751,7 @@ export default function QuadroOperacionalPage() {
           onClose={() => setCardAberto(null)}
           onCardUpdate={(payload) => {
             setCardAberto((prev) => (prev ? { ...prev, ...payload } : prev));
-            queryClient.setQueryData(['cards', quadro?.id, mostrarArquivados], (old = []) => (
+            queryClient.setQueryData(cardsQueryKey, (old = []) => (
               Array.isArray(old)
                 ? old
                     .map((item) => (item.id === payload.id ? { ...item, ...payload } : item))
@@ -762,7 +759,7 @@ export default function QuadroOperacionalPage() {
                 : old
             ));
             queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
-            queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id, mostrarArquivados] });
+            queryClient.invalidateQueries({ queryKey: cardsQueryKey });
           }}
         />
       )}
