@@ -51,6 +51,13 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ConferenciaMilitar',
   'ItemConferenciaMilitar',
   'JISO',
+  'QuadroOperacional',
+  'ColunaOperacional',
+  'CardOperacional',
+  'CardComentario',
+  'CardChecklistItem',
+  'CardVinculo',
+  'CardAcao',
 ]);
 
 
