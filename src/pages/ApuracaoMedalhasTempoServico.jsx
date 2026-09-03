@@ -25,6 +25,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { useToast } from '@/components/ui/use-toast';
+import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import MedalhasTabNavigation from '@/components/medalhas/MedalhasTabNavigation';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
@@ -81,7 +82,23 @@ export default function ApuracaoMedalhasTempoServico() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user, isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const {
+    user,
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    getMilitarScopeFilters,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
+    canAccessModule,
+    canAccessAction,
+    isLoading: loadingUser,
+    isAccessResolved,
+  } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const hasApuracaoAccess = temAlgumaPermissaoMedalhas(canAccessAction, ACOES_APURACAO);
   const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
@@ -89,6 +106,16 @@ export default function ApuracaoMedalhasTempoServico() {
   const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
   const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
   const podeModoAdmin = canAccessAction(ACOES_MEDALHAS.ADMIN_OVERRIDE);
+  const accessScopeKey = useMemo(() => buildAccessScopeKey({
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, hasGlobalScope, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, user?.email, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -113,16 +140,16 @@ export default function ApuracaoMedalhasTempoServico() {
   });
 
   const militaresQuery = useQuery({
-    queryKey: ['apuracao-medalhas-militares'],
-    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters }),
+    queryKey: ['apuracao-medalhas-militares', accessScopeKey],
+    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
   });
 
   const medalhasQuery = useQuery({
-    queryKey: ['apuracao-medalhas-registros'],
+    queryKey: ['apuracao-medalhas-registros', accessScopeKey],
     queryFn: async () => {
-      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
-      return listarMedalhasEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, hasGlobalScope, getMilitarScopeFilters });
+      return listarMedalhasEscopo({ base44Client: base44, isAdmin, hasGlobalScope, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
     },
     enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
   });
@@ -134,10 +161,10 @@ export default function ApuracaoMedalhasTempoServico() {
   });
 
   const impedimentosQuery = useQuery({
-    queryKey: ['apuracao-medalhas-impedimentos'],
+    queryKey: ['apuracao-medalhas-impedimentos', accessScopeKey],
     queryFn: async () => {
-      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
-      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, hasGlobalScope, getMilitarScopeFilters });
+      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, hasGlobalScope, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
     },
     enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
   });
@@ -328,7 +355,7 @@ export default function ApuracaoMedalhasTempoServico() {
         acao: ACOES_MEDALHAS.INDICAR,
         mensagem: 'Sem permissão para indicar medalhas.',
       });
-      validarMilitarDentroEscopo({ isAdmin, militarId: item?.militar_id, militarIdsEscopo });
+      validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId: item?.militar_id, militarIdsEscopo });
       const existente = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
       return indicarMedalhaPorCodigo(base44, {
         militar: item.militar,
@@ -352,7 +379,7 @@ export default function ApuracaoMedalhasTempoServico() {
         acao: ACOES_MEDALHAS.ADMIN_OVERRIDE,
         mensagem: 'Sem permissão para usar override administrativo de medalhas.',
       });
-      validarMilitarDentroEscopo({ isAdmin, militarId: item?.militar_id, militarIdsEscopo });
+      validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId: item?.militar_id, militarIdsEscopo });
       if (!justificativa?.trim()) {
         throw new Error('A justificativa do override administrativo é obrigatória.');
       }
@@ -391,7 +418,7 @@ export default function ApuracaoMedalhasTempoServico() {
         acao: ACOES_MEDALHAS.CONCEDER,
         mensagem: 'Sem permissão para conceder medalhas.',
       });
-      validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo });
+      validarMilitarDentroEscopo({ isAdmin, hasGlobalScope, militarId, militarIdsEscopo });
       return base44.entities.Medalha.update(
         medalhaId,
         adicionarAuditoriaMedalha(
