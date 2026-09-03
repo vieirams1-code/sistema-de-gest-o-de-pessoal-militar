@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { buildAccessScopeKey } from '../../../lib/accessScopeKey.js';
 
 const backendSource = readFileSync(new URL('../../../../base44/functions/getUserPermissions/entry.ts', import.meta.url), 'utf8');
 const frontendSource = readFileSync(new URL('../useCurrentUser.jsx', import.meta.url), 'utf8');
@@ -9,6 +10,7 @@ const publicacoesSource = readFileSync(new URL('../../../pages/Publicacoes.jsx',
 const rpSource = readFileSync(new URL('../../../pages/RP.jsx', import.meta.url), 'utf8');
 const publicacoesPainelServiceSource = readFileSync(new URL('../../../services/publicacoesPainelService.js', import.meta.url), 'utf8');
 const livroServiceSource = readFileSync(new URL('../../livro/livroService.js', import.meta.url), 'utf8');
+const agendaAcoesSource = readFileSync(new URL('../../../pages/AgendaAcoesOperacionais.jsx', import.meta.url), 'utf8');
 
 test('tipo_acesso admin representa escopo global, não privilégio absoluto', () => {
   assert.match(backendSource, /const isAdmin = isAdminByRole;/);
@@ -42,6 +44,21 @@ test('escopo geral é propagado às consultas de Publicações/RP sem elevar pri
   assert.match(publicacoesSource, /listarAtestadosPublicacaoEscopo\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
   assert.match(rpSource, /getLivroMetricasRPContrato\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
   assert.match(livroServiceSource, /const semRestricaoEscopo = temEscopoSemRestricao\(\{ isAdmin, hasGlobalScope \}\);/);
+});
+
+test('chave canônica de cache distingue escopos efetivos diferentes', () => {
+  const global = buildAccessScopeKey({ hasGlobalScope: true, modoAcesso: 'admin', effectiveEmail: 'global@sgp.local' });
+  const unidadeA = buildAccessScopeKey({ modoAcesso: 'unidade', effectiveEmail: 'operador@sgp.local', subgrupamentoId: 'u-a' });
+  const unidadeB = buildAccessScopeKey({ modoAcesso: 'unidade', effectiveEmail: 'operador@sgp.local', subgrupamentoId: 'u-b' });
+  assert.notDeepEqual(global, unidadeA);
+  assert.notDeepEqual(unidadeA, unidadeB);
+});
+
+test('permissão de gerir ações não substitui escopo organizacional na Agenda', () => {
+  assert.match(agendaAcoesSource, /useScopedMilitarIds\(\)/);
+  assert.match(agendaAcoesSource, /if \(semRestricaoEscopo\) return listAllCardAcoes\(3000\);/);
+  assert.match(agendaAcoesSource, /return listAllCardAcoes\(3000, \{ militar_id: \{ \$in: scopedIds \} \}\);/);
+  assert.doesNotMatch(agendaAcoesSource, /if \(canManageAcoes\)\s*\{\s*return listAllCardAcoes\(3000\)/);
 });
 
 test('campos legado de UsuarioAcesso não participam mais da autorização funcional', () => {
