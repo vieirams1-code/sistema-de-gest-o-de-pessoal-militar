@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useScopedMilitarIds } from '@/hooks/useScopedMilitarIds';
 
 function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
   if (!Array.isArray(lista)) return lista;
@@ -193,12 +194,12 @@ export default function AgendaAcoesOperacionaisPage() {
     canAccessAction,
     isLoading: loadingUser,
     isAccessResolved,
-    getMilitarScopeFilters,
   } = useCurrentUser();
   const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
+  const { ids: scopedIds, isAdmin: semRestricaoEscopo, isReady: scopedReady } = useScopedMilitarIds();
+  const scopeKey = semRestricaoEscopo ? 'global' : (scopedIds || []).map(String).sort().join(',');
 
-
-  const canFetch = isAccessResolved && hasQuadroOperacionalAccess;
+  const canFetch = isAccessResolved && scopedReady && hasQuadroOperacionalAccess;
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
@@ -215,10 +216,13 @@ export default function AgendaAcoesOperacionaisPage() {
   });
 
   const { data: cards = [] } = useQuery({
-    queryKey: ['cards', quadro?.id],
+    queryKey: ['cards', quadro?.id, 'agenda-acoes', scopeKey],
     queryFn: async () => {
       if (!colunas.length) return [];
-      const cardsBrutos = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
+      if (!semRestricaoEscopo && !scopedIds?.length) return [];
+      const filtrosCards = { arquivado: false };
+      if (!semRestricaoEscopo) filtrosCards.militar_id = { $in: scopedIds };
+      const cardsBrutos = await base44.entities.CardOperacional.filter(filtrosCards, '-created_date', 500);
       const colunasIds = new Set(colunas.map((coluna) => coluna.id));
       return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
     },
@@ -227,18 +231,11 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const canManageAcoes = canAccessAction('gerir_acoes_operacionais');
   const { data: acoesRaw = [] } = useQuery({
-    queryKey: ['acoes-consolidadas-quadro', canManageAcoes],
+    queryKey: ['acoes-consolidadas-quadro', scopeKey],
     queryFn: async () => {
-      if (canManageAcoes) {
-        return listAllCardAcoes(3000);
-      }
-      const militarScopeFilters = getMilitarScopeFilters();
-      let accessibleMilitarIds = [];
-      if (militarScopeFilters.length > 0) {
-        const militarQueries = await Promise.all(militarScopeFilters.map(f => base44.entities.Militar.filter(f)));
-        accessibleMilitarIds = [...new Set(militarQueries.flat().map(m => m.id).filter(Boolean))];
-      }
-      return listAllCardAcoes(3000, accessibleMilitarIds.length > 0 ? { militar_id: { $in: accessibleMilitarIds } } : { militar_id: null });
+      if (semRestricaoEscopo) return listAllCardAcoes(3000);
+      if (!scopedIds?.length) return [];
+      return listAllCardAcoes(3000, { militar_id: { $in: scopedIds } });
     },
     enabled: canFetch,
   });
