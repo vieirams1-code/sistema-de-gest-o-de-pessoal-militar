@@ -557,13 +557,14 @@ export default function ConciliacaoBoletim() {
   const [desvinculosManuais, setDesvinculosManuais] = useState([]);
   const [erroVinculo, setErroVinculo] = useState('');
   
-  const { isAdmin, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, hasGlobalScope, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('conciliacao_boletim');
+  const semRestricaoEscopo = Boolean(isAdmin || hasGlobalScope);
 
   const { data: registrosLivro = [], isLoading: isLoadingLivro } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.RegistroLivro.list('-created_date');
+      if (semRestricaoEscopo) return base44.entities.RegistroLivro.list('-created_date');
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
 
@@ -580,14 +581,14 @@ export default function ConciliacaoBoletim() {
 
   const { data: publicacoesExOfficio = [], isLoading: isLoadingExOfficio } = useQuery({
     queryKey: ['conciliacao-publicacoes-ex-officio'],
-    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
+    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasAccess
   });
 
 
   const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['conciliacao-atestados-publicacao'],
-    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
+    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasAccess
   });
 
