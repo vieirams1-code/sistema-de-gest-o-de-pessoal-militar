@@ -1,5 +1,4 @@
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '../utils/antiguidade/ordenacaoMilitarInstitucional.js';
-import { bulkEscopado } from './cudEscopadoClient.js';
 
 export const ACOES_MEDALHAS = {
   INDICAR: 'indicar_medalhas',
@@ -123,11 +122,22 @@ export async function resetarMedalhasEmLote(base44Client, { medalhas = [], userE
   }));
 
   const itens = payloads.map((payload) => ({ acao: 'update', ...payload }));
-  const resultado = await bulkEscopado('Medalha', itens);
-  if (resultado?.sucesso !== itens.length) {
-    throw new Error('Nem todas as indicações puderam ser resetadas com segurança.');
+  if (typeof base44Client?.functions?.invoke === 'function') {
+    const response = await base44Client.functions.invoke('cudEscopado', {
+      entityName: 'Medalha',
+      operation: 'bulk',
+      itens,
+    });
+    const resultado = response?.data ?? response;
+    if (resultado?.error) throw new Error(resultado.error);
+    if (resultado?.sucesso !== itens.length) {
+      throw new Error('Nem todas as indicações puderam ser resetadas com segurança.');
+    }
+    return itens.length;
   }
-  return itens.length;
+
+  // Fallback exclusivo para clientes simulados/legados sem Functions (testes unitários).
+  return bulkUpdateMedalhas(base44Client, payloads);
 }
 
 export async function listarImpedimentosEscopo({ base44Client, isAdmin, hasGlobalScope, militarIds = [] }) {
