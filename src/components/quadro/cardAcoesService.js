@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 
 const CARD_ACAO_ENTITY_CANDIDATES = [
   'CardAcao',
@@ -56,16 +57,19 @@ export async function listAllCardAcoes(limit = 2000) {
 }
 
 export async function createCardAcao(payload) {
-  const { entity } = await resolveCardAcoesEntity();
-  return entity.create(payload);
+  const { entityName } = await resolveCardAcoesEntity();
+  if (entityName !== 'CardAcao') throw new Error(`Entidade de ações não homologada para escrita segura: ${entityName}`);
+  return criarEscopado('CardAcao', payload);
 }
 
 export async function updateCardAcao(acaoId, payload) {
-  const { entity } = await resolveCardAcoesEntity();
-  return entity.update(acaoId, payload);
+  const { entityName } = await resolveCardAcoesEntity();
+  if (entityName !== 'CardAcao') throw new Error(`Entidade de ações não homologada para escrita segura: ${entityName}`);
+  return atualizarEscopado('CardAcao', acaoId, payload);
 }
 
 export async function deleteCardAcao(acaoId) {
-  const { entity } = await resolveCardAcoesEntity();
-  return entity.delete(acaoId);
+  const { entityName } = await resolveCardAcoesEntity();
+  if (entityName !== 'CardAcao') throw new Error(`Entidade de ações não homologada para escrita segura: ${entityName}`);
+  return excluirEscopado('CardAcao', acaoId);
 }
