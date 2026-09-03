@@ -11,6 +11,10 @@ export const LIVRO_PERSISTIDO_TEMPLATE_GOVERNANCA = {
   edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
 };
 
+function temEscopoSemRestricao({ isAdmin, hasGlobalScope } = {}) {
+  return Boolean(isAdmin || hasGlobalScope);
+}
+
 function emptyLivroPresenterContrato() {
   return mapLivroRegistrosPresenter({ registros: [], militares: [], ferias: [], periodos: [] });
 }
@@ -38,12 +42,14 @@ async function listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters } = {}) {
  * campo de escopo padronizado, portanto a consulta ampla é necessária aqui — o
  * acesso já foi validado pela camada de módulo antes de invocar esta função.
  */
-export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters } = {}) {
-  if (!isAdmin && !getMilitarScopeFilters) {
+export async function getLivroRegistrosContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters } = {}) {
+  const semRestricaoEscopo = temEscopoSemRestricao({ isAdmin, hasGlobalScope });
+
+  if (!semRestricaoEscopo && !getMilitarScopeFilters) {
     return emptyLivroPresenterContrato();
   }
 
-  if (isAdmin) {
+  if (semRestricaoEscopo) {
     const [registros, militares] = await Promise.all([
       base44.entities.RegistroLivro.list('-created_date'),
       base44.entities.Militar.list(),
@@ -113,12 +119,14 @@ export async function getLivroTextoPublicacaoRegistro({ registroId } = {}) {
  * períodos aquisitivos, templates ativos do Livro nem executa o mapper que
  * monta vínculos, cadeia de eventos completa e texto_publicacao renderizado.
  */
-export async function getLivroMetricasRPContrato({ isAdmin, getMilitarScopeFilters } = {}) {
-  if (!isAdmin && !getMilitarScopeFilters) {
+export async function getLivroMetricasRPContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters } = {}) {
+  const semRestricaoEscopo = temEscopoSemRestricao({ isAdmin, hasGlobalScope });
+
+  if (!semRestricaoEscopo && !getMilitarScopeFilters) {
     return emptyLivroMetricasRPContrato();
   }
 
-  if (isAdmin) {
+  if (semRestricaoEscopo) {
     const registros = await base44.entities.RegistroLivro.list('-created_date');
     return mapLivroRegistrosMetricasRP({ registros });
   }
