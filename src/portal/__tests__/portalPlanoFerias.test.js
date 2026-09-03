@@ -166,11 +166,13 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(opcaoSchemaSource, /"plano_ferias_institucional_id"/);
   });
 
-  it('abre campanha de férias com plano pré-selecionado e mantém criação visível em Campanhas', () => {
-    assert.match(paginaPlanosSource, /GerirCampanhasPortal.*planoId=|planoId=.*GerirCampanhasPortal/s);
-    assert.match(paginaCampanhasSource, /Nova Campanha de Férias/);
-    assert.match(paginaCampanhasSource, /new URLSearchParams\(location\.search\)/);
-    assert.match(paginaCampanhasSource, /abrirCriacaoCampanha\('PLANO_FERIAS', planoInicial\.id\)/);
-    assert.match(paginaCampanhasSource, /plano_ferias_institucional_id: planoId/);
+  it('cria campanhas e consulta respostas dentro do plano, sem redirecionar para Campanhas', () => {
+    assert.match(paginaPlanosSource, /const abrirNovaCampanha = \(\) =>/);
+    assert.match(paginaPlanosSource, /acao: 'CAMPANHA_CRIAR'/);
+    assert.match(paginaPlanosSource, /plano_ferias_institucional_id: selecionado\.id/);
+    assert.match(paginaPlanosSource, /const abrirRespostas = async/);
+    assert.doesNotMatch(paginaPlanosSource, /GerirCampanhasPortal|CentralRespostasCampanhas/);
+    assert.doesNotMatch(paginaCampanhasSource, /Nova Campanha de Férias/);
+    assert.doesNotMatch(paginaCampanhasSource, /option value="PLANO_FERIAS"/);
   });
 });
