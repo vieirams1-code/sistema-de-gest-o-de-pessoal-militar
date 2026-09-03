@@ -432,7 +432,7 @@ export default function VerMilitar() {
   const criarImpedimentoMutation = useMutation({
     mutationFn: async () => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
-      return base44.entities.ImpedimentoMedalha.create(adicionarAuditoriaMedalha({
+      return criarEscopado('ImpedimentoMedalha', adicionarAuditoriaMedalha({
         militar_id: id,
         ativo: true,
         data_inicio: impedimentoForm.data_inicio || new Date().toISOString().split('T')[0],
@@ -454,7 +454,7 @@ export default function VerMilitar() {
   const removerImpedimentoMutation = useMutation({
     mutationFn: async (impedimentoId) => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
-      return base44.entities.ImpedimentoMedalha.update(impedimentoId, adicionarAuditoriaMedalha({
+      return atualizarEscopado('ImpedimentoMedalha', impedimentoId, adicionarAuditoriaMedalha({
         ativo: false,
         data_fim: new Date().toISOString().split('T')[0]
       }, { userEmail }));
