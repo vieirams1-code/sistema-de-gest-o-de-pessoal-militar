@@ -455,10 +455,7 @@ export default function AvaliacaoComportamento() {
     isLoading: loadingUser,
     isAccessResolved,
     canAccessAction,
-    isAdmin,
-    modoAcesso,
     userEmail,
-    getMilitarScopeFilters,
   } = useCurrentUser();
   const canGerarPendencias = canAccessAction('gerar_pendencias_comportamento');
   const canAprovarMudanca = canAccessAction('aprovar_mudanca_comportamento');
@@ -473,35 +470,22 @@ export default function AvaliacaoComportamento() {
   const [linhaExpandidaId, setLinhaExpandidaId] = useState(null);
   const punicaoEntity = getPunicaoEntity();
 
-  // Lote 1D-E: escopo transversal — substitui Militar.list() global por
-  // listagem escopada via getMilitarScopeFilters().
+  // Escopo transversal: o hook central diferencia escopo global de escopos
+  // restritos sem confundir alcance organizacional com privilégio funcional.
   const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
   const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
 
   const { data: militares = [], isLoading } = useQuery({
-    queryKey: ['avaliacao-comportamento-militares', isAdmin, modoAcesso, userEmail],
+    queryKey: ['avaliacao-comportamento-militares', scopeKey],
     queryFn: async () => {
-      let lista = [];
-      if (isAdmin) {
-        lista = await base44.entities.Militar.list();
-      } else {
-        const filters = getMilitarScopeFilters();
-        if (!filters.length) return [];
-        const batches = await Promise.all(
-          filters.map((filtro) => base44.entities.Militar.filter(filtro))
-        );
-        const ids = new Set();
-        for (const m of batches.flat()) {
-          if (m?.id && !ids.has(m.id)) {
-            ids.add(m.id);
-            lista.push(m);
-          }
-        }
-      }
+      if (!scopedIsAdmin && !scopedIds?.length) return [];
+      const lista = scopedIsAdmin || scopedIds === null
+        ? await base44.entities.Militar.list()
+        : await base44.entities.Militar.filter({ id: { $in: scopedIds } });
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
     },
-    enabled: isAccessResolved,
+    enabled: isAccessResolved && scopedReady,
   });
   const { data: punicoes = [], isLoading: loadingPunicoes } = useQuery({
     queryKey: ['avaliacao-comportamento-punicoes', scopeKey],
