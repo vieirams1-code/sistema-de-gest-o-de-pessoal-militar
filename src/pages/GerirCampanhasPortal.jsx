@@ -43,7 +43,6 @@ const TIPOS_CAMPOS_FORMULARIO = [
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
   const [campanhas, setCampanhas] = useState([]);
-  const [planos, setPlanos] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -87,13 +86,7 @@ export default function GerirCampanhasPortal() {
     setFeedback({ type: '', msg: '' });
     try {
       const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
-      setCampanhas(res.data?.campanhas || []);
-      try {
-        const planosRes = await base44.functions.invoke('planos_ferias_servicos', { acao: 'LISTAR' });
-        setPlanos(planosRes.data?.planos || []);
-      } catch (_errPlanos) {
-        setPlanos([]);
-      }
+      setCampanhas((res.data?.campanhas || []).filter((campanha) => campanha.tipo !== 'PLANO_FERIAS'));
 
       let unidades = [];
       try {
@@ -973,21 +966,6 @@ export default function GerirCampanhasPortal() {
                     </select>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Plano Institucional *</label>
-                    <select
-                      value={modalNovaCampanha.plano_ferias_institucional_id || ''}
-                      onChange={(e) => setModalNovaCampanha({ ...modalNovaCampanha, plano_ferias_institucional_id: e.target.value })}
-                      disabled={modalNovaCampanha.tipo !== 'PLANO_FERIAS'}
-                      required={modalNovaCampanha.tipo === 'PLANO_FERIAS'}
-                      className="w-full h-10 px-3 border border-slate-300 rounded-xl text-xs bg-white outline-none focus:border-[#1e3a5f] font-semibold disabled:bg-slate-100"
-                    >
-                      <option value="">Selecione um plano aberto</option>
-                      {planos
-                        .filter((p) => String(p.status || 'ATIVO') === 'ATIVO' && Number(p.ano_referencia) === Number(modalNovaCampanha.ano_referencia))
-                        .map((p) => <option key={p.id} value={p.id}>{p.titulo} ({p.ano_referencia})</option>)}
-                    </select>
-                  </div>
 
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 block">Ano Exercício *</label>
