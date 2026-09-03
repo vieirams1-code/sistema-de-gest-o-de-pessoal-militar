@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { AlertTriangle, Bell, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 import {
   Dialog,
   DialogContent,
@@ -16,11 +17,34 @@ import {
 const SESSION_KEY = 'sgp_alert_operacional_shown';
 
 export default function AlertasOperacionais() {
-  const { isAdmin, getMilitarScopeFilters, isAccessResolved } = useCurrentUser();
+  const {
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
+    getMilitarScopeFilters,
+    isAccessResolved,
+  } = useCurrentUser();
   const [modalOpen, setModalOpen] = useState(false);
+  const semRestricaoEscopo = Boolean(isAdmin || hasGlobalScope);
+  const accessScopeKey = React.useMemo(() => buildAccessScopeKey({
+    isAdmin,
+    hasGlobalScope,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, hasGlobalScope, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
 
   const fetchAccessibleMilitarIds = async () => {
-    if (isAdmin) return null;
+    if (semRestricaoEscopo) return null;
     const filters = getMilitarScopeFilters();
     if (filters.length === 0) return [];
     const queries = await Promise.all(filters.map(f => base44.entities.Militar.filter(f)));
@@ -28,14 +52,14 @@ export default function AlertasOperacionais() {
   };
 
   const { data: urgentCards = [], isLoading } = useQuery({
-    queryKey: ['urgent-cards-alerts'],
+    queryKey: ['urgent-cards-alerts', accessScopeKey],
     queryFn: async () => {
       const filters = {
         prioridade: 'Urgente',
         arquivado: false
       };
 
-      if (!isAdmin) {
+      if (!semRestricaoEscopo) {
         const militarIds = await fetchAccessibleMilitarIds();
         filters.militar_id = { $in: militarIds };
       }
