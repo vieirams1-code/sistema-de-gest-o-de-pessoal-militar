@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import {
   CheckCircle2,
@@ -79,6 +80,8 @@ export default function PainelPlanoFerias() {
   const [planoSelecionadoId, setPlanoSelecionadoId] = useState('');
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
+  const [painelConsolidado, setPainelConsolidado] = useState(false);
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -134,7 +137,7 @@ export default function PainelPlanoFerias() {
   }, []);
 
   // Carrega lista de campanhas e opções da campanha selecionada
-  const carregarPainel = async (campanhaAlvoId = null) => {
+  const carregarPainel = async (campanhaAlvoId = null, planoAlvoId = null) => {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
@@ -142,6 +145,7 @@ export default function PainelPlanoFerias() {
       const res = await base44.functions.invoke('portal_servicos', {
         acao: 'PLANO_ESCALA_LISTAR',
         campanha_id: campanhaAlvoId || undefined,
+        plano_id: planoAlvoId || undefined,
       });
 
       const listaCampanhas = res.data?.campanhas || [];
@@ -156,19 +160,26 @@ export default function PainelPlanoFerias() {
         setPlanos([]);
       }
 
-      // Define campanha ativa/selecionada
+      // Define campanha ativa/selecionada e o contexto de consolidação.
       let selected = null;
       if (campanhaAlvoId) {
         selected = listaCampanhas.find((c) => c.id === campanhaAlvoId) || null;
+      }
+      if (!selected && planoAlvoId) {
+        selected = listaCampanhas.find((c) => (
+          c.plano_ferias_institucional_id === planoAlvoId
+          && (c.status === 'Aberta_Coleta' || c.status === 'Ativa')
+        )) || listaCampanhas.find((c) => c.plano_ferias_institucional_id === planoAlvoId) || null;
       }
       if (!selected && listaCampanhas.length > 0) {
         selected = listaCampanhas.find((c) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || listaCampanhas[0];
       }
       setCampanhaSelecionada(selected);
-      const planoDaCampanha = selected?.plano_ferias_institucional_id || '';
-      setPlanoSelecionadoId(planoDaCampanha);
+      const planoDaConsulta = planoAlvoId || res.data?.plano_id || selected?.plano_ferias_institucional_id || '';
+      setPlanoSelecionadoId(planoDaConsulta);
+      setPainelConsolidado(Boolean(res.data?.modo_consolidado));
 
-      // 2. Opções da campanha selecionada
+      // 2. Opções recebidas: uma linha por militar/período quando o contexto é um plano.
       const listaOpcoes = res.data?.opcoes || [];
       setOpcoes(listaOpcoes);
 
@@ -236,23 +247,36 @@ export default function PainelPlanoFerias() {
   };
 
   useEffect(() => {
-    carregarPainel();
+    carregarPainel(searchParams.get('campanhaId'), searchParams.get('planoId'));
   }, []);
 
   const handleSelecionarCampanha = (camp) => {
     setCampanhaSelecionada(camp);
     setPlanoSelecionadoId(camp?.plano_ferias_institucional_id || '');
-    carregarPainel(camp.id);
+    setPainelConsolidado(false);
+    carregarPainel(camp.id, null);
   };
 
   const handleSelecionarPlano = (planoId) => {
     setPlanoSelecionadoId(planoId);
-    const primeiraCampanha = campanhas.find((camp) => camp.plano_ferias_institucional_id === planoId);
-    if (primeiraCampanha) {
-      setCampanhaSelecionada(primeiraCampanha);
-      carregarPainel(primeiraCampanha.id);
+    if (planoId) {
+      const primeiraCampanha = campanhas.find((camp) => (
+        camp.plano_ferias_institucional_id === planoId
+        && (camp.status === 'Aberta_Coleta' || camp.status === 'Ativa')
+      )) || campanhas.find((camp) => camp.plano_ferias_institucional_id === planoId);
+      setCampanhaSelecionada(primeiraCampanha || null);
+      setPainelConsolidado(true);
+      carregarPainel(null, planoId);
+      return;
+    }
+
+    // Mantém disponível o histórico legado sem plano, sempre isolado por campanha.
+    const primeiraCampanhaLegada = campanhas.find((camp) => !camp.plano_ferias_institucional_id);
+    setCampanhaSelecionada(primeiraCampanhaLegada || null);
+    setPainelConsolidado(false);
+    if (primeiraCampanhaLegada) {
+      carregarPainel(primeiraCampanhaLegada.id, null);
     } else {
-      setCampanhaSelecionada(null);
       setOpcoes([]);
     }
   };
@@ -279,6 +303,14 @@ export default function PainelPlanoFerias() {
         [opId]: atual,
       };
     });
+  };
+
+  const recarregarPainelAtual = () => {
+    const usaPlanoConsolidado = painelConsolidado && Boolean(planoSelecionadoId);
+    return carregarPainel(
+      usaPlanoConsolidado ? null : campanhaSelecionada?.id,
+      usaPlanoConsolidado ? planoSelecionadoId : null,
+    );
   };
 
   // Salvar Escala Definitiva do Militar
@@ -363,7 +395,7 @@ export default function PainelPlanoFerias() {
 
       setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: false }));
       setFeedback({ type: 'success', msg: `Escala salva para ${op.militar_posto} ${op.militar_nome}: ${mesesResumoFormatado}` });
-      await carregarPainel(campanhaSelecionada?.id);
+      await recarregarPainelAtual();
       handleFecharPopupLateral(op.id);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao salvar escala.' });
@@ -394,7 +426,7 @@ export default function PainelPlanoFerias() {
       setModalNaoContemplado({ open: false, opcao: null, justificativa: '' });
       setMilitaresEmEdicao((prev) => ({ ...prev, [opId]: false }));
       setFeedback({ type: 'success', msg: `${op.militar_posto} ${op.militar_nome} registrado como NÃO CONTEMPLADO.` });
-      await carregarPainel(campanhaSelecionada?.id);
+      await recarregarPainelAtual();
       handleFecharPopupLateral(opId);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao registrar não contemplado.' });
