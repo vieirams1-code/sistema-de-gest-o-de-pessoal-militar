@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -221,7 +222,7 @@ export default function TiposPublicacaoManager() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.TipoPublicacaoCustom.create(data),
+    mutationFn: (data) => criarEscopado('TipoPublicacaoCustom', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-publicacao-custom'] });
       setAdding(false);
@@ -229,7 +230,7 @@ export default function TiposPublicacaoManager() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.TipoPublicacaoCustom.update(id, data),
+    mutationFn: ({ id, data }) => atualizarEscopado('TipoPublicacaoCustom', id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-publicacao-custom'] });
       setEditing(null);
@@ -237,7 +238,7 @@ export default function TiposPublicacaoManager() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.TipoPublicacaoCustom.delete(id),
+    mutationFn: (id) => excluirEscopado('TipoPublicacaoCustom', id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-publicacao-custom'] });
       setDeleteDialog({ open: false, id: null });
