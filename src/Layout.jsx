@@ -266,6 +266,14 @@ const menuGroups = [
             menuGroup: 'Gestão RH / Comando',
           },
           {
+            name: '3. Respostas e Escalação',
+            page: 'PainelPlanoFerias',
+            icon: CalendarDays,
+            moduleKey: 'acesso_campanhas',
+            actionKey: 'perm_gerir_respostas',
+            menuGroup: 'Gestão RH / Comando',
+          },
+          {
             name: '4. Regras & Configurações',
             page: 'ConfiguracoesPortal',
             icon: SlidersHorizontal,

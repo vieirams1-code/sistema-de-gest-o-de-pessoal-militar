@@ -132,6 +132,10 @@ const actionGuardByPage = {
   Atestados: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
   ExtratoAtestadosMedicos: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
   ControleProcessos: { moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
+  GerirCampanhasPortal: { moduleKey: 'campanhas', actionKey: 'gerir_campanhas', moduleName: 'Gestão de Campanhas' },
+  PlanosFerias: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Planos de Férias' },
+  PainelPlanoFerias: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Respostas e Escalação de Férias' },
+  CentralRespostasCampanhas: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Respostas de Campanhas' },
 };
 
 const actionGuardByPageNormalized = Object.entries(actionGuardByPage).reduce((acc, [pageKey, guard]) => {
