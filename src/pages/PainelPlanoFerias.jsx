@@ -449,7 +449,7 @@ export default function PainelPlanoFerias() {
       return;
     }
 
-    if (!window.confirm(`Confirma a geração de férias para os ${totalContemplados} militares contemplados da campanha "${campanhaSelecionada.titulo}"? A campanha será encerrada e as férias cadastradas no SGP.`)) {
+    if (!window.confirm('Confirma a geração de férias para os militares contemplados do contexto selecionado? As férias serão cadastradas no SGP.')) {
       return;
     }
 
