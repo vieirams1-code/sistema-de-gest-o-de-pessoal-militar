@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -90,6 +90,8 @@ function getStatusVisual(jiso) {
 
 export default function AgendarJISO() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkHandledRef = useRef('');
   const queryClient = useQueryClient();
   const {
     canAccessModule,
@@ -282,6 +284,40 @@ export default function AgendarJISO() {
     setJisoSelecionada(jiso);
     setDialogDetalheOpen(true);
   };
+
+  useEffect(() => {
+    const atestadoId = String(searchParams.get('atestado_id') || '').trim();
+    if (!atestadoId || isLoading || deepLinkHandledRef.current === atestadoId) return;
+
+    deepLinkHandledRef.current = atestadoId;
+    const atestado = atestadoById.get(atestadoId);
+    if (!atestado) {
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    const vinculoAtivo = vinculosAtivos.find((vinculo) => String(vinculo?.atestado_id || '') === atestadoId);
+    const jisoExistente = vinculoAtivo
+      ? (bundle.jisos || []).find((jiso) => String(jiso?.id || '') === String(vinculoAtivo.jiso_id || ''))
+      : (bundle.jisos || []).find((jiso) => String(jiso?.atestado_id || '') === atestadoId);
+
+    if (jisoExistente) {
+      setJisoSelecionada(jisoExistente);
+      setDialogDetalheOpen(true);
+    } else if (canGerirJiso) {
+      setAtestadoParaVincular(atestado);
+      setFormData({
+        ...FORM_INICIAL,
+        militar_id: String(atestado.militar_id || ''),
+        finalidade_jiso: 'Homologação de Atestado',
+        motivo_jiso: `Homologação do atestado iniciado em ${formatDateBR(atestado.data_inicio)}`,
+      });
+      setFormError('');
+      setDialogNovaOpen(true);
+    }
+
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, isLoading, atestadoById, vinculosAtivos, bundle.jisos, canGerirJiso]);
 
   const refreshBundle = async () => {
     await queryClient.invalidateQueries({ queryKey: ['jiso-independent-bundle'] });
