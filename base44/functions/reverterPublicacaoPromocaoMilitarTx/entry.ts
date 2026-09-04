@@ -52,6 +52,11 @@ function erro({ status, etapa, motivo, contexto = {} }: any) {
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
+    const authUser = await base44.auth.me();
+    if (!authUser) return erro({ status: 401, etapa: 'autorizacao', motivo: 'nao_autenticado' });
+    if (String(authUser.role || '').trim().toLowerCase() !== 'admin') {
+      return erro({ status: 403, etapa: 'autorizacao', motivo: 'requer_administrador_plataforma' });
+    }
     const payload = await parsePayload(req);
     const promocao = payload?.promocao || {};
     const item = payload?.item || {};
