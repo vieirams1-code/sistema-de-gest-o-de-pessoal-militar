@@ -201,7 +201,7 @@ export default function GerenciarPeriodoModal({
 
   const hasManagementPermission = canEdit || canChangeStatus || canDelete;
   const exclusaoPermitida = canDelete && vinculos.estado === ESTADO_SEGURANCA.SEGURO;
-  const confirmacaoEsperada = `EXCLUIR ${periodo?.referencia || ''}`.trim();
+  const confirmacaoEsperada = `INATIVAR ${periodo?.referencia || ''}`.trim();
   const confirmacaoValida = normalizarTexto(confirmacaoExclusao).toUpperCase() === confirmacaoEsperada.toUpperCase();
 
   const motivoExclusao = useMemo(() => {
@@ -220,8 +220,8 @@ export default function GerenciarPeriodoModal({
       return {
         className: 'border-emerald-200 bg-emerald-50',
         textClassName: 'text-emerald-800',
-        titulo: 'Seguro para excluir',
-        descricao: 'Nenhuma férias, Livro, publicação ou uso operacional foi identificado. A exclusão física pode ser feita com confirmação textual.',
+        titulo: 'Seguro para inativar',
+        descricao: 'Nenhuma férias, Livro, publicação ou uso operacional foi identificado. A inativação pode ser feita com confirmação textual.',
       };
     }
     if (vinculos.estado === ESTADO_SEGURANCA.REVERSAO) {
@@ -229,14 +229,14 @@ export default function GerenciarPeriodoModal({
         className: 'border-amber-200 bg-amber-50',
         textClassName: 'text-amber-800',
         titulo: 'Exige reversão',
-        descricao: `Exclusão bloqueada: ${motivoExclusao.join(', ')}. Reverta ou remova as férias vinculadas antes de tentar excluir o período.`,
+        descricao: `Inativação bloqueada: ${motivoExclusao.join(', ')}. Reverta ou remova as férias vinculadas antes de tentar inativar o período.`,
       };
     }
     return {
       className: 'border-red-200 bg-red-50',
       textClassName: 'text-red-800',
       titulo: 'Bloqueio administrativo total',
-      descricao: `Exclusão e inativação bloqueadas: ${motivoExclusao.join(', ')}. Acione o administrador para análise administrativa sem alterar Livro ou publicações.`,
+      descricao: `Inativação bloqueada: ${motivoExclusao.join(', ')}. Acione o administrador para análise administrativa sem alterar Livro ou publicações.`,
     };
   }, [motivoExclusao, vinculos.estado]);
 
@@ -287,11 +287,11 @@ export default function GerenciarPeriodoModal({
     try {
       if (!canDelete) throw new Error('Ação negada: você não tem permissão para excluir período aquisitivo.');
       if (!exclusaoPermitida) throw new Error('Exclusão bloqueada por vínculo operacional/administrativo.');
-      if (!confirmacaoValida) throw new Error(`Digite ${confirmacaoEsperada} para confirmar a exclusão física.`);
+      if (!confirmacaoValida) throw new Error(`Digite ${confirmacaoEsperada} para confirmar a inativação.`);
       await onConfirmDelete?.();
       setFeedback({
         type: 'success',
-        message: 'Período excluído com sucesso.',
+        message: 'Período inativado com sucesso.',
       });
     } catch (error) {
       setFeedback({ type: 'error', message: error?.message || 'Falha ao excluir período.' });
@@ -372,7 +372,7 @@ export default function GerenciarPeriodoModal({
 
             {canDelete && (
               <div className="border-t pt-4 space-y-2">
-              <p className="text-sm font-medium text-slate-700">Exclusão segura</p>
+              <p className="text-sm font-medium text-slate-700">Inativação segura</p>
               <Alert className={estadoSegurancaUi.className}>
                 <AlertDescription className={estadoSegurancaUi.textClassName}>
                   <strong>{estadoSegurancaUi.titulo}.</strong> {estadoSegurancaUi.descricao}
@@ -391,7 +391,7 @@ export default function GerenciarPeriodoModal({
                   }}
                   disabled={saving || deleting || !exclusaoPermitida}
                 >
-                  Excluir período
+                  Inativar período
                 </Button>
               </div>
               </div>
@@ -403,9 +403,9 @@ export default function GerenciarPeriodoModal({
       <AlertDialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão física</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar inativação</AlertDialogTitle>
             <AlertDialogDescription>
-              Este período será excluído definitivamente. Esta ação não exclui férias, Livro ou publicações e não pode ser desfeita.
+              Este período será inativado (soft-delete). A inativação preserva o registro para auditoria, impede a recriação pelo gerador automático e pode ser revertida alterando o status.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2 py-2">
@@ -422,7 +422,7 @@ export default function GerenciarPeriodoModal({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleExcluir} className="bg-red-600 hover:bg-red-700" disabled={deleting || !exclusaoPermitida || !confirmacaoValida}>
-              {deleting ? 'Processando...' : 'Excluir definitivamente'}
+              {deleting ? 'Processando...' : 'Inativar período'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

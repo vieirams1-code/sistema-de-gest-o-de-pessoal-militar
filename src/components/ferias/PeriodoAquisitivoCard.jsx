@@ -39,12 +39,19 @@ export default function PeriodoAquisitivoCard({
   const diasGozadosPrevistos = saldoOperacional.ferias_previstas_gozadas;
   const diasSaldo = saldoOperacional.saldo_restante;
 
+  const inativo = Boolean(periodo?.inativo);
+
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <article className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${inativo ? 'opacity-55' : ''}`}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500">Referência</p>
-          <h4 className="text-base font-semibold text-slate-900">{periodo.referencia || 'Sem referência'}</h4>
+          <h4 className="text-base font-semibold text-slate-900 inline-flex items-center gap-2">
+            {periodo.referencia || 'Sem referência'}
+            {inativo && (
+              <Badge className="bg-slate-100 text-slate-500 border-slate-200 text-[10px]">Inativo</Badge>
+            )}
+          </h4>
         </div>
         <Badge className={`${statusColors[periodo.status_operacional] || statusColors.Pendente} border text-xs`}>
           {periodo.status_operacional}

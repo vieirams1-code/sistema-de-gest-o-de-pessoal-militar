@@ -127,6 +127,7 @@ function mapPeriodo(periodo, feriasRelacionadas = [], ajustes = [], hoje) {
     dias_saldo: saldoConsolidado.dias_saldo,
     origem_periodo: periodo?.origem_periodo || periodo?.origem_tipo || periodo?.origem || null,
     criado_automaticamente: Boolean(periodo?.criado_automaticamente || periodo?.origem_automatica),
+    inativo: Boolean(periodo?.inativo),
     raw: periodo,
     fracoes: normalizarFeriasFracoes(feriasRelacionadas),
   };

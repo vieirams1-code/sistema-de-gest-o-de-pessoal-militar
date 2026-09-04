@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { AjusteSaldoFerias } from '@/api/entities';
-import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,12 +21,14 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
+  ShieldAlert,
 } from 'lucide-react';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from '@/components/ferias/feriasRules';
 import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAquisitivosMapper';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
+import SaneamentoPeriodosRecriadosPanel from '@/components/ferias/SaneamentoPeriodosRecriadosPanel';
 import {
   enriquecerMilitarComMatriculas,
   filtrarMilitaresOperacionais,
@@ -102,8 +104,12 @@ export default function PeriodosAquisitivos() {
     },
   });
 
-  const deletePeriodoMutation = useMutation({
-    mutationFn: ({ periodoId }) => excluirEscopado('PeriodoAquisitivo', periodoId),
+  const inativarPeriodoMutation = useMutation({
+    mutationFn: ({ periodoId }) => atualizarEscopado('PeriodoAquisitivo', periodoId, {
+      inativo: true,
+      status: 'Inativo',
+      observacoes: 'Período inativado (soft-delete) para impedir recriação pelo gerador automático.',
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
     },
@@ -254,11 +260,13 @@ export default function PeriodosAquisitivos() {
 
   const filteredPeriodosCount = filteredMilitares.reduce((total, grupo) => total + grupo.periodos.length, 0);
 
+  const periodosFlatAtivos = useMemo(() => periodosFlat.filter((p) => !p.inativo), [periodosFlat]);
+
   const stats = {
-    total: periodosFlat.length,
-    disponiveis: periodosFlat.filter((p) => getPeriodoResumoStatus(p).isDisponivel).length,
-    vencendo: periodosFlat.filter((p) => getPeriodoResumoStatus(p).isVencendo).length,
-    vencidos: periodosFlat.filter((p) => getPeriodoResumoStatus(p).isVencido).length,
+    total: periodosFlatAtivos.length,
+    disponiveis: periodosFlatAtivos.filter((p) => getPeriodoResumoStatus(p).isDisponivel).length,
+    vencendo: periodosFlatAtivos.filter((p) => getPeriodoResumoStatus(p).isVencendo).length,
+    vencidos: periodosFlatAtivos.filter((p) => getPeriodoResumoStatus(p).isVencido).length,
   };
 
   const quickFilterLabel = {
@@ -301,17 +309,20 @@ export default function PeriodosAquisitivos() {
     if (!canAlterarStatusPeriodoAquisitivo) throw new Error('Ação negada: você não tem permissão para alterar status do período aquisitivo.');
     if (!periodoGerenciado?.id) throw new Error('Período inválido para alteração de status.');
 
+    const payload = { status };
+    payload.inativo = status === 'Inativo';
+
     await updatePeriodoMutation.mutateAsync({
       periodoId: periodoGerenciado.id,
-      payload: { status },
+      payload,
     });
   };
 
-  const handleConfirmDelete = async () => {
-    if (!canExcluirPeriodoAquisitivo) throw new Error('Ação negada: você não tem permissão para excluir período aquisitivo.');
-    if (!periodoGerenciado?.id) throw new Error('Período inválido para exclusão.');
+  const handleConfirmInativar = async () => {
+    if (!canExcluirPeriodoAquisitivo) throw new Error('Ação negada: você não tem permissão para inativar período aquisitivo.');
+    if (!periodoGerenciado?.id) throw new Error('Período inválido para inativação.');
 
-    await deletePeriodoMutation.mutateAsync({
+    await inativarPeriodoMutation.mutateAsync({
       periodoId: periodoGerenciado.id,
     });
   };
@@ -406,6 +417,21 @@ export default function PeriodosAquisitivos() {
             </div>
           </div>
         </div>
+
+        {isAdmin && (
+          <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-4 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldAlert className="w-5 h-5 text-amber-600" />
+              <h2 className="text-base font-semibold text-slate-800">Saneamento de Períodos Recriados</h2>
+            </div>
+            <SaneamentoPeriodosRecriadosPanel
+              gruposMilitares={periodosTransformados.militares}
+              registrosLivro={registrosLivro}
+              publicacoesExOfficio={publicacoesExOfficio}
+              paBundleQueryKey={paBundleQueryKey}
+            />
+          </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4 flex-wrap">
@@ -574,7 +600,7 @@ export default function PeriodosAquisitivos() {
         registrosLivro={registrosLivro}
         publicacoes={publicacoesExOfficio}
         saving={updatePeriodoMutation.isPending}
-        deleting={deletePeriodoMutation.isPending}
+        deleting={inativarPeriodoMutation.isPending}
         onOpenChange={(open) => {
           if (!open) setPeriodoGerenciado(null);
         }}
@@ -583,7 +609,7 @@ export default function PeriodosAquisitivos() {
         canDelete={canExcluirPeriodoAquisitivo}
         onSubmitEdicao={handleSubmitEdicao}
         onChangeStatus={handleChangeStatus}
-        onConfirmDelete={handleConfirmDelete}
+        onConfirmDelete={handleConfirmInativar}
         onOpenFerias={abrirFeriasVinculadas}
       />
 
