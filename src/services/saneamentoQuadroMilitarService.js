@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { carregarMilitaresComMatriculas, getLotacaoAtualMilitar } from '@/services/matriculaMilitarViewService';
 
 export const QBMPT_LEGADO_FILTRO = { quadro: 'QBMPT' };
@@ -20,7 +21,7 @@ export async function listarMilitaresQbmptLegado() {
 export async function converterMilitaresQbmptParaQptbm(militares = []) {
   const candidatos = (militares || []).filter((militar) => String(militar?.quadro || '').trim() === 'QBMPT');
   const resultados = await Promise.allSettled(
-    candidatos.map((militar) => base44.entities.Militar.update(militar.id, QBMPT_PARA_QPTBM_PAYLOAD))
+    candidatos.map((militar) => atualizarEscopado('Militar', militar.id, QBMPT_PARA_QPTBM_PAYLOAD))
   );
 
   const idsAtualizados = [];
