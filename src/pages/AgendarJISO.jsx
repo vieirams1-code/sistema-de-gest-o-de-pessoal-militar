@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
+  FileCheck2,
   FileText,
   Link2,
   MessageCircle,
@@ -36,6 +37,7 @@ import {
 } from '@/components/ui/select';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import JisoDecisionDialog from '@/components/jiso/JisoDecisionDialog';
 import JisoWhatsAppDialog from '@/components/jiso/JisoWhatsAppDialog';
 import { fetchScopedJisoBundle } from '@/services/getScopedJisoBundleClient';
 import { criarJiso } from '@/services/jisoCudClient';
@@ -110,6 +112,7 @@ export default function AgendarJISO() {
   const [dialogNovaOpen, setDialogNovaOpen] = useState(false);
   const [dialogDetalheOpen, setDialogDetalheOpen] = useState(false);
   const [dialogWhatsAppOpen, setDialogWhatsAppOpen] = useState(false);
+  const [dialogDecisionOpen, setDialogDecisionOpen] = useState(false);
   const [jisoSelecionada, setJisoSelecionada] = useState(null);
   const [atestadoParaVincular, setAtestadoParaVincular] = useState(null);
   const [formData, setFormData] = useState(FORM_INICIAL);
@@ -280,7 +283,7 @@ export default function AgendarJISO() {
     setDialogDetalheOpen(true);
   };
 
-  const handleWhatsappSent = async () => {
+  const refreshBundle = async () => {
     await queryClient.invalidateQueries({ queryKey: ['jiso-independent-bundle'] });
   };
 
@@ -550,17 +553,24 @@ export default function AgendarJISO() {
                       <p className="text-sm text-slate-500">Matrícula {jisoSelecionada.militar_matricula_atual || jisoSelecionada.militar_matricula || '—'}</p>
                     </div>
                   </div>
-                  {canGerirJiso && (
-                    <Button
-                      size="sm"
-                      variant={jisoSelecionada.jiso_whatsapp_enviado_em ? 'outline' : 'default'}
-                      onClick={() => setDialogWhatsAppOpen(true)}
-                      className={!jisoSelecionada.jiso_whatsapp_enviado_em ? 'bg-emerald-700 hover:bg-emerald-800' : ''}
-                    >
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      {jisoSelecionada.jiso_whatsapp_enviado_em ? 'Reenviar convocação' : 'Convocar por WhatsApp'}
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {canRegistrarDecisao && (
+                      <Button size="sm" variant="outline" onClick={() => setDialogDecisionOpen(true)}>
+                        <FileCheck2 className="w-4 h-4 mr-2" /> Registrar decisão
+                      </Button>
+                    )}
+                    {canGerirJiso && (
+                      <Button
+                        size="sm"
+                        variant={jisoSelecionada.jiso_whatsapp_enviado_em ? 'outline' : 'default'}
+                        onClick={() => setDialogWhatsAppOpen(true)}
+                        className={!jisoSelecionada.jiso_whatsapp_enviado_em ? 'bg-emerald-700 hover:bg-emerald-800' : ''}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        {jisoSelecionada.jiso_whatsapp_enviado_em ? 'Reenviar convocação' : 'Convocar por WhatsApp'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
@@ -594,6 +604,9 @@ export default function AgendarJISO() {
                           <p className="text-xs text-slate-500">
                             {formatDateBR(atestado.data_inicio)} a {formatDateBR(atestado.data_termino)} · vínculo {vinculo?.origem_vinculo || 'manual'}
                           </p>
+                          {vinculo?.resultado_atestado && (
+                            <p className="text-xs font-medium text-emerald-700 mt-1">Resultado: {vinculo.resultado_atestado}</p>
+                          )}
                         </div>
                         <Button
                           variant="outline"
@@ -628,7 +641,15 @@ export default function AgendarJISO() {
         jiso={jisoSelecionada}
         open={dialogWhatsAppOpen}
         onOpenChange={setDialogWhatsAppOpen}
-        onSent={handleWhatsappSent}
+        onSent={refreshBundle}
+      />
+
+      <JisoDecisionDialog
+        jiso={jisoSelecionada}
+        linkedAtestados={detalheAtestados}
+        open={dialogDecisionOpen}
+        onOpenChange={setDialogDecisionOpen}
+        onSaved={refreshBundle}
       />
     </div>
   );
