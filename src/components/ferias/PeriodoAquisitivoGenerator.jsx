@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { bulkEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { parseDateOnlyStrict } from '@/services/dateOnlyService';
