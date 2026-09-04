@@ -4,7 +4,7 @@ const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 400;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
-const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'perfil_id'];
+const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'perfil_id', 'militar_id', 'grupamento_id', 'subgrupamento_id'];
 const REQUIRED_ACTION = 'gerir_gratificacoes_funcao';
 const OPERACOES = new Set(['criar_rascunho', 'atualizar_rascunho', 'enviar_dp', 'marcar_aguardando_publicacao', 'registrar_publicacao_nomeacao', 'criar_nomeacao_ativa', 'finalizar_gratificacao']);
 const STATUS_RASCUNHO = 'rascunho';
@@ -93,8 +93,38 @@ async function resolverPermissoes(base44: ReturnType<typeof createClientFromRequ
   }
   return {
     actions: consolidarActions(perfis || [], acessos || []),
-    isAdminByAccess: (acessos || []).some((a: any) => normalizeTipo(a?.tipo_acesso) === 'admin'),
+    acessos: acessos || [],
+    hasGlobalScope: (acessos || []).some((a: any) => normalizeTipo(a?.tipo_acesso) === 'admin'),
   };
+}
+
+async function podeAgirSobreMilitar(base44: ReturnType<typeof createClientFromRequest>, authUser: any, acessos: any[], militarId: string) {
+  if (!militarId) return false;
+  if (String(authUser?.role || '').trim().toLowerCase() === 'admin') return true;
+  if ((acessos || []).some((a: any) => normalizeTipo(a?.tipo_acesso) === 'admin')) return true;
+
+  const militar = await buscarUm(base44, 'Militar', militarId, ['id', 'estrutura_id', 'subgrupamento_id', 'grupamento_id', 'grupamento_raiz_id']);
+  for (const acesso of acessos || []) {
+    const tipo = normalizeTipo(acesso?.tipo_acesso);
+    if (tipo === 'proprio' && String(acesso?.militar_id || '') === String(militarId)) return true;
+
+    const estruturaId = String(militar?.estrutura_id || '').trim();
+    const militarSubId = String(militar?.subgrupamento_id || '').trim();
+    const militarGrpId = String(militar?.grupamento_id || '').trim();
+    const militarRaizId = String(militar?.grupamento_raiz_id || '').trim();
+    const acessoGrp = String(acesso?.grupamento_id || '').trim();
+    const acessoSub = String(acesso?.subgrupamento_id || '').trim();
+
+    if (tipo === 'setor' && acessoGrp && [estruturaId, militarGrpId, militarRaizId].includes(acessoGrp)) return true;
+    if (tipo === 'unidade' && acessoSub && [estruturaId, militarSubId].includes(acessoSub)) return true;
+    if (tipo === 'subsetor' && acessoSub) {
+      if ([estruturaId, militarSubId].includes(acessoSub)) return true;
+      const filhos = await base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: acessoSub }).catch(() => []);
+      const idsFilhos = new Set((filhos || []).map((f: any) => String(f?.id || '')).filter(Boolean));
+      if (idsFilhos.has(estruturaId) || idsFilhos.has(militarSubId)) return true;
+    }
+  }
+  return false;
 }
 
 function textoReferencia(value: any): string {
@@ -244,13 +274,15 @@ Deno.serve(async (req) => {
     if (!OPERACOES.has(operacao)) return Response.json({ error: 'Operação não permitida neste lote.' }, { status: 400 });
 
     const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
+    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin';
     const canManage = authIsAdmin || authPerms.actions?.[REQUIRED_ACTION] === true;
-    if (!canManage) return Response.json({ error: 'Acesso negado: requer gerir_gratificacoes_funcao ou admin/ALL.' }, { status: 403 });
+    if (!canManage) return Response.json({ error: 'Acesso negado: requer gerir_gratificacoes_funcao.' }, { status: 403 });
 
     const data = sanitizePayload(payload?.data && typeof payload.data === 'object' ? payload.data : {}, operacao);
 
     if (operacao === 'criar_rascunho' || operacao === 'atualizar_rascunho' || operacao === 'criar_nomeacao_ativa') {
+      const noEscopo = await podeAgirSobreMilitar(base44, authUser, authPerms.acessos, data.militar_id);
+      if (!noEscopo) throw withStatus('Acesso negado: militar fora do escopo organizacional.', 403);
       const refs = await validarReferencias(base44, data);
       const targetStatus = operacao === 'criar_nomeacao_ativa' ? STATUS_GRATIFICACAO_ATIVA : STATUS_RASCUNHO;
       const registro = montarRegistroGratificacao(data, refs, authUser, targetStatus);
@@ -271,6 +303,8 @@ Deno.serve(async (req) => {
     const id = trimString(payload?.id || payload?.data?.id);
     if (!id) throw withStatus('id é obrigatório para esta operação.', 400);
     const existente = await buscarUm(base44, 'GratificacaoFuncao', id);
+    const noEscopoExistente = await podeAgirSobreMilitar(base44, authUser, authPerms.acessos, String(existente?.militar_id || ''));
+    if (!noEscopoExistente) throw withStatus('Acesso negado: militar fora do escopo organizacional.', 403);
     const statusAtual = normalizeTipo(existente.status);
 
     if (operacao === 'enviar_dp') {
