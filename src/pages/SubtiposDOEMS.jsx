@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit3, Loader2, Plus, Search, BookOpenText } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -154,7 +155,7 @@ export default function SubtiposDOEMS() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: ({ id, data }) => (id ? base44.entities.SubtipoDOEMS.update(id, data) : base44.entities.SubtipoDOEMS.create(data)),
+    mutationFn: ({ id, data }) => (id ? atualizarEscopado('SubtipoDOEMS', id, data) : criarEscopado('SubtipoDOEMS', data)),
     onSuccess: (_, variables) => {
       refreshSubtipos();
       setDialogOpen(false);
@@ -165,7 +166,7 @@ export default function SubtiposDOEMS() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: (subtipo) => base44.entities.SubtipoDOEMS.update(subtipo.id, { ativo: subtipo.ativo === false }),
+    mutationFn: (subtipo) => atualizarEscopado('SubtipoDOEMS', subtipo.id, { ativo: subtipo.ativo === false }),
     onSuccess: (_, subtipo) => {
       refreshSubtipos();
       setStatusTarget(null);
