@@ -158,21 +158,13 @@ export default function ConfiguracoesPortal() {
         config_payload: payload,
       });
 
-      if (res.data?.ok) {
-        if (res.data?.config?.id) {
-          setConfigId(res.data.config.id);
-        }
-        setSuccessMsg('Configurações do Portal salvas com sucesso! As alterações de canais e regras já estão ativas.');
-      } else {
-        // Fallback direto
-        if (configId) {
-          await base44.entities.PortalAuthConfig.update(configId, payload);
-        } else {
-          const created = await base44.entities.PortalAuthConfig.create(payload);
-          setConfigId(created.id);
-        }
-        setSuccessMsg('Configurações do Portal salvas com sucesso!');
+      if (!res.data?.ok) {
+        throw new Error(res.data?.error || 'O backend não confirmou a gravação das configurações do Portal.');
       }
+      if (res.data?.config?.id) {
+        setConfigId(res.data.config.id);
+      }
+      setSuccessMsg('Configurações do Portal salvas com sucesso! As alterações de canais e regras já estão ativas.');
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao salvar configurações.');
     } finally {
@@ -213,63 +205,10 @@ export default function ConfiguracoesPortal() {
         valor_corrigido: valorCorrigido,
       });
 
-      if (res.data?.ok) {
-        setSuccessMsg(`Solicitação ${novoStatus.toLowerCase()} e dados atualizados na ficha do militar com sucesso!`);
-      } else {
-        // Fallback direto via entidade
-        const sol = solicitacoes.find((s) => s.id === solId);
-        const foiEditado = valorCorrigido !== undefined && valorCorrigido !== sol?.valor_proposto;
-        const valorFinal = foiEditado ? valorCorrigido : sol?.valor_proposto;
-
-        const updatePayload = {
-          status: novoStatus,
-          data_decisao: new Date().toISOString().split('T')[0],
-        };
-        if (foiEditado) {
-          updatePayload.valor_original_militar = sol.valor_proposto;
-          updatePayload.valor_proposto = valorFinal;
-          updatePayload.editado_pelo_gestor = true;
-          updatePayload.observacao_decisao = `Retificado pelo gestor (original: "${sol.valor_proposto}")`;
-        }
-
-        await base44.entities.SolicitacaoAtualizacao.update(solId, updatePayload);
-
-        if (novoStatus === 'Aprovada' && sol?.militar_id && sol?.campo_chave) {
-          const campo = sol.campo_chave.trim().toLowerCase();
-          const updateData = {
-            data_ultima_conferencia: new Date().toISOString().split('T')[0],
-          };
-
-          if (campo === 'endereco_logradouro' || campo === 'logradouro' || campo === 'endereco') {
-            updateData.logradouro = valorFinal;
-          } else if (campo === 'endereco_numero' || campo === 'numero_endereco' || campo === 'numero') {
-            updateData.numero_endereco = valorFinal;
-          } else if (campo === 'endereco_bairro' || campo === 'bairro') {
-            updateData.bairro = valorFinal;
-          } else if (campo === 'endereco_cidade' || campo === 'cidade' || campo === 'municipio') {
-            updateData.cidade = valorFinal;
-          } else if (campo === 'endereco_cep' || campo === 'cep') {
-            updateData.cep = valorFinal;
-          } else if (campo === 'endereco_complemento' || campo === 'complemento') {
-            updateData.complemento = valorFinal;
-          } else if (campo === 'telefone_celular' || campo === 'telefone' || campo === 'celular') {
-            updateData.telefone = valorFinal;
-          } else if (campo === 'email_funcional') {
-            updateData.email_funcional = valorFinal;
-          } else if (campo === 'email_particular' || campo === 'email') {
-            updateData.email_particular = valorFinal;
-          } else if (campo === 'estado_civil') {
-            updateData.estado_civil = valorFinal;
-          } else {
-            updateData[sol.campo_chave] = valorFinal;
-          }
-
-          try {
-            await base44.entities.Militar.update(sol.militar_id, updateData);
-          } catch (_errUpd) {}
-        }
-        setSuccessMsg(`Solicitação marcada como ${novoStatus}.`);
+      if (!res.data?.ok) {
+        throw new Error(res.data?.error || 'O backend não confirmou a decisão da solicitação cadastral.');
       }
+      setSuccessMsg(`Solicitação ${novoStatus.toLowerCase()} e dados atualizados na ficha do militar com sucesso!`);
 
       await loadSolicitacoes();
     } catch (err) {
@@ -291,13 +230,10 @@ export default function ConfiguracoesPortal() {
         itens_decisao: itensDecisao,
       });
 
-      if (res.data?.ok) {
-        setSuccessMsg(`Todas as alterações do militar foram marcadas como ${novoStatus.toLowerCase()}s com sucesso!`);
-      } else {
-        for (const item of itens) {
-          await handleDecidirSolicitacao(item.id, novoStatus);
-        }
+      if (!res.data?.ok) {
+        throw new Error(res.data?.error || 'O backend não confirmou a decisão cadastral em lote.');
       }
+      setSuccessMsg(`Todas as alterações do militar foram marcadas como ${novoStatus.toLowerCase()}s com sucesso!`);
 
       await loadSolicitacoes();
     } catch (err) {
