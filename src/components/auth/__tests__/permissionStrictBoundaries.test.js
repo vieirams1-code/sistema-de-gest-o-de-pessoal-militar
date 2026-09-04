@@ -44,6 +44,16 @@ const templatesTextoPage = read('../../../pages/TemplatesTexto.jsx');
 const funcaoSelector = read('../../militar/FuncaoSelector.jsx');
 const lotacaoSelector = read('../../militar/LotacaoSelector.jsx');
 const saneamentoQuadroMilitar = read('../../../services/saneamentoQuadroMilitarService.js');
+const promocoesPage = read('../../../pages/Promocoes.jsx');
+const detalhePromocaoPage = read('../../../pages/DetalhePromocao.jsx');
+const antiguidadeConfigQuadros = read('../../../pages/AntiguidadeConfigQuadros.jsx');
+const periodoGenerator = read('../../ferias/PeriodoAquisitivoGenerator.jsx');
+const acervoHistoricoService = read('../../../services/acervoHistoricoService.js');
+const gratificacoesService = read('../../../services/gratificacoesFuncaoService.js');
+const publicarPromocaoBackend = read('../../../../base44/functions/publicarPromocaoOficial/entry.ts');
+const reverterPromocaoBackend = read('../../../../base44/functions/reverterPublicacaoPromocaoMilitarTx/entry.ts');
+const excluirPromocaoBackend = read('../../../../base44/functions/excluirCadeiaPromocaoMilitarTx/entry.ts');
+const gerirGratificacaoBackend = read('../../../../base44/functions/gerirRascunhoGratificacaoFuncao/entry.ts');
 
 test('criação de publicação depende somente de adicionar_publicacoes', () => {
   assert.match(publicacoes, /const canCriarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
@@ -182,6 +192,41 @@ test('cadastros rápidos respeitam permissões estruturais existentes', () => {
 test('tipos de medalha exigem permissão de edição do módulo', () => {
   assert.match(tiposMedalhaPage, /const podeEditarTiposMedalha = canAccessAction\('editar_medalhas'\);/);
   assert.match(tiposMedalhaPage, /if \(!podeEditarTiposMedalha\) return <AccessDenied modulo="Configuração de Tipos de Medalha" \/>/);
+});
+
+test('promoções e configuração de antiguidade têm escrita administrativa server-side', () => {
+  assert.match(backendCud, /\['Promocao', 'PromocaoMilitar', 'ConfiguracaoAntiguidade'\]\.includes\(entityName\)/);
+  assert.match(backendCud, /gestão de promoções\/antiguidade é restrita ao administrador da plataforma/);
+  for (const source of [promocoesPage, detalhePromocaoPage, antiguidadeConfigQuadros]) {
+    assert.doesNotMatch(source, /base44\.entities\.(Promocao|PromocaoMilitar|ConfiguracaoAntiguidade)\.(create|update|delete|bulkCreate|bulkUpdate)/);
+  }
+  assert.match(promocoesPage, /\{isAdmin && \(\s*<Button[\s\S]*Nova Promoção/);
+  assert.match(detalhePromocaoPage, /\{isAdmin && \(\s*<Button[\s\S]*Salvar alterações/);
+});
+
+test('functions transacionais de promoção exigem administrador real', () => {
+  for (const source of [publicarPromocaoBackend, reverterPromocaoBackend, excluirPromocaoBackend]) {
+    assert.match(source, /String\(authUser\.role \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== 'admin'/);
+    assert.match(source, /requer_administrador_plataforma/);
+  }
+  assert.match(publicarPromocaoBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
+});
+
+test('períodos aquisitivos e acervo residual usam cudEscopado', () => {
+  assert.match(periodoGenerator, /bulkEscopado\('PeriodoAquisitivo'/);
+  assert.match(backendCud, /entityName === 'PeriodoAquisitivo' && subOp === 'create'[\s\S]*'gerar_periodos_aquisitivos'/);
+  assert.doesNotMatch(periodoGenerator, /base44\.entities\.PeriodoAquisitivo\.bulkCreate/);
+  assert.match(acervoHistoricoService, /atualizarEscopado\('AcervoFuncionalHistorico'/);
+  assert.doesNotMatch(acervoHistoricoService, /base44\.entities\.AcervoFuncionalHistorico\.update/);
+});
+
+test('gratificações separam permissão funcional de escopo organizacional', () => {
+  assert.match(gratificacoesService, /excluirEscopado\('GratificacaoFuncao', id\)/);
+  assert.match(backendCud, /GratificacaoFuncao:\s*\{\s*delete: 'gerir_gratificacoes_funcao'/s);
+  assert.match(gerirGratificacaoBackend, /const authIsAdmin = String\(authUser\.role \|\| ''\)\.toLowerCase\(\) === 'admin';/);
+  assert.match(gerirGratificacaoBackend, /podeAgirSobreMilitar\(base44, authUser, authPerms\.acessos, data\.militar_id\)/);
+  assert.match(gerirGratificacaoBackend, /militar fora do escopo organizacional/);
+  assert.doesNotMatch(gerirGratificacaoBackend, /authPerms\.isAdminByAccess/);
 });
 
 test('ações JISO independentes conseguem persistir apenas seus próprios reflexos', () => {
