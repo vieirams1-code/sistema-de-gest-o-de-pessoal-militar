@@ -3,7 +3,8 @@
   "type": "object",
   "properties": {
     "atestado_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Campo legado para compatibilidade com JISOs antigas vinculadas a um único atestado. Novos vínculos devem usar JISOAtestado."
     },
     "militar_id": {
       "type": "string"
@@ -27,23 +28,38 @@
       "type": "string",
       "format": "date"
     },
+    "hora_jiso": {
+      "type": "string",
+      "description": "Horário agendado da JISO no formato HH:MM."
+    },
+    "local_jiso": {
+      "type": "string"
+    },
     "secao_jiso": {
       "type": "string"
     },
     "finalidade_jiso": {
       "type": "string"
     },
+    "motivo_jiso": {
+      "type": "string"
+    },
     "nup": {
+      "type": "string"
+    },
+    "numero_tars": {
       "type": "string"
     },
     "resultado_jiso": {
       "type": "string"
     },
     "dias_original": {
-      "type": "number"
+      "type": "number",
+      "description": "Campo legado de compatibilidade com o fluxo de JISO originado por um único atestado."
     },
     "dias_jiso": {
-      "type": "number"
+      "type": "number",
+      "description": "Campo legado de compatibilidade. Efeitos específicos por atestado devem ser registrados em JISOAtestado."
     },
     "ata_jiso": {
       "type": "string"
@@ -57,6 +73,53 @@
     "observacoes": {
       "type": "string"
     },
+    "jiso_whatsapp_status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "enviado",
+        "legado"
+      ],
+      "default": "pendente"
+    },
+    "jiso_whatsapp_enviado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "jiso_whatsapp_enviado_por": {
+      "type": "string"
+    },
+    "jiso_whatsapp_mensagem": {
+      "type": "string"
+    },
+    "jiso_whatsapp_data_agendada_snapshot": {
+      "type": "string",
+      "format": "date"
+    },
+    "jiso_whatsapp_hora_agendada_snapshot": {
+      "type": "string"
+    },
+    "arquivo_ata_jiso": {
+      "type": "string"
+    },
+    "nota_para_bg": {
+      "type": "string"
+    },
+    "numero_bg": {
+      "type": "string"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date"
+    },
+    "status_publicacao": {
+      "type": "string",
+      "enum": [
+        "Aguardando Nota",
+        "Aguardando Publicação",
+        "Publicado"
+      ]
+    },
     "texto_publicacao": {
       "type": "string"
     },
@@ -65,7 +128,6 @@
     }
   },
   "required": [
-    "atestado_id",
     "militar_id"
   ]
 }
