@@ -1087,16 +1087,18 @@ export default function DetalhePromocao() {
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          <Button
-            onClick={confirmarPublicacaoPromocao}
-            disabled={publicarBloqueado}
-            title={bloqueioPublicarTexto}
-            className={publicarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}
-          >
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            {rotuloBotaoPublicar}
-          </Button>
-          {promocaoPermiteExclusao(promocao, { turma }) && (
+          {isAdmin && (
+            <Button
+              onClick={confirmarPublicacaoPromocao}
+              disabled={publicarBloqueado}
+              title={bloqueioPublicarTexto}
+              className={publicarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}
+            >
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              {rotuloBotaoPublicar}
+            </Button>
+          )}
+          {isAdmin && promocaoPermiteExclusao(promocao, { turma }) && (
             <Button variant="destructive" onClick={confirmarExclusaoPromocao} disabled={excluirPromocaoMutation.isPending}>
               <Trash2 className="mr-2 h-4 w-4" />
               Excluir promoção vazia
@@ -1202,7 +1204,7 @@ export default function DetalhePromocao() {
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
                 </div>
                 <div className="flex gap-2">
-                  {promocaoContext.permiteOrdenacao && (
+                  {isAdmin && promocaoContext.permiteOrdenacao && (
                     <Button
                       variant="outline"
                       onClick={() => ordenarPelaListaAtualMutation.mutate()}
@@ -1211,10 +1213,12 @@ export default function DetalhePromocao() {
                       {isPromocaoHistorica(promocao) ? 'Ordenar pela antiguidade anterior' : 'Ordenar pela lista atual'}
                     </Button>
                   )}
-                  <Button onClick={() => setModalAdicionarAberto(true)}>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Adicionar Militar
-                  </Button>
+                  {isAdmin && (
+                    <Button onClick={() => setModalAdicionarAberto(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Adicionar Militar
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1237,10 +1241,12 @@ export default function DetalhePromocao() {
                     <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
                       Clique em “Adicionar Militar” para montar a lista desta promoção. Depois confira a ordem e salve as alterações.
                     </p>
-                    <Button className="mt-4" onClick={() => setModalAdicionarAberto(true)}>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Adicionar militar
-                    </Button>
+                    {isAdmin && (
+                      <Button className="mt-4" onClick={() => setModalAdicionarAberto(true)}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Adicionar militar
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -1281,14 +1287,16 @@ export default function DetalhePromocao() {
                   Publicação: {bloqueioPublicarTexto}
                 </div>
               </div>
-              <Button
-                onClick={salvarRascunho}
-                disabled={salvarBloqueado}
-                className={salvarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : ''}
-              >
-                {!salvarBloqueado && <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Salvar alterações
-              </Button>
+              {isAdmin && (
+                <Button
+                  onClick={salvarRascunho}
+                  disabled={salvarBloqueado}
+                  className={salvarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : ''}
+                >
+                  {!salvarBloqueado && <CheckCircle2 className="mr-2 h-4 w-4" />}
+                  Salvar alterações
+                </Button>
+              )}
             </div>
           </div>
         </>
