@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { excluirEscopado } from '@/services/cudEscopadoClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 export const GRATIFICACAO_STATUS = {
@@ -276,7 +277,7 @@ export async function gerirRascunhoGratificacaoFuncao({ operacao, id, data } = {
 
 export async function deletarGratificacao(id) {
   try {
-    await base44.entities.GratificacaoFuncao.delete(id);
+    await excluirEscopado('GratificacaoFuncao', id);
     return true;
   } catch (err) {
     throw new Error(extrairMensagemErro(err, 'Erro ao excluir Gratificação de Função.'));
