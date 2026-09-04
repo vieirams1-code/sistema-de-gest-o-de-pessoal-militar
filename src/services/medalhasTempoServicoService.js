@@ -592,19 +592,37 @@ export async function garantirCatalogoFixoMedalhaTempo(base44Client) {
     }
   }
 
-  if (aCriar.length > 0) {
-    if (typeof base44Client.entities.TipoMedalha.bulkCreate === 'function') {
-      await base44Client.entities.TipoMedalha.bulkCreate(aCriar);
-    } else {
-      await Promise.all(aCriar.map((p) => base44Client.entities.TipoMedalha.create(p)));
+  if ((aCriar.length > 0 || aAtualizar.length > 0) && typeof base44Client?.functions?.invoke === 'function') {
+    const itens = [
+      ...aCriar.map((data) => ({ acao: 'create', ...data })),
+      ...aAtualizar.map(({ id, ...data }) => ({ acao: 'update', id, ...data })),
+    ];
+    const response = await base44Client.functions.invoke('cudEscopado', {
+      entityName: 'TipoMedalha',
+      operation: 'bulk',
+      itens,
+    });
+    const resultado = response?.data ?? response;
+    if (resultado?.error) throw new Error(resultado.error);
+    if (resultado?.sucesso !== itens.length) {
+      throw new Error('Não foi possível sincronizar integralmente o catálogo fixo de medalhas.');
     }
-  }
+  } else {
+    // Fallback exclusivo para clientes simulados/legados sem Functions (testes unitários).
+    if (aCriar.length > 0) {
+      if (typeof base44Client.entities.TipoMedalha.bulkCreate === 'function') {
+        await base44Client.entities.TipoMedalha.bulkCreate(aCriar);
+      } else {
+        await Promise.all(aCriar.map((p) => base44Client.entities.TipoMedalha.create(p)));
+      }
+    }
 
-  if (aAtualizar.length > 0) {
-    if (typeof base44Client.entities.TipoMedalha.bulkUpdate === 'function') {
-      await base44Client.entities.TipoMedalha.bulkUpdate(aAtualizar);
-    } else {
-      await Promise.all(aAtualizar.map(({ id, ...rest }) => base44Client.entities.TipoMedalha.update(id, rest)));
+    if (aAtualizar.length > 0) {
+      if (typeof base44Client.entities.TipoMedalha.bulkUpdate === 'function') {
+        await base44Client.entities.TipoMedalha.bulkUpdate(aAtualizar);
+      } else {
+        await Promise.all(aAtualizar.map(({ id, ...rest }) => base44Client.entities.TipoMedalha.update(id, rest)));
+      }
     }
   }
 
