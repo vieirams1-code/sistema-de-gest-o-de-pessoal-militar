@@ -88,27 +88,10 @@ export default function SolicitacoesAtualizacao() {
         valor_corrigido: valorCorrigido,
       });
 
-      if (res.data?.ok) {
-        setFeedback({ type: 'success', msg: `Solicitação ${novoStatus.toLowerCase()} e aplicada na ficha do militar com sucesso!` });
-      } else {
-        const foiEditado = valorCorrigido !== undefined && valorCorrigido !== sol.valor_proposto;
-        const valorFinal = foiEditado ? valorCorrigido : sol.valor_proposto;
-
-        const updatePayload = {
-          status: novoStatus,
-          usuario_decisao: user?.full_name || user?.email || 'Usuário',
-          data_decisao: new Date().toISOString().split('T')[0],
-        };
-        if (foiEditado) {
-          updatePayload.valor_original_militar = sol.valor_proposto;
-          updatePayload.valor_proposto = valorFinal;
-          updatePayload.editado_pelo_gestor = true;
-          updatePayload.observacao_decisao = `Retificado pelo gestor (original: "${sol.valor_proposto}")`;
-        }
-
-        await base44.entities.SolicitacaoAtualizacao.update(sol.id, updatePayload);
-        setFeedback({ type: 'success', msg: `Solicitação ${novoStatus.toLowerCase()} com sucesso.` });
+      if (!res.data?.ok) {
+        throw new Error(res.data?.error || 'O backend não confirmou a decisão da solicitação.');
       }
+      setFeedback({ type: 'success', msg: `Solicitação ${novoStatus.toLowerCase()} e aplicada na ficha do militar com sucesso!` });
 
       await queryClient.invalidateQueries({ queryKey: ['solicitacoes-atualizacao'] });
       await refetch();
@@ -136,13 +119,10 @@ export default function SolicitacoesAtualizacao() {
         itens_decisao: itensDecisao,
       });
 
-      if (res.data?.ok) {
-        setFeedback({ type: 'success', msg: `Todas as alterações do militar foram ${novoStatus.toLowerCase()}s com sucesso!` });
-      } else {
-        for (const item of itens) {
-          await handleDecidirItem(item, novoStatus);
-        }
+      if (!res.data?.ok) {
+        throw new Error(res.data?.error || 'O backend não confirmou a decisão em lote.');
       }
+      setFeedback({ type: 'success', msg: `Todas as alterações do militar foram ${novoStatus.toLowerCase()}s com sucesso!` });
 
       await queryClient.invalidateQueries({ queryKey: ['solicitacoes-atualizacao'] });
       await refetch();
