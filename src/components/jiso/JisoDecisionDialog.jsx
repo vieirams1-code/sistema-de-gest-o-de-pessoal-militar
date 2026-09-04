@@ -32,9 +32,16 @@ export default function JisoDecisionDialog({ jiso, linkedAtestados = [], open, o
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(null);
 
+  const linkSignature = useMemo(
+    () => linkedAtestados
+      .map((item) => `${item?.vinculo?.id || 'legacy'}:${item?.atestado?.id || ''}:${item?.vinculo?.updated_date || ''}`)
+      .join('|'),
+    [linkedAtestados],
+  );
+
   const hasLegacyOnlyLink = useMemo(
     () => linkedAtestados.some((item) => !item?.vinculo?.id),
-    [linkedAtestados],
+    [linkSignature],
   );
 
   useEffect(() => {
@@ -47,11 +54,11 @@ export default function JisoDecisionDialog({ jiso, linkedAtestados = [], open, o
     const next = {};
     for (const item of linkedAtestados) {
       const effect = initialEffect(item);
-      const key = effect.vinculo_id || `legacy:${item?.atestado?.id || Math.random()}`;
+      const key = effect.vinculo_id || `legacy:${item?.atestado?.id || 'unknown'}`;
       next[key] = effect;
     }
     setEffects(next);
-  }, [open, jiso?.id, linkedAtestados]);
+  }, [open, jiso?.id, linkSignature]);
 
   const updateEffect = (key, field, value) => {
     setEffects((prev) => ({
