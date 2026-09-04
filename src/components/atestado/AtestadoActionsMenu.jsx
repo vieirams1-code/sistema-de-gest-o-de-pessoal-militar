@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -11,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Eye, Pencil, Download, CheckCircle, BookOpen, FileText, Link2, Trash2 } from 'lucide-react';
+import { MoreVertical, Eye, Pencil, Download, CheckCircle, BookOpen, FileText, History, Trash2 } from 'lucide-react';
 import { calcStatusPublicacao, isPublicacaoAtestadoAtiva } from './atestadoPublicacaoHelpers';
 
 export default function AtestadoActionsMenu({
@@ -21,14 +20,9 @@ export default function AtestadoActionsMenu({
   estados,
   publicacoesVinculadas = [],
 }) {
-  const navigate = useNavigate();
   const { canAccessAction } = useCurrentUser();
   const canDownloadAttachments = canAccessAction('baixar_anexos_atestados');
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
-  const canGerirJiso = canAccessAction('gerir_jiso');
-  const canRegistrarDecisaoJiso = canAccessAction('registrar_decisao_jiso');
-  const canPublicarAtaJiso = canAccessAction('publicar_ata_jiso');
-  const canAccessJiso = canGerirJiso || canRegistrarDecisaoJiso || canPublicarAtaJiso;
 
   const {
     onView,
@@ -36,6 +30,7 @@ export default function AtestadoActionsMenu({
     onDelete,
     onOpenHomologacao,
     onOpenAtaJiso,
+    onOpenJisoModal,
   } = handlers;
 
   const { canEdit, canDelete } = permissoes;
@@ -49,15 +44,6 @@ export default function AtestadoActionsMenu({
     statusDocumentalAtaJiso,
     bloquearEdicaoPublicacaoNoCard = false,
   } = estados;
-
-  const abrirCentralJiso = () => {
-    const atestadoId = String(atestado?.id || '').trim();
-    if (!atestadoId) {
-      toast.error('Não foi possível identificar o atestado para abrir a JISO.');
-      return;
-    }
-    navigate(`${createPageUrl('AgendarJISO')}?atestado_id=${encodeURIComponent(atestadoId)}`);
-  };
 
   return (
     <DropdownMenu>
@@ -111,13 +97,6 @@ export default function AtestadoActionsMenu({
 
         <DropdownMenuSeparator />
 
-        {canAccessJiso && (
-          <DropdownMenuItem onClick={abrirCentralJiso}>
-            <Link2 className="w-4 h-4 mr-2 text-indigo-600" />
-            {canGerirJiso ? 'Gerar / Vincular JISO' : 'Abrir Central JISO'}
-          </DropdownMenuItem>
-        )}
-
         {podePublicarHomologacao && (
           <DropdownMenuItem onClick={() => onOpenHomologacao?.()} disabled={hasHomologacaoAtiva}>
             <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
@@ -162,6 +141,13 @@ export default function AtestadoActionsMenu({
             </DropdownMenuItem>
           );
         })}
+
+        {isFluxoJiso && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onOpenJisoModal?.(atestado)}><History className="w-4 h-4 mr-2" />Registrar decisão JISO</DropdownMenuItem>
+          </>
+        )}
 
         {canDelete && (
           <DropdownMenuItem

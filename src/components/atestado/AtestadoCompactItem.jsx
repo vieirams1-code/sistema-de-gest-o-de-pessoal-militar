@@ -58,19 +58,16 @@ export default function AtestadoCompactItem({
   );
 
   const quickAction = useMemo(() => {
+    if (isFluxoJiso && !atestado?.data_jiso_agendada && canAccessAction('gerir_jiso')) {
+      return { label: 'Agendar JISO', tone: 'warning', action: 'expand' };
+    }
     if (
       isFluxoJiso
-      && (
-        canAccessAction('gerir_jiso')
-        || canAccessAction('registrar_decisao_jiso')
-        || canAccessAction('publicar_ata_jiso')
-      )
+      && atestado?.data_jiso_agendada
+      && atestado?.status_jiso !== 'Homologado pela JISO'
+      && canAccessAction('registrar_decisao_jiso')
     ) {
-      return {
-        label: canAccessAction('gerir_jiso') ? 'Gerar / Vincular JISO' : 'Abrir JISO',
-        tone: 'warning',
-        action: 'jiso',
-      };
+      return { label: 'Registrar decisão', tone: 'primary', action: 'decision' };
     }
     if (
       atestado?.fluxo_homologacao === 'comandante'
@@ -92,8 +89,8 @@ export default function AtestadoCompactItem({
 
   const handleQuickAction = (event) => {
     event.stopPropagation();
-    if (quickAction.action === 'jiso') {
-      navigate(`${createPageUrl('AgendarJISO')}?atestado_id=${encodeURIComponent(atestado.id)}`);
+    if (quickAction.action === 'decision') {
+      navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`);
       return;
     }
     setExpanded(true);

@@ -125,20 +125,9 @@ const menuGroups = [
       {
         title: 'Saúde',
         icon: HeartPulse,
-        description: 'Atestados, JISO e controle de vínculos temporários',
+        description: 'Atestados e controle de vínculos temporários',
         items: [
           { name: 'Atestados', page: 'Atestados', icon: HeartPulse, moduleKey: 'atestados', actionKey: 'visualizar_atestados' },
-          {
-            name: 'JISO',
-            page: 'AgendarJISO',
-            icon: CalendarClock,
-            moduleKey: 'atestados',
-            anyOf: [
-              { type: 'action', key: 'gerir_jiso' },
-              { type: 'action', key: 'registrar_decisao_jiso' },
-              { type: 'action', key: 'publicar_ata_jiso' },
-            ],
-          },
           { name: 'Extrato de Atestados', page: 'ExtratoAtestadosMedicos', path: '/ExtratoAtestadosMedicos', icon: ScrollText, moduleKey: 'atestados', actionKey: 'visualizar_atestados' },
           { name: 'Cadastro de Médicos', page: 'Medicos', icon: Stethoscope, adminOnly: true, moduleKey: 'atestados' },
           { name: 'Atestados - T', page: 'ControleAtestadosTemporarios', icon: HeartPulse, moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios' },
