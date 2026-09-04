@@ -54,6 +54,7 @@ const publicarPromocaoBackend = read('../../../../base44/functions/publicarPromo
 const reverterPromocaoBackend = read('../../../../base44/functions/reverterPublicacaoPromocaoMilitarTx/entry.ts');
 const excluirPromocaoBackend = read('../../../../base44/functions/excluirCadeiaPromocaoMilitarTx/entry.ts');
 const gerirGratificacaoBackend = read('../../../../base44/functions/gerirRascunhoGratificacaoFuncao/entry.ts');
+const sincronizarGraduacoesBackend = read('../../../../base44/functions/sincronizarGraduacoesPromocao/entry.ts');
 
 test('criação de publicação depende somente de adicionar_publicacoes', () => {
   assert.match(publicacoes, /const canCriarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
@@ -205,11 +206,12 @@ test('promoções e configuração de antiguidade têm escrita administrativa se
 });
 
 test('functions transacionais de promoção exigem administrador real', () => {
-  for (const source of [publicarPromocaoBackend, reverterPromocaoBackend, excluirPromocaoBackend]) {
+  for (const source of [publicarPromocaoBackend, reverterPromocaoBackend, excluirPromocaoBackend, sincronizarGraduacoesBackend]) {
     assert.match(source, /String\(authUser\.role \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== 'admin'/);
     assert.match(source, /requer_administrador_plataforma/);
   }
   assert.match(publicarPromocaoBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
+  assert.match(sincronizarGraduacoesBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
 });
 
 test('períodos aquisitivos e acervo residual usam cudEscopado', () => {
