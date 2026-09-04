@@ -23,10 +23,10 @@ export default function CadastrarArmamento() {
   const hasArmamentosAccess = canAccessModule('armamentos');
   const podeAdicionarArmamento = canAccessAction('adicionar_armamentos');
   const podeEditarArmamento = canAccessAction('editar_armamentos');
-  const podeSalvarArmamento = armamentoId ? podeEditarArmamento : podeAdicionarArmamento;
 
   const [searchParams] = useSearchParams();
   const armamentoId = searchParams.get('id');
+  const podeSalvarArmamento = armamentoId ? podeEditarArmamento : podeAdicionarArmamento;
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     militar_id: '',
