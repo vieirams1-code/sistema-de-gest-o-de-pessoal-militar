@@ -62,6 +62,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'Militar',
   'Medalha',
   'ImpedimentoMedalha',
+  'Armamento',
+  'SolicitacaoAtualizacao',
 ]);
 
 
