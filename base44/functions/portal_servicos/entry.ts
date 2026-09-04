@@ -345,7 +345,67 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id',
 };
 
-Deno.serve(async (req: Request) => {
+function prioridadeOpcaoConsolidada(opcao: any): number {
+  if (opcao?.gerado_ferias_efetivas) return 4;
+  if (opcao?.status_camada_1 && opcao.status_camada_1 !== 'Pendente' && opcao.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO') return 3;
+  if (opcao?.status_camada_1 === 'Nao_Contemplado' || opcao?.decisao_camada_1_opcao === 'NAO_CONTEMPLADO') return 2;
+  return 1;
+}
+
+function dataOpcaoConsolidada(opcao: any): number {
+  const valor = opcao?.data_decisao_camada_1 || opcao?.updated_date || opcao?.data_envio_militar || opcao?.created_date;
+  const timestamp = valor ? new Date(valor).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function consolidarOpcoesPlano(opcoes: any[]): any[] {
+  const consolidadas = new Map<string, any>();
+
+  for (const opcao of (opcoes || [])) {
+    const militarId = textoId(opcao?.militar_id);
+    const periodoId = textoId(opcao?.periodo_aquisitivo_id);
+    if (!militarId || !periodoId) continue;
+
+    const chave = `${militarId}:${periodoId}`;
+    const atual = consolidadas.get(chave);
+    const origemAtual = Array.isArray(atual?.campanhas_origem) ? atual.campanhas_origem : [];
+    const origemNova = opcao?.campanha_id ? [{
+      campanha_id: opcao.campanha_id,
+      titulo: opcao.campanha_titulo || '',
+    }] : [];
+    const campanhasOrigem = [...origemAtual];
+    for (const origem of origemNova) {
+      if (!campanhasOrigem.some((item: any) => item.campanha_id === origem.campanha_id)) {
+        campanhasOrigem.push(origem);
+      }
+    }
+
+    const deveSubstituir = !atual
+      || prioridadeOpcaoConsolidada(opcao) > prioridadeOpcaoConsolidada(atual)
+      || (
+        prioridadeOpcaoConsolidada(opcao) === prioridadeOpcaoConsolidada(atual)
+        && dataOpcaoConsolidada(opcao) > dataOpcaoConsolidada(atual)
+      );
+
+    if (deveSubstituir) {
+      consolidadas.set(chave, {
+        ...opcao,
+        campanhas_origem: campanhasOrigem,
+        quantidade_respostas_campanhas: campanhasOrigem.length,
+      });
+    } else {
+      consolidadas.set(chave, {
+        ...atual,
+        campanhas_origem: campanhasOrigem,
+        quantidade_respostas_campanhas: campanhasOrigem.length,
+      });
+    }
+  }
+
+  return Array.from(consolidadas.values());
+}
+
+Deno.serve(async (req: Request) =>
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
