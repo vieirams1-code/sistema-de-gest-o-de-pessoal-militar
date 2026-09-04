@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -236,11 +237,11 @@ function buildTemplatePayload(data) {
 }
 
 async function createTemplate(payload) {
-  return base44.entities.TemplateTexto.create(payload);
+  return criarEscopado('TemplateTexto', payload);
 }
 
 async function updateTemplate(id, payload) {
-  return base44.entities.TemplateTexto.update(id, payload);
+  return atualizarEscopado('TemplateTexto', id, payload);
 }
 
 function getTipoDisplay(tipo) {
@@ -859,7 +860,7 @@ export default function TemplatesTexto() {
   const deleteMutation = useMutation({
     mutationFn: (id) => {
       if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
-      return base44.entities.TemplateTexto.delete(id);
+      return excluirEscopado('TemplateTexto', id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
