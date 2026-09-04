@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import JisoWhatsAppDialog from '@/components/jiso/JisoWhatsAppDialog';
 import { fetchScopedJisoBundle } from '@/services/getScopedJisoBundleClient';
 import { criarJiso } from '@/services/jisoCudClient';
 import { vincularAtestadoJiso } from '@/services/jisoAtestadoCudClient';
@@ -63,6 +64,13 @@ const FORM_INICIAL = {
   observacoes: '',
 };
 
+const STATUS_STYLE = {
+  'Aguardando Agendamento': 'bg-amber-100 text-amber-800 border-amber-200',
+  'Agendada': 'bg-blue-100 text-blue-800 border-blue-200',
+  'Realizada': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  'Cancelada': 'bg-rose-100 text-rose-800 border-rose-200',
+};
+
 function formatDateBR(value) {
   const raw = String(value || '').slice(0, 10);
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -78,13 +86,6 @@ function getStatusVisual(jiso) {
   return status || 'Aguardando Agendamento';
 }
 
-const STATUS_STYLE = {
-  'Aguardando Agendamento': 'bg-amber-100 text-amber-800 border-amber-200',
-  'Agendada': 'bg-blue-100 text-blue-800 border-blue-200',
-  'Realizada': 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  'Cancelada': 'bg-rose-100 text-rose-800 border-rose-200',
-};
-
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -96,8 +97,8 @@ export default function AgendarJISO() {
     effectiveUserEmail,
   } = useCurrentUser();
 
-  // Compatibilidade transitória: enquanto a permissão de módulo JISO ainda
-  // não foi migrada, preservamos o módulo Atestados como guard de entrada.
+  // Transição: a rota ainda herda o módulo Atestados para preservar todos os
+  // perfis existentes; as ações internas já são exclusivamente as ações JISO.
   const hasAtestadosAccess = canAccessModule('atestados');
   const canGerirJiso = canAccessAction('gerir_jiso');
   const canRegistrarDecisao = canAccessAction('registrar_decisao_jiso');
@@ -108,12 +109,16 @@ export default function AgendarJISO() {
   const [statusFilter, setStatusFilter] = useState('todos');
   const [dialogNovaOpen, setDialogNovaOpen] = useState(false);
   const [dialogDetalheOpen, setDialogDetalheOpen] = useState(false);
+  const [dialogWhatsAppOpen, setDialogWhatsAppOpen] = useState(false);
   const [jisoSelecionada, setJisoSelecionada] = useState(null);
   const [atestadoParaVincular, setAtestadoParaVincular] = useState(null);
   const [formData, setFormData] = useState(FORM_INICIAL);
   const [formError, setFormError] = useState('');
 
-  const { data: bundle = { jisos: [], vinculos: [], atestados: [], militares: [], meta: {} }, isLoading } = useQuery({
+  const {
+    data: bundle = { jisos: [], vinculos: [], atestados: [], militares: [], meta: {} },
+    isLoading,
+  } = useQuery({
     queryKey: ['jiso-independent-bundle', effectiveUserEmail || null],
     queryFn: () => fetchScopedJisoBundle(),
     enabled: hasAtestadosAccess && canViewJiso && isAccessResolved,
@@ -127,7 +132,6 @@ export default function AgendarJISO() {
     () => new Map((bundle.atestados || []).map((a) => [String(a.id), a])),
     [bundle.atestados],
   );
-
   const vinculosAtivos = useMemo(
     () => (bundle.vinculos || []).filter((v) => v?.ativo !== false),
     [bundle.vinculos],
@@ -153,7 +157,8 @@ export default function AgendarJISO() {
 
   const atestadosPendentes = useMemo(() => (
     (bundle.atestados || []).filter((atestado) => {
-      const precisa = atestado?.necessita_jiso === true || String(atestado?.fluxo_homologacao || '').toLowerCase() === 'jiso';
+      const precisa = atestado?.necessita_jiso === true
+        || String(atestado?.fluxo_homologacao || '').toLowerCase() === 'jiso';
       return precisa && !atestadoIdsJaRelacionados.has(String(atestado.id));
     })
   ), [bundle.atestados, atestadoIdsJaRelacionados]);
@@ -166,7 +171,7 @@ export default function AgendarJISO() {
         if (statusFilter !== 'todos' && status !== statusFilter) return false;
         if (!termo) return true;
         const militar = militarById.get(String(jiso.militar_id)) || {};
-        const texto = [
+        return [
           jiso.militar_nome,
           jiso.militar_matricula_atual,
           jiso.militar_matricula,
@@ -176,8 +181,7 @@ export default function AgendarJISO() {
           jiso.finalidade_jiso,
           jiso.motivo_jiso,
           jiso.nup,
-        ].filter(Boolean).join(' ').toLowerCase();
-        return texto.includes(termo);
+        ].filter(Boolean).join(' ').toLowerCase().includes(termo);
       })
       .sort((a, b) => String(a.data_jiso || '9999-99-99').localeCompare(String(b.data_jiso || '9999-99-99')));
   }, [bundle.jisos, militarById, searchTerm, statusFilter]);
@@ -196,7 +200,10 @@ export default function AgendarJISO() {
 
   const militaresOrdenados = useMemo(() => (
     [...(bundle.militares || [])].sort((a, b) => (
-      String(a.nome_completo || a.nome_guerra || '').localeCompare(String(b.nome_completo || b.nome_guerra || ''), 'pt-BR')
+      String(a.nome_completo || a.nome_guerra || '').localeCompare(
+        String(b.nome_completo || b.nome_guerra || ''),
+        'pt-BR',
+      )
     ))
   ), [bundle.militares]);
 
@@ -246,14 +253,8 @@ export default function AgendarJISO() {
   };
 
   const salvarNovaJiso = () => {
-    if (!formData.militar_id) {
-      setFormError('Selecione o militar.');
-      return;
-    }
-    if (!formData.finalidade_jiso) {
-      setFormError('Informe a finalidade da JISO.');
-      return;
-    }
+    if (!formData.militar_id) return setFormError('Selecione o militar.');
+    if (!formData.finalidade_jiso) return setFormError('Informe a finalidade da JISO.');
     createMutation.mutate({ dados: formData, atestado: atestadoParaVincular });
   };
 
@@ -277,6 +278,10 @@ export default function AgendarJISO() {
   const abrirDetalhe = (jiso) => {
     setJisoSelecionada(jiso);
     setDialogDetalheOpen(true);
+  };
+
+  const handleWhatsappSent = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['jiso-independent-bundle'] });
   };
 
   if (loadingUser || !isAccessResolved) return null;
@@ -351,8 +356,12 @@ export default function AgendarJISO() {
                 return (
                   <div key={atestado.id} className="p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="font-medium text-slate-900">{militar.posto_graduacao || atestado.militar_posto || ''} {militar.nome_completo || atestado.militar_nome || 'Militar'}</p>
-                      <p className="text-sm text-slate-600">Atestado de {formatDateBR(atestado.data_inicio)} · {atestado.dias || '—'} dias · {atestado.tipo_afastamento || 'Afastamento'}</p>
+                      <p className="font-medium text-slate-900">
+                        {militar.posto_graduacao || atestado.militar_posto || ''} {militar.nome_completo || atestado.militar_nome || 'Militar'}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        Atestado de {formatDateBR(atestado.data_inicio)} · {atestado.dias || '—'} dias · {atestado.tipo_afastamento || 'Afastamento'}
+                      </p>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => abrirNovaJisoDoAtestado(atestado)}>
                       <Link2 className="w-4 h-4 mr-2" /> Gerar JISO
@@ -374,7 +383,9 @@ export default function AgendarJISO() {
           </div>
 
           {isLoading ? (
-            <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" /></div>
+            <div className="py-20 flex justify-center">
+              <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+            </div>
           ) : jisosFiltradas.length === 0 ? (
             <div className="bg-white border border-dashed border-slate-300 rounded-xl p-12 text-center">
               <Stethoscope className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -401,7 +412,7 @@ export default function AgendarJISO() {
                             {militar.posto_graduacao || jiso.militar_posto || ''} {militar.nome_completo || jiso.militar_nome || 'Militar'}
                           </h3>
                           <Badge className={STATUS_STYLE[status] || 'bg-slate-100 text-slate-700'}>{status}</Badge>
-                          {atestadoDaJisoBadge(atestadosDaJiso.length)}
+                          <AtestadoCountBadge count={atestadosDaJiso.length} />
                         </div>
                         <p className="text-sm text-slate-700 font-medium">{jiso.finalidade_jiso || 'Finalidade não informada'}</p>
                         {jiso.motivo_jiso && <p className="text-sm text-slate-500 mt-1 line-clamp-1">{jiso.motivo_jiso}</p>}
@@ -454,9 +465,14 @@ export default function AgendarJISO() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Finalidade *</Label>
-                <Select value={formData.finalidade_jiso} onValueChange={(value) => setFormData((prev) => ({ ...prev, finalidade_jiso: value }))}>
+                <Select
+                  value={formData.finalidade_jiso}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, finalidade_jiso: value }))}
+                >
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{FINALIDADES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {FINALIDADES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
@@ -467,22 +483,44 @@ export default function AgendarJISO() {
 
             <div className="grid gap-2">
               <Label>Motivo / referência</Label>
-              <Input value={formData.motivo_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, motivo_jiso: e.target.value }))} placeholder="Ex.: promoção ao posto de..., renovação contratual..." />
+              <Input
+                value={formData.motivo_jiso}
+                onChange={(e) => setFormData((prev) => ({ ...prev, motivo_jiso: e.target.value }))}
+                placeholder="Ex.: promoção ao posto de..., renovação contratual..."
+              />
             </div>
 
             <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="grid gap-2"><Label>Data</Label><Input type="date" value={formData.data_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, data_jiso: e.target.value }))} /></div>
-              <div className="grid gap-2"><Label>Horário</Label><Input type="time" value={formData.hora_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, hora_jiso: e.target.value }))} /></div>
-              <div className="grid gap-2 sm:col-span-2 md:col-span-1"><Label>Seção</Label><Input value={formData.secao_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, secao_jiso: e.target.value }))} /></div>
-              <div className="grid gap-2 sm:col-span-2 md:col-span-1"><Label>Local</Label><Input value={formData.local_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, local_jiso: e.target.value }))} /></div>
+              <div className="grid gap-2">
+                <Label>Data</Label>
+                <Input type="date" value={formData.data_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, data_jiso: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Horário</Label>
+                <Input type="time" value={formData.hora_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, hora_jiso: e.target.value }))} />
+              </div>
+              <div className="grid gap-2 sm:col-span-2 md:col-span-1">
+                <Label>Seção</Label>
+                <Input value={formData.secao_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, secao_jiso: e.target.value }))} />
+              </div>
+              <div className="grid gap-2 sm:col-span-2 md:col-span-1">
+                <Label>Local</Label>
+                <Input value={formData.local_jiso} onChange={(e) => setFormData((prev) => ({ ...prev, local_jiso: e.target.value }))} />
+              </div>
             </div>
 
             <div className="grid gap-2">
               <Label>Observações</Label>
-              <Textarea value={formData.observacoes} onChange={(e) => setFormData((prev) => ({ ...prev, observacoes: e.target.value }))} rows={3} />
+              <Textarea
+                value={formData.observacoes}
+                onChange={(e) => setFormData((prev) => ({ ...prev, observacoes: e.target.value }))}
+                rows={3}
+              />
             </div>
 
-            {formError && <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">{formError}</div>}
+            {formError && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">{formError}</div>
+            )}
           </div>
 
           <DialogFooter>
@@ -500,16 +538,31 @@ export default function AgendarJISO() {
             <DialogTitle>Detalhes da JISO</DialogTitle>
             <DialogDescription>A JISO é o registro central; documentos médicos permanecem vinculados separadamente.</DialogDescription>
           </DialogHeader>
+
           {jisoSelecionada && (
             <div className="space-y-5 py-2">
               <div className="rounded-xl border border-slate-200 p-4">
-                <div className="flex items-start gap-3">
-                  <UserRound className="w-5 h-5 text-slate-500 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-slate-900">{jisoSelecionada.militar_posto || ''} {jisoSelecionada.militar_nome || 'Militar'}</p>
-                    <p className="text-sm text-slate-500">Matrícula {jisoSelecionada.militar_matricula_atual || jisoSelecionada.militar_matricula || '—'}</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <UserRound className="w-5 h-5 text-slate-500 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-slate-900">{jisoSelecionada.militar_posto || ''} {jisoSelecionada.militar_nome || 'Militar'}</p>
+                      <p className="text-sm text-slate-500">Matrícula {jisoSelecionada.militar_matricula_atual || jisoSelecionada.militar_matricula || '—'}</p>
+                    </div>
                   </div>
+                  {canGerirJiso && (
+                    <Button
+                      size="sm"
+                      variant={jisoSelecionada.jiso_whatsapp_enviado_em ? 'outline' : 'default'}
+                      onClick={() => setDialogWhatsAppOpen(true)}
+                      className={!jisoSelecionada.jiso_whatsapp_enviado_em ? 'bg-emerald-700 hover:bg-emerald-800' : ''}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      {jisoSelecionada.jiso_whatsapp_enviado_em ? 'Reenviar convocação' : 'Convocar por WhatsApp'}
+                    </Button>
+                  )}
                 </div>
+
                 <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   <InfoMini label="Finalidade" value={jisoSelecionada.finalidade_jiso || '—'} />
                   <InfoMini label="Data" value={formatDateBR(jisoSelecionada.data_jiso)} />
@@ -520,20 +573,35 @@ export default function AgendarJISO() {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-slate-900 flex items-center gap-2"><FileText className="w-4 h-4" /> Atestados vinculados</h3>
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Atestados vinculados
+                  </h3>
                   <Badge variant="secondary">{detalheAtestados.length}</Badge>
                 </div>
                 {detalheAtestados.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Esta JISO não depende de atestado médico.</div>
+                  <div className="rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
+                    Esta JISO não depende de atestado médico.
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {detalheAtestados.map(({ atestado, vinculo }) => (
-                      <div key={`${atestado.id}-${vinculo?.id || 'legado'}`} className="rounded-lg border border-slate-200 p-3 flex items-center justify-between gap-3">
+                      <div
+                        key={`${atestado.id}-${vinculo?.id || 'legado'}`}
+                        className="rounded-lg border border-slate-200 p-3 flex items-center justify-between gap-3"
+                      >
                         <div>
                           <p className="font-medium text-sm text-slate-900">{atestado.tipo_afastamento || 'Atestado'} · {atestado.dias || '—'} dias</p>
-                          <p className="text-xs text-slate-500">{formatDateBR(atestado.data_inicio)} a {formatDateBR(atestado.data_termino)} · vínculo {vinculo?.origem_vinculo || 'manual'}</p>
+                          <p className="text-xs text-slate-500">
+                            {formatDateBR(atestado.data_inicio)} a {formatDateBR(atestado.data_termino)} · vínculo {vinculo?.origem_vinculo || 'manual'}
+                          </p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}>Abrir</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}
+                        >
+                          Abrir
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -541,7 +609,13 @@ export default function AgendarJISO() {
               </div>
 
               <div className="grid sm:grid-cols-3 gap-3">
-                <StatusBox icon={MessageCircle} label="Convocação WhatsApp" value={jisoSelecionada.jiso_whatsapp_enviado_em ? `Enviada em ${new Date(jisoSelecionada.jiso_whatsapp_enviado_em).toLocaleString('pt-BR')}` : 'Pendente'} />
+                <StatusBox
+                  icon={MessageCircle}
+                  label="Convocação WhatsApp"
+                  value={jisoSelecionada.jiso_whatsapp_enviado_em
+                    ? `Enviada em ${new Date(jisoSelecionada.jiso_whatsapp_enviado_em).toLocaleString('pt-BR')}`
+                    : 'Pendente'}
+                />
                 <StatusBox icon={FileText} label="Ata / publicação" value={jisoSelecionada.status_publicacao || 'Aguardando Nota'} />
                 <StatusBox icon={CheckCircle2} label="Resultado" value={jisoSelecionada.resultado_jiso || 'Ainda não registrado'} />
               </div>
@@ -549,6 +623,13 @@ export default function AgendarJISO() {
           )}
         </DialogContent>
       </Dialog>
+
+      <JisoWhatsAppDialog
+        jiso={jisoSelecionada}
+        open={dialogWhatsAppOpen}
+        onOpenChange={setDialogWhatsAppOpen}
+        onSent={handleWhatsappSent}
+      />
     </div>
   );
 }
@@ -557,7 +638,10 @@ function ResumoCard({ label, value, icon: Icon }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <div><p className="text-xs font-medium text-slate-500">{label}</p><p className="text-2xl font-bold text-slate-900 mt-1">{value}</p></div>
+        <div>
+          <p className="text-xs font-medium text-slate-500">{label}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+        </div>
         <div className="rounded-lg bg-slate-100 p-2"><Icon className="w-5 h-5 text-slate-600" /></div>
       </div>
     </div>
@@ -565,14 +649,26 @@ function ResumoCard({ label, value, icon: Icon }) {
 }
 
 function InfoMini({ label, value }) {
-  return <div className="min-w-0"><p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p><p className="text-sm font-medium text-slate-700 truncate" title={String(value || '')}>{value || '—'}</p></div>;
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-sm font-medium text-slate-700 truncate" title={String(value || '')}>{value || '—'}</p>
+    </div>
+  );
 }
 
 function StatusBox({ icon: Icon, label, value }) {
-  return <div className="rounded-lg bg-slate-50 border border-slate-200 p-3"><div className="flex items-center gap-2 text-xs font-medium text-slate-500"><Icon className="w-4 h-4" />{label}</div><p className="text-sm font-medium text-slate-800 mt-2">{value}</p></div>;
+  return (
+    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <Icon className="w-4 h-4" /> {label}
+      </div>
+      <p className="text-sm font-medium text-slate-800 mt-2">{value}</p>
+    </div>
+  );
 }
 
-function atestadoDaJisoBadge(count) {
+function AtestadoCountBadge({ count }) {
   if (!count) return <Badge variant="outline">Sem atestado</Badge>;
   return <Badge variant="outline">{count} {count === 1 ? 'atestado' : 'atestados'}</Badge>;
 }
