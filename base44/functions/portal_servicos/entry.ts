@@ -1350,15 +1350,32 @@ Deno.serve(async (req: Request) => {
             const campanhasFerias = (todasCampanhasPortal || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS');
             const campanhasIdsValidos = new Set(campanhasFerias.map((c: any) => c.id));
 
-            // 2. Busca opções de férias de forma estritamente isolada pela campanha
-            let opcoes: any[] = [];
-            if (payload.campanha_id) {
-              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-              opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === payload.campanha_id);
-            } else if (campanhasFerias.length > 0) {
-              const primeiraCamp = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0];
-              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-              opcoes = (allOpcoes || []).filter((op: any) => op.campanha_id === primeiraCamp.id);
+            // 2. Consulta opções por campanha ou consolida todas as campanhas do mesmo plano.
+            // Sem parâmetros, mantém compatibilidade e abre o primeiro plano ativo de forma consolidada.
+            const primeiraCampanha = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0] || null;
+            const planoIdConsulta = !payload.campanha_id
+              ? (textoId(payload.plano_id) || textoId(primeiraCampanha?.plano_ferias_institucional_id))
+              : '';
+            const campanhasConsulta = payload.campanha_id
+              ? campanhasFerias.filter((campanha: any) => campanha.id === payload.campanha_id)
+              : planoIdConsulta
+                ? campanhasFerias.filter((campanha: any) => textoId(campanha.plano_ferias_institucional_id) === planoIdConsulta)
+                : primeiraCampanha
+                  ? [primeiraCampanha]
+                  : [];
+            const idsCampanhasConsulta = new Set(campanhasConsulta.map((campanha: any) => campanha.id));
+
+            const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+            let opcoes = (allOpcoes || [])
+              .filter((op: any) => idsCampanhasConsulta.has(op.campanha_id))
+              .map((op: any) => ({
+                ...op,
+                campanha_titulo: campanhasFerias.find((campanha: any) => campanha.id === op.campanha_id)?.titulo || '',
+              }));
+
+            const modoConsolidado = Boolean(planoIdConsulta && !payload.campanha_id);
+            if (modoConsolidado) {
+              opcoes = consolidarOpcoesPlano(opcoes);
             }
 
             // 3. Purga opções órfãs de campanhas que foram excluídas
@@ -1416,6 +1433,8 @@ Deno.serve(async (req: Request) => {
               ok: true,
               campanhas: campanhasFerias || [],
               opcoes: opcoes || [],
+              plano_id: planoIdConsulta || null,
+              modo_consolidado: modoConsolidado,
             }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
@@ -1573,13 +1592,12 @@ Deno.serve(async (req: Request) => {
                 .filter((campanha: any) => campanha.tipo === 'PLANO_FERIAS')
                 .map((campanha: any) => campanha.id));
               const opcoesDoPlano = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-              const unicas = new Map<string, any>();
-              for (const opcao of (opcoesDoPlano || [])) {
-                if (!campanhasIds.has(opcao.campanha_id) || opcao.gerado_ferias_efetivas) continue;
-                const chave = `${textoId(opcao.militar_id)}:${textoId(opcao.periodo_aquisitivo_id)}`;
-                if (chave !== ':' && !unicas.has(chave)) unicas.set(chave, opcao);
-              }
-              todasOpcoes = Array.from(unicas.values());
+              const opcoesElegiveis = (opcoesDoPlano || [])
+                .filter((opcao: any) => campanhasIds.has(opcao.campanha_id));
+              // Consolida antes de retirar as já geradas para que um duplicado
+              // pendente não gere férias novamente quando a outra campanha já gerou.
+              todasOpcoes = consolidarOpcoesPlano(opcoesElegiveis)
+                .filter((opcao: any) => !opcao.gerado_ferias_efetivas);
             } else if (campanha_id) {
               // Compatibilidade: geração isolada continua restrita à campanha informada.
               // Não existe fallback por ano, pois planos do mesmo ano podem coexistir.
