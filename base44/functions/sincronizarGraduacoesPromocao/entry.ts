@@ -124,6 +124,9 @@ Deno.serve(async (req) => {
   try {
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ success: false, error: 'Não autenticado' }, { status: 401 });
+    if (String(authUser.role || '').trim().toLowerCase() !== 'admin') {
+      return Response.json({ success: false, error: 'Acesso negado: requer administrador da plataforma.', motivo: 'requer_administrador_plataforma' }, { status: 403 });
+    }
 
     let payload: any = {};
     try { payload = await req.json(); } catch (_) { }
