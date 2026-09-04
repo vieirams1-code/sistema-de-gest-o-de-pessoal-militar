@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +46,7 @@ export default function SolicitarAtualizacaoModal({ militar, onClose, onSaved })
   const handleSubmit = async () => {
     if (!campoSelecionado || !valorProposto) return;
     setSaving(true);
-    await base44.entities.SolicitacaoAtualizacao.create({
+    await criarEscopado('SolicitacaoAtualizacao', {
       militar_id: militar.id,
       militar_nome: militar.nome_completo,
       militar_posto: militar.posto_graduacao,
