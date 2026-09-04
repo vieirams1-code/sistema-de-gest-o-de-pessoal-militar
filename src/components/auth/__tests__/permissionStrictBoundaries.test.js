@@ -35,6 +35,15 @@ const solicitarAtualizacao = read('../../militar/SolicitarAtualizacaoModal.jsx')
 const solicitacoesAtualizacao = read('../../../pages/SolicitacoesAtualizacao.jsx');
 const configuracoesPortal = read('../../../pages/ConfiguracoesPortal.jsx');
 const portalServicos = read('../../../../base44/functions/portal_servicos/entry.ts');
+const tiposPublicacaoManager = read('../../configuracoes/TiposPublicacaoManager.jsx');
+const medicosPage = read('../../../pages/Medicos.jsx');
+const medicoForm = read('../../atestado/MedicoFormDialog.jsx');
+const tiposMedalhaPage = read('../../../pages/TiposMedalha.jsx');
+const subtiposDoemsPage = read('../../../pages/SubtiposDOEMS.jsx');
+const templatesTextoPage = read('../../../pages/TemplatesTexto.jsx');
+const funcaoSelector = read('../../militar/FuncaoSelector.jsx');
+const lotacaoSelector = read('../../militar/LotacaoSelector.jsx');
+const saneamentoQuadroMilitar = read('../../../services/saneamentoQuadroMilitarService.js');
 
 test('criação de publicação depende somente de adicionar_publicacoes', () => {
   assert.match(publicacoes, /const canCriarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
@@ -148,6 +157,31 @@ test('portal_servicos separa escopo global de privilégio e valida escopo nas de
   assert.match(portalServicos, /Apenas role=admin da plataforma possui bypass/);
   assert.match(portalServicos, /usuarioPodeAgirSobreMilitarPortal\(base44, user, String\(sol\.militar_id \|\| ''\)\)/);
   assert.match(portalServicos, /usuarioPodeAgirSobreMilitarPortal\(base44, user, String\(militar_id\)\)/);
+});
+
+test('cadastros administrativos e utilitários passam pelo backend seguro', () => {
+  for (const source of [tiposPublicacaoManager, medicosPage, medicoForm, tiposMedalhaPage, subtiposDoemsPage, templatesTextoPage, funcaoSelector, lotacaoSelector, saneamentoQuadroMilitar]) {
+    assert.doesNotMatch(source, /base44\.entities\.(TipoPublicacaoCustom|Medico|TipoMedalha|SubtipoDOEMS|TemplateTexto|Funcao|Lotacao|Militar)\.(create|update|delete|bulkCreate|bulkUpdate)/);
+  }
+  assert.match(backendCud, /TipoPublicacaoCustom:\s*\{\s*create: 'gerir_configuracoes'/s);
+  assert.match(backendCud, /TipoMedalha:\s*\{\s*create: 'editar_medalhas'/s);
+  assert.match(backendCud, /TemplateTexto:\s*\{\s*create: 'gerir_templates'/s);
+  assert.match(backendCud, /Medico:\s*\{\s*create: 'adicionar_atestados'/s);
+  assert.match(backendCud, /manutenção do cadastro de médicos é administrativa/);
+  assert.match(backendCud, /manutenção de subtipos DOEMS é administrativa/);
+});
+
+test('cadastros rápidos respeitam permissões estruturais existentes', () => {
+  assert.match(funcaoSelector, /canAccessAction\('gerir_adicoes_personalizacoes'\)/);
+  assert.match(lotacaoSelector, /canAccessAction\('gerir_estrutura_organizacional'\)/);
+  assert.match(backendCud, /Funcao:\s*\{\s*create: 'gerir_adicoes_personalizacoes'/s);
+  assert.match(backendCud, /Lotacao:\s*\{\s*create: 'gerir_estrutura_organizacional'/s);
+  assert.match(saneamentoQuadroMilitar, /atualizarEscopado\('Militar', militar\.id, QBMPT_PARA_QPTBM_PAYLOAD\)/);
+});
+
+test('tipos de medalha exigem permissão de edição do módulo', () => {
+  assert.match(tiposMedalhaPage, /const podeEditarTiposMedalha = canAccessAction\('editar_medalhas'\);/);
+  assert.match(tiposMedalhaPage, /if \(!podeEditarTiposMedalha\) return <AccessDenied modulo="Configuração de Tipos de Medalha" \/>/);
 });
 
 test('ações JISO independentes conseguem persistir apenas seus próprios reflexos', () => {
