@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado } from '@/services/cudEscopadoClient';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Plus } from 'lucide-react';
@@ -24,6 +26,8 @@ export default function LotacaoSelector({ value, onChange, name = "lotacao" }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [novaLotacao, setNovaLotacao] = useState('');
   const queryClient = useQueryClient();
+  const { canAccessAction } = useCurrentUser();
+  const podeCriarLotacao = canAccessAction('gerir_estrutura_organizacional');
 
   const { data: lotacoes = [] } = useQuery({
     queryKey: ['lotacoes'],
@@ -31,7 +35,7 @@ export default function LotacaoSelector({ value, onChange, name = "lotacao" }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }),
+    mutationFn: (nome) => criarEscopado('Lotacao', { nome, ativa: true }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['lotacoes'] });
       onChange(name, data.nome);
@@ -64,15 +68,17 @@ export default function LotacaoSelector({ value, onChange, name = "lotacao" }) {
             ))}
           </SelectContent>
         </Select>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => setDialogOpen(true)}
-          className="flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-        </Button>
+        {podeCriarLotacao && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setDialogOpen(true)}
+            className="flex-shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
