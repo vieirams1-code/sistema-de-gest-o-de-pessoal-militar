@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, History, MoreHorizontal, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +30,7 @@ async function criarPromocaoManual() {
   const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
   const responsavel = usuario?.email || usuario?.full_name || '';
 
-  return base44.entities.Promocao.create({
+  return criarEscopado('Promocao', {
     tipo: 'historica',
     natureza: 'coletiva',
     posto_graduacao: '',
@@ -189,7 +190,7 @@ export default function Promocoes() {
       if ((vinculadosAtuais || []).length > 0) {
         throw new Error('Exclusão bloqueada: remova primeiro os militares da turma em rascunho/na promoção.');
       }
-      await base44.entities.Promocao.delete(promocao.id);
+      await excluirEscopado('Promocao', promocao.id);
     },
     onSuccess: () => {
       toast({ title: 'Promoção excluída', description: 'A promoção vazia foi removida da listagem.' });
@@ -256,10 +257,12 @@ export default function Promocoes() {
               Sincronizar graduações atuais
             </Button>
           )}
-          <Button className="h-11 rounded-xl px-5 font-bold bg-[#07172A] hover:bg-[#0F2647]" onClick={() => novaPromocaoMutation.mutate()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Promoção
-          </Button>
+          {isAdmin && (
+            <Button className="h-11 rounded-xl px-5 font-bold bg-[#07172A] hover:bg-[#0F2647]" onClick={() => novaPromocaoMutation.mutate()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Promoção
+            </Button>
+          )}
         </div>
       </div>
 
