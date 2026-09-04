@@ -3,6 +3,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,7 +55,7 @@ export default function TiposMedalha() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.TipoMedalha.create({ ...data, ativa: true }),
+    mutationFn: (data) => criarEscopado('TipoMedalha', { ...data, ativa: true }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-medalha'] });
       setDialogOpen(false);
@@ -63,7 +64,7 @@ export default function TiposMedalha() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.TipoMedalha.delete(id),
+    mutationFn: (id) => excluirEscopado('TipoMedalha', id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-medalha'] });
       setDeleteDialog({ open: false, id: null });
