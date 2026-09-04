@@ -69,6 +69,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TipoMedalha',
   'SubtipoDOEMS',
   'TemplateTexto',
+  'Funcao',
+  'Lotacao',
 ]);
 
 
