@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -329,9 +330,9 @@ export default function AntiguidadeConfigQuadros() {
       };
 
       const idConfiguracao = estadoInicial?.configuracaoAtiva?.id;
-      if (idConfiguracao) return base44.entities.ConfiguracaoAntiguidade.update(idConfiguracao, payloadAtualizacao);
+      if (idConfiguracao) return atualizarEscopado('ConfiguracaoAntiguidade', idConfiguracao, payloadAtualizacao);
 
-      return base44.entities.ConfiguracaoAntiguidade.create({
+      return criarEscopado('ConfiguracaoAntiguidade', {
         nome_configuracao: 'Rascunho de configuração de quadros disponíveis para antiguidade',
         ativo: true,
         versao_regra: VERSAO_REGRA_RASCUNHO,
