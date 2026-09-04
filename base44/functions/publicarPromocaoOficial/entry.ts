@@ -124,6 +124,10 @@ Deno.serve(async (req) => {
   let lockId = '';
   try {
     const authUser = await base44.auth.me();
+    if (!authUser) return Response.json({ success: false, etapa: 'autorizacao', motivo: 'nao_autenticado' }, { status: 401 });
+    if (String(authUser.role || '').trim().toLowerCase() !== 'admin') {
+      return Response.json({ success: false, etapa: 'autorizacao', motivo: 'requer_administrador_plataforma' }, { status: 403 });
+    }
     const input = (globalThis as any)?.input;
     const parsedPayload = await parseBase44Payload(req);
     const payload = parsedPayload ?? input ?? {};
