@@ -435,16 +435,17 @@ export default function PainelPlanoFerias() {
     }
   };
 
-  // Geração de Férias Específica desta Campanha
+  // Geração de férias no nível do Plano; mantém geração legada somente para campanhas sem plano.
   const handleGerarLoteFerias = async () => {
-    if (!campanhaSelecionada) return;
+    const usaPlanoConsolidado = painelConsolidado && Boolean(planoSelecionadoId);
+    if (!campanhaSelecionada && !usaPlanoConsolidado) return;
 
     const totalContemplados = opcoes.filter(
       (o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && !o.gerado_ferias_efetivas
     ).length;
 
     if (totalContemplados === 0) {
-      alert('Não há militares com escala salva prontos para geração de férias nesta campanha.');
+      alert(usaPlanoConsolidado ? 'Não há militares com escala salva prontos para geração de férias neste plano.' : 'Não há militares com escala salva prontos para geração de férias nesta campanha.');
       return;
     }
 
@@ -454,14 +455,20 @@ export default function PainelPlanoFerias() {
 
     setActionLoading(true);
     try {
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_GERAR_LOTE_FERIAS',
-        campanha_id: campanhaSelecionada.id,
-        ano_referencia: Number(campanhaSelecionada.ano_referencia),
-      });
+      const res = await base44.functions.invoke('portal_servicos', usaPlanoConsolidado
+        ? {
+            acao: 'PLANO_INSTITUCIONAL_GERAR_FERIAS',
+            plano_id: planoSelecionadoId,
+            ano_referencia: Number(planos.find((plano) => plano.id === planoSelecionadoId)?.ano_referencia || campanhaSelecionada?.ano_referencia),
+          }
+        : {
+            acao: 'PLANO_GERAR_LOTE_FERIAS',
+            campanha_id: campanhaSelecionada.id,
+            ano_referencia: Number(campanhaSelecionada.ano_referencia),
+          });
 
       setFeedback({ type: 'success', msg: res.data?.message || 'Férias geradas no SGP e campanha encerrada com sucesso!' });
-      await carregarPainel(campanhaSelecionada.id);
+      await recarregarPainelAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha na geração em lote.' });
     } finally {
