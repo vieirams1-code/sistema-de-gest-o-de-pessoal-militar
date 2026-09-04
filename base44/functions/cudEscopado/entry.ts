@@ -1610,7 +1610,9 @@ Deno.serve(async (req) => {
           // 1) Permissão funcional do item
           let requiredPermission = entityName === 'CardOperacional' && subOp === 'update'
             ? 'mover_card'
-            : PERMISSIONS_MAP[entityName]?.[subOp];
+            : entityName === 'PeriodoAquisitivo' && subOp === 'create'
+              ? 'gerar_periodos_aquisitivos'
+              : PERMISSIONS_MAP[entityName]?.[subOp];
           if (entityName === 'Medalha' && subOp === 'update') {
             const statusItem = String(raw?.status || '').trim().toUpperCase();
             requiredPermission = statusItem === 'CANCELADA' && String(raw?.observacoes || '').includes('[RESET]')
