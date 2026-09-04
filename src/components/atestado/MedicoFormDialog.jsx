@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Stethoscope } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,7 +73,7 @@ export default function MedicoFormDialog({ open, onOpenChange, initialSearch = '
         return;
       }
 
-      const created = await base44.entities.Medico.create({
+      const created = await criarEscopado('Medico', {
         ...normalizedForm,
         ativo: true,
       });
