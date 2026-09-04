@@ -65,6 +65,11 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ImpedimentoMedalha',
   'Armamento',
   'SolicitacaoAtualizacao',
+  'TipoPublicacaoCustom',
+  'Medico',
+  'TipoMedalha',
+  'SubtipoDOEMS',
+  'TemplateTexto',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -420,6 +425,24 @@ const PERMISSIONS_MAP = {
     create: 'adicionar_armamentos',
     update: 'editar_armamentos',
     delete: 'excluir_armamentos',
+  },
+  TipoPublicacaoCustom: {
+    create: 'gerir_configuracoes',
+    update: 'gerir_configuracoes',
+    delete: 'gerir_configuracoes',
+  },
+  TipoMedalha: {
+    create: 'editar_medalhas',
+    update: 'editar_medalhas',
+    delete: 'editar_medalhas',
+  },
+  TemplateTexto: {
+    create: 'gerir_templates',
+    update: 'gerir_templates',
+    delete: 'gerir_templates',
+  },
+  Medico: {
+    create: 'adicionar_atestados',
   },
 };
 
@@ -1469,6 +1492,14 @@ Deno.serve(async (req) => {
         // Solicitar correção não altera diretamente a ficha: basta estar autenticado e
         // possuir o militar alvo dentro do próprio escopo organizacional já validado acima.
         // A decisão/aplicação permanece exclusiva do fluxo administrativo portal_servicos.
+      } else if (entityName === 'Medico' && operation !== 'create') {
+        if (!targetIsAdmin) {
+          return Response.json({ error: 'Acesso negado: manutenção do cadastro de médicos é administrativa.', requiredPermission: 'platform_admin' }, { status: 403 });
+        }
+      } else if (entityName === 'SubtipoDOEMS') {
+        if (!targetIsAdmin) {
+          return Response.json({ error: 'Acesso negado: manutenção de subtipos DOEMS é administrativa.', requiredPermission: 'platform_admin' }, { status: 403 });
+        }
       } else if (entityName === 'Medalha' && operation !== 'bulk') {
         let requiredPermission = operation === 'delete' ? 'excluir_medalhas' : 'indicar_medalhas';
         const statusFinal = String(data?.status || registroExistente?.status || '').trim().toUpperCase();
