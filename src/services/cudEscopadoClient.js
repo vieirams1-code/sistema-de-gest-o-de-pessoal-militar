@@ -64,6 +64,11 @@ const ENTIDADES_PERMITIDAS = new Set([
   'ImpedimentoMedalha',
   'Armamento',
   'SolicitacaoAtualizacao',
+  'TipoPublicacaoCustom',
+  'Medico',
+  'TipoMedalha',
+  'SubtipoDOEMS',
+  'TemplateTexto',
 ]);
 
 
