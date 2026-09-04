@@ -265,7 +265,7 @@ function MilitarCard({
   const nomeGuerra = valorOuTraco(militar?.nome_guerra);
   const efeitoCadastro = efeitoCadastroVisualPorRegistro({ registro, militar, promocao });
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
-  const ordemEditavel = canEditarOrdem(registro, { promocaoContext, promocao });
+  const ordemEditavel = isAdmin && canEditarOrdem(registro, { promocaoContext, promocao });
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
@@ -322,7 +322,7 @@ function MilitarCard({
             {rotuloSituacao(registro.status, registro.publicado)}
           </Badge>
           {(() => {
-            const podeRemover = canRemoverDaTurma(registro, { promocao, itens: promocaoContext?.itens || [] });
+            const podeRemover = isAdmin && canRemoverDaTurma(registro, { promocao, itens: promocaoContext?.itens || [] });
             const podeReverter = canReverterPublicacao && canReverterItem(registro, { isAdmin });
             const podeExcluirDefinitivo = canExcluirDefinitivo(registro, { isAdmin });
             if (podeReverter) {
