@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -41,10 +42,13 @@ import {
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import AtestadoActionsMenu from './AtestadoActionsMenu';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
+import { createPageUrl } from '@/utils';
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { buildAtestadoTemplateVarsContrato, getTipoTemplateHomologacaoAtestado } from './atestadoTemplateVars';
+
+const INDEPENDENT_JISO_UI = true;
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -54,6 +58,13 @@ const statusColors = {
 };
 
 export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEdit = true, canDelete = true, embedded = false, defaultExpanded = false }) {
+  const navigate = useNavigate();
+  const abrirCentralJiso = () => {
+    const atestadoId = String(atestado?.id || '').trim();
+    if (!atestadoId) return;
+    navigate(`${createPageUrl('AgendarJISO')}?atestado_id=${encodeURIComponent(atestadoId)}`);
+  };
+
   // GOVERNANÇA TEMPLATE:
   // source_of_truth = render_on_submit
   // edit_mode = hibrido
@@ -716,6 +727,23 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                 {!isFluxoJiso ? (
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
                     Sem necessidade de JISO para este afastamento.
+                  </div>
+                ) : INDEPENDENT_JISO_UI ? (
+                  <div className="rounded-md border border-indigo-200 bg-indigo-50/70 px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-indigo-800">
+                      <Shield className="w-4 h-4" /> JISO gerida na Central JISO
+                    </div>
+                    <p className="mt-1 text-xs text-indigo-700">
+                      Agendamento, convocação por WhatsApp, vínculos e decisão não são mais registrados diretamente no atestado.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-3 h-8 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+                      onClick={abrirCentralJiso}
+                    >
+                      {canManageJiso ? 'Gerar / Vincular JISO' : 'Abrir Central JISO'}
+                    </Button>
                   </div>
                 ) : (
                   <div className={`rounded-md border px-4 py-3 ${jisoDate ? 'border-purple-200 bg-purple-50/70' : 'border-amber-200 bg-amber-50'}`}>
