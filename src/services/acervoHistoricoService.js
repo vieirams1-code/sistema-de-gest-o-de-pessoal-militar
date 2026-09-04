@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { AcervoHistoricoError } from './acervoHistoricoErrors.js';
 
 function extrairStatusErro(error, response) {
@@ -74,7 +75,7 @@ export async function listarHistoricoVersoes(substitui_documento_id) {
  * Exclui logicamente um documento do acervo.
  */
 export async function excluirDocumentoHistorico(id, usuario_email) {
-  return await base44.entities.AcervoFuncionalHistorico.update(id, {
+  return await atualizarEscopado('AcervoFuncionalHistorico', id, {
     ativo: false,
     deleted_at: new Date().toISOString(),
     deleted_by: usuario_email
@@ -85,7 +86,7 @@ export async function excluirDocumentoHistorico(id, usuario_email) {
  * Restaura um documento da lixeira.
  */
 export async function restaurarDocumentoHistorico(id) {
-  return await base44.entities.AcervoFuncionalHistorico.update(id, {
+  return await atualizarEscopado('AcervoFuncionalHistorico', id, {
     ativo: true,
     deleted_at: null,
     deleted_by: null
@@ -96,7 +97,7 @@ export async function restaurarDocumentoHistorico(id) {
  * Arquiva definitivamente um documento (remove da lixeira).
  */
 export async function arquivarDefinitivamenteAcervo(id) {
-  return await base44.entities.AcervoFuncionalHistorico.update(id, {
+  return await atualizarEscopado('AcervoFuncionalHistorico', id, {
     arquivado: true
   });
 }
