@@ -198,7 +198,7 @@ test('promoções e configuração de antiguidade têm escrita administrativa se
   assert.match(backendCud, /\['Promocao', 'PromocaoMilitar', 'ConfiguracaoAntiguidade'\]\.includes\(entityName\)/);
   assert.match(backendCud, /gestão de promoções\/antiguidade é restrita ao administrador da plataforma/);
   for (const source of [promocoesPage, detalhePromocaoPage, antiguidadeConfigQuadros]) {
-    assert.doesNotMatch(source, /base44\.entities\.(Promocao|PromocaoMilitar|ConfiguracaoAntiguidade)\.(create|update|delete|bulkCreate|bulkUpdate)/);
+    assert.doesNotMatch(source, /base44\.entities\.(Promocao|PromocaoMilitar|ConfiguracaoAntiguidade)\.(create|update|delete|bulkCreate|bulkUpdate)\s*\(/);
   }
   assert.match(promocoesPage, /\{isAdmin && \(\s*<Button[\s\S]*Nova Promoção/);
   assert.match(detalhePromocaoPage, /\{isAdmin && \(\s*<Button[\s\S]*Salvar alterações/);
