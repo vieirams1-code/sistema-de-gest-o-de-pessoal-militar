@@ -31,6 +31,15 @@ test('lista principal trata atestados apenas como vínculos da JISO', () => {
   assert.match(source, /Sem atestado/);
 });
 
+test('atestado pode ser vinculado a JISO aberta já existente do mesmo militar', () => {
+  assert.match(source, /getJisosVinculaveis/);
+  assert.match(source, /Vincular atestado a uma JISO existente/);
+  assert.match(source, /origem_vinculo: 'manual'/);
+  assert.match(source, /linkExistingMutation/);
+  assert.match(source, /Vincular à JISO/);
+  assert.match(source, /\['Realizada', 'Cancelada'\]/);
+});
+
 test('central mantém compatibilidade transitória de acesso sem inventar permissão nova', () => {
   assert.match(source, /canAccessModule\('atestados'\)/);
   assert.match(source, /canAccessAction\('gerir_jiso'\)/);
