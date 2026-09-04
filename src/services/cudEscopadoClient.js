@@ -71,6 +71,10 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TemplateTexto',
   'Funcao',
   'Lotacao',
+  'Promocao',
+  'PromocaoMilitar',
+  'ConfiguracaoAntiguidade',
+  'GratificacaoFuncao',
 ]);
 
 
