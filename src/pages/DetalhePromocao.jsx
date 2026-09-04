@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import { POSTOS_GRADUACOES_HIERARQUIA, QUADROS_PROMOCAO_FIXOS } from '@/constants/postosGraduacoes';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -652,7 +653,7 @@ export default function DetalhePromocao() {
       const patchPromocao = montarPatchPromocao(rascunhoPromocao);
       const promocaoAtualizada = { ...promocao, ...patchPromocao };
       diagLog('salvar-promocao-publicada:promocao-update:enviando', { promocaoId: promocao.id, status: promocao.status, patchPromocao });
-      const retornoPromocao = await base44.entities.Promocao.update(promocao.id, patchPromocao);
+      const retornoPromocao = await atualizarEscopado('Promocao', promocao.id, patchPromocao);
       diagLog('salvar-promocao-publicada:promocao-update:retorno', { promocaoId: promocao.id, retornoPromocao });
       diagLog('salvar-promocao-publicada:sincronizacao:chamada', { chamada: true });
       const sincronizacao = await sincronizarHistoricoPromocaoPublicada({
@@ -683,7 +684,7 @@ export default function DetalhePromocao() {
       if ((vinculadosAtuais || []).length > 0) {
         throw new Error('Exclusão bloqueada: remova primeiro os militares da turma em rascunho/na promoção.');
       }
-      await base44.entities.Promocao.delete(promocao.id);
+      await excluirEscopado('Promocao', promocao.id);
     },
     onSuccess: () => {
       toast({ title: 'Promoção excluída', description: 'A promoção vazia foi removida.' });
@@ -775,7 +776,7 @@ export default function DetalhePromocao() {
       if (registro?.historico_promocao_v2_id) {
         throw new Error('Não é possível remover item com histórico oficial/cancelado; mantenha para preservar rastreabilidade.');
       }
-      await base44.entities.PromocaoMilitar.delete(registro.id);
+      await excluirEscopado('PromocaoMilitar', registro.id);
     },
     onSuccess: async () => {
       toast({ title: 'Militar removido', description: 'O militar saiu da lista desta promoção.' });
@@ -873,7 +874,7 @@ export default function DetalhePromocao() {
       if (ehPromocaoPublicada(promocao)) {
         payload.origem = 'inclusao_complementar';
       }
-      await base44.entities.PromocaoMilitar.create(payload);
+      await criarEscopado('PromocaoMilitar', payload);
     },
     onSuccess: async () => {
       toast({ title: 'Militar adicionado', description: 'O militar foi incluído na lista desta promoção.' });
