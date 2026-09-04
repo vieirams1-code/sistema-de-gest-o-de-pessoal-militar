@@ -304,6 +304,41 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string): P
   return necessarias.length > 0 && necessarias.some((key) => permissoes.has(key));
 }
 
+async function usuarioPodeAgirSobreMilitarPortal(base44: any, user: any, militarId: string): Promise<boolean> {
+  if (!user?.email || !militarId) return false;
+  if (String(user.role || '').trim().toLowerCase() === 'admin') return true;
+
+  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true });
+  if ((acessos || []).some((a: any) => normalizarTipoAcesso(a?.tipo_acesso) === 'admin')) return true;
+
+  const militar = await base44.asServiceRole.entities.Militar.get(militarId).catch(() => null);
+  if (!militar) return false;
+
+  for (const acesso of acessos || []) {
+    const tipo = normalizarTipoAcesso(acesso?.tipo_acesso);
+    if (tipo === 'proprio' && String(acesso?.militar_id || '') === String(militarId)) return true;
+
+    const grupamentoId = String(acesso?.grupamento_id || '').trim();
+    const subgrupamentoId = String(acesso?.subgrupamento_id || '').trim();
+    const estruturaId = String(militar?.estrutura_id || '').trim();
+    const militarSubgrupamentoId = String(militar?.subgrupamento_id || '').trim();
+    const militarGrupamentoId = String(militar?.grupamento_id || '').trim();
+    const militarRaizId = String(militar?.grupamento_raiz_id || '').trim();
+
+    if (tipo === 'setor' && grupamentoId && [estruturaId, militarGrupamentoId, militarRaizId].includes(grupamentoId)) return true;
+    if (tipo === 'unidade' && subgrupamentoId && [estruturaId, militarSubgrupamentoId].includes(subgrupamentoId)) return true;
+
+    if (tipo === 'subsetor' && subgrupamentoId) {
+      if ([estruturaId, militarSubgrupamentoId].includes(subgrupamentoId)) return true;
+      const filhos = await base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }).catch(() => []);
+      const idsFilhos = new Set((filhos || []).map((f: any) => String(f?.id || '')).filter(Boolean));
+      if (idsFilhos.has(estruturaId) || idsFilhos.has(militarSubgrupamentoId)) return true;
+    }
+  }
+
+  return false;
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
