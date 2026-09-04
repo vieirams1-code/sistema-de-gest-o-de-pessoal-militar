@@ -1,0 +1,4 @@
+Checkpoint lógico da refatoração JISO independente após conclusão da Fase 1B.
+Data: 2026-09-04
+Branch de trabalho: refactor/jiso-independent-phase1
+Último commit esperado antes do checkpoint: documentação da Fase 1B.

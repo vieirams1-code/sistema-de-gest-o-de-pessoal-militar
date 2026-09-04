@@ -1,0 +1,68 @@
+{
+  "name": "JISOAtestado",
+  "type": "object",
+  "properties": {
+    "jiso_id": {
+      "type": "string"
+    },
+    "atestado_id": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "tipo_vinculo": {
+      "type": "string",
+      "enum": [
+        "Homologação",
+        "Prorrogação",
+        "Cassação",
+        "Reavaliação",
+        "Outro"
+      ],
+      "default": "Homologação"
+    },
+    "origem_vinculo": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "gerado_atestado",
+        "migracao_legado"
+      ],
+      "default": "manual"
+    },
+    "resultado_atestado": {
+      "type": "string"
+    },
+    "dias_homologados": {
+      "type": "number"
+    },
+    "data_termino_resultante": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_retorno_resultante": {
+      "type": "string",
+      "format": "date"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "desvinculado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "desvinculado_por": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "jiso_id",
+    "atestado_id",
+    "militar_id"
+  ]
+}
