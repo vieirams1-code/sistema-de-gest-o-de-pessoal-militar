@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { bulkEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { parseDateOnlyStrict } from '@/services/dateOnlyService';
 import {
@@ -320,7 +321,10 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
       const mensagemOrigemIndividual = getMensagemOrigemDataBase(origemDataBaseIndividual);
 
       if (novosPeriodos.length > 0) {
-        await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeriodos);
+        const resultadoBulk = await bulkEscopado('PeriodoAquisitivo', novosPeriodos.map((periodo) => ({ acao: 'create', ...periodo })));
+        if (resultadoBulk?.sucesso !== novosPeriodos.length) {
+          throw new Error('Nem todos os períodos aquisitivos puderam ser gerados com segurança.');
+        }
         queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
 
         setResult({
