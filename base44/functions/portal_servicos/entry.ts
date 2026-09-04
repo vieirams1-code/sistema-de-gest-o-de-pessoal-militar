@@ -293,8 +293,8 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string): P
   if (String(user.role || '').trim().toLowerCase() === 'admin') return true;
 
   const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true });
-  if ((acessos || []).some((a: any) => normalizarTipoAcesso(a?.tipo_acesso) === 'admin')) return true;
-
+  // tipo_acesso='admin' representa escopo organizacional global, não privilégio funcional absoluto.
+  // Apenas role=admin da plataforma possui bypass; demais usuários precisam das permissões do perfil.
   const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
   const perfis = perfilIds.length
     ? await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true })
