@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,9 +18,12 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 export default function CadastrarArmamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasArmamentosAccess = canAccessModule('armamentos');
+  const podeAdicionarArmamento = canAccessAction('adicionar_armamentos');
+  const podeEditarArmamento = canAccessAction('editar_armamentos');
+  const podeSalvarArmamento = armamentoId ? podeEditarArmamento : podeAdicionarArmamento;
 
   const [searchParams] = useSearchParams();
   const armamentoId = searchParams.get('id');
@@ -75,10 +79,13 @@ export default function CadastrarArmamento() {
     setLoading(true);
 
     try {
+      if (!podeSalvarArmamento) {
+        throw new Error(armamentoId ? 'Sem permissão para editar armamentos.' : 'Sem permissão para adicionar armamentos.');
+      }
       if (armamentoId) {
-        await base44.entities.Armamento.update(armamentoId, formData);
+        await atualizarEscopado('Armamento', armamentoId, formData);
       } else {
-        await base44.entities.Armamento.create(formData);
+        await criarEscopado('Armamento', formData);
       }
       queryClient.invalidateQueries({ queryKey: ['armamentos'] });
       navigate(createPageUrl('Armamentos'));
@@ -93,6 +100,7 @@ export default function CadastrarArmamento() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasArmamentosAccess) return <AccessDenied modulo="Armamentos" />;
+  if (!podeSalvarArmamento) return <AccessDenied modulo={armamentoId ? 'Edição de Armamentos' : 'Cadastro de Armamentos'} />;
 
   if (loadingArmamento) {
     return (
@@ -115,7 +123,7 @@ export default function CadastrarArmamento() {
               <p className="text-slate-500 text-sm">{armamentoId ? 'Editar registro de armamento' : 'Registrar novo armamento'}</p>
             </div>
           </div>
-          <Button onClick={handleSubmit} disabled={loading || !formData.militar_id || !formData.tipo || !formData.numero_serie} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+          <Button onClick={handleSubmit} disabled={loading || !podeSalvarArmamento || !formData.militar_id || !formData.tipo || !formData.numero_serie} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
             {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
             Salvar
           </Button>
