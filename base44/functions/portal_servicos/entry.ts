@@ -951,6 +951,14 @@ Deno.serve(async (req: Request) => {
             });
           }
 
+          const dentroEscopo = await usuarioPodeAgirSobreMilitarPortal(base44, user, String(sol.militar_id || ''));
+          if (!dentroEscopo) {
+            return new Response(JSON.stringify({ error: 'Acesso negado: militar fora do escopo organizacional do gestor.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+
           const statusDecisao = decisao === 'Aprovada' ? 'Aprovada' : 'Rejeitada';
           const foiEditado = Boolean(valor_corrigido !== undefined && valor_corrigido !== null && valor_corrigido !== sol.valor_proposto);
           const valorFinal = foiEditado ? valor_corrigido : sol.valor_proposto;
@@ -1042,6 +1050,14 @@ Deno.serve(async (req: Request) => {
           if (!militar_id || !decisao) {
             return new Response(JSON.stringify({ error: 'ID do militar e decisão são obrigatórios.' }), {
               status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const dentroEscopo = await usuarioPodeAgirSobreMilitarPortal(base44, user, String(militar_id));
+          if (!dentroEscopo) {
+            return new Response(JSON.stringify({ error: 'Acesso negado: militar fora do escopo organizacional do gestor.' }), {
+              status: 403,
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
