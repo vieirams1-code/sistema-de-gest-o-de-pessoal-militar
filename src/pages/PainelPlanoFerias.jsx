@@ -572,6 +572,10 @@ export default function PainelPlanoFerias() {
   const totalNaoContemplados = opcoes.filter((o) => o.status_camada_1 === 'Nao_Contemplado' || o.decisao_camada_1_opcao === 'NAO_CONTEMPLADO').length;
   const totalGeradas = opcoes.filter((o) => o.gerado_ferias_efetivas).length;
 
+  const planoAtual = planos.find((plano) => plano.id === planoSelecionadoId);
+  const tituloPainel = painelConsolidado
+    ? (planoAtual?.titulo || 'Plano de Férias')
+    : (campanhaSelecionada?.titulo || 'Gestão de Férias');
   const isCampanhaEncerradaOuDesativada = campanhaSelecionada && (campanhaSelecionada.status === 'Encerrada' || campanhaSelecionada.status === 'Desativada' || campanhaSelecionada.status === 'Arquivada');
 
   // Filtragem dos Militares
@@ -637,11 +641,11 @@ export default function PainelPlanoFerias() {
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900">
-                {campanhaSelecionada ? campanhaSelecionada.titulo : 'Gestão de Férias'}
+                {tituloPainel}
               </h1>
               {campanhaSelecionada && (
                 <span className="bg-green-100 text-green-700 text-xs px-2.5 py-0.5 rounded-full border border-green-200 uppercase font-bold tracking-wide">
-                  {campanhaSelecionada.status === 'Aberta_Coleta' ? 'Coleta Aberta' : campanhaSelecionada.status}
+                  {painelConsolidado ? 'Visão consolidada do Plano' : (campanhaSelecionada.status === 'Aberta_Coleta' ? 'Coleta Aberta' : campanhaSelecionada.status)}
                 </span>
               )}
             </div>
@@ -659,6 +663,11 @@ export default function PainelPlanoFerias() {
                 ))}
               </select>
             </div>
+            {painelConsolidado && (
+              <p className="text-[11px] text-blue-700 font-semibold mt-1">
+                {campanhasDoPlano.length} campanha(s) vinculada(s) • respostas consolidadas em uma linha por militar/período
+              </p>
+            )}
 
             {/* SELETOR DE CAMPANHA DENTRO DO PLANO */}
             {campanhasDoPlano.length > 0 && (
@@ -712,7 +721,7 @@ export default function PainelPlanoFerias() {
               <i className="ph ph-lightning text-base"></i>
               <span>
                 {totalGeradas > 0 && totalGeradas === totalSalvos
-                  ? 'Férias Desta Campanha Já Geradas'
+                  ? (painelConsolidado ? 'Férias deste Plano já geradas' : 'Férias desta Campanha já geradas')
                   : `Gerar Férias no Sistema SGP (${totalSalvos})`}
               </span>
             </button>
@@ -747,7 +756,7 @@ export default function PainelPlanoFerias() {
               (totalEfetivoGeral > 0 ? totalEfetivoGeral : Math.max(opcoes.length, 100))
             }
             solicitacoes={opcoes}
-            titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${campanhaSelecionada.titulo}`}
+            titulo={`Distribuição Mensal & Teto de Pagamento (10%) • ${tituloPainel}`}
           />
         )}
 
@@ -834,7 +843,7 @@ export default function PainelPlanoFerias() {
           {opcoesFiltradas.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-xs">
               <i className="ph ph-users text-4xl text-slate-300 mb-2 block"></i>
-              Nenhum militar encontrado para os filtros selecionados nesta campanha.
+              Nenhum militar encontrado para os filtros selecionados neste contexto.
             </div>
           ) : (
             opcoesFiltradas.map((op) => {
@@ -865,6 +874,11 @@ export default function PainelPlanoFerias() {
                       <p className="text-xs text-slate-500 truncate">
                         Mat: {op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}
                       </p>
+                      {painelConsolidado && Number(op.quantidade_respostas_campanhas || 0) > 1 && (
+                        <p className="text-[10px] text-blue-700 font-semibold truncate">
+                          Consolidado de {op.quantidade_respostas_campanhas} campanhas vinculadas
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1107,7 +1121,7 @@ export default function PainelPlanoFerias() {
                       <div className="flex items-center justify-between">
                         <span className="font-extrabold text-rose-950 text-xs flex items-center">
                           <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
-                          Militar Não Contemplado nesta Campanha
+                          {painelConsolidado ? 'Militar Não Contemplado neste Plano' : 'Militar Não Contemplado nesta Campanha'}
                         </span>
                         <Button
                           type="button"
@@ -1121,7 +1135,7 @@ export default function PainelPlanoFerias() {
                         </Button>
                       </div>
                       <p className="text-rose-800 text-[11px]">
-                        {op.justificativa_ajuste_gestor || 'Nenhuma fração será gerada para este militar nesta campanha.'}
+                        {op.justificativa_ajuste_gestor || (painelConsolidado ? 'Nenhuma fração será gerada para este militar neste plano.' : 'Nenhuma fração será gerada para este militar nesta campanha.')}
                       </p>
                     </div>
                   ) : isSalvo && !isEditing ? (
@@ -1280,7 +1294,7 @@ export default function PainelPlanoFerias() {
                   Militar: <strong>{modalNaoContemplado.opcao?.militar_posto} {modalNaoContemplado.opcao?.militar_nome}</strong>
                 </p>
                 <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
-                  O militar não terá frações de férias geradas nesta campanha. Você poderá alterar essa decisão a qualquer momento antes da geração final.
+                  O militar não terá frações de férias geradas {painelConsolidado ? 'neste plano' : 'nesta campanha'}. Você poderá alterar essa decisão a qualquer momento antes da geração final.
                 </div>
 
                 <div>
