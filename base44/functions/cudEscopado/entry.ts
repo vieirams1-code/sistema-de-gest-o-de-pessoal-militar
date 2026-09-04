@@ -72,6 +72,10 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TemplateTexto',
   'Funcao',
   'Lotacao',
+  'Promocao',
+  'PromocaoMilitar',
+  'ConfiguracaoAntiguidade',
+  'GratificacaoFuncao',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -223,6 +227,8 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'TemplateTexto',
   'Funcao',
   'Lotacao',
+  'Promocao',
+  'ConfiguracaoAntiguidade',
 ]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
@@ -458,6 +464,9 @@ const PERMISSIONS_MAP = {
   },
   Lotacao: {
     create: 'gerir_estrutura_organizacional',
+  },
+  GratificacaoFuncao: {
+    delete: 'gerir_gratificacoes_funcao',
   },
 };
 
@@ -1507,6 +1516,10 @@ Deno.serve(async (req) => {
         // Solicitar correção não altera diretamente a ficha: basta estar autenticado e
         // possuir o militar alvo dentro do próprio escopo organizacional já validado acima.
         // A decisão/aplicação permanece exclusiva do fluxo administrativo portal_servicos.
+      } else if (['Promocao', 'PromocaoMilitar', 'ConfiguracaoAntiguidade'].includes(entityName)) {
+        if (!targetIsAdmin) {
+          return Response.json({ error: 'Acesso negado: gestão de promoções/antiguidade é restrita ao administrador da plataforma.', requiredPermission: 'platform_admin' }, { status: 403 });
+        }
       } else if (entityName === 'Medico' && operation !== 'create') {
         if (!targetIsAdmin) {
           return Response.json({ error: 'Acesso negado: manutenção do cadastro de médicos é administrativa.', requiredPermission: 'platform_admin' }, { status: 403 });
