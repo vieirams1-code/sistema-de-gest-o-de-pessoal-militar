@@ -70,6 +70,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TipoMedalha',
   'SubtipoDOEMS',
   'TemplateTexto',
+  'Funcao',
+  'Lotacao',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -219,6 +221,8 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'TipoMedalha',
   'SubtipoDOEMS',
   'TemplateTexto',
+  'Funcao',
+  'Lotacao',
 ]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
@@ -448,6 +452,12 @@ const PERMISSIONS_MAP = {
   },
   Medico: {
     create: 'adicionar_atestados',
+  },
+  Funcao: {
+    create: 'gerir_adicoes_personalizacoes',
+  },
+  Lotacao: {
+    create: 'gerir_estrutura_organizacional',
   },
 };
 
