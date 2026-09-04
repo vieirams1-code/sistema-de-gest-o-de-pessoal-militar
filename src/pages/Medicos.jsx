@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit3, Loader2, Plus, Search, Stethoscope } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -169,7 +170,7 @@ export default function Medicos() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: ({ id, data }) => (id ? base44.entities.Medico.update(id, data) : base44.entities.Medico.create(data)),
+    mutationFn: ({ id, data }) => (id ? atualizarEscopado('Medico', id, data) : criarEscopado('Medico', data)),
     onSuccess: (_, variables) => {
       refreshMedicos();
       setDialogOpen(false);
@@ -180,7 +181,7 @@ export default function Medicos() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: (medico) => base44.entities.Medico.update(medico.id, { ativo: medico.ativo === false }),
+    mutationFn: (medico) => atualizarEscopado('Medico', medico.id, { ativo: medico.ativo === false }),
     onSuccess: (_, medico) => {
       refreshMedicos();
       setStatusTarget(null);
