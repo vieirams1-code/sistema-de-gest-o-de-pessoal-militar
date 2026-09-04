@@ -214,6 +214,11 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'RepositorioDocumental',
   'QuadroOperacional',
   'ColunaOperacional',
+  'TipoPublicacaoCustom',
+  'Medico',
+  'TipoMedalha',
+  'SubtipoDOEMS',
+  'TemplateTexto',
 ]);
 const DUPLICATE_ACCESS_MESSAGE = 'Já existe acesso cadastrado para este e-mail. Edite o registro existente.';
 
