@@ -63,6 +63,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'Militar',
   'Medalha',
   'ImpedimentoMedalha',
+  'Armamento',
+  'SolicitacaoAtualizacao',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
@@ -413,6 +415,11 @@ const PERMISSIONS_MAP = {
     create: 'gerir_impedimentos_medalha',
     update: 'gerir_impedimentos_medalha',
     delete: 'gerir_impedimentos_medalha',
+  },
+  Armamento: {
+    create: 'adicionar_armamentos',
+    update: 'editar_armamentos',
+    delete: 'excluir_armamentos',
   },
 };
 
@@ -1458,6 +1465,10 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
+      } else if (entityName === 'SolicitacaoAtualizacao' && operation === 'create') {
+        // Solicitar correção não altera diretamente a ficha: basta estar autenticado e
+        // possuir o militar alvo dentro do próprio escopo organizacional já validado acima.
+        // A decisão/aplicação permanece exclusiva do fluxo administrativo portal_servicos.
       } else if (entityName === 'Medalha' && operation !== 'bulk') {
         let requiredPermission = operation === 'delete' ? 'excluir_medalhas' : 'indicar_medalhas';
         const statusFinal = String(data?.status || registroExistente?.status || '').trim().toUpperCase();
