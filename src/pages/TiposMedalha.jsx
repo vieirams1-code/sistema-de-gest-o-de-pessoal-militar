@@ -33,8 +33,9 @@ import {
 
 export default function TiposMedalha() {
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
+  const podeEditarTiposMedalha = canAccessAction('editar_medalhas');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
@@ -51,7 +52,7 @@ export default function TiposMedalha() {
   useQuery({
     queryKey: ['tipos-medalha-fixos-sync'],
     queryFn: () => garantirCatalogoFixoMedalhaTempo(base44),
-    enabled: isAccessResolved && hasMedalhasAccess,
+    enabled: isAccessResolved && hasMedalhasAccess && podeEditarTiposMedalha,
   });
 
   const createMutation = useMutation({
@@ -73,6 +74,7 @@ export default function TiposMedalha() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+  if (!podeEditarTiposMedalha) return <AccessDenied modulo="Configuração de Tipos de Medalha" />;
 
   const codigosFixos = new Set(TIPOS_FIXOS_MEDALHA_TEMPO.map((item) => item.codigo));
 
