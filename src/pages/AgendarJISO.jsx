@@ -112,11 +112,13 @@ export default function AgendarJISO() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [dialogNovaOpen, setDialogNovaOpen] = useState(false);
+  const [dialogVincularOpen, setDialogVincularOpen] = useState(false);
   const [dialogDetalheOpen, setDialogDetalheOpen] = useState(false);
   const [dialogWhatsAppOpen, setDialogWhatsAppOpen] = useState(false);
   const [dialogDecisionOpen, setDialogDecisionOpen] = useState(false);
   const [jisoSelecionada, setJisoSelecionada] = useState(null);
   const [atestadoParaVincular, setAtestadoParaVincular] = useState(null);
+  const [jisoParaVincularId, setJisoParaVincularId] = useState('');
   const [formData, setFormData] = useState(FORM_INICIAL);
   const [formError, setFormError] = useState('');
 
@@ -212,6 +214,29 @@ export default function AgendarJISO() {
     ))
   ), [bundle.militares]);
 
+  const linkExistingMutation = useMutation({
+    mutationFn: async ({ jiso, atestado }) => {
+      await vincularAtestadoJiso({
+        jiso_id: jiso.id,
+        atestado_id: atestado.id,
+        militar_id: atestado.militar_id,
+        tipo_vinculo: 'Homologação',
+        origem_vinculo: 'manual',
+      });
+      return jiso;
+    },
+    onSuccess: async (jiso) => {
+      await queryClient.invalidateQueries({ queryKey: ['jiso-independent-bundle'] });
+      setDialogVincularOpen(false);
+      setJisoParaVincularId('');
+      setAtestadoParaVincular(null);
+      setFormError('');
+      setJisoSelecionada(jiso);
+      setDialogDetalheOpen(true);
+    },
+    onError: (error) => setFormError(error?.message || 'Não foi possível vincular o atestado à JISO.'),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ dados, atestado }) => {
       const createdResponse = await criarJiso(dados);
@@ -245,7 +270,9 @@ export default function AgendarJISO() {
     setDialogNovaOpen(true);
   };
 
-  const abrirNovaJisoDoAtestado = (atestado) => {
+  const abrirCriacaoJisoDoAtestado = (atestado) => {
+    setDialogVincularOpen(false);
+    setJisoParaVincularId('');
     setAtestadoParaVincular(atestado);
     setFormData({
       ...FORM_INICIAL,
@@ -255,6 +282,38 @@ export default function AgendarJISO() {
     });
     setFormError('');
     setDialogNovaOpen(true);
+  };
+
+  const getJisosVinculaveis = (atestado) => (
+    (bundle.jisos || [])
+      .filter((jiso) => String(jiso?.militar_id || '') === String(atestado?.militar_id || ''))
+      .filter((jiso) => !['Realizada', 'Cancelada'].includes(getStatusVisual(jiso)))
+      .sort((a, b) => String(a.data_jiso || '9999-99-99').localeCompare(String(b.data_jiso || '9999-99-99')))
+  );
+
+  const abrirNovaJisoDoAtestado = (atestado) => {
+    const candidatas = getJisosVinculaveis(atestado);
+    if (candidatas.length > 0) {
+      setAtestadoParaVincular(atestado);
+      setJisoParaVincularId(String(candidatas[0].id));
+      setFormError('');
+      setDialogVincularOpen(true);
+      return;
+    }
+    abrirCriacaoJisoDoAtestado(atestado);
+  };
+
+  const vincularJisoExistente = () => {
+    if (!atestadoParaVincular?.id || !jisoParaVincularId) {
+      setFormError('Selecione a JISO que receberá o atestado.');
+      return;
+    }
+    const jiso = (bundle.jisos || []).find((item) => String(item?.id || '') === String(jisoParaVincularId));
+    if (!jiso) {
+      setFormError('A JISO selecionada não está mais disponível. Atualize a página e tente novamente.');
+      return;
+    }
+    linkExistingMutation.mutate({ jiso, atestado: atestadoParaVincular });
   };
 
   const salvarNovaJiso = () => {
@@ -305,15 +364,27 @@ export default function AgendarJISO() {
       setJisoSelecionada(jisoExistente);
       setDialogDetalheOpen(true);
     } else if (canGerirJiso) {
-      setAtestadoParaVincular(atestado);
-      setFormData({
-        ...FORM_INICIAL,
-        militar_id: String(atestado.militar_id || ''),
-        finalidade_jiso: 'Homologação de Atestado',
-        motivo_jiso: `Homologação do atestado iniciado em ${formatDateBR(atestado.data_inicio)}`,
-      });
-      setFormError('');
-      setDialogNovaOpen(true);
+      const candidatas = (bundle.jisos || [])
+        .filter((jiso) => String(jiso?.militar_id || '') === String(atestado?.militar_id || ''))
+        .filter((jiso) => !['Realizada', 'Cancelada'].includes(getStatusVisual(jiso)))
+        .sort((a, b) => String(a.data_jiso || '9999-99-99').localeCompare(String(b.data_jiso || '9999-99-99')));
+
+      if (candidatas.length > 0) {
+        setAtestadoParaVincular(atestado);
+        setJisoParaVincularId(String(candidatas[0].id));
+        setFormError('');
+        setDialogVincularOpen(true);
+      } else {
+        setAtestadoParaVincular(atestado);
+        setFormData({
+          ...FORM_INICIAL,
+          militar_id: String(atestado.militar_id || ''),
+          finalidade_jiso: 'Homologação de Atestado',
+          motivo_jiso: `Homologação do atestado iniciado em ${formatDateBR(atestado.data_inicio)}`,
+        });
+        setFormError('');
+        setDialogNovaOpen(true);
+      }
     }
 
     setSearchParams({}, { replace: true });
@@ -403,7 +474,7 @@ export default function AgendarJISO() {
                       </p>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => abrirNovaJisoDoAtestado(atestado)}>
-                      <Link2 className="w-4 h-4 mr-2" /> Gerar JISO
+                      <Link2 className="w-4 h-4 mr-2" /> Gerar / Vincular JISO
                     </Button>
                   </div>
                 );
@@ -470,6 +541,61 @@ export default function AgendarJISO() {
           )}
         </section>
       </div>
+
+      <Dialog open={dialogVincularOpen} onOpenChange={setDialogVincularOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Vincular atestado a uma JISO existente</DialogTitle>
+            <DialogDescription>
+              Já existe JISO aberta para este militar. Vincule o atestado à mesma sessão ou crie uma nova JISO.
+            </DialogDescription>
+          </DialogHeader>
+
+          {atestadoParaVincular && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm">
+                <p className="font-medium text-slate-900">Atestado de {formatDateBR(atestadoParaVincular.data_inicio)}</p>
+                <p className="text-slate-500">{atestadoParaVincular.dias || '—'} dias · {atestadoParaVincular.tipo_afastamento || 'Afastamento'}</p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>JISO aberta *</Label>
+                <Select value={jisoParaVincularId} onValueChange={setJisoParaVincularId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a JISO" /></SelectTrigger>
+                  <SelectContent>
+                    {getJisosVinculaveis(atestadoParaVincular).map((jiso) => (
+                      <SelectItem key={jiso.id} value={String(jiso.id)}>
+                        {formatDateBR(jiso.data_jiso)} · {jiso.hora_jiso || 'sem horário'} · {jiso.finalidade_jiso || 'JISO'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formError && (
+                <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700">{formError}</div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => abrirCriacaoJisoDoAtestado(atestadoParaVincular)}
+              disabled={linkExistingMutation.isPending}
+            >
+              Criar nova JISO
+            </Button>
+            <Button
+              onClick={vincularJisoExistente}
+              disabled={linkExistingMutation.isPending || !jisoParaVincularId}
+              className="bg-[#1e3a5f] hover:bg-[#294c75]"
+            >
+              {linkExistingMutation.isPending ? 'Vinculando...' : 'Vincular à JISO'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogNovaOpen} onOpenChange={setDialogNovaOpen}>
         <DialogContent className="sm:max-w-2xl">
