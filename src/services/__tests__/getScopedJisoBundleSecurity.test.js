@@ -19,8 +19,10 @@ test('bundle deriva escopo diretamente dos militares permitidos', () => {
 });
 
 test('bundle inclui JISO sem depender de atestado_id', () => {
-  assert.match(backend, /const jisos = allJisos\.filter/);
-  assert.doesNotMatch(backend, /const jisos = allJisos\.filter\([\s\S]*atestado_id/);
+  const jisoFilterLine = backend.split('\n').find((line) => line.includes('const jisos = allJisos.filter'));
+  assert.ok(jisoFilterLine);
+  assert.match(jisoFilterLine, /militar_id/);
+  assert.doesNotMatch(jisoFilterLine, /atestado_id/);
 });
 
 test('bundle projeta atestado sem CID ou dados médicos sensíveis', () => {
