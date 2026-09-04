@@ -22,6 +22,11 @@ async function parsePayload(req: any) {
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
+    const authUser = await base44.auth.me();
+    if (!authUser) return Response.json({ success: false, etapa: 'autorizacao', motivo: 'nao_autenticado' }, { status: 401 });
+    if (String(authUser.role || '').trim().toLowerCase() !== 'admin') {
+      return Response.json({ success: false, etapa: 'autorizacao', motivo: 'requer_administrador_plataforma' }, { status: 403 });
+    }
     const payload = await parsePayload(req);
     const promocaoMilitarId = texto(payload?.promocaoMilitarId);
     const motivo = texto(payload?.motivo);
