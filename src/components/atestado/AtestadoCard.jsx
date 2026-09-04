@@ -848,7 +848,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
                     publicacoesVinculadas={publicacoesVinculadas}
                   />
                 </div>
-                {isFluxoJiso && canRegisterJisoDecision && (
+                {isFluxoJiso && INDEPENDENT_JISO_UI && (canManageJiso || canRegisterJisoDecision) && (
+                  <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={abrirCentralJiso}>
+                    {canManageJiso ? 'Gerar / Vincular JISO' : 'Abrir Central JISO'}
+                  </Button>
+                )}
+                {isFluxoJiso && !INDEPENDENT_JISO_UI && canRegisterJisoDecision && (
                   <Button type="button" className="w-full bg-purple-600 hover:bg-purple-700 text-white" onClick={() => setShowJisoModal(true)}>
                     Registrar Decisão Final
                   </Button>
@@ -883,7 +888,21 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             </div>
           </div>
 
-          {isFluxoJiso && !embedded && (
+          {isFluxoJiso && !embedded && INDEPENDENT_JISO_UI && (
+            <div className={`${expanded ? 'flex' : 'hidden'} mt-2.5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-2.5 items-center justify-between gap-3`}>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-800">
+                  <Shield className="w-3.5 h-3.5" /> JISO gerida separadamente do atestado
+                </div>
+                <p className="mt-0.5 text-[10px] text-indigo-700">Use a Central JISO para agendamento, WhatsApp, vínculos e decisão.</p>
+              </div>
+              <Button type="button" size="sm" className="h-7 px-2.5 text-[11px] shrink-0 bg-[#1e3a5f]" onClick={abrirCentralJiso}>
+                {canManageJiso ? 'Gerar / Vincular JISO' : 'Abrir JISO'}
+              </Button>
+            </div>
+          )}
+
+          {isFluxoJiso && !embedded && !INDEPENDENT_JISO_UI && (
             <div className={`${expanded ? 'block' : 'hidden'} mt-2.5 rounded-lg border px-3 py-2.5 ${jisoDate ? 'border-purple-100 bg-purple-50/60' : 'border-amber-200 bg-amber-50'}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -946,12 +965,17 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
             Ver detalhes
           </button>
           <div className="flex items-center gap-2">
-            {isFluxoJiso && (
+            {isFluxoJiso && INDEPENDENT_JISO_UI && (
+              <button type="button" onClick={abrirCentralJiso} className="text-[11px] font-medium text-indigo-700 hover:text-indigo-900">
+                Abrir Central JISO
+              </button>
+            )}
+            {isFluxoJiso && !INDEPENDENT_JISO_UI && (
               <button type="button" onClick={() => setShowJisoModal(true)} className="text-[11px] text-slate-500 hover:text-purple-700">
                 Histórico JISO
               </button>
             )}
-            {jisoDate && canManageJiso && !editingJiso && (
+            {jisoDate && canManageJiso && !editingJiso && !INDEPENDENT_JISO_UI && (
               <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px] text-green-700" onClick={abrirPreviaWhatsAppJiso} disabled={sendingWhatsApp}>
                 <MessageCircle className="w-3 h-3 mr-1" /> WhatsApp
               </Button>
