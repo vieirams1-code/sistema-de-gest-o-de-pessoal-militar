@@ -1,4 +1,5 @@
 import { base44 } from '../api/base44Client.js';
+import { bulkEscopado } from './cudEscopadoClient.js';
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 import { deveAtualizarCadastroMilitarPorPromocao } from '../utils/promocao/deveAtualizarCadastroMilitarPorPromocao.js';
@@ -1480,15 +1481,11 @@ export function simularImpactoCadeiaPromocoes({
 
 export async function bulkUpdatePromocaoMilitar(payloads = []) {
   if (!Array.isArray(payloads) || payloads.length === 0) return { atualizados: 0 };
-  const entity = base44.entities.PromocaoMilitar;
-  if (!entity) throw new Error('Entidade PromocaoMilitar indisponível para atualização em lote.');
-
-  if (typeof entity.bulkUpdate === 'function') {
-    await entity.bulkUpdate(payloads);
-  } else {
-    await Promise.all(payloads.map(({ id, ...rest }) => entity.update(id, rest)));
+  const itens = payloads.map(({ id, ...rest }) => ({ acao: 'update', id, ...rest }));
+  const resultado = await bulkEscopado('PromocaoMilitar', itens);
+  if (resultado?.sucesso !== itens.length) {
+    throw new Error('Nem todas as alterações da turma de promoção puderam ser gravadas com segurança.');
   }
-
   return { atualizados: payloads.length };
 }
 
