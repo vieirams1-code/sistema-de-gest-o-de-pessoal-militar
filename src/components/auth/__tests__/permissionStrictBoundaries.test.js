@@ -30,6 +30,11 @@ const apuracaoMedalhas = read('../../../pages/ApuracaoMedalhasTempoServico.jsx')
 const verMilitarPage = read('../../../pages/VerMilitar.jsx');
 const antiguidadeImportar = read('../../../pages/AntiguidadeImportarPromocoes.jsx');
 const carreiraAntiguidade = read('../../antiguidade/CarreiraAntiguidadePanel.jsx');
+const cadastroArmamento = read('../../../pages/CadastrarArmamento.jsx');
+const solicitarAtualizacao = read('../../militar/SolicitarAtualizacaoModal.jsx');
+const solicitacoesAtualizacao = read('../../../pages/SolicitacoesAtualizacao.jsx');
+const configuracoesPortal = read('../../../pages/ConfiguracoesPortal.jsx');
+const portalServicos = read('../../../../base44/functions/portal_servicos/entry.ts');
 
 test('criação de publicação depende somente de adicionar_publicacoes', () => {
   assert.match(publicacoes, /const canCriarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
@@ -121,6 +126,28 @@ test('histórico de promoções possui escrita administrativa server-side', () =
   for (const source of [antiguidadeImportar, carreiraAntiguidade]) {
     assert.doesNotMatch(source, /base44\.entities\.HistoricoPromocaoMilitarV2\.(create|update|delete)/);
   }
+});
+
+test('armamentos exigem permissões específicas e escrita escopada', () => {
+  assert.match(cadastroArmamento, /canAccessAction\('adicionar_armamentos'\)/);
+  assert.match(cadastroArmamento, /canAccessAction\('editar_armamentos'\)/);
+  assert.match(backendCud, /Armamento:\s*\{\s*create: 'adicionar_armamentos',\s*update: 'editar_armamentos',\s*delete: 'excluir_armamentos'/s);
+  assert.doesNotMatch(cadastroArmamento, /base44\.entities\.Armamento\.(create|update|delete)/);
+});
+
+test('solicitações cadastrais não possuem fallback de escrita direta no frontend', () => {
+  assert.doesNotMatch(solicitarAtualizacao, /base44\.entities\.SolicitacaoAtualizacao\.create/);
+  assert.doesNotMatch(solicitacoesAtualizacao, /base44\.entities\.(SolicitacaoAtualizacao|Militar)\.(create|update|delete)/);
+  assert.doesNotMatch(configuracoesPortal, /base44\.entities\.(SolicitacaoAtualizacao|Militar|PortalAuthConfig)\.(create|update|delete)/);
+  assert.match(solicitacoesAtualizacao, /O backend não confirmou a decisão da solicitação/);
+  assert.match(configuracoesPortal, /O backend não confirmou a gravação das configurações do Portal/);
+});
+
+test('portal_servicos separa escopo global de privilégio e valida escopo nas decisões cadastrais', () => {
+  assert.doesNotMatch(portalServicos, /normalizarTipoAcesso\(a\?\.tipo_acesso\) === 'admin'\)\) return true;\s*\n\s*const perfilIds/);
+  assert.match(portalServicos, /Apenas role=admin da plataforma possui bypass/);
+  assert.match(portalServicos, /usuarioPodeAgirSobreMilitarPortal\(base44, user, String\(sol\.militar_id \|\| ''\)\)/);
+  assert.match(portalServicos, /usuarioPodeAgirSobreMilitarPortal\(base44, user, String\(militar_id\)\)/);
 });
 
 test('ações JISO independentes conseguem persistir apenas seus próprios reflexos', () => {
