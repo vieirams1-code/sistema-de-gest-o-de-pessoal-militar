@@ -21,7 +21,6 @@ import {
   Link2,
   FileSignature,
   Layers,
-  FileSpreadsheet,
   X,
   Play,
 } from 'lucide-react';
