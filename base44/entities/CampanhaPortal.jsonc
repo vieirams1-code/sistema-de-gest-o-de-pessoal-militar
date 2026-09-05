@@ -17,15 +17,15 @@
     },
     "titulo": {
       "type": "string",
-      "description": "T\u00edtulo da campanha (ex: Plano Anual de F\u00e9rias 2027)"
+      "description": "T\u00edtulo da campanha"
     },
     "ano_referencia": {
       "type": "number",
-      "description": "Ano de refer\u00eancia (ex: 2027)"
+      "description": "Ano de refer\u00eancia"
     },
     "plano_ferias_institucional_id": {
       "type": "string",
-      "description": "Plano de F\u00e9rias Institucional ao qual esta campanha de coleta pertence"
+      "description": "Plano de F\u00e9rias Institucional ao qual esta campanha pertence"
     },
     "status": {
       "type": "string",
@@ -40,24 +40,20 @@
     },
     "config_formulario": {
       "type": "string",
-      "description": "JSON com a defini\u00e7\u00e3o dos campos e perguntas do formul\u00e1rio din\u00e2mico"
+      "description": "JSON com a defini\u00e7\u00e3o do formul\u00e1rio"
     },
     "arquivo_modelo_url": {
-      "type": "string",
-      "description": "URL do arquivo modelo disponibilizado pelo gestor para download"
+      "type": "string"
     },
     "arquivo_modelo_nome": {
-      "type": "string",
-      "description": "Nome original do arquivo modelo disponibilizado"
+      "type": "string"
     },
     "exigir_devolucao_arquivo": {
       "type": "boolean",
-      "default": false,
-      "description": "Se o militar \u00e9 obrigado a enviar um arquivo assinado/comprovante"
+      "default": false
     },
     "texto_termo_aceite": {
-      "type": "string",
-      "description": "Texto do termo de declara\u00e7\u00e3o/ci\u00eancia a ser marcado pelo militar"
+      "type": "string"
     },
     "tipo_escopo": {
       "type": "string",
@@ -67,26 +63,49 @@
         "SELECAO_MILITARES",
         "QUADROS"
       ],
-      "default": "TODOS",
-      "description": "Forma de sele\u00e7\u00e3o do p\u00fablico-alvo"
+      "default": "TODOS"
     },
     "escopo_unidades_ids": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Lista de IDs das unidades/lota\u00e7\u00f5es inclu\u00eddas"
+      "description": "IDs das lota\u00e7\u00f5es inclu\u00eddas"
     },
     "escopo_unidades_nomes": {
-      "type": "string",
-      "description": "Nomes das unidades para exibi\u00e7\u00e3o resumida"
+      "type": "string"
     },
     "escopo_militares_ids": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Lista de IDs de militares espec\u00edficos inclu\u00eddos"
+      "description": "IDs de militares inclu\u00eddos"
+    },
+    "escopo_militares_excluidos_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de militares exclu\u00eddos explicitamente"
+    },
+    "escopo_grupos_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de grupos reutiliz\u00e1veis inclu\u00eddos; combinam com o escopo base"
+    },
+    "escopo_grupos_nomes": {
+      "type": "string",
+      "description": "Nomes dos grupos para exibi\u00e7\u00e3o"
+    },
+    "escopo_grupos_excluidos_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de grupos exclu\u00eddos explicitamente"
     },
     "escopo_quadros": {
       "type": "array",
@@ -96,26 +115,21 @@
     },
     "data_inicio": {
       "type": "string",
-      "format": "date",
-      "description": "Data de in\u00edcio da campanha"
+      "format": "date"
     },
     "data_fim_militar": {
       "type": "string",
-      "format": "date",
-      "description": "Prazo limite para o militar responder no portal"
+      "format": "date"
     },
     "data_fim_unidade": {
       "type": "string",
-      "format": "date",
-      "description": "Prazo para homologa\u00e7\u00e3o pelos gestores da unidade"
+      "format": "date"
     },
     "instrucoes": {
-      "type": "string",
-      "description": "Orienta\u00e7\u00f5es aos militares exibidas no portal"
+      "type": "string"
     },
     "config_regras": {
-      "type": "string",
-      "description": "JSON com regras personalizadas da campanha"
+      "type": "string"
     },
     "total_publico_alvo": {
       "type": "number",
