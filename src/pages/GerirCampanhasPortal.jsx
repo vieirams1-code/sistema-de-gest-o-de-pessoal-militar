@@ -44,6 +44,7 @@ export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
   const [campanhas, setCampanhas] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
+  const [gruposList, setGruposList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
@@ -119,6 +120,12 @@ export default function GerirCampanhasPortal() {
       }
 
       setUnidadesList(unidades || []);
+      try {
+        const grupos = await base44.entities.GrupoEfetivo.filter({ ativo: true });
+        setGruposList((grupos || []).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+      } catch (_grupoErr) {
+        setGruposList([]);
+      }
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do painel.' });
     } finally {
@@ -310,6 +317,10 @@ export default function GerirCampanhasPortal() {
       plano_ferias_institucional_id: camp.plano_ferias_institucional_id || '',
       tipo_escopo: camp.tipo_escopo || 'TODOS',
       escopo_unidades_ids: camp.escopo_unidades_ids || [],
+      escopo_militares_ids: camp.escopo_militares_ids || [],
+      escopo_militares_excluidos_ids: camp.escopo_militares_excluidos_ids || [],
+      escopo_grupos_ids: camp.escopo_grupos_ids || [],
+      escopo_grupos_excluidos_ids: camp.escopo_grupos_excluidos_ids || [],
       escopo_quadros: camp.escopo_quadros || [],
       data_inicio: camp.data_inicio || new Date().toISOString().split('T')[0],
       data_fim_militar: camp.data_fim_militar || '',
@@ -448,6 +459,11 @@ export default function GerirCampanhasPortal() {
         tipo_escopo: modalNovaCampanha.tipo_escopo,
         escopo_unidades_ids: modalNovaCampanha.escopo_unidades_ids,
         escopo_unidades_nomes: nomesUnidades,
+        escopo_militares_ids: modalNovaCampanha.escopo_militares_ids || [],
+        escopo_militares_excluidos_ids: modalNovaCampanha.escopo_militares_excluidos_ids || [],
+        escopo_grupos_ids: modalNovaCampanha.escopo_grupos_ids || [],
+        escopo_grupos_nomes: (modalNovaCampanha.escopo_grupos_ids || []).map((id) => gruposList.find((g) => g.id === id)?.nome || id).join(', '),
+        escopo_grupos_excluidos_ids: modalNovaCampanha.escopo_grupos_excluidos_ids || [],
         escopo_quadros: modalNovaCampanha.escopo_quadros,
         data_inicio: modalNovaCampanha.data_inicio,
         data_fim_militar: modalNovaCampanha.data_fim_militar,
@@ -1109,6 +1125,24 @@ export default function GerirCampanhasPortal() {
                       </div>
                     </div>
                   )}
+
+                  <div className="p-3 bg-white rounded-xl border border-indigo-100 space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-700">Restringir por grupos reutilizáveis (opcional):</span>
+                      <span className="text-[11px] text-indigo-700 font-semibold">{(modalNovaCampanha.escopo_grupos_ids || []).length} selecionado(s)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">O grupo funciona como filtro adicional à lotação/quadro selecionado. Ex.: Campo Grande + Motossocorristas.</p>
+                    <div className="max-h-36 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {gruposList.map((grupo) => {
+                        const selected = (modalNovaCampanha.escopo_grupos_ids || []).includes(grupo.id);
+                        return <label key={grupo.id} className={\`p-1.5 rounded-lg border text-[11px] flex items-center gap-1.5 cursor-pointer \${selected ? 'bg-indigo-50 border-indigo-500 font-bold text-indigo-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}\`}>
+                          <input type="checkbox" checked={selected} onChange={() => { const atuais = modalNovaCampanha.escopo_grupos_ids || []; const novos = selected ? atuais.filter((id) => id !== grupo.id) : [...atuais, grupo.id]; setModalNovaCampanha({ ...modalNovaCampanha, escopo_grupos_ids: novos }); }} className="accent-indigo-600" />
+                          <span className="truncate" title={grupo.nome}>{grupo.nome}{grupo.sigla ? \` (\${grupo.sigla})\` : ''}</span>
+                        </label>;
+                      })}
+                      {gruposList.length === 0 && <span className="text-[11px] text-slate-500">Nenhum grupo ativo cadastrado.</span>}
+                    </div>
+                  </div>
                 </div>
 
                 {/* PRAZOS */}
