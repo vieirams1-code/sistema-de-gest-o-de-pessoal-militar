@@ -842,20 +842,11 @@ Deno.serve(async (req: Request) => {
             todosMilitares = [];
           }
 
-          // Militares no escopo
+          // Militares no escopo base, grupo e exclusões
+          const membrosPorGrupo = await carregarMembrosPorGrupo(base44, [campanha]);
           const militaresNoEscopo = todosMilitares.filter((m) => {
             if (m.status === 'Inativo' || m.status === 'Falecido') return false;
-            if (campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo) return true;
-            if (campanha.tipo_escopo === 'UNIDADES' && Array.isArray(campanha.escopo_unidades_ids)) {
-              return matchMilitarEscopoUnidade(m, campanha.escopo_unidades_ids);
-            }
-            if (campanha.tipo_escopo === 'QUADROS' && Array.isArray(campanha.escopo_quadros)) {
-              return campanha.escopo_quadros.includes(m.quadro);
-            }
-            if (campanha.tipo_escopo === 'SELECAO_MILITARES' && Array.isArray(campanha.escopo_militares_ids)) {
-              return campanha.escopo_militares_ids.includes(m.id);
-            }
-            return true;
+            return matchMilitarCampanha(campanha, m, membrosPorGrupo);
           });
 
           // Respostas / Registros
@@ -1857,22 +1848,11 @@ Deno.serve(async (req: Request) => {
     let campanhasAtivasMilitar: any[] = [];
     try {
       const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
+      const membrosPorGrupoPortal = await carregarMembrosPorGrupo(base44, allCamp || []);
       campanhasAtivasMilitar = (allCamp || []).filter((cp: any) => {
         const st = String(cp.status || '').toLowerCase();
         const isAtiva = st === 'aberta_coleta' || st === 'ativa' || st === 'aberta' || st === 'em_andamento' || !cp.status;
-        if (!isAtiva) return false;
-
-        if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
-        if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
-          return matchMilitarEscopoUnidade(militar, cp.escopo_unidades_ids);
-        }
-        if (cp.tipo_escopo === 'QUADROS' && Array.isArray(cp.escopo_quadros)) {
-          return cp.escopo_quadros.includes(militar.quadro);
-        }
-        if (cp.tipo_escopo === 'SELECAO_MILITARES' && Array.isArray(cp.escopo_militares_ids)) {
-          return cp.escopo_militares_ids.includes(militar.id);
-        }
-        return true;
+        return isAtiva && matchMilitarCampanha(cp, militar, membrosPorGrupoPortal);
       });
     } catch (_e) {
       campanhasAtivasMilitar = [];
