@@ -56,7 +56,7 @@ export default function GruposEfetivo() {
   };
 
   const salvar = useMutation({
-    mutationFn: () => editando ? base44.entities.GrupoEfetivo.update(grupoId, form) : base44.entities.GrupoEfetivo.create(form),
+    mutationFn: () => grupoId ? base44.entities.GrupoEfetivo.update(grupoId, form) : base44.entities.GrupoEfetivo.create(form),
     onSuccess: (g) => {
       refresh();
       setGrupoId(g?.id || grupoId);
