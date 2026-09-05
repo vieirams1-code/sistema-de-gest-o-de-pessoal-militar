@@ -57,6 +57,33 @@ function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean
   });
 }
 
+async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Promise<Map<string, Set<string>>> {
+  const ids = new Set<string>();
+  (campanhas || []).forEach((campanha) => (campanha?.escopo_grupos_ids || []).forEach((id: any) => ids.add(String(id))));
+  const resultado = new Map<string, Set<string>>();
+  if (ids.size === 0) return resultado;
+  let vinculos: any[] = [];
+  try { vinculos = await base44.asServiceRole.entities.MembroGrupoEfetivo.list(); } catch (_e) { vinculos = []; }
+  (vinculos || []).forEach((v: any) => {
+    if (v.ativo === false || !ids.has(String(v.grupo_id)) || !v.militar_id) return;
+    if (!resultado.has(String(v.grupo_id))) resultado.set(String(v.grupo_id), new Set<string>());
+    resultado.get(String(v.grupo_id))!.add(String(v.militar_id));
+  });
+  return resultado;
+}
+
+function matchMilitarCampanha(campanha: any, militar: any, membrosPorGrupo: Map<string, Set<string>> = new Map()): boolean {
+  const baseEscopo = campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo ||
+    (campanha.tipo_escopo === 'UNIDADES' && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
+    (campanha.tipo_escopo === 'QUADROS' && (campanha.escopo_quadros || []).includes(militar.quadro)) ||
+    (campanha.tipo_escopo === 'SELECAO_MILITARES' && (campanha.escopo_militares_ids || []).includes(militar.id));
+  const grupos = (campanha.escopo_grupos_ids || []).map((id: any) => membrosPorGrupo.get(String(id))).filter(Boolean) as Set<string>[];
+  const pertenceGrupo = grupos.length === 0 || grupos.some((membros) => membros.has(String(militar.id)));
+  const excluido = (campanha.escopo_militares_excluidos_ids || []).map(String).includes(String(militar.id)) ||
+    (campanha.escopo_grupos_excluidos_ids || []).some((id: any) => membrosPorGrupo.get(String(id))?.has(String(militar.id)));
+  return baseEscopo && pertenceGrupo && !excluido;
+}
+
 interface ParcelaItem {
   etapa: number;
   dias: number;
@@ -606,14 +633,12 @@ Deno.serve(async (req: Request) => {
             plano_ferias_institucional_id: planoId,
           })).filter((campanha: any) => campanha.tipo === 'PLANO_FERIAS');
           const militares = await base44.asServiceRole.entities.Militar.list();
+          const membrosPorGrupo = await carregarMembrosPorGrupo(base44, campanhas);
           const publicoIds = new Set<string>();
           for (const campanha of campanhas) {
             for (const militar of (militares || [])) {
               if (militar.status === 'Inativo' || militar.status === 'Falecido') continue;
-              const noEscopo = campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo ||
-                (campanha.tipo_escopo === 'UNIDADES' && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
-                (campanha.tipo_escopo === 'QUADROS' && (campanha.escopo_quadros || []).includes(militar.quadro)) ||
-                (campanha.tipo_escopo === 'SELECAO_MILITARES' && (campanha.escopo_militares_ids || []).includes(militar.id));
+              const noEscopo = matchMilitarCampanha(campanha, militar, membrosPorGrupo);
               if (noEscopo && militar.id) publicoIds.add(militar.id);
             }
           }
@@ -684,20 +709,11 @@ Deno.serve(async (req: Request) => {
             todosMilitares = [];
           }
 
-          // Filtra militares conforme o escopo selecionado
+          // Filtra militares pelo escopo base, grupos reutilizáveis e exclusões
+          const membrosPorGrupoCriacao = await carregarMembrosPorGrupo(base44, [cp]);
           const militaresEscopo = todosMilitares.filter((m) => {
             if (m.status === 'Inativo' || m.status === 'Falecido') return false;
-            if (cp.tipo_escopo === 'TODOS' || !cp.tipo_escopo) return true;
-            if (cp.tipo_escopo === 'UNIDADES' && Array.isArray(cp.escopo_unidades_ids)) {
-              return matchMilitarEscopoUnidade(m, cp.escopo_unidades_ids);
-            }
-            if (cp.tipo_escopo === 'QUADROS' && Array.isArray(cp.escopo_quadros)) {
-              return cp.escopo_quadros.includes(m.quadro);
-            }
-            if (cp.tipo_escopo === 'SELECAO_MILITARES' && Array.isArray(cp.escopo_militares_ids)) {
-              return cp.escopo_militares_ids.includes(m.id);
-            }
-            return true;
+            return matchMilitarCampanha(cp, m, membrosPorGrupoCriacao);
           });
 
           const created = await base44.asServiceRole.entities.CampanhaPortal.create({
@@ -710,6 +726,10 @@ Deno.serve(async (req: Request) => {
             escopo_unidades_ids: cp.escopo_unidades_ids || [],
             escopo_unidades_nomes: cp.escopo_unidades_nomes || 'Toda a Corporação',
             escopo_militares_ids: cp.escopo_militares_ids || [],
+            escopo_militares_excluidos_ids: cp.escopo_militares_excluidos_ids || [],
+            escopo_grupos_ids: cp.escopo_grupos_ids || [],
+            escopo_grupos_nomes: cp.escopo_grupos_nomes || '',
+            escopo_grupos_excluidos_ids: cp.escopo_grupos_excluidos_ids || [],
             escopo_quadros: cp.escopo_quadros || [],
             data_inicio: cp.data_inicio || new Date().toISOString().split('T')[0],
             data_fim_militar: cp.data_fim_militar || '',
@@ -982,6 +1002,11 @@ Deno.serve(async (req: Request) => {
             tipo_escopo: campanha_payload.tipo_escopo,
             escopo_unidades_ids: campanha_payload.escopo_unidades_ids,
             escopo_unidades_nomes: campanha_payload.escopo_unidades_nomes,
+            escopo_militares_ids: campanha_payload.escopo_militares_ids || [],
+            escopo_militares_excluidos_ids: campanha_payload.escopo_militares_excluidos_ids || [],
+            escopo_grupos_ids: campanha_payload.escopo_grupos_ids || [],
+            escopo_grupos_nomes: campanha_payload.escopo_grupos_nomes || '',
+            escopo_grupos_excluidos_ids: campanha_payload.escopo_grupos_excluidos_ids || [],
             escopo_quadros: campanha_payload.escopo_quadros,
             config_regras: JSON.stringify(campanha_payload.config_regras || {}),
             config_formulario: typeof campanha_payload.config_formulario === 'object' ? JSON.stringify(campanha_payload.config_formulario) : (campanha_payload.config_formulario || ''),
