@@ -185,6 +185,7 @@ const menuGroups = [
         description: 'Governança técnica, segurança e manutenção',
         items: [
           { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes', menuGroup: 'Cadastros' },
+          { name: 'Grupos do efetivo', page: 'GruposEfetivo', icon: UsersRound, adminOnly: true, menuGroup: 'Cadastros' },
           { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates', menuGroup: 'Cadastros' },
           { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp', menuGroup: 'Cadastros' },
           {
