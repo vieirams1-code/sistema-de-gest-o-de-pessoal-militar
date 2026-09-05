@@ -131,6 +131,7 @@ import CentralRespostasCampanhas from './pages/CentralRespostasCampanhas';
 import Portal from './pages/Portal';
 import PortalFerias from './pages/PortalFerias';
 import PortalCadastro from './pages/PortalCadastro';
+import GruposEfetivo from './pages/GruposEfetivo';
 import __Layout from './Layout.jsx';
 
 
@@ -140,6 +141,7 @@ export const PAGES = {
     "Portal": Portal,
     "PortalFerias": PortalFerias,
     "PortalCadastro": PortalCadastro,
+    "GruposEfetivo": GruposEfetivo,
     "PainelPlanoFerias": PainelPlanoFerias,
     "PlanosFerias": PlanosFerias,
     "ConfiguracoesPortal": ConfiguracoesPortal,
