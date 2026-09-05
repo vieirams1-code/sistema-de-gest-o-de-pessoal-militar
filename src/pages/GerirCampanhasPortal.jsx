@@ -1135,9 +1135,9 @@ export default function GerirCampanhasPortal() {
                     <div className="max-h-36 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {gruposList.map((grupo) => {
                         const selected = (modalNovaCampanha.escopo_grupos_ids || []).includes(grupo.id);
-                        return <label key={grupo.id} className={\`p-1.5 rounded-lg border text-[11px] flex items-center gap-1.5 cursor-pointer \${selected ? 'bg-indigo-50 border-indigo-500 font-bold text-indigo-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}\`}>
+                        return <label key={grupo.id} className={`p-1.5 rounded-lg border text-[11px] flex items-center gap-1.5 cursor-pointer ${selected ? 'bg-indigo-50 border-indigo-500 font-bold text-indigo-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                           <input type="checkbox" checked={selected} onChange={() => { const atuais = modalNovaCampanha.escopo_grupos_ids || []; const novos = selected ? atuais.filter((id) => id !== grupo.id) : [...atuais, grupo.id]; setModalNovaCampanha({ ...modalNovaCampanha, escopo_grupos_ids: novos }); }} className="accent-indigo-600" />
-                          <span className="truncate" title={grupo.nome}>{grupo.nome}{grupo.sigla ? \` (\${grupo.sigla})\` : ''}</span>
+                          <span className="truncate" title={grupo.nome}>{grupo.nome}{grupo.sigla ? ` (${grupo.sigla})` : ''}</span>
                         </label>;
                       })}
                       {gruposList.length === 0 && <span className="text-[11px] text-slate-500">Nenhum grupo ativo cadastrado.</span>}
