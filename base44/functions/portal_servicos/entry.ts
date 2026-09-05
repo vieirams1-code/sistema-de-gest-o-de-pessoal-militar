@@ -59,7 +59,9 @@ function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean
 
 async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Promise<Map<string, Set<string>>> {
   const ids = new Set<string>();
-  (campanhas || []).forEach((campanha) => (campanha?.escopo_grupos_ids || []).forEach((id: any) => ids.add(String(id))));
+  (campanhas || []).forEach((campanha) => {
+    [...(campanha?.escopo_grupos_ids || []), ...(campanha?.escopo_grupos_excluidos_ids || [])].forEach((id: any) => ids.add(String(id)));
+  });
   const resultado = new Map<string, Set<string>>();
   if (ids.size === 0) return resultado;
   let vinculos: any[] = [];
