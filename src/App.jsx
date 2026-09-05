@@ -32,6 +32,7 @@ const adminOnlyPages = new Set([
   'SubtiposDOEMS',
   'BackupSistema',
   'DiagnosticoSaldoFerias',
+  'GruposEfetivo',
 ]);
 
 
