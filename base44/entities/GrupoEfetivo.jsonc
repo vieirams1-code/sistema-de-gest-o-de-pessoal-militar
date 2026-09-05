@@ -1,0 +1,83 @@
+{
+  "name": "GrupoEfetivo",
+  "type": "object",
+  "title": "Grupo reutiliz\u00e1vel do efetivo",
+  "description": "Segmenta\u00e7\u00e3o reutiliz\u00e1vel de militares para campanhas, escalas e filtros operacionais. N\u00e3o substitui habilita\u00e7\u00f5es, guarni\u00e7\u00f5es, regimes ou miss\u00f5es.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do grupo, por exemplo Motossocorristas ou URSA."
+    },
+    "sigla": {
+      "type": "string",
+      "description": "Sigla curta para identifica\u00e7\u00e3o."
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "GRUPO_SERVICO",
+        "EQUIPE_OPERACIONAL",
+        "SEGMENTO_ADMINISTRATIVO",
+        "QUALIFICACAO",
+        "OUTRO"
+      ],
+      "default": "SEGMENTO_ADMINISTRATIVO"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o e finalidade do grupo."
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica se o grupo pode ser utilizado em novas configura\u00e7\u00f5es."
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "In\u00edcio de validade do grupo."
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date",
+      "description": "Fim de validade do grupo, quando aplic\u00e1vel."
+    },
+    "origem": {
+      "type": "string",
+      "enum": [
+        "MANUAL",
+        "DERIVADO",
+        "IMPORTADO"
+      ],
+      "default": "MANUAL",
+      "description": "Origem do agrupamento."
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es administrativas."
+    }
+  },
+  "required": [
+    "nome",
+    "tipo",
+    "ativo"
+  ],
+  "rls": {
+    "read": true,
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
