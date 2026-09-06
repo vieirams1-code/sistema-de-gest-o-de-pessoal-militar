@@ -602,6 +602,7 @@ Deno.serve(async (req: Request) => {
 
         case 'PLANO_INSTITUCIONAL_EXCLUIR': {
           const planoId = String(payload.plano_id || '').trim();
+          const confirmarPerdaVinculo = Boolean(payload.confirmar_perda_vinculo);
           const existente = planoId ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId) : null;
           if (!existente) {
             return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
@@ -609,15 +610,64 @@ Deno.serve(async (req: Request) => {
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
+
           const campanhasVinculadas = await base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id: planoId });
-          if (campanhasVinculadas.length > 0) {
-            return new Response(JSON.stringify({ error: 'Este plano possui campanhas vinculadas e não pode ser excluído. Arquive-o para preservar o histórico.' }), {
+          const campanhasIds = new Set(campanhasVinculadas.map((campanha: any) => campanha.id));
+          let feriasVinculadas: any[] = [];
+          try {
+            feriasVinculadas = await base44.asServiceRole.entities.Ferias.filter({ plano_ferias_id: planoId });
+          } catch (_errFeriasPlano) {
+            feriasVinculadas = [];
+          }
+
+          if (feriasVinculadas.length > 0 && !confirmarPerdaVinculo) {
+            return new Response(JSON.stringify({
+              error: 'Este plano possui férias já geradas. A exclusão removerá o vínculo dessas férias com o plano e impedirá o rastreamento pelo plano.',
+              requires_confirmation: true,
+              ferias_vinculadas: feriasVinculadas.length,
+            }), {
               status: 409,
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
+
+          // Exclui respostas e campanhas do plano, sem tocar nos militares nem nas férias geradas.
+          try {
+            const opcoesDoPlano = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+            for (const opcao of (opcoesDoPlano || [])) {
+              if (campanhasIds.has(opcao.campanha_id) || textoId(opcao.plano_ferias_institucional_id) === planoId) {
+                await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(opcao.id);
+              }
+            }
+          } catch (_errOpcoesPlano) {}
+
+          try {
+            const respostasDoPlano = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.list();
+            for (const resposta of (respostasDoPlano || [])) {
+              if (campanhasIds.has(resposta.campanha_id)) {
+                await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.delete(resposta.id);
+              }
+            }
+          } catch (_errRespostasPlano) {}
+
+          for (const campanha of campanhasVinculadas) {
+            await base44.asServiceRole.entities.CampanhaPortal.delete(campanha.id);
+          }
+
+          // Mantém as férias no SGP, mas remove o vínculo que permitiria rastreá-las pelo plano.
+          for (const ferias of feriasVinculadas) {
+            await base44.asServiceRole.entities.Ferias.update(ferias.id, { plano_ferias_id: '' });
+          }
+
           await base44.asServiceRole.entities.PlanoFeriasInstitucional.delete(planoId);
-          return new Response(JSON.stringify({ ok: true }), {
+          return new Response(JSON.stringify({
+            ok: true,
+            ferias_desvinculadas: feriasVinculadas.length,
+            campanhas_excluidas: campanhasVinculadas.length,
+            message: feriasVinculadas.length > 0
+              ? 'Plano, campanhas e respostas excluídos. As férias foram mantidas, mas perderam o vínculo e o rastreamento pelo plano.'
+              : 'Plano, campanhas e respostas excluídos com sucesso.',
+          }), {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
