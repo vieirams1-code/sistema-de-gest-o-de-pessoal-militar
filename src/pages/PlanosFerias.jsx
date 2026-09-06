@@ -339,6 +339,7 @@ export default function PlanosFerias() {
               <p className="text-xs text-slate-500 mt-3">Abertura: {selecionado.data_abertura || '-'} · Status: {selecionado.status === 'ARQUIVADO' ? 'Arquivado' : 'Aberto'}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
+              <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>
               {modoAdmin && <Button type="button" variant="outline" onClick={() => excluir(selecionado)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir plano</Button>}
               <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>
               <Button type="button" variant="outline" onClick={() => abrirEdicao(selecionado)}><Edit3 className="w-4 h-4 mr-1.5" />Editar plano</Button>
