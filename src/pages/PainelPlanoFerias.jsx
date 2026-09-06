@@ -847,36 +847,6 @@ export default function PainelPlanoFerias() {
         </div>
       </div>
 
-      {!painelConsolidado && campanhaSelecionada && modoAdmin && (
-        <div className="mx-6 mt-4 rounded-2xl border border-rose-200 bg-white p-5">
-          <h2 className="font-bold text-slate-900">Usuários autorizados nesta campanha</h2>
-          <p className="mt-1 text-xs text-slate-500">Defina quem pode visualizar, editar a escala, autorizar ou gerar férias desta campanha.</p>
-          <form onSubmit={salvarPermissaoCampanha} className="mt-4 grid gap-3 lg:grid-cols-6 items-end">
-            <div className="lg:col-span-2">
-              <label className="text-xs font-bold text-slate-700">Usuário</label>
-              <select required value={permissaoCampanhaForm.usuario_id} onChange={(e) => setPermissaoCampanhaForm({ ...permissaoCampanhaForm, usuario_id: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm">
-                <option value="">Selecione um usuário</option>
-                {usuariosPermitidos.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome} · {usuario.email}</option>)}
-              </select>
-            </div>
-            <div className="lg:col-span-3 flex flex-wrap gap-x-3 gap-y-2 text-xs">
-              <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoCampanhaForm.pode_visualizar} onChange={(e) => setPermissaoCampanhaForm({ ...permissaoCampanhaForm, pode_visualizar: e.target.checked })} />Visualizar</label>
-              <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoCampanhaForm.pode_editar_escala} onChange={(e) => setPermissaoCampanhaForm({ ...permissaoCampanhaForm, pode_editar_escala: e.target.checked })} />Editar escala</label>
-              <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoCampanhaForm.pode_autorizar} onChange={(e) => setPermissaoCampanhaForm({ ...permissaoCampanhaForm, pode_autorizar: e.target.checked })} />Autorizar</label>
-              <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoCampanhaForm.pode_gerar_ferias} onChange={(e) => setPermissaoCampanhaForm({ ...permissaoCampanhaForm, pode_gerar_ferias: e.target.checked })} />Gerar férias</label>
-            </div>
-            <Button type="submit" disabled={actionLoading} className="bg-rose-700 hover:bg-rose-800">Atribuir</Button>
-          </form>
-          {permissoesCampanha.length > 0 && <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
-            {permissoesCampanha.map((permissao) => <div key={permissao.id} className="flex items-center justify-between gap-3 p-3 text-xs">
-              <div><p className="font-bold text-slate-800">{permissao.usuario_nome || permissao.usuario_email}</p><p className="text-slate-500">{[permissao.pode_visualizar && 'visualizar', permissao.pode_editar_escala && 'editar escala', permissao.pode_autorizar && 'autorizar', permissao.pode_gerar_ferias && 'gerar férias'].filter(Boolean).join(', ') || 'sem permissões ativas'}</p></div>
-              <Button type="button" variant="ghost" size="sm" onClick={() => removerPermissaoCampanha(permissao)} className="text-red-700 hover:bg-red-50">Remover</Button>
-            </div>)}
-          </div>}
-          {usuariosPermitidos.length === 0 && <p className="mt-3 text-xs text-amber-700">Nenhum usuário foi carregado. Atualize a página e confirme que o usuário possui cadastro no sistema.</p>}
-        </div>
-      )}
-
       {/* FEEDBACK ALERTS */}
       {feedback.msg && (
         <div className="px-6 pt-4">
