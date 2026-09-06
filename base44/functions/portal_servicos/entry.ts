@@ -478,6 +478,7 @@ Deno.serve(async (req: Request) => {
       acao?.startsWith('CAMPANHA_') ||
       acao?.startsWith('PLANO_') ||
       acao?.startsWith('PORTAL_CONFIG_') ||
+      acao?.startsWith('PERMISSOES_') ||
       acao?.startsWith('CADASTRO_DECIDIR_')
     );
 
@@ -508,6 +509,63 @@ Deno.serve(async (req: Request) => {
       }
 
       switch (acao) {
+        case 'PERMISSOES_LISTAR_USUARIOS': {
+          const usuarios = await base44.asServiceRole.entities.User.list();
+          return new Response(JSON.stringify({
+            ok: true,
+            usuarios: (usuarios || []).map((usuario: any) => ({
+              id: usuario.id,
+              email: usuario.email || '',
+              nome: usuario.full_name || usuario.name || usuario.email || 'Usuário sem nome',
+              role: usuario.role || 'user',
+            })).filter((usuario: any) => usuario.id),
+          }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
+        case 'PLANO_PERMISSOES_LISTAR': {
+          const planoId = textoId(payload.plano_id);
+          if (!planoId) return new Response(JSON.stringify({ error: 'Plano não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const permissoes = await base44.asServiceRole.entities.PermissaoPlanoFerias.filter({ plano_ferias_institucional_id: planoId });
+          return new Response(JSON.stringify({ ok: true, permissoes: permissoes || [] }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
+        case 'PLANO_PERMISSAO_SALVAR': {
+          const planoId = textoId(payload.plano_id);
+          const dados = payload.permissao || {};
+          const usuarioId = textoId(dados.usuario_id);
+          if (!planoId || !usuarioId) return new Response(JSON.stringify({ error: 'Plano e usuário são obrigatórios.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
+          if (!plano) return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const usuario = await base44.asServiceRole.entities.User.get(usuarioId);
+          if (!usuario) return new Response(JSON.stringify({ error: 'Usuário não encontrado.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const campanhaId = textoId(dados.campanha_id);
+          const existentes = await base44.asServiceRole.entities.PermissaoPlanoFerias.filter({ plano_ferias_institucional_id: planoId, usuario_id: usuarioId });
+          const existente = (existentes || []).find((item: any) => textoId(item.campanha_id) === campanhaId);
+          const registro = {
+            plano_ferias_institucional_id: planoId,
+            campanha_id: campanhaId,
+            usuario_id: usuarioId,
+            usuario_email: usuario.email || '',
+            usuario_nome: usuario.full_name || usuario.name || usuario.email || 'Usuário sem nome',
+            pode_visualizar: dados.pode_visualizar !== false,
+            pode_editar_escala: Boolean(dados.pode_editar_escala),
+            pode_autorizar: Boolean(dados.pode_autorizar),
+            pode_gerar_ferias: Boolean(dados.pode_gerar_ferias),
+            ativo: dados.ativo !== false,
+          };
+          const salvo = existente
+            ? await base44.asServiceRole.entities.PermissaoPlanoFerias.update(existente.id, registro)
+            : await base44.asServiceRole.entities.PermissaoPlanoFerias.create(registro);
+          return new Response(JSON.stringify({ ok: true, permissao: salvo }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
+        case 'PLANO_PERMISSAO_EXCLUIR': {
+          const permissaoId = textoId(payload.permissao_id);
+          if (!permissaoId) return new Response(JSON.stringify({ error: 'Permissão não informada.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          await base44.asServiceRole.entities.PermissaoPlanoFerias.delete(permissaoId);
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
         case 'PLANO_INSTITUCIONAL_LISTAR': {
           // Ações do Plano de Férias Institucional: sincronizadas com a prévia sem tocar no portal.
           const planos = await base44.asServiceRole.entities.PlanoFeriasInstitucional.list();
