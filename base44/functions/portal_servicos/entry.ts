@@ -392,8 +392,8 @@ function consolidarOpcoesPlano(opcoes: any[]): any[] {
 
   for (const opcao of (opcoes || [])) {
     const militarId = textoId(opcao?.militar_id);
-    const periodoId = textoId(opcao?.periodo_aquisitivo_id);
-    if (!militarId || !periodoId) continue;
+    const periodoId = textoId(opcao?.periodo_aquisitivo_id) || `ANO:${textoId(opcao?.ano_referencia) || 'SEM_ANO'}`;
+    if (!militarId) continue;
 
     const chave = `${militarId}:${periodoId}`;
     const atual = consolidadas.get(chave);
@@ -1385,7 +1385,8 @@ Deno.serve(async (req: Request) => {
 
             const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
             let opcoes = (allOpcoes || [])
-              .filter((op: any) => idsCampanhasConsulta.has(op.campanha_id))
+              .filter((op: any) => idsCampanhasConsulta.has(op.campanha_id)
+                || (!payload.campanha_id && planoIdConsulta && textoId(op.plano_ferias_institucional_id) === planoIdConsulta))
               .map((op: any) => ({
                 ...op,
                 campanha_titulo: campanhasFerias.find((campanha: any) => campanha.id === op.campanha_id)?.titulo || '',
