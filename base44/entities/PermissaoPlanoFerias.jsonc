@@ -1,0 +1,73 @@
+{
+  "name": "PermissaoPlanoFerias",
+  "type": "object",
+  "title": "Permiss\u00e3o de usu\u00e1rio em plano/campanha de f\u00e9rias",
+  "properties": {
+    "plano_ferias_institucional_id": {
+      "type": "string"
+    },
+    "campanha_id": {
+      "type": "string"
+    },
+    "usuario_id": {
+      "type": "string"
+    },
+    "usuario_email": {
+      "type": "string"
+    },
+    "usuario_nome": {
+      "type": "string"
+    },
+    "pode_visualizar": {
+      "type": "boolean",
+      "default": true
+    },
+    "pode_editar_escala": {
+      "type": "boolean",
+      "default": false
+    },
+    "pode_autorizar": {
+      "type": "boolean",
+      "default": false
+    },
+    "pode_gerar_ferias": {
+      "type": "boolean",
+      "default": false
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "plano_ferias_institucional_id",
+    "usuario_id",
+    "pode_visualizar",
+    "pode_editar_escala",
+    "pode_autorizar",
+    "pode_gerar_ferias",
+    "ativo"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
