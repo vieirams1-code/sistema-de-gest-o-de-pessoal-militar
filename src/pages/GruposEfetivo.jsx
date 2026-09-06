@@ -41,7 +41,7 @@ export default function GruposEfetivo() {
   });
 
   const grupoAtual = grupos.find((g) => g.id === grupoId) || null;
-  const membrosIds = useMemo(() => new Set(membros.map((m) => String(m.militar_id))), [membros]);
+  const membrosIds = useMemo(() => new Set(membros.filter((m) => m.ativo !== false).map((m) => String(m.militar_id))), [membros]);
   const filtrados = useMemo(() => grupos.filter((g) => {
     const alvo = `${g.nome || ''} ${g.sigla || ''} ${g.tipo || ''}`.toLowerCase();
     return alvo.includes(busca.toLowerCase());
