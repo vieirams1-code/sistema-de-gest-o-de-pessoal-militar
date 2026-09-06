@@ -417,7 +417,7 @@ export default function PlanosFerias() {
                   <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.escopo_unidades_nomes || 'Toda a Corporação'} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
                     <div className="flex gap-2 flex-wrap">
-                      <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>
+                      <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>
                       <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>
                       {modoAdmin && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
                     </div>
