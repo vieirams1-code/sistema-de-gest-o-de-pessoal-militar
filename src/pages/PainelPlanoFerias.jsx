@@ -288,7 +288,7 @@ export default function PainelPlanoFerias() {
 
   useEffect(() => {
     carregarPainel(searchParams.get('campanhaId'), searchParams.get('planoId'));
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!modoAdmin || painelConsolidado || !campanhaSelecionada?.id || !planoSelecionadoId) {
@@ -748,7 +748,7 @@ export default function PainelPlanoFerias() {
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900">
-                {tituloPainel}
+                {painelConsolidado ? tituloPainel : 'Campanha — ' + tituloPainel}
               </h1>
               {campanhaSelecionada && (
                 <span className="bg-green-100 text-green-700 text-xs px-2.5 py-0.5 rounded-full border border-green-200 uppercase font-bold tracking-wide">
