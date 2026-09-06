@@ -401,6 +401,7 @@ export default function PlanosFerias() {
           <div className="flex items-center gap-2">
             <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>
             <Button type="button" onClick={abrirNovo} className="bg-emerald-700 hover:bg-emerald-800"><Plus className="w-4 h-4 mr-1.5" />Novo Plano de Férias</Button>
+          </div>
         </div>
         {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{feedback.texto}</div>}
         {modoFormulario && <form onSubmit={salvar} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
