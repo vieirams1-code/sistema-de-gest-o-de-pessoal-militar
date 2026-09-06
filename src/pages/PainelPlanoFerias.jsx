@@ -300,6 +300,8 @@ export default function PainelPlanoFerias() {
       try {
         const diretos = await base44.entities.User.list();
         if (Array.isArray(diretos) && diretos.length > 0) return diretos;
+        const filtrados = await base44.entities.User.filter({});
+        if (Array.isArray(filtrados) && filtrados.length > 0) return filtrados;
       } catch (_erroUsuariosDiretos) {}
       const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' });
       return resposta.data?.usuarios || [];
