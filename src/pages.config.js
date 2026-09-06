@@ -124,6 +124,7 @@ import BackupSistema from './pages/BackupSistema';
 import CursosFormacao from './pages/CursosFormacao';
 import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
+import ConfigurarCampanhaFerias from './pages/ConfigurarCampanhaFerias';
 import PainelPlanoFerias from './pages/PainelPlanoFerias';
 import PlanosFerias from './pages/PlanosFerias';
 import GerirCampanhasPortal from './pages/GerirCampanhasPortal';
@@ -145,6 +146,7 @@ export const PAGES = {
     "PainelPlanoFerias": PainelPlanoFerias,
     "PlanosFerias": PlanosFerias,
     "ConfiguracoesPortal": ConfiguracoesPortal,
+    "ConfigurarCampanhaFerias": ConfigurarCampanhaFerias,
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AjustesSaldoFerias": AjustesSaldoFerias,
     "AgendarJISO": AgendarJISO,
