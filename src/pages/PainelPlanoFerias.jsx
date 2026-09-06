@@ -81,6 +81,7 @@ export default function PainelPlanoFerias() {
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
   const [painelConsolidado, setPainelConsolidado] = useState(false);
+  const [todasCampanhasSelecionadas, setTodasCampanhasSelecionadas] = useState(false);
   const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
@@ -98,6 +99,7 @@ export default function PainelPlanoFerias() {
   const [militarModalAberto, setMilitarModalAberto] = useState(null);
   const [militarDestaqueAmareloId, setMilitarDestaqueAmareloId] = useState(null);
   const destaqueTimerRef = useRef(null);
+  const carregamentoPainelRef = useRef(0);
 
   // Quantitativo total de efetivo para cálculo do teto de 10%
   const [totalEfetivoGeral, setTotalEfetivoGeral] = useState(0);
@@ -138,6 +140,7 @@ export default function PainelPlanoFerias() {
 
   // Carrega lista de campanhas e opções da campanha selecionada
   const carregarPainel = async (campanhaAlvoId = null, planoAlvoId = null) => {
+    const carregamentoId = ++carregamentoPainelRef.current;
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
@@ -147,6 +150,8 @@ export default function PainelPlanoFerias() {
         campanha_id: campanhaAlvoId || undefined,
         plano_id: planoAlvoId || undefined,
       });
+
+      if (carregamentoId !== carregamentoPainelRef.current) return;
 
       const listaCampanhas = res.data?.campanhas || [];
       setCampanhas(listaCampanhas);
@@ -159,6 +164,8 @@ export default function PainelPlanoFerias() {
         listaPlanos = [];
         setPlanos([]);
       }
+
+      if (carregamentoId !== carregamentoPainelRef.current) return;
 
       // Define campanha ativa/selecionada e o contexto de consolidação.
       let selected = null;
@@ -177,7 +184,9 @@ export default function PainelPlanoFerias() {
       setCampanhaSelecionada(selected);
       const planoDaConsulta = planoAlvoId || res.data?.plano_id || selected?.plano_ferias_institucional_id || '';
       setPlanoSelecionadoId(planoDaConsulta);
-      setPainelConsolidado(Boolean(res.data?.modo_consolidado));
+      const visaoConsolidada = Boolean(res.data?.modo_consolidado) || Boolean(planoAlvoId && !campanhaAlvoId);
+      setPainelConsolidado(visaoConsolidada);
+      setTodasCampanhasSelecionadas(visaoConsolidada);
 
       // 2. Opções recebidas: uma linha por militar/período quando o contexto é um plano.
       const listaOpcoes = res.data?.opcoes || [];
@@ -254,6 +263,7 @@ export default function PainelPlanoFerias() {
     setCampanhaSelecionada(camp);
     setPlanoSelecionadoId(camp?.plano_ferias_institucional_id || '');
     setPainelConsolidado(false);
+    setTodasCampanhasSelecionadas(false);
     carregarPainel(camp.id, null);
   };
 
@@ -266,6 +276,7 @@ export default function PainelPlanoFerias() {
       )) || campanhas.find((camp) => camp.plano_ferias_institucional_id === planoId);
       setCampanhaSelecionada(primeiraCampanha || null);
       setPainelConsolidado(true);
+      setTodasCampanhasSelecionadas(true);
       carregarPainel(null, planoId);
       return;
     }
@@ -274,6 +285,7 @@ export default function PainelPlanoFerias() {
     const primeiraCampanhaLegada = campanhas.find((camp) => !camp.plano_ferias_institucional_id);
     setCampanhaSelecionada(primeiraCampanhaLegada || null);
     setPainelConsolidado(false);
+    setTodasCampanhasSelecionadas(false);
     if (primeiraCampanhaLegada) {
       carregarPainel(primeiraCampanhaLegada.id, null);
     } else {
@@ -674,10 +686,11 @@ export default function PainelPlanoFerias() {
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className="text-xs text-slate-500 font-medium">Coleta:</span>
                 <select
-                  value={painelConsolidado && planoSelecionadoId ? '__TODAS_AS_CAMPANHAS__' : (campanhaSelecionada?.id || '')}
+                  value={todasCampanhasSelecionadas && planoSelecionadoId ? '__TODAS_AS_CAMPANHAS__' : (campanhaSelecionada?.id || '')}
                   onChange={(e) => {
                     if (e.target.value === '__TODAS_AS_CAMPANHAS__' && planoSelecionadoId) {
                       setPainelConsolidado(true);
+                      setTodasCampanhasSelecionadas(true);
                       carregarPainel(null, planoSelecionadoId);
                       return;
                     }
