@@ -1614,7 +1614,7 @@ Deno.serve(async (req: Request) => {
                 data_decisao_camada_1: new Date().toISOString(),
                 justificativa_ajuste_gestor: decisao_camada_1?.justificativa || 'Militar não contemplado neste plano de férias.',
               });
-              await registrarAuditoriaFerias(base44, user, 'MILITAR_NAO_CONTEMPLADO', { ...opcaoNaoContemplada, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { justificativa: decisao_camada_1?.justificativa || '' });
+              await registrarAuditoriaFerias(base44, user, 'MILITAR_NAO_CONTEMPLADO', { ...opcaoNaoContemplada, opcao_id, campanha_id: opcaoNaoContemplada?.campanha_id, plano_id: opcaoNaoContemplada?.plano_ferias_institucional_id }, { justificativa: decisao_camada_1?.justificativa || '' });
               return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
             }
 
@@ -1729,7 +1729,7 @@ Deno.serve(async (req: Request) => {
               data_homologacao_superior: new Date().toISOString(),
               observacao_superior: homologacao_camada_2?.observacao || '',
             });
-            await registrarAuditoriaFerias(base44, user, homologacao_camada_2?.status === 'Homologado_Superior' ? 'HOMOLOGACAO_APROVADA' : 'HOMOLOGACAO_REJEITADA', { ...opcaoHomologacao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { observacao: homologacao_camada_2?.observacao || '' });
+            await registrarAuditoriaFerias(base44, user, homologacao_camada_2?.status === 'Homologado_Superior' ? 'HOMOLOGACAO_APROVADA' : 'HOMOLOGACAO_REJEITADA', { ...opcaoHomologacao, opcao_id, campanha_id: opcaoHomologacao?.campanha_id, plano_id: opcaoHomologacao?.plano_ferias_institucional_id }, { observacao: homologacao_camada_2?.observacao || '' });
             return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
