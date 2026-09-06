@@ -569,7 +569,7 @@ Deno.serve(async (req: Request) => {
           if (!planoId) return new Response(JSON.stringify({ error: 'Plano não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const permissoes = await base44.asServiceRole.entities.PermissaoPlanoFerias.filter({ plano_ferias_institucional_id: planoId });
           const filtradas = campanhaIdFiltro
-            ? (permissoes || []).filter((item: any) => !textoId(item.campanha_id) || textoId(item.campanha_id) === campanhaIdFiltro)
+            ? (permissoes || []).filter((item: any) => textoId(item.campanha_id) === campanhaIdFiltro)
             : permissoes || [];
           return new Response(JSON.stringify({ ok: true, permissoes: filtradas }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
