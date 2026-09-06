@@ -47,9 +47,15 @@ export default function GruposEfetivo() {
     return alvo.includes(busca.toLowerCase());
   }), [grupos, busca]);
   const militaresDisponiveis = useMemo(() => militares.filter((m) => {
-    const alvo = `${m.nome || ''} ${m.matricula || ''} ${m.posto_graduacao || ''}`.toLowerCase();
+    const alvo = `${m.nome_completo || ''} ${m.nome || ''} ${m.nome_guerra || ''} ${m.matricula || ''} ${m.posto_graduacao || ''} ${m.quadro || ''}`.toLowerCase();
     return !membrosIds.has(String(m.id)) && alvo.includes(militarBusca.toLowerCase());
   }).slice(0, 30), [militares, membrosIds, militarBusca]);
+  const membrosVisiveis = useMemo(() => membros.filter((m) => {
+    if (m.ativo === false) return false;
+    const militar = militares.find((x) => x.id === m.militar_id);
+    const alvo = `${militar?.nome_completo || ''} ${militar?.nome || ''} ${militar?.nome_guerra || ''} ${militar?.matricula || ''} ${militar?.posto_graduacao || ''} ${militar?.quadro || ''}`.toLowerCase();
+    return alvo.includes(membroBusca.toLowerCase());
+  }), [membros, militares, membroBusca]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['grupos-efetivo'] });
