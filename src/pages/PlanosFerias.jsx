@@ -37,6 +37,9 @@ export default function PlanosFerias() {
   const [modalRespostas, setModalRespostas] = useState(null);
   const [respostasCampanha, setRespostasCampanha] = useState(null);
   const [carregandoRespostas, setCarregandoRespostas] = useState(false);
+  const [usuariosSistema, setUsuariosSistema] = useState([]);
+  const [permissoes, setPermissoes] = useState([]);
+  const [permissaoForm, setPermissaoForm] = useState({ usuario_id: '', campanha_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
 
   const carregar = async () => {
     setLoading(true);
@@ -74,12 +77,28 @@ export default function PlanosFerias() {
   useEffect(() => {
     if (!selecionado?.id) {
       setMetricas(null);
+      setPermissoes([]);
       return;
     }
     base44.functions.invoke('planos_ferias_servicos', { acao: 'DETALHES', plano_id: selecionado.id })
       .then((res) => setMetricas(res.data?.metricas || null))
       .catch(() => setMetricas(null));
   }, [selecionado?.id]);
+
+  useEffect(() => {
+    if (!modoAdmin || !selecionado?.id) return;
+    Promise.all([
+      base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
+      base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id }),
+    ]).then(([usuariosRes, permissoesRes]) => {
+      setUsuariosSistema(usuariosRes.data?.usuarios || []);
+      setPermissoes(permissoesRes.data?.permissoes || []);
+    }).catch(() => {
+      setUsuariosSistema([]);
+      setPermissoes([]);
+    });
+  }, [modoAdmin, selecionado?.id]);
+
 
   const campanhasDoPlano = useMemo(
     () => selecionado ? campanhas.filter((c) => c.plano_ferias_institucional_id === selecionado.id) : [],
@@ -253,7 +272,41 @@ export default function PlanosFerias() {
     }
   };
 
-  const abrirRespostas = async (campanha) => {
+  const salvarPermissao = async (evento) => {
+    evento.preventDefault();
+    if (!selecionado?.id || !permissaoForm.usuario_id) return;
+    setSalvando(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_PERMISSAO_SALVAR',
+        plano_id: selecionado.id,
+        permissao: permissaoForm,
+      });
+      const atualizadas = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id });
+      setPermissoes(atualizadas.data?.permissoes || []);
+      setPermissaoForm({ usuario_id: '', campanha_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
+      setFeedback({ tipo: 'sucesso', texto: 'Permissão salva com sucesso.' });
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível salvar a permissão.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const removerPermissao = async (permissao) => {
+    if (!window.confirm('Remover esta atribuição de acesso?')) return;
+    setSalvando(true);
+    try {
+      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSAO_EXCLUIR', permissao_id: permissao.id });
+      setPermissoes((atual) => atual.filter((item) => item.id !== permissao.id));
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível remover a permissão.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirRespostas = async (campanha) =>
     setModalRespostas(campanha);
     setRespostasCampanha(null);
     setCarregandoRespostas(true);
