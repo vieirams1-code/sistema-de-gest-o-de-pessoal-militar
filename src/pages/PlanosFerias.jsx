@@ -39,6 +39,7 @@ export default function PlanosFerias() {
   const [carregandoRespostas, setCarregandoRespostas] = useState(false);
   const [usuariosSistema, setUsuariosSistema] = useState([]);
   const [permissoes, setPermissoes] = useState([]);
+  const [auditoria, setAuditoria] = useState([]);
   const [permissaoForm, setPermissaoForm] = useState({ usuario_id: '', campanha_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
 
   const carregar = async () => {
@@ -78,6 +79,7 @@ export default function PlanosFerias() {
     if (!selecionado?.id) {
       setMetricas(null);
       setPermissoes([]);
+      setAuditoria([]);
       return;
     }
     base44.functions.invoke('planos_ferias_servicos', { acao: 'DETALHES', plano_id: selecionado.id })
@@ -90,12 +92,15 @@ export default function PlanosFerias() {
     Promise.all([
       base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
       base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id }),
-    ]).then(([usuariosRes, permissoesRes]) => {
+      base44.functions.invoke('portal_servicos', { acao: 'PLANO_AUDITORIA_LISTAR', plano_id: selecionado.id }),
+    ]).then(([usuariosRes, permissoesRes, auditoriaRes]) => {
       setUsuariosSistema(usuariosRes.data?.usuarios || []);
       setPermissoes(permissoesRes.data?.permissoes || []);
+      setAuditoria(auditoriaRes.data?.auditoria || []);
     }).catch(() => {
       setUsuariosSistema([]);
       setPermissoes([]);
+      setAuditoria([]);
     });
   }, [modoAdmin, selecionado?.id]);
 
@@ -433,7 +438,7 @@ export default function PlanosFerias() {
                   <label className="text-xs font-bold text-slate-700">Usuário</label>
                   <select required value={permissaoForm.usuario_id} onChange={(e) => setPermissaoForm({ ...permissaoForm, usuario_id: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm">
                     <option value="">Selecione um usuário</option>
-                    {usuariosSistema.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome} · {usuario.email}</option>)}
+                    {usuariosSistema.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome || usuario.full_name || usuario.name || usuario.email} · {usuario.email}</option>)}
                   </select>
                 </div>
                 <div className="lg:col-span-2">
@@ -460,6 +465,18 @@ export default function PlanosFerias() {
                     <Button type="button" variant="ghost" size="sm" onClick={() => removerPermissao(permissao)} className="text-red-700 hover:bg-red-50">Remover</Button>
                   </div>;
                 })}
+              </div>}
+            </div>
+          )}
+          {modoAdmin && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <h2 className="font-bold text-slate-900">Histórico de ações</h2>
+              <p className="text-xs text-slate-500 mt-1">Registro de quem salvou, aprovou, rejeitou ou alterou cada decisão.</p>
+              {auditoria.length === 0 ? <p className="mt-4 text-sm text-slate-500">Nenhuma ação registrada neste plano.</p> : <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+                {auditoria.slice().sort((a, b) => String(b.data_hora || '').localeCompare(String(a.data_hora || ''))).map((registro) => <div key={registro.id} className="p-3 text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1"><p className="font-bold text-slate-800">{registro.acao?.replace(/_/g, ' ') || 'AÇÃO'}</p><span className="text-slate-500">{registro.data_hora ? new Date(registro.data_hora).toLocaleString('pt-BR') : '-'}</span></div>
+                  <p className="text-slate-600 mt-1">Usuário: <span className="font-semibold">{registro.usuario_nome || registro.usuario_email || '-'}</span>{registro.militar_nome ? ` · Militar: ${registro.militar_nome}` : ''}</p>
+                </div>)}
               </div>}
             </div>
           )}
