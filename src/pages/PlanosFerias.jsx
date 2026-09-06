@@ -425,45 +425,7 @@ export default function PlanosFerias() {
               </div>
             )}
           </div>
-          {modoAdmin && (
-            <div className="bg-white border border-rose-200 rounded-2xl p-5">
-              <h2 className="font-bold text-slate-900">Usuários autorizados</h2>
-              <p className="text-xs text-slate-500 mt-1">Atribua acesso ao plano inteiro ou a uma campanha específica.</p>
-              <form onSubmit={salvarPermissao} className="mt-4 grid lg:grid-cols-6 gap-3 items-end">
-                <div className="lg:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">Usuário</label>
-                  <select required value={permissaoForm.usuario_id} onChange={(e) => setPermissaoForm({ ...permissaoForm, usuario_id: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm">
-                    <option value="">Selecione um usuário</option>
-                    {usuariosSistema.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome || usuario.full_name || usuario.name || usuario.email} · {usuario.email}</option>)}
-                  </select>
-                </div>
-                <div className="lg:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">Abrangência</label>
-                  <select value={permissaoForm.campanha_id} onChange={(e) => setPermissaoForm({ ...permissaoForm, campanha_id: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm">
-                    <option value="">Todo o plano</option>
-                    {campanhasDoPlano.map((campanha) => <option key={campanha.id} value={campanha.id}>{campanha.titulo}</option>)}
-                  </select>
-                </div>
-                <div className="lg:col-span-2 flex flex-wrap gap-x-3 gap-y-2 text-xs">
-                  <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoForm.pode_visualizar} onChange={(e) => setPermissaoForm({ ...permissaoForm, pode_visualizar: e.target.checked })} />Visualizar</label>
-                  <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoForm.pode_editar_escala} onChange={(e) => setPermissaoForm({ ...permissaoForm, pode_editar_escala: e.target.checked })} />Editar escala</label>
-                  <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoForm.pode_autorizar} onChange={(e) => setPermissaoForm({ ...permissaoForm, pode_autorizar: e.target.checked })} />Autorizar</label>
-                  <label className="flex items-center gap-1"><input type="checkbox" checked={permissaoForm.pode_gerar_ferias} onChange={(e) => setPermissaoForm({ ...permissaoForm, pode_gerar_ferias: e.target.checked })} />Gerar férias</label>
-                  <Button type="submit" disabled={salvando} size="sm" className="bg-rose-700 hover:bg-rose-800">Atribuir</Button>
-                </div>
-              </form>
-              {permissoes.length > 0 && <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
-                {permissoes.map((permissao) => {
-                  const campanha = campanhasDoPlano.find((item) => item.id === permissao.campanha_id);
-                  const direitos = [permissao.pode_visualizar && 'visualizar', permissao.pode_editar_escala && 'editar escala', permissao.pode_autorizar && 'autorizar', permissao.pode_gerar_ferias && 'gerar férias'].filter(Boolean).join(', ');
-                  return <div key={permissao.id} className="flex items-center justify-between gap-3 p-3 text-xs">
-                    <div><p className="font-bold text-slate-800">{permissao.usuario_nome || permissao.usuario_email}</p><p className="text-slate-500">{campanha?.titulo || 'Todo o plano'} · {direitos || 'sem permissões ativas'}</p></div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removerPermissao(permissao)} className="text-red-700 hover:bg-red-50">Remover</Button>
-                  </div>;
-                })}
-              </div>}
-            </div>
-          )}
+
           {modoAdmin && (
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <h2 className="font-bold text-slate-900">Histórico de ações</h2>
