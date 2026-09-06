@@ -586,6 +586,13 @@ Deno.serve(async (req: Request) => {
           return new Response(JSON.stringify({ ok: true, permissao: salvo }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
+        case 'PLANO_AUDITORIA_LISTAR': {
+          const planoId = textoId(payload.plano_id);
+          if (!planoId) return new Response(JSON.stringify({ error: 'Plano não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const registros = await base44.asServiceRole.entities.AuditoriaFerias.filter({ plano_id: planoId });
+          return new Response(JSON.stringify({ ok: true, auditoria: registros || [] }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
         case 'PLANO_PERMISSAO_EXCLUIR': {
           const permissaoId = textoId(payload.permissao_id);
           if (!permissaoId) return new Response(JSON.stringify({ error: 'Permissão não informada.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
@@ -1596,6 +1603,7 @@ Deno.serve(async (req: Request) => {
             const { opcao_id, decisao_camada_1 } = payload;
             
             if (decisao_camada_1?.opcao_escolhida === 'NAO_CONTEMPLADO') {
+              const opcaoNaoContemplada = await base44.asServiceRole.entities.OpcaoFeriasMilitar.get(opcao_id);
               const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
                 status_camada_1: 'Nao_Contemplado',
                 decisao_camada_1_opcao: 'NAO_CONTEMPLADO',
@@ -1606,7 +1614,7 @@ Deno.serve(async (req: Request) => {
                 data_decisao_camada_1: new Date().toISOString(),
                 justificativa_ajuste_gestor: decisao_camada_1?.justificativa || 'Militar não contemplado neste plano de férias.',
               });
-              await registrarAuditoriaFerias(base44, user, 'MILITAR_NAO_CONTEMPLADO', { ...opcaoGestao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { justificativa: decisao_camada_1?.justificativa || '' });
+              await registrarAuditoriaFerias(base44, user, 'MILITAR_NAO_CONTEMPLADO', { ...opcaoNaoContemplada, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { justificativa: decisao_camada_1?.justificativa || '' });
               return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
             }
 
@@ -1713,6 +1721,7 @@ Deno.serve(async (req: Request) => {
 
           if (acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
             const { opcao_id, homologacao_camada_2 } = payload;
+            const opcaoHomologacao = await base44.asServiceRole.entities.OpcaoFeriasMilitar.get(opcao_id);
             const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
               status_camada_2: homologacao_camada_2?.status === 'Homologado_Superior' ? 'Homologado_Superior' : 'Rejeitado_Para_Revisao',
               superior_homologador_id: user.id,
@@ -1720,7 +1729,7 @@ Deno.serve(async (req: Request) => {
               data_homologacao_superior: new Date().toISOString(),
               observacao_superior: homologacao_camada_2?.observacao || '',
             });
-            await registrarAuditoriaFerias(base44, user, homologacao_camada_2?.status === 'Homologado_Superior' ? 'HOMOLOGACAO_APROVADA' : 'HOMOLOGACAO_REJEITADA', { ...opcaoGestao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { observacao: homologacao_camada_2?.observacao || '' });
+            await registrarAuditoriaFerias(base44, user, homologacao_camada_2?.status === 'Homologado_Superior' ? 'HOMOLOGACAO_APROVADA' : 'HOMOLOGACAO_REJEITADA', { ...opcaoHomologacao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { observacao: homologacao_camada_2?.observacao || '' });
             return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
