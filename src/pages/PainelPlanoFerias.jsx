@@ -189,7 +189,35 @@ export default function PainelPlanoFerias() {
       setTodasCampanhasSelecionadas(visaoConsolidada);
 
       // 2. Opções recebidas: uma linha por militar/período quando o contexto é um plano.
-      const listaOpcoes = res.data?.opcoes || [];
+      let listaOpcoes = res.data?.opcoes || [];
+
+      // Compatibilidade: se a rota consolidada retornar vazio, recupera as respostas
+      // campanha a campanha e ainda as mantém agrupadas no mesmo plano.
+      if (planoAlvoId && !campanhaAlvoId && listaOpcoes.length === 0) {
+        const campanhasDoPlanoConsulta = listaCampanhas.filter((campanha) => (
+          campanha.plano_ferias_institucional_id === planoAlvoId
+        ));
+        const respostasPorCampanha = await Promise.all(campanhasDoPlanoConsulta.map(async (campanha) => {
+          try {
+            const respostaCampanha = await base44.functions.invoke('portal_servicos', {
+              acao: 'PLANO_ESCALA_LISTAR',
+              campanha_id: campanha.id,
+            });
+            return respostaCampanha.data?.opcoes || [];
+          } catch (_errCampanha) {
+            return [];
+          }
+        }));
+
+        const opcoesAgrupadas = new Map();
+        respostasPorCampanha.flat().forEach((opcao) => {
+          const chave = `${opcao.militar_id || opcao.militar_matricula || opcao.id}:${opcao.periodo_aquisitivo_id || opcao.ano_referencia || 'SEM_PERIODO'}`;
+          if (!opcoesAgrupadas.has(chave)) opcoesAgrupadas.set(chave, opcao);
+        });
+        listaOpcoes = Array.from(opcoesAgrupadas.values());
+      }
+
+      if (carregamentoId !== carregamentoPainelRef.current) return;
       setOpcoes(listaOpcoes);
 
       // 3. Carrega o quantitativo total de militares ativos para cálculo real de cotas e percentual
