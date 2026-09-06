@@ -306,7 +306,7 @@ export default function PlanosFerias() {
     }
   };
 
-  const abrirRespostas = async (campanha) =>
+  const abrirRespostas = async (campanha) => {
     setModalRespostas(campanha);
     setRespostasCampanha(null);
     setCarregandoRespostas(true);
