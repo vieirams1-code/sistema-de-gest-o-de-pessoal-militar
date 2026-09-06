@@ -552,9 +552,6 @@ Deno.serve(async (req: Request) => {
           try {
             usuarios = usuarios.filter(Boolean);
           } catch (_erroNormalizacaoUsuarios) {}
-          } catch (_erroFiltroUsuarios) {
-            usuarios = await base44.asServiceRole.entities.User.list();
-          }
           return new Response(JSON.stringify({
             ok: true,
             usuarios: (usuarios || []).map((usuario: any) => ({
