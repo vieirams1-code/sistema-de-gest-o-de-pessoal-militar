@@ -231,7 +231,29 @@ export default function PlanosFerias() {
     }
   };
 
-  const abrirRespostas = async (campanha) => {
+  const excluirCampanha = async (campanha) => {
+    if (!modoAdmin) {
+      setFeedback({ tipo: 'erro', texto: 'Ative o Modo Admin para excluir campanhas.' });
+      return;
+    }
+    if (!window.confirm(`Excluir a campanha "${campanha.titulo}"? As respostas enviadas nela também serão excluídas. O militar continuará podendo responder em outra campanha ativa do mesmo plano.`)) return;
+    setSalvando(true);
+    try {
+      const resposta = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_EXCLUIR',
+        campanha_id: campanha.id,
+      });
+      setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Campanha e respostas excluídas com sucesso.' });
+      await carregar();
+      setSelecionado((atual) => atual ? { ...atual } : null);
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível excluir a campanha.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirRespostas = async (campanha) =>
     setModalRespostas(campanha);
     setRespostasCampanha(null);
     setCarregandoRespostas(true);
@@ -339,7 +361,10 @@ export default function PlanosFerias() {
                 {campanhasDoPlano.map((campanha) => (
                   <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.escopo_unidades_nomes || 'Toda a Corporação'} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
-                    <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>
+                      {modoAdmin && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
+                    </div>
                   </div>
                 ))}
               </div>
