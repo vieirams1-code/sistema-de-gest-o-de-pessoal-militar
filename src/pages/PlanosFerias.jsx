@@ -89,18 +89,14 @@ export default function PlanosFerias() {
 
   useEffect(() => {
     if (!modoAdmin || !selecionado?.id) return;
-    Promise.all([
+    Promise.allSettled([
       base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
       base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id }),
       base44.functions.invoke('portal_servicos', { acao: 'PLANO_AUDITORIA_LISTAR', plano_id: selecionado.id }),
-    ]).then(([usuariosRes, permissoesRes, auditoriaRes]) => {
-      setUsuariosSistema(usuariosRes.data?.usuarios || []);
-      setPermissoes(permissoesRes.data?.permissoes || []);
-      setAuditoria(auditoriaRes.data?.auditoria || []);
-    }).catch(() => {
-      setUsuariosSistema([]);
-      setPermissoes([]);
-      setAuditoria([]);
+    ]).then(([usuariosResult, permissoesResult, auditoriaResult]) => {
+      setUsuariosSistema(usuariosResult.status === 'fulfilled' ? (usuariosResult.value.data?.usuarios || []) : []);
+      setPermissoes(permissoesResult.status === 'fulfilled' ? (permissoesResult.value.data?.permissoes || []) : []);
+      setAuditoria(auditoriaResult.status === 'fulfilled' ? (auditoriaResult.value.data?.auditoria || []) : []);
     });
   }, [modoAdmin, selecionado?.id]);
 
