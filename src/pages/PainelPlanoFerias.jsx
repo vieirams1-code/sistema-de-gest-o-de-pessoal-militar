@@ -674,13 +674,23 @@ export default function PainelPlanoFerias() {
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className="text-xs text-slate-500 font-medium">Coleta:</span>
                 <select
-                  value={campanhaSelecionada?.id || ''}
+                  value={painelConsolidado && planoSelecionadoId ? '__TODAS_AS_CAMPANHAS__' : (campanhaSelecionada?.id || '')}
                   onChange={(e) => {
+                    if (e.target.value === '__TODAS_AS_CAMPANHAS__' && planoSelecionadoId) {
+                      setPainelConsolidado(true);
+                      carregarPainel(null, planoSelecionadoId);
+                      return;
+                    }
                     const c = campanhasDoPlano.find((item) => item.id === e.target.value);
                     if (c) handleSelecionarCampanha(c);
                   }}
                   className="text-xs bg-slate-50 border border-slate-300 rounded-md px-2 py-0.5 font-bold text-slate-800 outline-none cursor-pointer"
                 >
+                  {planoSelecionadoId && (
+                    <option value="__TODAS_AS_CAMPANHAS__">
+                      Todas as campanhas — visão agrupada
+                    </option>
+                  )}
                   {campanhasDoPlano.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.status})
