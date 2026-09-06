@@ -29,6 +29,7 @@ export default function PlanosFerias() {
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
   const [unidades, setUnidades] = useState([]);
+  const [grupos, setGrupos] = useState([]);
   const [modalCampanha, setModalCampanha] = useState(false);
   const [salvandoCampanha, setSalvandoCampanha] = useState(false);
   const [campanhaForm, setCampanhaForm] = useState(null);
@@ -53,6 +54,12 @@ export default function PlanosFerias() {
         })).filter((lotacao) => lotacao.id));
       } catch (_erroLotacoes) {
         setUnidades([]);
+      }
+      try {
+        const gruposAtivos = await base44.entities.GrupoEfetivo.filter({ ativo: true });
+        setGrupos((gruposAtivos || []).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+      } catch (_erroGrupos) {
+        setGrupos([]);
       }
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível carregar os Planos de Férias.') });
@@ -165,6 +172,7 @@ export default function PlanosFerias() {
       ano_referencia: ano,
       tipo_escopo: 'TODOS',
       escopo_unidades_ids: [],
+      escopo_grupos_ids: [],
       data_inicio: new Date().toISOString().slice(0, 10),
       data_fim_militar: `${ano}-10-31`,
       data_fim_unidade: `${ano}-11-30`,
@@ -197,6 +205,11 @@ export default function PlanosFerias() {
           tipo_escopo: campanhaForm.tipo_escopo,
           escopo_unidades_ids: campanhaForm.escopo_unidades_ids,
           escopo_unidades_nomes: nomesUnidades,
+          escopo_grupos_ids: campanhaForm.escopo_grupos_ids || [],
+          escopo_grupos_nomes: (campanhaForm.escopo_grupos_ids || [])
+            .map((id) => grupos.find((grupo) => grupo.id === id)?.nome || id)
+            .join(', '),
+          escopo_grupos_excluidos_ids: [],
           escopo_quadros: [],
           data_inicio: campanhaForm.data_inicio,
           data_fim_militar: campanhaForm.data_fim_militar,
@@ -259,6 +272,18 @@ export default function PlanosFerias() {
             <div className="grid sm:grid-cols-3 gap-3"><div><label className="text-xs font-bold text-slate-700">Início *</label><Input required type="date" value={campanhaForm.data_inicio} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_inicio: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo militar *</label><Input required type="date" value={campanhaForm.data_fim_militar} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo unidade</label><Input type="date" value={campanhaForm.data_fim_unidade} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_unidade: e.target.value })} /></div></div>
             <div><label className="text-xs font-bold text-slate-700">Escopo *</label><select value={campanhaForm.tipo_escopo} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.value, escopo_unidades_ids: [] })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Unidades selecionadas</option></select></div>
             {campanhaForm.tipo_escopo === 'UNIDADES' && <div className="grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{unidades.length === 0 ? <p className="text-xs text-slate-500">Nenhuma unidade disponível para seleção.</p> : unidades.map((unidade) => <label key={unidade.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={campanhaForm.escopo_unidades_ids.includes(unidade.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_unidades_ids: e.target.checked ? [...campanhaForm.escopo_unidades_ids, unidade.id] : campanhaForm.escopo_unidades_ids.filter((id) => id !== unidade.id) })} />{unidade.nome}</label>)}</div>}
+            <div>
+              <label className="text-xs font-bold text-slate-700">Grupos de militares</label>
+              <p className="mt-1 text-[11px] text-slate-500">Opcional. O grupo será combinado com o escopo de lotação acima.</p>
+              <div className="mt-2 grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                {grupos.length === 0 ? <p className="text-xs text-slate-500">Nenhum grupo ativo disponível. Cadastre grupos em Grupos do Efetivo.</p> : grupos.map((grupo) => (
+                  <label key={grupo.id} className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={(campanhaForm.escopo_grupos_ids || []).includes(grupo.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_grupos_ids: e.target.checked ? [...(campanhaForm.escopo_grupos_ids || []), grupo.id] : (campanhaForm.escopo_grupos_ids || []).filter((id) => id !== grupo.id) })} />
+                    <span>{grupo.nome}{grupo.sigla ? ` (${grupo.sigla})` : ''}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div><label className="text-xs font-bold text-slate-700">Orientações aos militares</label><textarea value={campanhaForm.instrucoes} onChange={(e) => setCampanhaForm({ ...campanhaForm, instrucoes: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" rows={4} /></div>
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><Button type="button" variant="outline" onClick={() => setModalCampanha(false)}>Cancelar</Button><Button type="submit" disabled={salvandoCampanha} className="bg-emerald-700 hover:bg-emerald-800">{salvandoCampanha ? 'Criando...' : 'Criar campanha'}</Button></div>
           </form>
