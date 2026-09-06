@@ -534,7 +534,24 @@ Deno.serve(async (req: Request) => {
         case 'PERMISSOES_LISTAR_USUARIOS': {
           let usuarios: any[] = [];
           try {
-            usuarios = await base44.asServiceRole.entities.User.filter({});
+            usuarios = await base44.entities.User.list();
+          } catch (_erroUsuarioAutenticado) {
+            try {
+              usuarios = await base44.asServiceRole.entities.User.filter({});
+            } catch (_erroFiltroUsuarios) {
+              usuarios = await base44.asServiceRole.entities.User.list();
+            }
+          }
+          if (!Array.isArray(usuarios) || usuarios.length === 0) {
+            try {
+              usuarios = await base44.asServiceRole.entities.User.filter({});
+            } catch (_erroFiltroUsuariosVazio) {}
+          }
+          /* fallback final para o formato do SDK */
+          if (!Array.isArray(usuarios)) usuarios = [];
+          try {
+            usuarios = usuarios.filter(Boolean);
+          } catch (_erroNormalizacaoUsuarios) {}
           } catch (_erroFiltroUsuarios) {
             usuarios = await base44.asServiceRole.entities.User.list();
           }
@@ -551,9 +568,13 @@ Deno.serve(async (req: Request) => {
 
         case 'PLANO_PERMISSOES_LISTAR': {
           const planoId = textoId(payload.plano_id);
+          const campanhaIdFiltro = textoId(payload.campanha_id);
           if (!planoId) return new Response(JSON.stringify({ error: 'Plano não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const permissoes = await base44.asServiceRole.entities.PermissaoPlanoFerias.filter({ plano_ferias_institucional_id: planoId });
-          return new Response(JSON.stringify({ ok: true, permissoes: permissoes || [] }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const filtradas = campanhaIdFiltro
+            ? (permissoes || []).filter((item: any) => !textoId(item.campanha_id) || textoId(item.campanha_id) === campanhaIdFiltro)
+            : permissoes || [];
+          return new Response(JSON.stringify({ ok: true, permissoes: filtradas }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         case 'PLANO_PERMISSAO_SALVAR': {
