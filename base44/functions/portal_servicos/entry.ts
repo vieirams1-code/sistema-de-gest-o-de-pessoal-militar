@@ -302,6 +302,28 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
   return permitidas;
 }
 
+async function registrarAuditoriaFerias(base44: any, user: any, acao: string, contexto: any = {}, detalhes: any = {}) {
+  try {
+    await base44.asServiceRole.entities.AuditoriaFerias.create({
+      acao,
+      resultado: 'SUCESSO',
+      usuario_id: String(user?.id || ''),
+      usuario_email: user?.email || '',
+      usuario_nome: user?.full_name || user?.name || user?.email || 'Usuário',
+      militar_id: String(contexto.militar_id || ''),
+      militar_nome: contexto.militar_nome || '',
+      militar_matricula: contexto.militar_matricula || '',
+      plano_id: String(contexto.plano_id || contexto.plano_ferias_institucional_id || ''),
+      campanha_id: String(contexto.campanha_id || ''),
+      opcao_id: String(contexto.opcao_id || ''),
+      detalhes: typeof detalhes === 'string' ? detalhes : JSON.stringify(detalhes || {}),
+      data_hora: new Date().toISOString(),
+    });
+  } catch (_erroAuditoria) {
+    // A auditoria não pode impedir a conclusão da ação principal.
+  }
+}
+
 function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao.startsWith('PLANO_INSTITUCIONAL_')) {
     return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal'];
@@ -510,7 +532,12 @@ Deno.serve(async (req: Request) => {
 
       switch (acao) {
         case 'PERMISSOES_LISTAR_USUARIOS': {
-          const usuarios = await base44.asServiceRole.entities.User.list();
+          let usuarios: any[] = [];
+          try {
+            usuarios = await base44.asServiceRole.entities.User.filter({});
+          } catch (_erroFiltroUsuarios) {
+            usuarios = await base44.asServiceRole.entities.User.list();
+          }
           return new Response(JSON.stringify({
             ok: true,
             usuarios: (usuarios || []).map((usuario: any) => ({
@@ -1579,6 +1606,7 @@ Deno.serve(async (req: Request) => {
                 data_decisao_camada_1: new Date().toISOString(),
                 justificativa_ajuste_gestor: decisao_camada_1?.justificativa || 'Militar não contemplado neste plano de férias.',
               });
+              await registrarAuditoriaFerias(base44, user, 'MILITAR_NAO_CONTEMPLADO', { ...opcaoGestao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { justificativa: decisao_camada_1?.justificativa || '' });
               return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
             }
 
@@ -1679,6 +1707,7 @@ Deno.serve(async (req: Request) => {
               data_decisao_camada_1: new Date().toISOString(),
               justificativa_ajuste_gestor: decisao_camada_1?.justificativa || '',
             });
+            await registrarAuditoriaFerias(base44, user, 'ESCALA_SALVA', { ...opcaoGestao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { parcelas: parcelasNormalizadas, justificativa: decisao_camada_1?.justificativa || '' });
             return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
@@ -1691,6 +1720,7 @@ Deno.serve(async (req: Request) => {
               data_homologacao_superior: new Date().toISOString(),
               observacao_superior: homologacao_camada_2?.observacao || '',
             });
+            await registrarAuditoriaFerias(base44, user, homologacao_camada_2?.status === 'Homologado_Superior' ? 'HOMOLOGACAO_APROVADA' : 'HOMOLOGACAO_REJEITADA', { ...opcaoGestao, opcao_id, campanha_id: opcaoGestao?.campanha_id, plano_id: opcaoGestao?.plano_ferias_institucional_id }, { observacao: homologacao_camada_2?.observacao || '' });
             return new Response(JSON.stringify({ ok: true, opcao: updated }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
