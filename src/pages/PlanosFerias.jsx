@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
-import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users, X, Eye } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users, X, Eye, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -32,6 +32,7 @@ export default function PlanosFerias() {
   const [grupos, setGrupos] = useState([]);
   const [modalCampanha, setModalCampanha] = useState(false);
   const [salvandoCampanha, setSalvandoCampanha] = useState(false);
+  const [modoAdmin, setModoAdmin] = useState(false);
   const [campanhaForm, setCampanhaForm] = useState(null);
   const [modalRespostas, setModalRespostas] = useState(null);
   const [respostasCampanha, setRespostasCampanha] = useState(null);
@@ -248,13 +249,19 @@ export default function PlanosFerias() {
   };
 
   const excluir = async (plano) => {
+    if (!modoAdmin) {
+      setFeedback({ tipo: 'erro', texto: 'Ative o Modo Admin para excluir planos de férias.' });
+      return;
+    }
+    const geradas = Number(metricas?.ferias_geradas_unicas || 0);
+    if (geradas > 0 && !window.confirm('ATENÇÃO: este plano possui ' + geradas + ' registro(s) de férias já gerado(s). A exclusão manterá as férias no SGP, mas removerá o vínculo com o plano e impedirá seu rastreamento por ele. Deseja continuar?')) return;
     if (!window.confirm(`Excluir o plano vazio "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('planos_ferias_servicos', { acao: 'EXCLUIR', plano_id: plano.id });
+      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_EXCLUIR', plano_id: plano.id, confirmar_perda_vinculo: geradas > 0 });
       setSelecionado(null);
       await carregar();
-      setFeedback({ tipo: 'sucesso', texto: 'Plano excluído.' });
+      setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Plano excluído.' });
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível excluir o plano.') });
     } finally {
