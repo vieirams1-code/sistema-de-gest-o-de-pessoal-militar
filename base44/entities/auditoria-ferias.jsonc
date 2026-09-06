@@ -1,0 +1,79 @@
+{
+  "name": "AuditoriaFerias",
+  "type": "object",
+  "title": "Auditoria de F\u00e9rias",
+  "description": "Registro imut\u00e1vel das a\u00e7\u00f5es administrativas realizadas sobre respostas, escalas e f\u00e9rias.",
+  "properties": {
+    "acao": {
+      "type": "string",
+      "enum": [
+        "ESCALA_SALVA",
+        "MILITAR_NAO_CONTEMPLADO",
+        "F\u00c9RIAS_AUTORIZADAS",
+        "F\u00c9RIAS_NEGADAS",
+        "HOMOLOGACAO_APROVADA",
+        "HOMOLOGACAO_REJEITADA",
+        "FERIAS_GERADAS",
+        "FERIAS_ALTERADAS"
+      ]
+    },
+    "resultado": {
+      "type": "string",
+      "enum": [
+        "SUCESSO",
+        "FALHA"
+      ]
+    },
+    "usuario_id": {
+      "type": "string"
+    },
+    "usuario_email": {
+      "type": "string"
+    },
+    "usuario_nome": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "plano_id": {
+      "type": "string"
+    },
+    "campanha_id": {
+      "type": "string"
+    },
+    "opcao_id": {
+      "type": "string"
+    },
+    "detalhes": {
+      "type": "string"
+    },
+    "data_hora": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "acao",
+    "resultado",
+    "usuario_id",
+    "usuario_email",
+    "data_hora"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
