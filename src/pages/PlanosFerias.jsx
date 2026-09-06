@@ -255,7 +255,7 @@ export default function PlanosFerias() {
     }
     const geradas = Number(metricas?.ferias_geradas_unicas || 0);
     if (geradas > 0 && !window.confirm('ATENÇÃO: este plano possui ' + geradas + ' registro(s) de férias já gerado(s). A exclusão manterá as férias no SGP, mas removerá o vínculo com o plano e impedirá seu rastreamento por ele. Deseja continuar?')) return;
-    if (!window.confirm(`Excluir o plano vazio "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Excluir o plano "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
     try {
       const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_EXCLUIR', plano_id: plano.id, confirmar_perda_vinculo: geradas > 0 });
