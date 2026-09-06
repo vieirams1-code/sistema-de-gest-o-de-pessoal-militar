@@ -90,6 +90,9 @@ export default function PainelPlanoFerias() {
 
   // Modo Admin para proteção de campanhas
   const [modoAdmin, setModoAdmin] = useState(false);
+  const [usuariosPermitidos, setUsuariosPermitidos] = useState([]);
+  const [permissoesCampanha, setPermissoesCampanha] = useState([]);
+  const [permissaoCampanhaForm, setPermissaoCampanhaForm] = useState({ usuario_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
 
   // Estados de Edição e Seleção por Militar
   const [selecoesMilitares, setSelecoesMilitares] = useState({});
@@ -286,6 +289,68 @@ export default function PainelPlanoFerias() {
   useEffect(() => {
     carregarPainel(searchParams.get('campanhaId'), searchParams.get('planoId'));
   }, []);
+
+  useEffect(() => {
+    if (!modoAdmin || painelConsolidado || !campanhaSelecionada?.id || !planoSelecionadoId) {
+      setUsuariosPermitidos([]);
+      setPermissoesCampanha([]);
+      return;
+    }
+    const carregarUsuarios = async () => {
+      try {
+        const diretos = await base44.entities.User.list();
+        if (Array.isArray(diretos) && diretos.length > 0) return diretos;
+      } catch (_erroUsuariosDiretos) {}
+      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' });
+      return resposta.data?.usuarios || [];
+    };
+    Promise.allSettled([
+      carregarUsuarios(),
+      base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoSelecionadoId, campanha_id: campanhaSelecionada.id }),
+    ]).then(([usuariosResult, permissoesResult]) => {
+      const usuarios = usuariosResult.status === 'fulfilled' ? usuariosResult.value : [];
+      setUsuariosPermitidos((usuarios || []).map((usuario) => ({
+        id: usuario.id,
+        email: usuario.email || '',
+        nome: usuario.nome || usuario.full_name || usuario.name || usuario.email || 'Usuário sem nome',
+      })).filter((usuario) => usuario.id));
+      setPermissoesCampanha(permissoesResult.status === 'fulfilled' ? (permissoesResult.value.data?.permissoes || []) : []);
+    });
+  }, [modoAdmin, painelConsolidado, campanhaSelecionada?.id, planoSelecionadoId]);
+
+  const salvarPermissaoCampanha = async (evento) => {
+    evento.preventDefault();
+    if (!planoSelecionadoId || !campanhaSelecionada?.id || !permissaoCampanhaForm.usuario_id) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_PERMISSAO_SALVAR',
+        plano_id: planoSelecionadoId,
+        permissao: { ...permissaoCampanhaForm, campanha_id: campanhaSelecionada.id },
+      });
+      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoSelecionadoId, campanha_id: campanhaSelecionada.id });
+      setPermissoesCampanha(resposta.data?.permissoes || []);
+      setPermissaoCampanhaForm({ usuario_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
+      setFeedback({ type: 'success', msg: 'Usuário autorizado nesta campanha.' });
+    } catch (erro) {
+      setFeedback({ type: 'error', msg: erro.response?.data?.error || erro.message || 'Não foi possível salvar a autorização.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const removerPermissaoCampanha = async (permissao) => {
+    if (!window.confirm('Remover o acesso deste usuário à campanha?')) return;
+    setActionLoading(true);
+    try {
+      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSAO_EXCLUIR', permissao_id: permissao.id });
+      setPermissoesCampanha((atual) => atual.filter((item) => item.id !== permissao.id));
+    } catch (erro) {
+      setFeedback({ type: 'error', msg: erro.response?.data?.error || erro.message || 'Não foi possível remover o acesso.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleSelecionarCampanha = (camp) => {
     setCampanhaSelecionada(camp);
