@@ -372,7 +372,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   return [];
 }
 
-async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string): Promise<boolean> {
+async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, payload: any = {}): Promise<boolean> {
   if (!user?.email) return false;
   if (String(user.role || '').trim().toLowerCase() === 'admin') return true;
 
@@ -385,7 +385,50 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string): P
     : [];
   const permissoes = consolidarPermissoesPortal(perfis || [], acessos || []);
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
-  return necessarias.length > 0 && necessarias.some((key) => permissoes.has(key));
+  if (necessarias.length > 0 && necessarias.some((key) => permissoes.has(key))) return true;
+
+  // Delegação por plano/campanha: um usuário pode atuar nas férias apenas
+  // quando recebeu uma autorização ativa e explícita naquele plano.
+  const acoesDelegaveis = new Set([
+    'PLANO_ESCALA_LISTAR',
+    'PLANO_DECISAO_CAMADA_1',
+    'PLANO_HOMOLOGACAO_CAMADA_2',
+    'PLANO_GERAR_LOTE_FERIAS',
+    'PLANO_INSTITUCIONAL_GERAR_FERIAS',
+  ]);
+  if (!acoesDelegaveis.has(acao)) return false;
+
+  let planoId = textoId(payload?.plano_id);
+  const campanhaId = textoId(payload?.campanha_id);
+  if (!planoId && campanhaId) {
+    try {
+      const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanhaId);
+      planoId = textoId(campanha?.plano_ferias_institucional_id);
+    } catch (_eCampanha) {}
+  }
+  if (!planoId) return false;
+
+  let delegacoes: any[] = [];
+  try {
+    delegacoes = await base44.asServiceRole.entities.PermissaoPlanoFerias.filter({
+      plano_ferias_institucional_id: planoId,
+      usuario_id: user.id,
+      ativo: true,
+    });
+  } catch (_eDelegacao) {
+    delegacoes = [];
+  }
+  const delegacao = (delegacoes || []).find((item: any) => {
+    const campanhaDelegada = textoId(item?.campanha_id);
+    return !campanhaDelegada || !campanhaId || campanhaDelegada === campanhaId;
+  });
+  if (!delegacao) return false;
+
+  if (acao === 'PLANO_ESCALA_LISTAR') return Boolean(delegacao.pode_visualizar);
+  if (acao === 'PLANO_DECISAO_CAMADA_1' || acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
+    return Boolean(delegacao.pode_autorizar || delegacao.pode_editar_escala);
+  }
+  return Boolean(delegacao.pode_gerar_ferias);
 }
 
 async function usuarioPodeAgirSobreMilitarPortal(base44: any, user: any, militarId: string): Promise<boolean> {
