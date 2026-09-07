@@ -1122,13 +1122,19 @@ export default function PainelPlanoFerias() {
                       {opcoesFiltradas.map((op) => {
                         const preferencias = [op.opcao_1_detalhes, op.opcao_2_detalhes, op.opcao_3_detalhes].flatMap((d) => extrairParcelas({ opcao_1_detalhes: d }));
                         const parcelas = extrairParcelas(op);
+                        const selecaoAtual = selecoesMilitares[op.id] || {};
+                        const limiteFracoes = op.modalidade === '3_ETAPAS_10' ? 3 : op.modalidade === '1_ETAPA_30' || op.modalidade === 'CUSTOM' ? 1 : 2;
+                        const mesesSelecionados = Array.from({ length: limiteFracoes }).map((_, i) => selecaoAtual['fracao' + (i + 1)]).filter(Boolean);
                         return <div key={op.id} className="grid border-b border-slate-100 hover:bg-slate-50" style={{ gridTemplateColumns: 'minmax(280px, 1.6fr) repeat(12, minmax(70px, 1fr))' }}>
                           <div className="sticky left-0 z-10 bg-white px-3 py-2.5 min-w-0"><div className="font-bold text-xs text-slate-800 truncate">{op.militar_posto} {op.militar_nome}</div><div className="text-[10px] text-slate-500 truncate">{op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</div></div>
                           {LISTA_MESES.map((mes) => {
                             const aprovadas = parcelas.filter((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
+                            const selecionadaIndex = mesesSelecionados.findIndex((m) => m === mes.val);
                             const prefIndex = preferencias.findIndex((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
-                            const classe = aprovadas.length ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-300 hover:bg-blue-50 hover:text-blue-500';
-                            return <button key={mes.val} type="button" onClick={() => handleSelecionarMesTimeline(op, mes.val, prefIndex)} title={aprovadas.length ? 'Parcela aprovada — clique para editar' : prefIndex >= 0 ? `${prefIndex + 1}ª preferência — clique para aprovar/editar` : 'Sem preferência — clique para alocar manualmente'} className={`m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ${classe}`}>{aprovadas.length ? aprovadas.map((p) => `${p.dias || p.quantidade_dias || '?'}d`).join(' + ') : prefIndex >= 0 ? `${prefIndex + 1}ª op` : '+'}</button>;
+                            const selecionada = selecionadaIndex >= 0 && !aprovadas.length;
+                            const classe = aprovadas.length ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : selecionada ? 'bg-blue-100 border-blue-300 text-blue-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-300 hover:bg-blue-50 hover:text-blue-500';
+                            const rotulo = aprovadas.length ? aprovadas.map((p) => String(p.dias || p.quantidade_dias || '?') + 'd').join(' + ') : selecionada ? (String(selecionadaIndex + 1) + 'ª fração') : prefIndex >= 0 ? (String(prefIndex + 1) + 'ª op') : '+';
+                            return <button key={mes.val} type="button" onClick={() => handleSelecionarMesTimeline(op, mes.val, prefIndex)} title={aprovadas.length ? 'Parcela aprovada — clique para editar' : selecionada ? 'Mês selecionado — clique para desmarcar' : prefIndex >= 0 ? 'Preferência — clique para selecionar' : 'Clique para alocar neste mês'} className={'m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ' + classe}>{rotulo}</button>;
                           })}
                         </div>;
                       })}
