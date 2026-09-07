@@ -73,6 +73,17 @@ function extrairMesDeDetalhes(detalhesStr, fallbackVal = '01') {
   return fallbackVal;
 }
 
+function extrairParcelas(op) {
+  const detalhes = op?.decisao_camada_1_detalhes || op?.opcao_1_detalhes;
+  if (!detalhes || detalhes === '[]') return [];
+  try {
+    const parcelas = JSON.parse(detalhes);
+    return Array.isArray(parcelas) ? parcelas.filter((p) => p && (p.mes || p.data_inicio)) : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
 export default function PainelPlanoFerias() {
   // Lista de Campanhas e Campanha Selecionada
   const [campanhas, setCampanhas] = useState([]);
@@ -113,6 +124,19 @@ export default function PainelPlanoFerias() {
   const [filtroModalidade, setFiltroModalidade] = useState('TODOS');
   const [filtroUnidade, setFiltroUnidade] = useState('TODOS');
   const [filtroMes, setFiltroMes] = useState('TODOS');
+  const [visualizacao, setVisualizacao] = useState(() => {
+    try {
+      return window.localStorage.getItem('sgp_ferias_visualizacao') || 'APROVACAO';
+    } catch (_e) {
+      return 'APROVACAO';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('sgp_ferias_visualizacao', visualizacao);
+    } catch (_e) {}
+  }, [visualizacao]);
 
   // Modal para Justificativa de Não Contemplado
   const [modalNaoContemplado, setModalNaoContemplado] = useState({ open: false, opcao: null, justificativa: '' });
@@ -678,6 +702,18 @@ export default function PainelPlanoFerias() {
   const totalSalvos = opcoes.filter((o) => o.status_camada_1 !== 'Pendente' && o.status_camada_1 !== 'Nao_Contemplado' && o.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO').length;
   const totalNaoContemplados = opcoes.filter((o) => o.status_camada_1 === 'Nao_Contemplado' || o.decisao_camada_1_opcao === 'NAO_CONTEMPLADO').length;
   const totalGeradas = opcoes.filter((o) => o.gerado_ferias_efetivas).length;
+  const timelineContagem = useMemo(() => {
+    const contagem = Object.fromEntries(LISTA_MESES.map((m) => [m.val, 0]));
+    opcoes.forEach((op) => {
+      if (op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO') return;
+      extrairParcelas(op).forEach((parcela) => {
+        const mes = String(parcela.mes || parcela.data_inicio?.slice(5, 7) || '').padStart(2, '0');
+        if (contagem[mes] !== undefined) contagem[mes] += 1;
+      });
+    });
+    return contagem;
+  }, [opcoes]);
+  const timelineLimite = Math.max(1, Math.ceil((campanhaSelecionada?.total_militares_escopo || campanhaSelecionada?.efetivo_total || totalEfetivoGeral || Math.max(opcoes.length, 100)) * 0.1));
 
   const planoAtual = planos.find((plano) => plano.id === planoSelecionadoId);
   const tituloPainel = painelConsolidado
