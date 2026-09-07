@@ -540,7 +540,7 @@ export default function Ferias() {
         meta: bundle.meta || {},
       };
     },
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
   const ferias = feriasData?.ferias || [];
   const feriasTagsFromBundle = Array.isArray(feriasData?.feriasTags) ? feriasData.feriasTags : [];
@@ -611,13 +611,13 @@ export default function Ferias() {
   const { data: descontosFerias = [] } = useQuery({
     queryKey: ['ferias-descontos-ferias', isAdmin, modoAcesso, userEmail],
     queryFn: listarDescontosFerias,
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
 
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail],
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
 
   const { data: periodosAquisitivosFerias = [] } = useQuery({
@@ -626,13 +626,13 @@ export default function Ferias() {
       const bundle = await fetchScopedPeriodosAquisitivosBundle();
       return bundle.periodosAquisitivos || [];
     },
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
 
   const { data: ajustesSaldoFerias = [] } = useQuery({
     queryKey: ['ferias-ajustes-saldo-operacionais', isAdmin, modoAcesso, userEmail],
     queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
   const feriasIdsEscopoTags = useMemo(
     () => ferias.map((item) => String(item.id)).filter(Boolean),
