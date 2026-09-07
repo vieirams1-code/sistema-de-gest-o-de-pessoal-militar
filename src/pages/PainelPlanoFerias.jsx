@@ -1120,7 +1120,11 @@ export default function PainelPlanoFerias() {
                         const limiteFracoes = op.modalidade === '3_ETAPAS_10' ? 3 : op.modalidade === '1_ETAPA_30' || op.modalidade === 'CUSTOM' ? 1 : 2;
                         const mesesSelecionados = Array.from({ length: limiteFracoes }).map((_, i) => selecaoAtual['fracao' + (i + 1)]).filter(Boolean);
                         return <div key={op.id} className="grid border-b border-slate-100 hover:bg-slate-50" style={{ gridTemplateColumns: 'minmax(280px, 1.6fr) repeat(12, minmax(70px, 1fr))' }}>
-                          <div className="sticky left-0 z-10 bg-white px-3 py-2.5 min-w-0"><div className="font-bold text-xs text-slate-800 truncate">{op.militar_posto} {op.militar_nome}</div><div className="text-[10px] text-slate-500 truncate">{op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</div></div>
+                          <div className="sticky left-0 z-10 bg-white px-3 py-2.5 min-w-0">
+                            <div className="font-bold text-xs text-slate-800 truncate">{op.militar_posto} {op.militar_nome}</div>
+                            <div className="text-[10px] text-slate-500 truncate">{op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</div>
+                            {!op.gerado_ferias_efetivas && mesesSelecionados.length > 0 && <div className="mt-1 flex items-center gap-2"><span className="text-[10px] font-bold text-blue-700">{mesesSelecionados.length}/{limiteFracoes} selecionadas</span>{mesesSelecionados.length === limiteFracoes && <button type="button" onClick={() => handleSalvarEscalaMilitar(op, selecaoAtual)} disabled={actionLoading} className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-blue-700">Salvar seleção</button>}</div>}
+                          </div>
                           {LISTA_MESES.map((mes) => {
                             const aprovadas = parcelas.filter((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
                             const selecionadaIndex = mesesSelecionados.findIndex((m) => m === mes.val);
