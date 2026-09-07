@@ -296,7 +296,8 @@ export default function PainelPlanoFerias() {
           initialMap[op.id] = { fracao1: mes1, fracao2: mes2, fracao3: mes3, justificativa: op.justificativa_ajuste_gestor || '' };
           initialEditing[op.id] = false;
         } else {
-          initialMap[op.id] = { fracao1: mes1, fracao2: mes2, fracao3: mes3, justificativa: '' };
+          // Pendentes começam sem meses selecionados; as preferências continuam visíveis na Timeline.
+          initialMap[op.id] = { fracao1: '', fracao2: '', fracao3: '', justificativa: '' };
           initialEditing[op.id] = selected?.status === 'Aberta_Coleta';
         }
       });
