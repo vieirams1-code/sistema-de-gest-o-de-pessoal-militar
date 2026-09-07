@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check, ShieldCheck, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 
@@ -30,32 +30,28 @@ export default function ConfigurarCampanhaFerias() {
     setLoading(true);
     setFeedback({ tipo: '', texto: '' });
     try {
-      const painel = await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_ESCALA_LISTAR',
-        campanha_id: campanhaId,
-        plano_id: planoId || undefined,
-      });
-      const lista = painel.data?.campanhas || [];
-      const encontrada = lista.find((item) => String(item.id) === String(campanhaId));
+      const encontrada = await base44.entities.CampanhaPortal.get(campanhaId);
       if (!encontrada) throw new Error('Campanha não encontrada ou sem acesso.');
       setCampanha(encontrada);
       const planoAtualId = planoId || encontrada.plano_ferias_institucional_id || '';
       if (planoAtualId) {
         try {
-          const planos = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_LISTAR' });
-          setPlano((planos.data?.planos || []).find((item) => String(item.id) === String(planoAtualId)) || null);
+          setPlano(await base44.entities.PlanoFeriasInstitucional.get(planoAtualId));
         } catch (_erroPlano) {}
       }
       const [users, acessos] = await Promise.all([
         base44.entities.User.list().catch(async () => base44.entities.User.filter({})),
-        base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoAtualId, campanha_id: campanhaId }),
+        base44.entities.PermissaoPlanoFerias.filter({
+          plano_ferias_institucional_id: planoAtualId,
+          campanha_id: campanhaId,
+        }),
       ]);
       setUsuarios((users || []).filter((item) => item?.id).map((item) => ({
         id: item.id,
         nome: item.full_name || item.name || item.email || 'Usuário sem nome',
         email: item.email || '',
       })).sort((a, b) => a.nome.localeCompare(b.nome)));
-      setPermissoes(acessos.data?.permissoes || []);
+      setPermissoes(acessos || []);
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível carregar a configuração da campanha.') });
     } finally {
@@ -75,11 +71,24 @@ export default function ConfigurarCampanhaFerias() {
     if (!form.usuario_id || !campanha?.id) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_PERMISSAO_SALVAR',
-        plano_id: planoId || campanha.plano_ferias_institucional_id,
-        permissao: { ...form, campanha_id: campanha.id },
+      const planoAtualId = planoId || campanha.plano_ferias_institucional_id;
+      const usuario = usuarios.find((item) => String(item.id) === String(form.usuario_id));
+      const existentes = await base44.entities.PermissaoPlanoFerias.filter({
+        plano_ferias_institucional_id: planoAtualId,
+        usuario_id: form.usuario_id,
       });
+      const existente = (existentes || []).find((item) => String(item.campanha_id || '') === String(campanha.id));
+      const registro = {
+        plano_ferias_institucional_id: planoAtualId,
+        campanha_id: campanha.id,
+        usuario_id: form.usuario_id,
+        usuario_email: usuario?.email || '',
+        usuario_nome: usuario?.nome || usuario?.email || 'Usuário sem nome',
+        ...form,
+        ativo: true,
+      };
+      if (existente?.id) await base44.entities.PermissaoPlanoFerias.update(existente.id, registro);
+      else await base44.entities.PermissaoPlanoFerias.create(registro);
       setForm(vazio);
       setFeedback({ tipo: 'sucesso', texto: 'Responsável atribuído com sucesso.' });
       await carregar();
@@ -94,7 +103,7 @@ export default function ConfigurarCampanhaFerias() {
     if (!window.confirm('Remover este responsável da campanha?')) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSAO_EXCLUIR', permissao_id: permissao.id });
+      await base44.entities.PermissaoPlanoFerias.delete(permissao.id);
       setPermissoes((atual) => atual.filter((item) => item.id !== permissao.id));
       setFeedback({ tipo: 'sucesso', texto: 'Acesso removido.' });
     } catch (erro) {
