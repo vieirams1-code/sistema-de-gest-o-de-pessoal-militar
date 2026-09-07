@@ -992,106 +992,75 @@ export default function PainelPlanoFerias() {
           </div>
         </div>
 
-        {/* TABELA DE MILITARES NO DESIGN CLEAN IDÊNTICO AO PREVIEW */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          {opcoesFiltradas.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 text-xs">
-              <i className="ph ph-users text-4xl text-slate-300 mb-2 block"></i>
-              Nenhum militar encontrado para os filtros selecionados neste contexto.
+        {visualizacao === 'APROVACAO' ? (
+          <>
+            {/* VISUALIZAÇÃO 1: APROVAÇÃO RÁPIDA */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              {opcoesFiltradas.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-xs">
+                  <i className="ph ph-users text-4xl text-slate-300 mb-2 block"></i>
+                  Nenhum militar encontrado para os filtros selecionados neste contexto.
+                </div>
+              ) : opcoesFiltradas.map((op) => {
+                const modalidade = op.modalidade || '2_ETAPAS_15';
+                const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
+                const isGerado = Boolean(op.gerado_ferias_efetivas);
+                const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
+                const isDestacadoAmarelo = militarDestaqueAmareloId === op.id;
+                return (
+                  <div key={op.id} onClick={() => setMilitarModalAberto(op)} className={`grid grid-cols-12 gap-4 p-4 items-center border-b border-slate-100 transition-all duration-700 cursor-pointer ${isDestacadoAmarelo ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300 shadow-md' : 'hover:bg-blue-50/60 bg-white'}`}>
+                    <div className="col-span-12 md:col-span-5 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">{op.militar_posto?.slice(0, 3) || 'MIL'}</div>
+                      <div className="min-w-0"><p className="font-bold text-slate-900 text-sm truncate">{op.militar_posto} {op.militar_nome}</p><p className="text-xs text-slate-500 truncate">Mat: {op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</p>{painelConsolidado && Number(op.quantidade_respostas_campanhas || 0) > 1 && <p className="text-[10px] text-blue-700 font-semibold truncate">Consolidado de {op.quantidade_respostas_campanhas} campanhas vinculadas</p>}</div>
+                    </div>
+                    <div className="col-span-6 md:col-span-3"><p className="text-sm font-medium text-slate-800">{modalidade === 'CUSTOM' ? `Saldo remanescente (${op.dias_direito || 0}d)` : modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}</p>{isSalvo && op.decisao_camada_1_meses && <span className="text-[11px] font-bold text-blue-700 block truncate">{op.decisao_camada_1_meses}</span>}</div>
+                    <div className="col-span-3 md:col-span-2 text-center"><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${isGerado ? 'bg-purple-100 text-purple-800 border-purple-200' : isNaoContemplado ? 'bg-rose-100 text-rose-800 border-rose-200' : isSalvo ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>{isGerado ? 'Férias Geradas' : isNaoContemplado ? 'Não Contemplado' : isSalvo ? 'Escala Salva' : 'Pendente'}</span></div>
+                    <div className="col-span-3 md:col-span-2 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); setMilitarModalAberto(op); }} className="px-4 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer">{isSalvo ? 'Ver Escala' : 'Definir Escala'}</button></div>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            opcoesFiltradas.map((op) => {
-              const modalidade = op.modalidade || '2_ETAPAS_15';
-              const isNaoContemplado = op.status_camada_1 === 'Nao_Contemplado' || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO';
-              const isGerado = Boolean(op.gerado_ferias_efetivas);
-              const isSalvo = !isNaoContemplado && op.status_camada_1 !== 'Pendente';
-              const isDestacadoAmarelo = militarDestaqueAmareloId === op.id;
-
-              return (
-                <div
-                  key={op.id}
-                  onClick={() => setMilitarModalAberto(op)}
-                  className={`grid grid-cols-12 gap-4 p-4 items-center border-b border-slate-100 transition-all duration-700 cursor-pointer ${
-                    isDestacadoAmarelo
-                      ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300 shadow-md'
-                      : 'hover:bg-blue-50/60 bg-white'
-                  }`}
-                >
-                  <div className="col-span-12 md:col-span-5 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
-                      {op.militar_posto?.slice(0, 3) || 'MIL'}
+          </>
+        ) : (
+          <>
+            {/* VISUALIZAÇÃO 3: TIMELINE MENSAL */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-3">
+                <div><h2 className="text-sm font-extrabold text-slate-800">Timeline mensal de férias</h2><p className="text-xs text-slate-500 mt-1">Clique em qualquer célula para abrir a escala do militar. Amarelo = preferência; verde = parcela aprovada.</p></div>
+                <span className="text-[11px] font-bold text-slate-500">{opcoesFiltradas.length} militares</span>
+              </div>
+              {opcoesFiltradas.length === 0 ? <div className="p-12 text-center text-slate-500 text-xs">Nenhum militar encontrado para os filtros selecionados neste contexto.</div> : (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1120px]">
+                    <div className="grid border-b border-slate-200 bg-slate-50" style={{ gridTemplateColumns: 'minmax(280px, 1.6fr) repeat(12, minmax(70px, 1fr))' }}>
+                      <div className="sticky left-0 z-10 bg-slate-50 px-3 py-3 text-[10px] font-extrabold uppercase text-slate-500">Militar</div>
+                      {LISTA_MESES.map((mes) => { const count = timelineContagem[mes.val] || 0; const cheio = count >= timelineLimite; return <div key={mes.val} className={`px-1 py-2 text-center border-l border-slate-200 ${cheio ? 'bg-rose-50 text-rose-700' : 'text-slate-600'}`}><div className="text-[10px] font-extrabold uppercase">{mes.nome.slice(0, 3)}</div><div className="text-[10px] font-bold">{count}/{timelineLimite}</div></div>; })}
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-900 text-sm truncate">
-                        {op.militar_posto} {op.militar_nome}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate">
-                        Mat: {op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}
-                      </p>
-                      {painelConsolidado && Number(op.quantidade_respostas_campanhas || 0) > 1 && (
-                        <p className="text-[10px] text-blue-700 font-semibold truncate">
-                          Consolidado de {op.quantidade_respostas_campanhas} campanhas vinculadas
-                        </p>
-                      )}
+                    <div className="max-h-[64vh] overflow-y-auto">
+                      {opcoesFiltradas.map((op) => {
+                        const preferencias = [op.opcao_1_detalhes, op.opcao_2_detalhes, op.opcao_3_detalhes].flatMap((d) => extrairParcelas({ opcao_1_detalhes: d }));
+                        const parcelas = extrairParcelas(op);
+                        return <div key={op.id} className="grid border-b border-slate-100 hover:bg-slate-50" style={{ gridTemplateColumns: 'minmax(280px, 1.6fr) repeat(12, minmax(70px, 1fr))' }}>
+                          <div className="sticky left-0 z-10 bg-white px-3 py-2.5 min-w-0"><div className="font-bold text-xs text-slate-800 truncate">{op.militar_posto} {op.militar_nome}</div><div className="text-[10px] text-slate-500 truncate">{op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</div></div>
+                          {LISTA_MESES.map((mes) => {
+                            const aprovadas = parcelas.filter((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
+                            const prefIndex = preferencias.findIndex((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
+                            const classe = aprovadas.length ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-300 hover:bg-blue-50 hover:text-blue-500';
+                            return <button key={mes.val} type="button" onClick={() => setMilitarModalAberto(op)} title={aprovadas.length ? 'Parcela aprovada — clique para editar' : prefIndex >= 0 ? `${prefIndex + 1}ª preferência — clique para aprovar/editar` : 'Sem preferência — clique para alocar manualmente'} className={`m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ${classe}`}>{aprovadas.length ? aprovadas.map((p) => `${p.dias || p.quantidade_dias || '?'}d`).join(' + ') : prefIndex >= 0 ? `${prefIndex + 1}ª op` : '+'}</button>;
+                          })}
+                        </div>;
+                      })}
                     </div>
-                  </div>
-
-                  <div className="col-span-6 md:col-span-3">
-                    <p className="text-sm font-medium text-slate-800">
-                      {modalidade === 'CUSTOM'
-                        ? `Saldo remanescente (${op.dias_direito || 0}d)`
-                        : modalidade === '1_ETAPA_30'
-                        ? 'Integral (30d)'
-                        : modalidade === '3_ETAPAS_10'
-                        ? '3 Frações (10+10+10d)'
-                        : '2 Frações (15+15d)'}
-                    </p>
-                    {isSalvo && op.decisao_camada_1_meses && (
-                      <span className="text-[11px] font-bold text-blue-700 block truncate">
-                        {op.decisao_camada_1_meses}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="col-span-3 md:col-span-2 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                        isGerado
-                          ? 'bg-purple-100 text-purple-800 border-purple-200'
-                          : isNaoContemplado
-                          ? 'bg-rose-100 text-rose-800 border-rose-200'
-                          : isSalvo
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                          : 'bg-orange-100 text-orange-700 border-orange-200'
-                      }`}
-                    >
-                      {isGerado
-                        ? 'Férias Geradas'
-                        : isNaoContemplado
-                        ? 'Não Contemplado'
-                        : isSalvo
-                        ? 'Escala Salva'
-                        : 'Pendente'}
-                    </span>
-                  </div>
-
-                  <div className="col-span-3 md:col-span-2 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMilitarModalAberto(op);
-                      }}
-                      className="px-4 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
-                    >
-                      {isSalvo ? 'Ver Escala' : 'Definir Escala'}
-                    </button>
+                    <div className="grid bg-slate-800 text-white" style={{ gridTemplateColumns: 'minmax(280px, 1.6fr) repeat(12, minmax(70px, 1fr))' }}>
+                      <div className="sticky left-0 z-10 bg-slate-900 px-3 py-2 text-[10px] font-extrabold">TOTAL / TETO</div>
+                      {LISTA_MESES.map((mes) => { const count = timelineContagem[mes.val] || 0; return <div key={mes.val} className={`px-1 py-2 text-center border-l border-slate-700 text-[10px] font-bold ${count >= timelineLimite ? 'text-rose-300' : 'text-emerald-300'}`}>{count}/{timelineLimite}</div>; })}
+                    </div>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* SEÇÃO 2: HISTÓRICO DE CAMPANHAS DE FÉRIAS (DESATIVADAS / ENCERRADAS / ARQUIVADAS) */}
         {campanhasHistorico.length > 0 && (
