@@ -265,14 +265,16 @@ export function useCurrentUser() {
     if (!modulo) return false;
     if (hasAbsoluteAccess) return true;
     if (!isPermissionResolved) return false;
-    return modules[modulo] === true;
+    const key = String(modulo).trim().replace(/^acesso_/, '');
+    return Boolean(key) && modules[key] === true;
   };
 
   const canAccessAction = (acao) => {
     if (!acao) return false;
     if (hasAbsoluteAccess) return true;
     if (!isPermissionResolved) return false;
-    return actions[acao] === true;
+    const key = String(acao).trim().replace(/^perm_/, '');
+    return Boolean(key) && actions[key] === true;
   };
 
   // Verificação de escopo por registro (mantida da API anterior).
