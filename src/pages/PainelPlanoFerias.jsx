@@ -88,9 +88,9 @@ function extrairParcelas(op) {
 export default function PainelPlanoFerias() {
   const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
   const podeAdminFerias = isAdmin || canAccessAction('perm_admin_campanhas_ferias') || canAccessAction('perm_admin_mode');
-  const podeAprovarFerias = isAdmin || canAccessAction('perm_aprovar_ferias') || canAccessAction('perm_gerir_respostas');
-  const podeGerarFerias = isAdmin || canAccessAction('perm_gerar_ferias_campanhas') || canAccessAction('perm_gerir_respostas');
-  const podeAtribuirPermissoesFerias = isAdmin || canAccessAction('perm_atribuir_permissoes_ferias') || canAccessAction('perm_gerir_respostas');
+  const podeAprovarFerias = isAdmin || canAccessAction('perm_aprovar_ferias');
+  const podeGerarFerias = isAdmin || canAccessAction('perm_gerar_ferias_campanhas');
+  const podeAtribuirPermissoesFerias = isAdmin || canAccessAction('perm_atribuir_permissoes_ferias');
 
   // Lista de Campanhas e Campanha Selecionada
   const [campanhas, setCampanhas] = useState([]);
