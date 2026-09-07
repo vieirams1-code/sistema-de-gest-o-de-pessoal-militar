@@ -30,9 +30,51 @@ async function fetchWithRetry(queryFn, label = 'query') {
   throw lastError;
 }
 
+function extrairMatrizPermissoes(descricao) {
+  if (typeof descricao !== 'string' || !descricao) return {};
+  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
+  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
+  if (start === -1 || end === -1 || end <= start) return {};
+  try {
+    const parsed = JSON.parse(descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim());
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+function consolidarPermissoesFerias(perfis = []) {
+  const modules = {};
+  const actions = {};
+  const aplicar = (fonte) => {
+    if (!fonte || typeof fonte !== 'object') return;
+    for (const [key, value] of Object.entries(fonte)) {
+      if (value !== true) continue;
+      if (key.startsWith('acesso_')) modules[key.replace(/^acesso_/, '')] = true;
+      if (key.startsWith('perm_')) actions[key.replace(/^perm_/, '')] = true;
+    }
+  };
+  for (const perfil of perfis || []) {
+    aplicar(perfil);
+    aplicar(extrairMatrizPermissoes(perfil?.descricao));
+  }
+  return { modules, actions };
+}
+
 async function resolverPermissoes(base44, email) {
   const acessos = await fetchWithRetry(() => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: email, ativo: true }, undefined, LIMIT_USUARIO_ACESSO, 0, CAMPOS_USUARIO_ACESSO), `usuarioAcesso.list:${email}`);
-  return { acessos: acessos || [], isAdminByAccess: (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin') };
+  const perfilIds = Array.from(new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean)));
+  const perfis = perfilIds.length
+    ? await fetchWithRetry(() => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }), `perfilPermissao.in:${email}`)
+    : [];
+  const { modules, actions } = consolidarPermissoesFerias(perfis || []);
+  return {
+    acessos: acessos || [],
+    modules,
+    actions,
+    hasGlobalScope: (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin'),
+    canViewFerias: modules.ferias === true && actions.visualizar_ferias === true,
+  };
 }
 
 async function listarMilitarIdsDoEscopo(base44, acessos) {
@@ -187,17 +229,21 @@ Deno.serve(async (req) => {
     const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
 
     const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
-    if (wantsImpersonation && !authIsAdmin) {
-      return Response.json({ error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' }, { status: 403 });
+    const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
+    if (wantsImpersonation && !authIsAdminByRole) {
+      return Response.json({ error: 'Ação não permitida: somente administradores da plataforma podem usar effectiveEmail.' }, { status: 403 });
     }
 
-    const isImpersonating = wantsImpersonation && authIsAdmin;
+    const isImpersonating = wantsImpersonation && authIsAdminByRole;
     const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
     const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
-    const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
+    const targetCanViewFerias = !isImpersonating && authIsAdminByRole ? true : targetPerms.canViewFerias;
+    if (!targetCanViewFerias) {
+      return Response.json({ error: 'Acesso negado: é necessária a permissão de visualizar férias.', requiredPermission: 'visualizar_ferias' }, { status: 403 });
+    }
+    const targetHasGlobalScope = (!isImpersonating && authIsAdminByRole) || targetPerms.hasGlobalScope;
 
-    if (targetIsAdmin) {
+    if (targetHasGlobalScope) {
       const [ferias, registrosLivro] = await Promise.all([
         fetchWithRetry(() => base44.asServiceRole.entities.Ferias.list('-data_inicio'), 'ferias.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(), 'registroLivro.admin'),
@@ -229,6 +275,7 @@ Deno.serve(async (req) => {
           feriasTagsUsedFallback: feriasTagsResultAdmin.usedFallback,
           warnings: warningsAdmin,
           targetIsAdmin: true,
+          hasGlobalScope: true;
         },
       });
     }
