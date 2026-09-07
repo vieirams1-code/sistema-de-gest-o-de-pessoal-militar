@@ -313,13 +313,37 @@ export const permissionStructure = [
     category: 'Campanhas e Autoatendimento',
     modules: [
       {
-        key: 'acesso_campanhas',
-        label: 'Gestão de Campanhas',
+        key: 'acesso_campanhas_ferias',
+        label: 'Campanhas de Férias',
         actions: [
-          { key: 'perm_visualizar_campanhas', label: 'Visualizar Campanhas' },
-          { key: 'perm_gerir_campanhas', label: 'Gerir Campanhas', sensitive: true },
-          { key: 'perm_gerir_respostas', label: 'Gerir Respostas e Painéis', sensitive: true },
-          { key: 'perm_configurar_portal', label: 'Configurar Regras do Portal', sensitive: true }
+          { key: 'perm_visualizar_campanhas_ferias', label: 'Visualizar campanhas de férias' },
+          { key: 'perm_visualizar_respostas_ferias', label: 'Visualizar férias e respostas das campanhas' },
+          { key: 'perm_criar_campanhas_ferias', label: 'Criar campanhas de férias', sensitive: true },
+          { key: 'perm_admin_campanhas_ferias', label: 'Ativar modo Admin de férias', sensitive: true },
+          { key: 'perm_editar_campanhas_ferias', label: 'Editar campanhas de férias', sensitive: true },
+          { key: 'perm_excluir_campanhas_ferias', label: 'Excluir campanhas de férias', sensitive: true },
+          { key: 'perm_visualizar_planos_ferias', label: 'Visualizar planos de férias' },
+          { key: 'perm_criar_planos_ferias', label: 'Criar planos de férias', sensitive: true },
+          { key: 'perm_editar_planos_ferias', label: 'Editar planos de férias', sensitive: true },
+          { key: 'perm_excluir_planos_ferias', label: 'Excluir planos de férias', sensitive: true },
+          { key: 'perm_aprovar_ferias', label: 'Aprovar respostas e definir escala de férias', sensitive: true },
+          { key: 'perm_gerar_ferias_campanhas', label: 'Gerar férias a partir das campanhas', sensitive: true },
+          { key: 'perm_atribuir_permissoes_ferias', label: 'Atribuir usuários autorizados a aprovar férias', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_campanhas_gerais',
+        label: 'Campanhas gerais',
+        actions: [
+          { key: 'perm_visualizar_campanhas_gerais', label: 'Visualizar campanhas' },
+          { key: 'perm_visualizar_respostas_campanhas', label: 'Visualizar respostas das campanhas' },
+          { key: 'perm_criar_campanhas', label: 'Criar campanhas', sensitive: true },
+          { key: 'perm_admin_campanhas', label: 'Ativar modo Admin de campanhas', sensitive: true },
+          { key: 'perm_editar_campanhas', label: 'Editar campanhas', sensitive: true },
+          { key: 'perm_excluir_campanhas', label: 'Excluir campanhas', sensitive: true },
+          { key: 'perm_aprovar_respostas_campanhas', label: 'Aprovar respostas de campanhas', sensitive: true },
+          { key: 'perm_atribuir_permissoes_campanhas', label: 'Atribuir usuários autorizados nas campanhas', sensitive: true },
+          { key: 'perm_configurar_portal', label: 'Configurar regras do Portal', sensitive: true }
         ]
       }
     ]
