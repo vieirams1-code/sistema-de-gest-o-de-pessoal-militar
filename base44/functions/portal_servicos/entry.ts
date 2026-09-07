@@ -291,7 +291,31 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
   const aplicar = (source: any) => {
     if (!source || typeof source !== 'object') return;
     for (const [key, value] of Object.entries(source)) {
-      if ((key.startsWith('perm_') || key.startsWith('acesso_')) && value === true) permitidas.add(key);
+      if (value !== true) continue;
+      if (key.startsWith('perm_') || key.startsWith('acesso_')) {
+        permitidas.add(key);
+        // Perfis antigos podem ter a chave sem o prefixo; manter ambos
+        // formatos evita divergência entre o editor de perfis e o backend.
+        permitidas.add(key.replace(/^(perm_|acesso_)/, ''));
+      } else if ([
+        'visualizar_campanhas_ferias',
+        'visualizar_respostas_ferias',
+        'visualizar_planos_ferias',
+        'aprovar_ferias',
+        'gerar_ferias_campanhas',
+        'atribuir_permissoes_ferias',
+        'visualizar_campanhas_gerais',
+        'visualizar_respostas_campanhas',
+        'criar_campanhas',
+        'editar_campanhas',
+        'excluir_campanhas',
+        'admin_campanhas',
+        'aprovar_respostas_campanhas',
+        'atribuir_permissoes_campanhas',
+      ].includes(key)) {
+        permitidas.add(key);
+        permitidas.add(`perm_${key}`);
+      }
     }
   };
   for (const perfil of perfis || []) {
