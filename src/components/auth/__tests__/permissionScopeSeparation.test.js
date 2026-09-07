@@ -37,8 +37,10 @@ test('frontend mantém bypass funcional somente para role administrativa real', 
 test('escopo Administrador Global continua abrangendo todos os registros sem liberar módulos', () => {
   assert.match(frontendSource, /if \(hasAbsoluteAccess \|\| modoAcesso === 'admin'\) return true;/);
   assert.match(frontendSource, /if \(hasAbsoluteAccess \|\| modoAcesso === 'admin'\) return \[\];/);
-  assert.match(frontendSource, /return modules\[modulo\] === true;/);
-  assert.match(frontendSource, /return actions\[acao\] === true;/);
+  assert.match(frontendSource, /String\(modulo\)\.trim\(\)\.replace\(\/\^acesso_\//);
+  assert.match(frontendSource, /return Boolean\(key\) && modules\[key\] === true;/);
+  assert.match(frontendSource, /String\(acao\)\.trim\(\)\.replace\(\/\^perm_\//);
+  assert.match(frontendSource, /return Boolean\(key\) && actions\[key\] === true;/);
 });
 
 test('escopo geral é propagado às consultas de Publicações/RP sem elevar privilégio funcional', () => {
@@ -91,6 +93,8 @@ test('campos legado de UsuarioAcesso não participam mais da autorização funci
   assert.match(backendSource, /function consolidarModulesActions\(perfis\)/);
   assert.match(backendSource, /const \{ modules, actions \} = consolidarModulesActions\(perfis\);/);
   assert.doesNotMatch(backendSource, /\(acessos \|\| \[\]\)\.forEach\(aplicarFonte\)/);
+  assert.match(backendCudSource, /function consolidarActions\(perfis\)/);
+  assert.doesNotMatch(backendCudSource, /\(acessos \|\| \[\]\)\.forEach\(aplicarFonte\)/);
 });
 
 test('menu normaliza chaves acesso_/perm_ antes de consultar o resolvedor canônico', () => {
