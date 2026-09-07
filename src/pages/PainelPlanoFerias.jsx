@@ -448,6 +448,9 @@ export default function PainelPlanoFerias() {
   // Timeline: marca/desmarca meses sem substituir outra fração aleatoriamente.
   const handleSelecionarMesTimeline = async (op, mes, preferenciaIndex = -1) => {
     if (actionLoading || op?.gerado_ferias_efetivas) return;
+    // Entra em edição local imediatamente, inclusive para escalas já salvas.
+    // A decisão persistida só muda quando o usuário confirmar em “Salvar seleção”.
+    setMilitaresEmEdicao((prev) => ({ ...prev, [op.id]: true }));
     const modalidade = op.modalidade || '2_ETAPAS_15';
     const numFracoes = modalidade === '1_ETAPA_30' || modalidade === 'CUSTOM' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
     const atual = selecoesMilitares[op.id] || {
@@ -1126,12 +1129,15 @@ export default function PainelPlanoFerias() {
                           </div>
                           {LISTA_MESES.map((mes) => {
                             const aprovadas = parcelas.filter((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
+                            const emEdicao = militaresEmEdicao[op.id] === true;
                             const selecionadaIndex = mesesSelecionados.findIndex((m) => m === mes.val);
                             const prefIndex = preferencias.findIndex((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
-                            const selecionada = selecionadaIndex >= 0 && !aprovadas.length;
-                            const classe = aprovadas.length ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : selecionada ? 'bg-blue-100 border-blue-300 text-blue-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-300 hover:bg-blue-50 hover:text-blue-500';
-                            const rotulo = aprovadas.length ? aprovadas.map((p) => String(p.dias || p.quantidade_dias || '?') + 'd').join(' + ') : selecionada ? (String(selecionadaIndex + 1) + 'ª fração') : prefIndex >= 0 ? (String(prefIndex + 1) + 'ª op') : '+';
-                            return <button key={mes.val} type="button" onClick={() => handleSelecionarMesTimeline(op, mes.val, prefIndex)} title={aprovadas.length ? 'Parcela aprovada — clique para editar' : selecionada ? 'Mês selecionado — clique para desmarcar' : prefIndex >= 0 ? 'Preferência — clique para selecionar' : 'Clique para alocar neste mês'} className={'m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ' + classe}>{rotulo}</button>;
+                            // Em edição, a seleção local tem precedência sobre a decisão salva.
+                            const mostrarAprovadas = aprovadas.length > 0 && !emEdicao;
+                            const selecionada = selecionadaIndex >= 0;
+                            const classe = mostrarAprovadas ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : selecionada ? 'bg-blue-100 border-blue-300 text-blue-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-300 hover:bg-blue-50 hover:text-blue-500';
+                            const rotulo = mostrarAprovadas ? aprovadas.map((p) => String(p.dias || p.quantidade_dias || '?') + 'd').join(' + ') : selecionada ? (String(selecionadaIndex + 1) + 'ª fração') : prefIndex >= 0 ? (String(prefIndex + 1) + 'ª op') : '+';
+                            return <button key={mes.val} type="button" onClick={() => handleSelecionarMesTimeline(op, mes.val, prefIndex)} title={mostrarAprovadas ? 'Parcela aprovada — clique para editar' : selecionada ? 'Mês selecionado — clique para desmarcar' : prefIndex >= 0 ? 'Preferência — clique para selecionar' : 'Clique para alocar neste mês'} className={'m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ' + classe}>{rotulo}</button>;
                           })}
                         </div>;
                       })}
