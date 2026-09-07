@@ -48,6 +48,7 @@ const initialForm = {
 export default function PerfisPermissao() {
   const queryClient = useQueryClient();
   const { canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const canManageProfiles = canAccessAction('gerir_perfis_permissao') || canAccessAction('gerir_permissoes');
   
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -145,7 +146,7 @@ export default function PerfisPermissao() {
   });
 
   if (loadingUser) return null;
-  if (!canAccessAction('gerir_permissoes')) {
+  if (!canManageProfiles) {
     return <AccessDenied modulo="Perfis de Permissão" />;
   }
 
@@ -184,7 +185,7 @@ export default function PerfisPermissao() {
   const handleSave = () => {
     if (!formData.nome_perfil.trim()) return;
     // Revalidação explícita no handler
-    if (!canAccessAction('gerir_permissoes')) {
+    if (!canManageProfiles) {
       alert('Ação negada: você não tem permissão para salvar perfis de permissão.');
       return;
     }
@@ -205,7 +206,7 @@ export default function PerfisPermissao() {
 
   const handleDelete = () => {
     // Revalidação explícita no handler
-    if (!canAccessAction('gerir_permissoes')) {
+    if (!canManageProfiles) {
       alert('Ação negada: você não tem permissão para excluir perfis de permissão.');
       setDeleteDialog({ open: false, id: null });
       return;
