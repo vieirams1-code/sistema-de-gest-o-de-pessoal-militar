@@ -450,14 +450,11 @@ export default function PainelPlanoFerias() {
     if (actionLoading || op?.gerado_ferias_efetivas) return;
     const modalidade = op.modalidade || '2_ETAPAS_15';
     const numFracoes = modalidade === '1_ETAPA_30' || modalidade === 'CUSTOM' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
-    const pendente = op.status_camada_1 === 'Pendente';
-    const atual = pendente
-      ? { fracao1: '', fracao2: '', fracao3: '' }
-      : (selecoesMilitares[op.id] || {
-          fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
-          fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
-          fracao3: extrairMesDeDetalhes(op.opcao_3_detalhes, '10'),
-        });
+    const atual = selecoesMilitares[op.id] || {
+      fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
+      fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
+      fracao3: extrairMesDeDetalhes(op.opcao_3_detalhes, '10'),
+    };
     const fracaoExistente = Array.from({ length: numFracoes }).find((n) => atual['fracao' + n] === mes);
     let proximaSelecao = { ...atual };
     if (fracaoExistente) {
