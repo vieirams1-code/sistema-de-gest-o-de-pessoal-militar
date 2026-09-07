@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
           feriasTagsUsedFallback: feriasTagsResultAdmin.usedFallback,
           warnings: warningsAdmin,
           targetIsAdmin: true,
-          hasGlobalScope: true;
+          hasGlobalScope: true,
         },
       });
     }
@@ -299,6 +299,7 @@ Deno.serve(async (req) => {
           feriasTagsUsedFallback: false,
           warnings: ['SEM_ESCOPO'],
           targetIsAdmin: false,
+          hasGlobalScope: false,
         },
       });
     }
