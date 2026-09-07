@@ -404,9 +404,24 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   // tipo_acesso='admin' representa escopo organizacional global, não privilégio funcional absoluto.
   // Apenas role=admin da plataforma possui bypass; demais usuários precisam das permissões do perfil.
   const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
-  const perfis = perfilIds.length
-    ? await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true })
-    : [];
+  let perfis: any[] = [];
+  if (perfilIds.length) {
+    try {
+      perfis = await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true });
+    } catch (_ePerfisFiltro) {
+      perfis = [];
+    }
+    if (!Array.isArray(perfis) || perfis.length === 0) {
+      perfis = (await Promise.all(perfilIds.map(async (id: any) => {
+        try {
+          const perfil = await base44.asServiceRole.entities.PerfilPermissao.get(id);
+          return perfil?.ativo === false ? null : perfil;
+        } catch (_ePerfil) {
+          return null;
+        }
+      }))).filter(Boolean);
+    }
+  }
   const permissoes = consolidarPermissoesPortal(perfis || [], acessos || []);
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
   if (necessarias.length > 0 && necessarias.some((key) => permissoes.has(key))) return true;
