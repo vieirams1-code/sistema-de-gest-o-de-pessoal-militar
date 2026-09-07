@@ -1106,7 +1106,7 @@ export default function PainelPlanoFerias() {
             {/* VISUALIZAÇÃO 3: TIMELINE MENSAL */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-3">
-                <div><h2 className="text-sm font-extrabold text-slate-800">Timeline mensal de férias</h2><p className="text-xs text-slate-500 mt-1">Clique em qualquer célula para abrir a escala do militar. Amarelo = preferência; verde = parcela aprovada.</p></div>
+                <div><h2 className="text-sm font-extrabold text-slate-800">Timeline mensal de férias</h2><p className="text-xs text-slate-500 mt-1">Clique nos meses para marcar ou desmarcar frações. Azul = seleção em andamento; amarelo = preferência; verde = parcela aprovada.</p></div>
                 <span className="text-[11px] font-bold text-slate-500">{opcoesFiltradas.length} militares</span>
               </div>
               {opcoesFiltradas.length === 0 ? <div className="p-12 text-center text-slate-500 text-xs">Nenhum militar encontrado para os filtros selecionados neste contexto.</div> : (
