@@ -5,7 +5,7 @@ import { createPageUrl } from '@/utils';
 
 const TABS = [
   { id: 'registradas', label: 'Registradas', path: 'Medalhas', title: 'Medalhas', description: 'Controle de indicações e concessões' },
-  { id: 'dompedro', label: 'Dom Pedro II', path: 'IndicacoesDomPedroII', title: 'Indicações Dom Pedro II', description: 'Fluxo manual separado para indicação e concessão da medalha Dom Pedro II.', actionKey: 'perm_visualizar_dom_pedro' },
+  { id: 'dompedro', label: 'Dom Pedro II', path: 'IndicacoesDomPedroII', title: 'Indicações Dom Pedro II', description: 'Fluxo manual separado para indicação e concessão da medalha Dom Pedro II.', actionKey: 'perm_visualizar_medalhas' },
   { id: 'tempo', label: 'Tempo de Serviço', path: 'ApuracaoMedalhasTempoServico', title: 'Apuração de Tempo de Serviço', description: 'Tabela operacional por militar para indicação e concessão das faixas de 10, 20, 30 e 40 anos.' },
 ];
 
@@ -15,7 +15,7 @@ export default function MedalhasTabNavigation({ activeTab, actions, canAccessAct
 
   const visibleTabs = TABS.filter(tab => {
     if (tab.id === 'dompedro' && canAccessAction) {
-      return canAccessAction('perm_visualizar_dom_pedro');
+      return canAccessAction('perm_visualizar_medalhas');
     }
     return true;
   });
