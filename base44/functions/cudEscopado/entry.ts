@@ -491,7 +491,7 @@ function extrairMatrizPermissoes(descricao) {
 // dos perfis ativos (campos diretos + matriz embutida). UsuarioAcesso define
 // identidade/escopo e não participa da autorização funcional, espelhando
 // getUserPermissions.
-function consolidarActions(perfis, acessos) {
+function consolidarActions(perfis) {
   const actions = {};
   const aplicarFonte = (fonte) => {
     if (!fonte) return;
@@ -577,7 +577,7 @@ async function resolverPermissoes(base44, email) {
     );
   }
 
-  const actions = consolidarActions(perfis || [], acessos || []);
+  const actions = consolidarActions(perfis || []);
 
   return {
     acessos: acessos || [],
