@@ -24,7 +24,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { AlertTriangle } from 'lucide-react';
 
-export default function RequireAction({ children, moduleKey, actionKey, moduleName }) {
+export default function RequireAction({ children, moduleKey, moduleKeys = [], actionKey, actionKeys = [], moduleName }) {
   const {
     canAccessModule,
     canAccessAction,
@@ -60,11 +60,18 @@ export default function RequireAction({ children, moduleKey, actionKey, moduleNa
   // Bypass administrativo preservado.
   const isAdminBypass = canAccessAll || permissions === 'ALL';
 
-  // Fail-closed: ambas as chaves são obrigatórias; ausência de qualquer uma bloqueia.
-  const hasRequiredKeys = Boolean(moduleKey) && Boolean(actionKey);
-  const hasModuleAccess = hasRequiredKeys && canAccessModule(moduleKey);
-  const hasActionAccess = hasRequiredKeys && canAccessAction(actionKey);
-  const canAccess = isAdminBypass || (hasRequiredKeys && hasModuleAccess && hasActionAccess);
+  // Fail-closed com suporte a grupos de capacidades: quando há várias chaves,
+  // basta uma chave válida dentro de cada grupo (módulo e ação). Isso permite
+  // que páginas de gestão sejam abertas por capacidades independentes, sem
+  // depender de uma permissão legado oculta.
+  const normalizedModuleKeys = [...(moduleKey ? [moduleKey] : []), ...moduleKeys].filter(Boolean);
+  const normalizedActionKeys = [...(actionKey ? [actionKey] : []), ...actionKeys].filter(Boolean);
+  const hasExplicitRule = normalizedModuleKeys.length > 0 || normalizedActionKeys.length > 0;
+  const hasModuleAccess = normalizedModuleKeys.length === 0
+    || normalizedModuleKeys.some((key) => canAccessModule(key));
+  const hasActionAccess = normalizedActionKeys.length === 0
+    || normalizedActionKeys.some((key) => canAccessAction(key));
+  const canAccess = isAdminBypass || (hasExplicitRule && hasModuleAccess && hasActionAccess);
 
   if (!canAccess) {
     return <AccessDenied modulo={moduleName} />;
