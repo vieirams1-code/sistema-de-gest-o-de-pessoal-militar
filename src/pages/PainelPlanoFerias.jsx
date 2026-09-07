@@ -108,6 +108,7 @@ export default function PainelPlanoFerias() {
   // Estados de Edição e Seleção por Militar
   const [selecoesMilitares, setSelecoesMilitares] = useState({});
   const [militaresEmEdicao, setMilitaresEmEdicao] = useState({});
+  const [militarAlocacaoSelecionadoId, setMilitarAlocacaoSelecionadoId] = useState('');
 
   // POPUP LATERAL (DRAWER) E DESTAQUE TEMPORÁRIO DE 2 SEGUNDOS
   const [militarModalAberto, setMilitarModalAberto] = useState(null);
@@ -969,6 +970,13 @@ export default function PainelPlanoFerias() {
             </button>
             <button
               type="button"
+              onClick={() => setVisualizacao('ALOCACAO')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'ALOCACAO' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <i className="ph ph-list-checks mr-1"></i>Alocação por militar
+            </button>
+            <button
+              type="button"
               onClick={() => setVisualizacao('TIMELINE')}
               className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'TIMELINE' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
@@ -1098,6 +1106,33 @@ export default function PainelPlanoFerias() {
                 );
               })}
             </div>
+          </>
+        ) : visualizacao === 'ALOCACAO' ? (
+          <>
+            {/* VISUALIZAÇÃO ALTERNATIVA: ALOCAÇÃO EXPLÍCITA POR MILITAR */}
+            {(() => {
+              const militarAtivo = opcoesFiltradas.find((item) => item.id === militarAlocacaoSelecionadoId) || opcoesFiltradas[0];
+              if (!militarAtivo) return <div className="p-12 text-center text-slate-500 text-xs bg-white rounded-xl border border-slate-200">Nenhum militar encontrado para os filtros selecionados neste contexto.</div>;
+              const modalidade = militarAtivo.modalidade || '2_ETAPAS_15';
+              const limiteFracoes = modalidade === '3_ETAPAS_10' ? 3 : modalidade === '1_ETAPA_30' || modalidade === 'CUSTOM' ? 1 : 2;
+              const selecaoAtual = selecoesMilitares[militarAtivo.id] || {};
+              const mesesSelecionados = Array.from({ length: limiteFracoes }).map((_, i) => selecaoAtual['fracao' + (i + 1)]).filter(Boolean).sort((a, b) => Number(a) - Number(b));
+              const preferencias = [militarAtivo.opcao_1_detalhes, militarAtivo.opcao_2_detalhes, militarAtivo.opcao_3_detalhes].flatMap((d) => extrairParcelas({ opcao_1_detalhes: d }));
+              const isGerado = Boolean(militarAtivo.gerado_ferias_efetivas);
+              return <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,0.8fr)_minmax(420px,1.2fr)] gap-4">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 flex items-center justify-between"><h2 className="text-sm font-extrabold text-slate-800">Militares</h2><span className="text-[11px] text-slate-500">{opcoesFiltradas.length} registros</span></div>
+                  <div className="max-h-[58vh] overflow-y-auto">{opcoesFiltradas.map((item) => { const itemLimite = item.modalidade === '3_ETAPAS_10' ? 3 : item.modalidade === '1_ETAPA_30' || item.modalidade === 'CUSTOM' ? 1 : 2; const itemSelecao = selecoesMilitares[item.id] || {}; const itemCount = Array.from({ length: itemLimite }).map((_, i) => itemSelecao['fracao' + (i + 1)]).filter(Boolean).length; return <button key={item.id} type="button" onClick={() => setMilitarAlocacaoSelecionadoId(item.id)} className={`w-full text-left p-3 border-b border-slate-100 transition-colors ${item.id === militarAtivo.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-slate-50'}`}><div className="font-bold text-xs text-slate-800 truncate">{item.militar_posto} {item.militar_nome}</div><div className="text-[10px] text-slate-500 mt-1">{item.militar_matricula || '-'} · {itemLimite} {itemLimite === 1 ? 'fração' : 'frações'}</div><span className={`inline-flex mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${itemCount === itemLimite ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>{itemCount}/{itemLimite} marcadas</span></button>; })}</div>
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3"><div><h2 className="text-sm font-extrabold text-slate-800">{militarAtivo.militar_posto} {militarAtivo.militar_nome}</h2><p className="text-[11px] text-slate-500 mt-1">{limiteFracoes === 3 ? '3 frações de 10 dias' : limiteFracoes === 2 ? '2 frações de 15 dias' : '1 fração de 30 dias'}</p></div><span className="text-[11px] font-bold text-slate-600">{mesesSelecionados.length}/{limiteFracoes}</span></div>
+                  <div className="p-4 bg-blue-50 border-b border-blue-100 text-[11px] text-blue-800">Marque ou desmarque os meses. Para trocar uma fração, primeiro retire o mês atual. A numeração das frações segue automaticamente do mês mais antigo para o mais recente.</div>
+                  <div className="p-4 flex flex-wrap gap-2 border-b border-slate-100">{Array.from({ length: limiteFracoes }).map((_, i) => <div key={i} className={`min-w-[115px] rounded-lg border px-3 py-2 ${mesesSelecionados[i] ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}><div className="text-[10px] font-bold uppercase text-slate-500">{i + 1}ª fração</div><div className="text-sm font-extrabold text-blue-700">{mesesSelecionados[i] ? getNomeMesPorVal(mesesSelecionados[i]) : 'Escolha um mês'}</div></div>)}</div>
+                  <div className="p-4"><div className="flex items-center justify-between mb-2"><span className="text-xs font-extrabold text-slate-700">Meses da campanha</span><span className="text-[10px] text-slate-500">Preferências aparecem tracejadas</span></div><div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">{LISTA_MESES.map((mes) => { const selecionadaIndex = mesesSelecionados.findIndex((m) => m === mes.val); const prefIndex = preferencias.findIndex((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val); const cheio = (timelineContagem[mes.val] || 0) >= timelineLimite; const classe = selecionadaIndex >= 0 ? 'bg-blue-100 border-blue-400 text-blue-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600'; return <button key={mes.val} type="button" disabled={isGerado || (selecionadaIndex < 0 && mesesSelecionados.length >= limiteFracoes) || (selecionadaIndex < 0 && cheio)} onClick={() => handleSelecionarMesTimeline(militarAtivo, mes.val)} className={`min-h-[46px] rounded-lg border text-[11px] font-bold transition-colors ${classe} ${!isGerado && selecionadaIndex < 0 && mesesSelecionados.length < limiteFracoes && !cheio ? 'hover:border-blue-400 hover:bg-blue-50 cursor-pointer' : ''}`}>{mes.nome.slice(0, 3)}{selecionadaIndex >= 0 && <span className="block text-[9px] mt-0.5">{selecionadaIndex + 1}ª fração</span>}{prefIndex >= 0 && selecionadaIndex < 0 && <span className="block text-[9px] mt-0.5">{prefIndex + 1}ª opção</span>}</button>; })}</div></div>
+                  <div className="p-4 border-t border-slate-200 flex items-center justify-between"><span className="text-[11px] text-slate-600">{mesesSelecionados.length < limiteFracoes ? `Faltam ${limiteFracoes - mesesSelecionados.length} fração(ões).` : 'Todas as frações estão marcadas.'}</span>{mesesSelecionados.length === limiteFracoes && !isGerado && <button type="button" onClick={() => handleSalvarEscalaMilitar(militarAtivo, selecaoAtual)} disabled={actionLoading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">Salvar seleção</button>}</div>
+                </div>
+              </div>;
+            })()}
           </>
         ) : (
           <>
