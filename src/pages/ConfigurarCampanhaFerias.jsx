@@ -39,15 +39,21 @@ export default function ConfigurarCampanhaFerias() {
           setPlano(await base44.entities.PlanoFeriasInstitucional.get(planoAtualId));
         } catch (_erroPlano) {}
       }
+      const carregarUsuariosAtivos = async () => {
+        try {
+          const diretos = await base44.entities.User.list();
+          if (Array.isArray(diretos) && diretos.length) return diretos;
+        } catch (_erroDireto) {}
+        const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' });
+        return resposta.data?.usuarios || [];
+      };
       const [usersResult, acessosResult] = await Promise.allSettled([
-        base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
-        base44.entities.PermissaoPlanoFerias.filter({
-          plano_ferias_institucional_id: planoAtualId,
-          campanha_id: campanhaId,
-        }),
+        carregarUsuariosAtivos(),
+        base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoAtualId, campanha_id: campanhaId }),
       ]);
-      const users = usersResult.status === 'fulfilled' ? (usersResult.value.data?.usuarios || []) : [];
-      const acessos = acessosResult.status === 'fulfilled' ? (acessosResult.value || []) : [];
+      const users = usersResult.status === 'fulfilled' ? (usersResult.value || []) : [];
+      const acessosPayload = acessosResult.status === 'fulfilled' ? acessosResult.value?.data : null;
+      const acessos = Array.isArray(acessosPayload?.permissoes) ? acessosPayload.permissoes : [];
       setUsuarios((users || []).filter((item) => item?.id).map((item) => ({
         id: item.id,
         nome: item.nome || item.full_name || item.name || item.email || 'Usuário sem nome',
