@@ -444,25 +444,40 @@ export default function PainelPlanoFerias() {
     );
   };
 
-  // Na Timeline, o clique em um mês já define a fração e persiste a decisão.
+  // Timeline: marca/desmarca meses sem substituir outra fração aleatoriamente.
   const handleSelecionarMesTimeline = async (op, mes, preferenciaIndex = -1) => {
     if (actionLoading || op?.gerado_ferias_efetivas) return;
     const modalidade = op.modalidade || '2_ETAPAS_15';
     const numFracoes = modalidade === '1_ETAPA_30' || modalidade === 'CUSTOM' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
-    const atual = selecoesMilitares[op.id] || {
-      fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
-      fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
-      fracao3: extrairMesDeDetalhes(op.opcao_3_detalhes, '10'),
-    };
+    const pendente = op.status_camada_1 === 'Pendente';
+    const atual = pendente
+      ? { fracao1: '', fracao2: '', fracao3: '' }
+      : (selecoesMilitares[op.id] || {
+          fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
+          fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
+          fracao3: extrairMesDeDetalhes(op.opcao_3_detalhes, '10'),
+        });
     const fracaoExistente = Array.from({ length: numFracoes }).find((n) => atual['fracao' + n] === mes);
-    const alvo = fracaoExistente || (preferenciaIndex >= 0 && preferenciaIndex < numFracoes ? preferenciaIndex + 1 : 1);
-    const proximaSelecao = { ...atual, ['fracao' + alvo]: mes };
-    const meses = Array.from({ length: numFracoes }).map((_, i) => proximaSelecao['fracao' + (i + 1)]);
-    if (numFracoes > 1 && new Set(meses).size !== meses.length) {
-      setFeedback({ type: 'error', msg: 'Escolha meses diferentes para cada fração.' });
+    let proximaSelecao = { ...atual };
+    if (fracaoExistente) {
+      proximaSelecao['fracao' + fracaoExistente] = '';
+    } else {
+      const alvo = (preferenciaIndex >= 0 && preferenciaIndex < numFracoes)
+        ? preferenciaIndex + 1
+        : (Array.from({ length: numFracoes }).find((n) => !proximaSelecao['fracao' + n]) || 1);
+      const ocupadoPorOutra = Array.from({ length: numFracoes }).some((_, i) => proximaSelecao['fracao' + (i + 1)] === mes && i + 1 !== alvo);
+      if (ocupadoPorOutra) {
+        setFeedback({ type: 'error', msg: 'Este mês já está marcado para outra fração. Clique nele para desmarcar.' });
+        return;
+      }
+      proximaSelecao['fracao' + alvo] = mes;
+    }
+    const meses = Array.from({ length: numFracoes }).map((_, i) => proximaSelecao['fracao' + (i + 1)]).filter(Boolean);
+    setSelecoesMilitares((prev) => ({ ...prev, [op.id]: proximaSelecao }));
+    if (meses.length < numFracoes) {
+      setFeedback({ type: 'info', msg: `${meses.length}/${numFracoes} frações marcadas para ${op.militar_nome || 'o militar'}. Marque ${numFracoes - meses.length} mês(es) restante(s).` });
       return;
     }
-    setSelecoesMilitares((prev) => ({ ...prev, [op.id]: proximaSelecao }));
     await handleSalvarEscalaMilitar(op, proximaSelecao);
   };
 
