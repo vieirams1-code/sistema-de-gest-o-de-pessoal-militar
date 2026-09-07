@@ -133,11 +133,31 @@ const actionGuardByPage = {
   Atestados: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
   ExtratoAtestadosMedicos: { moduleKey: 'atestados', actionKey: 'visualizar_atestados', moduleName: 'Atestados' },
   ControleProcessos: { moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
-  GerirCampanhasPortal: { moduleKey: 'campanhas', actionKey: 'gerir_campanhas', moduleName: 'Gestão de Campanhas' },
-  PlanosFerias: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Planos de Férias' },
-  ConfigurarCampanhaFerias: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Configuração de Campanha de Férias' },
-  PainelPlanoFerias: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Respostas e Escalação de Férias' },
-  CentralRespostasCampanhas: { moduleKey: 'campanhas', actionKey: 'gerir_respostas', moduleName: 'Respostas de Campanhas' },
+  GerirCampanhasPortal: {
+    moduleKey: 'campanhas_gerais',
+    actionKeys: ['visualizar_campanhas_gerais', 'criar_campanhas', 'editar_campanhas', 'excluir_campanhas', 'admin_campanhas'],
+    moduleName: 'Gestão de Campanhas',
+  },
+  PlanosFerias: {
+    moduleKey: 'campanhas_ferias',
+    actionKeys: ['visualizar_planos_ferias', 'visualizar_campanhas_ferias', 'criar_planos_ferias', 'editar_planos_ferias', 'excluir_planos_ferias'],
+    moduleName: 'Planos de Férias',
+  },
+  ConfigurarCampanhaFerias: {
+    moduleKey: 'campanhas_ferias',
+    actionKeys: ['atribuir_permissoes_ferias', 'admin_campanhas_ferias'],
+    moduleName: 'Configuração de Campanha de Férias',
+  },
+  PainelPlanoFerias: {
+    moduleKey: 'campanhas_ferias',
+    actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas', 'atribuir_permissoes_ferias'],
+    moduleName: 'Respostas e Escalação de Férias',
+  },
+  CentralRespostasCampanhas: {
+    moduleKey: 'campanhas_gerais',
+    actionKeys: ['visualizar_respostas_campanhas', 'aprovar_respostas_campanhas'],
+    moduleName: 'Respostas de Campanhas',
+  },
 };
 
 const actionGuardByPageNormalized = Object.entries(actionGuardByPage).reduce((acc, [pageKey, guard]) => {
@@ -224,11 +244,13 @@ function App() {
               const pageActionGuard = getActionGuardByPage(path);
 
               if (pageActionGuard) {
-                const { moduleKey, actionKey, moduleName } = pageActionGuard;
+                const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageActionGuard;
                 pageContent = (
                   <RequireAction
                     moduleKey={moduleKey}
+                    moduleKeys={moduleKeys}
                     actionKey={actionKey}
+                    actionKeys={actionKeys}
                     moduleName={moduleName}
                   >
                     {pageContent}
