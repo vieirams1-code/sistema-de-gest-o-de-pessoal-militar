@@ -39,20 +39,24 @@ export default function ConfigurarCampanhaFerias() {
           setPlano(await base44.entities.PlanoFeriasInstitucional.get(planoAtualId));
         } catch (_erroPlano) {}
       }
-      const [usersResponse, acessos] = await Promise.all([
+      const [usersResult, acessosResult] = await Promise.allSettled([
         base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
         base44.entities.PermissaoPlanoFerias.filter({
           plano_ferias_institucional_id: planoAtualId,
           campanha_id: campanhaId,
         }),
       ]);
-      const users = usersResponse.data?.usuarios || [];
+      const users = usersResult.status === 'fulfilled' ? (usersResult.value.data?.usuarios || []) : [];
+      const acessos = acessosResult.status === 'fulfilled' ? (acessosResult.value || []) : [];
       setUsuarios((users || []).filter((item) => item?.id).map((item) => ({
         id: item.id,
-        nome: item.full_name || item.name || item.email || 'Usuário sem nome',
+        nome: item.nome || item.full_name || item.name || item.email || 'Usuário sem nome',
         email: item.email || '',
       })).sort((a, b) => a.nome.localeCompare(b.nome)));
-      setPermissoes(acessos || []);
+      setPermissoes(acessos);
+      if (usersResult.status === 'rejected' && acessosResult.status === 'rejected') {
+        throw usersResult.reason || acessosResult.reason;
+      }
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível carregar a configuração da campanha.') });
     } finally {
