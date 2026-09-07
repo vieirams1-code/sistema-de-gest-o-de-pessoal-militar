@@ -595,7 +595,7 @@ Deno.serve(async (req: Request) => {
 
       let autorizado = false;
       try {
-        autorizado = await autorizarAcaoAdminPortal(base44, user, acao);
+        autorizado = await autorizarAcaoAdminPortal(base44, user, acao, payload);
       } catch (_ePerm) {
         autorizado = false;
       }
