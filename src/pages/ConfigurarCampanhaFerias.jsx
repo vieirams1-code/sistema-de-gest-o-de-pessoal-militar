@@ -39,13 +39,14 @@ export default function ConfigurarCampanhaFerias() {
           setPlano(await base44.entities.PlanoFeriasInstitucional.get(planoAtualId));
         } catch (_erroPlano) {}
       }
-      const [users, acessos] = await Promise.all([
-        base44.entities.User.list().catch(async () => base44.entities.User.filter({})),
+      const [usersResponse, acessos] = await Promise.all([
+        base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
         base44.entities.PermissaoPlanoFerias.filter({
           plano_ferias_institucional_id: planoAtualId,
           campanha_id: campanhaId,
         }),
       ]);
+      const users = usersResponse.data?.usuarios || [];
       setUsuarios((users || []).filter((item) => item?.id).map((item) => ({
         id: item.id,
         nome: item.full_name || item.name || item.email || 'Usuário sem nome',
