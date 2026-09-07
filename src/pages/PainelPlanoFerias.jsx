@@ -473,8 +473,13 @@ export default function PainelPlanoFerias() {
       }
       proximaSelecao['fracao' + alvo] = mes;
     }
-    const meses = Array.from({ length: numFracoes }).map((_, i) => proximaSelecao['fracao' + (i + 1)]).filter(Boolean);
-    setSelecoesMilitares((prev) => ({ ...prev, [op.id]: proximaSelecao }));
+    // A numeração é sempre cronológica: mês mais antigo = 1ª fração.
+    const meses = Array.from({ length: numFracoes })
+      .map((_, i) => proximaSelecao['fracao' + (i + 1)])
+      .filter(Boolean)
+      .sort((a, b) => Number(a) - Number(b));
+    const selecaoOrdenada = { ...proximaSelecao, fracao1: meses[0] || '', fracao2: meses[1] || '', fracao3: meses[2] || '' };
+    setSelecoesMilitares((prev) => ({ ...prev, [op.id]: selecaoOrdenada }));
     setFeedback({ type: 'info', msg: `${meses.length}/${numFracoes} frações marcadas para ${op.militar_nome || 'o militar'}.${meses.length < numFracoes ? ` Marque ${numFracoes - meses.length} mês(es) restante(s).` : ' Revise e clique em Salvar seleção.'}` });
   };
 
