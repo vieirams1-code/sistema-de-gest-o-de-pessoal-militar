@@ -1034,6 +1034,10 @@ export default function PainelPlanoFerias() {
         {visualizacao === 'APROVACAO' ? (
           <>
             {/* VISUALIZAÇÃO 1: APROVAÇÃO RÁPIDA */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3 text-blue-800">
+              <i className="ph ph-lightbulb text-xl mt-0.5"></i>
+              <div><h3 className="font-extrabold text-sm">Por que esta opção?</h3><p className="text-xs mt-1">Foco em agilidade: confira as preferências e aprove rapidamente a primeira opção quando houver disponibilidade. Os limites mensais são atualizados em tempo real.</p></div>
+            </div>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
               {opcoesFiltradas.length === 0 ? (
                 <div className="p-12 text-center text-slate-500 text-xs">
@@ -1052,7 +1056,18 @@ export default function PainelPlanoFerias() {
                       <div className="w-10 h-10 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">{op.militar_posto?.slice(0, 3) || 'MIL'}</div>
                       <div className="min-w-0"><p className="font-bold text-slate-900 text-sm truncate">{op.militar_posto} {op.militar_nome}</p><p className="text-xs text-slate-500 truncate">Mat: {op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</p>{painelConsolidado && Number(op.quantidade_respostas_campanhas || 0) > 1 && <p className="text-[10px] text-blue-700 font-semibold truncate">Consolidado de {op.quantidade_respostas_campanhas} campanhas vinculadas</p>}</div>
                     </div>
-                    <div className="col-span-6 md:col-span-3"><p className="text-sm font-medium text-slate-800">{modalidade === 'CUSTOM' ? `Saldo remanescente (${op.dias_direito || 0}d)` : modalidade === '1_ETAPA_30' ? 'Integral (30d)' : modalidade === '3_ETAPAS_10' ? '3 Frações (10+10+10d)' : '2 Frações (15+15d)'}</p>{isSalvo && op.decisao_camada_1_meses && <span className="text-[11px] font-bold text-blue-700 block truncate">{op.decisao_camada_1_meses}</span>}</div>
+                    <div className="col-span-6 md:col-span-3">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase block mb-1">Preferência solicitada</span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {[op.opcao_1_detalhes, op.opcao_2_detalhes, op.opcao_3_detalhes].map((detalhes, idx) => {
+                          const mes = extrairMesDeDetalhes(detalhes, '');
+                          if (!mes) return null;
+                          const restante = Math.max(0, timelineLimite - (timelineContagem[mes] || 0));
+                          return <span key={idx} className={`bg-slate-50 border rounded-md px-2 py-1 text-[11px] font-bold ${restante === 0 ? 'border-rose-300 text-rose-700' : 'border-slate-200 text-slate-700'}`}>{getNomeMesPorVal(mes)} <small className={`block text-[9px] font-medium ${restante === 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{restante}/{timelineLimite} disponíveis</small></span>;
+                        })}
+                      </div>
+                      {isSalvo && op.decisao_camada_1_meses && <span className="text-[11px] font-bold text-blue-700 block truncate mt-1">{op.decisao_camada_1_meses}</span>}
+                    </div>
                     <div className="col-span-3 md:col-span-2 text-center"><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${isGerado ? 'bg-purple-100 text-purple-800 border-purple-200' : isNaoContemplado ? 'bg-rose-100 text-rose-800 border-rose-200' : isSalvo ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>{isGerado ? 'Férias Geradas' : isNaoContemplado ? 'Não Contemplado' : isSalvo ? 'Escala Salva' : 'Pendente'}</span></div>
                     <div className="col-span-3 md:col-span-2 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); setMilitarModalAberto(op); }} className="px-4 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer">{isSalvo ? 'Ver Escala' : 'Definir Escala'}</button></div>
                   </div>
