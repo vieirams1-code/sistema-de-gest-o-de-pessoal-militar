@@ -458,14 +458,13 @@ export default function PainelPlanoFerias() {
     const fracaoExistente = Array.from({ length: numFracoes }).find((n) => atual['fracao' + n] === mes);
     let proximaSelecao = { ...atual };
     if (fracaoExistente) {
+      // Clique no mês marcado: retira a pedra daquela fração.
       proximaSelecao['fracao' + fracaoExistente] = '';
     } else {
-      const alvo = (preferenciaIndex >= 0 && preferenciaIndex < numFracoes)
-        ? preferenciaIndex + 1
-        : (Array.from({ length: numFracoes }).find((n) => !proximaSelecao['fracao' + n]) || 1);
-      const ocupadoPorOutra = Array.from({ length: numFracoes }).some((_, i) => proximaSelecao['fracao' + (i + 1)] === mes && i + 1 !== alvo);
-      if (ocupadoPorOutra) {
-        setFeedback({ type: 'error', msg: 'Este mês já está marcado para outra fração. Clique nele para desmarcar.' });
+      // Só coloca em uma fração vazia; nunca move uma pedra já existente.
+      const alvo = Array.from({ length: numFracoes }).find((n) => !proximaSelecao['fracao' + n]);
+      if (!alvo) {
+        setFeedback({ type: 'info', msg: 'Todas as frações já estão marcadas. Desmarque um mês antes de escolher outro.' });
         return;
       }
       proximaSelecao['fracao' + alvo] = mes;
