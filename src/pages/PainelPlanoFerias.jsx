@@ -916,6 +916,23 @@ export default function PainelPlanoFerias() {
 
         {/* BARRA DE FILTROS & PESQUISA */}
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 p-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setVisualizacao('APROVACAO')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'APROVACAO' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <i className="ph ph-check-circle mr-1"></i>Aprovação rápida
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisualizacao('TIMELINE')}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'TIMELINE' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <i className="ph ph-chart-bar-horizontal mr-1"></i>Timeline mensal
+            </button>
+          </div>
+
           {/* TABS DE STATUS */}
           <div className="flex items-center gap-1.5 flex-wrap w-full md:w-auto">
             <button
