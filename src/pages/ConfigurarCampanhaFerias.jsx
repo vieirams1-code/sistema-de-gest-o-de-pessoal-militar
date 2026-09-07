@@ -84,22 +84,21 @@ export default function ConfigurarCampanhaFerias() {
     try {
       const planoAtualId = planoId || campanha.plano_ferias_institucional_id;
       const usuario = usuarios.find((item) => String(item.id) === String(form.usuario_id));
-      const existentes = await base44.entities.PermissaoPlanoFerias.filter({
-        plano_ferias_institucional_id: planoAtualId,
-        usuario_id: form.usuario_id,
-      });
-      const existente = (existentes || []).find((item) => String(item.campanha_id || '') === String(campanha.id));
       const registro = {
         plano_ferias_institucional_id: planoAtualId,
         campanha_id: campanha.id,
         usuario_id: form.usuario_id,
-        usuario_email: usuario?.email || '',
-        usuario_nome: usuario?.nome || usuario?.email || 'Usuário sem nome',
-        ...form,
+        pode_visualizar: Boolean(form.pode_visualizar),
+        pode_editar_escala: Boolean(form.pode_editar_escala),
+        pode_autorizar: Boolean(form.pode_autorizar),
+        pode_gerar_ferias: Boolean(form.pode_gerar_ferias),
         ativo: true,
       };
-      if (existente?.id) await base44.entities.PermissaoPlanoFerias.update(existente.id, registro);
-      else await base44.entities.PermissaoPlanoFerias.create(registro);
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_PERMISSAO_SALVAR',
+        plano_id: planoAtualId,
+        permissao: registro,
+      });
       setForm(vazio);
       setFeedback({ tipo: 'sucesso', texto: 'Responsável atribuído com sucesso.' });
       await carregar();
@@ -114,7 +113,10 @@ export default function ConfigurarCampanhaFerias() {
     if (!window.confirm('Remover este responsável da campanha?')) return;
     setSalvando(true);
     try {
-      await base44.entities.PermissaoPlanoFerias.delete(permissao.id);
+      await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_PERMISSAO_EXCLUIR',
+        permissao_id: permissao.id,
+      });
       setPermissoes((atual) => atual.filter((item) => item.id !== permissao.id));
       setFeedback({ tipo: 'sucesso', texto: 'Acesso removido.' });
     } catch (erro) {
