@@ -125,19 +125,8 @@ export default function PainelPlanoFerias() {
   const [filtroModalidade, setFiltroModalidade] = useState('TODOS');
   const [filtroUnidade, setFiltroUnidade] = useState('TODOS');
   const [filtroMes, setFiltroMes] = useState('TODOS');
-  const [visualizacao, setVisualizacao] = useState(() => {
-    try {
-      return window.localStorage.getItem('sgp_ferias_visualizacao') || 'APROVACAO';
-    } catch (_e) {
-      return 'APROVACAO';
-    }
-  });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem('sgp_ferias_visualizacao', visualizacao);
-    } catch (_e) {}
-  }, [visualizacao]);
+  // A tela de configuração usa uma única experiência: Aprovação Rápida.
+  const visualizacao = 'APROVACAO';
 
   // Modal para Justificativa de Não Contemplado
   const [modalNaoContemplado, setModalNaoContemplado] = useState({ open: false, opcao: null, justificativa: '' });
@@ -965,28 +954,9 @@ export default function PainelPlanoFerias() {
 
         {/* BARRA DE FILTROS & PESQUISA */}
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 p-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setVisualizacao('APROVACAO')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'APROVACAO' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <i className="ph ph-check-circle mr-1"></i>Aprovação rápida
-            </button>
-            <button
-              type="button"
-              onClick={() => setVisualizacao('ALOCACAO')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'ALOCACAO' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <i className="ph ph-list-checks mr-1"></i>Alocação por militar
-            </button>
-            <button
-              type="button"
-              onClick={() => setVisualizacao('TIMELINE')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${visualizacao === 'TIMELINE' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <i className="ph ph-chart-bar-horizontal mr-1"></i>Timeline mensal
-            </button>
+          <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 shrink-0">
+            <i className="ph ph-check-circle text-blue-700"></i>
+            <span className="text-xs font-extrabold text-blue-800">Aprovação Rápida</span>
           </div>
 
           {/* TABS DE STATUS */}
