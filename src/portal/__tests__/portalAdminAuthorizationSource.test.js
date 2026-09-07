@@ -30,10 +30,12 @@ test('headers X-App-Id e Authorization não funcionam como autorização adminis
 test('serviço exclusivo de Planos de Férias exige autenticação e permissão funcional', () => {
   assert.match(planosSource, /user\s*=\s*await base44\.auth\.me\(\)/);
   assert.match(planosSource, /if \(!user\)/);
-  assert.match(planosSource, /usuarioPodeGerirPlanos\(base44, user\)/);
-  assert.match(planosSource, /perm_gerir_campanhas/);
-  assert.match(planosSource, /perm_gerir_respostas/);
-  assert.match(planosSource, /perm_configurar_portal/);
+  assert.match(planosSource, /usuarioPodeGerirPlanos\(base44, user, acao\)/);
+  assert.match(planosSource, /perm_visualizar_planos_ferias/);
+  assert.match(planosSource, /perm_criar_planos_ferias/);
+  assert.match(planosSource, /perm_editar_planos_ferias/);
+  assert.match(planosSource, /perm_excluir_planos_ferias/);
+  assert.doesNotMatch(planosSource, /for \(const acesso of acessos \|\| \[\]\) coletar\(acesso\)/);
   assert.match(planosSource, /403/);
 });
 
