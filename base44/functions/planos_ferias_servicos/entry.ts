@@ -32,7 +32,26 @@ function permissoesDaDescricao(descricao: unknown): Record<string, unknown> {
   }
 }
 
-async function usuarioPodeGerirPlanos(base44: any, user: any): Promise<boolean> {
+function permissoesNecessariasPlano(acao: string): string[] {
+  const legado = ['perm_gerir_campanhas', 'perm_gerir_respostas'];
+  if (acao === 'LISTAR' || acao === 'DETALHES') {
+    return [
+      'perm_visualizar_planos_ferias',
+      'perm_visualizar_campanhas_ferias',
+      'perm_criar_planos_ferias',
+      'perm_editar_planos_ferias',
+      'perm_excluir_planos_ferias',
+      'perm_admin_campanhas_ferias',
+      ...legado,
+    ];
+  }
+  if (acao === 'CRIAR') return ['perm_criar_planos_ferias', 'perm_admin_campanhas_ferias', ...legado];
+  if (acao === 'ATUALIZAR' || acao === 'ARQUIVAR') return ['perm_editar_planos_ferias', 'perm_admin_campanhas_ferias', ...legado];
+  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias', ...legado];
+  return [];
+}
+
+async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Promise<boolean> {
   if (!user?.email) return false;
   if (normalizar(user.role) === 'admin') return true;
 
@@ -54,14 +73,13 @@ async function usuarioPodeGerirPlanos(base44: any, user: any): Promise<boolean> 
       }
     }
   };
-  for (const acesso of acessos || []) coletar(acesso);
   for (const perfil of perfis || []) {
     coletar(perfil);
     coletar(permissoesDaDescricao(perfil?.descricao));
   }
 
-  return ['perm_gerir_campanhas', 'perm_gerir_respostas', 'perm_configurar_portal']
-    .some((permissao) => permitidas.has(permissao));
+  const necessarias = permissoesNecessariasPlano(acao);
+  return necessarias.length > 0 && necessarias.some((permissao) => permitidas.has(permissao));
 }
 
 function militarNoEscopo(militar: any, campanha: any): boolean {
@@ -108,11 +126,11 @@ Deno.serve(async (req: Request) => {
 
     let autorizado = false;
     try {
-      autorizado = await usuarioPodeGerirPlanos(base44, user);
+      autorizado = await usuarioPodeGerirPlanos(base44, user, acao);
     } catch {
       autorizado = false;
     }
-    if (!autorizado) return json({ error: 'Usuário sem permissão para gerir Planos de Férias.' }, 403);
+    if (!autorizado) return json({ error: 'Usuário sem permissão para esta ação em Planos de Férias.' }, 403);
 
     if (acao === 'LISTAR') {
       const [planos, campanhas] = await Promise.all([
