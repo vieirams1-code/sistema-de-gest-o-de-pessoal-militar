@@ -532,6 +532,7 @@ Deno.serve(async (req: Request) => {
 
       switch (acao) {
         case 'PERMISSOES_LISTAR_USUARIOS': {
+          // Consulta administrativa protegida; não depende de X-Portal-Token.
           let usuarios: any[] = [];
           try {
             usuarios = await base44.entities.User.list();
