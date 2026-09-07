@@ -320,13 +320,13 @@ const PERMISSIONS_MAP = {
     delete: 'excluir_contrato_designacao',
   },
   PerfilPermissao: {
-    create: 'gerir_permissoes',
-    update: 'gerir_permissoes',
-    delete: 'gerir_permissoes',
+    create: ['gerir_perfis_permissao', 'gerir_permissoes'],
+    update: ['gerir_perfis_permissao', 'gerir_permissoes'],
+    delete: ['gerir_perfis_permissao', 'gerir_permissoes'],
   },
   UsuarioAcesso: {
-    create: 'gerir_permissoes',
-    update: 'gerir_permissoes',
+    create: ['gerir_permissoes_usuarios', 'gerir_permissoes'],
+    update: ['gerir_permissoes_usuarios', 'gerir_permissoes'],
     delete: 'excluir_usuarios_acesso',
   },
   MilitarFuncao: {
@@ -487,9 +487,10 @@ function extrairMatrizPermissoes(descricao) {
   }
 }
 
-// Consolida actions (chaves perm_*) por OR aditivo a partir de perfis
-// (campos diretos + matriz embutida) e UsuarioAcesso. Espelha exatamente
-// a regra de consolidarModulesActions de getUserPermissions.
+// Consolida actions (chaves perm_*) por OR aditivo exclusivamente a partir
+// dos perfis ativos (campos diretos + matriz embutida). UsuarioAcesso define
+// identidade/escopo e não participa da autorização funcional, espelhando
+// getUserPermissions.
 function consolidarActions(perfis, acessos) {
   const actions = {};
   const aplicarFonte = (fonte) => {
@@ -510,7 +511,6 @@ function consolidarActions(perfis, acessos) {
     aplicarFonte(p);
     aplicarFonte(extrairMatrizPermissoes(p.descricao));
   });
-  (acessos || []).forEach(aplicarFonte);
   return actions;
 }
 
@@ -1562,16 +1562,17 @@ Deno.serve(async (req) => {
           { status: 403 },
         );
       }
-      const possui = targetPerms.actions?.[requiredPermission] === true;
+      const requiredPermissions = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+      const possui = requiredPermissions.some((permission) => targetPerms.actions?.[permission] === true);
       if (!possui) {
         console.warn('[cudEscopado] permissão funcional insuficiente', {
           targetEmail,
           entityName,
           operation,
-          requiredPermission,
+          requiredPermissions,
         });
         return Response.json(
-          { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+          { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: requiredPermissions.join(' ou ') },
           { status: 403 },
         );
       }
@@ -1621,7 +1622,8 @@ Deno.serve(async (req) => {
                 ? 'conceder_medalhas'
                 : 'editar_medalhas';
           }
-          if (!targetIsAdmin && (!requiredPermission || targetPerms.actions?.[requiredPermission] !== true)) {
+          const requiredPermissions = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission].filter(Boolean);
+          if (!targetIsAdmin && (requiredPermissions.length === 0 || !requiredPermissions.some((permission) => targetPerms.actions?.[permission] === true))) {
             resultados.push({ ok: false, error: 'Sem permissão para esta ação no item.', item: raw });
             continue;
           }
