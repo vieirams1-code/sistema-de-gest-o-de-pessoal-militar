@@ -466,6 +466,16 @@ export default function PainelPlanoFerias() {
     await handleSalvarEscalaMilitar(op, proximaSelecao);
   };
 
+  const handleAprovarPrimeiraOpcao = async (op) => {
+    if (actionLoading || op?.gerado_ferias_efetivas) return;
+    const selecao = {
+      fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
+      fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
+      fracao3: extrairMesDeDetalhes(op.opcao_3_detalhes, '10'),
+    };
+    await handleSalvarEscalaMilitar(op, selecao);
+  };
+
   // Salvar Escala Definitiva do Militar
   const handleSalvarEscalaMilitar = async (op, selecaoOverride = null) => {
     const selecao = selecaoOverride || selecoesMilitares[op.id] || {};
@@ -1069,7 +1079,10 @@ export default function PainelPlanoFerias() {
                       {isSalvo && op.decisao_camada_1_meses && <span className="text-[11px] font-bold text-blue-700 block truncate mt-1">{op.decisao_camada_1_meses}</span>}
                     </div>
                     <div className="col-span-3 md:col-span-2 text-center"><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${isGerado ? 'bg-purple-100 text-purple-800 border-purple-200' : isNaoContemplado ? 'bg-rose-100 text-rose-800 border-rose-200' : isSalvo ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>{isGerado ? 'Férias Geradas' : isNaoContemplado ? 'Não Contemplado' : isSalvo ? 'Escala Salva' : 'Pendente'}</span></div>
-                    <div className="col-span-3 md:col-span-2 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); setMilitarModalAberto(op); }} className="px-4 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-sm font-semibold transition-colors cursor-pointer">{isSalvo ? 'Ver Escala' : 'Definir Escala'}</button></div>
+                    <div className="col-span-3 md:col-span-2 flex justify-end gap-2 flex-wrap">
+                      {!isSalvo && !isNaoContemplado && !isGerado && <button type="button" onClick={(e) => { e.stopPropagation(); handleAprovarPrimeiraOpcao(op); }} disabled={actionLoading} className="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer">✓ Aprovar 1ª opção</button>}
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setMilitarModalAberto(op); }} className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer">{isSalvo ? 'Ver escala' : 'Editar manualmente'}</button>
+                    </div>
                   </div>
                 );
               })}
