@@ -109,6 +109,48 @@ async function fetchWithRetry(queryFn, label = 'query') {
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
+function extrairMatrizPermissoes(descricao) {
+    if (typeof descricao !== 'string' || !descricao) return {};
+    const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
+    const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
+    if (start === -1 || end === -1 || end <= start) return {};
+    try {
+        const parsed = JSON.parse(descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim());
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_e) {
+        return {};
+    }
+}
+
+function consolidarPermissoesMilitares(perfis = []) {
+    const modules = {};
+    const actions = {};
+    const aplicar = (fonte) => {
+        if (!fonte || typeof fonte !== 'object') return;
+        for (const [key, value] of Object.entries(fonte)) {
+            if (value !== true) continue;
+            if (key.startsWith('acesso_')) modules[key.replace(/^acesso_/, '')] = true;
+            if (key.startsWith('perm_')) actions[key.replace(/^perm_/, '')] = true;
+        }
+    };
+    for (const perfil of perfis || []) {
+        aplicar(perfil);
+        aplicar(extrairMatrizPermissoes(perfil?.descricao));
+    }
+    return { modules, actions };
+}
+
+async function resolverPermissoesFuncionais(base44, acessos = [], label = 'target') {
+    const perfilIds = Array.from(new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean)));
+    const perfis = perfilIds.length
+        ? await fetchWithRetry(
+            () => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }),
+            `perfilPermissao.list.${label}`
+        )
+        : [];
+    return consolidarPermissoesMilitares(perfis || []);
+}
+
 const normalizeText = (s) =>
     String(s || '')
         .toLowerCase()
@@ -412,11 +454,12 @@ async function resolverEstruturasLotacaoFiltro(base44, lotacaoFiltro, permitidos
 // =====================================================================
 //
 // Suporte a "effectiveEmail" (modo usuário efetivo / impersonação para
-// suporte e testes administrativos). A validação é a mesma de
-// getUserPermissions: somente admins reais (por role ou por UsuarioAcesso
-// tipo_acesso='admin') podem usar effectiveEmail. A barra "Você está
-// agindo como..." do preview do Base44 NÃO é fonte para isso — usamos
-// somente sgp_effective_user_email (sessionStorage) como ponte controlada.
+// suporte e testes administrativos). Somente administradores reais da
+// plataforma (role='admin') podem usar effectiveEmail. UsuarioAcesso com
+// tipo_acesso='admin' representa apenas escopo organizacional global e não
+// privilégio funcional/administrativo. A barra "Você está agindo como..."
+// do preview do Base44 NÃO é fonte para isso — usamos somente
+// sgp_effective_user_email (sessionStorage) como ponte controlada.
 //
 // Suporte a "militarIds" (Lote 1B.1): permite hidratar 1+ militares
 // específicos sem ampliar o escopo. A interseção com o escopo do usuário
@@ -520,24 +563,20 @@ Deno.serve(async (req) => {
         );
 
         const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-        const authIsAdminByAccess = (acessosAuth || []).some(
-            (a) => normalizeTipo(a.tipo_acesso) === 'admin'
-        );
-        const authIsAdmin = authIsAdminByRole || authIsAdminByAccess;
 
         // 2. Validação de impersonação
-        if (wantsImpersonation && !authIsAdmin) {
+        if (wantsImpersonation && !authIsAdminByRole) {
             console.warn('[getScopedMilitares] tentativa de impersonação por não-admin', {
                 authUserEmail,
                 effectiveEmailNorm,
             });
             return Response.json(
-                { error: 'Ação não permitida: somente administradores podem usar effectiveEmail.', militares: [] },
+                { error: 'Ação não permitida: somente administradores da plataforma podem usar effectiveEmail.', militares: [] },
                 { status: 403 }
             );
         }
 
-        const isImpersonating = wantsImpersonation && authIsAdmin;
+        const isImpersonating = wantsImpersonation && authIsAdminByRole;
         const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
 
         // 3. Buscar UsuarioAcesso do email-alvo (reaproveita se não impersonando)
@@ -555,19 +594,34 @@ Deno.serve(async (req) => {
             )
             : (acessosAuth || []);
 
-        // 4. Calcular admin DO USUÁRIO EFETIVO
-        // SEGURANÇA: quando impersonando, NÃO consideramos role do autenticado.
-        const isAdminByRole = isImpersonating
-            ? false
-            : authIsAdminByRole;
-        const isAdminByAccess = (acessos || []).some(
+        // 4. Resolver permissão funcional DO USUÁRIO EFETIVO.
+        // PerfilPermissao define o que pode fazer; UsuarioAcesso define somente
+        // onde pode atuar. Administrador real da plataforma mantém bypass.
+        const isAdminByRole = isImpersonating ? false : authIsAdminByRole;
+        const permissoesFuncionais = await resolverPermissoesFuncionais(
+            base44,
+            acessos || [],
+            isImpersonating ? 'target' : 'auth'
+        );
+        const canViewMilitares = isAdminByRole || (
+            permissoesFuncionais.modules.militares === true
+            && permissoesFuncionais.actions.visualizar_militares === true
+        );
+        if (!canViewMilitares) {
+            return Response.json(
+                { error: 'Acesso negado: é necessária a permissão de visualizar militares.', requiredPermission: 'visualizar_militares', militares: [] },
+                { status: 403 }
+            );
+        }
+
+        // 5. Resolver escopo. tipo_acesso='admin' significa escopo global,
+        // não privilégio funcional.
+        const hasGlobalScope = isAdminByRole || (acessos || []).some(
             (a) => normalizeTipo(a.tipo_acesso) === 'admin'
         );
-        const isAdmin = isAdminByRole || isAdminByAccess;
-
-        // 5. Resolver escopo
+        const isAdmin = hasGlobalScope;
         let escopo;
-        if (isAdmin) {
+        if (hasGlobalScope) {
             escopo = { isAdmin: true };
         } else {
             escopo = await resolverEscopoConsolidado(base44, acessos || []);
