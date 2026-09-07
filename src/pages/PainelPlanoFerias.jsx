@@ -472,11 +472,7 @@ export default function PainelPlanoFerias() {
     }
     const meses = Array.from({ length: numFracoes }).map((_, i) => proximaSelecao['fracao' + (i + 1)]).filter(Boolean);
     setSelecoesMilitares((prev) => ({ ...prev, [op.id]: proximaSelecao }));
-    if (meses.length < numFracoes) {
-      setFeedback({ type: 'info', msg: `${meses.length}/${numFracoes} frações marcadas para ${op.militar_nome || 'o militar'}. Marque ${numFracoes - meses.length} mês(es) restante(s).` });
-      return;
-    }
-    await handleSalvarEscalaMilitar(op, proximaSelecao);
+    setFeedback({ type: 'info', msg: `${meses.length}/${numFracoes} frações marcadas para ${op.militar_nome || 'o militar'}.${meses.length < numFracoes ? ` Marque ${numFracoes - meses.length} mês(es) restante(s).` : ' Revise e clique em Salvar seleção.'}` });
   };
 
   const handleAprovarPrimeiraOpcao = async (op) => {
