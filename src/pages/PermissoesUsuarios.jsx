@@ -100,10 +100,10 @@ export default function PermissoesUsuarios() {
     permissionErrorMessage,
     refetchAccess,
   } = useCurrentUser();
-  const hasAccess = !loadingUser && isAccessResolved && canAccessAction('gerir_permissoes');
+  const canManageUsers = canAccessAction('gerir_permissoes_usuarios') || canAccessAction('gerir_permissoes');
+  const hasAccess = !loadingUser && isAccessResolved && canManageUsers;
   const canManageAccessLifecycle = hasAccess && (
-    canAccessAction('gerir_permissoes_usuarios')
-    || canAccessAction('gerir_permissoes')
+    canManageUsers
     || canAccessAction('excluir_usuarios_acesso')
   );
   const canHardDeleteAccess = hasAccess && canAccessAction('excluir_usuarios_acesso');
@@ -243,7 +243,7 @@ export default function PermissoesUsuarios() {
       </div>
     );
   }
-  if (!canAccessAction('gerir_permissoes')) {
+  if (!canManageUsers) {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 
@@ -389,7 +389,7 @@ export default function PermissoesUsuarios() {
       return;
     }
     // Revalidação explícita no handler — não depende só da UI
-    if (!canAccessAction('gerir_permissoes')) {
+    if (!canManageUsers) {
       alert('Ação negada: você não tem permissão para gerenciar permissões de usuários.');
       return;
     }
