@@ -83,7 +83,6 @@ export default function ConfigurarCampanhaFerias() {
     setSalvando(true);
     try {
       const planoAtualId = planoId || campanha.plano_ferias_institucional_id;
-      const usuario = usuarios.find((item) => String(item.id) === String(form.usuario_id));
       const registro = {
         plano_ferias_institucional_id: planoAtualId,
         campanha_id: campanha.id,
