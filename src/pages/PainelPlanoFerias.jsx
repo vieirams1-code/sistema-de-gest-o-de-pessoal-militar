@@ -444,9 +444,31 @@ export default function PainelPlanoFerias() {
     );
   };
 
+  // Na Timeline, o clique em um mês já define a fração e persiste a decisão.
+  const handleSelecionarMesTimeline = async (op, mes, preferenciaIndex = -1) => {
+    if (actionLoading || op?.gerado_ferias_efetivas) return;
+    const modalidade = op.modalidade || '2_ETAPAS_15';
+    const numFracoes = modalidade === '1_ETAPA_30' || modalidade === 'CUSTOM' ? 1 : modalidade === '3_ETAPAS_10' ? 3 : 2;
+    const atual = selecoesMilitares[op.id] || {
+      fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
+      fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
+      fracao3: extrairMesDeDetalhes(op.opcao_3_detalhes, '10'),
+    };
+    const fracaoExistente = Array.from({ length: numFracoes }).find((n) => atual['fracao' + n] === mes);
+    const alvo = fracaoExistente || (preferenciaIndex >= 0 && preferenciaIndex < numFracoes ? preferenciaIndex + 1 : 1);
+    const proximaSelecao = { ...atual, ['fracao' + alvo]: mes };
+    const meses = Array.from({ length: numFracoes }).map((_, i) => proximaSelecao['fracao' + (i + 1)]);
+    if (numFracoes > 1 && new Set(meses).size !== meses.length) {
+      setFeedback({ type: 'error', msg: 'Escolha meses diferentes para cada fração.' });
+      return;
+    }
+    setSelecoesMilitares((prev) => ({ ...prev, [op.id]: proximaSelecao }));
+    await handleSalvarEscalaMilitar(op, proximaSelecao);
+  };
+
   // Salvar Escala Definitiva do Militar
-  const handleSalvarEscalaMilitar = async (op) => {
-    const selecao = selecoesMilitares[op.id] || {};
+  const handleSalvarEscalaMilitar = async (op, selecaoOverride = null) => {
+    const selecao = selecaoOverride || selecoesMilitares[op.id] || {};
     const mod = op.modalidade || '2_ETAPAS_15';
     const anoCampanha = campanhaSelecionada?.ano_referencia || (new Date().getFullYear() + 1);
 
@@ -1063,7 +1085,7 @@ export default function PainelPlanoFerias() {
                             const aprovadas = parcelas.filter((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
                             const prefIndex = preferencias.findIndex((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
                             const classe = aprovadas.length ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-300 hover:bg-blue-50 hover:text-blue-500';
-                            return <button key={mes.val} type="button" onClick={() => setMilitarModalAberto(op)} title={aprovadas.length ? 'Parcela aprovada — clique para editar' : prefIndex >= 0 ? `${prefIndex + 1}ª preferência — clique para aprovar/editar` : 'Sem preferência — clique para alocar manualmente'} className={`m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ${classe}`}>{aprovadas.length ? aprovadas.map((p) => `${p.dias || p.quantidade_dias || '?'}d`).join(' + ') : prefIndex >= 0 ? `${prefIndex + 1}ª op` : '+'}</button>;
+                            return <button key={mes.val} type="button" onClick={() => handleSelecionarMesTimeline(op, mes.val, prefIndex)} title={aprovadas.length ? 'Parcela aprovada — clique para editar' : prefIndex >= 0 ? `${prefIndex + 1}ª preferência — clique para aprovar/editar` : 'Sem preferência — clique para alocar manualmente'} className={`m-1 min-h-[44px] rounded-md border text-[10px] font-bold transition-colors ${classe}`}>{aprovadas.length ? aprovadas.map((p) => `${p.dias || p.quantidade_dias || '?'}d`).join(' + ') : prefIndex >= 0 ? `${prefIndex + 1}ª op` : '+'}</button>;
                           })}
                         </div>;
                       })}
