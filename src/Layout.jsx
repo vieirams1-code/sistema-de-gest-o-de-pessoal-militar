@@ -270,7 +270,7 @@ const menuGroups = [
             anyOf: [
               { type: 'action', key: 'perm_visualizar_planos_ferias' },
               { type: 'action', key: 'perm_visualizar_campanhas_ferias' },
-              { type: 'action', key: 'perm_criar_planos_ferias' }
+              { type: 'action', key: 'perm_criar_planos_ferias' },
               { type: 'action', key: 'perm_editar_planos_ferias' },
               { type: 'action', key: 'perm_excluir_planos_ferias' },
               { type: 'action', key: 'perm_gerir_respostas' },
