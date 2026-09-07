@@ -357,13 +357,13 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     return ['perm_atribuir_permissoes_ferias', 'perm_atribuir_permissoes_campanhas', ...legadoRespostas];
   }
   if (acao === 'PLANO_PERMISSOES_LISTAR' || acao === 'PLANO_AUDITORIA_LISTAR') {
-    return ['perm_visualizar_respostas_ferias', 'perm_atribuir_permissoes_ferias', ...legadoRespostas];
+    return ['perm_visualizar_respostas_ferias', 'perm_atribuir_permissoes_ferias', 'acesso_campanhas_ferias', ...legadoRespostas];
   }
   if (acao === 'PLANO_PERMISSAO_SALVAR' || acao === 'PLANO_PERMISSAO_EXCLUIR') {
     return ['perm_atribuir_permissoes_ferias', ...legadoRespostas];
   }
   if (acao === 'PLANO_INSTITUCIONAL_LISTAR') {
-    return ['perm_visualizar_planos_ferias', 'perm_visualizar_campanhas_ferias', 'perm_criar_planos_ferias', ...legadoCampanhas, ...legadoRespostas];
+    return ['perm_visualizar_planos_ferias', 'perm_visualizar_campanhas_ferias', 'perm_criar_planos_ferias', 'acesso_campanhas_ferias', ...legadoCampanhas, ...legadoRespostas];
   }
   if (acao === 'PLANO_INSTITUCIONAL_CRIAR') {
     return ['perm_criar_planos_ferias', 'perm_criar_campanhas_ferias', ...legadoCampanhas];
@@ -375,7 +375,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     return ['perm_excluir_planos_ferias', 'perm_excluir_campanhas_ferias', 'perm_admin_campanhas_ferias', ...legadoCampanhas];
   }
   if (acao === 'PLANO_ESCALA_LISTAR') {
-    return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', ...legadoRespostas];
+    return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'acesso_campanhas_ferias', ...legadoRespostas];
   }
   if (acao === 'PLANO_DECISAO_CAMADA_1' || acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
     return ['perm_aprovar_ferias', ...legadoRespostas];
@@ -388,7 +388,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   }
   if (acao.startsWith('PORTAL_CONFIG_')) return ['perm_configurar_portal'];
   if (acao.startsWith('CADASTRO_DECIDIR_')) return ['perm_aprovar_respostas_campanhas', ...legadoRespostas];
-  if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais', 'perm_visualizar_campanhas_ferias', ...legadoCampanhas, ...legadoRespostas];
+  if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais', 'perm_visualizar_campanhas_ferias', 'acesso_campanhas_gerais', 'acesso_campanhas_ferias', ...legadoCampanhas, ...legadoRespostas];
   if (['CAMPANHA_DETALHES_RETORNO', 'CAMPANHA_HOMOLOGAR_RESPOSTA', 'CAMPANHA_DISPARAR_LEMBRETES'].includes(acao)) {
     return ['perm_visualizar_respostas_campanhas', 'perm_aprovar_respostas_campanhas', ...legadoRespostas];
   }
