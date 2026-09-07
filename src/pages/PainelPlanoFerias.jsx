@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ResumoCotasMensais from '@/components/ferias-portal/ResumoCotasMensais';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const LISTA_MESES = [
   { val: '01', nome: 'Janeiro' },
@@ -85,6 +86,12 @@ function extrairParcelas(op) {
 }
 
 export default function PainelPlanoFerias() {
+  const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
+  const podeAdminFerias = isAdmin || canAccessAction('perm_admin_campanhas_ferias') || canAccessAction('perm_admin_mode');
+  const podeAprovarFerias = isAdmin || canAccessAction('perm_aprovar_ferias') || canAccessAction('perm_gerir_respostas');
+  const podeGerarFerias = isAdmin || canAccessAction('perm_gerar_ferias_campanhas') || canAccessAction('perm_gerir_respostas');
+  const podeAtribuirPermissoesFerias = isAdmin || canAccessAction('perm_atribuir_permissoes_ferias') || canAccessAction('perm_gerir_respostas');
+
   // Lista de Campanhas e Campanha Selecionada
   const [campanhas, setCampanhas] = useState([]);
   const [planos, setPlanos] = useState([]);
@@ -473,7 +480,7 @@ export default function PainelPlanoFerias() {
   };
 
   const handleAprovarPrimeiraOpcao = async (op) => {
-    if (actionLoading || op?.gerado_ferias_efetivas) return;
+    if (!podeAprovarFerias || actionLoading || op?.gerado_ferias_efetivas) return;
     const selecao = {
       fracao1: extrairMesDeDetalhes(op.opcao_1_detalhes, '01'),
       fracao2: extrairMesDeDetalhes(op.opcao_2_detalhes, '07'),
@@ -484,6 +491,7 @@ export default function PainelPlanoFerias() {
 
   // Salvar Escala Definitiva do Militar
   const handleSalvarEscalaMilitar = async (op, selecaoOverride = null) => {
+    if (!podeAprovarFerias) return;
     const selecao = selecaoOverride || selecoesMilitares[op.id] || {};
     const mod = op.modalidade || '2_ETAPAS_15';
     const anoCampanha = campanhaSelecionada?.ano_referencia || (new Date().getFullYear() + 1);
@@ -606,6 +614,7 @@ export default function PainelPlanoFerias() {
 
   // Geração de férias no nível do Plano; mantém geração legada somente para campanhas sem plano.
   const handleGerarLoteFerias = async () => {
+    if (!podeGerarFerias) return;
     const usaPlanoConsolidado = painelConsolidado && Boolean(planoSelecionadoId);
     if (!campanhaSelecionada && !usaPlanoConsolidado) return;
 
@@ -647,6 +656,7 @@ export default function PainelPlanoFerias() {
 
   // Ações Administrativas de Campanha (Protegidas pelo Modo Admin)
   const handleDesativarCampanhaAdmin = async (camp) => {
+    if (!podeAdminFerias) return;
     if (!window.confirm(`Modo Admin: Deseja desativar a campanha "${camp.titulo}"? Ela deixará de receber respostas e passará para o histórico de consulta.`)) return;
     setActionLoading(true);
     try {
@@ -664,6 +674,7 @@ export default function PainelPlanoFerias() {
   };
 
   const handleArquivarCampanhaAdmin = async (camp) => {
+    if (!podeAdminFerias) return;
     if (!window.confirm(`Modo Admin: Deseja arquivar a campanha "${camp.titulo}"?`)) return;
     setActionLoading(true);
     try {
@@ -681,6 +692,7 @@ export default function PainelPlanoFerias() {
   };
 
   const handleExcluirCampanhaAdmin = async (camp) => {
+    if (!podeAdminFerias) return;
     if (!window.confirm(`ALERTA MODO ADMIN: Tem certeza que deseja EXCLUIR a campanha "${camp.titulo}"? As opções de preferência desta campanha serão apagadas. (Férias já geradas na escala oficial NÃO serão afetadas).`)) return;
     setActionLoading(true);
     try {
@@ -886,7 +898,7 @@ export default function PainelPlanoFerias() {
 
         {/* AÇÕES NO TOPO: ADMIN E GERAÇÃO NO SGP */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <button
+          {podeAdminFerias && <button
             type="button"
             onClick={() => setModoAdmin(!modoAdmin)}
             className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
@@ -897,9 +909,9 @@ export default function PainelPlanoFerias() {
           >
             <i className={`ph ${modoAdmin ? 'ph-shield-warning' : 'ph-shield'} text-base`}></i>
             <span>{modoAdmin ? 'Admin ON' : 'Admin'}</span>
-          </button>
+          </button>}
 
-          {!isCampanhaEncerradaOuDesativada && (
+          {podeGerarFerias && !isCampanhaEncerradaOuDesativada && (
             <button
               type="button"
               onClick={handleGerarLoteFerias}
@@ -1074,7 +1086,7 @@ export default function PainelPlanoFerias() {
                     </div>
                     <div className="col-span-3 md:col-span-2 text-center"><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${isGerado ? 'bg-purple-100 text-purple-800 border-purple-200' : isNaoContemplado ? 'bg-rose-100 text-rose-800 border-rose-200' : isSalvo ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>{isGerado ? 'Férias Geradas' : isNaoContemplado ? 'Não Contemplado' : isSalvo ? 'Escala Salva' : 'Pendente'}</span></div>
                     <div className="col-span-3 md:col-span-2 flex justify-end gap-2 flex-wrap">
-                      {!isSalvo && !isNaoContemplado && !isGerado && <button type="button" onClick={(e) => { e.stopPropagation(); handleAprovarPrimeiraOpcao(op); }} disabled={actionLoading} className="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer">✓ Aprovar 1ª opção</button>}
+                      {podeAprovarFerias && !isSalvo && !isNaoContemplado && !isGerado && <button type="button" onClick={(e) => { e.stopPropagation(); handleAprovarPrimeiraOpcao(op); }} disabled={actionLoading} className="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer">✓ Aprovar 1ª opção</button>}
                       <button type="button" onClick={(e) => { e.stopPropagation(); setMilitarModalAberto(op); }} className="px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white border border-green-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer">{isSalvo ? 'Ver escala' : 'Editar manualmente'}</button>
                     </div>
                   </div>
@@ -1104,7 +1116,7 @@ export default function PainelPlanoFerias() {
                   <div className="p-4 bg-blue-50 border-b border-blue-100 text-[11px] text-blue-800">Marque ou desmarque os meses. Para trocar uma fração, primeiro retire o mês atual. A numeração das frações segue automaticamente do mês mais antigo para o mais recente.</div>
                   <div className="p-4 flex flex-wrap gap-2 border-b border-slate-100">{Array.from({ length: limiteFracoes }).map((_, i) => <div key={i} className={`min-w-[115px] rounded-lg border px-3 py-2 ${mesesSelecionados[i] ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}><div className="text-[10px] font-bold uppercase text-slate-500">{i + 1}ª fração</div><div className="text-sm font-extrabold text-blue-700">{mesesSelecionados[i] ? getNomeMesPorVal(mesesSelecionados[i]) : 'Escolha um mês'}</div></div>)}</div>
                   <div className="p-4"><div className="flex items-center justify-between mb-2"><span className="text-xs font-extrabold text-slate-700">Meses da campanha</span><span className="text-[10px] text-slate-500">Preferências aparecem tracejadas</span></div><div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">{LISTA_MESES.map((mes) => { const selecionadaIndex = mesesSelecionados.findIndex((m) => m === mes.val); const prefIndex = preferencias.findIndex((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val); const cheio = (timelineContagem[mes.val] || 0) >= timelineLimite; const classe = selecionadaIndex >= 0 ? 'bg-blue-100 border-blue-400 text-blue-800' : prefIndex >= 0 ? 'bg-amber-50 border-amber-300 border-dashed text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600'; return <button key={mes.val} type="button" disabled={isGerado || (selecionadaIndex < 0 && mesesSelecionados.length >= limiteFracoes) || (selecionadaIndex < 0 && cheio)} onClick={() => handleSelecionarMesTimeline(militarAtivo, mes.val)} className={`min-h-[46px] rounded-lg border text-[11px] font-bold transition-colors ${classe} ${!isGerado && selecionadaIndex < 0 && mesesSelecionados.length < limiteFracoes && !cheio ? 'hover:border-blue-400 hover:bg-blue-50 cursor-pointer' : ''}`}>{mes.nome.slice(0, 3)}{selecionadaIndex >= 0 && <span className="block text-[9px] mt-0.5">{selecionadaIndex + 1}ª fração</span>}{prefIndex >= 0 && selecionadaIndex < 0 && <span className="block text-[9px] mt-0.5">{prefIndex + 1}ª opção</span>}</button>; })}</div></div>
-                  <div className="p-4 border-t border-slate-200 flex items-center justify-between"><span className="text-[11px] text-slate-600">{mesesSelecionados.length < limiteFracoes ? `Faltam ${limiteFracoes - mesesSelecionados.length} fração(ões).` : 'Todas as frações estão marcadas.'}</span>{mesesSelecionados.length === limiteFracoes && !isGerado && <button type="button" onClick={() => handleSalvarEscalaMilitar(militarAtivo, selecaoAtual)} disabled={actionLoading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">Salvar seleção</button>}</div>
+                  <div className="p-4 border-t border-slate-200 flex items-center justify-between"><span className="text-[11px] text-slate-600">{mesesSelecionados.length < limiteFracoes ? `Faltam ${limiteFracoes - mesesSelecionados.length} fração(ões).` : 'Todas as frações estão marcadas.'}</span>{podeAprovarFerias && mesesSelecionados.length === limiteFracoes && !isGerado && <button type="button" onClick={() => handleSalvarEscalaMilitar(militarAtivo, selecaoAtual)} disabled={actionLoading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">Salvar seleção</button>}</div>
                 </div>
               </div>;
             })()}
@@ -1135,7 +1147,7 @@ export default function PainelPlanoFerias() {
                           <div className="sticky left-0 z-10 bg-white px-3 py-2.5 min-w-0">
                             <div className="font-bold text-xs text-slate-800 truncate">{op.militar_posto} {op.militar_nome}</div>
                             <div className="text-[10px] text-slate-500 truncate">{op.militar_matricula || '-'} • {op.lotacao_nome || 'Unidade'}</div>
-                            {!op.gerado_ferias_efetivas && mesesSelecionados.length > 0 && <div className="mt-1 flex items-center gap-2"><span className="text-[10px] font-bold text-blue-700">{mesesSelecionados.length}/{limiteFracoes} selecionadas</span>{mesesSelecionados.length === limiteFracoes && <button type="button" onClick={() => handleSalvarEscalaMilitar(op, selecaoAtual)} disabled={actionLoading} className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-blue-700">Salvar seleção</button>}</div>}
+                            {podeAprovarFerias && !op.gerado_ferias_efetivas && mesesSelecionados.length > 0 && <div className="mt-1 flex items-center gap-2"><span className="text-[10px] font-bold text-blue-700">{mesesSelecionados.length}/{limiteFracoes} selecionadas</span>{mesesSelecionados.length === limiteFracoes && <button type="button" onClick={() => handleSalvarEscalaMilitar(op, selecaoAtual)} disabled={actionLoading} className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-blue-700">Salvar seleção</button>}</div>}
                           </div>
                           {LISTA_MESES.map((mes) => {
                             const aprovadas = parcelas.filter((p) => String(p.mes || p.data_inicio?.slice(5, 7)).padStart(2, '0') === mes.val);
@@ -1207,7 +1219,7 @@ export default function PainelPlanoFerias() {
                       Público: {camp.escopo_unidades_nomes || 'Geral'}
                     </p>
 
-                    {modoAdmin && (
+                    {modoAdmin && podeAtribuirPermissoesFerias && (
                       <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
