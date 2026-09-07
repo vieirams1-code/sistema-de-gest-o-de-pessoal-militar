@@ -322,7 +322,6 @@ function consolidarPermissoesPortal(perfis: any[] = [], acessos: any[] = []): Se
     aplicar(perfil);
     aplicar(extrairMatrizPermissoesPerfil(perfil?.descricao));
   }
-  for (const acesso of acessos || []) aplicar(acesso);
   return permitidas;
 }
 
