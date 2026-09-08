@@ -7,7 +7,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
-import { AjusteSaldoFerias } from '@/api/entities';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,15 +77,6 @@ export default function PeriodosAquisitivos() {
     enabled: isPaBundleQueryEnabled,
   });
 
-  const { data: ajustesSaldoFerias = [], isLoading: loadingAjustesSaldoFerias } = useQuery({
-    queryKey: ['pa-diagnostico-ajustes-saldo-ferias', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null],
-    queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: isPaBundleQueryEnabled,
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-  });
-
-
   const periodos = paBundle?.periodosAquisitivos || [];
   const ferias = paBundle?.ferias || [];
   const registrosLivro = paBundle?.registrosLivro || [];
@@ -94,7 +84,8 @@ export default function PeriodosAquisitivos() {
   const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
-  const isLoadingDiagnosticoSaldo = loadingAjustesSaldoFerias;
+  const ajustesSaldoFerias = paBundle?.ajustesSaldoFerias || [];
+  const isLoadingDiagnosticoSaldo = isLoading;
 
 
   const updatePeriodoMutation = useMutation({
