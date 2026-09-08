@@ -215,15 +215,16 @@ export function exportarPlanilhaCampanhaExcel(campanha, militares) {
       formCampos.forEach((c) => {
         if (c.tipo === 'upload_arquivo') {
           const anexo = arquivosObj[c.id];
-          row[c.pergunta] = typeof anexo === 'object' ? (anexo?.url || '') : (anexo || '');
+          row[c.pergunta] = typeof anexo === 'object'
+            ? (anexo?.nome || anexo?.nome_original || 'Arquivo enviado')
+            : (anexo ? 'Arquivo enviado' : '');
         } else {
           const val = respostasObj[c.id];
           row[c.pergunta] = Array.isArray(val) ? val.join(', ') : (val !== undefined && val !== null ? String(val) : '');
         }
       });
     } else if (campanha.tipo === 'ASSINATURA_DOCUMENTO') {
-      row['Arquivo Devolvido (URL)'] = resp.arquivo_devolucao_url || '';
-      row['Nome Original Arquivo'] = resp.arquivo_devolucao_nome || '';
+      row['Arquivo Devolvido'] = resp.arquivo_devolucao_nome || (resp.arquivo_devolucao_url ? 'Arquivo enviado' : '');
       row['Termo de Aceite/Ciência'] = resp.termo_aceite ? 'Sim, concorda' : (resp.texto_termo_aceite ? 'Aceito' : '-');
     } else if (campanha.tipo === 'PLANO_FERIAS') {
       row['1ª Opção de Mês'] = resp.opcao_1_meses || m.detalhes_resposta || '';
@@ -271,7 +272,7 @@ export function exportarPlanilhaCampanhaCsv(campanha, militares) {
       headers.push(`"${(c.pergunta || '').replace(/"/g, '""')}"`);
     });
   } else if (campanha.tipo === 'ASSINATURA_DOCUMENTO') {
-    headers.push('Arquivo Devolvido URL', 'Arquivo Devolvido Nome', 'Termo Ciência');
+    headers.push('Arquivo Devolvido', 'Termo Ciência');
   } else if (campanha.tipo === 'PLANO_FERIAS') {
     headers.push('Opção 1', 'Opção 2', 'Opção 3', 'Parcelamento');
   } else {
@@ -307,7 +308,10 @@ export function exportarPlanilhaCampanhaCsv(campanha, militares) {
       formCampos.forEach((c) => {
         if (c.tipo === 'upload_arquivo') {
           const anexo = arquivosObj[c.id];
-          row.push(`"${(typeof anexo === 'object' ? anexo?.url : anexo) || ''}"`);
+          const nomeAnexo = typeof anexo === 'object'
+            ? (anexo?.nome || anexo?.nome_original || 'Arquivo enviado')
+            : (anexo ? 'Arquivo enviado' : '');
+          row.push(`"${String(nomeAnexo).replace(/"/g, '""')}"`);
         } else {
           const val = respostasObj[c.id];
           const strVal = Array.isArray(val) ? val.join(', ') : (val !== undefined && val !== null ? String(val) : '');
@@ -316,8 +320,7 @@ export function exportarPlanilhaCampanhaCsv(campanha, militares) {
       });
     } else if (campanha.tipo === 'ASSINATURA_DOCUMENTO') {
       row.push(
-        `"${resp.arquivo_devolucao_url || ''}"`,
-        `"${resp.arquivo_devolucao_nome || ''}"`,
+        `"${(resp.arquivo_devolucao_nome || (resp.arquivo_devolucao_url ? 'Arquivo enviado' : '')).replace(/"/g, '""')}"`,
         `"${resp.termo_aceite ? 'Sim' : 'Não'}"`
       );
     } else if (campanha.tipo === 'PLANO_FERIAS') {
