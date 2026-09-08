@@ -245,6 +245,76 @@ const CAMPOS_AJUSTE_SALDO_SUPORTE = [
   'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'ano_referencia',
   'tipo', 'dias', 'status', 'created_date',
 ];
+const CAMPOS_PUBLICACAO_DESCONTO = [
+  'id', 'tipo', 'numero_bg', 'data_bg', 'nota_para_bg', 'publicacao_referencia_id', 'status',
+];
+
+function projetarPublicacaoDesconto(publicacao) {
+  if (!publicacao || typeof publicacao !== 'object') return null;
+  const out = {};
+  for (const campo of CAMPOS_PUBLICACAO_DESCONTO) if (campo in publicacao) out[campo] = publicacao[campo];
+  return out;
+}
+
+function calcularStatusPublicacaoDesconto(publicacao) {
+  if (!publicacao) return 'Publicação não encontrada';
+  if (publicacao.numero_bg && publicacao.data_bg) return 'Publicado';
+  if (publicacao.nota_para_bg) return 'Aguardando Publicação';
+  return 'Aguardando Nota';
+}
+
+async function enriquecerDescontosFerias(base44, descontos = []) {
+  const publicacaoIds = Array.from(new Set((descontos || []).map((item) => String(item?.publicacao_id || '')).filter(Boolean)));
+  if (publicacaoIds.length === 0) {
+    return (descontos || []).map((desconto) => ({
+      ...desconto,
+      publicacao: null,
+      publicacao_reversao: null,
+      status_publicacao: desconto?.publicacao_id ? 'Publicação não encontrada' : '—',
+    }));
+  }
+
+  const publicacoes = [];
+  const reversoes = [];
+  for (let i = 0; i < publicacaoIds.length; i += CHUNK_FERIAS_IDS) {
+    const chunk = publicacaoIds.slice(i, i + CHUNK_FERIAS_IDS);
+    const [originaisChunk, reversoesChunk] = await Promise.all([
+      fetchWithRetry(
+        () => base44.asServiceRole.entities.PublicacaoExOfficio.filter(
+          { id: { $in: chunk } }, undefined, 1000, 0, CAMPOS_PUBLICACAO_DESCONTO,
+        ),
+        'publicacaoDesconto.originais',
+      ),
+      fetchWithRetry(
+        () => base44.asServiceRole.entities.PublicacaoExOfficio.filter(
+          { publicacao_referencia_id: { $in: chunk } }, undefined, 1000, 0, CAMPOS_PUBLICACAO_DESCONTO,
+        ),
+        'publicacaoDesconto.reversoes',
+      ),
+    ]);
+    publicacoes.push(...(originaisChunk || []));
+    reversoes.push(...(reversoesChunk || []));
+  }
+
+  const publicacoesPorId = new Map(publicacoes.filter((item) => item?.id).map((item) => [String(item.id), item]));
+  const reversoesPorReferencia = new Map(
+    reversoes
+      .filter((item) => item?.tipo === 'Tornar sem Efeito' && item?.publicacao_referencia_id)
+      .map((item) => [String(item.publicacao_referencia_id), item]),
+  );
+
+  return (descontos || []).map((desconto) => {
+    const publicacaoId = String(desconto?.publicacao_id || '');
+    const publicacao = publicacaoId ? publicacoesPorId.get(publicacaoId) || null : null;
+    return {
+      ...desconto,
+      publicacao: projetarPublicacaoDesconto(publicacao),
+      publicacao_reversao: projetarPublicacaoDesconto(publicacaoId ? reversoesPorReferencia.get(publicacaoId) || null : null),
+      status_publicacao: publicacaoId ? calcularStatusPublicacaoDesconto(publicacao) : '—',
+    };
+  });
+}
+
 function projetarAjustesSaldo(registros) {
   return (registros || []).map((registro) => {
     const out = {};
@@ -264,6 +334,7 @@ Deno.serve(async (req) => {
 
     const authUserEmail = normalizeEmail(authUser.email);
     const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
+    const includeDescontos = payload?.includeDescontos === true;
     const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
 
     const authPerms = await resolverPermissoes(base44, authUser.email);
@@ -285,11 +356,17 @@ Deno.serve(async (req) => {
     const targetHasGlobalScope = (!isImpersonating && authIsAdminByRole) || targetPerms.hasGlobalScope;
 
     if (targetHasGlobalScope) {
-      const [ferias, registrosLivro, ajustesSaldoFerias] = await Promise.all([
+      const [ferias, registrosLivro, ajustesSaldoFerias, descontosFeriasRaw] = await Promise.all([
         fetchWithRetry(() => base44.asServiceRole.entities.Ferias.list('-data_inicio'), 'ferias.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(), 'registroLivro.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.AjusteSaldoFerias.list('-created_date'), 'ajusteSaldoFerias.admin'),
+        includeDescontos
+          ? fetchWithRetry(() => base44.asServiceRole.entities.DescontoFerias.list('-created_date'), 'descontoFerias.admin')
+          : Promise.resolve([]),
       ]);
+      const descontosFerias = includeDescontos
+        ? await enriquecerDescontosFerias(base44, descontosFeriasRaw || [])
+        : [];
 
       const feriasIdsAdmin = (ferias || []).map((f) => String(f?.id || '')).filter(Boolean);
       const feriasTagsResultAdmin = await listarFeriasTagsPorFeriasIds(base44, feriasIdsAdmin);
@@ -304,6 +381,7 @@ Deno.serve(async (req) => {
         ferias: ferias || [],
         registrosLivro: projetarEventosFerias(registrosLivro, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
         ajustesSaldoFerias: projetarAjustesSaldo(ajustesSaldoFerias),
+        descontosFerias,
         feriasTags: feriasTagsResultAdmin.rows,
         tagsCatalogo: tagsCatalogoAdmin.rows,
         meta: {
@@ -329,6 +407,7 @@ Deno.serve(async (req) => {
         ferias: [],
         registrosLivro: [],
         ajustesSaldoFerias: [],
+        descontosFerias: [],
         feriasTags: [],
         tagsCatalogo: [],
         meta: {
@@ -348,17 +427,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [feriasResult, registrosResult, ajustesResult] = await Promise.all([
+    const [feriasResult, registrosResult, ajustesResult, descontosResult] = await Promise.all([
       listarPorEscopoIds(base44, 'Ferias', militarIds, '-data_inicio'),
       listarPorEscopoIds(base44, 'RegistroLivro', militarIds, undefined),
       listarPorEscopoIds(base44, 'AjusteSaldoFerias', militarIds, '-created_date'),
+      includeDescontos
+        ? listarPorEscopoIds(base44, 'DescontoFerias', militarIds, '-created_date')
+        : Promise.resolve({ rows: [], partialFailures: 0 }),
     ]);
+    const descontosFerias = includeDescontos
+      ? await enriquecerDescontosFerias(base44, descontosResult.rows)
+      : [];
 
     const feriasIdsEscopo = feriasResult.rows.map((f) => String(f?.id || '')).filter(Boolean);
     const feriasTagsResult = await listarFeriasTagsPorFeriasIds(base44, feriasIdsEscopo);
     const tagsCatalogoResult = await listarCatalogoTagsParaFeriasTags(base44, feriasTagsResult.rows);
 
-    const partialFailures = feriasResult.partialFailures + registrosResult.partialFailures + ajustesResult.partialFailures;
+    const partialFailures = feriasResult.partialFailures + registrosResult.partialFailures + ajustesResult.partialFailures + descontosResult.partialFailures;
     const warnings = [];
     if (partialFailures > 0) warnings.push('PARTIAL_FAILURES');
     if (feriasTagsResult.partialFailures > 0) warnings.push('FERIAS_TAGS_PARTIAL_FAILURES');
@@ -369,6 +454,7 @@ Deno.serve(async (req) => {
       ferias: feriasResult.rows,
       registrosLivro: projetarEventosFerias(registrosResult.rows, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
       ajustesSaldoFerias: projetarAjustesSaldo(ajustesResult.rows),
+      descontosFerias,
       feriasTags: feriasTagsResult.rows,
       tagsCatalogo: tagsCatalogoResult.rows,
       meta: {
