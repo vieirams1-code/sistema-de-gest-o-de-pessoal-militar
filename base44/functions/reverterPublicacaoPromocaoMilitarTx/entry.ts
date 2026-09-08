@@ -54,8 +54,12 @@ Deno.serve(async (req) => {
   try {
     const authUser = await base44.auth.me();
     if (!authUser) return erro({ status: 401, etapa: 'autorizacao', motivo: 'nao_autenticado' });
-    if (String(authUser.role || '').trim().toLowerCase() !== 'admin') {
-      return erro({ status: 403, etapa: 'autorizacao', motivo: 'requer_administrador_plataforma' });
+    const authIsAdmin = String(authUser.role || '').trim().toLowerCase() === 'admin';
+    const authzBaseResponse = await base44.functions.invoke('getUserPermissions', {});
+    const authzBase = authzBaseResponse?.data ?? authzBaseResponse ?? {};
+    const temPermissaoReversaoExcepcional = authIsAdmin || authzBase?.actions?.[PERMISSAO_REVERSAO_EXCEPCIONAL] === true;
+    if (!authIsAdmin && !temPermissaoReversaoExcepcional) {
+      return erro({ status: 403, etapa: 'autorizacao', motivo: 'permissao_ausente', contexto: { campo_faltante: PERMISSAO_REVERSAO_EXCEPCIONAL } });
     }
     const payload = await parsePayload(req);
     const promocao = payload?.promocao || {};
