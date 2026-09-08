@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
+import { CANONICAL_PERMISSION_KEYS, PROFILE_MATRIX_VERSION } from './permissionManifest.ts';
 
 // =====================================================================
 // Constantes
@@ -80,6 +81,49 @@ function sanitizeAuthError(error) {
 // PerfilPermissao, no formato:
 //   [SGP_PERMISSIONS_MATRIX]{...JSON...}[/SGP_PERMISSIONS_MATRIX]
 // Retorna um objeto plano com chaves acesso_* / perm_* booleanas, ou {} se ausente.
+const PROFILE_VERSION_START = '[SGP_PERMISSIONS_VERSION]';
+const PROFILE_VERSION_END = '[/SGP_PERMISSIONS_VERSION]';
+const CANONICAL_PERMISSION_KEY_SET = new Set(CANONICAL_PERMISSION_KEYS as readonly string[]);
+const KNOWN_LEGACY_PERMISSION_KEYS = new Set([
+    'acesso_campanhas',
+    'perm_visualizar_campanhas',
+    'perm_gerir_campanhas',
+    'perm_gerir_respostas',
+    'perm_excluir_atestados',
+    'perm_gerir_fluxo_dom_pedro_ii',
+    'acesso_rotinas_administrativas',
+    'perm_visualizar_rotinas_administrativas',
+    'perm_gerir_rotinas_administrativas',
+    'perm_executar_rotinas_administrativas',
+    'perm_visualizar_rotinas_globais_administrativas',
+    'perm_gerir_contratos_designacao',
+]);
+
+function extrairVersaoMatrizPermissoes(descricao) {
+    if (typeof descricao !== 'string' || !descricao) return '';
+    const start = descricao.indexOf(PROFILE_VERSION_START);
+    const end = descricao.indexOf(PROFILE_VERSION_END);
+    if (start === -1 || end === -1 || end <= start) return '';
+    return descricao.slice(start + PROFILE_VERSION_START.length, end).trim();
+}
+
+function diagnosticarMatrizPerfil(perfil) {
+    const matriz = extrairMatrizPermissoes(perfil?.descricao);
+    const keys = Object.keys(matriz || {}).filter((key) => key.startsWith('acesso_') || key.startsWith('perm_'));
+    const unknownKeys = keys.filter((key) => !CANONICAL_PERMISSION_KEY_SET.has(key) && !KNOWN_LEGACY_PERMISSION_KEYS.has(key));
+    const legacyKeys = keys.filter((key) => KNOWN_LEGACY_PERMISSION_KEYS.has(key));
+    const version = extrairVersaoMatrizPermissoes(perfil?.descricao) || 'LEGADO_SEM_VERSAO';
+    return {
+        perfilId: perfil?.id || '',
+        perfilNome: perfil?.nome_perfil || '',
+        version,
+        currentVersion: PROFILE_MATRIX_VERSION,
+        isCurrentVersion: version === PROFILE_MATRIX_VERSION,
+        legacyKeys,
+        unknownKeys,
+    };
+}
+
 function extrairMatrizPermissoes(descricao) {
     if (typeof descricao !== 'string' || !descricao) return {};
     const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
