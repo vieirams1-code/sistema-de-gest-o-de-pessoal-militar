@@ -62,8 +62,11 @@ async function listarPorEscopoIds(base44, entityName, militarIds, orderBy) {
 
 const CAMPOS_ATESTADO_OPERACIONAL = [
   'id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula', 'militar_matricula_atual',
-  'militar_matricula_label', 'tipo_afastamento', 'dias', 'data_inicio', 'data_fim', 'status',
-  'necessita_jiso', 'data_jiso_agendada', 'medico_nome_snapshot', 'medico_crm_snapshot', 'medico', 'crm_medico',
+  'militar_matricula_label', 'tipo_afastamento', 'dias', 'data_inicio', 'data_termino', 'data_retorno', 'status',
+  'fluxo_homologacao', 'necessita_jiso', 'homologado_comandante', 'encaminhado_jiso',
+  'data_jiso_agendada', 'hora_jiso_agendada', 'jiso_id', 'status_jiso', 'status_publicacao',
+  'numero_bg', 'data_bg', 'apostilada_por_id', 'tornada_sem_efeito_por_id',
+  'medico_nome_snapshot', 'medico_crm_snapshot', 'medico', 'crm_medico',
   'created_date', 'updated_date',
 ];
 const CAMPOS_ATESTADO_SENSIVEIS = [
