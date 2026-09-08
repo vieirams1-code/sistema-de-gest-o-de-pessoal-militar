@@ -31,6 +31,16 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_grupos_efetivo',
+        label: 'Grupos do Efetivo',
+        actions: [
+          { key: 'perm_visualizar_grupos_efetivo', label: 'Visualizar Grupos do Efetivo' },
+          { key: 'perm_criar_grupos_efetivo', label: 'Criar Grupos do Efetivo', sensitive: true },
+          { key: 'perm_editar_grupos_efetivo', label: 'Editar/ativar Grupos do Efetivo', sensitive: true },
+          { key: 'perm_gerir_membros_grupos_efetivo', label: 'Gerenciar membros dos Grupos do Efetivo', sensitive: true }
+        ]
+      },
+      {
         key: 'acesso_extracao_efetivo',
         label: 'Extração do Efetivo',
         actions: [
@@ -357,6 +367,14 @@ export const permissionStructure = [
   {
     category: 'Administração do Sistema',
     modules: [
+      {
+        key: 'acesso_tags',
+        label: 'Tags',
+        actions: [
+          { key: 'perm_visualizar_tags', label: 'Visualizar catálogo de Tags' },
+          { key: 'perm_gerir_tags', label: 'Gerir catálogo de Tags', sensitive: true }
+        ]
+      },
       {
         key: 'acesso_templates',
         label: 'Templates',
