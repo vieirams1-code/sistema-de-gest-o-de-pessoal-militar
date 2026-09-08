@@ -8,6 +8,18 @@ const createMockEntity = (data = []) => ({
   list: async () => data,
 });
 
+const ALL_PERMISSIONS = {
+  livro: true,
+  publicacoes: true,
+  ferias: true,
+  atestados: true,
+  atestadoSensitive: true,
+  antiguidade: true,
+  medalhas: true,
+  funcoes: true,
+  gratificacoes: true,
+};
+
 test('getMilitarTimeline - ordena por data decrescente', async () => {
   const mockBase44 = {
     entities: {
@@ -26,7 +38,7 @@ test('getMilitarTimeline - ordena por data decrescente', async () => {
 
   __setMilitarTimelineClientForTests(mockBase44);
 
-  const timeline = await getMilitarTimeline('m1');
+  const timeline = await getMilitarTimeline('m1', ALL_PERMISSIONS);
 
   assert.equal(timeline.length, 6);
   assert.equal(timeline[0].data, '2023-06-01'); // Medalha
@@ -60,7 +72,7 @@ test('getMilitarTimeline - lida com múltiplos eventos na mesma data', async () 
 
   __setMilitarTimelineClientForTests(mockBase44);
 
-  const timeline = await getMilitarTimeline('m1');
+  const timeline = await getMilitarTimeline('m1', ALL_PERMISSIONS);
 
   assert.equal(timeline.length, 2);
   assert.equal(timeline[0].data, '2023-01-01');
@@ -85,7 +97,7 @@ test('getMilitarTimeline - ignora eventos sem data', async () => {
 
   __setMilitarTimelineClientForTests(mockBase44);
 
-  const timeline = await getMilitarTimeline('m1');
+  const timeline = await getMilitarTimeline('m1', ALL_PERMISSIONS);
 
   assert.equal(timeline.length, 1);
   assert.equal(timeline[0].titulo, 'Com data');
@@ -110,7 +122,7 @@ test('getMilitarTimeline - remove eventos duplicados', async () => {
 
   __setMilitarTimelineClientForTests(mockBase44);
 
-  const timeline = await getMilitarTimeline('m1');
+  const timeline = await getMilitarTimeline('m1', ALL_PERMISSIONS);
 
   assert.equal(timeline.length, 1);
   assert.equal(timeline[0].titulo, 'Duplicado');
@@ -134,7 +146,7 @@ test('getMilitarTimeline - formatação correta dos campos', async () => {
 
   __setMilitarTimelineClientForTests(mockBase44);
 
-  const timeline = await getMilitarTimeline('m1');
+  const timeline = await getMilitarTimeline('m1', ALL_PERMISSIONS);
 
   const promo = timeline.find(it => it.tipo === 'Promoção');
   assert.equal(promo.titulo, 'Sgt QPBM');
@@ -172,7 +184,7 @@ test('getMilitarTimeline - inclui funções e gratificações', async () => {
 
   __setMilitarTimelineClientForTests(mockBase44);
 
-  const timeline = await getMilitarTimeline('m1');
+  const timeline = await getMilitarTimeline('m1', ALL_PERMISSIONS);
 
   assert.equal(timeline.length, 2);
 
