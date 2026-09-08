@@ -1212,7 +1212,7 @@ export default function PainelPlanoFerias() {
                       {camp.titulo}
                     </strong>
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
-                      Público: {camp.escopo_unidades_nomes || 'Geral'}
+                      Público: {camp.tipo_escopo === 'SEM_ESCOPO' ? 'Somente grupos' : (camp.escopo_unidades_nomes || 'Geral')}{camp.escopo_grupos_nomes ? ` · ${camp.escopo_grupos_nomes}` : ''}
                     </p>
 
                     {modoAdmin && podeAdminFerias && podeExcluirCampanhasFerias && (
