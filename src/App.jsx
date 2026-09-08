@@ -25,6 +25,7 @@ const adminOnlyPages = new Set([
   'AuditoriaComportamento',
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
+  'AntiguidadePrevia',
   'Medicos',
   'SubtiposDOEMS',
   'BackupSistema',
