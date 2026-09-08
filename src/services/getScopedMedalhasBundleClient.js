@@ -1,5 +1,5 @@
-import { base44 } from '@/api/base44Client';
-import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { base44 } from '../api/base44Client.js';
+import { getEffectiveEmail } from '../utils/impersonation.js';
 export async function fetchScopedMedalhasBundle(payload = {}) {
   const effectiveEmail = payload.effectiveEmail !== undefined ? payload.effectiveEmail : getEffectiveEmail();
   const finalPayload = { ...payload };
