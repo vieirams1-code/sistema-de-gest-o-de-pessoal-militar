@@ -24,6 +24,22 @@ function base64ToBlob(base64, mimeType) {
   return new Blob([bytes], { type: mimeType || 'application/octet-stream' });
 }
 
+async function resolverAutorizacaoAcervo(base44, payload, militarId) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    scopeMilitarIds: [String(militarId)],
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.gerir_acervo_historico !== true) {
+    throw Object.assign(new Error('Acesso negado: requer gerir_acervo_historico.'), { status: 403 });
+  }
+  if (authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -36,6 +52,9 @@ Deno.serve(async (req) => {
     if (!militar_id || !tipo_documento || !data || !file?.content) {
       return Response.json({ error: 'Parâmetros insuficientes.' }, { status: 400 });
     }
+
+    const authz = await resolverAutorizacaoAcervo(base44, payload, militar_id);
+    const effectiveEmail = String(authz?.effectiveUserEmail || authUser.email || '').trim().toLowerCase();
 
     // 1. Hash SHA-256 + tamanho
     const binaryString = atob(file.content);
@@ -78,7 +97,10 @@ Deno.serve(async (req) => {
     const substitui_documento_id = data.substitui_documento_id || null;
     if (substitui_documento_id) {
       const docAnterior = await base44.asServiceRole.entities.AcervoFuncionalHistorico.get(substitui_documento_id);
-      if (docAnterior) versao = (Number(docAnterior.versao) || 1) + 1;
+      if (!docAnterior || String(docAnterior?.militar_id || '') !== String(militar_id)) {
+        return Response.json({ error: 'Documento anterior inválido ou pertencente a outro militar.' }, { status: 403 });
+      }
+      versao = (Number(docAnterior.versao) || 1) + 1;
     }
 
     // 5. Upload no storage do Base44
@@ -97,7 +119,7 @@ Deno.serve(async (req) => {
       militar_id,
       tipo_documento,
       arquivo_url,
-      usuario_cadastro: authUser.email,
+      usuario_cadastro: effectiveEmail,
       status_documento: 'ATIVO',
       versao,
       substitui_documento_id,
