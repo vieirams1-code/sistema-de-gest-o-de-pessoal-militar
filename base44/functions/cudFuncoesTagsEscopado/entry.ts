@@ -3,8 +3,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const ENTIDADES = new Set(['MilitarFuncao', 'MilitarTag', 'FeriasTag', 'FuncaoMilitar', 'TagGrupo', 'Tag']);
 const OPERACOES = new Set(['create', 'update', 'encerrar', 'remover', 'desativar', 'delete', 'bulk']);
 
-const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
-
 const PERMISSIONS_MAP: Record<string, string[]> = {
   MilitarFuncao: ['adicionar_militares', 'editar_militares'],
   MilitarTag: ['adicionar_militares', 'editar_militares'],
@@ -36,32 +34,11 @@ function logDev(label: string, payload: Record<string, unknown>) {
   console.log(label, payload);
 }
 
-function extrairMatrizPermissoes(descricao: unknown) {
-  if (typeof descricao !== 'string' || !descricao) return {};
-  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-  if (start === -1 || end === -1 || end <= start) return {};
-  try { return JSON.parse(descricao.slice(start + 24, end).trim()) || {}; } catch { return {}; }
+async function resolverAutorizacaoCanonica(base44: any) {
+  const response = await base44.functions.invoke('getUserPermissions', {});
+  return response?.data ?? response ?? {};
 }
-function consolidarActions(perfis: any[], acessos: any[]) {
-  const actions: Record<string, boolean> = {};
-  const apply = (src: any) => Object.entries(src || {}).forEach(([k, v]) => {
-    if (!k.startsWith('perm_') || typeof v !== 'boolean') return;
-    const key = k.replace(/^perm_/, '');
-    if (v === true) actions[key] = true;
-    else if (!(key in actions)) actions[key] = false;
-  });
-  (perfis || []).forEach((p) => { apply(p); apply(extrairMatrizPermissoes(p?.descricao)); });
-  (acessos || []).forEach(apply);
-  return actions;
-}
-async function resolverPermissoes(base44: any, email: string) {
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: email, ativo: true }, undefined, 100, 0, CAMPOS_USUARIO_ACESSO);
-  const isAdminByAccess = (acessos || []).some((a: any) => normalizeTipo(a.tipo_acesso) === 'admin');
-  const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
-  const perfis = perfilIds.length > 0 ? await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }) : [];
-  return { acessos: acessos || [], actions: consolidarActions(perfis || [], acessos || []), isAdminByAccess };
-}
+
 async function listarMilitarIdsDoEscopo(base44: any, acessos: any[]) {
   const ids = new Set<string>();
   const queries: any[] = [];
@@ -414,14 +391,16 @@ Deno.serve(async (req) => {
     const { entidade, operacao, id, data = {}, itens } = await req.json();
     if (!ENTIDADES.has(entidade) || !OPERACOES.has(operacao)) return erro(400, 'Entidade/operação inválida.');
 
-    const perms = await resolverPermissoes(base44, authUser.email);
-    const isAdmin = String(authUser.role || '').toLowerCase() === 'admin' || perms.isAdminByAccess;
-    if (!isAdmin) {
+    const authz = await resolverAutorizacaoCanonica(base44);
+    const isPlatformAdmin = authz?.isAdmin === true;
+    if (!isPlatformAdmin) {
       const required = PERMISSIONS_MAP[entidade] || [];
-      if (!required.some((p) => perms.actions[p] === true)) return erro(403, 'Sem permissão para esta ação.');
+      if (!required.some((p) => authz?.actions?.[p] === true)) return erro(403, 'Sem permissão para esta ação.');
     }
 
-    const militarIdsEscopo = isAdmin ? null : await listarMilitarIdsDoEscopo(base44, perms.acessos);
+    const militarIdsEscopo = authz?.hasGlobalScope === true
+      ? null
+      : await listarMilitarIdsDoEscopo(base44, authz?.acessos || []);
     const isInScope = (mid: unknown) => militarIdsEscopo === null || militarIdsEscopo.includes(String(mid || ''));
 
     // ========== BULK ==========
