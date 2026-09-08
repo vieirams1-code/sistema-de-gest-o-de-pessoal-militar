@@ -32,44 +32,10 @@ async function fetchWithRetry(queryFn, label = 'query') {
   throw lastError;
 }
 
-function extrairMatrizPermissoes(descricao) {
-  if (typeof descricao !== 'string' || !descricao) return {};
-  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-  if (start === -1 || end === -1 || end <= start) return {};
-  try {
-    const parsed = JSON.parse(descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim());
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_e) { return {}; }
-}
-
-function consolidarActions(perfis, acessos) {
-  const actions = {};
-  const aplicarFonte = (fonte) => {
-    if (!fonte) return;
-    Object.entries(fonte).forEach(([key, val]) => {
-      if (typeof val !== 'boolean' || !key.startsWith('perm_')) return;
-      const actionKey = key.replace(/^perm_/, '');
-      if (val === true) actions[actionKey] = true;
-      else if (!(actionKey in actions)) actions[actionKey] = false;
-    });
-  };
-  (perfis || []).forEach((perfil) => { aplicarFonte(perfil); aplicarFonte(extrairMatrizPermissoes(perfil?.descricao)); });
-  (acessos || []).forEach(aplicarFonte);
-  return actions;
-}
-
-async function resolverPermissoes(base44, email) {
-  const acessos = await fetchWithRetry(
-    () => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: email, ativo: true }, undefined, LIMIT_USUARIO_ACESSO, 0, CAMPOS_USUARIO_ACESSO),
-    `usuarioAcesso.list:${email}`,
-  );
-  const perfilIds = Array.from(new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean)));
-  let perfis = [];
-  if (perfilIds.length > 0) {
-    perfis = await fetchWithRetry(() => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }), `perfilPermissao.in:${email}`);
-  }
-  return { acessos: acessos || [], perfis: perfis || [], actions: consolidarActions(perfis || [], acessos || []), isAdminByAccess: (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin') };
+async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
+  const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  return response?.data ?? response ?? {};
 }
 
 async function listarMilitarIdsDoEscopo(base44, acessos, criteriosAplicados, warnings) {
@@ -196,17 +162,14 @@ Deno.serve(async (req) => {
     let payload = {}; try { payload = await req.json(); } catch (_e) { payload = {}; }
     const { limit, offset } = normalizarPaginacao(payload);
 
-    const authUserEmail = normalizeEmail(authUser.email);
-    const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
-    const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-    const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
-    if (wantsImpersonation && !authIsAdmin) return Response.json({ error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' }, { status: 403 });
-
-    const isImpersonating = wantsImpersonation && authIsAdmin;
-    const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
-    const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
-    const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
+    const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
+    if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
+    const effectiveEmailNorm = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
+    const isImpersonating = authz?.isImpersonating === true;
+    const targetIsAdmin = authz?.isAdmin === true;
+    const targetHasGlobalScope = authz?.hasGlobalScope === true;
+    const targetPerms = { actions: authz?.actions || {}, acessos: authz?.acessos || [] };
     const criteriosAplicados = new Set();
     const warnings = [];
     let partialFailures = 0;
@@ -219,8 +182,8 @@ Deno.serve(async (req) => {
 
     let contratos = [];
     let militarIdsEscopo = null;
-    if (targetIsAdmin) {
-      criteriosAplicados.add('admin');
+    if (targetHasGlobalScope) {
+      criteriosAplicados.add('global');
       const contratosPagina = await fetchWithRetry(
         () => base44.asServiceRole.entities.ContratoDesignacaoMilitar.list('-data_inicio_contrato', limit + 1, offset),
         'ContratoDesignacaoMilitar.list',
@@ -256,7 +219,7 @@ Deno.serve(async (req) => {
       matriculasMilitar: matriculasResult.rows || [],
       legadoAtivaPorContrato,
       counters,
-      meta: { isAdmin: targetIsAdmin, modoAcesso: getModoAcesso(criteriosAplicados), userEmail: authUserEmail || null, effectiveEmail: isImpersonating ? effectiveEmailNorm : null, totalMilitaresEscopo, partialFailures, warnings, limit, offset, hasNext },
+      meta: { isAdmin: targetIsAdmin, hasGlobalScope: targetHasGlobalScope, modoAcesso: getModoAcesso(criteriosAplicados), userEmail: authUserEmail || null, effectiveEmail: isImpersonating ? effectiveEmailNorm : null, totalMilitaresEscopo, partialFailures, warnings, limit, offset, hasNext },
     });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
