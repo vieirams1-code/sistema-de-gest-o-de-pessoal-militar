@@ -85,15 +85,7 @@ const militares = {
   label: 'Militares / Efetivo',
   canonicalModuleKey: 'militares',
   legacyModuleKeys: ['acesso_militares'],
-  aliases: [
-    {
-      key: 'efetivo',
-      type: 'relatedAlias',
-      ambiguous: true,
-      observation:
-        "'efetivo' NÃO é alias canônico de 'militares'. App.jsx usa moduleKey 'efetivo' apenas na rota Tags ({ moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' }), relacionado a Tags/configurações. Tratado aqui como alias ambíguo.",
-    },
-  ],
+  aliases: [],
   permissions: {
     canonical: {
       view: 'visualizar_militares',
