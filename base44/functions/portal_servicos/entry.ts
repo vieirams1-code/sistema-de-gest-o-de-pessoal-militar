@@ -1106,7 +1106,8 @@ Deno.serve(async (req: Request) => {
             campanhas = [];
           }
 
-          return new Response(JSON.stringify({ ok: true, campanhas: campanhas || [] }), {
+          campanhas = (campanhas || []).filter((campanha: any) => campanha?.tipo !== 'PLANO_FERIAS');
+          return new Response(JSON.stringify({ ok: true, campanhas }), {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
@@ -1161,8 +1162,25 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        // Detalhes de Retorno e Acompanhamento Nominal
-        case 'CAMPANHA_DETALHES_RETORNO': {
+        case 'CAMPANHA_CONTEXTO_RETORNO': {
+          const campanhaId = textoId(payload?.campanha_id);
+          if (!campanhaId) {
+            return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+          const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanhaId);
+          if (!campanha || campanha.tipo === 'PLANO_FERIAS') {
+            return new Response(JSON.stringify({ error: 'Campanha geral não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+          return new Response(JSON.stringify({ ok: true, campanha }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Detalhes de Retorno e Acompanhamento Nominal. Cada modo tem autorização própria.
+        case 'CAMPANHA_DETALHES_RETORNO':
+        case 'CAMPANHA_EXPORTAR_RETORNO':
+        case 'CAMPANHA_ANEXOS_RETORNO': {
           const { campanha_id } = payload;
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), {
@@ -1246,7 +1264,10 @@ Deno.serve(async (req: Request) => {
               status_homologacao: resposta?.status || (respondido ? 'Enviado' : 'Pendente'),
               data_resposta: resposta?.data_envio || resposta?.data_envio_militar || resposta?.created_date || (conferiuRecentemente ? m.data_ultima_conferencia : null),
               detalhes_resposta: detalhesTexto,
-              resposta_completa: resposta || null,
+              resposta_completa: sanitizarRespostaCampanha(
+                resposta,
+                acao === 'CAMPANHA_ANEXOS_RETORNO' ? 'ANEXOS' : (acao === 'CAMPANHA_EXPORTAR_RETORNO' ? 'EXPORTAR' : 'VISUALIZAR')
+              ),
             };
           });
 
