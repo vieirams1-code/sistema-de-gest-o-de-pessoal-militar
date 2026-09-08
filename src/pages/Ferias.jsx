@@ -67,8 +67,6 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
-import { AjusteSaldoFerias } from '@/api/entities';
-import { listarDescontosFerias } from '@/services/descontoFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
@@ -533,13 +531,15 @@ export default function Ferias() {
   } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
-      const bundle = await fetchScopedFeriasBundle();
+      const bundle = await fetchScopedFeriasBundle({ includeDescontos: true });
       const ferias = await enriquecerFeriasComContextoMilitar(bundle.ferias || [], { contexto: 'operacional' });
       return {
         ferias,
         feriasTags: Array.isArray(bundle.feriasTags) ? bundle.feriasTags : undefined,
         tagsCatalogo: Array.isArray(bundle.tagsCatalogo) ? bundle.tagsCatalogo : undefined,
         registrosLivro: bundle.registrosLivro || [],
+        ajustesSaldoFerias: bundle.ajustesSaldoFerias || [],
+        descontosFerias: bundle.descontosFerias || [],
         partialFailures: Number(bundle.partialFailures || 0),
         meta: bundle.meta || {},
       };
@@ -552,6 +552,8 @@ export default function Ferias() {
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
   const registrosLivro = feriasData?.registrosLivro || [];
+  const ajustesSaldoFerias = feriasData?.ajustesSaldoFerias || [];
+  const descontosFerias = feriasData?.descontosFerias || [];
   const registrosPartialFailures = feriasPartialFailures;
   const hasPartialDataWarning = feriasPartialFailures > 0;
   const hasFeriasLoadError = isFeriasError;
@@ -612,12 +614,6 @@ export default function Ferias() {
     await refetchFerias();
   };
 
-  const { data: descontosFerias = [] } = useQuery({
-    queryKey: ['ferias-descontos-ferias', isAdmin, modoAcesso, userEmail],
-    queryFn: listarDescontosFerias,
-    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
-  });
-
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail],
     queryFn: () => listarCreditosExtraFerias('-data_referencia', { supportMode: 'ferias' }),
@@ -633,11 +629,6 @@ export default function Ferias() {
     enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
 
-  const { data: ajustesSaldoFerias = [] } = useQuery({
-    queryKey: ['ferias-ajustes-saldo-operacionais', isAdmin, modoAcesso, userEmail],
-    queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
-  });
   const feriasIdsEscopoTags = useMemo(
     () => ferias.map((item) => String(item.id)).filter(Boolean),
     [ferias],
