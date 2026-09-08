@@ -53,13 +53,19 @@ import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas
 import { conferenciaMilitarService } from '@/services/conferenciaMilitarService';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  formatarTipoCreditoExtra } from
+  formatarTipoCreditoExtra,
+  listarCreditosExtraFerias } from
 '@/services/creditoExtraFeriasService';
 import { calcularSaldoOperacionalPeriodoComTodosAjustes, isFeriasDoPeriodo } from '@/services/saldoFeriasOperacionalService';
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
-import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
+import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
+import { fetchScopedArmamentosBundle } from '@/services/getScopedArmamentosBundleClient';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { getPostoGraduacaoMilitar, getQuadroMilitar, getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
