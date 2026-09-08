@@ -377,8 +377,9 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao === 'PLANO_GERAR_LOTE_FERIAS' || acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
     return ['perm_gerar_ferias_campanhas', ...legadoRespostas];
   }
-  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR') return ['perm_criar_campanhas_ferias', ...legadoCampanhas];
-  if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_editar_campanhas_ferias', ...legadoCampanhas];
+  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias', ...legadoCampanhas];
+  if (acao === 'PLANO_CAMPANHA_SALVAR' || acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') return ['perm_editar_campanhas_ferias', ...legadoCampanhas];
+  if (acao === 'PLANO_CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas_ferias', ...legadoCampanhas];
 
   if (acao === 'PORTAL_CONFIG_GET' || acao === 'PORTAL_CONFIG_SAVE') return ['perm_configurar_portal'];
   if (acao === 'CADASTRO_SOLICITACOES_LISTAR') return ['perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais', ...legadoRespostas];
@@ -1017,7 +1018,8 @@ Deno.serve(async (req: Request) => {
           }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
-        // Criar Nova Campanha (Férias ou Cadastral com Escopo)
+        // Criar campanha geral ou campanha de férias, cada uma por ação/autorização própria.
+        case 'PLANO_CAMPANHA_CRIAR':
         case 'CAMPANHA_CRIAR': {
           const cp = payload.campanha_payload || {};
           if (!cp.tipo || !cp.titulo) {
@@ -1026,9 +1028,15 @@ Deno.serve(async (req: Request) => {
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
-          if (cp.tipo === 'PLANO_FERIAS') {
+          if (acao === 'CAMPANHA_CRIAR' && cp.tipo === 'PLANO_FERIAS') {
             return new Response(JSON.stringify({ error: 'Campanhas de férias devem ser criadas pelo módulo específico de Planos de Férias.' }), {
               status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          if (acao === 'PLANO_CAMPANHA_CRIAR' && cp.tipo !== 'PLANO_FERIAS') {
+            return new Response(JSON.stringify({ error: 'A ação PLANO_CAMPANHA_CRIAR aceita somente campanhas de férias.' }), {
+              status: 400,
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
