@@ -12,7 +12,7 @@ const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
 
 // Frase exigida para confirmar a reversão EXCEPCIONAL (promoção originada de curso).
 const FRASE_CONFIRMACAO_EXCEPCIONAL = 'CONFIRMO REVERSÃO E CIÊNCIA DA PENDÊNCIA';
-const PERMISSAO_REVERSAO_EXCEPCIONAL = 'perm_reverter_promocao_excepcional';
+const PERMISSAO_REVERSAO_EXCEPCIONAL = 'reverter_promocao_excepcional';
 
 // Status do participante que caracterizam vínculo "ativo" com a promoção a ser revertida.
 const STATUS_PARTICIPANTE_VINCULADO = new Set(['promovido', 'pendente_reanalise']);
