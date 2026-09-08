@@ -616,7 +616,7 @@ export default function Ferias() {
 
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail],
-    queryFn: () => listarCreditosExtraFerias('-data_referencia'),
+    queryFn: () => listarCreditosExtraFerias('-data_referencia', { supportMode: 'ferias' }),
     enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
 
