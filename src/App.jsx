@@ -117,10 +117,9 @@ const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((ac
 
 const getModuleGuardByPage = (pageKey) => moduleGuardByPageNormalized[pageKey.toLowerCase()] || null;
 
-// P1.3-A: Enforcement REAL e MÍNIMO — guard combinado (AND) de módulo + actionKey.
-// Aplicado SOMENTE às rotas prioritárias abaixo, via RequireAction.
-// Quando uma página consta aqui, ela usa RequireAction (AND) em vez do
-// RequireModuleAccess (OR), garantindo que a action seja realmente exigida.
+// Guardas explícitos de páginas com capacidades de entrada bem definidas.
+// Desde o F8-L06, RequireModuleAccess também aplica AND entre módulo e ação;
+// este mapa permanece para páginas que possuem política funcional própria.
 const actionGuardByPage = {
   Militares: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   CadastrarMilitar: { moduleKey: 'militares', actionKeys: ['adicionar_militares', 'editar_militares'], moduleName: 'Efetivo' },
