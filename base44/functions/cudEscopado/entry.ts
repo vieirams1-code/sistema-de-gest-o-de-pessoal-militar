@@ -285,19 +285,19 @@ async function sincronizarAjusteCreditoExtraFerias(base44, credito, userEmail) {
 // =====================================================================
 const PERMISSIONS_MAP = {
   Ferias: {
-    create: 'adicionar_ferias',
+    create: 'criar_ferias',
     update: 'editar_ferias',
     delete: 'excluir_ferias',
   },
   PeriodoAquisitivo: {
-    create: 'adicionar_ferias',
-    update: 'editar_ferias',
-    delete: 'excluir_ferias',
+    create: 'gerar_periodos_aquisitivos',
+    update: 'editar_periodo_aquisitivo',
+    delete: 'excluir_periodo_aquisitivo',
   },
   CreditoExtraFerias: {
-    create: 'adicionar_ferias',
-    update: 'editar_ferias',
-    delete: 'excluir_ferias',
+    create: 'criar_credito_extra_ferias',
+    update: 'editar_credito_extra_ferias',
+    delete: 'excluir_credito_extra_ferias',
   },
   Atestado: {
     create: 'adicionar_atestados',
@@ -1546,6 +1546,41 @@ Deno.serve(async (req) => {
         let requiredPermission = 'adicionar_publicacoes';
         if (tipoPublicacao === 'Ata JISO') requiredPermission = 'publicar_ata_jiso';
         if (tipoPublicacao === 'Homologação de Atestado') requiredPermission = 'publicar_homologacao';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'PublicacaoExOfficio' && operation === 'update') {
+        const statusDestino = String(data?.status || '').trim().toLowerCase();
+        const alteraBg = Object.prototype.hasOwnProperty.call(data || {}, 'numero_bg')
+          || Object.prototype.hasOwnProperty.call(data || {}, 'data_bg')
+          || statusDestino === 'publicado';
+        const requiredPermission = alteraBg ? 'publicar_bg' : 'editar_publicacoes';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'PeriodoAquisitivo' && operation === 'update') {
+        const requiredPermission = Object.prototype.hasOwnProperty.call(data || {}, 'status')
+          ? 'alterar_status_periodo_aquisitivo'
+          : 'editar_periodo_aquisitivo';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else if (entityName === 'CreditoExtraFerias' && operation === 'update') {
+        const statusCredito = String(data?.status || '').trim().toUpperCase();
+        const possuiGozo = Object.prototype.hasOwnProperty.call(data || {}, 'gozo_ferias_id');
+        let requiredPermission = 'editar_credito_extra_ferias';
+        if (statusCredito === 'CANCELADO') requiredPermission = 'cancelar_credito_extra_ferias';
+        else if (possuiGozo && String(data?.gozo_ferias_id || '').trim()) requiredPermission = 'vincular_credito_extra_ferias';
+        else if (possuiGozo) requiredPermission = 'remover_vinculo_credito_extra_ferias';
         if (targetPerms.actions?.[requiredPermission] !== true) {
           return Response.json(
             { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
