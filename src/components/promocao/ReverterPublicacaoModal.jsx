@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   FRASE_CONFIRMACAO_REVERSAO_COMUM,
+  FRASE_CONFIRMACAO_REVERSAO_EXCEPCIONAL,
   MENSAGEM_BLOQUEIO_REVERSAO_CURSO,
 } from '@/services/promocaoService';
 
@@ -36,16 +37,12 @@ export default function ReverterPublicacaoModal({
     }
   }, [open]);
 
-  const fraseValida = frase.trim() === FRASE_CONFIRMACAO_REVERSAO_COMUM;
+  const fraseEsperada = originadaDeCurso
+    ? FRASE_CONFIRMACAO_REVERSAO_EXCEPCIONAL
+    : FRASE_CONFIRMACAO_REVERSAO_COMUM;
+  const fraseValida = frase.trim() === fraseEsperada;
   const motivoValido = Boolean(motivo);
-
-  // Decisão institucional: promoções originadas de Curso de Formação NÃO são
-  // revertidas pela interface. O modal apenas informa e bloqueia a confirmação.
-  const bloqueado = detectando
-    || submitting
-    || originadaDeCurso
-    || !fraseValida
-    || !motivoValido;
+  const bloqueado = detectando || submitting || !fraseValida || !motivoValido;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -53,7 +50,7 @@ export default function ReverterPublicacaoModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-600" />
-            {originadaDeCurso ? 'Reversão não disponível' : 'ATENÇÃO'}
+            {originadaDeCurso ? 'Reversão excepcional' : 'ATENÇÃO'}
           </DialogTitle>
         </DialogHeader>
 
@@ -72,16 +69,16 @@ export default function ReverterPublicacaoModal({
             </Alert>
           )}
 
-          {!detectando && !originadaDeCurso && (
+          {!detectando && (
             <>
               <p>Você está revertendo uma promoção oficial.</p>
               <p>Esta ação poderá cancelar histórico oficial, restaurar posto/quadro anterior, alterar Prévia Geral e reabrir esta promoção para edição.</p>
 
-              <Label>Digite: {FRASE_CONFIRMACAO_REVERSAO_COMUM}</Label>
+              <Label>Digite: {fraseEsperada}</Label>
               <Input
                 value={frase}
                 onChange={(event) => setFrase(event.target.value)}
-                placeholder={FRASE_CONFIRMACAO_REVERSAO_COMUM}
+                placeholder={fraseEsperada}
               />
 
               <Label>Motivo obrigatório</Label>
@@ -103,23 +100,19 @@ export default function ReverterPublicacaoModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {originadaDeCurso ? 'Entendi' : 'Cancelar'}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            variant="destructive"
+            disabled={bloqueado}
+            onClick={() => onConfirmar({
+              registro,
+              motivo,
+              observacao,
+              fraseConfirmacao: frase.trim(),
+            })}
+          >
+            {originadaDeCurso ? 'Confirmar reversão excepcional' : 'Confirmar reversão'}
           </Button>
-          {!originadaDeCurso && (
-            <Button
-              variant="destructive"
-              disabled={bloqueado}
-              onClick={() => onConfirmar({
-                registro,
-                motivo,
-                observacao,
-                fraseConfirmacao: frase.trim(),
-              })}
-            >
-              Confirmar reversão
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
