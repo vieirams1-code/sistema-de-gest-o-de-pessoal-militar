@@ -1,6 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
+import {
+  adicionarMembroGrupoEfetivo,
+  alternarGrupoEfetivo,
+  atualizarGrupoEfetivo,
+  criarGrupoEfetivo,
+  listarGruposEfetivo,
+  removerMembroGrupoEfetivo,
+} from '@/services/gruposEfetivoService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
@@ -19,6 +28,11 @@ const FORM = { nome: '', sigla: '', tipo: 'SEGMENTO_ADMINISTRATIVO', descricao: 
 export default function GruposEfetivo() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingAccess, isAccessResolved } = useCurrentUser();
+  const podeVisualizar = isAdmin || (canAccessModule('grupos_efetivo') && canAccessAction('visualizar_grupos_efetivo'));
+  const podeCriar = isAdmin || canAccessAction('criar_grupos_efetivo');
+  const podeEditar = isAdmin || canAccessAction('editar_grupos_efetivo');
+  const podeGerirMembros = isAdmin || canAccessAction('gerir_membros_grupos_efetivo');
   const [busca, setBusca] = useState('');
   const [grupoId, setGrupoId] = useState(null);
   const [form, setForm] = useState(FORM);
@@ -26,19 +40,14 @@ export default function GruposEfetivo() {
   const [militarBusca, setMilitarBusca] = useState('');
   const [membroBusca, setMembroBusca] = useState('');
 
-  const { data: grupos = [], isLoading: carregandoGrupos } = useQuery({
+  const { data: bundle = { grupos: [], membros: [], militares: [] }, isLoading: carregandoGrupos } = useQuery({
     queryKey: ['grupos-efetivo'],
-    queryFn: () => base44.entities.GrupoEfetivo.list('-created_date'),
+    queryFn: listarGruposEfetivo,
+    enabled: isAccessResolved && podeVisualizar,
   });
-  const { data: membros = [] } = useQuery({
-    queryKey: ['membros-grupo-efetivo', grupoId],
-    queryFn: () => grupoId ? base44.entities.MembroGrupoEfetivo.filter({ grupo_id: grupoId }) : Promise.resolve([]),
-    enabled: Boolean(grupoId),
-  });
-  const { data: militares = [] } = useQuery({
-    queryKey: ['militares-grupos-efetivo'],
-    queryFn: () => base44.entities.Militar.list('nome', 500),
-  });
+  const grupos = bundle?.grupos || [];
+  const membros = useMemo(() => (bundle?.membros || []).filter((m) => !grupoId || String(m.grupo_id) === String(grupoId)), [bundle, grupoId]);
+  const militares = bundle?.militares || [];
 
   const grupoAtual = grupos.find((g) => g.id === grupoId) || null;
   const membrosIds = useMemo(() => new Set(membros.filter((m) => m.ativo !== false).map((m) => String(m.militar_id))), [membros]);
@@ -57,16 +66,13 @@ export default function GruposEfetivo() {
     return alvo.includes(membroBusca.toLowerCase());
   }), [membros, militares, membroBusca]);
 
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: ['grupos-efetivo'] });
-    qc.invalidateQueries({ queryKey: ['membros-grupo-efetivo', grupoId] });
-  };
+  const refresh = () => qc.invalidateQueries({ queryKey: ['grupos-efetivo'] });
 
   const salvar = useMutation({
-    mutationFn: () => grupoId ? base44.entities.GrupoEfetivo.update(grupoId, form) : base44.entities.GrupoEfetivo.create(form),
-    onSuccess: (g) => {
+    mutationFn: () => grupoId ? atualizarGrupoEfetivo(grupoId, form) : criarGrupoEfetivo(form),
+    onSuccess: (response) => {
       refresh();
-      setGrupoId(g?.id || grupoId);
+      setGrupoId(response?.grupo?.id || grupoId);
       setEditando(false);
       toast({ title: 'Grupo salvo com sucesso.' });
     },
@@ -74,26 +80,29 @@ export default function GruposEfetivo() {
   });
 
   const alternar = useMutation({
-    mutationFn: (g) => base44.entities.GrupoEfetivo.update(g.id, { ativo: g.ativo === false }),
+    mutationFn: (g) => alternarGrupoEfetivo(g.id),
     onSuccess: () => { refresh(); toast({ title: 'Status do grupo atualizado.' }); },
     onError: (e) => toast({ title: 'Não foi possível atualizar o grupo.', description: e?.message, variant: 'destructive' }),
   });
 
   const vincular = useMutation({
-    mutationFn: (militarId) => base44.entities.MembroGrupoEfetivo.create({ grupo_id: grupoId, militar_id: militarId, ativo: true, origem: 'MANUAL' }),
+    mutationFn: (militarId) => adicionarMembroGrupoEfetivo(grupoId, militarId),
     onSuccess: () => { refresh(); setMilitarBusca(''); toast({ title: 'Militar incluído no grupo.' }); },
     onError: (e) => toast({ title: 'Não foi possível incluir o militar.', description: e?.message, variant: 'destructive' }),
   });
 
   const desvincular = useMutation({
-    mutationFn: (membroId) => base44.entities.MembroGrupoEfetivo.update(membroId, { ativo: false, data_fim: new Date().toISOString().slice(0, 10) }),
+    mutationFn: (membroId) => removerMembroGrupoEfetivo(membroId),
     onSuccess: () => { refresh(); toast({ title: 'Militar removido do grupo.' }); },
     onError: (e) => toast({ title: 'Não foi possível remover o militar.', description: e?.message, variant: 'destructive' }),
   });
 
-  const novo = () => { setGrupoId(null); setForm(FORM); setEditando(true); };
-  const editar = (g) => { setGrupoId(g.id); setForm({ ...FORM, ...g }); setEditando(true); };
+  const novo = () => { if (!podeCriar) return; setGrupoId(null); setForm(FORM); setEditando(true); };
+  const editar = (g) => { if (!podeEditar) return; setGrupoId(g.id); setForm({ ...FORM, ...g }); setEditando(true); };
   const selecionar = (g) => { setGrupoId(g.id); setEditando(false); };
+
+  if (loadingAccess || !isAccessResolved) return null;
+  if (!podeVisualizar) return <AccessDenied modulo="Grupos do Efetivo" />;
 
   return <div className="min-h-screen bg-slate-50 p-6">
     <div className="max-w-7xl mx-auto space-y-6">
@@ -102,7 +111,7 @@ export default function GruposEfetivo() {
           <UsersRound className="w-8 h-8 text-indigo-600 mt-1" />
           <div><h1 className="text-2xl font-bold text-slate-900">Grupos do efetivo</h1><p className="text-sm text-slate-500 mt-1">Cadastre segmentos reutilizáveis para campanhas, escalas e filtros operacionais.</p></div>
         </div>
-        <Button onClick={novo}><Plus className="w-4 h-4 mr-2" />Novo grupo</Button>
+        {podeCriar && <Button onClick={novo}><Plus className="w-4 h-4 mr-2" />Novo grupo</Button>}
       </header>
       <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">Um grupo pode ser usado em várias campanhas e futuramente nas escalas. A alteração do grupo não altera campanhas já encerradas.</div>
       <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5">
@@ -119,7 +128,7 @@ export default function GruposEfetivo() {
         </section>
         <section className="space-y-6">
           {!grupoAtual && !editando && <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center text-slate-500"><UsersRound className="w-10 h-10 mx-auto mb-3 text-slate-300" /><p>Selecione um grupo para administrar seus membros ou crie um novo.</p></div>}
-          {editando && <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          {editando && (grupoId ? podeEditar : podeCriar) && <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex justify-between items-center mb-5"><h2 className="font-semibold text-slate-900">{grupoId ? 'Editar grupo' : 'Novo grupo'}</h2><Button variant="ghost" size="icon" onClick={() => setEditando(false)}><X className="w-4 h-4" /></Button></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Nome"><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Field>
@@ -132,11 +141,11 @@ export default function GruposEfetivo() {
             <div className="flex justify-end gap-3 mt-5"><Button variant="outline" onClick={() => setEditando(false)}>Cancelar</Button><Button disabled={salvar.isPending || !form.nome.trim()} onClick={() => salvar.mutate()}>Salvar grupo</Button></div>
           </div>}
           {grupoAtual && !editando && <><div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold text-slate-900">{grupoAtual.nome}</h2><p className="text-sm text-slate-500">{grupoAtual.descricao || 'Sem descrição'}</p><p className="text-xs text-slate-500 mt-2">{membros.filter((m) => m.ativo !== false).length} membro(s) ativo(s) · {grupoAtual.ativo === false ? 'grupo inativo' : 'grupo ativo'}</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => editar(grupoAtual)}><Pencil className="w-4 h-4 mr-2" />Editar</Button><Button variant="outline" onClick={() => alternar.mutate(grupoAtual)}><Power className="w-4 h-4 mr-2" />{grupoAtual.ativo === false ? 'Reativar' : 'Desativar'}</Button></div></div>
+            <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold text-slate-900">{grupoAtual.nome}</h2><p className="text-sm text-slate-500">{grupoAtual.descricao || 'Sem descrição'}</p><p className="text-xs text-slate-500 mt-2">{membros.filter((m) => m.ativo !== false).length} membro(s) ativo(s) · {grupoAtual.ativo === false ? 'grupo inativo' : 'grupo ativo'}</p></div>{podeEditar && <div className="flex gap-2"><Button variant="outline" onClick={() => editar(grupoAtual)}><Pencil className="w-4 h-4 mr-2" />Editar</Button><Button variant="outline" onClick={() => alternar.mutate(grupoAtual)}><Power className="w-4 h-4 mr-2" />{grupoAtual.ativo === false ? 'Reativar' : 'Desativar'}</Button></div>}</div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5"><h3 className="font-semibold text-slate-900 mb-3">Adicionar militar</h3><div className="relative mb-3"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" placeholder="Nome, guerra, matrícula, posto ou quadro..." value={militarBusca} onChange={(e) => setMilitarBusca(e.target.value)} /></div><div className="max-h-80 overflow-auto divide-y">{militaresDisponiveis.map((m) => <div key={m.id} className="flex items-center justify-between gap-2 py-2"><div><p className="text-sm font-medium">{m.nome_completo || m.nome || 'Militar sem nome'}</p><p className="text-xs text-slate-600">Nome de guerra: {m.nome_guerra || '—'}</p><p className="text-xs text-slate-500">Matrícula: {m.matricula || '—'} · {m.posto_graduacao || 'Posto/graduação —'} · Quadro: {m.quadro || '—'}</p></div><Button size="sm" variant="outline" onClick={() => vincular.mutate(m.id)} disabled={vincular.isPending}><UserPlus className="w-4 h-4" /></Button></div>)}{militarBusca && militaresDisponiveis.length === 0 && <p className="text-sm text-slate-500 py-3">Nenhum militar disponível.</p>}</div></div>
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5"><div className="flex items-center justify-between gap-3 mb-3"><h3 className="font-semibold text-slate-900">Membros do grupo</h3><div className="relative w-56"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" placeholder="Pesquisar membro..." value={membroBusca} onChange={(e) => setMembroBusca(e.target.value)} /></div></div><div className="max-h-96 overflow-auto divide-y">{membrosVisiveis.map((m) => { const militar = militares.find((x) => x.id === m.militar_id); return <div key={m.id} className="flex items-center justify-between gap-2 py-2"><div><p className="text-sm font-medium">{militar?.nome_completo || militar?.nome || 'Militar não localizado'}</p><p className="text-xs text-slate-600">Nome de guerra: {militar?.nome_guerra || '—'}</p><p className="text-xs text-slate-500">Matrícula: {militar?.matricula || '—'} · {militar?.posto_graduacao || 'Posto/graduação —'} · Quadro: {militar?.quadro || '—'}</p></div><Button size="sm" variant="ghost" onClick={() => desvincular.mutate(m.id)} disabled={desvincular.isPending}><UserMinus className="w-4 h-4 text-rose-600" /></Button></div>; })}{membrosVisiveis.length === 0 && <p className="text-sm text-slate-500 py-3">{membroBusca ? 'Nenhum membro encontrado.' : 'Nenhum membro ativo.'}</p>}</div></div>
+            {podeGerirMembros && <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5"><h3 className="font-semibold text-slate-900 mb-3">Adicionar militar</h3><div className="relative mb-3"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" placeholder="Nome, guerra, matrícula, posto ou quadro..." value={militarBusca} onChange={(e) => setMilitarBusca(e.target.value)} /></div><div className="max-h-80 overflow-auto divide-y">{militaresDisponiveis.map((m) => <div key={m.id} className="flex items-center justify-between gap-2 py-2"><div><p className="text-sm font-medium">{m.nome_completo || m.nome || 'Militar sem nome'}</p><p className="text-xs text-slate-600">Nome de guerra: {m.nome_guerra || '—'}</p><p className="text-xs text-slate-500">Matrícula: {m.matricula || '—'} · {m.posto_graduacao || 'Posto/graduação —'} · Quadro: {m.quadro || '—'}</p></div><Button size="sm" variant="outline" onClick={() => vincular.mutate(m.id)} disabled={vincular.isPending}><UserPlus className="w-4 h-4" /></Button></div>)}{militarBusca && militaresDisponiveis.length === 0 && <p className="text-sm text-slate-500 py-3">Nenhum militar disponível.</p>}</div></div>}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5"><div className="flex items-center justify-between gap-3 mb-3"><h3 className="font-semibold text-slate-900">Membros do grupo</h3><div className="relative w-56"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" placeholder="Pesquisar membro..." value={membroBusca} onChange={(e) => setMembroBusca(e.target.value)} /></div></div><div className="max-h-96 overflow-auto divide-y">{membrosVisiveis.map((m) => { const militar = militares.find((x) => x.id === m.militar_id); return <div key={m.id} className="flex items-center justify-between gap-2 py-2"><div><p className="text-sm font-medium">{militar?.nome_completo || militar?.nome || 'Militar não localizado'}</p><p className="text-xs text-slate-600">Nome de guerra: {militar?.nome_guerra || '—'}</p><p className="text-xs text-slate-500">Matrícula: {militar?.matricula || '—'} · {militar?.posto_graduacao || 'Posto/graduação —'} · Quadro: {militar?.quadro || '—'}</p></div>{podeGerirMembros && <Button size="sm" variant="ghost" onClick={() => desvincular.mutate(m.id)} disabled={desvincular.isPending}><UserMinus className="w-4 h-4 text-rose-600" /></Button>}</div>; })}{membrosVisiveis.length === 0 && <p className="text-sm text-slate-500 py-3">{membroBusca ? 'Nenhum membro encontrado.' : 'Nenhum membro ativo.'}</p>}</div></div>
           </div></>}
         </section>
       </div>
