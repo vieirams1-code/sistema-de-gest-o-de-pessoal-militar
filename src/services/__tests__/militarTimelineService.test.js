@@ -198,3 +198,31 @@ test('getMilitarTimeline - inclui funções e gratificações', async () => {
   assert.equal(grat.categoria, 'Gratificação');
   assert.ok(grat.descricao.includes('Comandante'));
 });
+
+test('getMilitarTimeline - não consulta domínios sem permissão e não expõe CID sem permissão sensível', async () => {
+  let medalhasCalls = 0;
+  let feriasCalls = 0;
+  const mockBase44 = {
+    entities: {
+      RegistroLivro: createMockEntity([]),
+      PublicacaoExOfficio: createMockEntity([]),
+      Ferias: { filter: async () => { feriasCalls += 1; return [{ id: 'f1', data_inicio: '2023-01-01' }]; } },
+      Atestado: createMockEntity([{ id: 'a1', data_inicio: '2023-02-01', dias: 2, cid_10: 'A00' }]),
+      HistoricoPromocaoMilitarV2: createMockEntity([]),
+      Medalha: { filter: async () => { medalhasCalls += 1; return [{ id: 'm1', data_concessao: '2023-03-01' }]; } },
+      MilitarFuncao: createMockEntity([]),
+      GratificacaoFuncao: createMockEntity([]),
+      FuncaoMilitar: createMockEntity([]),
+      TipoGratificacaoFuncao: createMockEntity([]),
+    },
+  };
+
+  __setMilitarTimelineClientForTests(mockBase44);
+  const timeline = await getMilitarTimeline('m1', { atestados: true, atestadoSensitive: false });
+
+  assert.equal(feriasCalls, 0);
+  assert.equal(medalhasCalls, 0);
+  assert.equal(timeline.length, 1);
+  assert.equal(timeline[0].tipo, 'Atestado');
+  assert.equal(timeline[0].descricao, '2 dias');
+});
