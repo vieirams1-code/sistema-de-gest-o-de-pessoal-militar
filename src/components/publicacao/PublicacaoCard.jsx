@@ -74,7 +74,7 @@ function formatDate(value) {
 }
 
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false, isAdmin = false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, isAdmin = false }) {
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
@@ -95,14 +95,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const TipoIcon = tipoVisual.icon;
   const isPublicado = currentStatus === STATUS_PUBLICACAO.PUBLICADO;
   const podePublicarBg = canAccessAction('publicar_bg');
-  const adminPodeEditarBgPublicado = isAdmin && canAccessAction('admin_mode') && modoAdmin;
+  const adminPodeEditarBgPublicado = isAdmin && podePublicarBg;
   const podeInformarBg = (adminPodeEditarBgPublicado || !isPublicado) && (
     currentStatus === STATUS_PUBLICACAO.AGUARDANDO_NOTA ||
     currentStatus === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO ||
     (adminPodeEditarBgPublicado && currentStatus === STATUS_PUBLICACAO.PUBLICADO)
   );
-  const podeExcluir = !isPublicado && canAccessAction('excluir_publicacoes') && canAccessAction('admin_mode') && modoAdmin;
-  const podeExcluirDesabilitado = !isPublicado && canAccessAction('excluir_publicacoes') && canAccessAction('admin_mode') && !modoAdmin;
+  const podeExcluir = !isPublicado && canAccessAction('excluir_publicacoes');
   const {
     data: textoLivroLazy,
     isFetching: isTextoPublicacaoFetching,
@@ -285,11 +284,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </Button>
           {podeExcluir && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Excluir
-            </Button>
-          )}
-          {podeExcluirDesabilitado && (
-            <Button variant="outline" size="sm" disabled title="Ative o modo admin para excluir.">
               <Trash2 className="mr-2 h-4 w-4" /> Excluir
             </Button>
           )}
