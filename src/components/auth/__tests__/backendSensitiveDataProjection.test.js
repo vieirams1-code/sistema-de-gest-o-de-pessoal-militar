@@ -8,6 +8,11 @@ const permissionStructure = read('../../../config/permissionStructure.js');
 const scopedMilitares = read('../../../../base44/functions/getScopedMilitares/entry.ts');
 const scopedAtestados = read('../../../../base44/functions/getScopedAtestadosBundle/entry.ts');
 const verMilitar = read('../../../pages/VerMilitar.jsx');
+const verAtestado = read('../../../pages/VerAtestado.jsx');
+const cadastrarMilitar = read('../../../pages/CadastrarMilitar.jsx');
+const identidadeClient = read('../../../services/militarIdentidadeService.js');
+const identidadeGateway = read('../../../../base44/functions/militarIdentidadeGateway/entry.ts');
+const app = read('../../../App.jsx');
 const consultaColumnsJs = read('../../../pages/consultaMilitar/consultaMilitarColumns.js');
 const consultaColumnsJsx = read('../../../pages/consultaMilitar/consultaMilitarColumns.jsx');
 
@@ -68,4 +73,35 @@ test('abas da ficha 360 dependem das respectivas permissões funcionais', () => 
   assert.match(verMilitar, /visible: podeVisualizarAcervo/);
   assert.match(verMilitar, /visible: podeVisualizarRegistrosMilitar/);
   assert.match(verMilitar, /podeVerDadosSensiveisAtestado && a\.cid_10/);
+});
+
+test('detalhe de atestado usa bundle escopado antes de renderizar qualquer registro', () => {
+  assert.match(verAtestado, /fetchScopedAtestadosBundle/);
+  assert.match(verAtestado, /canAccessModule\('atestados'\) && canAccessAction\('visualizar_atestados'\)/);
+  assert.doesNotMatch(verAtestado, /base44\.entities\.Atestado\.(filter|list|get)/);
+  assert.doesNotMatch(verAtestado, /base44\.entities\.Militar\.(filter|list|get)/);
+});
+
+test('identidade militar é escrita somente pelo gateway server-side', () => {
+  assert.doesNotMatch(identidadeClient, /base44\.entities\./);
+  assert.doesNotMatch(cadastrarMilitar, /base44\.entities\./);
+  assert.match(identidadeClient, /militarIdentidadeGateway/);
+  assert.match(identidadeGateway, /requireModuleAction\(a, 'militares', 'adicionar_militares'/);
+  assert.match(identidadeGateway, /requireModuleAction\(a, 'militares', 'editar_militares'/);
+  assert.match(identidadeGateway, /requireModuleAction\(a, 'migracao_alteracoes_legado', 'revisar_duplicidades'/);
+});
+
+test('adicionar e editar militar são independentes e contextuais', () => {
+  assert.match(app, /CadastrarMilitar: \{ moduleKey: 'militares', actionKeys: \['adicionar_militares', 'editar_militares'\]/);
+  assert.match(cadastrarMilitar, /const requiredAction = editId \? 'editar_militares' : 'adicionar_militares';/);
+  assert.match(cadastrarMilitar, /const hasRequiredAction = canAccessAction\(requiredAction\);/);
+});
+
+test('snapshots de duplicidade e merge não copiam cadastro pessoal completo', () => {
+  const snapshotBlock = identidadeGateway.match(/function minimalSnapshot\(m\) \{([\s\S]*?)\n\}/)?.[1] || '';
+  const queuePayloadBlock = identidadeGateway.match(/function minimalPayloadCadastro\(p = \{\}\) \{([\s\S]*?)\n\}/)?.[1] || '';
+  for (const campo of ['cpf', 'data_nascimento', 'telefone', 'email_particular', 'banco', 'agencia', 'conta', 'logradouro', 'religiao', 'tipo_sanguineo']) {
+    assert.doesNotMatch(snapshotBlock, new RegExp(campo), `${campo} não deve entrar no snapshot de merge`);
+    assert.doesNotMatch(queuePayloadBlock, new RegExp(campo), `${campo} não deve entrar no payload persistido da fila`);
+  }
 });
