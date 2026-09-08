@@ -1669,9 +1669,21 @@ Deno.serve(async (req) => {
           // 1) Permissão funcional do item
           let requiredPermission = entityName === 'CardOperacional' && subOp === 'update'
             ? 'mover_card'
-            : entityName === 'PeriodoAquisitivo' && subOp === 'create'
-              ? 'gerar_periodos_aquisitivos'
-              : PERMISSIONS_MAP[entityName]?.[subOp];
+            : PERMISSIONS_MAP[entityName]?.[subOp];
+          if (entityName === 'PeriodoAquisitivo' && subOp === 'update' && Object.prototype.hasOwnProperty.call(raw || {}, 'status')) {
+            requiredPermission = 'alterar_status_periodo_aquisitivo';
+          }
+          if (entityName === 'CreditoExtraFerias' && subOp === 'update') {
+            const statusCredito = String(raw?.status || '').trim().toUpperCase();
+            const possuiGozo = Object.prototype.hasOwnProperty.call(raw || {}, 'gozo_ferias_id');
+            requiredPermission = statusCredito === 'CANCELADO'
+              ? 'cancelar_credito_extra_ferias'
+              : possuiGozo && String(raw?.gozo_ferias_id || '').trim()
+                ? 'vincular_credito_extra_ferias'
+                : possuiGozo
+                  ? 'remover_vinculo_credito_extra_ferias'
+                  : 'editar_credito_extra_ferias';
+          }
           if (entityName === 'Medalha' && subOp === 'update') {
             const statusItem = String(raw?.status || '').trim().toUpperCase();
             requiredPermission = statusItem === 'CANCELADA' && String(raw?.observacoes || '').includes('[RESET]')
