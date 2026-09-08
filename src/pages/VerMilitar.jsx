@@ -178,6 +178,23 @@ export default function VerMilitar() {
   const registrosLivro = [];
   const selectedTab = searchParams.get('tab') || 'comportamento';
   const { isAdmin, hasAccess, hasSelfAccess, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const podeVerDadosSensiveisMilitar = isAdmin || (
+    canAccessModule('militares') && canAccessAction('ver_dados_sensiveis_militar')
+  );
+  const podeVisualizarFerias = isAdmin || (canAccessModule('ferias') && canAccessAction('visualizar_ferias'));
+  const podeVisualizarPeriodosAquisitivos = isAdmin || (canAccessModule('ferias') && canAccessAction('visualizar_periodos_aquisitivos'));
+  const podeVisualizarAtestados = isAdmin || (canAccessModule('atestados') && canAccessAction('visualizar_atestados'));
+  const podeVerDadosSensiveisAtestado = isAdmin || canAccessAction('ver_dados_sensiveis_atestado');
+  const podeVisualizarMedalhas = isAdmin || (canAccessModule('medalhas') && canAccessAction('visualizar_medalhas'));
+  const podeVisualizarArmamentos = isAdmin || (canAccessModule('armamentos') && canAccessAction('visualizar_armamentos'));
+  const podeVisualizarAntiguidade = isAdmin || (canAccessModule('antiguidade') && canAccessAction('visualizar_rastreamento_promocoes'));
+  const podeVisualizarComportamento = isAdmin || (canAccessModule('controle_comportamento') && canAccessAction('visualizar_controle_comportamento'));
+  const podeVisualizarPunicoes = isAdmin || (canAccessModule('punicoes') && canAccessAction('visualizar_punicoes'));
+  const podeVisualizarAcervo = isAdmin || (canAccessModule('acervo_historico') && canAccessAction('visualizar_acervo_historico'));
+  const podeVisualizarRegistrosMilitar = isAdmin || (canAccessModule('registros_militar') && canAccessAction('visualizar_registros_militar'));
+  const podeVisualizarLivro = isAdmin || (canAccessModule('livro') && canAccessAction('visualizar_livro'));
+  const podeVisualizarPublicacoes = isAdmin || (canAccessModule('publicacoes') && canAccessAction('visualizar_publicacoes'));
+  const podeVisualizarGratificacoes = isAdmin || (canAccessModule('gratificacoes_funcao') && canAccessAction('visualizar_gratificacoes_funcao'));
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const podeGerirAcervo = canAccessAction('gerir_acervo_historico');
   const podeBaixarAcervo = canAccessAction('baixar_acervo_historico');
