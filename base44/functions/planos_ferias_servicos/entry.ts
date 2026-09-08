@@ -75,7 +75,7 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
 
 function militarNoEscopo(militar: any, campanha: any): boolean {
   if (!militar || militar.status === 'Inativo' || militar.status === 'Falecido') return false;
-  if (!campanha?.tipo_escopo || campanha.tipo_escopo === 'TODOS') return true;
+  if (!campanha?.tipo_escopo || campanha.tipo_escopo === 'TODOS' || campanha.tipo_escopo === 'SEM_ESCOPO') return true;
   if (campanha.tipo_escopo === 'SELECAO_MILITARES') {
     return (campanha.escopo_militares_ids || []).includes(militar.id);
   }
