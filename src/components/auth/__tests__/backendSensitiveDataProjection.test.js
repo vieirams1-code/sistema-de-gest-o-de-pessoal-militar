@@ -45,6 +45,9 @@ test('getScopedAtestadosBundle remove conteúdo clínico sem permissão sensíve
   assert.match(scopedAtestados, /sanitizarAtestados\(atestadosResult\.rows, podeVerDadosSensiveis\)/);
 
   const operationalBlock = scopedAtestados.match(/const CAMPOS_ATESTADO_OPERACIONAL = \[([\s\S]*?)\];/)?.[1] || '';
+  for (const campo of ['data_termino', 'data_retorno', 'status_jiso', 'status_publicacao', 'fluxo_homologacao', 'homologado_comandante']) {
+    assert.match(operationalBlock, new RegExp(`['\"]${campo}['\"]`), `${campo} precisa permanecer no DTO operacional`);
+  }
   for (const campo of ['cid_10', 'diagnostico', 'historico_clinico', 'arquivo_url', 'anexos']) {
     assert.doesNotMatch(operationalBlock, new RegExp(`['\"]${campo}['\"]`), `${campo} não pode estar no DTO operacional`);
   }
