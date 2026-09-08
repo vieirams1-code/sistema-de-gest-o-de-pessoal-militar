@@ -742,12 +742,12 @@ export default function VerMilitar() {
                 </div>
                 <div className="rounded-lg border p-3">
                   <p className="text-slate-500">Calculado</p>
-                  <p className="font-semibold">{avaliacaoComportamento?.comportamento || '—'}</p>
+                  <p className="font-semibold">{podeVisualizarPunicoes ? (avaliacaoComportamento?.comportamento || '—') : 'Sem acesso a punições'}</p>
                 </div>
                 <div className="rounded-lg border p-3">
                   <p className="text-slate-500">Próxima melhoria</p>
                   <p className="font-semibold">
-                    {avaliacaoComportamento?.inconsistente_para_calculo ?
+                    {!podeVisualizarPunicoes ? 'Sem acesso a punições' : avaliacaoComportamento?.inconsistente_para_calculo ?
                   'Bloqueada por inconsistência' :
                   proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}
                   </p>
@@ -795,23 +795,25 @@ export default function VerMilitar() {
               </div>
             </Section>
 
-            <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
-              {punicoesSistema.length === 0 ?
-            <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p> :
+            {podeVisualizarPunicoes && (
+              <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
+                {punicoesSistema.length === 0 ?
+              <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p> :
 
-            <div className="space-y-2">
-                  {punicoesSistema.slice(0, 5).map((punicao) =>
-              <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
-                      <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
-                      <p className="text-xs text-slate-500">
-                        Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
-                        Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
-                      </p>
-                    </div>
-              )}
-                </div>
-            }
-            </Section>
+              <div className="space-y-2">
+                    {punicoesSistema.slice(0, 5).map((punicao) =>
+                <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
+                        <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
+                        <p className="text-xs text-slate-500">
+                          Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
+                          Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
+                        </p>
+                      </div>
+                )}
+                  </div>
+              }
+              </Section>
+            )}
           </div>
         )
       },
