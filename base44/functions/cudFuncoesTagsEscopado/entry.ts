@@ -8,8 +8,8 @@ const PERMISSIONS_MAP: Record<string, string[]> = {
   MilitarTag: ['adicionar_militares', 'editar_militares'],
   FeriasTag: ['adicionar_ferias', 'editar_ferias'],
   FuncaoMilitar: ['gerir_configuracoes'],
-  TagGrupo: ['gerir_configuracoes'],
-  Tag: ['gerir_configuracoes'],
+  TagGrupo: ['gerir_tags'],
+  Tag: ['gerir_tags'],
 };
 
 const APLICABILIDADES = new Set(['militar', 'ferias', 'atestado', 'todos']);
