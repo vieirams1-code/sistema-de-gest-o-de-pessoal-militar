@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { AjusteSaldoFerias } from '@/api/entities';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -106,13 +105,8 @@ export default function CadastrarFerias() {
   const feriasExistentes = (paBundle?.ferias || [])
     .filter(f => String(f.militar_id) === String(formData.militar_id));
 
-  const { data: ajustesSaldoFerias = [] } = useQuery({
-    queryKey: ['cadastrar-ferias-ajustes-saldo-ferias', Boolean(isAdmin), modoAcesso || null, userEmail || null, effectiveEmail || null, formData.militar_id || null],
-    queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: isAccessResolved && hasFeriasAccess && hasRequiredFeriasAction && !!formData.militar_id,
-    refetchOnMount: 'always',
-    staleTime: 0,
-  });
+  const ajustesSaldoFerias = (paBundle?.ajustesSaldoFerias || [])
+    .filter((ajuste) => String(ajuste?.militar_id || '') === String(formData.militar_id || ''));
 
   // Só períodos disponíveis operacionalmente para novas férias.
   const periodosAtivos = periodosExistentes.filter(isPeriodoDisponivelOperacional);
