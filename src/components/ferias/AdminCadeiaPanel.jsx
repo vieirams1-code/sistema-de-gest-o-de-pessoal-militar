@@ -40,7 +40,7 @@ const statusResultante = {
 
 export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = false }) {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction } = useCurrentUser();
+  const { canAccessAction } = useCurrentUser();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -49,8 +49,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
   const cadeia = montarCadeia(ferias, registrosLivro);
 
   const handleRecalcular = async () => {
-    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('recalcular_ferias')) {
-      setFeedback({ type: 'error', msg: 'Ative o modo admin e certifique-se de ter permissão para recalcular férias.' });
+    if (!modoAdmin || !canAccessAction('recalcular_ferias')) {
+      setFeedback({ type: 'error', msg: 'Ative a confirmação administrativa e certifique-se de ter permissão para recalcular férias.' });
       return;
     }
     setLoading(true);
@@ -78,8 +78,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
   };
 
   const handleIniciarExclusao = (evento, incluirDescendentes) => {
-    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
-      setFeedback({ type: 'error', msg: 'Ative o modo admin e certifique-se de ter permissão para gerir cadeia.' });
+    if (!modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
+      setFeedback({ type: 'error', msg: 'Ative a confirmação administrativa e certifique-se de ter permissão para gerir cadeia.' });
       return;
     }
 
@@ -99,8 +99,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
 
   const handleConfirmarExclusao = async () => {
     if (!confirmarExclusao) return;
-    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
-      setFeedback({ type: 'error', msg: 'Ative o modo admin e certifique-se de ter permissão para gerir cadeia.' });
+    if (!modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
+      setFeedback({ type: 'error', msg: 'Ative a confirmação administrativa e certifique-se de ter permissão para gerir cadeia.' });
       return;
     }
 
@@ -216,7 +216,7 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
                 className="shrink-0 border-slate-300 hover:border-[#1e3a5f] hover:text-[#1e3a5f]"
                 disabled={loading || !modoAdmin}
                 onClick={handleRecalcular}
-                title={!modoAdmin ? 'Ative o modo admin para usar esta função.' : ''}
+                title={!modoAdmin ? 'Ative a confirmação administrativa para usar esta função.' : ''}
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -380,7 +380,7 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
                             size="sm"
                             variant="ghost"
                             className="text-xs text-red-700 hover:text-red-800 hover:bg-red-100 h-7 px-2"
-                            title={!modoAdmin ? 'Ative o modo admin' : `Excluir este + ${descendentes.length} descendente(s)`}
+                            title={!modoAdmin ? 'Ative a confirmação administrativa' : `Excluir este + ${descendentes.length} descendente(s)`}
                             disabled={!modoAdmin}
                             onClick={() => modoAdmin && handleIniciarExclusao(evento, true)}
                           >
