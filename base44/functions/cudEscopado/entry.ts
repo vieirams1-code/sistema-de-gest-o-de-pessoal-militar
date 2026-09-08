@@ -1569,10 +1569,14 @@ Deno.serve(async (req) => {
         let requiredPermissions = ['adicionar_publicacoes'];
         if (tipoPublicacao === 'Ata JISO') requiredPermissions = ['publicar_ata_jiso'];
         else if (tipoPublicacao === 'Homologação de Atestado') requiredPermissions = ['publicar_homologacao'];
-        else if ((data?.numero_bg && data?.data_bg) || String(data?.status || '').trim().toLowerCase() === 'publicado') {
-          requiredPermissions = ['adicionar_publicacoes', 'publicar_bg'];
+        else if (tipoPublicacao === 'Apostila') requiredPermissions = ['apostilar_publicacao'];
+        else if (tipoPublicacao === 'Tornar sem Efeito') requiredPermissions = ['tornar_sem_efeito_publicacao'];
+
+        const informaBg = (data?.numero_bg && data?.data_bg) || String(data?.status || '').trim().toLowerCase() === 'publicado';
+        if (informaBg && !['Ata JISO', 'Homologação de Atestado'].includes(tipoPublicacao)) {
+          requiredPermissions = [...requiredPermissions, 'publicar_bg'];
         }
-        const faltantes = requiredPermissions.filter((permission) => targetPerms.actions?.[permission] !== true);
+        const faltantes = [...new Set(requiredPermissions)].filter((permission) => targetPerms.actions?.[permission] !== true);
         if (faltantes.length > 0) {
           return Response.json(
             { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: faltantes.join(' e ') },
@@ -1584,7 +1588,17 @@ Deno.serve(async (req) => {
         const alteraBg = Object.prototype.hasOwnProperty.call(data || {}, 'numero_bg')
           || Object.prototype.hasOwnProperty.call(data || {}, 'data_bg')
           || statusDestino === 'publicado';
-        const requiredPermission = alteraBg ? 'publicar_bg' : 'editar_publicacoes';
+        const apenasApostilamento = Object.keys(data || {}).length > 0
+          && Object.keys(data || {}).every((key) => ['apostilada_por_id', 'foi_apostilada'].includes(key));
+        const apenasTornarSemEfeito = Object.keys(data || {}).length > 0
+          && Object.keys(data || {}).every((key) => ['tornada_sem_efeito_por_id', 'foi_tornada_sem_efeito'].includes(key));
+        const requiredPermission = alteraBg
+          ? 'publicar_bg'
+          : apenasApostilamento
+            ? 'apostilar_publicacao'
+            : apenasTornarSemEfeito
+              ? 'tornar_sem_efeito_publicacao'
+              : 'editar_publicacoes';
         if (targetPerms.actions?.[requiredPermission] !== true) {
           return Response.json(
             { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
