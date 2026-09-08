@@ -110,11 +110,16 @@ export default function RequireModuleAccess({
     ...actionKeys,
   ];
 
-  const hasModuleAccess = normalizedModuleKeys.some((key) => canAccessModule(key));
-  const hasActionAccess = normalizedActionKeys.some((key) => canAccessAction(key));
+  // F8-L06: módulo e ação são dimensões independentes. Quando ambos são
+  // declarados pela rota, ambos devem ser satisfeitos (AND). Dentro de cada
+  // dimensão, listas alternativas continuam sendo OR intencional.
+  const hasModuleAccess = normalizedModuleKeys.length === 0
+    || normalizedModuleKeys.some((key) => canAccessModule(key));
+  const hasActionAccess = normalizedActionKeys.length === 0
+    || normalizedActionKeys.some((key) => canAccessAction(key));
   const hasExplicitRule = normalizedModuleKeys.length > 0 || normalizedActionKeys.length > 0;
 
-  if (hasExplicitRule && !hasModuleAccess && !hasActionAccess) {
+  if (!hasExplicitRule || !hasModuleAccess || !hasActionAccess) {
     return <AccessDenied modulo={moduleName} />;
   }
 
