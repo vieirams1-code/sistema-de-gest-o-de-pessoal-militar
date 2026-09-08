@@ -122,6 +122,25 @@ function clampLimit(raw) {
   return Math.min(n, LIMIT_MAX);
 }
 
+const CAMPOS_CREDITO_SUPORTE_FERIAS = [
+  'id', 'militar_id', 'gozo_ferias_id', 'status', 'quantidade_dias', 'tipo_credito', 'data_referencia',
+];
+
+function projetarCreditoSuporteFerias(credito) {
+  if (!credito || typeof credito !== 'object') return credito;
+  const out = {};
+  for (const campo of CAMPOS_CREDITO_SUPORTE_FERIAS) {
+    if (campo in credito) out[campo] = credito[campo];
+  }
+  return out;
+}
+
+function prepararCreditosResposta(creditos, supportModeFerias) {
+  return supportModeFerias
+    ? (creditos || []).map(projetarCreditoSuporteFerias)
+    : (creditos || []);
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -145,8 +164,10 @@ Deno.serve(async (req) => {
       orderBy: orderByRaw,
       limit: limitRaw,
       effectiveEmail: effectiveEmailRaw,
+      supportMode: supportModeRaw,
     } = payload || {};
 
+    const supportModeFerias = String(supportModeRaw || '').trim().toLowerCase() === 'ferias';
     const gozoFeriasId = gozoFeriasIdRaw ? String(gozoFeriasIdRaw).trim() : '';
     const statusFiltro = statusRaw ? String(statusRaw).trim() : '';
     const militarIdFiltro = militarIdRaw ? String(militarIdRaw).trim() : '';
