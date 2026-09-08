@@ -80,6 +80,7 @@ export default function VerAtestado() {
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { podeAgirSobre, isReady: isScopeReady } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados') && canAccessAction('visualizar_atestados');
+  const hasMilitaresAccess = canAccessModule('militares') && canAccessAction('visualizar_militares');
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const canEditar = canAccessAction('editar_atestados');
 
@@ -96,14 +97,23 @@ export default function VerAtestado() {
   const { data: militarAtestadoData = { militares: [], matriculasMilitar: [] } } = useQuery({
     queryKey: ['militar-atestado', atestado?.militar_id],
     queryFn: () => fetchScopedMilitares({ militarIds: [atestado.militar_id], limit: 1, includeMatriculas: true }),
-    enabled: !!atestado?.militar_id && isAccessResolved && hasAtestadosAccess,
+    enabled: !!atestado?.militar_id && isAccessResolved && hasAtestadosAccess && hasMilitaresAccess,
   });
   const militarAtestado = React.useMemo(() => {
     const militar = militarAtestadoData?.militares?.[0] || null;
-    if (!militar) return null;
-    const indice = montarIndiceMatriculas(militarAtestadoData?.matriculasMilitar || []);
-    return enriquecerMilitarComMatriculas(militar, indice);
-  }, [militarAtestadoData]);
+    if (militar) {
+      const indice = montarIndiceMatriculas(militarAtestadoData?.matriculasMilitar || []);
+      return enriquecerMilitarComMatriculas(militar, indice);
+    }
+    if (!atestado) return null;
+    return {
+      id: atestado.militar_id,
+      nome_completo: atestado.militar_nome || '',
+      nome_guerra: atestado.militar_nome || '',
+      posto_graduacao: atestado.militar_posto || '',
+      matricula: atestado.militar_matricula_atual || atestado.militar_matricula || '',
+    };
+  }, [militarAtestadoData, atestado]);
 
   const atestadoView = React.useMemo(
     () => aplicarContextoMilitarNoAtestado(atestado || {}, militarAtestado, { contexto: 'documental' }),
