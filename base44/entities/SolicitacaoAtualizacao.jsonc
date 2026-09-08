@@ -30,7 +30,7 @@
     },
     "valor_original_militar": {
       "type": "string",
-      "description": "Valor original proposto pelo militar antes de retificação pelo gestor"
+      "description": "Valor original proposto pelo militar antes de retifica\u00e7\u00e3o pelo gestor"
     },
     "editado_pelo_gestor": {
       "type": "boolean",
@@ -70,5 +70,11 @@
     "campo_label",
     "valor_proposto",
     "data_solicitacao"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
