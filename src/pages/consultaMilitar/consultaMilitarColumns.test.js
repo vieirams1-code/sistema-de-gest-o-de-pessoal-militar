@@ -22,10 +22,10 @@ test('admin vê todas as colunas sensíveis (telefone, email, tipo_sanguineo)', 
   }
 });
 
-test('usuário comum com acesso_dados_sensiveis vê colunas sensíveis', () => {
+test('usuário comum com ver_dados_sensiveis_militar vê colunas sensíveis', () => {
   const allowedKeys = getAllowedKeys({
     isAdmin: false,
-    canAccessAction: (action) => action === 'acesso_dados_sensiveis',
+    canAccessAction: (action) => action === 'ver_dados_sensiveis_militar',
   });
 
   for (const key of SENSITIVE_KEYS) {
@@ -61,10 +61,10 @@ test('colunas não sensíveis sempre aparecem para usuário comum', () => {
   }
 });
 
-test('fallback visibleFor em colunas sensíveis segue decisão atual e libera para role compatível', () => {
+test('role ou modo de acesso não substituem a permissão explícita de dados sensíveis', () => {
   const column = byKey('telefone');
   assert.ok(column, 'coluna sensível de referência deve existir');
-  assert.deepEqual(column.visibleFor, ['admin'], 'decisão atual depende de visibleFor para fallback');
+  assert.deepEqual(column.visibleFor, ['admin'], 'metadado visual legado pode permanecer sem conceder acesso');
 
   const allowedKeys = getAllowedKeys({
     isAdmin: false,
@@ -75,8 +75,8 @@ test('fallback visibleFor em colunas sensíveis segue decisão atual e libera pa
 
   assert.equal(
     allowedKeys.includes('telefone'),
-    true,
-    'fallback atual libera coluna sensível quando role/mode coincide com visibleFor',
+    false,
+    'role/mode não deve liberar coluna sensível sem ver_dados_sensiveis_militar',
   );
 });
 
