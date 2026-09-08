@@ -5,13 +5,21 @@ const ALERTA_PUBLICACAO = 'Ajuste cancelado no sistema. Verifique necessidade de
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const normalize = (v) => String(v ?? '').trim();
 
-async function assertAdminFerias(base44, authUser) {
-  if (String(authUser?.role || '').toLowerCase() === 'admin') return;
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso
-    .filter({ user_email: normalizeEmail(authUser?.email), ativo: true }, undefined, 100, 0)
-    .catch(() => []);
-  if ((acessos || []).some((a) => String(a?.tipo_acesso || '').trim().toLowerCase() === 'admin')) return;
-  throw Object.assign(new Error('Acesso negado: operação restrita a administradores do módulo Férias.'), { status: 403 });
+async function resolverAutorizacao(base44, payload, militarId = null) {
+  const request = {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    ...(militarId ? { scopeMilitarIds: [militarId] } : {}),
+  };
+  const response = await base44.functions.invoke('getUserPermissions', request);
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.cancelar_credito_extra_ferias !== true) {
+    throw Object.assign(new Error('Acesso negado: requer cancelar_credito_extra_ferias.'), { status: 403 });
+  }
+  if (militarId && authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
 }
 
 function anexarAuditoriaObservacoes(observacoes, texto) {
@@ -23,20 +31,21 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
-    await assertAdminFerias(base44, authUser);
 
     let payload = {};
     try { payload = await req.json(); } catch (_e) { payload = {}; }
 
     const ajusteId = normalize(payload?.ajuste_id);
     const motivoCancelamento = normalize(payload?.motivo_cancelamento);
-    const effectiveEmail = normalizeEmail(payload?.effectiveEmail || authUser.email);
 
     if (!ajusteId) return Response.json({ error: 'ajuste_id é obrigatório.' }, { status: 400 });
     if (!motivoCancelamento) return Response.json({ error: 'motivo_cancelamento é obrigatório.' }, { status: 400 });
 
+    await resolverAutorizacao(base44, payload);
     const ajuste = await base44.asServiceRole.entities.AjusteSaldoFerias.get(ajusteId).catch(() => null);
     if (!ajuste) return Response.json({ error: 'Ajuste de saldo de férias não encontrado.' }, { status: 404 });
+    const authz = await resolverAutorizacao(base44, payload, String(ajuste?.militar_id || ''));
+    const effectiveEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
 
     const statusAtual = normalize(ajuste?.status).toLowerCase();
     if (!STATUS_CANCELAVEIS.has(statusAtual)) {
