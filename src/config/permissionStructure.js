@@ -7,6 +7,7 @@ export const permissionStructure = [
         label: 'Militares',
         actions: [
           { key: 'perm_visualizar_militares', label: 'Visualizar Militares' },
+          { key: 'perm_ver_dados_sensiveis_militar', label: 'Ver dados sensíveis do militar', sensitive: true },
           { key: 'perm_adicionar_militares', label: 'Adicionar Militares' },
           { key: 'perm_editar_militares', label: 'Editar Militares' },
           { key: 'perm_excluir_militares', label: 'Excluir Militares', sensitive: true },
