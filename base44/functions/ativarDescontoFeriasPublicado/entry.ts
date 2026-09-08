@@ -63,6 +63,22 @@ function publicacaoEstaPublicada(pub = {}) {
   return Boolean(pub.numero_bg && pub.data_bg);
 }
 
+async function resolverAutorizacao(base44, payload, militarId = null) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    ...(militarId ? { scopeMilitarIds: [militarId] } : {}),
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.publicar_bg !== true) {
+    throw Object.assign(new Error('Acesso negado: requer publicar_bg.'), { status: 403 });
+  }
+  if (militarId && authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -76,6 +92,8 @@ Deno.serve(async (req) => {
     if (!publicacaoId) {
       return Response.json({ error: 'publicacao_id é obrigatório.' }, { status: 400 });
     }
+
+    await resolverAutorizacao(base44, payload);
 
     // ---- Carregar publicação ----
     const publicacao = await base44.asServiceRole.entities.PublicacaoExOfficio
@@ -107,6 +125,8 @@ Deno.serve(async (req) => {
     if (!desconto) {
       return Response.json({ ok: true, aplicado: false, motivo: 'desconto_nao_encontrado' });
     }
+    const authz = await resolverAutorizacao(base44, payload, String(desconto?.militar_id || ''));
+    const effectiveEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
 
     // ---- Idempotência: já aplicado / já ativo ----
     if (desconto.saldo_aplicado === true || String(desconto.status || '') === 'ativo') {
@@ -143,7 +163,7 @@ Deno.serve(async (req) => {
     const auditoriaTexto = `[${carimbo}] Desconto ativado por publicação ${publicacaoId} (status Publicado). ` +
       `Criado/ativado AjusteSaldoFerias de débito com ${dias}d para o período ${periodo.ano_referencia || periodo.id}. ` +
       `Nenhuma alteração realizada no cálculo oficial/dias_direito (${diasDireitoAtual}). ` +
-      `Acionado por ${normalizeEmail(authUser.email)}.`;
+      `Acionado por ${effectiveEmail}.`;
     const observacoesNovas = [String(desconto.observacoes || '').trim(), auditoriaTexto]
       .filter(Boolean).join('\n');
 
