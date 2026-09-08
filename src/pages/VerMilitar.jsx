@@ -326,31 +326,35 @@ export default function VerMilitar() {
     [atestadosBundle, id]
   );
 
-  const { data: medalhas = [] } = useQuery({
-    queryKey: ['ver-medalhas', id],
-    queryFn: () => base44.entities.Medalha.filter({ militar_id: id }, '-data_indicacao'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+  const { data: medalhasBundle = { medalhas: [], tiposMedalha: [] } } = useQuery({
+    queryKey: ['ver-medalhas', id, effectiveEmail || null],
+    queryFn: () => fetchScopedMedalhasBundle(),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarMedalhas,
   });
-  const { data: tiposMedalha = [] } = useQuery({
-    queryKey: ['ver-tipos-medalha'],
-    queryFn: () => base44.entities.TipoMedalha.list('nome'),
-    enabled: !!id && isAccessResolved && canViewMilitar
-  });
+  const medalhas = React.useMemo(
+    () => (medalhasBundle?.medalhas || []).filter((item) => String(item?.militar_id || '') === String(id)),
+    [medalhasBundle, id]
+  );
+  const tiposMedalha = medalhasBundle?.tiposMedalha || [];
   const { data: impedimentosMedalha = [] } = useQuery({
     queryKey: ['ver-impedimentos-medalha', id],
     queryFn: () => base44.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarMedalhas,
   });
 
-  const { data: armamentos = [], isLoading: isLoadingArmamentos } = useQuery({
-    queryKey: ['ver-armamentos', id],
-    queryFn: () => base44.entities.Armamento.filter({ militar_id: id }),
-    enabled: !!id && isAccessResolved && canViewMilitar
+  const { data: armamentosBundle = { armamentos: [] }, isLoading: isLoadingArmamentos } = useQuery({
+    queryKey: ['ver-armamentos', id, effectiveEmail || null],
+    queryFn: () => fetchScopedArmamentosBundle(),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarArmamentos,
   });
+  const armamentos = React.useMemo(
+    () => (armamentosBundle?.armamentos || []).filter((item) => String(item?.militar_id || '') === String(id)),
+    [armamentosBundle, id]
+  );
   const { data: historicoPromocoes = [], refetch: refetchHistoricoPromocoes } = useQuery({
     queryKey: ['ver-historico-promocoes', id],
     queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: id }, '-data_promocao'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarAntiguidade,
   });
   const selecaoPromocao = React.useMemo(() => selecionarPromocaoAtualEAnteriores({
     historicoPromocoes,
