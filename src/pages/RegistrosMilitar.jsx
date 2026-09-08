@@ -119,7 +119,6 @@ export default function RegistrosMilitar() {
     isLoading: loadingUser,
     canAccessModule,
     canAccessAction,
-    user,
   } = useCurrentUser();
 
   const [filtroMilitarId, setFiltroMilitarId] = useState(() => searchParams.get('militar_id') || 'all');
