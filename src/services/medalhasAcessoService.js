@@ -80,6 +80,17 @@ export async function listarMilitaresEscopo({ base44Client, isAdmin, hasGlobalSc
 }
 
 export async function listarMedalhasEscopo({ base44Client, isAdmin, hasGlobalScope, militarIds = [] }) {
+  if (typeof base44Client?.functions?.invoke === 'function') {
+    const response = await base44Client.functions.invoke('getScopedMedalhasBundle', {
+      readPurpose: 'APURACAO',
+      militarIds,
+    });
+    const resultado = response?.data ?? response ?? {};
+    if (resultado?.error) throw new Error(resultado.error);
+    return Array.isArray(resultado?.medalhas) ? resultado.medalhas : [];
+  }
+
+  // Fallback exclusivo para clientes simulados em testes unitários.
   if (isAdmin || hasGlobalScope) return base44Client.entities.Medalha.list('-created_date');
   if (!militarIds.length) return [];
 
