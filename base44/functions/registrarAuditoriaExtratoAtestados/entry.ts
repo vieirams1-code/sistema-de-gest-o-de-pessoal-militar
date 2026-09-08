@@ -24,6 +24,9 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const authUser = await base44.auth.me();
+    if (!authUser?.email) {
+      return Response.json({ ok: false, warning: 'Não autenticado.' }, { status: 401 });
+    }
 
     let payload: Record<string, unknown> = {};
     try {
@@ -33,11 +36,20 @@ Deno.serve(async (req) => {
     }
 
     const atestadoIds = normalizeIds(payload?.atestado_ids);
+    const permsResponse = await base44.functions.invoke('getUserPermissions', {
+      ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    });
+    const perms = permsResponse?.data ?? permsResponse ?? {};
+    if (perms?.error) {
+      return Response.json({ ok: false, warning: perms.error }, { status: 403 });
+    }
 
     const auditoriaPayload = {
-      usuario_email: normalizeString(payload?.usuario_email || authUser?.email, 200),
-      usuario_id: normalizeString(payload?.usuario_id || authUser?.id, 120),
-      data_hora: normalizeString(payload?.data_hora || nowIso, 80),
+      usuario_email: normalizeString(authUser.email, 200),
+      usuario_id: normalizeString(authUser.id, 120),
+      usuario_efetivo_email: normalizeString(perms?.effectiveUserEmail || authUser.email, 200),
+      is_impersonating: perms?.isImpersonating === true,
+      data_hora: nowIso,
       acao: normalizeString(payload?.acao, 60),
       quantidade_registros: normalizeInteger(payload?.quantidade_registros),
       atestado_ids: atestadoIds,
