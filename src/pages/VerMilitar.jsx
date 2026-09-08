@@ -1560,6 +1560,11 @@ export default function VerMilitar() {
     contratosDesignacaoMilitar, matriculasMilitar, id, isLoadingContratosDesignacao,
     podeCriarContratoDesignacao, podeEditarContratoDesignacao, podeEncerrarContratoDesignacao,
     podeCancelarContratoDesignacao, podeExcluirContratoDesignacao,
+    podeVerDadosSensiveisMilitar, podeVisualizarFerias, podeVisualizarAtestados,
+    podeVerDadosSensiveisAtestado, podeVisualizarMedalhas, podeVisualizarArmamentos,
+    podeVisualizarAntiguidade, podeVisualizarComportamento, podeVisualizarPunicoes,
+    podeVisualizarAcervo, podeVisualizarRegistrosMilitar, podeVisualizarLivro,
+    podeVisualizarPublicacoes, podeVisualizarGratificacoes,
     contratoDesignacaoMutation.isPending, historicoPromocoes, isAdmin, queryClient, refetchHistoricoPromocoes
   ]);
 
