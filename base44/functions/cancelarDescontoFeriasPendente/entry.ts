@@ -51,6 +51,22 @@ function publicacaoEstaPublicada(pub = {}) {
   return Boolean(pub.numero_bg || pub.data_bg);
 }
 
+async function resolverAutorizacao(base44, payload, militarId = null) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    ...(militarId ? { scopeMilitarIds: [militarId] } : {}),
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.excluir_publicacoes !== true) {
+    throw Object.assign(new Error('Acesso negado: requer excluir_publicacoes.'), { status: 403 });
+  }
+  if (militarId && authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -64,6 +80,8 @@ Deno.serve(async (req) => {
     if (!publicacaoId) {
       return Response.json({ error: 'publicacao_id é obrigatório.' }, { status: 400 });
     }
+
+    await resolverAutorizacao(base44, payload);
 
     const publicacao = await base44.asServiceRole.entities.PublicacaoExOfficio
       .get(publicacaoId).catch(() => null);
@@ -85,6 +103,8 @@ Deno.serve(async (req) => {
     if (!desconto) {
       return Response.json({ ok: true, cancelado: false, motivo: 'desconto_nao_encontrado' });
     }
+    const authz = await resolverAutorizacao(base44, payload, String(desconto?.militar_id || ''));
+    const effectiveEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
 
     if (String(desconto.status || '') === 'cancelado') {
       const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, desconto, { status: 'cancelado' });
@@ -101,7 +121,7 @@ Deno.serve(async (req) => {
 
     const carimbo = new Date().toISOString();
     const auditoriaTexto = `[${carimbo}] Desconto cancelado por exclusão da publicação pendente ${publicacaoId}. ` +
-      `Nenhuma alteração de saldo/período aquisitivo realizada. Acionado por ${normalizeEmail(authUser.email)}.`;
+      `Nenhuma alteração de saldo/período aquisitivo realizada. Acionado por ${effectiveEmail}.`;
     const observacoesNovas = [String(desconto.observacoes || '').trim(), auditoriaTexto]
       .filter(Boolean).join('\n');
 
