@@ -168,7 +168,7 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
 
   it('cria campanhas e consulta respostas dentro do plano, sem redirecionar para Campanhas', () => {
     assert.match(paginaPlanosSource, /const abrirNovaCampanha = \(\) =>/);
-    assert.match(paginaPlanosSource, /acao: 'CAMPANHA_CRIAR'/);
+    assert.match(paginaPlanosSource, /acao: 'PLANO_CAMPANHA_CRIAR'/);
     assert.match(paginaPlanosSource, /plano_ferias_institucional_id: selecionado\.id/);
     assert.match(paginaPlanosSource, /const abrirRespostas = async/);
     assert.doesNotMatch(paginaPlanosSource, /GerirCampanhasPortal|CentralRespostasCampanhas/);
