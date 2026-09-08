@@ -166,16 +166,6 @@ Deno.serve(async (req) => {
     );
 
     if (ehReversaoOriginadaDeCurso) {
-      // O usuário autenticado real é a fonte de verdade para permissão (não o payload).
-      let usuarioAutenticado = null;
-      try { usuarioAutenticado = await base44.auth.me(); } catch (_) { usuarioAutenticado = null; }
-
-      const permissoes = usuarioAutenticado?.permissions || usuarioAutenticado?.permissoes || {};
-      const ehAdmin = normalizar(usuarioAutenticado?.role) === 'admin';
-      const temPermissaoExcepcional = ehAdmin
-        || permissoes?.[PERMISSAO_REVERSAO_EXCEPCIONAL] === true
-        || (Array.isArray(usuarioAutenticado?.actions) && usuarioAutenticado.actions.includes(PERMISSAO_REVERSAO_EXCEPCIONAL));
-
       const contextoExcepcional = {
         promocao_id: promocaoId,
         promocao_militar_id: itemId,
