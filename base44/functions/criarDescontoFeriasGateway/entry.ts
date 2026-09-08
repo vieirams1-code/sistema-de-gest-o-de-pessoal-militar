@@ -13,7 +13,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 //   - NÃO altera saldo do PeriodoAquisitivo (mesmo que a publicação já nasça Publicado);
 //   - status da publicação segue a regra padrão do RP (sem nota / com nota / com BG);
 //   - idempotência: não cria DescontoFerias duplicado para a mesma publicacao_id;
-//   - somente admin (role admin OU UsuarioAcesso tipo_acesso=admin).
+//   - exige capacidades funcionais explícitas e escopo do militar alvo;
 // =====================================================================
 
 const TIPO_INTERNO = 'Dispensa com Desconto em Férias';
@@ -30,6 +30,27 @@ function calcDataFim(dataInicio, dias) {
   if (Number.isNaN(base.getTime())) return '';
   base.setDate(base.getDate() + (Number(dias) - 1));
   return base.toISOString().slice(0, 10);
+}
+
+async function resolverAutorizacao(base44, payload, militarId, exigePublicarBg = false) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    scopeMilitarIds: [militarId],
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true) {
+    const required = ['criar_credito_extra_ferias', 'adicionar_publicacoes'];
+    if (exigePublicarBg) required.push('publicar_bg');
+    const faltantes = required.filter((action) => authz?.actions?.[action] !== true);
+    if (faltantes.length) {
+      throw Object.assign(new Error(`Acesso negado: requer ${faltantes.join(' e ')}.`), { status: 403 });
+    }
+  }
+  if (authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
 }
 
 async function upsertAjusteDescontoFerias(base44, desconto, overrides = {}) {
@@ -68,20 +89,6 @@ Deno.serve(async (req) => {
     let payload = {};
     try { payload = await req.json(); } catch (_e) { payload = {}; }
 
-    // ---- Autorização: somente admin ----
-    const isAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-    let isAdminByAccess = false;
-    try {
-      const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter(
-        { user_email: normalizeEmail(authUser.email), ativo: true }, undefined, 100, 0, ['tipo_acesso'],
-      );
-      isAdminByAccess = (acessos || []).some((a) => String(a?.tipo_acesso || '').trim().toLowerCase() === 'admin');
-    } catch (_e) { isAdminByAccess = false; }
-
-    if (!isAdminByRole && !isAdminByAccess) {
-      return Response.json({ error: 'Acesso negado: somente administradores.' }, { status: 403 });
-    }
-
     // ---- Validação de entrada ----
     const militarId = String(payload?.militar_id || '').trim();
     const periodoAquisitivoId = String(payload?.periodo_aquisitivo_id || '').trim();
@@ -99,6 +106,9 @@ Deno.serve(async (req) => {
     if (!Number.isFinite(dias) || dias <= 0) erros.push('dias deve ser maior que 0.');
     if (!dataInicio) erros.push('data_inicio é obrigatória.');
     if (erros.length) return Response.json({ error: erros.join(' ') }, { status: 400 });
+
+    const authz = await resolverAutorizacao(base44, payload, militarId, Boolean(numeroBg && dataBg));
+    const effectiveEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
 
     // ---- Carregar entidades de referência ----
     const periodo = await base44.asServiceRole.entities.PeriodoAquisitivo.get(periodoAquisitivoId).catch(() => null);
@@ -139,7 +149,7 @@ Deno.serve(async (req) => {
       data_bg: dataBg,
       status: statusPublicacao,
       observacoes,
-      criado_por_email: normalizeEmail(authUser.email),
+      criado_por_email: effectiveEmail,
     });
 
     // ---- 2) Criar DescontoFerias vinculado (idempotente por publicacao_id) ----
@@ -167,7 +177,7 @@ Deno.serve(async (req) => {
       status: 'pendente_publicacao',
       saldo_aplicado: false,
       observacoes,
-      criado_por_email: authUser.email,
+      criado_por_email: effectiveEmail,
       criado_em: new Date().toISOString(),
     });
     const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, descontoFerias);
