@@ -37,12 +37,23 @@ function formatDate(dateStr) {
   }
 }
 
-export default function MilitarTimelineTab({ militarId }) {
+export default function MilitarTimelineTab({ militarId, permissions = {} }) {
   const [limit, setLimit] = React.useState(10);
+  const permissionsKey = React.useMemo(() => JSON.stringify({
+    livro: permissions?.livro === true,
+    publicacoes: permissions?.publicacoes === true,
+    ferias: permissions?.ferias === true,
+    atestados: permissions?.atestados === true,
+    atestadoSensitive: permissions?.atestadoSensitive === true,
+    antiguidade: permissions?.antiguidade === true,
+    medalhas: permissions?.medalhas === true,
+    funcoes: permissions?.funcoes === true,
+    gratificacoes: permissions?.gratificacoes === true,
+  }), [permissions]);
 
   const { data: timeline = [], isLoading, error } = useQuery({
-    queryKey: ['militar-timeline', militarId],
-    queryFn: () => getMilitarTimeline(militarId),
+    queryKey: ['militar-timeline', militarId, permissionsKey],
+    queryFn: () => getMilitarTimeline(militarId, permissions),
     enabled: !!militarId,
   });
 
