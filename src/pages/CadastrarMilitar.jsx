@@ -179,20 +179,12 @@ export default function CadastrarMilitar() {
   const [novaDataInicio, setNovaDataInicio] = useState('');
 
 
-  const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
-    queryKey: ['militar', editId],
-    queryFn: async () => {
-      if (!editId) return null;
-      const list = await base44.entities.Militar.filter({ id: editId });
-      return list[0] || null;
-    },
-    enabled: !!editId,
-    onSuccess: (data) => {
-      if (data) {
-        setFormData(normalizarMilitarParaFormulario(data));
-      }
-    }
+  const { data: editingData = { militar: null, matriculas: [] }, isLoading: loadingEdit } = useQuery({
+    queryKey: ['militar-edicao-segura', editId],
+    queryFn: () => carregarMilitarParaEdicao(editId),
+    enabled: !!editId && isAccessResolved && hasMilitaresAccess && hasRequiredAction,
   });
+  const editingMilitar = editingData?.militar || null;
 
   React.useEffect(() => {
     if (editingMilitar) {
@@ -237,11 +229,7 @@ export default function CadastrarMilitar() {
     processarConferencia();
   }, [militarSalvoParaConferencia]);
 
-  const { data: matriculasMilitar = [] } = useQuery({
-    queryKey: ['militar-matriculas-edicao', editId],
-    queryFn: () => base44.entities.MatriculaMilitar.filter({ militar_id: editId }, '-data_inicio'),
-    enabled: !!editId,
-  });
+  const matriculasMilitar = Array.isArray(editingData?.matriculas) ? editingData.matriculas : [];
   const militarDetalhado = React.useMemo(() => {
     if (!editingMilitar) return null;
     const indice = montarIndiceMatriculas(matriculasMilitar);
