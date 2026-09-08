@@ -71,7 +71,7 @@ function sanitizeIds(raw) {
     const trimmed = v.trim();
     if (trimmed) set.add(trimmed);
   }
-  return Array.from(set);
+  return Array.from(set).slice(0, LIMIT_MAX);
 }
 
 Deno.serve(async (req) => {
