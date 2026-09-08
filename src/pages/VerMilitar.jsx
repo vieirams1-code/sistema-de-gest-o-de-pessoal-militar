@@ -848,6 +848,7 @@ export default function VerMilitar() {
                   </div>
                 }
               </Section>
+              {podeVerDadosSensiveisMilitar ? <>
               <Section title="Dados Pessoais" icon={User}>
                 <div className="grid grid-cols-2 gap-x-4">
                   <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
@@ -907,6 +908,11 @@ export default function VerMilitar() {
                 </div>
               </Section>
               }
+              </> : (
+                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Dados pessoais sensíveis não estão disponíveis para este perfil.
+                </div>
+              )}
             </div>
           </div>
         )
