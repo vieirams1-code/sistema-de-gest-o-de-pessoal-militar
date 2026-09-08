@@ -97,6 +97,14 @@ test('adicionar e editar militar são independentes e contextuais', () => {
   assert.match(cadastrarMilitar, /const hasRequiredAction = canAccessAction\(requiredAction\);/);
 });
 
+test('edição sem permissão sensível não recebe, renderiza nem reaplica campos sensíveis', () => {
+  assert.match(identidadeGateway, /projectMilitarForEdit\(militar, includeSensitive\)/);
+  assert.match(identidadeGateway, /a\?\.actions\?\.ver_dados_sensiveis_militar === true/);
+  assert.match(cadastrarMilitar, /const podeVerCamposSensiveisEdicao = !editId \|\| editingData\?\.sensitiveFieldsIncluded === true;/);
+  assert.match(cadastrarMilitar, /if \(editId && !podeVerCamposSensiveisEdicao\) \{[\s\S]*?delete dataToSave\[campo\]/);
+  assert.match(cadastrarMilitar, /\{podeVerCamposSensiveisEdicao && \([\s\S]*?title="Dados Pessoais"[\s\S]*?title="Informações Físicas"/);
+});
+
 test('snapshots de duplicidade e merge não copiam cadastro pessoal completo', () => {
   const snapshotBlock = identidadeGateway.match(/function minimalSnapshot\(m\) \{([\s\S]*?)\n\}/)?.[1] || '';
   const queuePayloadBlock = identidadeGateway.match(/function minimalPayloadCadastro\(p = \{\}\) \{([\s\S]*?)\n\}/)?.[1] || '';
