@@ -60,6 +60,39 @@ async function listarPorEscopoIds(base44, entityName, militarIds, orderBy) {
   return { rows: out, partialFailures };
 }
 
+const CAMPOS_ATESTADO_OPERACIONAL = [
+  'id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula', 'militar_matricula_atual',
+  'militar_matricula_label', 'tipo_afastamento', 'dias', 'data_inicio', 'data_fim', 'status',
+  'necessita_jiso', 'data_jiso_agendada', 'medico_nome_snapshot', 'medico_crm_snapshot', 'medico', 'crm_medico',
+  'created_date', 'updated_date',
+];
+const CAMPOS_ATESTADO_SENSIVEIS = [
+  'cid_10', 'cid', 'diagnostico', 'diagnostico_descricao', 'observacoes', 'observacao', 'parecer_jiso',
+  'parecer_homologacao', 'resultado_jiso', 'restricoes', 'historico_clinico', 'notas_medicas',
+  'arquivo_url', 'anexo_url', 'arquivo_path', 'storage_path', 'anexos', 'documentos',
+];
+const CAMPOS_JISO_OPERACIONAL = [
+  'id', 'atestado_id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula',
+  'data_jiso', 'status', 'finalidade_jiso', 'created_date', 'updated_date',
+];
+const CAMPOS_JISO_SENSIVEIS = ['resultado_jiso', 'dias_jiso', 'parecer', 'parecer_jiso', 'observacoes', 'cid_10', 'diagnostico'];
+
+function projetarRegistro(registro, campos) {
+  const out = {};
+  for (const campo of campos) if (registro && Object.prototype.hasOwnProperty.call(registro, campo)) out[campo] = registro[campo];
+  return out;
+}
+
+function sanitizarAtestados(registros, podeVerSensiveis) {
+  const campos = podeVerSensiveis ? [...CAMPOS_ATESTADO_OPERACIONAL, ...CAMPOS_ATESTADO_SENSIVEIS] : CAMPOS_ATESTADO_OPERACIONAL;
+  return (registros || []).map((registro) => projetarRegistro(registro, campos));
+}
+
+function sanitizarJisos(registros, podeVerSensiveis) {
+  const campos = podeVerSensiveis ? [...CAMPOS_JISO_OPERACIONAL, ...CAMPOS_JISO_SENSIVEIS] : CAMPOS_JISO_OPERACIONAL;
+  return (registros || []).map((registro) => projetarRegistro(registro, campos));
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
