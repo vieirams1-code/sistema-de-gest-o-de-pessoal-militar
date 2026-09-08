@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
             meta: {
                 ...baseMeta,
                 returned: filtradas.length,
-                scope_tipo: isAdmin ? 'admin' : escopo.tipo,
+                scope_tipo: hasGlobalScope ? 'global' : escopo.tipo,
             },
         });
     } catch (error) {
