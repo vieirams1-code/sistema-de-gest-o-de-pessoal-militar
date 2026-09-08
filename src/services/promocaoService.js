@@ -431,14 +431,11 @@ async function restaurarCadastroMilitarDaPromocao({
 const STATUS_PARTICIPANTE_VINCULADO_CURSO = new Set(['promovido', 'pendente_reanalise']);
 
 // Frase exata exigida para a reversão excepcional de promoção originada de curso.
-// MANTIDA apenas para compatibilidade de testes/backend; a UI não usa mais este fluxo.
 export const FRASE_CONFIRMACAO_REVERSAO_EXCEPCIONAL = 'CONFIRMO REVERSÃO E CIÊNCIA DA PENDÊNCIA';
 // Frase padrão (promoção comum).
 export const FRASE_CONFIRMACAO_REVERSAO_COMUM = 'REVERTER PROMOÇÃO';
 
-// Decisão institucional final: promoções originadas de Curso de Formação NÃO são
-// revertidas pela interface. Correção excepcional é feita pelo administrador na base.
-export const MENSAGEM_BLOQUEIO_REVERSAO_CURSO = 'Promoções originadas de Curso de Formação não são revertidas pela interface. Em caso excepcional, acionar o administrador do sistema.';
+export const MENSAGEM_BLOQUEIO_REVERSAO_CURSO = 'Promoções originadas de Curso de Formação exigem a permissão específica de reversão excepcional, confirmação reforçada e motivo obrigatório.';
 
 /**
  * Detecta se a reversão é de promoção ORIGINADA DE CURSO DE FORMAÇÃO,
@@ -477,11 +474,7 @@ export async function reverterPublicacaoPromocaoMilitar({
   if (!promocao?.id) throw new Error('Promoção não carregada.');
   if (!item?.id) throw new Error('Item da promoção não carregado.');
 
-  // Guarda defensiva (defesa em profundidade): a UI não deve reverter promoções
-  // originadas de Curso de Formação. Mesmo que a chamada chegue aqui, bloqueamos
-  // antes de qualquer payload ser enviado ao backend.
   const { originadaDeCurso } = await detectarVinculoCursoPromocao({ promocao, item, entities });
-  if (originadaDeCurso) throw new Error(MENSAGEM_BLOQUEIO_REVERSAO_CURSO);
 
   const Historico = entities?.HistoricoPromocaoMilitarV2;
   const PromocaoMilitar = entities?.PromocaoMilitar;
@@ -525,8 +518,8 @@ export async function reverterPublicacaoPromocaoMilitar({
     observacoes: observacoesNormalizado,
     observacao: observacoesNormalizado,
     usuario,
-    modo_admin: Boolean(modoAdmin),
-    modoAdmin: Boolean(modoAdmin),
+    modo_admin: Boolean(modoAdmin || originadaDeCurso),
+    modoAdmin: Boolean(modoAdmin || originadaDeCurso),
     frase_confirmacao: texto(fraseConfirmacao),
     fraseConfirmacao: texto(fraseConfirmacao),
   };
