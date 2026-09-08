@@ -53,6 +53,7 @@ import QuickAccessWidget from '@/components/layout/QuickAccessWidget';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
 import SgpThemeProfileSelector from '@/themes/sgpThemeModes/SgpThemeProfileSelector';
 import useSgpThemeMode from '@/themes/sgpThemeModes/useSgpThemeMode';
+import { canAccessPagePolicy, getPageAccessPolicy } from '@/config/pageAccessPolicy';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -184,8 +185,8 @@ const menuGroups = [
         icon: Wrench,
         description: 'Governança técnica, segurança e manutenção',
         items: [
-          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes', menuGroup: 'Cadastros' },
-          { name: 'Grupos do efetivo', page: 'GruposEfetivo', icon: Users, adminOnly: true, menuGroup: 'Cadastros' },
+          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'tags', actionKey: 'visualizar_tags', menuGroup: 'Cadastros' },
+          { name: 'Grupos do efetivo', page: 'GruposEfetivo', icon: Users, moduleKey: 'grupos_efetivo', actionKey: 'visualizar_grupos_efetivo', menuGroup: 'Cadastros' },
           { name: 'Templates', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates', menuGroup: 'Cadastros' },
           { name: 'Subtipos DOEMS', page: 'SubtiposDOEMS', icon: BookMarked, adminOnly: true, moduleKey: 'rp', menuGroup: 'Cadastros' },
           {
@@ -391,6 +392,18 @@ export default function Layout({ children, currentPageName }) {
   const canViewMenuEntry = (entry) => {
     if (entry.adminOnly && !isAdmin) return false;
     if (hasAbsoluteAccess) return true;
+
+    // F8-L06: quando a página possui política canônica, menu e URL direta
+    // consultam exatamente a mesma expressão de autorização.
+    const canonicalPolicy = getPageAccessPolicy(entry.page);
+    if (canonicalPolicy) {
+      return canAccessPagePolicy(canonicalPolicy, {
+        canAccessModule,
+        canAccessAction,
+        isAdmin,
+        canAccessAll: hasAbsoluteAccess,
+      });
+    }
 
     if (entry.viewPermission && !temPermissao(entry.viewPermission)) return false;
     if (entry.actionKey && !canAccessAction(normalizeMenuPermissionKey(entry.actionKey, 'action'))) return false;
