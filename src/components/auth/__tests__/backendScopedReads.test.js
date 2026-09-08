@@ -26,9 +26,24 @@ test('bundles escopados exigem módulo e permissão funcional de visualização 
   assert.match(atestados, /modules\?\.atestados === true && authz\?\.actions\?\.visualizar_atestados === true/);
   assert.match(armamentos, /modules\?\.armamentos===true&&authz\?\.actions\?\.visualizar_armamentos===true/);
   assert.match(medalhas, /modules\?\.medalhas===true&&authz\?\.actions\?\.visualizar_medalhas===true/);
-  assert.match(creditos, /modules\?\.ferias === true && authz\?\.actions\?\.visualizar_creditos_ferias === true/);
+  assert.match(creditos, /modules\?\.ferias === true && acoesCredito\.some/);
   assert.match(gratificacoes, /modules\?\.gratificacoes_funcao === true && authz\?\.actions\?\.visualizar_gratificacoes_funcao === true/);
   assert.match(cotasGratificacoes, /modules\?\.gratificacoes_funcao === true && authz\?\.actions\?\.visualizar_gratificacoes_funcao === true/);
+});
+
+test('créditos separam leitura funcional própria de DTO mínimo usado pela tela de Férias', () => {
+  for (const action of [
+    'visualizar_creditos_ferias', 'criar_credito_extra_ferias', 'editar_credito_extra_ferias',
+    'vincular_credito_extra_ferias', 'remover_vinculo_credito_extra_ferias',
+    'cancelar_credito_extra_ferias', 'excluir_credito_extra_ferias',
+  ]) {
+    assert.match(creditos, new RegExp(`'${action}'`));
+  }
+  assert.match(creditos, /supportModeFerias[\s\S]*visualizar_ferias === true/);
+  const supportFields = extractArray(creditos, 'CAMPOS_CREDITO_SUPORTE_FERIAS');
+  assert.match(supportFields, /'quantidade_dias'/);
+  assert.match(supportFields, /'tipo_credito'/);
+  assert.doesNotMatch(supportFields, /'observacoes'/);
 });
 
 test('bundle de períodos exige capacidade funcional de Férias mesmo quando usado como dataset de apoio', () => {
