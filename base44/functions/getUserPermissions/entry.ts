@@ -510,6 +510,14 @@ Deno.serve(async (req) => {
                 role: authUser.role,
             };
 
+        const profileMatrixDiagnostics = (perfis || []).map(diagnosticarMatrizPerfil);
+        const profileMatrixWarnings = profileMatrixDiagnostics.filter((item) =>
+            !item.isCurrentVersion || item.legacyKeys.length > 0 || item.unknownKeys.length > 0
+        );
+        if (profileMatrixWarnings.length > 0) {
+            console.warn('[getUserPermissions] perfis com matriz legada/desconhecida', profileMatrixWarnings);
+        }
+
         return Response.json({
             authUserEmail: authUser.email,
             effectiveUserEmail: isImpersonating ? targetEmail : authUser.email,
@@ -535,6 +543,9 @@ Deno.serve(async (req) => {
                 impersonationRequested: wantsImpersonation,
                 authIsAdmin,
                 authHasGlobalScope,
+                profileMatrixVersion: PROFILE_MATRIX_VERSION,
+                profileMatrixDiagnostics,
+                profileMatrixWarnings,
             },
         });
     } catch (error) {
