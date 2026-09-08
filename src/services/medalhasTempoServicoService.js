@@ -642,6 +642,25 @@ export async function resolverOuGarantirTipoMedalha(base44Client, codigoOuNome, 
   return tipo || null;
 }
 
+async function persistirMedalhaEscopada(base44Client, operation, registroId, data) {
+  if (typeof base44Client?.functions?.invoke === 'function') {
+    const payload = {
+      entityName: 'Medalha',
+      operation,
+      data: data || {},
+    };
+    if (registroId) payload.registroId = String(registroId);
+    const response = await base44Client.functions.invoke('cudEscopado', payload);
+    const resultado = response?.data ?? response ?? {};
+    if (resultado?.error) throw new Error(resultado.error);
+    return resultado?.data ?? resultado;
+  }
+
+  // Fallback exclusivo para clientes simulados em testes unitários.
+  if (operation === 'update') return base44Client.entities.Medalha.update(registroId, data);
+  return base44Client.entities.Medalha.create(data);
+}
+
 export async function indicarMedalhaPorCodigo(base44Client, {
   militar,
   codigoMedalha,
@@ -663,12 +682,13 @@ export async function indicarMedalhaPorCodigo(base44Client, {
   }
 
   if (registroExistente?.id && normalizarStatusMedalha(registroExistente.status) !== 'CONCEDIDA') {
-    return base44Client.entities.Medalha.update(registroExistente.id, {
+    return persistirMedalhaEscopada(base44Client, 'update', registroExistente.id, {
       status: 'INDICADA',
       data_indicacao: dataIndicacao,
       tipo_medalha_id: tipoMedalha.id,
       tipo_medalha_codigo: tipoMedalha.codigo || codigoResolvido,
       tipo_medalha_nome: tipoMedalha.nome,
+      origem_registro: origemRegistro,
       ...camposExtras,
     });
   }
@@ -679,7 +699,7 @@ export async function indicarMedalhaPorCodigo(base44Client, {
     tipoMedalha,
   });
 
-  return base44Client.entities.Medalha.create({
+  return persistirMedalhaEscopada(base44Client, 'create', null, {
     ...payload,
     origem_registro: origemRegistro,
     observacoes,
