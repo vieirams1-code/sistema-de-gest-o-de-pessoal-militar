@@ -381,7 +381,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_editar_campanhas_ferias', ...legadoCampanhas];
 
   if (acao === 'PORTAL_CONFIG_GET' || acao === 'PORTAL_CONFIG_SAVE') return ['perm_configurar_portal'];
-  if (acao === 'CADASTRO_SOLICITACOES_LISTAR') return ['perm_visualizar_solicitacoes_cadastrais', ...legadoRespostas];
+  if (acao === 'CADASTRO_SOLICITACOES_LISTAR') return ['perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais', ...legadoRespostas];
   if (acao === 'CADASTRO_DECIDIR_SOLICITACAO' || acao === 'CADASTRO_DECIDIR_LOTE_MILITAR') {
     return ['perm_decidir_solicitacoes_cadastrais', ...legadoRespostas];
   }
