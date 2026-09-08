@@ -1,0 +1,132 @@
+{
+  "name": "AuditoriaPermissoesMapa",
+  "type": "object",
+  "properties": {
+    "execucao_id": {
+      "type": "string"
+    },
+    "modulo": {
+      "type": "string"
+    },
+    "submodulo": {
+      "type": "string"
+    },
+    "permissao_chave": {
+      "type": "string"
+    },
+    "permissao_label": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "MODULO",
+        "ACAO",
+        "ESCOPO",
+        "REGRA_CONTEXTO"
+      ]
+    },
+    "origem_definicao": {
+      "type": "string"
+    },
+    "menus": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rotas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "paginas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "componentes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "funcoes_backend": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entidades": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependencias_declaradas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependencias_encontradas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status_consistencia": {
+      "type": "string",
+      "enum": [
+        "NAO_AUDITADA",
+        "CONSISTENTE",
+        "INCONSISTENTE",
+        "DEPENDENCIA_JUSTIFICADA",
+        "PERMISSAO_MORTA",
+        "SEM_ENFORCEMENT",
+        "ENFORCEMENT_PARCIAL"
+      ],
+      "default": "NAO_AUDITADA"
+    },
+    "regra_esperada": {
+      "type": "string"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "auditado_em": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "execucao_id",
+    "permissao_chave",
+    "tipo",
+    "status_consistencia"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "name": "AuditoriaPermissoesAchado",
+  "type": "object",
+  "properties": {
+    "execucao_id": {
+      "type": "string"
+    },
+    "codigo": {
+      "type": "string",
+      "description": "Identificador est\u00e1vel do achado, ex.: PERM-FER-001"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "categoria": {
+      "type": "string",
+      "enum": [
+        "MENU",
+        "ROTA",
+        "FRONTEND",
+        "BACKEND",
+        "ESCOPO",
+        "RLS",
+        "DEPENDENCIA_OCULTA",
+        "PERMISSAO_MORTA",
+        "NOMENCLATURA",
+        "SEGURANCA",
+        "DADOS_SENSIVEIS",
+        "UX",
+        "TESTE",
+        "ARQUITETURA",
+        "OUTRO"
+      ]
+    },
+    "modulo": {
+      "type": "string"
+    },
+    "submodulo": {
+      "type": "string"
+    },
+    "pagina": {
+      "type": "string"
+    },
+    "componente": {
+      "type": "string"
+    },
+    "funcao_backend": {
+      "type": "string"
+    },
+    "entidade": {
+      "type": "string"
+    },
+    "permissao_esperada": {
+      "type": "string"
+    },
+    "permissao_encontrada": {
+      "type": "string"
+    },
+    "dependencias": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "severidade": {
+      "type": "string",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "default": "P2"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "IDENTIFICADO",
+        "EM_VALIDACAO",
+        "VALIDADO",
+        "AGUARDANDO_CORRECAO",
+        "EM_CORRECAO",
+        "CORRIGIDO",
+        "EM_RETESTE",
+        "RETESTADO",
+        "NAO_PROCEDE",
+        "ACEITO_COMO_REGRA"
+      ],
+      "default": "IDENTIFICADO"
+    },
+    "impacto": {
+      "type": "string"
+    },
+    "evidencia": {
+      "type": "string"
+    },
+    "comportamento_atual": {
+      "type": "string"
+    },
+    "comportamento_esperado": {
+      "type": "string"
+    },
+    "causa_raiz": {
+      "type": "string"
+    },
+    "correcao_proposta": {
+      "type": "string"
+    },
+    "correcao_aplicada": {
+      "type": "string"
+    },
+    "arquivos_afetados": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "testes_requeridos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resultado_reteste": {
+      "type": "string"
+    },
+    "impacto_visual": {
+      "type": "boolean",
+      "default": false
+    },
+    "exige_aprovacao_usuario": {
+      "type": "boolean",
+      "default": false
+    },
+    "risco_regressao": {
+      "type": "string",
+      "enum": [
+        "BAIXO",
+        "MEDIO",
+        "ALTO",
+        "CRITICO"
+      ],
+      "default": "MEDIO"
+    },
+    "checkpoint_antes": {
+      "type": "string"
+    },
+    "checkpoint_depois": {
+      "type": "string"
+    },
+    "referencia_commit": {
+      "type": "string"
+    },
+    "identificado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "corrigido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "retestado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "execucao_id",
+    "codigo",
+    "titulo",
+    "categoria",
+    "severidade",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
