@@ -51,50 +51,10 @@ async function fetchWithRetry(queryFn: () => Promise<any>, label = 'query') {
   throw lastError;
 }
 
-function extrairMatrizPermissoes(descricao: unknown) {
-  if (typeof descricao !== 'string' || !descricao) return {};
-  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-  if (start === -1 || end === -1 || end <= start) return {};
-  try {
-    const parsed = JSON.parse(descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim());
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) { return {}; }
-}
-
-function consolidarActions(perfis: any[], acessos: any[]) {
-  const actions: Record<string, boolean> = {};
-  const aplicarFonte = (fonte: any) => {
-    if (!fonte) return;
-    Object.entries(fonte).forEach(([key, val]) => {
-      if (typeof val !== 'boolean' || !key.startsWith('perm_')) return;
-      const actionKey = key.replace(/^perm_/, '');
-      if (val === true) actions[actionKey] = true;
-      else if (!(actionKey in actions)) actions[actionKey] = false;
-    });
-  };
-  (perfis || []).forEach((perfil) => { aplicarFonte(perfil); aplicarFonte(extrairMatrizPermissoes(perfil?.descricao)); });
-  (acessos || []).forEach(aplicarFonte);
-  return actions;
-}
-
-async function resolverPermissoes(base44: ReturnType<typeof createClientFromRequest>, email: string) {
-  const emailNorm = normalizeEmail(email);
-  const acessos = await fetchWithRetry(
-    () => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: emailNorm, ativo: true }, undefined, LIMIT_USUARIO_ACESSO, 0, CAMPOS_USUARIO_ACESSO),
-    `UsuarioAcesso:${emailNorm}`,
-  );
-  const perfilIds = Array.from(new Set((acessos || []).map((acesso: any) => acesso?.perfil_id).filter(Boolean)));
-  let perfis: any[] = [];
-  if (perfilIds.length > 0) {
-    perfis = await fetchWithRetry(() => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }), `PerfilPermissao:${emailNorm}`);
-  }
-  return {
-    acessos: acessos || [],
-    perfis: perfis || [],
-    actions: consolidarActions(perfis || [], acessos || []),
-    isAdminByAccess: (acessos || []).some((a: any) => normalizeTipo(a?.tipo_acesso) === 'admin'),
-  };
+async function resolverAutorizacaoCanonica(base44: ReturnType<typeof createClientFromRequest>, effectiveEmail?: unknown) {
+  const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  return response?.data ?? response ?? {};
 }
 
 function normalizarPaginacao(payload: any = {}) {
@@ -273,26 +233,21 @@ Deno.serve(async (req) => {
     const { limit, offset } = normalizarPaginacao(payload);
     const filtros = normalizarFiltros(payload, warnings);
 
-    const authUserEmail = normalizeEmail(authUser.email);
-    const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
-    const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-    const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
-    if (wantsImpersonation && !authIsAdmin) {
-      return Response.json({ error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' }, { status: 403 });
-    }
-
-    const isImpersonating = wantsImpersonation && authIsAdmin;
-    const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
-    const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
-    const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
-    if (!targetIsAdmin && !(targetPerms.acessos || []).length) {
+    const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
+    if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
+    const effectiveEmailNorm = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
+    const isImpersonating = authz?.isImpersonating === true;
+    const targetIsAdmin = authz?.isAdmin === true;
+    const targetHasGlobalScope = authz?.hasGlobalScope === true;
+    const targetAcessos = Array.isArray(authz?.acessos) ? authz.acessos : [];
+    if (!targetIsAdmin && !targetAcessos.length) {
       return Response.json({ error: 'Acesso negado: usuário sem acesso ativo.' }, { status: 403 });
     }
 
-    const escopo = targetIsAdmin
-      ? { isAdminScope: true, criteriosAplicados: new Set<string>(['admin']), militarIds: null, estruturaIds: null, hasOnlyProprio: false }
-      : await resolverEscopo(base44, targetPerms.acessos, warnings);
+    const escopo = targetHasGlobalScope
+      ? { isAdminScope: true, criteriosAplicados: new Set<string>(['global']), militarIds: null, estruturaIds: null, hasOnlyProprio: false }
+      : await resolverEscopo(base44, targetAcessos, warnings);
 
     const tiposRaw = await listarTodos(base44, 'TipoGratificacaoFuncao', 'nome', CAMPOS_TIPO, 2000);
     if (escopo.hasOnlyProprio) {
@@ -301,7 +256,7 @@ Deno.serve(async (req) => {
         cotas: [],
         totais: { autorizadas: 0, ocupadas: 0, disponiveis: 0, excedentes: 0 },
         tipos: (tiposRaw || []).map(sanitizerTipo),
-        meta: { isAdmin: targetIsAdmin, modoAcesso: modoAcesso(escopo.criteriosAplicados), scopedFunction: true, readOnly: true, userEmail: authUserEmail || null, effectiveEmail: isImpersonating ? effectiveEmailNorm : null, warnings, limit, offset, hasNext: false, returned: 0 },
+        meta: { isAdmin: targetIsAdmin, hasGlobalScope: targetHasGlobalScope, modoAcesso: modoAcesso(escopo.criteriosAplicados), scopedFunction: true, readOnly: true, userEmail: authUserEmail || null, effectiveEmail: isImpersonating ? effectiveEmailNorm : null, warnings, limit, offset, hasNext: false, returned: 0 },
       });
     }
 
