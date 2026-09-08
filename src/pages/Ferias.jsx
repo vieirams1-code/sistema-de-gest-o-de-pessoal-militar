@@ -517,6 +517,10 @@ export default function Ferias() {
   const canInterromperFerias = canAccessAction('interromper_ferias');
   const canContinuarFerias = canAccessAction('continuar_ferias');
   const canLancarRetornoFerias = canAccessAction('lancar_retorno_ferias');
+  const canExcluirFerias = canAccessAction('excluir_ferias');
+  const canGerirCadeiaFerias = canAccessAction('gerir_cadeia_ferias');
+  const canRecalcularFerias = canAccessAction('recalcular_ferias');
+  const canUsarConfirmacaoAdministrativaFerias = canExcluirFerias || canGerirCadeiaFerias || canRecalcularFerias;
 
   const {
     data: feriasData,
@@ -971,8 +975,8 @@ export default function Ferias() {
   }, [editDataModal]);
 
   const handleDelete = async (f) => {
-    if (!canAccessAction('excluir_ferias') || !canAccessAction('admin_mode') || !modoAdmin) {
-      alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
+    if (!canExcluirFerias || !modoAdmin) {
+      alert('Ação restrita. Exige permissão de exclusão e confirmação administrativa ativa.');
       return;
     }
     const escopo = validarEscopoMilitar(f?.militar_id);
@@ -1007,8 +1011,8 @@ export default function Ferias() {
 
   const confirmDelete = () => {
     if (!feriasToDelete) return;
-    if (!canAccessAction('excluir_ferias') || !canAccessAction('admin_mode') || !modoAdmin) {
-      alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
+    if (!canExcluirFerias || !modoAdmin) {
+      alert('Ação restrita. Exige permissão de exclusão e confirmação administrativa ativa.');
       return;
     }
     const escopo = validarEscopoMilitar(feriasToDelete?.militar_id);
@@ -1168,17 +1172,17 @@ export default function Ferias() {
           </div>
 
           <div className="flex gap-2">
-            {canAccessAction('admin_mode') && (
+            {canUsarConfirmacaoAdministrativaFerias && (
               <Button
                 variant={modoAdmin ? 'default' : 'outline'}
                 onClick={() => setModoAdmin((v) => !v)}
                 className={modoAdmin
                   ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
                   : 'border-red-300 text-red-600 hover:bg-red-50'}
-                title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
+                title={modoAdmin ? 'Desativar confirmação administrativa' : 'Ativar confirmação para ações sensíveis de Férias'}
               >
                 <ShieldAlert className="w-4 h-4 mr-2" />
-                {modoAdmin ? 'Admin Ativo' : 'Modo Admin'}
+                {modoAdmin ? 'Confirmação Ativa' : 'Ações Sensíveis'}
               </Button>
             )}
 
@@ -1821,11 +1825,11 @@ export default function Ferias() {
                                           }
                                           const escopo = validarEscopoMilitar(f?.militar_id);
                                           const semEscopo = !escopo.permitido;
-                                          const disabled = !modoAdmin || !canAccessAction('admin_mode') || semEscopo;
-                                          const title = !canAccessAction('admin_mode')
-                                            ? 'Ação negada: sem permissão para usar o modo admin.'
+                                          const disabled = !canExcluirFerias || !modoAdmin || semEscopo;
+                                          const title = !canExcluirFerias
+                                            ? 'Ação negada: sem permissão para excluir férias.'
                                             : (!modoAdmin
-                                              ? 'Ative o modo admin para usar esta função.'
+                                              ? 'Ative a confirmação administrativa para usar esta função.'
                                               : (semEscopo ? escopo.motivo : ''));
                                           return (
                                             <DropdownMenuItem
