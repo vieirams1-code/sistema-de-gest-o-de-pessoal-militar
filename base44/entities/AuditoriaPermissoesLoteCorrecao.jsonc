@@ -1,0 +1,125 @@
+{
+  "name": "AuditoriaPermissoesLoteCorrecao",
+  "type": "object",
+  "title": "Lote de Corre\u00e7\u00e3o da Auditoria de Permiss\u00f5es",
+  "description": "Plano ordenado de corre\u00e7\u00f5es derivado da auditoria de permiss\u00f5es, com depend\u00eancias, impacto e crit\u00e9rios de aceite.",
+  "properties": {
+    "execucao_id": {
+      "type": "string"
+    },
+    "ordem": {
+      "type": "number"
+    },
+    "codigo": {
+      "type": "string"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PLANEJADO",
+        "AGUARDANDO_APROVACAO",
+        "EM_EXECUCAO",
+        "CONCLUIDO",
+        "BLOQUEADO",
+        "CANCELADO"
+      ],
+      "default": "PLANEJADO"
+    },
+    "objetivo": {
+      "type": "string"
+    },
+    "achados_codigos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependencias_lotes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prioridade": {
+      "type": "string",
+      "enum": [
+        "CRITICA",
+        "ALTA",
+        "MEDIA",
+        "BAIXA"
+      ],
+      "default": "ALTA"
+    },
+    "impacto_visual": {
+      "type": "boolean",
+      "default": false
+    },
+    "exige_aprovacao_usuario": {
+      "type": "boolean",
+      "default": false
+    },
+    "estrategia": {
+      "type": "string"
+    },
+    "criterios_aceite": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "testes_obrigatorios": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risco_principal": {
+      "type": "string"
+    },
+    "rollback": {
+      "type": "string"
+    },
+    "checkpoint_antes": {
+      "type": "string"
+    },
+    "checkpoint_depois": {
+      "type": "string"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "execucao_id",
+    "ordem",
+    "codigo",
+    "titulo",
+    "status",
+    "prioridade"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
