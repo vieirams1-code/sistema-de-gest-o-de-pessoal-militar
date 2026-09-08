@@ -21,6 +21,7 @@ export async function fetchScopedFeriasBundle(payload = {}) {
     ferias: Array.isArray(body?.ferias) ? body.ferias : [],
     registrosLivro: Array.isArray(body?.registrosLivro) ? body.registrosLivro : [],
     ajustesSaldoFerias: Array.isArray(body?.ajustesSaldoFerias) ? body.ajustesSaldoFerias : [],
+    descontosFerias: Array.isArray(body?.descontosFerias) ? body.descontosFerias : [],
     feriasTags: Array.isArray(body?.feriasTags) ? body.feriasTags : undefined,
     tagsCatalogo: Array.isArray(body?.tagsCatalogo) ? body.tagsCatalogo : undefined,
     partialFailures: Number(body?.meta?.partialFailures || 0),
