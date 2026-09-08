@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Ban, CalendarDays, MinusCircle, PlusCircle, RefreshCw } from 'lucide-react';
-import { AjusteSaldoFerias } from '@/api/entities';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -133,10 +132,15 @@ export default function AjustesSaldoFerias() {
 
   const enabled = isAccessResolved && !loadingUser && canVisualizar;
   const bundleKey = ['ajustes-saldo-ferias-bundle', modoAcesso || null, user?.email || null, effectiveEmail || null];
-  const ajustesKey = ['ajustes-saldo-ferias-list', modoAcesso || null, user?.email || null, effectiveEmail || null];
+  const ajustesKey = bundleKey;
 
-  const { data: bundle = {}, isLoading: loadingBundle } = useQuery({ queryKey: bundleKey, queryFn: () => fetchScopedPeriodosAquisitivosBundle(), enabled });
-  const { data: ajustes = [], isLoading: loadingAjustes } = useQuery({ queryKey: ajustesKey, queryFn: () => AjusteSaldoFerias.list('-created_date'), enabled });
+  const { data: bundle = {}, isLoading: loadingBundle } = useQuery({
+    queryKey: bundleKey,
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle({ includeAjustesDetalhados: true }),
+    enabled,
+  });
+  const ajustes = bundle?.ajustesSaldoFerias || [];
+  const loadingAjustes = loadingBundle;
 
   const militares = bundle?.militares || [];
   const periodos = bundle?.periodosAquisitivos || [];
