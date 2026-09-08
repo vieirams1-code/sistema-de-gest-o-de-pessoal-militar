@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +24,9 @@ import { ptBR } from 'date-fns/locale';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
-import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
+import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
+import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
 
 const statusColors = {
@@ -78,31 +79,31 @@ export default function VerAtestado() {
   const id = searchParams.get('id');
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { podeAgirSobre, isReady: isScopeReady } = useUsuarioPodeAgirSobreMilitar();
-  const hasAtestadosAccess = canAccessModule('atestados');
+  const hasAtestadosAccess = canAccessModule('atestados') && canAccessAction('visualizar_atestados');
   const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const canEditar = canAccessAction('editar_atestados');
 
-  const { data: atestado, isLoading } = useQuery({
-    queryKey: ['atestado', id],
-    queryFn: async () => {
-      const list = await base44.entities.Atestado.filter({ id });
-      return list[0] || null;
-    },
-    enabled: !!id
+  const { data: atestadosBundle = { atestados: [] }, isLoading } = useQuery({
+    queryKey: ['atestado-seguro', id, canViewSensitive],
+    queryFn: () => fetchScopedAtestadosBundle(),
+    enabled: !!id && isAccessResolved && hasAtestadosAccess,
   });
+  const atestado = React.useMemo(
+    () => (atestadosBundle?.atestados || []).find((item) => String(item?.id || '') === String(id)) || null,
+    [atestadosBundle, id]
+  );
 
-
-  const { data: militarAtestado = null } = useQuery({
+  const { data: militarAtestadoData = { militares: [], matriculasMilitar: [] } } = useQuery({
     queryKey: ['militar-atestado', atestado?.militar_id],
-    queryFn: async () => {
-      if (!atestado?.militar_id) return null;
-      const rows = await base44.entities.Militar.filter({ id: atestado.militar_id });
-      if (!rows?.length) return null;
-      const [enriquecido] = await carregarMilitaresComMatriculas([rows[0]]);
-      return enriquecido || rows[0];
-    },
-    enabled: !!atestado?.militar_id,
+    queryFn: () => fetchScopedMilitares({ militarIds: [atestado.militar_id], limit: 1, includeMatriculas: true }),
+    enabled: !!atestado?.militar_id && isAccessResolved && hasAtestadosAccess,
   });
+  const militarAtestado = React.useMemo(() => {
+    const militar = militarAtestadoData?.militares?.[0] || null;
+    if (!militar) return null;
+    const indice = montarIndiceMatriculas(militarAtestadoData?.matriculasMilitar || []);
+    return enriquecerMilitarComMatriculas(militar, indice);
+  }, [militarAtestadoData]);
 
   const atestadoView = React.useMemo(
     () => aplicarContextoMilitarNoAtestado(atestado || {}, militarAtestado, { contexto: 'documental' }),
