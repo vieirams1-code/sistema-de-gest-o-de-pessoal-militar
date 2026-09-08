@@ -16,6 +16,9 @@ const tagsGateway = read('../../../../base44/functions/cudFuncoesTagsEscopado/en
 const estruturaPage = read('../../../pages/EstruturaOrganizacional.jsx');
 const migracaoPage = read('../../../pages/MigracaoMilitares.jsx');
 const comportamentoPage = read('../../../pages/AvaliacaoComportamento.jsx');
+const perfisPage = read('../../../pages/PerfisPermissao.jsx');
+const permissionMatrixService = read('../../../services/permissionMatrixService.js');
+const getUserPermissions = read('../../../../base44/functions/getUserPermissions/entry.ts');
 
 test('RequireModuleAccess exige AND entre módulo e ação quando ambos existem', () => {
   assert.match(requireModuleAccess, /const hasModuleAccess = normalizedModuleKeys\.length === 0/);
@@ -83,4 +86,13 @@ test('Migração e Comportamento aceitam visualização sem ação mutável esco
 test('Antiguidade prévia mantém natureza administrativa refletida no menu', () => {
   assert.match(app, /'AntiguidadePrevia'/);
   assert.match(layout, /name: 'Antiguidade',[\s\S]*?page: 'AntiguidadePrevia',[\s\S]*?adminOnly: true/);
+});
+
+test('novas permissões persistem pela matriz serializada do perfil e são lidas no backend', () => {
+  assert.match(perfisPage, /permissionStructure, modulosList, acoesSensiveis/);
+  assert.match(perfisPage, /mergeProfileDescriptionWithMatrix\(formData\.descricao, normalizedPermissions\)/);
+  assert.match(permissionMatrixService, /canonicalPermissionKeys = \[\.\.\.modulePermissionKeys, \.\.\.actionPermissionKeys\]/);
+  assert.match(permissionMatrixService, /PROFILE_MATRIX_START_MARKER = '\[SGP_PERMISSIONS_MATRIX\]'/);
+  assert.match(getUserPermissions, /\[SGP_PERMISSIONS_MATRIX\]/);
+  assert.match(getUserPermissions, /function consolidarModulesActions\(perfis\)/);
 });
