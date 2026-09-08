@@ -41,6 +41,7 @@ export default function MigracaoMilitares() {
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
   const [salvandoCorrecao, setSalvandoCorrecao] = useState(false);
   const [modo, setModo] = useState(MODO_IMPORTAR);
+  const podeVisualizar = canAccessAction('visualizar_importacao_militares');
   const podeImportar = canAccessAction('importar_militares');
   const podeConferir = canAccessAction('conferir_base_militares');
 
@@ -238,7 +239,7 @@ export default function MigracaoMilitares() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!canAccessModule('migracao_militares') || (!podeImportar && !podeConferir)) return <AccessDenied modulo="Migração de Militares" />;
+  if (!canAccessModule('migracao_militares') || !podeVisualizar) return <AccessDenied modulo="Migração de Militares" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -253,7 +254,7 @@ export default function MigracaoMilitares() {
           </div>
         </div>
 
-        {!analise && !resultadoImportacao && (
+        {!analise && !resultadoImportacao && (podeImportar || podeConferir) && (
           <>
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <p className="text-sm font-semibold text-slate-700 mb-2">Ação</p>
@@ -279,6 +280,12 @@ export default function MigracaoMilitares() {
               loading={carregando}
             />
           </>
+        )}
+
+        {!analise && !resultadoImportacao && !podeImportar && !podeConferir && (
+          <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-600">
+            Você possui acesso de visualização ao módulo. As ações de importar e conferir base dependem das permissões específicas correspondentes.
+          </div>
         )}
 
         {analise && !resultadoImportacao && (
