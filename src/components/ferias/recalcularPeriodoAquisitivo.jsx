@@ -1,4 +1,4 @@
-import { base44 } from '@/api/base44Client';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { calcularSaldoOperacionalPeriodoComTodosAjustes } from '@/services/saldoFeriasOperacionalService';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
@@ -72,35 +72,35 @@ export function montarPayloadRecalculoPeriodo(periodo = {}, ferias = [], ajustes
   };
 }
 
-async function carregarPeriodosRelacionados({ periodoId, periodoRef, militarId }) {
+function carregarPeriodosRelacionados({ periodoId, periodoRef, militarId, periodosAquisitivos = [] }) {
   if (periodoId) {
-    const periodos = await withRateLimitRetry(() => base44.entities.PeriodoAquisitivo.filter({ id: periodoId }));
-    return periodos.filter(Boolean);
+    return periodosAquisitivos.filter((periodo) => String(periodo?.id || '') === String(periodoId));
   }
 
   if (periodoRef && militarId) {
-    const periodos = await withRateLimitRetry(() => base44.entities.PeriodoAquisitivo.filter({
-      militar_id: militarId,
-      ano_referencia: periodoRef,
-    }));
-    return periodos.filter(Boolean);
+    return periodosAquisitivos.filter((periodo) =>
+      String(periodo?.militar_id || '') === String(militarId)
+      && String(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref || '') === String(periodoRef)
+    );
   }
 
   return [];
 }
 
 export async function recalcularPeriodoAquisitivoVinculado({ periodoId = null, periodoRef = null, militarId = null }) {
-  const periodos = await carregarPeriodosRelacionados({ periodoId, periodoRef, militarId });
+  const bundle = await withRateLimitRetry(() => fetchScopedPeriodosAquisitivosBundle());
+  const periodos = carregarPeriodosRelacionados({
+    periodoId,
+    periodoRef,
+    militarId,
+    periodosAquisitivos: bundle?.periodosAquisitivos || [],
+  });
 
   if (!periodos.length) return [];
 
   const militarAlvo = militarId || periodos[0]?.militar_id;
-  const todasFerias = militarAlvo
-    ? await withRateLimitRetry(() => base44.entities.Ferias.filter({ militar_id: militarAlvo }))
-    : await withRateLimitRetry(() => base44.entities.Ferias.list());
-  const ajustesSaldoFerias = militarAlvo
-    ? await withRateLimitRetry(() => base44.entities.AjusteSaldoFerias.filter({ militar_id: militarAlvo }))
-    : await withRateLimitRetry(() => base44.entities.AjusteSaldoFerias.list());
+  const todasFerias = (bundle?.ferias || []).filter((item) => !militarAlvo || String(item?.militar_id || '') === String(militarAlvo));
+  const ajustesSaldoFerias = (bundle?.ajustesSaldoFerias || []).filter((item) => !militarAlvo || String(item?.militar_id || '') === String(militarAlvo));
 
   const atualizacoes = [];
 
