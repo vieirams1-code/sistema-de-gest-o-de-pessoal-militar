@@ -33,21 +33,12 @@ function permissoesDaDescricao(descricao: unknown): Record<string, unknown> {
 }
 
 function permissoesNecessariasPlano(acao: string): string[] {
-  const legado = ['perm_gerir_campanhas', 'perm_gerir_respostas'];
-  if (acao === 'LISTAR' || acao === 'DETALHES') {
-    return [
-      'perm_visualizar_planos_ferias',
-      'perm_visualizar_campanhas_ferias',
-      'perm_criar_planos_ferias',
-      'perm_editar_planos_ferias',
-      'perm_excluir_planos_ferias',
-      'perm_admin_campanhas_ferias',
-      ...legado,
-    ];
-  }
-  if (acao === 'CRIAR') return ['perm_criar_planos_ferias', 'perm_admin_campanhas_ferias', ...legado];
-  if (acao === 'ATUALIZAR' || acao === 'ARQUIVAR') return ['perm_editar_planos_ferias', 'perm_admin_campanhas_ferias', ...legado];
-  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias', ...legado];
+  // Compatibilidade transitória somente até a migração de perfis da F8-L08.
+  const legadoCampanhas = ['perm_gerir_campanhas'];
+  if (acao === 'LISTAR' || acao === 'DETALHES') return ['perm_visualizar_planos_ferias', ...legadoCampanhas];
+  if (acao === 'CRIAR') return ['perm_criar_planos_ferias', ...legadoCampanhas];
+  if (acao === 'ATUALIZAR' || acao === 'ARQUIVAR') return ['perm_editar_planos_ferias', ...legadoCampanhas];
+  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias', ...legadoCampanhas];
   return [];
 }
 
