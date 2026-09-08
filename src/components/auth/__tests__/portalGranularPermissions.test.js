@@ -11,6 +11,9 @@ const centralRespostas = read('../../../pages/CentralRespostasCampanhas.jsx');
 const gerirCampanhas = read('../../../pages/GerirCampanhasPortal.jsx');
 const solicitacoes = read('../../../pages/SolicitacoesAtualizacao.jsx');
 const configuracoes = read('../../../pages/ConfiguracoesPortal.jsx');
+const paginaPlanos = read('../../../pages/PlanosFerias.jsx');
+const painelFerias = read('../../../pages/PainelPlanoFerias.jsx');
+const layout = read('../../../Layout.jsx');
 const app = read('../../../App.jsx');
 const exporter = read('../../../utils/portalCampanhasExport.js');
 
@@ -50,6 +53,9 @@ test('planos de férias exigem ações específicas por operação', () => {
   assert.match(planosFerias, /acao === 'CRIAR'.*perm_criar_planos_ferias/s);
   assert.match(planosFerias, /ATUALIZAR' \|\| acao === 'ARQUIVAR'.*perm_editar_planos_ferias/s);
   assert.match(planosFerias, /acao === 'EXCLUIR'.*perm_excluir_planos_ferias/s);
+  assert.match(portalServicos, /PLANO_CAMPANHA_CRIAR'\) return \['perm_criar_campanhas_ferias'/);
+  assert.match(portalServicos, /PLANO_CAMPANHA_EXCLUIR'\) return \['perm_excluir_campanhas_ferias'/);
+  assert.match(portalServicos, /PLANO_CAMPANHA_ARQUIVAR'.*perm_editar_campanhas_ferias/s);
 });
 
 test('Central de Respostas busca datasets separados conforme a capacidade', () => {
@@ -87,6 +93,32 @@ test('Configurações do Portal não têm fallback direto e Mesa RH respeita per
   assert.match(configuracoes, /CADASTRO_SOLICITACOES_LISTAR/);
   assert.match(configuracoes, /canViewSolicitacoes/);
   assert.match(configuracoes, /canDecidirSolicitacoes/);
+});
+
+test('PlanosFerias aplica permissões próprias e não depende de leitura direta de efetivo', () => {
+  for (const action of [
+    'visualizar_planos_ferias', 'criar_planos_ferias', 'editar_planos_ferias', 'excluir_planos_ferias',
+    'criar_campanhas_ferias', 'excluir_campanhas_ferias', 'visualizar_respostas_ferias',
+    'gerar_ferias_campanhas', 'atribuir_permissoes_ferias', 'admin_campanhas_ferias',
+  ]) assert.match(paginaPlanos, new RegExp(action));
+  assert.doesNotMatch(paginaPlanos, /base44\.entities\.(Militar|GrupoEfetivo)/);
+  assert.match(paginaPlanos, /PLANO_CAMPANHA_CRIAR/);
+  assert.match(paginaPlanos, /PLANO_CAMPANHA_EXCLUIR/);
+});
+
+test('Painel de Férias não herda admin_mode e exige aprovação para Não Contemplado', () => {
+  assert.doesNotMatch(painelFerias, /canAccessAction\('perm_admin_mode'\)/);
+  assert.match(painelFerias, /if \(!podeAprovarFerias \|\| !modalNaoContemplado\.opcao\) return/);
+  assert.match(painelFerias, /modalNaoContemplado\.open && podeAprovarFerias/);
+  assert.doesNotMatch(painelFerias, /base44\.entities\.(Militar|User)\.(list|filter)/);
+  assert.match(painelFerias, /PLANO_CAMPANHA_(DESATIVAR|ARQUIVAR|EXCLUIR)/);
+});
+
+test('menu e rota de Campanhas mantêm os mesmos aliases legados durante a migração', () => {
+  assert.match(layout, /GerirCampanhasPortal[\s\S]*perm_gerir_campanhas/);
+  assert.match(app, /GerirCampanhasPortal:[\s\S]*'gerir_campanhas'/);
+  assert.match(layout, /PainelPlanoFerias[\s\S]*perm_atribuir_permissoes_ferias[\s\S]*perm_gerir_respostas/);
+  assert.match(app, /PainelPlanoFerias:[\s\S]*'atribuir_permissoes_ferias'[\s\S]*'gerir_respostas'/);
 });
 
 test('exportação de respostas não inclui URL de anexos', () => {
