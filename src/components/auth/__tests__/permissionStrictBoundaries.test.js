@@ -168,9 +168,10 @@ test('solicitações cadastrais não possuem fallback de escrita direta no front
   assert.match(configuracoesPortal, /O backend não confirmou a gravação das configurações do Portal/);
 });
 
-test('portal_servicos separa escopo global de privilégio e valida escopo nas decisões cadastrais', () => {
-  assert.doesNotMatch(portalServicos, /normalizarTipoAcesso\(a\?\.tipo_acesso\) === 'admin'\)\) return true;\s*\n\s*const perfilIds/);
-  assert.match(portalServicos, /Apenas role=admin da plataforma possui bypass/);
+test('portal_servicos delega privilégio funcional ao resolvedor canônico e valida escopo nas decisões cadastrais', () => {
+  assert.match(portalServicos, /base44\.functions\.invoke\('getUserPermissions', \{\}\)/);
+  assert.match(portalServicos, /authz\?\.actions\?\.\[key\.replace\(\/\^perm_\/, ''\)\] === true/);
+  assert.doesNotMatch(portalServicos, /const perfilIds = Array\.from\(new Set\(\(acessos \|\| \[\]\).*autorizarAcaoAdminPortal/s);
   assert.match(portalServicos, /usuarioPodeAgirSobreMilitarPortal\(base44, user, String\(sol\.militar_id \|\| ''\)\)/);
   assert.match(portalServicos, /usuarioPodeAgirSobreMilitarPortal\(base44, user, String\(militar_id\)\)/);
 });
