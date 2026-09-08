@@ -284,5 +284,11 @@
     "titulo",
     "etapa_fluxo",
     "prioridade"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
