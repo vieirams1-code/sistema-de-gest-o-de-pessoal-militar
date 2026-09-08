@@ -1843,7 +1843,7 @@ export default function Ferias() {
                                               ) : (
                                                 <Lock className="w-4 h-4 mr-2" />
                                               )}
-                                              <span>{modoAdmin ? 'Excluir Férias' : 'Excluir (modo admin)'}</span>
+                                              <span>{modoAdmin ? 'Excluir Férias' : 'Excluir (ativar confirmação)'}</span>
                                             </DropdownMenuItem>
                                           );
                                         })()}
