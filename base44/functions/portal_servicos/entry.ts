@@ -75,7 +75,7 @@ async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Prom
 }
 
 function matchMilitarCampanha(campanha: any, militar: any, membrosPorGrupo: Map<string, Set<string>> = new Map()): boolean {
-  const baseEscopo = campanha.tipo_escopo === 'TODOS' || !campanha.tipo_escopo ||
+  const baseEscopo = campanha.tipo_escopo === 'TODOS' || campanha.tipo_escopo === 'SEM_ESCOPO' || !campanha.tipo_escopo ||
     (campanha.tipo_escopo === 'UNIDADES' && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
     (campanha.tipo_escopo === 'QUADROS' && (campanha.escopo_quadros || []).includes(militar.quadro)) ||
     (campanha.tipo_escopo === 'SELECAO_MILITARES' && (campanha.escopo_militares_ids || []).includes(militar.id));
@@ -1029,7 +1029,9 @@ Deno.serve(async (req: Request) => {
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
-          if (acao === 'CAMPANHA_CRIAR' && cp.tipo === 'PLANO_FERIAS') {
+          // A rota geral nunca pode criar férias. A rota do módulo de Planos é a única
+          // origem autorizada para esse tipo, evitando o bloqueio indevido dentro do próprio módulo.
+          if (cp.tipo === 'PLANO_FERIAS' && acao !== 'PLANO_CAMPANHA_CRIAR') {
             return new Response(JSON.stringify({ error: 'Campanhas de férias devem ser criadas pelo módulo específico de Planos de Férias.' }), {
               status: 403,
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -1070,6 +1072,28 @@ Deno.serve(async (req: Request) => {
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
+
+            const tipoEscopo = String(cp.tipo_escopo || 'TODOS');
+            const gruposIds = Array.isArray(cp.escopo_grupos_ids) ? cp.escopo_grupos_ids.filter(Boolean) : [];
+            const unidadesIds = Array.isArray(cp.escopo_unidades_ids) ? cp.escopo_unidades_ids.filter(Boolean) : [];
+            if (tipoEscopo === 'SEM_ESCOPO' && gruposIds.length === 0) {
+              return new Response(JSON.stringify({ error: 'Selecione ao menos um grupo de militares quando o escopo de lotação estiver vazio.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (tipoEscopo === 'SEM_ESCOPO' && unidadesIds.length > 0) {
+              return new Response(JSON.stringify({ error: 'O modo somente grupos não pode conter unidades no escopo de lotação.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (tipoEscopo === 'UNIDADES' && unidadesIds.length === 0) {
+              return new Response(JSON.stringify({ error: 'Selecione ao menos uma unidade para o escopo da campanha.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
           }
 
           // Busca militares para calcular o total do público-alvo
@@ -1095,7 +1119,7 @@ Deno.serve(async (req: Request) => {
             status: cp.status || 'Aberta_Coleta',
             tipo_escopo: cp.tipo_escopo || 'TODOS',
             escopo_unidades_ids: cp.escopo_unidades_ids || [],
-            escopo_unidades_nomes: cp.escopo_unidades_nomes || 'Toda a Corporação',
+            escopo_unidades_nomes: cp.tipo_escopo === 'SEM_ESCOPO' ? '' : (cp.escopo_unidades_nomes || 'Toda a Corporação'),
             escopo_militares_ids: cp.escopo_militares_ids || [],
             escopo_militares_excluidos_ids: cp.escopo_militares_excluidos_ids || [],
             escopo_grupos_ids: cp.escopo_grupos_ids || [],
