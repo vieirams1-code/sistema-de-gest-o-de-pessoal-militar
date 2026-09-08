@@ -878,7 +878,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
                           )}
                         </div>
 
-                        {evento.texto_publicacao ? (
+                        {evento.tem_texto_publicacao ? (
                           <div className="mt-2 text-[11px] text-slate-500 italic">
                             Texto vinculado à publicação disponível.
                           </div>
