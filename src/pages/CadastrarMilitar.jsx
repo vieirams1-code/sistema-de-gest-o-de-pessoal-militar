@@ -847,6 +847,8 @@ export default function CadastrarMilitar() {
             </div>
           </FormSection>
 
+          {podeVerCamposSensiveisEdicao && (
+            <>
           {/* Dados Pessoais */}
           <FormSection title="Dados Pessoais" icon={User}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1026,6 +1028,8 @@ export default function CadastrarMilitar() {
               <FormField label="Etnia" name="etnia" value={formData.etnia} onChange={handleChange} type="select" options={['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'Não declarada']} />
             </div>
           </FormSection>
+            </>
+          )}
 
           {/* Habilidades */}
           <FormSection title="Habilidades e Cursos" icon={GraduationCap}>
