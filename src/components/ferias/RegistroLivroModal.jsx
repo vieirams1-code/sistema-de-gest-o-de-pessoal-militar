@@ -35,6 +35,7 @@ import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/co
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
 import { calcularSaldoOperacionalPeriodoComTodosAjustes, obterDiasBase } from '@/services/saldoFeriasOperacionalService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import {
   calcularTotaisGozoComCreditos,
@@ -384,7 +385,10 @@ export default function RegistroLivroModal({
     queryKey: ['ajustes-saldo-ferias-modal', feriasOperacional?.militar_id],
     queryFn: async () => {
       if (!feriasOperacional?.militar_id) return [];
-      return base44.entities.AjusteSaldoFerias.filter({ militar_id: feriasOperacional.militar_id }, '-created_date');
+      const bundle = await fetchScopedPeriodosAquisitivosBundle();
+      return (bundle?.ajustesSaldoFerias || []).filter(
+        (ajuste) => String(ajuste?.militar_id || '') === String(feriasOperacional.militar_id),
+      );
     },
     refetchOnMount: 'always',
     staleTime: 0,
