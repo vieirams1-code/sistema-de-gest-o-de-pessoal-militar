@@ -1352,7 +1352,7 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
-          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          await obterCampanhaGeralOuErro(base44, campanha_id);
           const planoIdEditado = '';
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
