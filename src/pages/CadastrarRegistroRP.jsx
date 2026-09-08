@@ -210,11 +210,14 @@ export default function CadastrarRegistroRP() {
     resolvedAccessContext,
   } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
-  const hasAccess = canAccessModule('rp');
-  // Permissões estritas: Modo Admin é apenas um estado operacional adicional,
-  // nunca uma permissão substituta para editar ou publicar.
-  const canGerirPublicacoes = canAccessAction('editar_publicacoes');
+  const hasAccess = canAccessModule('controle_publicacoes') || canAccessModule('rp');
+  const canAdicionarPublicacoes = canAccessAction('adicionar_publicacoes');
+  const canEditarPublicacoes = canAccessAction('editar_publicacoes');
+  const canApostilarPublicacao = canAccessAction('apostilar_publicacao');
+  const canTornarSemEfeitoPublicacao = canAccessAction('tornar_sem_efeito_publicacao');
   const canPublicarBg = canAccessAction('publicar_bg');
+  const canAcessarCriacao = canAdicionarPublicacoes || canApostilarPublicacao || canTornarSemEfeitoPublicacao;
+  const canAcessarFormulario = isEditing ? canEditarPublicacoes : canAcessarCriacao;
 
   const [step, setStep] = useState(1);
   const [tipoSearch, setTipoSearch] = useState('');
@@ -315,7 +318,7 @@ export default function CadastrarRegistroRP() {
     modoAcesso: modoAcesso || 'indefinido',
     effectiveEmail: resolvedAccessContext?.effectiveEmail || user?.email || 'self',
   }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, user?.email]);
-  const canRunScopedQueries = Boolean(isAccessResolved && hasAccess && canGerirPublicacoes);
+  const canRunScopedQueries = Boolean(isAccessResolved && hasAccess && canAcessarFormulario);
 
   // Fetch existing record when editing
   const {
