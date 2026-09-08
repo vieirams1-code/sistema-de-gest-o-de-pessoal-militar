@@ -37,8 +37,11 @@ async function invocarGetScopedCreditos(payload = {}) {
   return Array.isArray(body?.creditos) ? body.creditos : [];
 }
 
-export async function listarCreditosExtraFerias(orderBy = '-data_referencia') {
-  return invocarGetScopedCreditos({ orderBy });
+export async function listarCreditosExtraFerias(orderBy = '-data_referencia', options = {}) {
+  return invocarGetScopedCreditos({
+    orderBy,
+    ...(options?.supportMode ? { supportMode: options.supportMode } : {}),
+  });
 }
 
 export async function salvarCreditoExtraFerias({ form, militar }) {
