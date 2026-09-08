@@ -1,7 +1,8 @@
-import { base44 } from '@/api/base44Client';
 import {
   listarCaixasEscopado,
   listarProcessosEscopado,
+  listarTramitesProcessoEscopado,
+  listarEventosProcessoEscopado,
   criarCaixaEscopado,
   editarCaixaEscopado,
   criarProcessoEscopado,
@@ -17,12 +18,9 @@ import {
 // passam pela Deno Function `controleProcessosEscopado` (a escrita
 // direta pelo SDK é bloqueada por RLS admin-only nas entidades).
 //
-// Os reads de TramiteProcessual / EventoProcessual de um processo
-// específico continuam diretos pelo SDK (RLS read = true), pois são
-// detalhes carregados sob demanda no modal.
+// Leituras de TramiteProcessual / EventoProcessual também passam pelo
+// gateway: o processo é revalidado no servidor antes de liberar histórico.
 // =====================================================================
-
-const { TramiteProcessual, EventoProcessual } = base44.entities;
 
 /* ----------------------------- Caixas ----------------------------- */
 
@@ -91,7 +89,7 @@ export async function tramitarProcesso(processo, dados) {
 }
 
 export async function listarTramites(processoId) {
-  return TramiteProcessual.filter({ processo_id: processoId }, '-data_envio', 200);
+  return listarTramitesProcessoEscopado(processoId);
 }
 
 /* ----------------------------- Eventos ---------------------------- */
@@ -102,5 +100,5 @@ export async function registrarEvento(processoId, evento) {
 }
 
 export async function listarEventos(processoId) {
-  return EventoProcessual.filter({ processo_id: processoId }, '-data_evento', 300);
+  return listarEventosProcessoEscopado(processoId);
 }
