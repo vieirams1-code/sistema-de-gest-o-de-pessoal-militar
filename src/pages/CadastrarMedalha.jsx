@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -81,10 +82,13 @@ export default function CadastrarMedalha() {
   const { data: medalhaExistente, isLoading: loadingMedalha } = useQuery({
     queryKey: ['medalha', medalhaId],
     queryFn: async () => {
-      const result = await base44.entities.Medalha.filter({ id: medalhaId });
-      return result[0];
+      const { medalhas = [] } = await fetchScopedMedalhasBundle({
+        medalhaId,
+        readPurpose: 'EDIT',
+      });
+      return medalhas[0];
     },
-    enabled: !!medalhaId
+    enabled: !!medalhaId && isAccessResolved && hasMedalhasAccess && podeEditar,
   });
 
   useEffect(() => {
