@@ -231,6 +231,10 @@ export default function PlanosFerias() {
       setFeedback({ tipo: 'erro', texto: 'Selecione ao menos uma unidade para o escopo da campanha.' });
       return;
     }
+    if (campanhaForm.tipo_escopo === 'SEM_ESCOPO' && (campanhaForm.escopo_grupos_ids || []).length === 0) {
+      setFeedback({ tipo: 'erro', texto: 'Selecione ao menos um grupo quando o escopo de lotação estiver vazio.' });
+      return;
+    }
     setSalvandoCampanha(true);
     try {
       const nomesUnidades = campanhaForm.escopo_unidades_ids
@@ -389,11 +393,11 @@ export default function PlanosFerias() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Nova campanha de férias</h2><p className="text-xs text-slate-500">Plano: {selecionado?.titulo}</p></div><button type="button" onClick={() => setModalCampanha(false)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>
             <div><label className="text-xs font-bold text-slate-700">Nome da campanha *</label><Input required value={campanhaForm.titulo} onChange={(e) => setCampanhaForm({ ...campanhaForm, titulo: e.target.value })} /></div>
             <div className="grid sm:grid-cols-3 gap-3"><div><label className="text-xs font-bold text-slate-700">Início *</label><Input required type="date" value={campanhaForm.data_inicio} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_inicio: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo militar *</label><Input required type="date" value={campanhaForm.data_fim_militar} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo unidade</label><Input type="date" value={campanhaForm.data_fim_unidade} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_unidade: e.target.value })} /></div></div>
-            <div><label className="text-xs font-bold text-slate-700">Escopo *</label><select value={campanhaForm.tipo_escopo} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.value, escopo_unidades_ids: [] })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Unidades selecionadas</option></select></div>
+            <div><label className="text-xs font-bold text-slate-700">Escopo de lotação</label><select value={campanhaForm.tipo_escopo} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.value, escopo_unidades_ids: [] })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Unidades selecionadas</option><option value="SEM_ESCOPO">Somente grupos de militares (sem lotação)</option></select>{campanhaForm.tipo_escopo === 'SEM_ESCOPO' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida exclusivamente pelos grupos selecionados abaixo.</p>}</div>
             {campanhaForm.tipo_escopo === 'UNIDADES' && <div className="grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{unidades.length === 0 ? <p className="text-xs text-slate-500">Nenhuma unidade disponível para seleção.</p> : unidades.map((unidade) => <label key={unidade.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={campanhaForm.escopo_unidades_ids.includes(unidade.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_unidades_ids: e.target.checked ? [...campanhaForm.escopo_unidades_ids, unidade.id] : campanhaForm.escopo_unidades_ids.filter((id) => id !== unidade.id) })} />{unidade.nome}</label>)}</div>}
             <div>
               <label className="text-xs font-bold text-slate-700">Grupos de militares</label>
-              <p className="mt-1 text-[11px] text-slate-500">Opcional. O grupo será combinado com o escopo de lotação acima.</p>
+              <p className="mt-1 text-[11px] text-slate-500">Opcional quando houver lotação; selecione um ou mais grupos para restringir o público. Com “Somente grupos”, eles definem o público sem lotação.</p>
               <div className="mt-2 grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 {grupos.length === 0 ? <p className="text-xs text-slate-500">Nenhum grupo ativo disponível. Cadastre grupos em Grupos do Efetivo.</p> : grupos.map((grupo) => (
                   <label key={grupo.id} className="flex items-center gap-2 text-xs">
@@ -451,7 +455,7 @@ export default function PlanosFerias() {
               <div className="divide-y divide-slate-100">
                 {campanhasDoPlano.map((campanha) => (
                   <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.escopo_unidades_nomes || 'Toda a Corporação'} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
+                    <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.tipo_escopo === 'SEM_ESCOPO' ? 'Somente grupos' : (campanha.escopo_unidades_nomes || 'Toda a Corporação')}{campanha.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
                     <div className="flex gap-2 flex-wrap">
                       {(podeAtribuirPermissoes || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
                       {podeVisualizarRespostas && <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>}
