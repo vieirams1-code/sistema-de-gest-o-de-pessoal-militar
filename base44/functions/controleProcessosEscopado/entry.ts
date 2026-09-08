@@ -40,17 +40,6 @@ const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
-const CAMPOS_USUARIO_ACESSO = [
-  'id',
-  'user_email',
-  'ativo',
-  'tipo_acesso',
-  'grupamento_id',
-  'subgrupamento_id',
-  'militar_id',
-  'perfil_id',
-];
-
 const PARAMS_SENSIVEIS = [
   'access_token', 'token', 'auth', 'authorization', 'jwt', 'id_token',
   'refresh_token', 'api_key', 'apikey', 'key', 'senha', 'password', 'secret',
@@ -60,7 +49,6 @@ const PARAMS_SENSIVEIS = [
 const PROCESSO_CAMPOS_PROTEGIDOS = ['caixa_atual_id', 'unidade_id', 'criado_por', 'arquivado'];
 const CAIXA_CAMPOS_PROTEGIDOS_EDICAO = []; // membros/gestores são editáveis só via gerenciar caixas (já validado).
 
-const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const nowIso = () => new Date().toISOString();
 
@@ -101,59 +89,9 @@ async function fetchWithRetry(queryFn, label = 'query') {
   throw lastError;
 }
 
-function extrairMatrizPermissoes(descricao) {
-  if (typeof descricao !== 'string' || !descricao) return {};
-  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-  if (start === -1 || end === -1 || end <= start) return {};
-  const jsonStr = descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim();
-  if (!jsonStr) return {};
-  try {
-    const parsed = JSON.parse(jsonStr);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_e) {
-    return {};
-  }
-}
-
-function consolidarActions(perfis, acessos) {
-  const actions = {};
-  const aplicarFonte = (fonte) => {
-    if (!fonte) return;
-    Object.entries(fonte).forEach(([key, val]) => {
-      if (typeof val !== 'boolean') return;
-      if (!key.startsWith('perm_')) return;
-      const actionKey = key.replace(/^perm_/, '');
-      if (val === true) actions[actionKey] = true;
-      else if (!(actionKey in actions)) actions[actionKey] = false;
-    });
-  };
-  (perfis || []).forEach((p) => {
-    if (!p) return;
-    aplicarFonte(p);
-    aplicarFonte(extrairMatrizPermissoes(p.descricao));
-  });
-  (acessos || []).forEach(aplicarFonte);
-  return actions;
-}
-
-async function resolverPermissoes(base44, email) {
-  const acessos = await fetchWithRetry(
-    () => base44.asServiceRole.entities.UsuarioAcesso.filter(
-      { user_email: email, ativo: true }, undefined, 100, 0, CAMPOS_USUARIO_ACESSO,
-    ),
-    `usuarioAcesso.list:${email}`,
-  );
-  const isAdminByAccess = (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin');
-  const perfilIds = Array.from(new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean)));
-  let perfis = [];
-  if (perfilIds.length > 0) {
-    perfis = await fetchWithRetry(
-      () => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }),
-      `perfilPermissao.in:${email}`,
-    );
-  }
-  return { acessos: acessos || [], actions: consolidarActions(perfis || [], acessos || []), isAdminByAccess };
+async function resolverAutorizacaoCanonica(base44) {
+  const response = await base44.functions.invoke('getUserPermissions', {});
+  return response?.data ?? response ?? {};
 }
 
 const isMembroCaixa = (caixa, email) =>
@@ -220,14 +158,13 @@ Deno.serve(async (req) => {
     const id = payload?.id ? String(payload.id) : null;
 
     const email = normalizeEmail(authUser.email);
-    const isAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-    const perms = await resolverPermissoes(base44, authUser.email);
-    const isAdmin = isAdminByRole || perms.isAdminByAccess;
-    const actions = perms.actions || {};
+    const authz = await resolverAutorizacaoCanonica(base44);
+    const isPlatformAdmin = authz?.isAdmin === true;
+    const actions = authz?.actions || {};
 
-    const can = (key) => isAdmin || actions[key] === true;
-    const podeVerTodas = isAdmin || actions['visualizar_todas_caixas_processuais'] === true;
-    const podeModulo = isAdmin || actions['visualizar_controle_processos'] === true;
+    const can = (key) => isPlatformAdmin || actions[key] === true;
+    const podeVerTodas = isPlatformAdmin || actions['visualizar_todas_caixas_processuais'] === true;
+    const podeModulo = isPlatformAdmin || actions['visualizar_controle_processos'] === true;
 
     if (!podeModulo) {
       return Response.json({ error: 'Acesso negado: sem permissão no módulo Controle de Processos.' }, { status: 403 });
