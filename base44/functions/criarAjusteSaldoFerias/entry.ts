@@ -9,13 +9,21 @@ const STATUS_FERIAS_BLOQUEIA_DEBITO = STATUS_IMPACTO_FERIAS;
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const normalize = (v) => String(v ?? '').trim();
 
-async function assertAdminFerias(base44, authUser) {
-  if (String(authUser?.role || '').toLowerCase() === 'admin') return;
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso
-    .filter({ user_email: normalizeEmail(authUser?.email), ativo: true }, undefined, 100, 0)
-    .catch(() => []);
-  if ((acessos || []).some((a) => String(a?.tipo_acesso || '').trim().toLowerCase() === 'admin')) return;
-  throw Object.assign(new Error('Acesso negado: operação restrita a administradores do módulo Férias.'), { status: 403 });
+async function resolverAutorizacao(base44, payload, militarId) {
+  const request = {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    ...(militarId ? { scopeMilitarIds: [militarId] } : {}),
+  };
+  const response = await base44.functions.invoke('getUserPermissions', request);
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.criar_credito_extra_ferias !== true) {
+    throw Object.assign(new Error('Acesso negado: requer criar_credito_extra_ferias.'), { status: 403 });
+  }
+  if (militarId && authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
 }
 
 function diasBase(periodo = {}) {
@@ -60,7 +68,6 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
-    await assertAdminFerias(base44, authUser);
 
     let payload = {};
     try { payload = await req.json(); } catch (_e) { payload = {}; }
@@ -71,7 +78,6 @@ Deno.serve(async (req) => {
     const dias = Number(payload?.dias);
     const motivo = normalize(payload?.motivo);
     const observacoes = normalize(payload?.observacoes);
-    const effectiveEmail = normalizeEmail(payload?.effectiveEmail || authUser.email);
 
     const erros = [];
     if (!militarId) erros.push('militar_id é obrigatório.');
@@ -80,6 +86,9 @@ Deno.serve(async (req) => {
     if (!Number.isFinite(dias) || dias <= 0) erros.push('dias deve ser maior que 0.');
     if (!motivo) erros.push('motivo é obrigatório.');
     if (erros.length) return Response.json({ error: erros.join(' ') }, { status: 400 });
+
+    const authz = await resolverAutorizacao(base44, payload, militarId);
+    const effectiveEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
 
     const militar = await base44.asServiceRole.entities.Militar.get(militarId).catch(() => null);
     if (!militar) return Response.json({ error: 'Militar não encontrado.' }, { status: 404 });
