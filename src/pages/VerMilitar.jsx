@@ -310,11 +310,10 @@ export default function VerMilitar() {
     [feriasBundle, id]
   );
 
-  const { data: ajustesSaldoFerias = [] } = useQuery({
-    queryKey: ['ver-ajustes-saldo-ferias', id],
-    queryFn: () => base44.entities.AjusteSaldoFerias.filter({ militar_id: id }, '-created_date'),
-    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarFerias,
-  });
+  const ajustesSaldoFerias = React.useMemo(
+    () => (feriasBundle?.ajustesSaldoFerias || []).filter((item) => String(item?.militar_id || '') === String(id)),
+    [feriasBundle, id]
+  );
 
   const { data: atestadosBundle = { atestados: [] }, isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['ver-atestados', id, effectiveEmail || null],
