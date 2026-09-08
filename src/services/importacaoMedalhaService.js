@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { criarEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
 import { strFromU8, unzipSync } from 'fflate';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 import { normalizarStatusMedalha, getChaveDuplicidadeMedalha } from './medalhasTempoServicoService';
@@ -303,7 +304,10 @@ export async function analisarPlanilhaMedalha(file, medalhaCodigo) {
   const configMedalha = CONFIG_MEDALHAS[medalhaCodigo];
   if (!configMedalha) throw new Error(`Configuração de medalha não encontrada: ${medalhaCodigo}`);
 
-  const medalhasExistentes = await base44.entities.Medalha.filter({ tipo_medalha_codigo: medalhaCodigo });
+  const { medalhas: medalhasExistentes = [] } = await fetchScopedMedalhasBundle({
+    tipoMedalhaCodigo: medalhaCodigo,
+    readPurpose: 'MIGRATION',
+  });
   const setMedalhasAtivas = new Set(
     medalhasExistentes
       .filter(m => {
@@ -377,7 +381,10 @@ export async function importarMedalhas(linhas, userEmail) {
 
   // Assumimos que todas as linhas elegíveis são do mesmo tipo de medalha
   const medalhaCodigo = elegiveis[0].tipo_medalha_codigo;
-  const medalhasExistentes = await base44.entities.Medalha.filter({ tipo_medalha_codigo: medalhaCodigo });
+  const { medalhas: medalhasExistentes = [] } = await fetchScopedMedalhasBundle({
+    tipoMedalhaCodigo: medalhaCodigo,
+    readPurpose: 'MIGRATION',
+  });
   const setMedalhasAtivas = new Set(
     medalhasExistentes
       .filter(m => {
