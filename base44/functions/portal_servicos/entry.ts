@@ -377,7 +377,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao === 'PLANO_GERAR_LOTE_FERIAS' || acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
     return ['perm_gerar_ferias_campanhas', ...legadoRespostas];
   }
-  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias', ...legadoCampanhas];
+  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR' || acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas_ferias', 'perm_editar_campanhas_ferias', ...legadoCampanhas];
   if (acao === 'PLANO_CAMPANHA_SALVAR' || acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') return ['perm_editar_campanhas_ferias', ...legadoCampanhas];
   if (acao === 'PLANO_CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas_ferias', ...legadoCampanhas];
 
@@ -1188,6 +1188,7 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        case 'PLANO_CAMPANHA_SCOPE_OPTIONS':
         case 'CAMPANHA_SCOPE_OPTIONS': {
           const [militares, grupos] = await Promise.all([
             base44.asServiceRole.entities.Militar.list().catch(() => []),
@@ -1648,6 +1649,28 @@ Deno.serve(async (req: Request) => {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
+        }
+
+        case 'PLANO_CAMPANHA_EXCLUIR': {
+          const { campanha_id } = payload;
+          if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+          if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
+          for (const op of (await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id }).catch(() => [])) || []) await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
+          for (const r of (await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ campanha_id }).catch(() => [])) || []) await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.delete(r.id);
+          return new Response(JSON.stringify({ ok: true, message: 'Campanha de férias e respostas associadas excluídas com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
+        case 'PLANO_CAMPANHA_ARQUIVAR':
+        case 'PLANO_CAMPANHA_DESATIVAR': {
+          const { campanha_id } = payload;
+          if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+          if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const status = acao === 'PLANO_CAMPANHA_ARQUIVAR' ? 'Arquivada' : 'Desativada';
+          const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: `Campanha ${status.toLowerCase()} com sucesso.` }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         // Excluir Campanha
