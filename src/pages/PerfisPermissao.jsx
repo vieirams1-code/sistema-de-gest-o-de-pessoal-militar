@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { previewProfilePermissionMigration } from '@/services/permissionProfileMigrationService';
 
 const CUD_ENTITIES_ALLOWLIST = new Set(['PerfilPermissao', 'UsuarioAcesso']);
 
@@ -164,7 +165,8 @@ export default function PerfisPermissao() {
       // fallback para registro parcial da listagem
     }
 
-    const resolvedPermissions = resolveProfilePermissions({ profileSource: fullPerfil }).permissions;
+    const migrationPreview = previewProfilePermissionMigration(fullPerfil);
+    const resolvedPermissions = migrationPreview.finalMatrix;
     const profileDescriptionData = extractProfileMatrixFromDescription(fullPerfil.descricao);
 
     setFormData({
