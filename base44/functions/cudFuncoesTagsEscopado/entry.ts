@@ -5,8 +5,8 @@ const OPERACOES = new Set(['create', 'update', 'encerrar', 'remover', 'desativar
 
 const PERMISSIONS_MAP: Record<string, string[]> = {
   MilitarFuncao: ['adicionar_militares', 'editar_militares'],
-  MilitarTag: ['adicionar_militares', 'editar_militares'],
-  FeriasTag: ['adicionar_ferias', 'editar_ferias'],
+  MilitarTag: ['gerenciar_tags_militar'],
+  FeriasTag: ['gerenciar_tags_ferias'],
   FuncaoMilitar: ['gerir_configuracoes'],
   TagGrupo: ['gerir_tags'],
   Tag: ['gerir_tags'],
