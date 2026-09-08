@@ -16,10 +16,22 @@ function getClient() {
  * @param {string} militarId - ID do militar.
  * @returns {Promise<Array>} - Lista de eventos formatada e ordenada.
  */
-export async function getMilitarTimeline(militarId) {
+export async function getMilitarTimeline(militarId, permissions = {}) {
   if (!militarId) return [];
 
   const client = getClient();
+  const allowed = {
+    livro: permissions?.livro === true,
+    publicacoes: permissions?.publicacoes === true,
+    ferias: permissions?.ferias === true,
+    atestados: permissions?.atestados === true,
+    atestadoSensitive: permissions?.atestadoSensitive === true,
+    antiguidade: permissions?.antiguidade === true,
+    medalhas: permissions?.medalhas === true,
+    funcoes: permissions?.funcoes === true,
+    gratificacoes: permissions?.gratificacoes === true,
+  };
+  const maybe = (enabled, fn) => enabled ? fn() : Promise.resolve([]);
 
   const [
     registrosLivro,
@@ -33,16 +45,16 @@ export async function getMilitarTimeline(militarId) {
     funcoesCatalogo,
     tiposGratificacao
   ] = await Promise.all([
-    client.entities.RegistroLivro.filter({ militar_id: militarId }),
-    client.entities.PublicacaoExOfficio.filter({ militar_id: militarId }),
-    client.entities.Ferias.filter({ militar_id: militarId }),
-    client.entities.Atestado.filter({ militar_id: militarId }),
-    client.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: militarId }),
-    client.entities.Medalha.filter({ militar_id: militarId }),
-    client.entities.MilitarFuncao.filter({ militar_id: militarId }),
-    client.entities.GratificacaoFuncao.filter({ militar_id: militarId }),
-    client.entities.FuncaoMilitar.list(),
-    client.entities.TipoGratificacaoFuncao.list()
+    maybe(allowed.livro, () => client.entities.RegistroLivro.filter({ militar_id: militarId })),
+    maybe(allowed.publicacoes, () => client.entities.PublicacaoExOfficio.filter({ militar_id: militarId })),
+    maybe(allowed.ferias, () => client.entities.Ferias.filter({ militar_id: militarId })),
+    maybe(allowed.atestados, () => client.entities.Atestado.filter({ militar_id: militarId })),
+    maybe(allowed.antiguidade, () => client.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: militarId })),
+    maybe(allowed.medalhas, () => client.entities.Medalha.filter({ militar_id: militarId })),
+    maybe(allowed.funcoes, () => client.entities.MilitarFuncao.filter({ militar_id: militarId })),
+    maybe(allowed.gratificacoes, () => client.entities.GratificacaoFuncao.filter({ militar_id: militarId })),
+    maybe(allowed.funcoes, () => client.entities.FuncaoMilitar.list()),
+    maybe(allowed.gratificacoes, () => client.entities.TipoGratificacaoFuncao.list())
   ]);
 
   const funcoesMap = new Map((funcoesCatalogo || []).map(f => [f.id, f]));
@@ -92,7 +104,7 @@ export async function getMilitarTimeline(militarId) {
       tipo: 'Atestado',
       categoria: 'Saúde',
       titulo: item.tipo_afastamento || 'Atestado Médico',
-      descricao: `${item.dias || 0} dias${item.cid_10 ? ' - CID: ' + item.cid_10 : ''}`,
+      descricao: `${item.dias || 0} dias${allowed.atestadoSensitive && item.cid_10 ? ' - CID: ' + item.cid_10 : ''}`,
       origem: 'Atestado'
     })),
     ...(promocoes || []).map(item => ({
