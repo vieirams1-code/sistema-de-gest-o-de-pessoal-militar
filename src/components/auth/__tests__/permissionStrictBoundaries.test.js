@@ -62,14 +62,19 @@ test('criação de publicação depende somente de adicionar_publicacoes', () =>
   assert.doesNotMatch(publicacoes, /canCriarPublicacoes = .*admin_mode/);
 });
 
-test('editar e publicar RP não herdam admin_mode', () => {
-  assert.match(cadastrarRp, /const canGerirPublicacoes = canAccessAction\('editar_publicacoes'\);/);
+test('criar, editar e publicar RP usam capacidades próprias e não herdam admin_mode', () => {
+  assert.match(cadastrarRp, /const canAdicionarPublicacoes = canAccessAction\('adicionar_publicacoes'\);/);
+  assert.match(cadastrarRp, /const canEditarPublicacoes = canAccessAction\('editar_publicacoes'\);/);
+  assert.match(cadastrarRp, /const canApostilarPublicacao = canAccessAction\('apostilar_publicacao'\);/);
+  assert.match(cadastrarRp, /const canTornarSemEfeitoPublicacao = canAccessAction\('tornar_sem_efeito_publicacao'\);/);
   assert.match(cadastrarRp, /const canPublicarBg = canAccessAction\('publicar_bg'\);/);
+  assert.doesNotMatch(cadastrarRp, /canAccessAction\('admin_mode'\)/);
 });
 
 test('PublicacaoCard exige permissões exatas para publicar e excluir', () => {
   assert.match(publicacaoCard, /const podePublicarBg = canAccessAction\('publicar_bg'\);/);
-  assert.match(publicacaoCard, /canAccessAction\('excluir_publicacoes'\)\s*&&\s*canAccessAction\('admin_mode'\)/s);
+  assert.match(publicacaoCard, /const podeExcluir = !isPublicado && canAccessAction\('excluir_publicacoes'\);/);
+  assert.doesNotMatch(publicacaoCard, /canAccessAction\('admin_mode'\)/);
 });
 
 test('créditos de férias separam visualizar, criar e cancelar', () => {
@@ -205,11 +210,15 @@ test('promoções e configuração de antiguidade têm escrita administrativa se
   assert.match(detalhePromocaoPage, /\{isAdmin && \(\s*<Button[\s\S]*Salvar alterações/);
 });
 
-test('functions transacionais de promoção exigem administrador real', () => {
-  for (const source of [publicarPromocaoBackend, reverterPromocaoBackend, excluirPromocaoBackend, sincronizarGraduacoesBackend]) {
+test('functions transacionais de promoção mantêm administração real, exceto reversão excepcional delegável', () => {
+  for (const source of [publicarPromocaoBackend, excluirPromocaoBackend, sincronizarGraduacoesBackend]) {
     assert.match(source, /String\(authUser\.role \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== 'admin'/);
     assert.match(source, /requer_administrador_plataforma/);
   }
+  assert.match(reverterPromocaoBackend, /const PERMISSAO_REVERSAO_EXCEPCIONAL = 'reverter_promocao_excepcional';/);
+  assert.match(reverterPromocaoBackend, /functions\.invoke\('getUserPermissions', \{\}\)/);
+  assert.match(reverterPromocaoBackend, /scopeMilitarIds: militarId \? \[militarId\] : \[\]/);
+  assert.match(reverterPromocaoBackend, /reversao_comum_requer_administrador_plataforma/);
   assert.match(publicarPromocaoBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
   assert.match(sincronizarGraduacoesBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
 });
