@@ -91,16 +91,24 @@ Deno.serve(async (req) => {
     const permsResponse = await base44.functions.invoke('getUserPermissions', payload);
     const perms = permsResponse?.data ?? permsResponse ?? {};
     const permActions = perms?.actions || {};
-    const podeVerAtestados = Boolean(perms?.isAdmin) || permActions?.visualizar_atestados === true;
+    const isPlatformAdmin = perms?.isAdmin === true;
+    const permissoesNecessarias = ['visualizar_atestados', 'baixar_anexos_atestados', 'ver_dados_sensiveis_atestado'];
+    const faltantes = isPlatformAdmin
+      ? []
+      : permissoesNecessarias.filter((action) => permActions?.[action] !== true);
 
-    if (!podeVerAtestados) {
+    if (perms?.error || faltantes.length > 0) {
       console.warn('[getAtestadoAnexoSignedUrl] permissao_negada', {
         authUserEmail: String(perms?.authUserEmail || ''),
         effectiveUserEmail: String(perms?.effectiveUserEmail || ''),
         isImpersonating: Boolean(perms?.isImpersonating),
         atestado_id: atestadoId,
       });
-      return Response.json({ error: 'Sem permissão para visualizar atestados.', code: 'FORBIDDEN' }, { status: 403 });
+      return Response.json({
+        error: perms?.error || `Sem permissão para baixar anexo médico: ${faltantes.join(', ')}.`,
+        code: 'FORBIDDEN',
+        requiredPermissions: permissoesNecessarias,
+      }, { status: 403 });
     }
 
     // (P0) Validação de ESCOPO sobre o atestado, via bundle escopado já corrigido.
