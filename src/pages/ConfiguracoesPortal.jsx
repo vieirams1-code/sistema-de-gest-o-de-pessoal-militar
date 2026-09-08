@@ -20,8 +20,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function ConfiguracoesPortal() {
+  const { canAccessAction } = useCurrentUser();
+  const canViewSolicitacoes = canAccessAction('visualizar_solicitacoes_cadastrais') || canAccessAction('decidir_solicitacoes_cadastrais');
+  const canDecidirSolicitacoes = canAccessAction('decidir_solicitacoes_cadastrais');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -64,18 +68,9 @@ export default function ConfiguracoesPortal() {
     setErrorMsg(null);
     try {
       let c = null;
-      try {
-        const res = await base44.functions.invoke('portal_servicos', { acao: 'PORTAL_CONFIG_GET' });
-        if (res.data?.ok && res.data?.config) {
-          c = res.data.config;
-        }
-      } catch (_eFn) {}
-
-      if (!c) {
-        const records = await base44.entities.PortalAuthConfig.list();
-        if (Array.isArray(records) && records.length > 0) {
-          c = records[0];
-        }
+      const res = await base44.functions.invoke('portal_servicos', { acao: 'PORTAL_CONFIG_GET' });
+      if (res.data?.ok && res.data?.config) {
+        c = res.data.config;
       }
 
       if (c) {
@@ -106,10 +101,14 @@ export default function ConfiguracoesPortal() {
   };
 
   const loadSolicitacoes = async () => {
+    if (!canViewSolicitacoes) {
+      setSolicitacoes([]);
+      return;
+    }
     setLoadingSolicitacoes(true);
     try {
-      const list = await base44.entities.SolicitacaoAtualizacao.list();
-      setSolicitacoes(list || []);
+      const res = await base44.functions.invoke('portal_servicos', { acao: 'CADASTRO_SOLICITACOES_LISTAR', status: 'todos' });
+      setSolicitacoes(res.data?.solicitacoes || []);
     } catch (err) {
       console.error('Falha ao carregar solicitações:', err);
     } finally {
@@ -196,6 +195,7 @@ export default function ConfiguracoesPortal() {
   };
 
   const handleDecidirSolicitacao = async (solId, novoStatus) => {
+    if (!canDecidirSolicitacoes) return;
     try {
       const valorCorrigido = valoresEditados[solId];
       const res = await base44.functions.invoke('portal_servicos', {
@@ -217,6 +217,7 @@ export default function ConfiguracoesPortal() {
   };
 
   const handleDecidirLoteMilitar = async (militarId, itens, novoStatus) => {
+    if (!canDecidirSolicitacoes) return;
     try {
       const itensDecisao = itens.map((item) => ({
         solicitacao_id: item.id,
