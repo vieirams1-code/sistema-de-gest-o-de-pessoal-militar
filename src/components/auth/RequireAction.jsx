@@ -10,9 +10,9 @@
  *   - usuário efetivo (impersonação já tratada internamente pelo useCurrentUser);
  *   - bypass para admin / canAccessAll.
  *
- * Diferença em relação ao RequireModuleAccess: este exige módulo E action (AND),
- * enquanto o RequireModuleAccess avalia em modo OR. Guard isolado para não
- * alterar o comportamento das demais rotas.
+ * Desde o F8-L06, RequireModuleAccess também usa AND entre as dimensões
+ * módulo/ação. RequireAction permanece como guard explícito das páginas com
+ * política canônica e grupos de capacidades independentes.
  *
  * Negação segura: tela genérica (AccessDenied), sem PII, sem backend, sem
  * alteração de estado, sem redirecionamento em loop.
