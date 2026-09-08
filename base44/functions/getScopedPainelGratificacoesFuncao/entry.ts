@@ -239,6 +239,16 @@ Deno.serve(async (req) => {
 
     const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
     if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const canViewGratificacoes = authz?.isAdmin === true || (
+      authz?.modules?.gratificacoes_funcao === true && authz?.actions?.visualizar_gratificacoes_funcao === true
+    );
+    if (!canViewGratificacoes) {
+      return Response.json({
+        error: 'Acesso negado: é necessário acesso a Gratificação de Função e a permissão visualizar_gratificacoes_funcao.',
+        requiredModule: 'gratificacoes_funcao',
+        requiredPermission: 'visualizar_gratificacoes_funcao',
+      }, { status: 403 });
+    }
     const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
     const effectiveEmailNorm = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
     const isImpersonating = authz?.isImpersonating === true;
