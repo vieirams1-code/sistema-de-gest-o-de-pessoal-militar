@@ -10,6 +10,10 @@ const permissionsBackend = await readFile(new URL('../../../../base44/functions/
 const cadastroMedalha = await readFile(new URL('../../../pages/CadastrarMedalha.jsx', import.meta.url), 'utf8');
 const importacaoMedalha = await readFile(new URL('../../../services/importacaoMedalhaService.js', import.meta.url), 'utf8');
 const medalhasBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedMedalhasBundle/entry.ts', import.meta.url), 'utf8');
+const medalhasAcessoService = await readFile(new URL('../../../services/medalhasAcessoService.js', import.meta.url), 'utf8');
+const medalhasTempoService = await readFile(new URL('../../../services/medalhasTempoServicoService.js', import.meta.url), 'utf8');
+const timelineService = await readFile(new URL('../../../services/militarTimelineService.js', import.meta.url), 'utf8');
+const cudBackend = await readFile(new URL('../../../../base44/functions/cudEscopado/entry.ts', import.meta.url), 'utf8');
 
 test('L09: páginas administrativas não leem UsuarioAcesso ou PerfilPermissao diretamente pelo SDK', () => {
   for (const source of [perfisPage, usuariosPage]) {
@@ -51,12 +55,31 @@ test('L09: Medalha não possui leitura ou escrita direta no frontend', () => {
   assert.match(importacaoMedalha, /readPurpose: 'MIGRATION'/);
 });
 
-test('L09: bundle de Medalhas separa edição, migração e visualização', () => {
+test('L09: bundle de Medalhas separa edição, migração, apuração e visualização', () => {
   assert.match(medalhasBundleBackend, /purpose === 'EDIT'/);
   assert.match(medalhasBundleBackend, /editar_medalhas/);
   assert.match(medalhasBundleBackend, /purpose === 'MIGRATION'/);
   assert.match(medalhasBundleBackend, /migracao_alteracoes_legado/);
+  assert.match(medalhasBundleBackend, /purpose === 'APURACAO'/);
+  assert.match(medalhasBundleBackend, /indicar_medalhas/);
+  assert.match(medalhasBundleBackend, /gerir_dom_pedro_ii/);
   assert.match(medalhasBundleBackend, /visualizar_medalhas/);
   assert.match(medalhasBundleBackend, /medalhaId é obrigatório para leitura de edição/);
   assert.match(medalhasBundleBackend, /tipoMedalhaCodigo é obrigatório para leitura de migração/);
+  assert.match(medalhasBundleBackend, /militarIds/);
+});
+
+test('L09: consumidores indiretos de Medalha usam gateway em produção e mantêm fallback apenas para mocks', () => {
+  assert.match(medalhasAcessoService, /functions\?\.invoke === 'function'[\s\S]*getScopedMedalhasBundle[\s\S]*readPurpose: 'APURACAO'/);
+  assert.match(medalhasAcessoService, /Fallback exclusivo para clientes simulados em testes unitários/);
+  assert.match(medalhasTempoService, /functions\?\.invoke === 'function'[\s\S]*cudEscopado/);
+  assert.match(medalhasTempoService, /Fallback exclusivo para clientes simulados em testes unitários/);
+  assert.match(timelineService, /fetchScopedMedalhasBundle\([\s\S]*readPurpose: 'VIEW'[\s\S]*militarId/);
+  assert.match(timelineService, /Fallback exclusivo para o cliente injetado pelos testes unitários/);
+});
+
+test('L09: reindicação APURACAO/INDICACAO exige indicar_medalhas, não editar_medalhas', () => {
+  assert.match(cudBackend, /origemRegistro\.startsWith\('INDICACAO_'\) \|\| origemRegistro\.startsWith\('APURACAO_'\)/);
+  assert.match(cudBackend, /statusFinal === 'INDICADA' && ehFluxoIndicacao[\s\S]*'indicar_medalhas'[\s\S]*'editar_medalhas'/);
+  assert.match(medalhasTempoService, /origem_registro: origemRegistro/);
 });
