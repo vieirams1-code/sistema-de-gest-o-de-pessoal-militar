@@ -12,7 +12,6 @@ import {
   buildPermissionPayload,
   extractProfileMatrixFromDescription,
   mergeProfileDescriptionWithMatrix,
-  resolveProfilePermissions,
   buildPermissionsFromSource,
   isLegacyCustomProfile,
 } from '@/services/permissionMatrixService';
