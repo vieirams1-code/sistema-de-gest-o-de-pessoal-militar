@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, ClipboardCheck } from 'lucide-react';
@@ -19,7 +18,7 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
-import { adicionarNovaMatriculaMilitar, atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
+import { adicionarNovaMatriculaMilitar, atualizarMilitarSemTrocarMatricula, carregarMilitarParaEdicao, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { isMilitarAtivo } from '@/utils/militarStatus';
 import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
@@ -155,8 +154,10 @@ export default function CadastrarMilitar() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
+  const requiredAction = editId ? 'editar_militares' : 'adicionar_militares';
+  const hasRequiredAction = canAccessAction(requiredAction);
 
   const [formData, setFormData] = useState(initialFormData);
 
