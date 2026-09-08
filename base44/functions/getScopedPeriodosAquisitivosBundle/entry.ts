@@ -110,6 +110,83 @@ async function listarMilitaresPorIds(base44, militarIds) {
   return { rows: out, partialFailures };
 }
 
+function projetarCampos(item, campos) {
+  if (!item || typeof item !== 'object') return item;
+  const out = {};
+  for (const campo of campos) if (campo in item) out[campo] = item[campo];
+  return out;
+}
+
+const CAMPOS_MILITAR_SUPORTE = [
+  'id', 'nome', 'nome_completo', 'nome_guerra', 'matricula', 'posto_graduacao', 'quadro',
+  'lotacao', 'lotacao_atual', 'estrutura_id', 'estrutura_nome', 'subgrupamento_nome', 'grupamento_nome',
+  'data_inclusao', 'status', 'status_cadastro', 'situacao_militar', 'ativo', 'merged_into_id',
+];
+const CAMPOS_MATRICULA_SUPORTE = ['id', 'militar_id', 'matricula', 'matricula_normalizada', 'data_inicio', 'data_fim', 'is_atual', 'situacao'];
+const CAMPOS_FERIAS_SUPORTE = [
+  'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'status', 'dias', 'fracionamento',
+  'data_inicio', 'data_fim', 'data_retorno', 'data_termino',
+];
+const CAMPOS_REGISTRO_LIVRO_SUPORTE = [
+  'id', 'militar_id', 'ferias_id', 'periodo_aquisitivo_id', 'periodo_id', 'referencia_id', 'tipo_registro',
+  'periodo_aquisitivo_ref', 'ano_referencia', 'data_registro', 'data_inicio', 'created_date', 'numero_bg', 'data_bg',
+];
+const CAMPOS_PUBLICACAO_SUPORTE = [
+  'id', 'militar_id', 'ferias_id', 'ferias_interrompida_id', 'gozo_ferias_id', 'gozo_id', 'registro_livro_id',
+  'livro_id', 'referencia_id', 'periodo_aquisitivo_id', 'periodo_id', 'periodo_aquisitivo_ref', 'ano_referencia',
+  'tipo_publicacao', 'status', 'numero_bg', 'data_bg',
+];
+const CAMPOS_CONTRATO_SUPORTE = [
+  'id', 'militar_id', 'status_contrato', 'data_inicio_contrato', 'data_fim_contrato', 'data_inclusao_para_ferias',
+  'gera_direito_ferias', 'regra_geracao_periodos',
+];
+const CAMPOS_TEXTO_REFERENCIA = [
+  'periodo_aquisitivo', 'documento_referencia', 'documento_texto', 'texto_publicacao', 'nota_para_bg',
+  'observacoes', 'texto_base', 'texto_complemento',
+];
+
+function construirReferenciasPorMilitar(periodos = []) {
+  const mapa = new Map();
+  for (const periodo of periodos || []) {
+    const militarId = String(periodo?.militar_id || '').trim();
+    const referencia = String(periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref || '').trim();
+    if (!militarId || !referencia) continue;
+    if (!mapa.has(militarId)) mapa.set(militarId, new Set());
+    mapa.get(militarId).add(referencia);
+  }
+  return mapa;
+}
+
+function detectarReferenciaPeriodo(registro = {}, referenciasPorMilitar = new Map()) {
+  const estruturada = String(registro?.periodo_aquisitivo_ref || registro?.ano_referencia || '').trim();
+  if (estruturada) return estruturada;
+  const militarId = String(registro?.militar_id || '').trim();
+  const referencias = referenciasPorMilitar.get(militarId);
+  if (!referencias?.size) return '';
+  const blob = CAMPOS_TEXTO_REFERENCIA.map((campo) => String(registro?.[campo] || '')).filter(Boolean).join(' ');
+  if (!blob) return '';
+  for (const referencia of referencias) if (blob.includes(referencia)) return referencia;
+  return '';
+}
+
+function sanitizarDadosSuporte({ periodosAquisitivos, militares, matriculasMilitar, ferias, registrosLivro, publicacoesExOfficio, contratosDesignacaoMilitar }) {
+  const referenciasPorMilitar = construirReferenciasPorMilitar(periodosAquisitivos);
+  return {
+    militares: (militares || []).map((item) => projetarCampos(item, CAMPOS_MILITAR_SUPORTE)),
+    matriculasMilitar: (matriculasMilitar || []).map((item) => projetarCampos(item, CAMPOS_MATRICULA_SUPORTE)),
+    ferias: (ferias || []).map((item) => projetarCampos(item, CAMPOS_FERIAS_SUPORTE)),
+    registrosLivro: (registrosLivro || []).map((item) => ({
+      ...projetarCampos(item, CAMPOS_REGISTRO_LIVRO_SUPORTE),
+      periodo_aquisitivo_ref: detectarReferenciaPeriodo(item, referenciasPorMilitar),
+    })),
+    publicacoesExOfficio: (publicacoesExOfficio || []).map((item) => ({
+      ...projetarCampos(item, CAMPOS_PUBLICACAO_SUPORTE),
+      periodo_aquisitivo_ref: detectarReferenciaPeriodo(item, referenciasPorMilitar),
+    })),
+    contratosDesignacaoMilitar: (contratosDesignacaoMilitar || []).map((item) => projetarCampos(item, CAMPOS_CONTRATO_SUPORTE)),
+  };
+}
+
 function getPeriodoResumoStatus(periodo, hoje) {
   const isDisponivel = periodo?.status === 'Disponível';
   let isVencendo = false; let isVencido = false;
@@ -128,6 +205,21 @@ Deno.serve(async (req) => {
     let payload = {}; try { payload = await req.json(); } catch (_e) {}
     const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
     if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const acoesLeituraSuporte = [
+      'visualizar_periodos_aquisitivos', 'visualizar_ferias', 'visualizar_creditos_ferias',
+      'criar_ferias', 'editar_ferias', 'gerar_periodos_aquisitivos',
+      'criar_credito_extra_ferias', 'cancelar_credito_extra_ferias',
+    ];
+    const canReadPeriodoSupport = authz?.isAdmin === true || (
+      authz?.modules?.ferias === true && acoesLeituraSuporte.some((acao) => authz?.actions?.[acao] === true)
+    );
+    if (!canReadPeriodoSupport) {
+      return Response.json({
+        error: 'Acesso negado: permissão funcional de Férias insuficiente para consultar períodos aquisitivos.',
+        requiredModule: 'ferias',
+        requiredAnyPermission: acoesLeituraSuporte,
+      }, { status: 403 });
+    }
     const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
     const effectiveEmailNorm = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
     const isImpersonating = authz?.isImpersonating === true;
@@ -174,7 +266,8 @@ Deno.serve(async (req) => {
     if (partialFailures>0) warnings.push('PARTIAL_FAILURES');
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const counters = (periodosAquisitivos||[]).reduce((acc,periodo)=>{ const r=getPeriodoResumoStatus(periodo,hoje); acc.total+=1; if(r.isDisponivel)acc.disponiveis+=1; if(r.isVencendo)acc.vencendo90d+=1; if(r.isVencido)acc.vencidos+=1; return acc; }, { total:0, disponiveis:0, vencendo90d:0, vencidos:0 });
-    return Response.json({ periodosAquisitivos,militares,matriculasMilitar,ferias,registrosLivro,publicacoesExOfficio,contratosDesignacaoMilitar,counters,meta:{ isAdmin: targetIsAdmin, hasGlobalScope: targetHasGlobalScope, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings }});
+    const suporte = sanitizarDadosSuporte({ periodosAquisitivos, militares, matriculasMilitar, ferias, registrosLivro, publicacoesExOfficio, contratosDesignacaoMilitar });
+    return Response.json({ periodosAquisitivos,...suporte,counters,meta:{ isAdmin: targetIsAdmin, hasGlobalScope: targetHasGlobalScope, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings, supportingDataSanitized:true }});
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     return Response.json({ error: error?.message || 'Erro ao carregar bundle de períodos aquisitivos.', meta: { status } }, { status });
