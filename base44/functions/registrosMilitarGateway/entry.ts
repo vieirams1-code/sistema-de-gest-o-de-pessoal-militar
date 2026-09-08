@@ -68,8 +68,8 @@ Deno.serve(async (req) => {
 
       const payload = {
         [campoTipo]: tipo,
-        ...(data?.tipo_alterado_por ? { tipo_alterado_por: String(data.tipo_alterado_por) } : {}),
-        ...(data?.tipo_alterado_em ? { tipo_alterado_em: String(data.tipo_alterado_em) } : {}),
+        tipo_alterado_por: String(user?.email || ''),
+        tipo_alterado_em: new Date().toISOString(),
       };
       const atualizado = await base44.asServiceRole.entities[entityName].update(id, payload);
       return Response.json({ data: atualizado });
