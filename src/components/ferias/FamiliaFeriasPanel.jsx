@@ -257,7 +257,8 @@ function detectarInconsistencias(cadeia) {
 }
 
 export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFerias = [], onClose, modoAdmin = false }) {
-  const { isAdmin } = useCurrentUser();
+  const { canAccessAction } = useCurrentUser();
+  const podeAdministrarCadeia = canAccessAction('gerir_cadeia_ferias') || canAccessAction('recalcular_ferias');
 
   const eventosVinculados = useMemo(() => {
     if (!ferias) return [];
@@ -896,7 +897,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, descontosFe
           )}
         </div>
 
-        {isAdmin && <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} modoAdmin={modoAdmin} />}
+        {podeAdministrarCadeia && <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} modoAdmin={modoAdmin} />}
       </div>
 
       {possuiEventosPendentes && (
