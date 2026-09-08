@@ -412,7 +412,7 @@ export default function VerMilitar() {
   const { data: punicoes = [] } = useQuery({
     queryKey: ['ver-punicoes-comportamento', id],
     queryFn: () => base44.entities.PunicaoDisciplinar.filter({ militar_id: id }, '-data_inicio_cumprimento'),
-    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel && podeVisualizarComportamento,
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel && podeVisualizarPunicoes,
   });
 
   const { data: acervoHistorico = [] } = useQuery({
