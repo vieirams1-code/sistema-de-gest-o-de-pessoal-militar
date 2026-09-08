@@ -132,12 +132,12 @@ const actionGuardByPage = {
   ControleProcessos: { moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos', moduleName: 'Controle de Processos e Procedimentos' },
   GerirCampanhasPortal: {
     moduleKey: 'campanhas_gerais',
-    actionKeys: ['visualizar_campanhas_gerais', 'criar_campanhas', 'editar_campanhas', 'excluir_campanhas', 'gerir_campanhas'],
+    actionKeys: ['visualizar_campanhas_gerais', 'criar_campanhas', 'editar_campanhas', 'excluir_campanhas'],
     moduleName: 'Gestão de Campanhas',
   },
   PlanosFerias: {
     moduleKey: 'campanhas_ferias',
-    actionKeys: ['visualizar_planos_ferias', 'visualizar_campanhas_ferias', 'criar_planos_ferias', 'editar_planos_ferias', 'excluir_planos_ferias', 'gerir_respostas'],
+    actionKeys: ['visualizar_planos_ferias', 'visualizar_campanhas_ferias', 'criar_planos_ferias', 'editar_planos_ferias', 'excluir_planos_ferias'],
     moduleName: 'Planos de Férias',
   },
   ConfigurarCampanhaFerias: {
@@ -147,7 +147,7 @@ const actionGuardByPage = {
   },
   PainelPlanoFerias: {
     moduleKey: 'campanhas_ferias',
-    actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas', 'atribuir_permissoes_ferias', 'gerir_respostas'],
+    actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas', 'atribuir_permissoes_ferias'],
     moduleName: 'Respostas e Escalação de Férias',
   },
   CentralRespostasCampanhas: {
@@ -162,7 +162,7 @@ const actionGuardByPage = {
   },
   SolicitacoesAtualizacao: {
     moduleKey: 'campanhas_gerais',
-    actionKeys: ['visualizar_solicitacoes_cadastrais', 'decidir_solicitacoes_cadastrais', 'gerir_respostas'],
+    actionKeys: ['visualizar_solicitacoes_cadastrais', 'decidir_solicitacoes_cadastrais'],
     moduleName: 'Solicitações Cadastrais',
   },
 };
