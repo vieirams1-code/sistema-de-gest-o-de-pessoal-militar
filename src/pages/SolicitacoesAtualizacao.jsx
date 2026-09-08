@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
-import RequireAdmin from '@/components/auth/RequireAdmin';
 
 function formatDate(d) {
   if (!d) return '—';
@@ -31,7 +30,9 @@ function formatDate(d) {
 
 export default function SolicitacoesAtualizacao() {
   const queryClient = useQueryClient();
-  const { user, isAdmin } = useCurrentUser();
+  const { user, canAccessAction } = useCurrentUser();
+  const canViewSolicitacoes = canAccessAction('visualizar_solicitacoes_cadastrais') || canAccessAction('decidir_solicitacoes_cadastrais');
+  const canDecidirSolicitacoes = canAccessAction('decidir_solicitacoes_cadastrais');
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
   const [buscaTermo, setBuscaTermo] = useState('');
   const [valoresEditados, setValoresEditados] = useState({}); // { [solId]: valorCorrigido }
@@ -42,10 +43,14 @@ export default function SolicitacoesAtualizacao() {
 
   const { data: solicitacoes = [], isLoading, refetch } = useQuery({
     queryKey: ['solicitacoes-atualizacao', filtroStatus],
-    queryFn: () => base44.entities.SolicitacaoAtualizacao.filter(
-      filtroStatus === 'todos' ? {} : { status: filtroStatus },
-      '-data_solicitacao'
-    ),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'CADASTRO_SOLICITACOES_LISTAR',
+        status: filtroStatus,
+      });
+      return res.data?.solicitacoes || [];
+    },
+    enabled: canViewSolicitacoes,
   });
 
   const handleEditarValor = (solId, valor) => {
@@ -76,7 +81,7 @@ export default function SolicitacoesAtualizacao() {
   };
 
   const handleDecidirItem = async (sol, novoStatus) => {
-    if (!isAdmin) return;
+    if (!canDecidirSolicitacoes) return;
     setProcessing(true);
     setFeedback(null);
     try {
@@ -103,7 +108,7 @@ export default function SolicitacoesAtualizacao() {
   };
 
   const handleDecidirLote = async (militarId, itens, novoStatus) => {
-    if (!isAdmin) return;
+    if (!canDecidirSolicitacoes) return;
     setProcessing(true);
     setFeedback(null);
     try {
@@ -176,7 +181,6 @@ export default function SolicitacoesAtualizacao() {
   }, [solicitacoes]);
 
   return (
-    <RequireAdmin>
       <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 font-sans">
         <div className="max-w-5xl mx-auto space-y-6">
           
@@ -363,7 +367,7 @@ export default function SolicitacoesAtualizacao() {
 
                       {/* AÇÕES EM LOTE E BOTÃO EXPANDIR/RECOLHER */}
                       <div className="flex items-center space-x-2 self-end sm:self-center shrink-0" onClick={(e) => e.stopPropagation()}>
-                        {isAdmin && temPendentes && (
+                        {canDecidirSolicitacoes && temPendentes && (
                           <div className="flex items-center space-x-1.5 mr-2">
                             <Button
                               type="button"
@@ -562,6 +566,5 @@ export default function SolicitacoesAtualizacao() {
           )}
         </div>
       </div>
-    </RequireAdmin>
   );
 }
