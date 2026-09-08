@@ -215,6 +215,32 @@ async function listarCatalogoTagsParaFeriasTags(base44, feriasTags) {
   return { rows: out, partialFailures };
 }
 
+const CAMPOS_EVENTO_FERIAS = [
+  'id', 'militar_id', 'ferias_id', 'tipo_registro', 'data_registro', 'data_inicio', 'created_date',
+  'dias', 'dias_no_momento', 'saldo_remanescente', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref',
+  'referencia_id', 'numero_bg', 'data_bg', 'nota_para_bg', 'status',
+  'dias_base_gozo', 'dias_extras_creditos', 'dias_totais_gozo', 'creditos_extra_resumo',
+];
+
+function projetarEventoFerias(registro, { incluirDetalhesAdministrativos = false } = {}) {
+  if (!registro || typeof registro !== 'object') return registro;
+  const out = {};
+  for (const campo of CAMPOS_EVENTO_FERIAS) {
+    if (campo in registro) out[campo] = registro[campo];
+  }
+  // A tela só precisa saber se existe texto vinculado; o conteúdo integral do
+  // RegistroLivro não deve atravessar o bundle de Férias.
+  out.tem_texto_publicacao = Boolean(String(registro?.texto_publicacao || '').trim());
+  if (incluirDetalhesAdministrativos && 'observacoes' in registro) {
+    out.observacoes = registro.observacoes;
+  }
+  return out;
+}
+
+function projetarEventosFerias(registros, options) {
+  return (registros || []).map((registro) => projetarEventoFerias(registro, options));
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -238,6 +264,9 @@ Deno.serve(async (req) => {
     const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
     const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
     const targetCanViewFerias = !isImpersonating && authIsAdminByRole ? true : targetPerms.canViewFerias;
+    const incluirDetalhesAdministrativosEventos = (!isImpersonating && authIsAdminByRole)
+      || targetPerms.actions?.gerir_cadeia_ferias === true
+      || targetPerms.actions?.recalcular_ferias === true;
     if (!targetCanViewFerias) {
       return Response.json({ error: 'Acesso negado: é necessária a permissão de visualizar férias.', requiredPermission: 'visualizar_ferias' }, { status: 403 });
     }
@@ -260,7 +289,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ferias: ferias || [],
-        registrosLivro: registrosLivro || [],
+        registrosLivro: projetarEventosFerias(registrosLivro, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
         feriasTags: feriasTagsResultAdmin.rows,
         tagsCatalogo: tagsCatalogoAdmin.rows,
         meta: {
@@ -322,7 +351,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       ferias: feriasResult.rows,
-      registrosLivro: registrosResult.rows,
+      registrosLivro: projetarEventosFerias(registrosResult.rows, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
       feriasTags: feriasTagsResult.rows,
       tagsCatalogo: tagsCatalogoResult.rows,
       meta: {
