@@ -156,6 +156,17 @@ Deno.serve(async (req) => {
     // ---- Resolução canônica de auth/effective ----
     const authz = await resolverAutorizacaoCanonica(base44, effectiveEmailRaw);
     if (authz?.error) return Response.json({ error: authz.error, creditos: [] }, { status: 403 });
+    const canViewCreditos = authz?.isAdmin === true || (
+      authz?.modules?.ferias === true && authz?.actions?.visualizar_creditos_ferias === true
+    );
+    if (!canViewCreditos) {
+      return Response.json({
+        error: 'Acesso negado: é necessário acesso a Férias e a permissão visualizar_creditos_ferias.',
+        requiredModule: 'ferias',
+        requiredPermission: 'visualizar_creditos_ferias',
+        creditos: [],
+      }, { status: 403 });
+    }
     const targetEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
     const isImpersonating = authz?.isImpersonating === true;
     const targetIsAdmin = authz?.isAdmin === true;
