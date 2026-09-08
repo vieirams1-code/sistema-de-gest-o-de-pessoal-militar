@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users, X, Eye, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,18 @@ const novoPlano = () => ({
 
 export default function PlanosFerias() {
   const navigate = useNavigate();
+  const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
+  const podeVisualizarPlanos = isAdmin || canAccessAction('visualizar_planos_ferias');
+  const podeCriarPlanos = isAdmin || canAccessAction('criar_planos_ferias');
+  const podeEditarPlanos = isAdmin || canAccessAction('editar_planos_ferias');
+  const podeExcluirPlanos = isAdmin || canAccessAction('excluir_planos_ferias');
+  const podeCriarCampanhas = isAdmin || canAccessAction('criar_campanhas_ferias');
+  const podeEditarCampanhas = isAdmin || canAccessAction('editar_campanhas_ferias');
+  const podeExcluirCampanhas = isAdmin || canAccessAction('excluir_campanhas_ferias');
+  const podeVisualizarRespostas = isAdmin || canAccessAction('visualizar_respostas_ferias');
+  const podeGerarFerias = isAdmin || canAccessAction('gerar_ferias_campanhas');
+  const podeAtribuirPermissoes = isAdmin || canAccessAction('atribuir_permissoes_ferias');
+  const podeAdminFerias = isAdmin || canAccessAction('admin_campanhas_ferias');
   const [planos, setPlanos] = useState([]);
   const [campanhas, setCampanhas] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
@@ -46,24 +58,29 @@ export default function PlanosFerias() {
     setLoading(true);
     setFeedback({ tipo: '', texto: '' });
     try {
-      const resposta = await base44.functions.invoke('planos_ferias_servicos', { acao: 'LISTAR' });
-      const listaPlanos = resposta.data?.planos || [];
-      setPlanos(listaPlanos);
-      setCampanhas(resposta.data?.campanhas || []);
-      setSelecionado((atual) => atual ? listaPlanos.find((p) => p.id === atual.id) || null : null);
-      try {
-        const lotacoes = await fetchScopedLotacoes({});
-        setUnidades((lotacoes?.lotacoes || []).map((lotacao) => ({
-          id: String(lotacao.id || lotacao.nome || '').trim(),
-          nome: lotacao.nome || lotacao.sigla || lotacao.label || lotacao.id,
-        })).filter((lotacao) => lotacao.id));
-      } catch (_erroLotacoes) {
-        setUnidades([]);
+      let listaPlanos = [];
+      if (podeVisualizarPlanos) {
+        const resposta = await base44.functions.invoke('planos_ferias_servicos', { acao: 'LISTAR' });
+        listaPlanos = resposta.data?.planos || [];
+        setPlanos(listaPlanos);
+        setCampanhas(resposta.data?.campanhas || []);
+        setSelecionado((atual) => atual ? listaPlanos.find((p) => p.id === atual.id) || null : null);
+      } else {
+        setPlanos([]);
+        setCampanhas([]);
+        setSelecionado(null);
       }
-      try {
-        const gruposAtivos = await base44.entities.GrupoEfetivo.filter({ ativo: true });
-        setGrupos((gruposAtivos || []).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
-      } catch (_erroGrupos) {
+      if (podeCriarCampanhas || podeEditarCampanhas) {
+        try {
+          const scopeRes = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_CAMPANHA_SCOPE_OPTIONS' });
+          setUnidades(scopeRes.data?.unidades || []);
+          setGrupos(scopeRes.data?.grupos || []);
+        } catch (_erroEscopo) {
+          setUnidades([]);
+          setGrupos([]);
+        }
+      } else {
+        setUnidades([]);
         setGrupos([]);
       }
     } catch (erro) {
@@ -73,7 +90,7 @@ export default function PlanosFerias() {
     }
   };
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => { carregar(); }, [podeVisualizarPlanos, podeCriarCampanhas, podeEditarCampanhas]);
 
   useEffect(() => {
     if (!selecionado?.id) {
@@ -88,7 +105,7 @@ export default function PlanosFerias() {
   }, [selecionado?.id]);
 
   useEffect(() => {
-    if (!modoAdmin || !selecionado?.id) return;
+    if (!modoAdmin || !podeAtribuirPermissoes || !selecionado?.id) return;
     Promise.allSettled([
       base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
       base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id }),
