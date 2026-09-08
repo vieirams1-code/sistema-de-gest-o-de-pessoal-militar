@@ -339,7 +339,7 @@ export default function PainelPlanoFerias() {
 
   const salvarPermissaoCampanha = async (evento) => {
     evento.preventDefault();
-    if (!planoSelecionadoId || !campanhaSelecionada?.id || !permissaoCampanhaForm.usuario_id) return;
+    if (!podeAtribuirPermissoesFerias || !planoSelecionadoId || !campanhaSelecionada?.id || !permissaoCampanhaForm.usuario_id) return;
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
@@ -359,6 +359,7 @@ export default function PainelPlanoFerias() {
   };
 
   const removerPermissaoCampanha = async (permissao) => {
+    if (!podeAtribuirPermissoesFerias) return;
     if (!window.confirm('Remover o acesso deste usuário à campanha?')) return;
     setActionLoading(true);
     try {
@@ -578,7 +579,7 @@ export default function PainelPlanoFerias() {
 
   // Marcar como Não Contemplado
   const handleConfirmarNaoContemplado = async () => {
-    if (!modalNaoContemplado.opcao) return;
+    if (!podeAprovarFerias || !modalNaoContemplado.opcao) return;
     const op = modalNaoContemplado.opcao;
 
     setActionLoading(true);
@@ -651,12 +652,12 @@ export default function PainelPlanoFerias() {
 
   // Ações Administrativas de Campanha (Protegidas pelo Modo Admin)
   const handleDesativarCampanhaAdmin = async (camp) => {
-    if (!podeAdminFerias) return;
+    if (!podeAdminFerias || !modoAdmin || !podeEditarCampanhasFerias) return;
     if (!window.confirm(`Modo Admin: Deseja desativar a campanha "${camp.titulo}"? Ela deixará de receber respostas e passará para o histórico de consulta.`)) return;
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_DESATIVAR',
+        acao: 'PLANO_CAMPANHA_DESATIVAR',
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" desativada.` });
@@ -669,12 +670,12 @@ export default function PainelPlanoFerias() {
   };
 
   const handleArquivarCampanhaAdmin = async (camp) => {
-    if (!podeAdminFerias) return;
+    if (!podeAdminFerias || !modoAdmin || !podeEditarCampanhasFerias) return;
     if (!window.confirm(`Modo Admin: Deseja arquivar a campanha "${camp.titulo}"?`)) return;
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_ARQUIVAR',
+        acao: 'PLANO_CAMPANHA_ARQUIVAR',
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" arquivada.` });
@@ -687,12 +688,12 @@ export default function PainelPlanoFerias() {
   };
 
   const handleExcluirCampanhaAdmin = async (camp) => {
-    if (!podeAdminFerias) return;
+    if (!podeAdminFerias || !modoAdmin || !podeExcluirCampanhasFerias) return;
     if (!window.confirm(`ALERTA MODO ADMIN: Tem certeza que deseja EXCLUIR a campanha "${camp.titulo}"? As opções de preferência desta campanha serão apagadas. (Férias já geradas na escala oficial NÃO serão afetadas).`)) return;
     setActionLoading(true);
     try {
       await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_EXCLUIR',
+        acao: 'PLANO_CAMPANHA_EXCLUIR',
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" excluída com sucesso.` });
