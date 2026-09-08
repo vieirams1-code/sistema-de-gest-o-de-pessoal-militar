@@ -27,6 +27,7 @@ const CAMPOS_BASE_MILITAR = [
     'posto_graduacao',
     'quadro',
     'lotacao',
+    'lotacao_atual',
     'estrutura_id',
     'estrutura_nome',
     'estrutura_tipo',
@@ -40,15 +41,48 @@ const CAMPOS_BASE_MILITAR = [
     'destino',
     'ltip_data_inicio',
     'ltip_data_fim',
+    'data_inclusao',
+    'cidade',
+    'email_funcional',
+    'merged_into_id',
+];
+
+// Dados pessoais/sensíveis só entram no payload quando o perfil do usuário
+// efetivo possui perm_ver_dados_sensiveis_militar. A projeção manual abaixo
+// é a última barreira caso o SDK ignore a seleção de campos da query.
+const CAMPOS_SENSIVEIS_MILITAR = [
     'sexo',
     'tipo_sanguineo',
-    'data_inclusao',
     'data_nascimento',
     'cpf',
     'rg',
-    'cidade',
-    'email_funcional',
     'email_particular',
+    'telefone',
+    'estado_civil',
+    'religiao',
+    'escolaridade',
+    'naturalidade',
+    'naturalidade_uf',
+    'nome_pai',
+    'nome_mae',
+    'orgao_expedidor_rg',
+    'uf_rg',
+    'cnh_categoria',
+    'cnh_validade',
+    'banco',
+    'agencia',
+    'conta',
+    'logradouro',
+    'numero_endereco',
+    'bairro',
+    'cep',
+    'uf',
+    'habilidades',
+];
+
+const CAMPOS_MATRICULA_MILITAR = [
+    'id', 'militar_id', 'matricula', 'matricula_normalizada', 'tipo_matricula',
+    'situacao', 'data_inicio', 'data_fim', 'is_atual',
 ];
 
 const CAMPOS_USUARIO_ACESSO = [
