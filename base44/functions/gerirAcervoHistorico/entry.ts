@@ -138,7 +138,8 @@ Deno.serve(async (req) => {
 
     return Response.json({ ok: true, registro: registroAcervo });
   } catch (error) {
+    const status = Number(error?.status || error?.response?.status || 500);
     console.error('[gerirAcervoHistorico] Erro:', error);
-    return Response.json({ error: error.message || 'Erro interno.' }, { status: 500 });
+    return Response.json({ error: error.message || 'Erro interno.' }, { status: Number.isFinite(status) ? status : 500 });
   }
 });
