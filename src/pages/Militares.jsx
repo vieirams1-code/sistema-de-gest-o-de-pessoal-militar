@@ -189,6 +189,7 @@ export default function Militares() {
     isLoading: loadingUser,
     isAccessResolved,
   } = useCurrentUser();
+  const canManageMilitaryTags = canAccessAction('gerenciar_tags_militar');
 
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => searchParams.get('q') || '');
@@ -945,6 +946,10 @@ export default function Militares() {
 
   const executarBulk = async ({ finalSelectedTagIds, finalSelectedFuncaoIds, motivo }) => {
     if (bulkSaving) return;
+    if (!canManageMilitaryTags) {
+      toast({ title: 'Ação negada', description: 'Você não possui permissão para gerenciar tags de militares.', variant: 'destructive' });
+      return;
+    }
 
     if (excedeLimiteMilitaresSelecionados(selectedMilitarIds.size)) {
       toast({ title: 'Limite excedido', description: `Selecione no máximo ${BULK_TAGS_MAX_MILITARES} militares nesta versão inicial.`, variant: 'destructive' });
@@ -1463,7 +1468,7 @@ export default function Militares() {
                 count={selectedMilitarIds.size}
                 label="militares selecionados"
                 helperText="Ação aplicada apenas aos militares selecionados nesta tela."
-                onManageTags={() => setBulkPanelOpen(true)}
+                onManageTags={canManageMilitaryTags ? () => setBulkPanelOpen(true) : undefined}
                 onClear={() => setSelectedMilitarIds(new Set())}
               />
             )}
@@ -1684,7 +1689,7 @@ export default function Militares() {
         />
       )}
       <MilitarTagsBulkPanel
-        open={bulkPanelOpen}
+        open={bulkPanelOpen && canManageMilitaryTags}
         onClose={() => setBulkPanelOpen(false)}
         selectedCount={selectedMilitarIds.size}
         selectedMilitares={selectedMilitaresBulk}
