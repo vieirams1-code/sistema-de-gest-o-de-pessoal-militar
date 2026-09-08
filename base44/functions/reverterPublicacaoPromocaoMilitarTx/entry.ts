@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
         participante_curso_id: participante?.id || null,
       };
 
-      if (!temPermissaoExcepcional) {
+      if (!temPermissaoReversaoExcepcional) {
         return erro({ status: 403, etapa: 'autorizacao', motivo: 'permissao_ausente', contexto: { ...contextoExcepcional, campo_faltante: PERMISSAO_REVERSAO_EXCEPCIONAL, validacao_bloqueada: 'reversao_excepcional_sem_permissao' } });
       }
       if (!modoAdmin) {
