@@ -20,9 +20,6 @@ const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
 
 const adminOnlyPages = new Set([
-  // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
-  // de uma action key específica na arquitetura (ex: gerir_solicitacoes_atualizacao).
-  'SolicitacoesAtualizacao',
   // Lote 1D-D: Auditoria de Comportamento — admin only por requisito do lote.
   'AuditoriaComportamento',
   'AntiguidadeConfigQuadros',
@@ -155,8 +152,18 @@ const actionGuardByPage = {
   },
   CentralRespostasCampanhas: {
     moduleKey: 'campanhas_gerais',
-    actionKeys: ['visualizar_respostas_campanhas', 'aprovar_respostas_campanhas'],
+    actionKeys: ['visualizar_respostas_campanhas', 'exportar_respostas_campanhas', 'baixar_anexos_respostas_campanhas', 'aprovar_respostas_campanhas'],
     moduleName: 'Respostas de Campanhas',
+  },
+  ConfiguracoesPortal: {
+    moduleKey: 'campanhas_gerais',
+    actionKey: 'configurar_portal',
+    moduleName: 'Configurações do Portal',
+  },
+  SolicitacoesAtualizacao: {
+    moduleKey: 'campanhas_gerais',
+    actionKeys: ['visualizar_solicitacoes_cadastrais', 'decidir_solicitacoes_cadastrais'],
+    moduleName: 'Solicitações Cadastrais',
   },
 };
 
