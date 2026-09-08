@@ -41,6 +41,7 @@ export async function listarCreditosExtraFerias(orderBy = '-data_referencia', op
   return invocarGetScopedCreditos({
     orderBy,
     ...(options?.supportMode ? { supportMode: options.supportMode } : {}),
+    ...(options?.militarId ? { militar_id: options.militarId } : {}),
   });
 }
 
