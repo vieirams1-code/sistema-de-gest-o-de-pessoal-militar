@@ -338,11 +338,16 @@ export const permissionStructure = [
         actions: [
           { key: 'perm_visualizar_campanhas_gerais', label: 'Visualizar campanhas' },
           { key: 'perm_visualizar_respostas_campanhas', label: 'Visualizar respostas das campanhas' },
+          { key: 'perm_exportar_respostas_campanhas', label: 'Exportar respostas das campanhas', sensitive: true },
+          { key: 'perm_baixar_anexos_respostas_campanhas', label: 'Baixar anexos das respostas das campanhas', sensitive: true },
+          { key: 'perm_visualizar_solicitacoes_cadastrais', label: 'Visualizar solicitações cadastrais do Portal', sensitive: true },
+          { key: 'perm_decidir_solicitacoes_cadastrais', label: 'Aprovar ou rejeitar solicitações cadastrais do Portal', sensitive: true },
           { key: 'perm_criar_campanhas', label: 'Criar campanhas', sensitive: true },
           { key: 'perm_admin_campanhas', label: 'Ativar modo Admin de campanhas', sensitive: true },
           { key: 'perm_editar_campanhas', label: 'Editar campanhas', sensitive: true },
           { key: 'perm_excluir_campanhas', label: 'Excluir campanhas', sensitive: true },
           { key: 'perm_aprovar_respostas_campanhas', label: 'Aprovar respostas de campanhas', sensitive: true },
+          { key: 'perm_enviar_lembretes_campanhas', label: 'Enviar lembretes de campanhas', sensitive: true },
           { key: 'perm_atribuir_permissoes_campanhas', label: 'Atribuir usuários autorizados nas campanhas', sensitive: true },
           { key: 'perm_configurar_portal', label: 'Configurar regras do Portal', sensitive: true }
         ]
