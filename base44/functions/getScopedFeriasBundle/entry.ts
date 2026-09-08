@@ -241,6 +241,18 @@ function projetarEventosFerias(registros, options) {
   return (registros || []).map((registro) => projetarEventoFerias(registro, options));
 }
 
+const CAMPOS_AJUSTE_SALDO_SUPORTE = [
+  'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'ano_referencia',
+  'tipo', 'dias', 'status', 'created_date',
+];
+function projetarAjustesSaldo(registros) {
+  return (registros || []).map((registro) => {
+    const out = {};
+    for (const campo of CAMPOS_AJUSTE_SALDO_SUPORTE) if (registro && campo in registro) out[campo] = registro[campo];
+    return out;
+  });
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -273,9 +285,10 @@ Deno.serve(async (req) => {
     const targetHasGlobalScope = (!isImpersonating && authIsAdminByRole) || targetPerms.hasGlobalScope;
 
     if (targetHasGlobalScope) {
-      const [ferias, registrosLivro] = await Promise.all([
+      const [ferias, registrosLivro, ajustesSaldoFerias] = await Promise.all([
         fetchWithRetry(() => base44.asServiceRole.entities.Ferias.list('-data_inicio'), 'ferias.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(), 'registroLivro.admin'),
+        fetchWithRetry(() => base44.asServiceRole.entities.AjusteSaldoFerias.list('-created_date'), 'ajusteSaldoFerias.admin'),
       ]);
 
       const feriasIdsAdmin = (ferias || []).map((f) => String(f?.id || '')).filter(Boolean);
@@ -290,6 +303,7 @@ Deno.serve(async (req) => {
       return Response.json({
         ferias: ferias || [],
         registrosLivro: projetarEventosFerias(registrosLivro, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
+        ajustesSaldoFerias: projetarAjustesSaldo(ajustesSaldoFerias),
         feriasTags: feriasTagsResultAdmin.rows,
         tagsCatalogo: tagsCatalogoAdmin.rows,
         meta: {
@@ -314,6 +328,7 @@ Deno.serve(async (req) => {
       return Response.json({
         ferias: [],
         registrosLivro: [],
+        ajustesSaldoFerias: [],
         feriasTags: [],
         tagsCatalogo: [],
         meta: {
@@ -333,16 +348,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [feriasResult, registrosResult] = await Promise.all([
+    const [feriasResult, registrosResult, ajustesResult] = await Promise.all([
       listarPorEscopoIds(base44, 'Ferias', militarIds, '-data_inicio'),
       listarPorEscopoIds(base44, 'RegistroLivro', militarIds, undefined),
+      listarPorEscopoIds(base44, 'AjusteSaldoFerias', militarIds, '-created_date'),
     ]);
 
     const feriasIdsEscopo = feriasResult.rows.map((f) => String(f?.id || '')).filter(Boolean);
     const feriasTagsResult = await listarFeriasTagsPorFeriasIds(base44, feriasIdsEscopo);
     const tagsCatalogoResult = await listarCatalogoTagsParaFeriasTags(base44, feriasTagsResult.rows);
 
-    const partialFailures = feriasResult.partialFailures + registrosResult.partialFailures;
+    const partialFailures = feriasResult.partialFailures + registrosResult.partialFailures + ajustesResult.partialFailures;
     const warnings = [];
     if (partialFailures > 0) warnings.push('PARTIAL_FAILURES');
     if (feriasTagsResult.partialFailures > 0) warnings.push('FERIAS_TAGS_PARTIAL_FAILURES');
@@ -352,6 +368,7 @@ Deno.serve(async (req) => {
     return Response.json({
       ferias: feriasResult.rows,
       registrosLivro: projetarEventosFerias(registrosResult.rows, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
+      ajustesSaldoFerias: projetarAjustesSaldo(ajustesResult.rows),
       feriasTags: feriasTagsResult.rows,
       tagsCatalogo: tagsCatalogoResult.rows,
       meta: {
