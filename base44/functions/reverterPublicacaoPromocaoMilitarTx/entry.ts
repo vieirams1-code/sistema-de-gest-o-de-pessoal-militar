@@ -187,6 +187,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (!ehReversaoOriginadaDeCurso && !authIsAdmin) {
+      return erro({ status: 403, etapa: 'autorizacao', motivo: 'reversao_comum_requer_administrador_plataforma', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+    }
+
     // Regra de produção: ao reverter, o participante 'promovido' NÃO volta para
     // aprovado/aguardando_nova_etapa. Passa para 'pendente_reanalise', mantendo
     // promocao_id para rastreabilidade. Qualquer retorno ao curso é ação manual.
