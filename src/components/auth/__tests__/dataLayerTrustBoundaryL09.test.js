@@ -14,6 +14,8 @@ const medalhasAcessoService = await readFile(new URL('../../../services/medalhas
 const medalhasTempoService = await readFile(new URL('../../../services/medalhasTempoServicoService.js', import.meta.url), 'utf8');
 const timelineService = await readFile(new URL('../../../services/militarTimelineService.js', import.meta.url), 'utf8');
 const cudBackend = await readFile(new URL('../../../../base44/functions/cudEscopado/entry.ts', import.meta.url), 'utf8');
+const processosBackend = await readFile(new URL('../../../../base44/functions/controleProcessosEscopado/entry.ts', import.meta.url), 'utf8');
+const processosService = await readFile(new URL('../../../services/controleProcessosService.js', import.meta.url), 'utf8');
 
 test('L09: páginas administrativas não leem UsuarioAcesso ou PerfilPermissao diretamente pelo SDK', () => {
   for (const source of [perfisPage, usuariosPage]) {
@@ -82,4 +84,25 @@ test('L09: reindicação APURACAO/INDICACAO exige indicar_medalhas, não editar_
   assert.match(cudBackend, /origemRegistro\.startsWith\('INDICACAO_'\) \|\| origemRegistro\.startsWith\('APURACAO_'\)/);
   assert.match(cudBackend, /statusFinal === 'INDICADA' && ehFluxoIndicacao[\s\S]*'indicar_medalhas'[\s\S]*'editar_medalhas'/);
   assert.match(medalhasTempoService, /origem_registro: origemRegistro/);
+});
+
+test('L09: Controle de Processos exige módulo e ação de visualização no gateway', () => {
+  assert.match(processosBackend, /modules\['controle_processos'\] === true && actions\['visualizar_controle_processos'\] === true/);
+  assert.match(processosBackend, /visualizar_todas_caixas_processuais/);
+  assert.match(processosBackend, /caixasDoUsuarioIds\.has\(p\.caixa_atual_id\)/);
+});
+
+test('L09: histórico processual é lido somente após revalidar processo e participação na caixa', () => {
+  assert.match(processosBackend, /case 'listarTramitesProcessoEscopado'/);
+  assert.match(processosBackend, /case 'listarEventosProcessoEscopado'/);
+  assert.match(processosBackend, /getProcesso\(base44, id\)/);
+  assert.match(processosBackend, /!podeVerTodas && !participaCaixa\(caixaAtual, email\)/);
+  assert.match(processosBackend, /asServiceRole\.entities\.TramiteProcessual\.filter/);
+  assert.match(processosBackend, /asServiceRole\.entities\.EventoProcessual\.filter/);
+});
+
+test('L09: frontend de Controle de Processos não lê entidades processuais diretamente pelo SDK', () => {
+  assert.doesNotMatch(processosService, /base44\.entities\.(ProcessoControle|CaixaProcessual|TramiteProcessual|EventoProcessual)/);
+  assert.match(processosService, /listarTramitesProcessoEscopado/);
+  assert.match(processosService, /listarEventosProcessoEscopado/);
 });
