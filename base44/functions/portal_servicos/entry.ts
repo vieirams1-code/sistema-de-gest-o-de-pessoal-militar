@@ -387,6 +387,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   }
 
   if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais', ...legadoCampanhas];
+  if (acao === 'CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas', 'perm_editar_campanhas', ...legadoCampanhas];
   if (acao === 'CAMPANHA_CONTEXTO_RETORNO') {
     return [
       'perm_visualizar_respostas_campanhas',
@@ -397,6 +398,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     ];
   }
   if (acao === 'CAMPANHA_DETALHES_RETORNO') return ['perm_visualizar_respostas_campanhas', ...legadoRespostas];
+  if (acao === 'CAMPANHA_APROVACAO_RETORNO') return ['perm_aprovar_respostas_campanhas', ...legadoRespostas];
   if (acao === 'CAMPANHA_EXPORTAR_RETORNO') return ['perm_exportar_respostas_campanhas', ...legadoRespostas];
   if (acao === 'CAMPANHA_ANEXOS_RETORNO') return ['perm_baixar_anexos_respostas_campanhas', ...legadoRespostas];
   if (acao === 'CAMPANHA_HOMOLOGAR_RESPOSTA') return ['perm_aprovar_respostas_campanhas', ...legadoRespostas];
@@ -1178,6 +1180,24 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        case 'CAMPANHA_SCOPE_OPTIONS': {
+          const [militares, grupos] = await Promise.all([
+            base44.asServiceRole.entities.Militar.list().catch(() => []),
+            base44.asServiceRole.entities.GrupoEfetivo.filter({ ativo: true }).catch(() => []),
+          ]);
+          const unidadesMap = new Map<string, { id: string; nome: string }>();
+          for (const militar of militares || []) {
+            const nome = textoId(militar?.lotacao || militar?.estrutura_nome);
+            const id = textoId(militar?.estrutura_id || militar?.subgrupamento_id || militar?.lotacao_id || nome);
+            if (nome && id && !unidadesMap.has(id)) unidadesMap.set(id, { id, nome });
+          }
+          return new Response(JSON.stringify({
+            ok: true,
+            unidades: Array.from(unidadesMap.values()).sort((a, b) => a.nome.localeCompare(b.nome)),
+            grupos: (grupos || []).map((g: any) => ({ id: g.id, nome: g.nome || g.titulo || g.id })).filter((g: any) => g.id),
+          }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+
         case 'CAMPANHA_CONTEXTO_RETORNO': {
           const campanhaId = textoId(payload?.campanha_id);
           if (!campanhaId) {
@@ -1195,6 +1215,7 @@ Deno.serve(async (req: Request) => {
 
         // Detalhes de Retorno e Acompanhamento Nominal. Cada modo tem autorização própria.
         case 'CAMPANHA_DETALHES_RETORNO':
+        case 'CAMPANHA_APROVACAO_RETORNO':
         case 'CAMPANHA_EXPORTAR_RETORNO':
         case 'CAMPANHA_ANEXOS_RETORNO': {
           const { campanha_id } = payload;
