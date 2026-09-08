@@ -1215,7 +1215,7 @@ export default function PainelPlanoFerias() {
                       Público: {camp.escopo_unidades_nomes || 'Geral'}
                     </p>
 
-                    {modoAdmin && podeAtribuirPermissoesFerias && (
+                    {modoAdmin && podeAdminFerias && podeExcluirCampanhasFerias && (
                       <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
