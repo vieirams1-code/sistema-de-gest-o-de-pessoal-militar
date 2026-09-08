@@ -162,9 +162,11 @@ Deno.serve(async (req) => {
     const isPlatformAdmin = authz?.isAdmin === true;
     const actions = authz?.actions || {};
 
+    const modules = authz?.modules || {};
     const can = (key) => isPlatformAdmin || actions[key] === true;
     const podeVerTodas = isPlatformAdmin || actions['visualizar_todas_caixas_processuais'] === true;
-    const podeModulo = isPlatformAdmin || actions['visualizar_controle_processos'] === true;
+    const podeModulo = isPlatformAdmin
+      || (modules['controle_processos'] === true && actions['visualizar_controle_processos'] === true);
 
     if (!podeModulo) {
       return Response.json({ error: 'Acesso negado: sem permissão no módulo Controle de Processos.' }, { status: 403 });
@@ -195,6 +197,36 @@ Deno.serve(async (req) => {
           ? (processos || [])
           : (processos || []).filter((p) => caixasDoUsuarioIds.has(p.caixa_atual_id));
         return Response.json({ ok: true, processos: visiveis });
+      }
+
+      case 'listarTramitesProcessoEscopado': {
+        if (!id) return Response.json({ error: 'id do processo é obrigatório.' }, { status: 400 });
+        const processo = await getProcesso(base44, id);
+        if (!processo) return Response.json({ error: 'Processo não encontrado.' }, { status: 404 });
+        const caixaAtual = caixasById.get(processo.caixa_atual_id);
+        if (!podeVerTodas && !participaCaixa(caixaAtual, email)) {
+          return Response.json({ error: 'Acesso negado: você não participa da caixa atual do processo.' }, { status: 403 });
+        }
+        const tramites = await fetchWithRetry(
+          () => base44.asServiceRole.entities.TramiteProcessual.filter({ processo_id: id }, '-data_envio', 200),
+          `tramites.list:${id}`,
+        );
+        return Response.json({ ok: true, tramites: tramites || [] });
+      }
+
+      case 'listarEventosProcessoEscopado': {
+        if (!id) return Response.json({ error: 'id do processo é obrigatório.' }, { status: 400 });
+        const processo = await getProcesso(base44, id);
+        if (!processo) return Response.json({ error: 'Processo não encontrado.' }, { status: 404 });
+        const caixaAtual = caixasById.get(processo.caixa_atual_id);
+        if (!podeVerTodas && !participaCaixa(caixaAtual, email)) {
+          return Response.json({ error: 'Acesso negado: você não participa da caixa atual do processo.' }, { status: 403 });
+        }
+        const eventos = await fetchWithRetry(
+          () => base44.asServiceRole.entities.EventoProcessual.filter({ processo_id: id }, '-data_evento', 300),
+          `eventos.list:${id}`,
+        );
+        return Response.json({ ok: true, eventos: eventos || [] });
       }
 
       // ---------------- Caixas ----------------
