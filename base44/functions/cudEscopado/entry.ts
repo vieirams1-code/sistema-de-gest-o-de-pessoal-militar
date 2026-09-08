@@ -1391,6 +1391,11 @@ Deno.serve(async (req) => {
           || Object.prototype.hasOwnProperty.call(data || {}, 'data_bg')
           || statusPublicacaoDestino === 'publicado';
 
+        const camposApostilamento = new Set(['apostilada_por_id', 'foi_apostilada']);
+        const camposTornarSemEfeito = new Set(['tornada_sem_efeito_por_id', 'foi_tornada_sem_efeito']);
+        const ehApostilamento = apenas(camposApostilamento);
+        const ehTornarSemEfeito = apenas(camposTornarSemEfeito);
+
         const camposGestaoJiso = new Set(['necessita_jiso', 'status_jiso', 'data_jiso_agendada', 'hora_jiso_agendada']);
         const statusGestaoPermitidos = new Set(['Aguardando JISO', 'Em análise']);
         const ehGestaoJiso = apenas(camposGestaoJiso)
@@ -1414,6 +1419,12 @@ Deno.serve(async (req) => {
         if (alteraBg) {
           requiredPermission = 'publicar_bg';
           allowed = targetPerms.actions?.['publicar_bg'] === true;
+        } else if (ehApostilamento) {
+          requiredPermission = 'apostilar_publicacao';
+          allowed = targetPerms.actions?.['apostilar_publicacao'] === true;
+        } else if (ehTornarSemEfeito) {
+          requiredPermission = 'tornar_sem_efeito_publicacao';
+          allowed = targetPerms.actions?.['tornar_sem_efeito_publicacao'] === true;
         } else if (ehGestaoJiso) {
           requiredPermission = 'gerir_jiso';
           allowed = targetPerms.actions?.['gerir_jiso'] === true;
