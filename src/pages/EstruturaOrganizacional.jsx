@@ -52,6 +52,8 @@ export default function EstruturaOrganizacional() {
   const queryClient = useQueryClient();
   const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
   const hasEstruturaAccess = canAccessModule('estrutura_organizacional');
+  const podeVisualizarEstrutura = canAccessAction('visualizar_estrutura_organizacional');
+  const podeGerirEstrutura = canAccessAction('gerir_estrutura_organizacional') || canAccessAction('gerir_estrutura');
 
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
@@ -106,17 +108,16 @@ export default function EstruturaOrganizacional() {
   });
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!hasEstruturaAccess) return <AccessDenied modulo="Estrutura Organizacional" />;
-  if (!canAccessAction('gerir_estrutura')) {
-    return <AccessDenied modulo="Estrutura Organizacional" />;
-  }
+  if (!hasEstruturaAccess || !podeVisualizarEstrutura) return <AccessDenied modulo="Estrutura Organizacional" />;
 
   const startEdit = (s) => {
+    if (!podeGerirEstrutura) return;
     setEditingId(s.id);
     setEditData({ nome: s.nome, sigla: s.sigla || '', descricao: s.descricao || '', tipo: normalizeTipo(s), grupamento_id: s.parentId || '' });
   };
 
   const saveEdit = (id) => {
+    if (!podeGerirEstrutura) return;
     const parent = estrutura.find(g => g.id === editData.grupamento_id);
     updateMutation.mutate({
       id,
@@ -133,6 +134,7 @@ export default function EstruturaOrganizacional() {
   };
 
   const handleCreate = () => {
+    if (!podeGerirEstrutura) return;
     const parent = estrutura.find(g => g.id === newData.grupamento_id);
     createMutation.mutate({
       ...newData,
@@ -151,6 +153,7 @@ export default function EstruturaOrganizacional() {
   };
 
   const handleDelete = () => {
+    if (!podeGerirEstrutura) return;
     if (deleteDialog.id) deleteMutation.mutate(deleteDialog.id);
   };
 
@@ -206,13 +209,13 @@ export default function EstruturaOrganizacional() {
               <p className="text-sm text-slate-500">Árvore hierárquica em 3 níveis (Setor {'>'} Subsetor {'>'} Unidade)</p>
             </div>
           </div>
-          <Button onClick={() => setShowNew(true)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white shadow-sm">
+          {podeGerirEstrutura && <Button onClick={() => setShowNew(true)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white shadow-sm">
             <Plus className="w-4 h-4 mr-2" /> Nova Unidade
-          </Button>
+          </Button>}
         </div>
 
         {/* Formulário de Criação Global */}
-        {showNew && (
+        {showNew && podeGerirEstrutura && (
           <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm ring-1 ring-[#1e3a5f]/5">
             <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
               <Plus className="w-5 h-5 text-indigo-500" /> Cadastrar Novo Nó na Estrutura
@@ -261,7 +264,7 @@ export default function EstruturaOrganizacional() {
             <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-slate-700">Estrutura Vazia</h3>
             <p className="text-slate-500 mb-6">Nenhum Setor de Nível 1 cadastrado ainda.</p>
-            <Button onClick={() => setShowNew(true)} className="bg-[#1e3a5f] text-white">Criar Primeiro Setor</Button>
+            {podeGerirEstrutura && <Button onClick={() => setShowNew(true)} className="bg-[#1e3a5f] text-white">Criar Primeiro Setor</Button>}
           </div>
         ) : (
           <div className="space-y-4">
@@ -299,10 +302,10 @@ export default function EstruturaOrganizacional() {
                       
                       <div className="flex items-center gap-4">
                         <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">{mySubsetores.length} subsetores</span>
-                        <div className="flex gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                        {podeGerirEstrutura && <div className="flex gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
                           <Button variant="ghost" size="icon" onClick={() => startEdit(setor)} className="h-8 w-8 text-slate-500 hover:text-[#1e3a5f]"><Pencil className="w-4 h-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, id: setor.id })} className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
-                        </div>
+                        </div>}
                       </div>
                     </div>
                   )}
@@ -350,10 +353,10 @@ export default function EstruturaOrganizacional() {
 
                                 <div className="flex items-center gap-3">
                                   {myUnidades.length > 0 && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{myUnidades.length} uni.</span>}
-                                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {podeGerirEstrutura && <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button variant="ghost" size="icon" onClick={() => startEdit(sub)} className="h-7 w-7 text-slate-400 hover:text-indigo-600"><Pencil className="w-3.5 h-3.5" /></Button>
                                     <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, id: sub.id })} className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></Button>
-                                  </div>
+                                  </div>}
                                 </div>
                               </div>
                             )}
@@ -387,10 +390,10 @@ export default function EstruturaOrganizacional() {
                                             </div>
                                           </div>
 
-                                          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          {podeGerirEstrutura && <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <Button variant="ghost" size="icon" onClick={() => startEdit(uni)} className="h-6 w-6 text-slate-400 hover:text-emerald-600"><Pencil className="w-3 h-3" /></Button>
                                             <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, id: uni.id })} className="h-6 w-6 text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-3 h-3" /></Button>
-                                          </div>
+                                          </div>}
                                         </div>
                                       )}
                                     </div>
@@ -428,10 +431,10 @@ export default function EstruturaOrganizacional() {
                              <GitMerge className="w-4 h-4" />
                              <span className="font-semibold">{sub.nome}</span>
                            </div>
-                           <div className="flex gap-1">
+                           {podeGerirEstrutura && <div className="flex gap-1">
                              <Button variant="ghost" size="icon" onClick={() => startEdit(sub)} className="h-7 w-7 text-red-500 hover:bg-red-100"><Pencil className="w-3.5 h-3.5" /></Button>
                              <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, id: sub.id })} className="h-7 w-7 text-red-500 hover:bg-red-100"><Trash2 className="w-3.5 h-3.5" /></Button>
-                           </div>
+                           </div>}
                          </>
                        )}
                     </div>
@@ -443,7 +446,7 @@ export default function EstruturaOrganizacional() {
         )}
 
         {/* Modal de Exclusão */}
-        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+        {podeGerirEstrutura && <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmação de Exclusão</AlertDialogTitle>
@@ -456,7 +459,7 @@ export default function EstruturaOrganizacional() {
               <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">Sim, excluir</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>
+        </AlertDialog>}
 
       </div>
     </div>
