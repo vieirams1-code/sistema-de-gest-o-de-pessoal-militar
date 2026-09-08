@@ -177,14 +177,22 @@ Deno.serve(async (req) => {
     // ---- Resolução canônica de auth/effective ----
     const authz = await resolverAutorizacaoCanonica(base44, effectiveEmailRaw);
     if (authz?.error) return Response.json({ error: authz.error, creditos: [] }, { status: 403 });
-    const canViewCreditos = authz?.isAdmin === true || (
-      authz?.modules?.ferias === true && authz?.actions?.visualizar_creditos_ferias === true
+    const acoesCredito = [
+      'visualizar_creditos_ferias', 'criar_credito_extra_ferias', 'editar_credito_extra_ferias',
+      'vincular_credito_extra_ferias', 'remover_vinculo_credito_extra_ferias',
+      'cancelar_credito_extra_ferias', 'excluir_credito_extra_ferias',
+    ];
+    const canUseCreditos = authz?.isAdmin === true || (
+      authz?.modules?.ferias === true && acoesCredito.some((acao) => authz?.actions?.[acao] === true)
     );
-    if (!canViewCreditos) {
+    const canReadFeriasSupport = supportModeFerias
+      && authz?.modules?.ferias === true
+      && authz?.actions?.visualizar_ferias === true;
+    if (!canUseCreditos && !canReadFeriasSupport) {
       return Response.json({
-        error: 'Acesso negado: é necessário acesso a Férias e a permissão visualizar_creditos_ferias.',
+        error: 'Acesso negado: permissão funcional insuficiente para consultar créditos de férias.',
         requiredModule: 'ferias',
-        requiredPermission: 'visualizar_creditos_ferias',
+        requiredAnyPermission: acoesCredito,
         creditos: [],
       }, { status: 403 });
     }
@@ -214,16 +222,18 @@ Deno.serve(async (req) => {
         'creditoExtraFerias.filter.admin',
       );
 
+      const creditosResposta = prepararCreditosResposta(creditos, supportModeFerias && !canUseCreditos);
       return Response.json({
-        creditos: creditos || [],
+        creditos: creditosResposta,
         meta: {
           authUserEmail: authUser.email,
           effectiveUserEmail: targetEmail,
           isImpersonating,
           targetIsAdmin,
           hasGlobalScope: true,
-          returned: (creditos || []).length,
+          returned: creditosResposta.length,
           scope_tipo: 'admin',
+          supportMode: supportModeFerias && !canUseCreditos ? 'ferias' : null,
         },
       });
     }
@@ -311,17 +321,19 @@ Deno.serve(async (req) => {
     });
 
     const truncados = ordenados.slice(0, effLimit);
+    const creditosResposta = prepararCreditosResposta(truncados, supportModeFerias && !canUseCreditos);
 
     return Response.json({
-      creditos: truncados,
+      creditos: creditosResposta,
       meta: {
         authUserEmail: authUser.email,
         effectiveUserEmail: targetEmail,
         isImpersonating,
         targetIsAdmin,
         hasGlobalScope: false,
-        returned: truncados.length,
+        returned: creditosResposta.length,
         scope_tipo: 'estrutura',
+        supportMode: supportModeFerias && !canUseCreditos ? 'ferias' : null,
         militares_no_escopo: idsPermitidos.length,
       },
     });
