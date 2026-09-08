@@ -300,23 +300,31 @@ export default function VerMilitar() {
   const canViewMilitar = militar ? hasAccess(militar) || hasSelfAccess(militar) : false;
   const comportamentoElegivel = militar ? !isOficial(postoGraduacaoMilitar) : false;
 
-  const { data: ferias = [] } = useQuery({
-    queryKey: ['ver-ferias', id],
-    queryFn: () => base44.entities.Ferias.filter({ militar_id: id }, '-data_inicio'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+  const { data: feriasBundle = { ferias: [] } } = useQuery({
+    queryKey: ['ver-ferias', id, effectiveEmail || null],
+    queryFn: () => fetchScopedFeriasBundle(),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarFerias,
   });
+  const ferias = React.useMemo(
+    () => (feriasBundle?.ferias || []).filter((item) => String(item?.militar_id || '') === String(id)),
+    [feriasBundle, id]
+  );
 
   const { data: ajustesSaldoFerias = [] } = useQuery({
     queryKey: ['ver-ajustes-saldo-ferias', id],
     queryFn: () => base44.entities.AjusteSaldoFerias.filter({ militar_id: id }, '-created_date'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarFerias,
   });
 
-  const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
-    queryKey: ['ver-atestados', id],
-    queryFn: () => base44.entities.Atestado.filter({ militar_id: id }, '-data_inicio'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+  const { data: atestadosBundle = { atestados: [] }, isLoading: isLoadingAtestados } = useQuery({
+    queryKey: ['ver-atestados', id, effectiveEmail || null],
+    queryFn: () => fetchScopedAtestadosBundle(),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarAtestados,
   });
+  const atestados = React.useMemo(
+    () => (atestadosBundle?.atestados || []).filter((item) => String(item?.militar_id || '') === String(id)),
+    [atestadosBundle, id]
+  );
 
   const { data: medalhas = [] } = useQuery({
     queryKey: ['ver-medalhas', id],
