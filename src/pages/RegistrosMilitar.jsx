@@ -118,7 +118,6 @@ export default function RegistrosMilitar() {
     isAccessResolved,
     isLoading: loadingUser,
     canAccessModule,
-    isAdmin,
     canAccessAction,
     user,
   } = useCurrentUser();
@@ -146,9 +145,8 @@ export default function RegistrosMilitar() {
   const [tipoEdicao, setTipoEdicao] = useState({});
 
   const canAccessRegistrosMilitar = canAccessModule('registros_militar');
-  const canUseAdminMode = isAdmin && canAccessAction('admin_mode');
-  const canEditarRegistros = canUseAdminMode && canAccessAction('editar_registros_militar');
-  const canExcluirRegistros = canUseAdminMode && canAccessAction('excluir_registros_militar');
+  const canEditarRegistros = canAccessAction('editar_registros_militar');
+  const canExcluirRegistros = canAccessAction('excluir_registros_militar');
   const canManageAdminActions = canEditarRegistros || canExcluirRegistros;
 
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
@@ -323,7 +321,7 @@ export default function RegistrosMilitar() {
   const aguardandoMilitarPreSelecionado = filtroMilitarId !== 'all' && loadingMilitares;
 
   const editarTipoMutation = useMutation({
-    mutationFn: ({ registro, novoTipo }) => atualizarTipoRegistroMilitar(registro, novoTipo, { userEmail: user?.email }),
+    mutationFn: ({ registro, novoTipo }) => atualizarTipoRegistroMilitar(registro, novoTipo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-militar-registros'] });
       toast({
