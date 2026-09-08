@@ -32,6 +32,21 @@ Deno.serve(async (req) => {
     const idsSelecionados = normalizeIds(payload.idsSelecionados);
     if (!idsSelecionados.length) return Response.json({ error: 'Nenhum atestado selecionado.' }, { status: 400 });
 
+    const permsResponse = await base44.functions.invoke('getUserPermissions', payload);
+    const perms = permsResponse?.data ?? permsResponse ?? {};
+    const actions = perms?.actions || {};
+    const requiredPermissions = ['visualizar_atestados', 'baixar_zip_atestados', 'ver_dados_sensiveis_atestado'];
+    const faltantes = perms?.isAdmin === true
+      ? []
+      : requiredPermissions.filter((action) => actions?.[action] !== true);
+    if (perms?.error || faltantes.length > 0) {
+      return Response.json({
+        error: perms?.error || `Sem permissão para gerar ZIP de anexos médicos: ${faltantes.join(', ')}.`,
+        code: 'FORBIDDEN',
+        requiredPermissions,
+      }, { status: 403 });
+    }
+
     const scopedResponse = await base44.functions.invoke('getScopedAtestadosBundle', payload);
     const scopedData = scopedResponse?.data ?? scopedResponse ?? {};
     const scopedAtestados = Array.isArray(scopedData?.atestados) ? scopedData.atestados : [];
