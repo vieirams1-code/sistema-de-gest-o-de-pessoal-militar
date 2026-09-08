@@ -32,7 +32,7 @@ export function getEffectiveEmail() {
  * sessionStorage (a menos que o caller já tenha passado um valor).
  *
  * Payload suportado (campos opcionais):
- *  - limit, offset, fetchAll, includeFoto, debugFields
+ *  - limit, offset, fetchAll, includeFoto, includeMatriculas, debugFields
  *  - statusCadastro, situacaoMilitar, search, militarIds
  *  - postoGraduacaoFiltro (string) | postoGraduacaoFiltros (array)
  *  - lotacaoFiltro (string)
@@ -65,6 +65,7 @@ export async function fetchScopedMilitares(payload = {}) {
     const data = response?.data ?? response ?? {};
     return {
       militares: Array.isArray(data.militares) ? data.militares : [],
+      matriculasMilitar: Array.isArray(data.matriculasMilitar) ? data.matriculasMilitar : [],
       meta: data.meta || {},
     };
   };
@@ -75,6 +76,7 @@ export async function fetchScopedMilitares(payload = {}) {
 
   return {
     militares: data.militares.map((militar) => normalizarPostoGraduacaoMilitar(militar)),
+    matriculasMilitar: Array.isArray(data.matriculasMilitar) ? data.matriculasMilitar : [],
     meta: data.meta,
   };
 }
