@@ -666,18 +666,18 @@ export default function VerMilitar() {
   const mensagemRegistrosSistema = React.useMemo(() => getMensagemRegistrosSistemaPerfilMilitar(), []);
 
   const avaliacaoComportamento = React.useMemo(() => {
-    if (!militar) return null;
+    if (!militar || !podeVisualizarPunicoes) return null;
     return calcularComportamento(punicoesSistema, militar.posto_graduacao, new Date(), {
       dataInclusaoMilitar: militar.data_inclusao
     });
-  }, [militar, punicoesSistema]);
+  }, [militar, punicoesSistema, podeVisualizarPunicoes]);
 
   const proximaMelhoria = React.useMemo(() => {
-    if (!militar) return null;
+    if (!militar || !podeVisualizarPunicoes) return null;
     return calcularProximaMelhoria(punicoesSistema, militar.posto_graduacao, new Date(), {
       dataInclusaoMilitar: militar.data_inclusao
     });
-  }, [militar, punicoesSistema]);
+  }, [militar, punicoesSistema, podeVisualizarPunicoes]);
 
   const conferenciaAbertaPrincipal = React.useMemo(() => {
     return conferenciasAtivasMilitar.find(c => ['em_andamento', 'pendente'].includes(c.status)) || conferenciasAtivasMilitar[0];
