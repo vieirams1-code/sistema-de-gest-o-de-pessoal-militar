@@ -165,6 +165,22 @@ function autorizarLeitura(authz: any, payload: any) {
       : { ok: false, status: 403, error: 'Acesso negado: leitura para migração exige o módulo Migração de Alterações Legado.' };
   }
 
+  if (purpose === 'APURACAO') {
+    const acoesApuracao = [
+      'indicar_medalhas',
+      'conceder_medalhas',
+      'resetar_indicacoes_medalhas',
+      'gerir_impedimentos_medalha',
+      'gerir_dom_pedro_ii',
+      'exportar_medalhas',
+    ];
+    const ok = authz?.modules?.medalhas === true
+      && acoesApuracao.some((action) => authz?.actions?.[action] === true);
+    return ok
+      ? { ok: true }
+      : { ok: false, status: 403, error: 'Acesso negado: apuração de medalhas exige uma capacidade operacional explícita do módulo Medalhas.' };
+  }
+
   const ok = authz?.modules?.medalhas === true && authz?.actions?.visualizar_medalhas === true;
   return ok
     ? { ok: true }
