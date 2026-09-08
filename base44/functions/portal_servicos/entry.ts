@@ -348,68 +348,65 @@ async function registrarAuditoriaFerias(base44: any, user: any, acao: string, co
 }
 
 function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
-  // Compatibilidade transitória: aliases legados são aceitos somente até a migração formal dos perfis (F8-L08).
-  // As capacidades canônicas abaixo não se substituem entre si.
-  const legadoCampanhas = ['perm_gerir_campanhas'];
-  const legadoRespostas = ['perm_gerir_respostas'];
+  // F8-L08: somente capacidades canônicas. Aliases legados são convertidos
+  // exclusivamente pelo getUserPermissions antes de chegar a este serviço.
 
   if (acao === 'PERMISSOES_LISTAR_USUARIOS') {
-    return ['perm_atribuir_permissoes_ferias', 'perm_atribuir_permissoes_campanhas', ...legadoRespostas];
+    return ['perm_atribuir_permissoes_ferias', 'perm_atribuir_permissoes_campanhas'];
   }
   if (acao === 'PLANO_PERMISSOES_LISTAR' || acao === 'PLANO_AUDITORIA_LISTAR') {
-    return ['perm_atribuir_permissoes_ferias', ...legadoRespostas];
+    return ['perm_atribuir_permissoes_ferias'];
   }
   if (acao === 'PLANO_PERMISSAO_SALVAR' || acao === 'PLANO_PERMISSAO_EXCLUIR') {
-    return ['perm_atribuir_permissoes_ferias', ...legadoRespostas];
+    return ['perm_atribuir_permissoes_ferias'];
   }
   if (acao === 'PLANO_INSTITUCIONAL_LISTAR' || acao === 'PLANO_INSTITUCIONAL_DETALHES') {
-    return ['perm_visualizar_planos_ferias', ...legadoCampanhas];
+    return ['perm_visualizar_planos_ferias'];
   }
-  if (acao === 'PLANO_INSTITUCIONAL_CRIAR') return ['perm_criar_planos_ferias', ...legadoCampanhas];
+  if (acao === 'PLANO_INSTITUCIONAL_CRIAR') return ['perm_criar_planos_ferias'];
   if (['PLANO_INSTITUCIONAL_ATUALIZAR', 'PLANO_INSTITUCIONAL_ARQUIVAR'].includes(acao)) {
-    return ['perm_editar_planos_ferias', ...legadoCampanhas];
+    return ['perm_editar_planos_ferias'];
   }
-  if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias', ...legadoCampanhas];
-  if (acao === 'PLANO_ESCALA_LISTAR') return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas', 'perm_atribuir_permissoes_ferias', ...legadoRespostas];
+  if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias'];
+  if (acao === 'PLANO_ESCALA_LISTAR') return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas', 'perm_atribuir_permissoes_ferias'];
   if (acao === 'PLANO_DECISAO_CAMADA_1' || acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
-    return ['perm_aprovar_ferias', ...legadoRespostas];
+    return ['perm_aprovar_ferias'];
   }
   if (acao === 'PLANO_GERAR_LOTE_FERIAS' || acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
-    return ['perm_gerar_ferias_campanhas', ...legadoRespostas];
+    return ['perm_gerar_ferias_campanhas'];
   }
-  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias', ...legadoCampanhas];
-  if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas_ferias', 'perm_editar_campanhas_ferias', ...legadoCampanhas];
-  if (acao === 'PLANO_CAMPANHA_SALVAR' || acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') return ['perm_editar_campanhas_ferias', ...legadoCampanhas];
-  if (acao === 'PLANO_CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas_ferias', ...legadoCampanhas];
+  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias'];
+  if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas_ferias', 'perm_editar_campanhas_ferias'];
+  if (acao === 'PLANO_CAMPANHA_SALVAR' || acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') return ['perm_editar_campanhas_ferias'];
+  if (acao === 'PLANO_CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas_ferias'];
 
   if (acao === 'PORTAL_CONFIG_GET' || acao === 'PORTAL_CONFIG_SAVE') return ['perm_configurar_portal'];
-  if (acao === 'CADASTRO_SOLICITACOES_LISTAR') return ['perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais', ...legadoRespostas];
+  if (acao === 'CADASTRO_SOLICITACOES_LISTAR') return ['perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais'];
   if (acao === 'CADASTRO_DECIDIR_SOLICITACAO' || acao === 'CADASTRO_DECIDIR_LOTE_MILITAR') {
-    return ['perm_decidir_solicitacoes_cadastrais', ...legadoRespostas];
+    return ['perm_decidir_solicitacoes_cadastrais'];
   }
 
-  if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais', ...legadoCampanhas];
-  if (acao === 'CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas', 'perm_editar_campanhas', ...legadoCampanhas];
+  if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais'];
+  if (acao === 'CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas', 'perm_editar_campanhas'];
   if (acao === 'CAMPANHA_CONTEXTO_RETORNO') {
     return [
       'perm_visualizar_respostas_campanhas',
       'perm_exportar_respostas_campanhas',
       'perm_baixar_anexos_respostas_campanhas',
       'perm_aprovar_respostas_campanhas',
-      ...legadoRespostas,
     ];
   }
-  if (acao === 'CAMPANHA_DETALHES_RETORNO') return ['perm_visualizar_respostas_campanhas', ...legadoRespostas];
-  if (acao === 'CAMPANHA_APROVACAO_RETORNO') return ['perm_aprovar_respostas_campanhas', ...legadoRespostas];
-  if (acao === 'CAMPANHA_EXPORTAR_RETORNO') return ['perm_exportar_respostas_campanhas', ...legadoRespostas];
-  if (acao === 'CAMPANHA_ANEXOS_RETORNO') return ['perm_baixar_anexos_respostas_campanhas', ...legadoRespostas];
-  if (acao === 'CAMPANHA_HOMOLOGAR_RESPOSTA') return ['perm_aprovar_respostas_campanhas', ...legadoRespostas];
-  if (acao === 'CAMPANHA_DISPARAR_LEMBRETES') return ['perm_enviar_lembretes_campanhas', ...legadoCampanhas];
-  if (acao === 'CAMPANHA_CRIAR') return ['perm_criar_campanhas', ...legadoCampanhas];
+  if (acao === 'CAMPANHA_DETALHES_RETORNO') return ['perm_visualizar_respostas_campanhas'];
+  if (acao === 'CAMPANHA_APROVACAO_RETORNO') return ['perm_aprovar_respostas_campanhas'];
+  if (acao === 'CAMPANHA_EXPORTAR_RETORNO') return ['perm_exportar_respostas_campanhas'];
+  if (acao === 'CAMPANHA_ANEXOS_RETORNO') return ['perm_baixar_anexos_respostas_campanhas'];
+  if (acao === 'CAMPANHA_HOMOLOGAR_RESPOSTA') return ['perm_aprovar_respostas_campanhas'];
+  if (acao === 'CAMPANHA_DISPARAR_LEMBRETES') return ['perm_enviar_lembretes_campanhas'];
+  if (acao === 'CAMPANHA_CRIAR') return ['perm_criar_campanhas'];
   if (['CAMPANHA_EDITAR', 'CAMPANHA_ARQUIVAR', 'CAMPANHA_DESATIVAR', 'CAMPANHA_ENCERRAR', 'CAMPANHA_REABRIR', 'CAMPANHA_ATIVAR'].includes(acao)) {
-    return ['perm_editar_campanhas', ...legadoCampanhas];
+    return ['perm_editar_campanhas'];
   }
-  if (acao === 'CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas', ...legadoCampanhas];
+  if (acao === 'CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas'];
   return [];
 }
 
@@ -417,31 +414,10 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   if (!user?.email) return false;
   if (String(user.role || '').trim().toLowerCase() === 'admin') return true;
 
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true });
-  // tipo_acesso='admin' representa escopo organizacional global, não privilégio funcional absoluto.
-  // Apenas role=admin da plataforma possui bypass; demais usuários precisam das permissões do perfil.
-  const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
-  let perfis: any[] = [];
-  if (perfilIds.length) {
-    try {
-      perfis = await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true });
-    } catch (_ePerfisFiltro) {
-      perfis = [];
-    }
-    if (!Array.isArray(perfis) || perfis.length === 0) {
-      perfis = (await Promise.all(perfilIds.map(async (id: any) => {
-        try {
-          const perfil = await base44.asServiceRole.entities.PerfilPermissao.get(id);
-          return perfil?.ativo === false ? null : perfil;
-        } catch (_ePerfil) {
-          return null;
-        }
-      }))).filter(Boolean);
-    }
-  }
-  const permissoes = consolidarPermissoesPortal(perfis || [], acessos || []);
+  const authzResponse = await base44.functions.invoke('getUserPermissions', {});
+  const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
-  if (necessarias.length > 0 && necessarias.some((key) => permissoes.has(key))) return true;
+  if (necessarias.length > 0 && necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)) return true;
 
   // Delegação por plano/campanha: um usuário pode atuar nas férias apenas
   // quando recebeu uma autorização ativa e explícita naquele plano.
