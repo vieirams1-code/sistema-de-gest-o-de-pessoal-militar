@@ -125,7 +125,7 @@ const getModuleGuardByPage = (pageKey) => moduleGuardByPageNormalized[pageKey.to
 // RequireModuleAccess (OR), garantindo que a action seja realmente exigida.
 const actionGuardByPage = {
   Militares: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
-  CadastrarMilitar: { moduleKey: 'militares', actionKey: 'adicionar_militares', moduleName: 'Efetivo' },
+  CadastrarMilitar: { moduleKey: 'militares', actionKeys: ['adicionar_militares', 'editar_militares'], moduleName: 'Efetivo' },
   Ferias: { moduleKey: 'ferias', actionKey: 'visualizar_ferias', moduleName: 'Férias' },
   PlanoAnualFerias: { moduleKey: 'ferias', actionKey: 'visualizar_plano_ferias', moduleName: 'Férias' },
   PeriodosAquisitivos: { moduleKey: 'ferias', actionKey: 'visualizar_periodos_aquisitivos', moduleName: 'Férias' },
