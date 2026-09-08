@@ -518,6 +518,58 @@ async function usuarioPodeAgirSobreMilitarPortal(base44: any, user: any, militar
   return false;
 }
 
+function sanitizarItemAnexoCampanha(item: any, incluirUrl = false): any {
+  if (!item) return item;
+  if (typeof item === 'string') return incluirUrl ? item : { nome: 'Arquivo enviado' };
+  if (typeof item !== 'object') return null;
+  const seguro: any = {
+    nome: item.nome || item.nome_original || item.name || 'Arquivo enviado',
+  };
+  if (incluirUrl && item.url) seguro.url = item.url;
+  return seguro;
+}
+
+function sanitizarRespostaCampanha(resposta: any, modo: 'VISUALIZAR' | 'EXPORTAR' | 'ANEXOS' = 'VISUALIZAR'): any {
+  if (!resposta) return null;
+  const incluirUrl = modo === 'ANEXOS';
+  const base: any = {
+    id: resposta.id,
+    militar_id: resposta.militar_id,
+    campanha_id: resposta.campanha_id,
+    status: resposta.status,
+    data_envio: resposta.data_envio,
+    data_envio_militar: resposta.data_envio_militar,
+    created_date: resposta.created_date,
+    resposta_texto_geral: resposta.resposta_texto_geral,
+    respostas_json: modo === 'ANEXOS' ? undefined : resposta.respostas_json,
+    termo_aceite: modo === 'ANEXOS' ? undefined : resposta.termo_aceite,
+    texto_termo_aceite: modo === 'ANEXOS' ? undefined : resposta.texto_termo_aceite,
+    observacao_gestor: modo === 'ANEXOS' ? undefined : resposta.observacao_gestor,
+    homologado_por_nome: modo === 'ANEXOS' ? undefined : resposta.homologado_por_nome,
+    data_homologacao: modo === 'ANEXOS' ? undefined : resposta.data_homologacao,
+    arquivo_devolucao_nome: resposta.arquivo_devolucao_nome || '',
+    arquivo_devolucao_url: incluirUrl ? (resposta.arquivo_devolucao_url || '') : '',
+  };
+
+  if (resposta.arquivos_anexados_json) {
+    try {
+      const parsed = typeof resposta.arquivos_anexados_json === 'string'
+        ? JSON.parse(resposta.arquivos_anexados_json)
+        : resposta.arquivos_anexados_json;
+      const anexos: Record<string, any> = {};
+      for (const [key, item] of Object.entries(parsed || {})) {
+        anexos[key] = sanitizarItemAnexoCampanha(item, incluirUrl);
+      }
+      base.arquivos_anexados_json = JSON.stringify(anexos);
+    } catch (_eAnexos) {
+      base.arquivos_anexados_json = '';
+    }
+  } else {
+    base.arquivos_anexados_json = '';
+  }
+  return base;
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
