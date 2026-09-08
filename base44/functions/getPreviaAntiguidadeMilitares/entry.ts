@@ -99,6 +99,30 @@ Deno.serve(async (req) => {
       });
     }
 
+    const permsResponse = await base44.functions.invoke('getUserPermissions', {
+      ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+      scopeMilitarIds: idsMilitares,
+    });
+    const perms = permsResponse?.data ?? permsResponse ?? {};
+    const autorizadoFuncional = perms?.isAdmin === true || (
+      perms?.modules?.antiguidade === true
+      && perms?.actions?.visualizar_rastreamento_promocoes === true
+    );
+    if (perms?.error || !autorizadoFuncional) {
+      return Response.json({
+        error: perms?.error || 'Acesso negado: requer Antiguidade e visualizar_rastreamento_promocoes.',
+        historicoPromocoes: [],
+        requiredPermission: 'visualizar_rastreamento_promocoes',
+      }, { status: 403 });
+    }
+    if (perms?.scopeCheck?.allAllowed !== true) {
+      return Response.json({
+        error: 'Acesso negado: um ou mais militares estão fora do escopo organizacional.',
+        historicoPromocoes: [],
+        militaresForaDoEscopo: perms?.scopeCheck?.deniedIds || [],
+      }, { status: 403 });
+    }
+
     // Particiona em chunks para evitar payloads grandes em `$in`.
     const chunks = [];
     for (let i = 0; i < idsMilitares.length; i += CHUNK_SIZE) {
