@@ -1365,7 +1365,18 @@ Deno.serve(async (req) => {
         const alteraBg = Object.prototype.hasOwnProperty.call(data || {}, 'numero_bg')
           || Object.prototype.hasOwnProperty.call(data || {}, 'data_bg')
           || statusDestino === 'publicado';
-        const requiredPermission = alteraBg ? 'publicar_bg' : 'editar_livro';
+        const chavesRegistroLivro = Object.keys(data || {});
+        const apenasApostilamento = chavesRegistroLivro.length > 0
+          && chavesRegistroLivro.every((key) => ['apostilada_por_id', 'foi_apostilada'].includes(key));
+        const apenasTornarSemEfeito = chavesRegistroLivro.length > 0
+          && chavesRegistroLivro.every((key) => ['tornada_sem_efeito_por_id', 'foi_tornada_sem_efeito'].includes(key));
+        const requiredPermission = alteraBg
+          ? 'publicar_bg'
+          : apenasApostilamento
+            ? 'apostilar_publicacao'
+            : apenasTornarSemEfeito
+              ? 'tornar_sem_efeito_publicacao'
+              : 'editar_livro';
         if (targetPerms.actions?.[requiredPermission] !== true) {
           return Response.json(
             { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
