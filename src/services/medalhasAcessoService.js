@@ -1,6 +1,8 @@
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '../utils/antiguidade/ordenacaoMilitarInstitucional.js';
 
 export const ACOES_MEDALHAS = {
+  ADICIONAR: 'adicionar_medalhas',
+  EDITAR: 'editar_medalhas',
   INDICAR: 'indicar_medalhas',
   ADMIN_OVERRIDE: 'editar_medalhas',
   CONCEDER: 'conceder_medalhas',
