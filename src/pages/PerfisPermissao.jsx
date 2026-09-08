@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
@@ -28,6 +27,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { previewProfilePermissionMigration } from '@/services/permissionProfileMigrationService';
+import {
+  listarPerfisPermissaoAdmin,
+  obterPerfilPermissaoAdmin,
+  listarUsoPerfisAdmin,
+} from '@/services/permissoesAdminGatewayClient';
 
 const CUD_ENTITIES_ALLOWLIST = new Set(['PerfilPermissao', 'UsuarioAcesso']);
 
@@ -57,11 +61,13 @@ export default function PerfisPermissao() {
 
   const { data: perfis = [], isLoading } = useQuery({
     queryKey: ['perfisPermissao'],
-    queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
+    queryFn: listarPerfisPermissaoAdmin,
+    enabled: canManageProfiles,
   });
   const { data: acessosUsuarios = [] } = useQuery({
-    queryKey: ['usuariosAcesso'],
-    queryFn: () => base44.entities.UsuarioAcesso.list(),
+    queryKey: ['perfisPermissaoUso'],
+    queryFn: listarUsoPerfisAdmin,
+    enabled: canManageProfiles,
   });
   const perfisBase = useMemo(
     () => perfis.filter((perfil) => !isLegacyCustomProfile(perfil)),
@@ -159,7 +165,7 @@ export default function PerfisPermissao() {
   const handleEdit = async (p) => {
     let fullPerfil = p;
     try {
-      fullPerfil = await base44.entities.PerfilPermissao.get(p.id);
+      fullPerfil = await obterPerfilPermissaoAdmin(p.id);
     } catch {
       // fallback para registro parcial da listagem
     }
