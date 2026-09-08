@@ -16,6 +16,20 @@ const timelineService = await readFile(new URL('../../../services/militarTimelin
 const cudBackend = await readFile(new URL('../../../../base44/functions/cudEscopado/entry.ts', import.meta.url), 'utf8');
 const processosBackend = await readFile(new URL('../../../../base44/functions/controleProcessosEscopado/entry.ts', import.meta.url), 'utf8');
 const processosService = await readFile(new URL('../../../services/controleProcessosService.js', import.meta.url), 'utf8');
+const entidadesProcessuaisServiceOnly = [
+  'CaixaProcessual',
+  'ProcessoControle',
+  'TramiteProcessual',
+  'EventoProcessual',
+  'ProcedimentoProcesso',
+  'ProcedimentoEnvolvido',
+  'ProcedimentoPendencia',
+  'ProcedimentoPrazoHistorico',
+  'ProcedimentoViatura',
+  'Demanda',
+  'DemandaComentario',
+  'Processo',
+];
 
 test('L09: páginas administrativas não leem UsuarioAcesso ou PerfilPermissao diretamente pelo SDK', () => {
   for (const source of [perfisPage, usuariosPage]) {
@@ -105,4 +119,19 @@ test('L09: frontend de Controle de Processos não lê entidades processuais dire
   assert.doesNotMatch(processosService, /base44\.entities\.(ProcessoControle|CaixaProcessual|TramiteProcessual|EventoProcessual)/);
   assert.match(processosService, /listarTramitesProcessoEscopado/);
   assert.match(processosService, /listarEventosProcessoEscopado/);
+});
+
+test('L09: entidades processuais ativas e legadas permanecem service-only', async () => {
+  for (const entityName of entidadesProcessuaisServiceOnly) {
+    const source = await readFile(
+      new URL(`../../../../base44/entities/${entityName}.jsonc`, import.meta.url),
+      'utf8',
+    );
+    const schema = JSON.parse(source);
+    assert.deepEqual(
+      schema.rls,
+      { create: false, read: false, update: false, delete: false },
+      `${entityName} deve permanecer fechado para o SDK cliente`,
+    );
+  }
 });
