@@ -385,15 +385,19 @@ export default function VerMilitar() {
     enabled: Boolean(militar?.id && isAccessResolved && canViewMilitar),
   });
 
-  const { data: periodos = [] } = useQuery({
-    queryKey: ['ver-periodos', id],
-    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+  const { data: periodosBundle = { periodosAquisitivos: [] } } = useQuery({
+    queryKey: ['ver-periodos', id, effectiveEmail || null],
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarPeriodosAquisitivos,
   });
+  const periodos = React.useMemo(
+    () => (periodosBundle?.periodosAquisitivos || []).filter((item) => String(item?.militar_id || '') === String(id)),
+    [periodosBundle, id]
+  );
   const { data: creditosExtraFerias = [] } = useQuery({
-    queryKey: ['ver-creditos-extra-ferias', id],
-    queryFn: () => base44.entities.CreditoExtraFerias.filter({ militar_id: id }, '-data_referencia'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    queryKey: ['ver-creditos-extra-ferias', id, effectiveEmail || null],
+    queryFn: () => listarCreditosExtraFerias('-data_referencia', { supportMode: 'ferias', militarId: id }),
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarFerias,
   });
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
@@ -414,7 +418,7 @@ export default function VerMilitar() {
   const { data: acervoHistorico = [] } = useQuery({
     queryKey: ['ver-acervo-historico', id],
     queryFn: () => listarAcervoMilitar(id),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && podeVisualizarAcervo,
   });
 
   const { data: lixeiraAcervo = [] } = useQuery({
