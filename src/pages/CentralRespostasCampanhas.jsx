@@ -279,36 +279,42 @@ export default function CentralRespostasCampanhas() {
               <ArrowLeft className="w-4 h-4 mr-1.5" />
               Fechar
             </Button>
-            <Button
-              type="button"
-              onClick={handleExportarExcel}
-              disabled={loadingRespostas || !respostasData?.militares?.length}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md h-10 px-4"
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-1.5" />
-              Exportar Excel (.xlsx)
-            </Button>
+            {canExportResponses && (
+              <>
+                <Button
+                  type="button"
+                  onClick={handleExportarExcel}
+                  disabled={actionLoading}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md h-10 px-4"
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+                  Exportar Excel (.xlsx)
+                </Button>
 
-            <Button
-              type="button"
-              onClick={handleExportarCsv}
-              disabled={loadingRespostas || !respostasData?.militares?.length}
-              variant="outline"
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-bold rounded-xl h-10 px-3.5"
-            >
-              CSV
-            </Button>
+                <Button
+                  type="button"
+                  onClick={handleExportarCsv}
+                  disabled={actionLoading}
+                  variant="outline"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-bold rounded-xl h-10 px-3.5"
+                >
+                  CSV
+                </Button>
+              </>
+            )}
 
-            <Button
-              type="button"
-              onClick={handleBaixarZipLote}
-              disabled={loadingRespostas || contagemAnexos === 0}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md h-10 px-4 disabled:opacity-40"
-              title={contagemAnexos === 0 ? 'Esta campanha não possui anexos enviados' : 'Baixar todos os anexos organizados em ZIP'}
-            >
-              <FolderDown className="w-4 h-4 mr-1.5" />
-              Baixar Anexos (ZIP)
-            </Button>
+            {canDownloadAttachments && (
+              <Button
+                type="button"
+                onClick={handleBaixarZipLote}
+                disabled={actionLoading}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md h-10 px-4 disabled:opacity-40"
+                title="Baixar todos os anexos organizados em ZIP"
+              >
+                <FolderDown className="w-4 h-4 mr-1.5" />
+                Baixar Anexos (ZIP)
+              </Button>
+            )}
           </div>
         </div>
 
@@ -358,17 +364,19 @@ export default function CentralRespostasCampanhas() {
             </div>
           </div>
 
-          <Button
-            type="button"
-            onClick={() => carregarRespostas(campanhaSelecionada)}
-            disabled={loadingRespostas}
-            variant="outline"
-            className="h-10 text-xs font-semibold rounded-xl"
-            title="Recarregar Dados"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loadingRespostas ? 'animate-spin' : ''}`} />
-            Recarregar Dados
-          </Button>
+          {canLoadResponseRows && (
+            <Button
+              type="button"
+              onClick={() => carregarRespostas(campanhaSelecionada)}
+              disabled={loadingRespostas}
+              variant="outline"
+              className="h-10 text-xs font-semibold rounded-xl"
+              title="Recarregar Dados"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loadingRespostas ? 'animate-spin' : ''}`} />
+              Recarregar Dados
+            </Button>
+          )}
         </div>
 
         {/* KPI CARDS RESUMO */}
@@ -936,10 +944,11 @@ export default function CentralRespostasCampanhas() {
                   Fechar
                 </Button>
 
-                <div className="flex items-center space-x-2">
-                  <Button
-                    type="button"
-                    onClick={async () => {
+                {canApproveResponses && (
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      type="button"
+                      onClick={async () => {
                       if (!modalMilitar.resposta?.id) return;
                       setActionLoading(true);
                       try {
@@ -963,9 +972,10 @@ export default function CentralRespostasCampanhas() {
                     className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold h-9 px-4 shadow-xs"
                   >
                     <Check className="w-3.5 h-3.5 mr-1" />
-                    Dar Visto / Homologar
-                  </Button>
-                </div>
+                      Dar Visto / Homologar
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
