@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
-import { CANONICAL_PERMISSION_KEYS, PROFILE_MATRIX_VERSION } from './permissionManifest.ts';
+import { CANONICAL_PERMISSION_KEYS, PERMISSION_MODULES, PROFILE_MATRIX_VERSION } from './permissionManifest.ts';
 
 // =====================================================================
 // Constantes
@@ -152,41 +152,71 @@ function extrairMatrizPermissoes(descricao) {
 //
 // Para PerfilPermissao, lemos tanto os campos booleanos da raiz quanto a matriz
 // completa serializada em `descricao` ([SGP_PERMISSIONS_MATRIX]{...}[/...]).
+const LEGACY_EXPANSIONS = Object.freeze({
+    acesso_campanhas: ['acesso_campanhas_ferias', 'acesso_campanhas_gerais'],
+    perm_visualizar_campanhas: ['perm_visualizar_campanhas_ferias', 'perm_visualizar_campanhas_gerais'],
+    perm_gerir_campanhas: [
+        'perm_visualizar_campanhas_ferias', 'perm_criar_campanhas_ferias', 'perm_admin_campanhas_ferias',
+        'perm_editar_campanhas_ferias', 'perm_excluir_campanhas_ferias', 'perm_visualizar_planos_ferias',
+        'perm_criar_planos_ferias', 'perm_editar_planos_ferias', 'perm_excluir_planos_ferias',
+        'perm_visualizar_campanhas_gerais', 'perm_criar_campanhas', 'perm_admin_campanhas',
+        'perm_editar_campanhas', 'perm_excluir_campanhas', 'perm_enviar_lembretes_campanhas',
+    ],
+    perm_gerir_respostas: [
+        'perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas',
+        'perm_atribuir_permissoes_ferias', 'perm_visualizar_respostas_campanhas',
+        'perm_exportar_respostas_campanhas', 'perm_baixar_anexos_respostas_campanhas',
+        'perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais',
+        'perm_aprovar_respostas_campanhas', 'perm_atribuir_permissoes_campanhas',
+    ],
+    perm_excluir_atestados: ['perm_excluir_atestado'],
+    perm_gerir_fluxo_dom_pedro_ii: ['perm_gerir_dom_pedro_ii'],
+});
+
+const PARENT_BY_ACTION = new Map(
+    (PERMISSION_MODULES || []).flatMap((module) => (module.actions || []).map((action) => [action, module.key]))
+);
+
+function canonicalizarFontePerfil(perfil) {
+    const matriz = extrairMatrizPermissoes(perfil?.descricao);
+    const fonte = Object.keys(matriz).length > 0 ? matriz : (perfil || {});
+    const canonical = {};
+
+    for (const key of CANONICAL_PERMISSION_KEYS) {
+        if (typeof fonte?.[key] === 'boolean') canonical[key] = fonte[key];
+        else canonical[key] = false;
+    }
+
+    for (const [legacyKey, targets] of Object.entries(LEGACY_EXPANSIONS)) {
+        if (fonte?.[legacyKey] !== true) continue;
+        for (const target of targets) {
+            if (CANONICAL_PERMISSION_KEY_SET.has(target)) canonical[target] = true;
+        }
+    }
+
+    for (const [actionKey, moduleKey] of PARENT_BY_ACTION.entries()) {
+        if (canonical[actionKey] === true) canonical[moduleKey] = true;
+    }
+
+    return canonical;
+}
+
 function consolidarModulesActions(perfis) {
     const modules = {};
     const actions = {};
 
-    const aplicarFonte = (fonte) => {
-        if (!fonte) return;
-        Object.entries(fonte).forEach(([key, val]) => {
-            if (typeof val !== 'boolean') return;
+    (perfis || []).forEach((perfil) => {
+        if (!perfil) return;
+        const canonical = canonicalizarFontePerfil(perfil);
+        for (const [key, val] of Object.entries(canonical)) {
             if (key.startsWith('acesso_')) {
                 const moduleKey = key.replace(/^acesso_/, '');
-                if (val === true) {
-                    modules[moduleKey] = true;
-                } else if (!(moduleKey in modules)) {
-                    modules[moduleKey] = false;
-                }
-                // se já é true, nunca sobrescreve com false
+                modules[moduleKey] = modules[moduleKey] === true || val === true;
             } else if (key.startsWith('perm_')) {
                 const actionKey = key.replace(/^perm_/, '');
-                if (val === true) {
-                    actions[actionKey] = true;
-                } else if (!(actionKey in actions)) {
-                    actions[actionKey] = false;
-                }
-                // se já é true, nunca sobrescreve com false
+                actions[actionKey] = actions[actionKey] === true || val === true;
             }
-        });
-    };
-
-    (perfis || []).forEach((p) => {
-        if (!p) return;
-        // 1. Campos booleanos diretos do perfil
-        aplicarFonte(p);
-        // 2. Matriz completa embutida em descricao
-        const matriz = extrairMatrizPermissoes(p.descricao);
-        aplicarFonte(matriz);
+        }
     });
 
     return { modules, actions };
