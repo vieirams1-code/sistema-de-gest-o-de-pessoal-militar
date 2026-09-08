@@ -140,6 +140,14 @@ const CAMPOS_CONTRATO_SUPORTE = [
   'id', 'militar_id', 'status_contrato', 'data_inicio_contrato', 'data_fim_contrato', 'data_inclusao_para_ferias',
   'gera_direito_ferias', 'regra_geracao_periodos',
 ];
+const CAMPOS_AJUSTE_SALDO_SUPORTE = [
+  'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'tipo', 'dias', 'status', 'created_date',
+];
+const CAMPOS_AJUSTE_SALDO_DETALHADO = [
+  ...CAMPOS_AJUSTE_SALDO_SUPORTE,
+  'militar_nome', 'motivo', 'origem', 'publicacao_id', 'entidade_origem', 'entidade_origem_id',
+  'observacoes', 'criado_por_email', 'cancelado_em', 'cancelado_por_email', 'motivo_cancelamento',
+];
 const CAMPOS_TEXTO_REFERENCIA = [
   'periodo_aquisitivo', 'documento_referencia', 'documento_texto', 'texto_publicacao', 'nota_para_bg',
   'observacoes', 'texto_base', 'texto_complemento',
@@ -169,7 +177,7 @@ function detectarReferenciaPeriodo(registro = {}, referenciasPorMilitar = new Ma
   return '';
 }
 
-function sanitizarDadosSuporte({ periodosAquisitivos, militares, matriculasMilitar, ferias, registrosLivro, publicacoesExOfficio, contratosDesignacaoMilitar }) {
+function sanitizarDadosSuporte({ periodosAquisitivos, militares, matriculasMilitar, ferias, registrosLivro, publicacoesExOfficio, contratosDesignacaoMilitar, ajustesSaldoFerias, incluirAjustesDetalhados = false }) {
   const referenciasPorMilitar = construirReferenciasPorMilitar(periodosAquisitivos);
   return {
     militares: (militares || []).map((item) => projetarCampos(item, CAMPOS_MILITAR_SUPORTE)),
@@ -184,6 +192,10 @@ function sanitizarDadosSuporte({ periodosAquisitivos, militares, matriculasMilit
       periodo_aquisitivo_ref: detectarReferenciaPeriodo(item, referenciasPorMilitar),
     })),
     contratosDesignacaoMilitar: (contratosDesignacaoMilitar || []).map((item) => projetarCampos(item, CAMPOS_CONTRATO_SUPORTE)),
+    ajustesSaldoFerias: (ajustesSaldoFerias || []).map((item) => projetarCampos(
+      item,
+      incluirAjustesDetalhados ? CAMPOS_AJUSTE_SALDO_DETALHADO : CAMPOS_AJUSTE_SALDO_SUPORTE,
+    )),
   };
 }
 
@@ -205,6 +217,7 @@ Deno.serve(async (req) => {
     let payload = {}; try { payload = await req.json(); } catch (_e) {}
     const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
     if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const incluirAjustesDetalhadosSolicitado = payload?.includeAjustesDetalhados === true;
     const acoesLeituraSuporte = [
       'visualizar_periodos_aquisitivos', 'visualizar_ferias', 'visualizar_creditos_ferias',
       'criar_ferias', 'editar_ferias', 'gerar_periodos_aquisitivos',
@@ -220,6 +233,16 @@ Deno.serve(async (req) => {
         requiredAnyPermission: acoesLeituraSuporte,
       }, { status: 403 });
     }
+    const podeVerAjustesDetalhados = authz?.isAdmin === true || (
+      authz?.modules?.ferias === true && authz?.actions?.visualizar_creditos_ferias === true
+    );
+    if (incluirAjustesDetalhadosSolicitado && !podeVerAjustesDetalhados) {
+      return Response.json({
+        error: 'Acesso negado: detalhes de ajustes de saldo exigem visualizar créditos de férias.',
+        requiredModule: 'ferias',
+        requiredPermission: 'visualizar_creditos_ferias',
+      }, { status: 403 });
+    }
     const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
     const effectiveEmailNorm = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
     const isImpersonating = authz?.isImpersonating === true;
@@ -227,10 +250,10 @@ Deno.serve(async (req) => {
     const targetHasGlobalScope = authz?.hasGlobalScope === true;
     const targetAcessos = Array.isArray(authz?.acessos) ? authz.acessos : [];
     const criteriosAplicados = new Set(); const warnings = [];
-    let periodosAquisitivos = []; let militares = []; let matriculasMilitar = []; let ferias = []; let registrosLivro = []; let publicacoesExOfficio = []; let contratosDesignacaoMilitar = []; let partialFailures = 0; let totalMilitaresEscopo = null;
+    let periodosAquisitivos = []; let militares = []; let matriculasMilitar = []; let ferias = []; let registrosLivro = []; let publicacoesExOfficio = []; let contratosDesignacaoMilitar = []; let ajustesSaldoFerias = []; let partialFailures = 0; let totalMilitaresEscopo = null;
     if (targetHasGlobalScope) {
       criteriosAplicados.add('global');
-      const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]=await Promise.allSettled([
+      const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ajRes]=await Promise.allSettled([
         fetchWithRetry(() => base44.asServiceRole.entities.PeriodoAquisitivo.list('-inicio_aquisitivo'),'periodos.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.Militar.list(),'militares.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.MatriculaMilitar.list('-created_date'),'matriculas.admin'),
@@ -238,8 +261,9 @@ Deno.serve(async (req) => {
         fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(),'registros.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.PublicacaoExOfficio.list('-created_date'),'publicacoesExOfficio.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.ContratoDesignacaoMilitar.list('-data_inicio_contrato'),'contratosDesignacaoMilitar.admin'),
+        fetchWithRetry(() => base44.asServiceRole.entities.AjusteSaldoFerias.list('-created_date'),'ajustesSaldoFerias.admin'),
       ]);
-      for (const r of [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]) if (r.status === 'rejected') partialFailures += 1;
+      for (const r of [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ajRes]) if (r.status === 'rejected') partialFailures += 1;
       periodosAquisitivos = paRes.status === 'fulfilled' ? (paRes.value || []) : [];
       militares = mRes.status === 'fulfilled' ? (mRes.value || []) : [];
       matriculasMilitar = matRes.status === 'fulfilled' ? (matRes.value || []) : [];
@@ -247,17 +271,18 @@ Deno.serve(async (req) => {
       registrosLivro = rRes.status === 'fulfilled' ? (rRes.value || []) : [];
       publicacoesExOfficio = pubRes.status === 'fulfilled' ? (pubRes.value || []) : [];
       contratosDesignacaoMilitar = cdmRes.status === 'fulfilled' ? (cdmRes.value || []) : [];
+      ajustesSaldoFerias = ajRes.status === 'fulfilled' ? (ajRes.value || []) : [];
     } else {
       const militarIds = await listarMilitarIdsDoEscopo(base44, targetAcessos, criteriosAplicados);
       if (!militarIds || militarIds.length === 0) { warnings.push('SEM_ESCOPO'); totalMilitaresEscopo = 0; }
       else {
         totalMilitaresEscopo = militarIds.length;
-        const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]=await Promise.all([
-          listarPorEscopoIds(base44,'PeriodoAquisitivo',militarIds,'-inicio_aquisitivo'), listarMilitaresPorIds(base44,militarIds), listarPorEscopoIds(base44,'MatriculaMilitar',militarIds,'-created_date'), listarPorEscopoIds(base44,'Ferias',militarIds,'-data_inicio'), listarPorEscopoIds(base44,'RegistroLivro',militarIds,undefined), listarPorEscopoIds(base44,'PublicacaoExOfficio',militarIds,'-created_date'), listarPorEscopoIds(base44,'ContratoDesignacaoMilitar',militarIds,'-data_inicio_contrato')
+        const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ajRes]=await Promise.all([
+          listarPorEscopoIds(base44,'PeriodoAquisitivo',militarIds,'-inicio_aquisitivo'), listarMilitaresPorIds(base44,militarIds), listarPorEscopoIds(base44,'MatriculaMilitar',militarIds,'-created_date'), listarPorEscopoIds(base44,'Ferias',militarIds,'-data_inicio'), listarPorEscopoIds(base44,'RegistroLivro',militarIds,undefined), listarPorEscopoIds(base44,'PublicacaoExOfficio',militarIds,'-created_date'), listarPorEscopoIds(base44,'ContratoDesignacaoMilitar',militarIds,'-data_inicio_contrato'), listarPorEscopoIds(base44,'AjusteSaldoFerias',militarIds,'-created_date')
         ]);
-        periodosAquisitivos=paRes.rows; militares=mRes.rows; matriculasMilitar=matRes.rows; ferias=fRes.rows; registrosLivro=rRes.rows; publicacoesExOfficio=pubRes.rows; contratosDesignacaoMilitar=cdmRes.rows;
+        periodosAquisitivos=paRes.rows; militares=mRes.rows; matriculasMilitar=matRes.rows; ferias=fRes.rows; registrosLivro=rRes.rows; publicacoesExOfficio=pubRes.rows; contratosDesignacaoMilitar=cdmRes.rows; ajustesSaldoFerias=ajRes.rows;
         if (militarIds.length > 0 && periodosAquisitivos.length > 0 && militares.length === 0) warnings.push('MILITARES_ESCOPO_NAO_CARREGADOS');
-        partialFailures = paRes.partialFailures+mRes.partialFailures+matRes.partialFailures+fRes.partialFailures+rRes.partialFailures+pubRes.partialFailures+cdmRes.partialFailures;
+        partialFailures = paRes.partialFailures+mRes.partialFailures+matRes.partialFailures+fRes.partialFailures+rRes.partialFailures+pubRes.partialFailures+cdmRes.partialFailures+ajRes.partialFailures;
       }
     }
     const militaresIdsSet = new Set((militares||[]).map((m)=>String(m?.id||'')));
@@ -266,7 +291,17 @@ Deno.serve(async (req) => {
     if (partialFailures>0) warnings.push('PARTIAL_FAILURES');
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const counters = (periodosAquisitivos||[]).reduce((acc,periodo)=>{ const r=getPeriodoResumoStatus(periodo,hoje); acc.total+=1; if(r.isDisponivel)acc.disponiveis+=1; if(r.isVencendo)acc.vencendo90d+=1; if(r.isVencido)acc.vencidos+=1; return acc; }, { total:0, disponiveis:0, vencendo90d:0, vencidos:0 });
-    const suporte = sanitizarDadosSuporte({ periodosAquisitivos, militares, matriculasMilitar, ferias, registrosLivro, publicacoesExOfficio, contratosDesignacaoMilitar });
+    const suporte = sanitizarDadosSuporte({
+      periodosAquisitivos,
+      militares,
+      matriculasMilitar,
+      ferias,
+      registrosLivro,
+      publicacoesExOfficio,
+      contratosDesignacaoMilitar,
+      ajustesSaldoFerias,
+      incluirAjustesDetalhados: incluirAjustesDetalhadosSolicitado && podeVerAjustesDetalhados,
+    });
     return Response.json({ periodosAquisitivos,...suporte,counters,meta:{ isAdmin: targetIsAdmin, hasGlobalScope: targetHasGlobalScope, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings, supportingDataSanitized:true }});
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
