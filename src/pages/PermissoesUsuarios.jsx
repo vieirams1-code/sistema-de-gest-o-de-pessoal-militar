@@ -26,6 +26,12 @@ import {
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import {
+  listarPerfisPermissaoAdmin,
+  obterPerfilPermissaoAdmin,
+  listarAcessosUsuariosAdmin,
+  obterAcessoUsuarioAdmin,
+} from '@/services/permissoesAdminGatewayClient';
 
 const CUD_ENTITIES_ALLOWLIST = new Set(['PerfilPermissao', 'UsuarioAcesso']);
 
@@ -148,12 +154,12 @@ export default function PermissoesUsuarios() {
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome'), enabled: hasAccess });
   const { data: acessos = [], error: acessosError } = useQuery({
     queryKey: ['usuariosAcesso'],
-    queryFn: () => base44.entities.UsuarioAcesso.list(),
+    queryFn: listarAcessosUsuariosAdmin,
     enabled: hasAccess,
   });
   const { data: perfis = [] } = useQuery({
     queryKey: ['perfisPermissao'],
-    queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
+    queryFn: listarPerfisPermissaoAdmin,
     enabled: hasAccess,
   });
 
@@ -250,7 +256,7 @@ export default function PermissoesUsuarios() {
   const getProfileWithPermissions = async (profileId) => {
     if (!profileId) return null;
     try {
-      const perfilCompleto = await base44.entities.PerfilPermissao.get(profileId);
+      const perfilCompleto = await obterPerfilPermissaoAdmin(profileId);
       return perfilCompleto;
     } catch {
       return perfis.find((p) => p.id === profileId) || null;
@@ -266,7 +272,7 @@ export default function PermissoesUsuarios() {
     try {
       // O list() pode não retornar todos os campos booleanos de permissão;
       // ao selecionar, buscamos o registro completo para hidratar corretamente.
-      fullAcesso = await base44.entities.UsuarioAcesso.get(acesso.id);
+      fullAcesso = await obterAcessoUsuarioAdmin(acesso.id);
     } catch {
       // Em caso de falha, seguimos com os dados já retornados no list().
     }
@@ -406,7 +412,7 @@ export default function PermissoesUsuarios() {
     if (isNewAcesso) {
       const emailNormalizado = normalizeEmail(userUserEmail);
       try {
-        const existentes = await base44.entities.UsuarioAcesso.list();
+        const existentes = await listarAcessosUsuariosAdmin();
         if ((existentes || []).some((acesso) => normalizeEmail(acesso?.user_email) === emailNormalizado)) {
           alert(DUPLICATE_ACCESS_MESSAGE);
           return;
@@ -508,7 +514,7 @@ export default function PermissoesUsuarios() {
       if (!resolvedRecordId) {
         throw new Error('Não foi possível determinar o usuário salvo para concluir a vinculação de perfil.');
       }
-      const reloadedAccess = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
+      const reloadedAccess = await obterAcessoUsuarioAdmin(resolvedRecordId);
       const usuarioVinculadoId = reloadedAccess?.id;
       if (!usuarioVinculadoId) {
         throw new Error('Não foi possível identificar o ID do usuário para vincular o perfil personalizado.');
@@ -587,7 +593,7 @@ export default function PermissoesUsuarios() {
       // O retorno do update pode não refletir integralmente o estado persistido.
       // Recarregamos o UsuarioAcesso após todas as alterações de escopo/perfil para
       // impedir que selectedUser mantenha campos antigos em memória.
-      const refreshedAccess = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
+      const refreshedAccess = await obterAcessoUsuarioAdmin(resolvedRecordId);
       const resolvedReloaded = await resolveUserPermissions({
         userSource: refreshedAccess,
         profileSource: reloadedProfile || {},
@@ -678,7 +684,7 @@ export default function PermissoesUsuarios() {
     }
     try {
       // A decisão deve usar o banco, não o selectedUser potencialmente obsoleto.
-      const acessoAtual = await base44.entities.UsuarioAcesso.get(targetAcesso.id);
+      const acessoAtual = await obterAcessoUsuarioAdmin(targetAcesso.id);
       if (acessoAtual.militar_id) {
         const mensagemBloqueio = isAdministrator
           ? `Exclusão definitiva bloqueada. O registro ainda possui militar_id vinculado: ${acessoAtual.militar_id}`
