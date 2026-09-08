@@ -39,16 +39,6 @@ const CAMPOS_SUBGRUPAMENTO = [
     'ativo',
 ];
 
-const CAMPOS_USUARIO_ACESSO = [
-    'id',
-    'user_email',
-    'ativo',
-    'tipo_acesso',
-    'grupamento_id',
-    'subgrupamento_id',
-    'militar_id',
-];
-
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -84,6 +74,12 @@ async function fetchWithRetry(queryFn, label = 'query') {
         }
     }
     throw lastError;
+}
+
+async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
+    const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+    const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+    return response?.data ?? response ?? {};
 }
 
 // =====================================================================
@@ -265,82 +261,32 @@ Deno.serve(async (req) => {
 
         const { effectiveEmail } = payload || {};
 
-        const authUserEmail = normalizeEmail(authUser.email);
-        const effectiveEmailNorm = normalizeEmail(effectiveEmail);
-        const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-
-        // 1. Buscar UsuarioAcesso do usuário autenticado real
-        const acessosAuth = await fetchWithRetry(
-            () =>
-                base44.asServiceRole.entities.UsuarioAcesso.filter(
-                    { user_email: authUser.email, ativo: true },
-                    undefined,
-                    LIMIT_MAX,
-                    0,
-                    CAMPOS_USUARIO_ACESSO
-                ),
-            'usuarioAcesso.list.auth'
-        );
-
-        const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-        const authIsAdminByAccess = (acessosAuth || []).some(
-            (a) => normalizeTipo(a.tipo_acesso) === 'admin'
-        );
-        const authIsAdmin = authIsAdminByRole || authIsAdminByAccess;
-
-        // 2. Validação de impersonação
-        if (wantsImpersonation && !authIsAdmin) {
-            console.warn('[getScopedLotacoes] tentativa de impersonação por não-admin', {
-                authUserEmail,
-                effectiveEmailNorm,
-            });
-            return Response.json(
-                { error: 'Ação não permitida: somente administradores podem usar effectiveEmail.', lotacoes: [] },
-                { status: 403 }
-            );
+        const authz = await resolverAutorizacaoCanonica(base44, effectiveEmail);
+        if (authz?.error) {
+            return Response.json({ error: authz.error, lotacoes: [] }, { status: 403 });
         }
-
-        const isImpersonating = wantsImpersonation && authIsAdmin;
-        const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
-
-        // 3. Acessos do alvo
-        const acessos = isImpersonating
-            ? await fetchWithRetry(
-                () =>
-                    base44.asServiceRole.entities.UsuarioAcesso.filter(
-                        { user_email: targetEmail, ativo: true },
-                        undefined,
-                        LIMIT_MAX,
-                        0,
-                        CAMPOS_USUARIO_ACESSO
-                    ),
-                'usuarioAcesso.list.target'
-            )
-            : (acessosAuth || []);
-
-        // 4. Admin do usuário efetivo (não herda role do autenticado se impersonando)
-        const isAdminByRole = isImpersonating ? false : authIsAdminByRole;
-        const isAdminByAccess = (acessos || []).some(
-            (a) => normalizeTipo(a.tipo_acesso) === 'admin'
-        );
-        const isAdmin = isAdminByRole || isAdminByAccess;
+        const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
+        const targetEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
+        const isImpersonating = authz?.isImpersonating === true;
+        const isPlatformAdmin = authz?.isAdmin === true;
+        const hasGlobalScope = authz?.hasGlobalScope === true;
+        const acessos = Array.isArray(authz?.acessos) ? authz.acessos : [];
 
         const baseMeta = {
-            authUserEmail: authUser.email,
-            effectiveUserEmail: isImpersonating ? targetEmail : authUser.email,
+            authUserEmail,
+            effectiveUserEmail: targetEmail,
             isImpersonating,
+            isPlatformAdmin,
+            hasGlobalScope,
         };
 
-        // 5. Resolver escopo
-        let escopo;
-        if (isAdmin) {
-            escopo = { isAdmin: true };
-        } else {
-            escopo = await resolverEscopoLotacoes(base44, acessos || []);
-        }
+        // tipo_acesso=admin representa alcance global; somente role=admin é privilégio.
+        const escopo = hasGlobalScope
+            ? { isAdmin: true }
+            : await resolverEscopoLotacoes(base44, acessos);
 
         // 6. Caminhos curtos: vazio / proprio
-        if (!isAdmin && escopo.tipo === 'vazio') {
+        if (!hasGlobalScope && escopo.tipo === 'vazio') {
             return Response.json(
                 {
                     lotacoes: [],
@@ -355,7 +301,7 @@ Deno.serve(async (req) => {
             );
         }
 
-        if (!isAdmin && escopo.tipo === 'proprio') {
+        if (!hasGlobalScope && escopo.tipo === 'proprio') {
             return Response.json(
                 {
                     lotacoes: [],
@@ -371,7 +317,7 @@ Deno.serve(async (req) => {
 
         // 7. Buscar Subgrupamentos
         let lotacoes = [];
-        if (isAdmin) {
+        if (hasGlobalScope) {
             const result = await fetchWithRetry(
                 () =>
                     base44.asServiceRole.entities.Subgrupamento.filter(

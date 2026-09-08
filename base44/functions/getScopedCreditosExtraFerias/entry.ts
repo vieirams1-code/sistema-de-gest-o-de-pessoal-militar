@@ -26,17 +26,6 @@ const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_DEFAULT = 500;
 const LIMIT_MAX = 1000;
 
-const CAMPOS_USUARIO_ACESSO = [
-  'id',
-  'user_email',
-  'ativo',
-  'tipo_acesso',
-  'grupamento_id',
-  'subgrupamento_id',
-  'militar_id',
-  'perfil_id',
-];
-
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -59,21 +48,10 @@ async function fetchWithRetry(queryFn, label = 'query') {
   throw lastError;
 }
 
-async function resolverPermissoes(base44, email) {
-  const acessos = await fetchWithRetry(
-    () => base44.asServiceRole.entities.UsuarioAcesso.filter(
-      { user_email: email, ativo: true },
-      undefined,
-      LIMIT_MAX,
-      0,
-      CAMPOS_USUARIO_ACESSO,
-    ),
-    `usuarioAcesso.list:${email}`,
-  );
-  const isAdminByAccess = (acessos || []).some(
-    (a) => normalizeTipo(a.tipo_acesso) === 'admin',
-  );
-  return { acessos: acessos || [], isAdminByAccess };
+async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
+  const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  return response?.data ?? response ?? {};
 }
 
 // Reaproveita exatamente a mesma lógica do cudEscopado para garantir
@@ -175,28 +153,14 @@ Deno.serve(async (req) => {
     const orderBy = orderByRaw && typeof orderByRaw === 'string' ? orderByRaw : '-data_referencia';
     const effLimit = clampLimit(limitRaw);
 
-    // ---- Resolução de auth/effective ----
-    const authUserEmail = normalizeEmail(authUser.email);
-    const effectiveEmailNorm = normalizeEmail(effectiveEmailRaw);
-    const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-
-    const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-    const authIsAdmin = authIsAdminByRole || authPerms.isAdminByAccess;
-
-    if (wantsImpersonation && !authIsAdmin) {
-      return Response.json(
-        { error: 'Ação não permitida: somente administradores podem usar effectiveEmail.', creditos: [] },
-        { status: 403 },
-      );
-    }
-
-    const isImpersonating = wantsImpersonation && authIsAdmin;
-    const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
-    const targetPerms = isImpersonating
-      ? await resolverPermissoes(base44, targetEmail)
-      : authPerms;
-    const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
+    // ---- Resolução canônica de auth/effective ----
+    const authz = await resolverAutorizacaoCanonica(base44, effectiveEmailRaw);
+    if (authz?.error) return Response.json({ error: authz.error, creditos: [] }, { status: 403 });
+    const targetEmail = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
+    const isImpersonating = authz?.isImpersonating === true;
+    const targetIsAdmin = authz?.isAdmin === true;
+    const targetHasGlobalScope = authz?.hasGlobalScope === true;
+    const targetAcessos = Array.isArray(authz?.acessos) ? authz.acessos : [];
 
     // ---- Construção do filtro base ----
     const baseFilter = {};
@@ -204,7 +168,7 @@ Deno.serve(async (req) => {
     if (statusFiltro) baseFilter.status = statusFiltro;
 
     // ---- Caminho ADMIN ----
-    if (targetIsAdmin) {
+    if (targetHasGlobalScope) {
       const filtroFinal = { ...baseFilter };
       if (militarIdFiltro) filtroFinal.militar_id = militarIdFiltro;
 
@@ -224,7 +188,8 @@ Deno.serve(async (req) => {
           authUserEmail: authUser.email,
           effectiveUserEmail: targetEmail,
           isImpersonating,
-          targetIsAdmin: true,
+          targetIsAdmin,
+          hasGlobalScope: true,
           returned: (creditos || []).length,
           scope_tipo: 'admin',
         },
@@ -232,7 +197,7 @@ Deno.serve(async (req) => {
     }
 
     // ---- Caminho RESTRITO ----
-    const idsPermitidos = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
+    const idsPermitidos = await listarMilitarIdsDoEscopo(base44, targetAcessos);
 
     // null = admin (já tratado acima); aqui sempre é Array
     if (!idsPermitidos || idsPermitidos.length === 0) {
@@ -242,7 +207,8 @@ Deno.serve(async (req) => {
           authUserEmail: authUser.email,
           effectiveUserEmail: targetEmail,
           isImpersonating,
-          targetIsAdmin: false,
+          targetIsAdmin,
+          hasGlobalScope: false,
           returned: 0,
           scope_tipo: 'vazio',
           reason: 'SEM_ESCOPO',
@@ -263,7 +229,8 @@ Deno.serve(async (req) => {
             authUserEmail: authUser.email,
             effectiveUserEmail: targetEmail,
             isImpersonating,
-            targetIsAdmin: false,
+            targetIsAdmin,
+            hasGlobalScope: false,
             returned: 0,
             scope_tipo: 'estrutura',
             reason: 'MILITAR_FORA_DO_ESCOPO',
@@ -319,7 +286,8 @@ Deno.serve(async (req) => {
         authUserEmail: authUser.email,
         effectiveUserEmail: targetEmail,
         isImpersonating,
-        targetIsAdmin: false,
+        targetIsAdmin,
+        hasGlobalScope: false,
         returned: truncados.length,
         scope_tipo: 'estrutura',
         militares_no_escopo: idsPermitidos.length,

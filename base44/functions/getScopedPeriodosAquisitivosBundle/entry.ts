@@ -3,10 +3,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-const LIMIT_USUARIO_ACESSO = 1000;
 const CHUNK_MILITAR_IDS = 200;
 
-const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -25,9 +23,10 @@ async function fetchWithRetry(queryFn, label = 'query') {
   throw lastError;
 }
 
-async function resolverPermissoes(base44, email) {
-  const acessos = await fetchWithRetry(() => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: email, ativo: true }, undefined, LIMIT_USUARIO_ACESSO, 0, CAMPOS_USUARIO_ACESSO), `usuarioAcesso.list:${email}`);
-  return { acessos: acessos || [], isAdminByAccess: (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin') };
+async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
+  const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  return response?.data ?? response ?? {};
 }
 
 async function listarMilitarIdsDoEscopo(base44, acessos, criteriosAplicados) {
@@ -127,20 +126,18 @@ Deno.serve(async (req) => {
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
     let payload = {}; try { payload = await req.json(); } catch (_e) {}
-    const authUserEmail = normalizeEmail(authUser.email);
-    const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
-    const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-    const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
-    if (wantsImpersonation && !authIsAdmin) return Response.json({ error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' }, { status: 403 });
-    const isImpersonating = wantsImpersonation && authIsAdmin;
-    const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
-    const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
-    const targetIsAdmin = isImpersonating ? targetPerms.isAdminByAccess : authIsAdmin;
+    const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
+    if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const authUserEmail = normalizeEmail(authz?.authUserEmail || authUser.email);
+    const effectiveEmailNorm = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
+    const isImpersonating = authz?.isImpersonating === true;
+    const targetIsAdmin = authz?.isAdmin === true;
+    const targetHasGlobalScope = authz?.hasGlobalScope === true;
+    const targetAcessos = Array.isArray(authz?.acessos) ? authz.acessos : [];
     const criteriosAplicados = new Set(); const warnings = [];
     let periodosAquisitivos = []; let militares = []; let matriculasMilitar = []; let ferias = []; let registrosLivro = []; let publicacoesExOfficio = []; let contratosDesignacaoMilitar = []; let partialFailures = 0; let totalMilitaresEscopo = null;
-    if (targetIsAdmin) {
-      criteriosAplicados.add('admin');
+    if (targetHasGlobalScope) {
+      criteriosAplicados.add('global');
       const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes]=await Promise.allSettled([
         fetchWithRetry(() => base44.asServiceRole.entities.PeriodoAquisitivo.list('-inicio_aquisitivo'),'periodos.admin'),
         fetchWithRetry(() => base44.asServiceRole.entities.Militar.list(),'militares.admin'),
@@ -159,7 +156,7 @@ Deno.serve(async (req) => {
       publicacoesExOfficio = pubRes.status === 'fulfilled' ? (pubRes.value || []) : [];
       contratosDesignacaoMilitar = cdmRes.status === 'fulfilled' ? (cdmRes.value || []) : [];
     } else {
-      const militarIds = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos, criteriosAplicados);
+      const militarIds = await listarMilitarIdsDoEscopo(base44, targetAcessos, criteriosAplicados);
       if (!militarIds || militarIds.length === 0) { warnings.push('SEM_ESCOPO'); totalMilitaresEscopo = 0; }
       else {
         totalMilitaresEscopo = militarIds.length;
@@ -177,7 +174,7 @@ Deno.serve(async (req) => {
     if (partialFailures>0) warnings.push('PARTIAL_FAILURES');
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const counters = (periodosAquisitivos||[]).reduce((acc,periodo)=>{ const r=getPeriodoResumoStatus(periodo,hoje); acc.total+=1; if(r.isDisponivel)acc.disponiveis+=1; if(r.isVencendo)acc.vencendo90d+=1; if(r.isVencido)acc.vencidos+=1; return acc; }, { total:0, disponiveis:0, vencendo90d:0, vencidos:0 });
-    return Response.json({ periodosAquisitivos,militares,matriculasMilitar,ferias,registrosLivro,publicacoesExOfficio,contratosDesignacaoMilitar,counters,meta:{ isAdmin: targetIsAdmin, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings }});
+    return Response.json({ periodosAquisitivos,militares,matriculasMilitar,ferias,registrosLivro,publicacoesExOfficio,contratosDesignacaoMilitar,counters,meta:{ isAdmin: targetIsAdmin, hasGlobalScope: targetHasGlobalScope, modoAcesso: criteriosAplicados.size===1?Array.from(criteriosAplicados)[0]:(criteriosAplicados.size>1?'multiplo':null), userEmail: authUserEmail||null, effectiveEmail:isImpersonating?effectiveEmailNorm:null, criteriosAplicados:Array.from(criteriosAplicados), totalMilitaresEscopo, partialFailures, warnings }});
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     return Response.json({ error: error?.message || 'Erro ao carregar bundle de períodos aquisitivos.', meta: { status } }, { status });
