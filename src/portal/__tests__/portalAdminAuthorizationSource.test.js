@@ -11,12 +11,12 @@ test('rotas administrativas do Portal exigem usuário autenticado real', () => {
   assert.doesNotMatch(source, /Boolean\(user \|\| req\.headers\.get\('Authorization'\) \|\| req\.headers\.get\('X-App-Id'\)\)/);
 });
 
-test('rotas administrativas validam permissão no servidor antes do switch', () => {
+test('rotas administrativas validam permissão canônica no servidor antes do switch', () => {
   assert.match(source, /autorizado\s*=\s*await autorizarAcaoAdminPortal\(base44, user, acao\)/);
   assert.match(source, /status:\s*403/);
+  assert.match(source, /base44\.functions\.invoke\('getUserPermissions'/);
   assert.match(source, /perm_configurar_portal/);
-  assert.match(source, /perm_gerir_respostas/);
-  assert.match(source, /perm_gerir_campanhas/);
+  assert.doesNotMatch(source, /perm_gerir_respostas|perm_gerir_campanhas/);
 });
 
 test('headers X-App-Id e Authorization não funcionam como autorização administrativa', () => {
@@ -35,6 +35,8 @@ test('serviço exclusivo de Planos de Férias exige autenticação e permissão 
   assert.match(planosSource, /perm_criar_planos_ferias/);
   assert.match(planosSource, /perm_editar_planos_ferias/);
   assert.match(planosSource, /perm_excluir_planos_ferias/);
+  assert.match(planosSource, /base44\.functions\.invoke\('getUserPermissions'/);
+  assert.doesNotMatch(planosSource, /perm_gerir_campanhas|perm_gerir_respostas/);
   assert.doesNotMatch(planosSource, /for \(const acesso of acessos \|\| \[\]\) coletar\(acesso\)/);
   assert.match(planosSource, /403/);
 });
