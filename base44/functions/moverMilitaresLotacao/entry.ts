@@ -35,7 +35,6 @@ const CAMPOS_USUARIO_ACESSO = [
 const ACTIONS_AUTORIZADAS = ['gerir_estrutura', 'gerir_lotacao_militares', 'gerir_permissoes'];
 
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
-const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
 async function fetchWithRetry(queryFn, label = 'query') {
     let lastError;
