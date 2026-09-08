@@ -1548,7 +1548,11 @@ Deno.serve(async (req) => {
           return Response.json({ error: 'Acesso negado: manutenção de subtipos DOEMS é administrativa.', requiredPermission: 'platform_admin' }, { status: 403 });
         }
       } else if (entityName === 'Medalha' && operation !== 'bulk') {
-        let requiredPermission = operation === 'delete' ? 'excluir_medalhas' : 'indicar_medalhas';
+        const origemRegistro = String(data?.origem_registro || registroExistente?.origem_registro || '').trim().toUpperCase();
+        const ehFluxoIndicacao = origemRegistro.startsWith('INDICACAO_');
+        let requiredPermission = operation === 'delete'
+          ? 'excluir_medalhas'
+          : (operation === 'create' && ehFluxoIndicacao ? 'indicar_medalhas' : 'adicionar_medalhas');
         const statusFinal = String(data?.status || registroExistente?.status || '').trim().toUpperCase();
         if (operation === 'update') requiredPermission = 'editar_medalhas';
         if (statusFinal === 'CONCEDIDA') requiredPermission = 'conceder_medalhas';
