@@ -49,11 +49,9 @@
     "nome"
   ],
   "rls": {
-    "read": true,
-    "write": {
-      "user_condition": {
-        "role": "admin"
-      }
-    }
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
   }
 }
