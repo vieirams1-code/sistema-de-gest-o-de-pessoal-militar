@@ -131,23 +131,22 @@ export default function VerAtestado() {
     );
   }
 
-  // Validação de escopo organizacional (Hardening P1.4-C.4)
-  if (!podeAgirSobre(atestado.militar_id)) {
-    return <AccessDenied modulo="Atestados" />;
-  }
-
-
   if (!atestado) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-slate-500 mb-4">Atestado não encontrado</p>
+          <p className="text-slate-500 mb-4">Atestado não encontrado ou fora do seu escopo</p>
           <Button onClick={() => navigate(createPageUrl('Atestados'))}>
             Voltar
           </Button>
         </div>
       </div>
     );
+  }
+
+  // Defesa adicional no cliente. O bundle já aplica o escopo no servidor.
+  if (!podeAgirSobre(atestado.militar_id)) {
+    return <AccessDenied modulo="Atestados" />;
   }
 
   const formatDate = (dateString) => {
