@@ -289,14 +289,12 @@ export default function VerMilitar() {
       toast({ title: 'Erro ao salvar contrato de designação', description: error?.message || 'Tente novamente.', variant: 'destructive' });
     },
   });
-  const { data: militarDestinoMerge } = useQuery({
-    queryKey: ['militar-merge-destino', militar?.merged_into_id],
-    queryFn: async () => {
-      const list = await base44.entities.Militar.filter({ id: militar.merged_into_id });
-      return list[0] || null;
-    },
-    enabled: Boolean(militar?.merged_into_id)
+  const { data: militarDestinoMergeData = { militares: [] } } = useQuery({
+    queryKey: ['militar-merge-destino', militar?.merged_into_id, effectiveEmail || null],
+    queryFn: () => fetchScopedMilitares({ militarIds: [militar.merged_into_id], limit: 1 }),
+    enabled: Boolean(militar?.merged_into_id && isAccessResolved),
   });
+  const militarDestinoMerge = militarDestinoMergeData?.militares?.[0] || null;
 
   const postoGraduacaoMilitar = getPostoGraduacaoOficial(militar);
   const canViewMilitar = militar ? hasAccess(militar) || hasSelfAccess(militar) : false;
