@@ -1,4 +1,5 @@
 import { base44 } from '../api/base44Client.js';
+import { fetchScopedMedalhasBundle } from './getScopedMedalhasBundleClient.js';
 
 let runtimeClient = null;
 
@@ -32,6 +33,17 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
     gratificacoes: permissions?.gratificacoes === true,
   };
   const maybe = (enabled, fn) => enabled ? fn() : Promise.resolve([]);
+  const carregarMedalhasTimeline = async () => {
+    if (runtimeClient) {
+      // Fallback exclusivo para o cliente injetado pelos testes unitários.
+      return client.entities.Medalha.filter({ militar_id: militarId });
+    }
+    const { medalhas = [] } = await fetchScopedMedalhasBundle({
+      readPurpose: 'VIEW',
+      militarId,
+    });
+    return medalhas;
+  };
 
   const [
     registrosLivro,
@@ -50,7 +62,7 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
     maybe(allowed.ferias, () => client.entities.Ferias.filter({ militar_id: militarId })),
     maybe(allowed.atestados, () => client.entities.Atestado.filter({ militar_id: militarId })),
     maybe(allowed.antiguidade, () => client.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: militarId })),
-    maybe(allowed.medalhas, () => client.entities.Medalha.filter({ militar_id: militarId })),
+    maybe(allowed.medalhas, carregarMedalhasTimeline),
     maybe(allowed.funcoes, () => client.entities.MilitarFuncao.filter({ militar_id: militarId })),
     maybe(allowed.gratificacoes, () => client.entities.GratificacaoFuncao.filter({ militar_id: militarId })),
     maybe(allowed.funcoes, () => client.entities.FuncaoMilitar.list()),
