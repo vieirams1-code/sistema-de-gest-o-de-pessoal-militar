@@ -15,6 +15,7 @@ import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 import DescontosFerias from '@/pages/DescontosFerias';
 import PortalApp from '@/portal/PortalApp';
+import { getPageAccessPolicy } from '@/config/pageAccessPolicy';
 
 const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
@@ -24,12 +25,10 @@ const adminOnlyPages = new Set([
   'AuditoriaComportamento',
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
-  'AntiguidadePrevia',
   'Medicos',
   'SubtiposDOEMS',
   'BackupSistema',
   'DiagnosticoSaldoFerias',
-  'GruposEfetivo',
 ]);
 
 
@@ -88,7 +87,8 @@ const moduleGuardByPage = {
   RegistrosMilitar: { moduleKey: 'registros_militar', moduleName: 'Registros do Militar' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   Configuracoes: { moduleKeys: ['configuracoes', 'adicoes_personalizacoes'], actionKeys: ['gerir_configuracoes', 'gerir_adicoes_personalizacoes'], moduleName: 'Configurações' },
-  Tags: { moduleKey: 'efetivo', actionKey: 'gerir_configuracoes', moduleName: 'Tags' },
+  Tags: { moduleKey: 'tags', actionKey: 'visualizar_tags', moduleName: 'Tags' },
+  GruposEfetivo: { moduleKey: 'grupos_efetivo', actionKey: 'visualizar_grupos_efetivo', moduleName: 'Grupos do Efetivo' },
   PermissoesUsuarios: { moduleKeys: ['permissoes_usuarios'], actionKeys: ['gerir_permissoes_usuarios'], moduleName: 'Permissões de Usuários' },
   PerfisPermissao: { moduleKeys: ['perfis_permissao'], actionKeys: ['gerir_perfis_permissao'], moduleName: 'Perfis de Permissão' },
   Publicacoes: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },
@@ -247,8 +247,8 @@ function App() {
                 );
               }
 
-              // P1.3-A: rotas prioritárias usam RequireAction (AND: módulo + actionKey).
-              const pageActionGuard = getActionGuardByPage(path);
+              // F8-L06: páginas com política canônica usam a mesma fonte do menu.
+              const pageActionGuard = getPageAccessPolicy(path) || getActionGuardByPage(path);
 
               if (pageActionGuard) {
                 const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageActionGuard;
