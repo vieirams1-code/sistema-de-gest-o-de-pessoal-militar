@@ -6,13 +6,14 @@ export function canShowAtestadosTab({
   canAccessModule = () => false,
   canAccessAction = () => false,
 } = {}) {
-  if (hasItems(atestados)) return true;
-  if (isLoadingAtestados) return true;
-
-  return Boolean(
+  const autorizado = Boolean(
     canAccessModule('atestados')
     && canAccessAction('visualizar_atestados')
   );
+  if (!autorizado) return false;
+  if (hasItems(atestados)) return true;
+  if (isLoadingAtestados) return true;
+  return true;
 }
 
 export function canShowArmamentosTab({
@@ -21,11 +22,12 @@ export function canShowArmamentosTab({
   canAccessModule = () => false,
   canAccessAction = () => false,
 } = {}) {
-  if (hasItems(armamentos)) return true;
-  if (isLoadingArmamentos) return true;
-
-  return Boolean(
+  const autorizado = Boolean(
     canAccessModule('armamentos')
     && canAccessAction('visualizar_armamentos')
   );
+  if (!autorizado) return false;
+  if (hasItems(armamentos)) return true;
+  if (isLoadingArmamentos) return true;
+  return true;
 }
