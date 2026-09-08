@@ -385,22 +385,6 @@ export default function CadastrarMilitar() {
       console.log('[CadastrarMilitar] militar salvo bruto:', militarSalvoBruto);
       let militarId = getMilitarId(militarSalvoBruto) || editId;
 
-      // Fallback: se o save não retornou o militar completo com ID, buscar pela matrícula
-      if (!militarId && dataToSave.matricula) {
-        console.log('[CadastrarMilitar] ID não encontrado no retorno do save. Tentando fallback por matrícula...');
-        try {
-          const matriculaPadrao = formatarMatriculaPadrao(dataToSave.matricula);
-          const list = await base44.entities.Militar.filter({ matricula: matriculaPadrao });
-          if (list && list.length === 1) {
-            militarId = getMilitarId(list[0]);
-            militarSalvoBruto = list[0];
-            console.log('[CadastrarMilitar] Militar resolvido via fallback:', militarId);
-          }
-        } catch (fallbackError) {
-          console.error('[CadastrarMilitar] Erro no fallback de identificação:', fallbackError);
-        }
-      }
-
       console.log('[CadastrarMilitar] militar_id resolvido:', militarId);
 
       if (isNewRegistration && militarId) {
@@ -499,8 +483,8 @@ export default function CadastrarMilitar() {
         dataInicio: novaDataInicio,
       });
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['militar-edicao-segura', editId] }),
         queryClient.invalidateQueries({ queryKey: ['militar', editId] }),
-        queryClient.invalidateQueries({ queryKey: ['militar-matriculas-edicao', editId] }),
         queryClient.invalidateQueries({ queryKey: ['militares'] }),
       ]);
       setNovaMatricula('');
@@ -516,7 +500,9 @@ export default function CadastrarMilitar() {
   };
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+  if (!hasMilitaresAccess || !hasRequiredAction) {
+    return <AccessDenied modulo={editId ? 'Editar Militar' : 'Adicionar Militar'} />;
+  }
 
   if (loadingEdit) {
     return (
@@ -545,16 +531,11 @@ export default function CadastrarMilitar() {
 
       if (tipoConferenciaSugerida === 'reativacao') {
         const militarId = getMilitarId(militar);
-        try {
-          const mats = await base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-data_inicio');
-          const ultimaInativa = mats.find(m => m.data_fim && (m.situacao === 'Inativa' || m.situacao === 'Transferida'));
-          if (ultimaInativa) {
-            dataInicioRef = ultimaInativa.data_fim;
-          } else {
-            observacaoAutomatica = 'Data de início da ausência não localizada automaticamente. Conferir manualmente.';
-          }
-        } catch (e) {
-           console.error('[CadastrarMilitar] Erro ao buscar histórico para reativação', e);
+        const ultimaInativa = matriculasMilitar.find(m => m.data_fim && (m.situacao === 'Inativa' || m.situacao === 'Transferida'));
+        if (ultimaInativa) {
+          dataInicioRef = ultimaInativa.data_fim;
+        } else {
+          observacaoAutomatica = 'Data de início da ausência não localizada automaticamente. Conferir manualmente.';
         }
       }
 
