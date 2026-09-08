@@ -11,9 +11,10 @@ const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
 async function fetchWithRetry(queryFn) { let lastError; for (let i = 1; i <= RETRY_MAX_ATTEMPTS; i++) { try { return await queryFn(); } catch (e) { lastError = e; const status = e?.response?.status || e?.status || 0; if (!RETRY_STATUS.has(status) || i === RETRY_MAX_ATTEMPTS) break; await new Promise((r) => setTimeout(r, RETRY_BASE_DELAY_MS * Math.pow(2, i - 1) + Math.floor(Math.random() * 200))); } } throw lastError; }
 
-async function resolverPermissoes(base44, email) {
-  const acessos = await fetchWithRetry(() => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: email, ativo: true }, undefined, LIMIT_MAX, 0, CAMPOS_USUARIO_ACESSO));
-  return { acessos: acessos || [], isAdminByAccess: (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin') };
+async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
+  const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  return response?.data ?? response ?? {};
 }
 
 async function resolverEscopoConsolidado(base44, acessos) {
@@ -66,30 +67,17 @@ Deno.serve(async (req) => {
     if (!authUser) return Response.json({ error: 'Não autenticado.' }, { status: 401 });
     let payload = {}; try { payload = await req.json(); } catch (_e) {}
 
-    const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
-    const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
-    const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== normalizeEmail(authUser.email);
-    if (wantsImpersonation && !authIsAdmin) return Response.json({ error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' }, { status: 403 });
+    const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
+    if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const targetEscopo = await resolverEscopoConsolidado(base44, authz?.acessos || []);
+    const podeEscopoGlobal = authz?.hasGlobalScope === true || targetEscopo?.isAdmin === true;
 
-    const targetPerms = wantsImpersonation ? await resolverPermissoes(base44, effectiveEmailNorm) : authPerms;
-    const targetEscopo = await resolverEscopoConsolidado(base44, targetPerms.acessos);
-
-    // SEGURANÇA (P0): durante impersonação, authIsAdmin NÃO pode ampliar o
-    // escopo de dados. authIsAdmin serve apenas para autorizar o direito de
-    // impersonar (validado acima). O escopo de retorno é SEMPRE o do usuário
-    // efetivo. Só retorna dados globais quando:
-    //   - não há impersonação E o usuário real é admin; OU
-    //   - o próprio usuário efetivo é admin.
-    const effectiveIsAdmin = Boolean(targetEscopo?.isAdmin);
-    const podeEscopoGlobal = wantsImpersonation ? effectiveIsAdmin : (authIsAdmin || effectiveIsAdmin);
-
-    console.info('[getScopedAtestadosBundle] impersonation_audit', {
-      authUserEmail: normalizeEmail(authUser.email),
-      effectiveUserEmail: wantsImpersonation ? effectiveEmailNorm : normalizeEmail(authUser.email),
-      isImpersonating: wantsImpersonation,
-      authIsAdmin,
-      effectiveIsAdmin,
+    console.info('[getScopedAtestadosBundle] authorization_audit', {
+      authUserEmail: normalizeEmail(authz?.authUserEmail || authUser.email),
+      effectiveUserEmail: normalizeEmail(authz?.effectiveUserEmail || authUser.email),
+      isImpersonating: authz?.isImpersonating === true,
+      isPlatformAdmin: authz?.isAdmin === true,
+      hasGlobalScope: authz?.hasGlobalScope === true,
       escopoAplicado: podeEscopoGlobal ? 'global' : 'escopado',
     });
 
