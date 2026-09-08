@@ -350,6 +350,16 @@ Deno.serve(async (req) => {
       requireModuleAction(a, 'militares', 'adicionar_militares', 'Sem permissão para adicionar militares.');
       return Response.json({ result: await createMilitar(base44, payload.data || {}, actor, payload.origemRegistro || 'manual') });
     }
+    if (action === 'GET_MILITAR_FOR_EDIT') {
+      requireModuleAction(a, 'militares', 'editar_militares', 'Sem permissão para editar militares.');
+      requireScopeAll(a, [payload.militarId]);
+      const [militar, matriculas] = await Promise.all([
+        findMilitarById(base44, payload.militarId),
+        base44.asServiceRole.entities.MatriculaMilitar.filter({ militar_id: payload.militarId }, '-data_inicio'),
+      ]);
+      if (!militar) throw Object.assign(new Error('Militar não encontrado para edição.'), { status: 404 });
+      return Response.json({ result: { militar, matriculas: matriculas || [] } });
+    }
     if (action === 'UPDATE_MILITAR') {
       requireModuleAction(a, 'militares', 'editar_militares', 'Sem permissão para editar militares.');
       requireScopeAll(a, [payload.militarId]);
