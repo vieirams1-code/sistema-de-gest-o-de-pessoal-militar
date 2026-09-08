@@ -1571,12 +1571,16 @@ Deno.serve(async (req) => {
         }
       } else if (entityName === 'Medalha' && operation !== 'bulk') {
         const origemRegistro = String(data?.origem_registro || registroExistente?.origem_registro || '').trim().toUpperCase();
-        const ehFluxoIndicacao = origemRegistro.startsWith('INDICACAO_');
+        const ehFluxoIndicacao = origemRegistro.startsWith('INDICACAO_') || origemRegistro.startsWith('APURACAO_');
         let requiredPermission = operation === 'delete'
           ? 'excluir_medalhas'
           : (operation === 'create' && ehFluxoIndicacao ? 'indicar_medalhas' : 'adicionar_medalhas');
         const statusFinal = String(data?.status || registroExistente?.status || '').trim().toUpperCase();
-        if (operation === 'update') requiredPermission = 'editar_medalhas';
+        if (operation === 'update') {
+          requiredPermission = statusFinal === 'INDICADA' && ehFluxoIndicacao
+            ? 'indicar_medalhas'
+            : 'editar_medalhas';
+        }
         if (statusFinal === 'CONCEDIDA') requiredPermission = 'conceder_medalhas';
         if (statusFinal === 'CANCELADA' && String(data?.observacoes || '').includes('[RESET]')) requiredPermission = 'resetar_indicacoes_medalhas';
         if (data?.override_admin === true) requiredPermission = 'editar_medalhas';
