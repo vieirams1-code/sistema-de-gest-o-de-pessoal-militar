@@ -1014,6 +1014,12 @@ Deno.serve(async (req: Request) => {
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
+          if (cp.tipo === 'PLANO_FERIAS') {
+            return new Response(JSON.stringify({ error: 'Campanhas de férias devem ser criadas pelo módulo específico de Planos de Férias.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
 
           let planoInstitucional: any = null;
           if (cp.tipo === 'PLANO_FERIAS') {
@@ -1190,8 +1196,8 @@ Deno.serve(async (req: Request) => {
           }
 
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
-          if (!campanha) {
-            return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
+          if (!campanha || campanha.tipo === 'PLANO_FERIAS') {
+            return new Response(JSON.stringify({ error: 'Campanha geral não encontrada.' }), {
               status: 404,
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
