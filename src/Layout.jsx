@@ -144,6 +144,7 @@ const menuGroups = [
             name: 'Antiguidade',
             page: 'AntiguidadePrevia',
             icon: ListOrdered,
+            adminOnly: true,
             moduleKey: 'antiguidade',
             actionKey: 'visualizar_rastreamento_promocoes',
             anyOf: [
