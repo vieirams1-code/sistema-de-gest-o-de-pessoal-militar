@@ -429,11 +429,11 @@ export default function PlanosFerias() {
               <p className="text-xs text-slate-500 mt-3">Abertura: {selecionado.data_abertura || '-'} · Status: {selecionado.status === 'ARQUIVADO' ? 'Arquivado' : 'Aberto'}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>
-              {modoAdmin && <Button type="button" variant="outline" onClick={() => excluir(selecionado)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir plano</Button>}
-              <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>
-              <Button type="button" variant="outline" onClick={() => abrirEdicao(selecionado)}><Edit3 className="w-4 h-4 mr-1.5" />Editar plano</Button>
-              {selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
+              {podeAdminFerias && <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>}
+              {modoAdmin && podeAdminFerias && podeExcluirPlanos && <Button type="button" variant="outline" onClick={() => excluir(selecionado)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir plano</Button>}
+              {(podeVisualizarRespostas || podeGerarFerias || podeAtribuirPermissoes) && <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>}
+              {podeEditarPlanos && <Button type="button" variant="outline" onClick={() => abrirEdicao(selecionado)}><Edit3 className="w-4 h-4 mr-1.5" />Editar plano</Button>}
+              {podeEditarPlanos && selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
             </div>
           </div>
           {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{feedback.texto}</div>}
@@ -443,7 +443,7 @@ export default function PlanosFerias() {
                 <h2 className="font-bold text-slate-900">Campanhas deste plano</h2>
                 <p className="text-xs text-slate-500 mt-1">Cada campanha possui prazo e escopo próprios; todas fazem parte deste mesmo plano.</p>
               </div>
-              {selecionado.status !== 'ARQUIVADO' && <Button type="button" onClick={abrirNovaCampanha} className="bg-[#1e3a5f] hover:bg-[#2a4d7d]"><Plus className="w-4 h-4 mr-1.5" />Nova campanha de férias</Button>}
+              {podeCriarCampanhas && selecionado.status !== 'ARQUIVADO' && <Button type="button" onClick={abrirNovaCampanha} className="bg-[#1e3a5f] hover:bg-[#2a4d7d]"><Plus className="w-4 h-4 mr-1.5" />Nova campanha de férias</Button>}
             </div>
             {campanhasDoPlano.length === 0 ? (
               <div className="p-10 text-center text-sm text-slate-500">Ainda não há campanhas neste plano.</div>
@@ -453,9 +453,9 @@ export default function PlanosFerias() {
                   <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.escopo_unidades_nomes || 'Toda a Corporação'} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
                     <div className="flex gap-2 flex-wrap">
-                      <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>
-                      <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>
-                      {modoAdmin && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
+                      {(podeAtribuirPermissoes || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
+                      {podeVisualizarRespostas && <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>}
+                      {modoAdmin && podeAdminFerias && podeExcluirCampanhas && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
                     </div>
                   </div>
                 ))}
@@ -463,7 +463,7 @@ export default function PlanosFerias() {
             )}
           </div>
 
-          {modoAdmin && (
+          {modoAdmin && podeAtribuirPermissoes && (
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <h2 className="font-bold text-slate-900">Histórico de ações</h2>
               <p className="text-xs text-slate-500 mt-1">Registro de quem salvou, aprovou, rejeitou ou alterou cada decisão.</p>
@@ -485,11 +485,11 @@ export default function PlanosFerias() {
                 ['Férias geradas', metricas?.ferias_geradas_unicas ?? '-'],
               ].map(([rotulo, valor]) => <div key={rotulo} className="rounded-xl bg-slate-50 border border-slate-200 p-3"><p className="text-xs text-slate-500">{rotulo}</p><p className="text-xl font-black text-slate-900 mt-1">{valor}</p></div>)}
             </div>
-            {modoAdmin && <p className="mt-4 text-xs text-rose-700">Modo Admin ativo: a exclusão remove campanhas e respostas vinculadas; férias geradas só perdem o vínculo com o plano após confirmação.</p>}
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 pt-4">
+            {modoAdmin && podeAdminFerias && <p className="mt-4 text-xs text-rose-700">Modo Admin ativo: a exclusão remove campanhas e respostas vinculadas; férias geradas só perdem o vínculo com o plano após confirmação.</p>}
+            {podeGerarFerias && <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 pt-4">
               <p className="text-xs text-slate-500">A geração inclui somente respostas novas, com escala salva, e preserva tudo o que já foi gerado.</p>
               <Button type="button" onClick={gerarFeriasDoPlano} disabled={salvando || selecionado.status === 'ARQUIVADO'} className="bg-emerald-700 hover:bg-emerald-800"><CalendarDays className="w-4 h-4 mr-1.5" />{salvando ? 'Gerando...' : 'Gerar férias do plano'}</Button>
-            </div>
+            </div>}
           </div>
           {renderModaisDoPlano()}
         </div>
@@ -503,8 +503,8 @@ export default function PlanosFerias() {
         <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center"><CalendarDays className="w-6 h-6" /></div><div><h1 className="text-xl sm:text-2xl font-black text-slate-900">Plano de Férias</h1><p className="text-xs text-slate-500">Crie, consulte e administre os planos que reúnem as campanhas de coleta.</p></div></div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>
-            <Button type="button" onClick={abrirNovo} className="bg-emerald-700 hover:bg-emerald-800"><Plus className="w-4 h-4 mr-1.5" />Novo Plano de Férias</Button>
+            {podeAdminFerias && <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>}
+            {podeCriarPlanos && <Button type="button" onClick={abrirNovo} className="bg-emerald-700 hover:bg-emerald-800"><Plus className="w-4 h-4 mr-1.5" />Novo Plano de Férias</Button>}
           </div>
         </div>
         {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{feedback.texto}</div>}
