@@ -139,7 +139,7 @@ export default function ConfigurarCampanhaFerias() {
               <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Campanha de Férias</p>
               <h1 className="mt-1 text-2xl font-black text-slate-900">{campanha?.titulo || 'Campanha'}</h1>
               <p className="mt-2 text-sm text-slate-500">Plano: {plano?.titulo || 'Plano de Férias'} · Status: {campanha?.status || '-'}</p>
-              <p className="mt-1 text-xs text-slate-500">Escopo: {campanha?.escopo_unidades_nomes || 'Toda a corporação'}{campanha?.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''}</p>
+              <p className="mt-1 text-xs text-slate-500">Escopo: {campanha?.tipo_escopo === 'SEM_ESCOPO' ? 'Somente grupos' : (campanha?.escopo_unidades_nomes || 'Toda a corporação')}{campanha?.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''}</p>
             </div>
             <Button type="button" variant="outline" onClick={() => navigate('/PainelPlanoFerias?planoId=' + (planoId || campanha?.plano_ferias_institucional_id || '') + '&campanhaId=' + campanhaId)}><ExternalLink className="mr-1.5 h-4 w-4" />Abrir respostas e escalação</Button>
           </div>
