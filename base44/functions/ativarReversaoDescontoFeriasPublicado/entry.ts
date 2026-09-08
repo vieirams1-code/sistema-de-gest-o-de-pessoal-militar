@@ -7,6 +7,22 @@ const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const isPublicado = (p = {}) => String(p.status || '').trim() === 'Publicado' || Boolean(p.numero_bg && p.data_bg);
 const erro = (message, status = 400) => Response.json({ error: message }, { status });
 
+async function resolverAutorizacao(base44, payload, militarId = null) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    ...(militarId ? { scopeMilitarIds: [militarId] } : {}),
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.publicar_bg !== true) {
+    throw Object.assign(new Error('Acesso negado: requer publicar_bg.'), { status: 403 });
+  }
+  if (militarId && authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
+}
+
 async function upsertAjusteDescontoFerias(base44, desconto, overrides = {}) {
   if (!desconto?.id) return null;
   const existentes = await base44.asServiceRole.entities.AjusteSaldoFerias
@@ -43,7 +59,7 @@ Deno.serve(async (req) => {
     try { payload = await req.json(); } catch (_e) { payload = {}; }
     const publicacaoId = String(payload?.publicacao_id || '').trim();
     if (!publicacaoId) return erro('publicacao_id é obrigatório.');
-    const acionadoPor = normalizeEmail(payload?.effectiveEmail || authUser.email);
+    await resolverAutorizacao(base44, payload);
 
     const tse = await base44.asServiceRole.entities.PublicacaoExOfficio.get(publicacaoId).catch(() => null);
     if (!tse) return erro('Publicação Tornar sem Efeito não encontrada.', 404);
@@ -61,6 +77,8 @@ Deno.serve(async (req) => {
 
     const [desconto] = await base44.asServiceRole.entities.DescontoFerias.filter({ publicacao_id: original.id }).catch(() => []);
     if (!desconto) return erro('Desconto em férias vinculado à publicação original não encontrado.', 404);
+    const authz = await resolverAutorizacao(base44, payload, String(desconto?.militar_id || ''));
+    const acionadoPor = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
 
     if (String(desconto.status || '') === 'revertido') {
       const ajusteSaldoFerias = await upsertAjusteDescontoFerias(base44, desconto, { status: 'revertido' });
