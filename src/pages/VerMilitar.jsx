@@ -991,7 +991,7 @@ export default function VerMilitar() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-medium text-slate-800">{a.tipo_afastamento}</span>
-                    {a.cid_10 && <span className="text-xs text-slate-500 ml-2">CID: {a.cid_10}</span>}
+                    {podeVerDadosSensiveisAtestado && a.cid_10 && <span className="text-xs text-slate-500 ml-2">CID: {a.cid_10}</span>}
                   </div>
                   <Badge className={a.status === 'Ativo' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}>{a.status}</Badge>
                 </div>
