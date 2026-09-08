@@ -114,11 +114,13 @@ test('Painel de Férias não herda admin_mode e exige aprovação para Não Cont
   assert.match(painelFerias, /PLANO_CAMPANHA_(DESATIVAR|ARQUIVAR|EXCLUIR)/);
 });
 
-test('menu e rota de Campanhas mantêm os mesmos aliases legados durante a migração', () => {
-  assert.match(layout, /GerirCampanhasPortal[\s\S]*perm_gerir_campanhas/);
-  assert.match(app, /GerirCampanhasPortal:[\s\S]*'gerir_campanhas'/);
-  assert.match(layout, /PainelPlanoFerias[\s\S]*perm_atribuir_permissoes_ferias[\s\S]*perm_gerir_respostas/);
-  assert.match(app, /PainelPlanoFerias:[\s\S]*'atribuir_permissoes_ferias'[\s\S]*'gerir_respostas'/);
+test('menu e rota de Campanhas usam somente permissões canônicas após L08', () => {
+  assert.match(layout, /GerirCampanhasPortal[\s\S]*perm_visualizar_campanhas_gerais/);
+  assert.match(app, /GerirCampanhasPortal:[\s\S]*'visualizar_campanhas_gerais'/);
+  assert.match(layout, /PainelPlanoFerias[\s\S]*perm_atribuir_permissoes_ferias/);
+  assert.match(app, /PainelPlanoFerias:[\s\S]*'atribuir_permissoes_ferias'/);
+  assert.doesNotMatch(layout, /perm_gerir_campanhas|perm_gerir_respostas/);
+  assert.doesNotMatch(app, /'gerir_campanhas'|'gerir_respostas'/);
 });
 
 test('exportação de respostas não inclui URL de anexos', () => {
