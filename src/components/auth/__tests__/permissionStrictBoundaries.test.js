@@ -225,10 +225,11 @@ test('períodos aquisitivos e acervo residual usam cudEscopado', () => {
 test('gratificações separam permissão funcional de escopo organizacional', () => {
   assert.match(gratificacoesService, /excluirEscopado\('GratificacaoFuncao', id\)/);
   assert.match(backendCud, /GratificacaoFuncao:\s*\{\s*delete: 'gerir_gratificacoes_funcao'/s);
-  assert.match(gerirGratificacaoBackend, /const authIsAdmin = String\(authUser\.role \|\| ''\)\.toLowerCase\(\) === 'admin';/);
-  assert.match(gerirGratificacaoBackend, /podeAgirSobreMilitar\(base44, authUser, authPerms\.acessos, data\.militar_id\)/);
+  assert.match(gerirGratificacaoBackend, /functions\.invoke\('getUserPermissions', \{\}\)/);
+  assert.match(gerirGratificacaoBackend, /const canManage = authz\?\.isAdmin === true \|\| authz\?\.actions\?\.\[REQUIRED_ACTION\] === true;/);
+  assert.match(gerirGratificacaoBackend, /podeAgirSobreMilitar\(base44, authUser, authz\?\.acessos \|\| \[\], data\.militar_id\)/);
   assert.match(gerirGratificacaoBackend, /militar fora do escopo organizacional/);
-  assert.doesNotMatch(gerirGratificacaoBackend, /authPerms\.isAdminByAccess/);
+  assert.doesNotMatch(gerirGratificacaoBackend, /isAdminByAccess/);
 });
 
 test('ações JISO independentes conseguem persistir apenas seus próprios reflexos', () => {
