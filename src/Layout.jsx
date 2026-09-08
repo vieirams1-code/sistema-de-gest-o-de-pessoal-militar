@@ -303,8 +303,8 @@ const menuGroups = [
             page: 'SolicitacoesAtualizacao',
             icon: ClipboardList,
             anyOf: [
-              { type: 'action', key: 'perm_visualizar_respostas_campanhas' },
-              { type: 'action', key: 'perm_aprovar_respostas_campanhas' },
+              { type: 'action', key: 'perm_visualizar_solicitacoes_cadastrais' },
+              { type: 'action', key: 'perm_decidir_solicitacoes_cadastrais' },
               { type: 'action', key: 'perm_gerir_respostas' },
             ],
             menuGroup: 'Gestão RH / Comando',
