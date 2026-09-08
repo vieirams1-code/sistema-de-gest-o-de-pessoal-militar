@@ -98,6 +98,9 @@ export const nestedMatrixKeys = [
 
 export const PROFILE_MATRIX_START_MARKER = '[SGP_PERMISSIONS_MATRIX]';
 export const PROFILE_MATRIX_END_MARKER = '[/SGP_PERMISSIONS_MATRIX]';
+export const PROFILE_MATRIX_VERSION = '2026.09.08-v3';
+export const PROFILE_VERSION_START_MARKER = '[SGP_PERMISSIONS_VERSION]';
+export const PROFILE_VERSION_END_MARKER = '[/SGP_PERMISSIONS_VERSION]';
 export const PROFILE_ORIGIN_START_MARKER = '[SGP_PROFILE_ORIGIN]';
 export const PROFILE_ORIGIN_END_MARKER = '[/SGP_PROFILE_ORIGIN]';
 
@@ -135,6 +138,18 @@ export const isLegacyCustomProfile = (profile = {}) => {
 
 export const isBasePermissionProfile = (profile = {}) => !isLegacyCustomProfile(profile);
 
+const stripProfileVersionMarker = (rawDescricao = '') => String(rawDescricao || '')
+  .replace(/\[SGP_PERMISSIONS_VERSION\][\s\S]*?\[\/SGP_PERMISSIONS_VERSION\]/g, '')
+  .trim();
+
+export const extractProfileMatrixVersionFromDescription = (rawDescricao = '') => {
+  const descricao = typeof rawDescricao === 'string' ? rawDescricao : '';
+  const startIdx = descricao.indexOf(PROFILE_VERSION_START_MARKER);
+  const endIdx = descricao.indexOf(PROFILE_VERSION_END_MARKER);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return '';
+  return descricao.slice(startIdx + PROFILE_VERSION_START_MARKER.length, endIdx).trim();
+};
+
 export const extractProfileMatrixFromDescription = (rawDescricao = '') => {
   const descricao = typeof rawDescricao === 'string' ? rawDescricao : '';
   const startIdx = descricao.indexOf(PROFILE_MATRIX_START_MARKER);
@@ -146,7 +161,7 @@ export const extractProfileMatrixFromDescription = (rawDescricao = '') => {
 
   const before = descricao.slice(0, startIdx).trimEnd();
   const after = descricao.slice(endIdx + PROFILE_MATRIX_END_MARKER.length).trimStart();
-  const cleanDescricao = [before, after].filter(Boolean).join('\n\n').trim();
+  const cleanDescricao = stripProfileVersionMarker([before, after].filter(Boolean).join('\n\n')); 
   const jsonRaw = descricao
     .slice(startIdx + PROFILE_MATRIX_START_MARKER.length, endIdx)
     .trim();
@@ -172,12 +187,13 @@ export const extractProfileMatrixFromDescription = (rawDescricao = '') => {
 };
 
 export const mergeProfileDescriptionWithMatrix = (cleanDescricao = '', matrix = {}) => {
-  const sanitizedDescricao = typeof cleanDescricao === 'string' ? cleanDescricao.trim() : '';
+  const sanitizedDescricao = stripProfileVersionMarker(typeof cleanDescricao === 'string' ? cleanDescricao.trim() : '');
   const sanitizedMatrix = sanitizePermissionsMatrix(matrix);
   const serialized = JSON.stringify(sanitizedMatrix);
   const matrixBlock = `${PROFILE_MATRIX_START_MARKER}${serialized}${PROFILE_MATRIX_END_MARKER}`;
-
-  return sanitizedDescricao ? `${sanitizedDescricao}\n\n${matrixBlock}` : matrixBlock;
+  const versionBlock = `${PROFILE_VERSION_START_MARKER}${PROFILE_MATRIX_VERSION}${PROFILE_VERSION_END_MARKER}`;
+  const blocks = [sanitizedDescricao, matrixBlock, versionBlock].filter(Boolean);
+  return blocks.join('\n\n');
 };
 
 export const extractProfileOriginIdFromDescription = (rawDescricao = '') => {
