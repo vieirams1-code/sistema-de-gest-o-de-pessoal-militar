@@ -1,0 +1,48 @@
+{
+  "name": "AuditoriaPermissoesPerfilSnapshot",
+  "type": "object",
+  "title": "Snapshot de Perfil de Permiss\u00e3o",
+  "properties": {
+    "execucao_id": {
+      "type": "string"
+    },
+    "lote_codigo": {
+      "type": "string"
+    },
+    "perfil_id": {
+      "type": "string"
+    },
+    "perfil_nome": {
+      "type": "string"
+    },
+    "versao_origem": {
+      "type": "string"
+    },
+    "versao_destino": {
+      "type": "string"
+    },
+    "snapshot_json": {
+      "type": "string"
+    },
+    "hash_snapshot": {
+      "type": "string"
+    },
+    "motivo": {
+      "type": "string"
+    },
+    "criado_em": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "perfil_id",
+    "snapshot_json"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
