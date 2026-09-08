@@ -33,12 +33,11 @@ function permissoesDaDescricao(descricao: unknown): Record<string, unknown> {
 }
 
 function permissoesNecessariasPlano(acao: string): string[] {
-  // Compatibilidade transitória somente até a migração de perfis da F8-L08.
-  const legadoCampanhas = ['perm_gerir_campanhas'];
-  if (acao === 'LISTAR' || acao === 'DETALHES') return ['perm_visualizar_planos_ferias', ...legadoCampanhas];
-  if (acao === 'CRIAR') return ['perm_criar_planos_ferias', ...legadoCampanhas];
-  if (acao === 'ATUALIZAR' || acao === 'ARQUIVAR') return ['perm_editar_planos_ferias', ...legadoCampanhas];
-  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias', ...legadoCampanhas];
+  // F8-L08: somente capacidades canônicas; aliases são resolvidos em getUserPermissions.
+  if (acao === 'LISTAR' || acao === 'DETALHES') return ['perm_visualizar_planos_ferias'];
+  if (acao === 'CRIAR') return ['perm_criar_planos_ferias'];
+  if (acao === 'ATUALIZAR' || acao === 'ARQUIVAR') return ['perm_editar_planos_ferias'];
+  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias'];
   return [];
 }
 
@@ -46,31 +45,10 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
   if (!user?.email) return false;
   if (normalizar(user.role) === 'admin') return true;
 
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({
-    user_email: user.email,
-    ativo: true,
-  });
-  const perfilIds = Array.from(new Set((acessos || []).map((a: any) => a?.perfil_id).filter(Boolean)));
-  const perfis = perfilIds.length
-    ? await base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true })
-    : [];
-
-  const permitidas = new Set<string>();
-  const coletar = (fonte: any) => {
-    if (!fonte || typeof fonte !== 'object') return;
-    for (const [chave, valor] of Object.entries(fonte)) {
-      if (valor === true && (chave.startsWith('perm_') || chave.startsWith('acesso_'))) {
-        permitidas.add(chave);
-      }
-    }
-  };
-  for (const perfil of perfis || []) {
-    coletar(perfil);
-    coletar(permissoesDaDescricao(perfil?.descricao));
-  }
-
+  const authzResponse = await base44.functions.invoke('getUserPermissions', {});
+  const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasPlano(acao);
-  return necessarias.length > 0 && necessarias.some((permissao) => permitidas.has(permissao));
+  return necessarias.length > 0 && necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true);
 }
 
 function militarNoEscopo(militar: any, campanha: any): boolean {
