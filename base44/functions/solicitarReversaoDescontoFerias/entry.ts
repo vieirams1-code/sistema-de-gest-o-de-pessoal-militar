@@ -7,6 +7,22 @@ const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const isPublicado = (p = {}) => String(p.status || '').trim() === 'Publicado' || Boolean(p.numero_bg && p.data_bg);
 const erro = (message, status = 400) => Response.json({ error: message }, { status });
 
+async function resolverAutorizacao(base44, payload, militarId = null) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    ...(militarId ? { scopeMilitarIds: [militarId] } : {}),
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.tornar_sem_efeito_publicacao !== true) {
+    throw Object.assign(new Error('Acesso negado: requer tornar_sem_efeito_publicacao.'), { status: 403 });
+  }
+  if (militarId && authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -17,10 +33,12 @@ Deno.serve(async (req) => {
 
     const descontoId = String(payload?.desconto_ferias_id || '').trim();
     if (!descontoId) return erro('desconto_ferias_id é obrigatório.');
-    const acionadoPor = normalizeEmail(payload?.effectiveEmail || authUser.email);
+    await resolverAutorizacao(base44, payload);
 
     const desconto = await base44.asServiceRole.entities.DescontoFerias.get(descontoId).catch(() => null);
     if (!desconto) return erro('Desconto em férias não encontrado.', 404);
+    const authz = await resolverAutorizacao(base44, payload, String(desconto?.militar_id || ''));
+    const acionadoPor = normalizeEmail(authz?.effectiveUserEmail || authUser.email);
     if (String(desconto.status || '') !== 'ativo') return erro('Somente descontos ativos podem solicitar reversão.');
     if (desconto.saldo_aplicado !== true) return erro('Somente descontos com saldo aplicado podem solicitar reversão.');
     if (!desconto.publicacao_id) return erro('Desconto sem publicação original vinculada.');
