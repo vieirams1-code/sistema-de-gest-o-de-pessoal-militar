@@ -103,6 +103,9 @@ test('cudEscopado usa capacidades granulares de férias e protege publicação d
   assert.match(cud, /statusCredito === 'CANCELADO'[\s\S]*'cancelar_credito_extra_ferias'/s);
   assert.match(cud, /'vincular_credito_extra_ferias'/);
   assert.match(cud, /'remover_vinculo_credito_extra_ferias'/);
-  assert.match(cud, /const requiredPermission = alteraBg \? 'publicar_bg' : 'editar_publicacoes'/);
-  assert.match(cud, /requiredPermissions = \['adicionar_publicacoes', 'publicar_bg'\]/);
+  assert.match(cud, /tipoPublicacao === 'Apostila'.*requiredPermissions = \['apostilar_publicacao'\]/s);
+  assert.match(cud, /tipoPublicacao === 'Tornar sem Efeito'.*requiredPermissions = \['tornar_sem_efeito_publicacao'\]/s);
+  assert.match(cud, /apenasApostilamento[\s\S]*'apostilar_publicacao'/s);
+  assert.match(cud, /apenasTornarSemEfeito[\s\S]*'tornar_sem_efeito_publicacao'/s);
+  assert.match(cud, /requiredPermissions = \[\.\.\.requiredPermissions, 'publicar_bg'\]/);
 });
