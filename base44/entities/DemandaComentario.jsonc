@@ -42,5 +42,11 @@
     "demanda_id",
     "tipo_registro",
     "mensagem"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
