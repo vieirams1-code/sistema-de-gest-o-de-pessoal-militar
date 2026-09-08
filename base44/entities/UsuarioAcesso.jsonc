@@ -243,5 +243,11 @@
     "user_email",
     "tipo_acesso",
     "ativo"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
