@@ -80,9 +80,9 @@ export default function Atestados() {
   const [viewMode, setViewMode] = useState('list');
 
   const { data: atestadosBundle, isLoading } = useQuery({
-    queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
+    queryKey: ['atestados', 'dto-operacional-v2', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
     queryFn: async () => {
-      const { atestados, meta } = await fetchScopedAtestadosBundle();
+      const { atestados, meta } = await fetchScopedAtestadosBundle({ dtoVersion: 'operacional-v2' });
       if (meta?.partialFailures > 0) {
         console.warn('getScopedAtestadosBundle retornou partialFailures', meta);
       }
