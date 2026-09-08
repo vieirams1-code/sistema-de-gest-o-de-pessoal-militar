@@ -406,13 +406,13 @@ export default function VerMilitar() {
       const historico = await obterHistoricoComportamentoMilitar(militarIdHistorico);
       return historico;
     },
-    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel && podeVisualizarComportamento,
   });
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['ver-punicoes-comportamento', id],
     queryFn: () => base44.entities.PunicaoDisciplinar.filter({ militar_id: id }, '-data_inicio_cumprimento'),
-    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel && podeVisualizarComportamento,
   });
 
   const { data: acervoHistorico = [] } = useQuery({
@@ -436,7 +436,7 @@ export default function VerMilitar() {
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['ver-pendencias-comportamento', id],
     queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
-    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel && podeVisualizarComportamento,
   });
 
   const pendenciasComportamentoUnicas = React.useMemo(() => {
