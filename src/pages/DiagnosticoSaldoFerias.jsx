@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, AlertTriangle, CheckCircle2, Search, ShieldAlert } from 'lucide-react';
-import { AjusteSaldoFerias } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -116,23 +115,16 @@ export default function DiagnosticoSaldoFerias() {
 
   const { data: paBundle, isLoading: loadingBundle } = useQuery({
     queryKey: ['diagnostico-saldo-ferias-pa-bundle', isAdmin],
-    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle({ includeAjustesDetalhados: true }),
     enabled: queryEnabled,
     staleTime: 60 * 1000,
   });
-
-  const { data: ajustes = [], isLoading: loadingAjustes } = useQuery({
-    queryKey: ['diagnostico-saldo-ferias-ajustes', isAdmin],
-    queryFn: () => AjusteSaldoFerias.list('-created_date'),
-    enabled: queryEnabled,
-    staleTime: 60 * 1000,
-  });
-
 
   const periodos = paBundle?.periodosAquisitivos || [];
   const ferias = paBundle?.ferias || [];
   const militares = paBundle?.militares || [];
-  const isLoading = loadingBundle || loadingAjustes;
+  const ajustes = paBundle?.ajustesSaldoFerias || [];
+  const isLoading = loadingBundle;
 
   const militarById = useMemo(() => new Map(militares.map((militar) => [militar.id, militar])), [militares]);
 
