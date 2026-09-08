@@ -535,6 +535,7 @@ Deno.serve(async (req) => {
             limit,
             offset,
             includeFoto,
+            includeMatriculas,
             debugFields,
             effectiveEmail,
             militarIds: militarIdsRaw,
@@ -640,6 +641,10 @@ Deno.serve(async (req) => {
         const canViewMilitares = isAdminByRole || (
             permissoesFuncionais.modules.militares === true
             && permissoesFuncionais.actions.visualizar_militares === true
+        );
+        const canViewSensitiveMilitar = isAdminByRole || (
+            permissoesFuncionais.modules.militares === true
+            && permissoesFuncionais.actions.ver_dados_sensiveis_militar === true
         );
         if (!canViewMilitares) {
             return Response.json(
@@ -867,8 +872,13 @@ Deno.serve(async (req) => {
             usouFiltroProprios = proprios.length > 0;
         }
 
-        // 8. Seleção de campos
-        const campos = effIncludeFoto ? [...CAMPOS_BASE_MILITAR, 'foto'] : CAMPOS_BASE_MILITAR;
+        // 8. Seleção de campos. Dados sensíveis só são consultados e projetados
+        // quando a capacidade explícita está presente no perfil efetivo.
+        const campos = [
+            ...CAMPOS_BASE_MILITAR,
+            ...(canViewSensitiveMilitar ? CAMPOS_SENSIVEIS_MILITAR : []),
+            ...(effIncludeFoto ? ['foto'] : []),
+        ];
 
         // 9. Buscar militares
         // ATENÇÃO: quando militarIds é informado, ignoramos `search` (não faz
