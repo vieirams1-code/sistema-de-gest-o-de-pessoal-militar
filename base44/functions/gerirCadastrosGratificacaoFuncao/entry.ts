@@ -3,8 +3,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 400;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-const LIMIT_USUARIO_ACESSO = 1000;
-const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'perfil_id'];
 const REQUIRED_ACTION = 'gerir_cotas_gratificacao_funcao';
 const OPERACOES = new Set(['criar_tipo', 'atualizar_tipo', 'criar_cota', 'atualizar_cota']);
 const COTA_STATUS = new Set(['ativa', 'suspensa', 'encerrada']);
@@ -36,49 +34,9 @@ async function fetchWithRetry(queryFn: () => Promise<any>, label = 'query') {
   throw lastError;
 }
 
-function extrairMatrizPermissoes(descricao: unknown) {
-  if (typeof descricao !== 'string' || !descricao) return {};
-  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-  if (start === -1 || end === -1 || end <= start) return {};
-  try {
-    const parsed = JSON.parse(descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim());
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) { return {}; }
-}
-
-function consolidarActions(perfis: any[], acessos: any[]) {
-  const actions: Record<string, boolean> = {};
-  const aplicarFonte = (fonte: any) => {
-    if (!fonte) return;
-    Object.entries(fonte).forEach(([key, val]) => {
-      if (typeof val !== 'boolean' || !key.startsWith('perm_')) return;
-      const actionKey = key.replace(/^perm_/, '');
-      if (val === true) actions[actionKey] = true;
-      else if (!(actionKey in actions)) actions[actionKey] = false;
-    });
-  };
-  (perfis || []).forEach((perfil) => { aplicarFonte(perfil); aplicarFonte(extrairMatrizPermissoes(perfil?.descricao)); });
-  (acessos || []).forEach(aplicarFonte);
-  return actions;
-}
-
-async function resolverPermissoes(base44: ReturnType<typeof createClientFromRequest>, email: string) {
-  const emailNorm = normalizeEmail(email);
-  const acessos = await fetchWithRetry(
-    () => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: emailNorm, ativo: true }, undefined, LIMIT_USUARIO_ACESSO, 0, CAMPOS_USUARIO_ACESSO),
-    `UsuarioAcesso:${emailNorm}`,
-  );
-  const perfilIds = Array.from(new Set((acessos || []).map((acesso: any) => acesso?.perfil_id).filter(Boolean)));
-  let perfis: any[] = [];
-  if (perfilIds.length > 0) {
-    perfis = await fetchWithRetry(() => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }), `PerfilPermissao:${emailNorm}`);
-  }
-  return {
-    acessos: acessos || [],
-    actions: consolidarActions(perfis || [], acessos || []),
-    isAdminByAccess: (acessos || []).some((a: any) => normalizeTipo(a?.tipo_acesso) === 'admin'),
-  };
+async function resolverAutorizacaoCanonica(base44: ReturnType<typeof createClientFromRequest>) {
+  const response = await base44.functions.invoke('getUserPermissions', {});
+  return response?.data ?? response ?? {};
 }
 
 function sanitizeTipo(input: any = {}) {
@@ -182,9 +140,8 @@ Deno.serve(async (req) => {
     const operacao = String(payload?.operacao || '').trim();
     if (!OPERACOES.has(operacao)) return Response.json({ error: 'Operação não permitida.' }, { status: 400 });
 
-    const authPerms = await resolverPermissoes(base44, authUser.email);
-    const authIsAdmin = String(authUser.role || '').toLowerCase() === 'admin' || authPerms.isAdminByAccess;
-    const canManage = authIsAdmin || authPerms.actions?.[REQUIRED_ACTION] === true;
+    const authz = await resolverAutorizacaoCanonica(base44);
+    const canManage = authz?.isAdmin === true || authz?.actions?.[REQUIRED_ACTION] === true;
     if (!canManage) return Response.json({ error: 'Acesso negado: requer gerir_cotas_gratificacao_funcao ou admin/ALL.' }, { status: 403 });
 
     const data = payload?.data && typeof payload.data === 'object' ? payload.data : {};

@@ -60,78 +60,14 @@ async function fetchWithRetry(queryFn, label = 'query') {
     throw lastError;
 }
 
-// Extrai a matriz de permissões serializada no campo `descricao` de um
-// PerfilPermissao, no formato:
-//   [SGP_PERMISSIONS_MATRIX]{...JSON...}[/SGP_PERMISSIONS_MATRIX]
-function extrairMatrizPermissoes(descricao) {
-    if (typeof descricao !== 'string' || !descricao) return {};
-    const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-    const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-    if (start === -1 || end === -1 || end <= start) return {};
-    const jsonStr = descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim();
-    if (!jsonStr) return {};
-    try {
-        const parsed = JSON.parse(jsonStr);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (_e) {
-        return {};
-    }
+async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
+    const payload = effectiveEmail ? { effectiveEmail } : {};
+    const response = await base44.functions.invoke('getUserPermissions', payload);
+    return response?.data ?? response ?? {};
 }
 
-function consolidarActions(perfis, acessos) {
-    const actions = {};
-    const aplicar = (fonte) => {
-        if (!fonte) return;
-        Object.entries(fonte).forEach(([key, val]) => {
-            if (typeof val !== 'boolean') return;
-            if (!key.startsWith('perm_')) return;
-            const actionKey = key.replace(/^perm_/, '');
-            if (val === true) actions[actionKey] = true;
-            else if (!(actionKey in actions)) actions[actionKey] = false;
-        });
-    };
-    (perfis || []).forEach((p) => {
-        aplicar(p);
-        aplicar(extrairMatrizPermissoes(p?.descricao));
-    });
-    (acessos || []).forEach(aplicar);
-    return actions;
-}
-
-async function resolverPermissoes(base44, email) {
-    const acessos = await fetchWithRetry(
-        () => base44.asServiceRole.entities.UsuarioAcesso.filter(
-            { user_email: email, ativo: true },
-            undefined,
-            100,
-            0,
-            CAMPOS_USUARIO_ACESSO
-        ),
-        `usuarioAcesso.list:${email}`
-    );
-
-    const isAdminByAccess = (acessos || []).some((a) => normalizeTipo(a.tipo_acesso) === 'admin');
-
-    const perfilIds = Array.from(new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean)));
-    let perfis = [];
-    if (perfilIds.length > 0) {
-        perfis = await fetchWithRetry(
-            () => base44.asServiceRole.entities.PerfilPermissao.filter({
-                id: { $in: perfilIds },
-                ativo: true,
-            }),
-            'perfilPermissao.in'
-        );
-    }
-
-    const actions = consolidarActions(perfis || [], acessos || []);
-
-    return { acessos: acessos || [], isAdminByAccess, actions };
-}
-
-function temPermissaoMover(authIsAdmin, targetIsAdmin, targetActions) {
-    if (authIsAdmin) return true;
-    if (targetIsAdmin) return true;
+function temPermissaoMover(isPlatformAdmin, targetActions) {
+    if (isPlatformAdmin) return true;
     return ACTIONS_AUTORIZADAS.some((k) => targetActions?.[k] === true);
 }
 
@@ -314,61 +250,31 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Nenhum militar informado.' }, { status: 400 });
         }
 
-        // ---- Impersonação (mesmo padrão do getUserPermissions) ----
-        const authUserEmail = normalizeEmail(authUser.email);
-        const effectiveEmailNorm = normalizeEmail(effectiveEmailRaw);
-        const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-
-        const authPerms = await resolverPermissoes(base44, authUser.email);
-        const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-        const authIsAdmin = authIsAdminByRole || authPerms.isAdminByAccess;
-
-        if (wantsImpersonation && !authIsAdmin) {
-            return Response.json(
-                { error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' },
-                { status: 403 }
-            );
+        // ---- Autorização canônica via getUserPermissions ----
+        const authz = await resolverAutorizacaoCanonica(base44, effectiveEmailRaw);
+        if (authz?.error) {
+            return Response.json({ error: authz.error }, { status: 403 });
         }
-
-        const isImpersonating = wantsImpersonation && authIsAdmin;
-        const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
-        const targetPerms = isImpersonating
-            ? await resolverPermissoes(base44, targetEmail)
-            : authPerms;
-        const targetIsAdmin = isImpersonating
-            ? targetPerms.isAdminByAccess
-            : authIsAdmin;
-
-        const autorizado = temPermissaoMover(authIsAdmin, targetIsAdmin, targetPerms.actions);
+        const targetEmail = authz?.effectiveUserEmail || authUser.email;
+        const isImpersonating = authz?.isImpersonating === true;
+        const targetIsPlatformAdmin = authz?.isAdmin === true;
+        const autorizado = temPermissaoMover(targetIsPlatformAdmin, authz?.actions || {});
         if (!autorizado) {
-            return Response.json(
-                { error: 'Permissão insuficiente para mover militares.' },
-                { status: 403 }
-            );
+            return Response.json({ error: 'Permissão insuficiente para mover militares.' }, { status: 403 });
         }
 
-        // ---- Lote 1D-F: validar escopo de militares (anti-bypass) ----
-        // Para não-admin, todos os militaresIds alvo devem pertencer ao
-        // escopo organizacional do usuário efetivo (alvo da ação).
-        if (!targetIsAdmin) {
-            const idsPermitidos = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
-            if (idsPermitidos === null) {
-                // segurança extra: se algo retornar admin aqui, mantém o fluxo
-            } else {
+        // tipo_acesso=admin significa escopo global, não privilégio funcional.
+        if (authz?.hasGlobalScope !== true) {
+            const idsPermitidos = await listarMilitarIdsDoEscopo(base44, authz?.acessos || []);
+            if (idsPermitidos !== null) {
                 const setPermitidos = new Set(idsPermitidos.map(String));
                 const foraDoEscopo = militaresIds.filter((id) => !setPermitidos.has(String(id)));
                 if (foraDoEscopo.length > 0) {
-                    console.warn('[moverMilitaresLotacao] tentativa de mover militares fora do escopo', {
-                        targetEmail,
-                        foraDoEscopo,
-                    });
-                    return Response.json(
-                        {
-                            error: 'Acesso negado: um ou mais militares estão fora do seu escopo.',
-                            militaresForaDoEscopo: foraDoEscopo,
-                        },
-                        { status: 403 }
-                    );
+                    console.warn('[moverMilitaresLotacao] tentativa de mover militares fora do escopo', { targetEmail, foraDoEscopo });
+                    return Response.json({
+                        error: 'Acesso negado: um ou mais militares estão fora do seu escopo.',
+                        militaresForaDoEscopo: foraDoEscopo,
+                    }, { status: 403 });
                 }
             }
         }
