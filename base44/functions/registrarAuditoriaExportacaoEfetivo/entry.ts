@@ -19,7 +19,6 @@ const CAMPOS_USUARIO_ACESSO = [
   'subgrupamento_id',
   'militar_id',
   'perfil_id',
-  'perm_exportar_extracao_efetivo',
 ];
 
 const ALLOWED_COLUMNS = Object.freeze({
@@ -92,44 +91,6 @@ async function fetchWithRetry(queryFn: () => Promise<unknown>, label = 'query') 
     }
   }
   throw lastError;
-}
-
-function extrairMatrizPermissoes(descricao: unknown) {
-  if (typeof descricao !== 'string' || !descricao) return {};
-  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
-  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
-  if (start === -1 || end === -1 || end <= start) return {};
-  const jsonStr = descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim();
-  if (!jsonStr) return {};
-  try {
-    const parsed = JSON.parse(jsonStr);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
-}
-
-function aplicarPermissoes(fonte: Record<string, unknown> | null | undefined, actions: Record<string, boolean>) {
-  if (!fonte) return;
-  Object.entries(fonte).forEach(([key, value]) => {
-    if (typeof value !== 'boolean' || !key.startsWith('perm_')) return;
-    const actionKey = key.replace(/^perm_/, '');
-    if (value === true) {
-      actions[actionKey] = true;
-    } else if (!(actionKey in actions)) {
-      actions[actionKey] = false;
-    }
-  });
-}
-
-function consolidarActions(perfis: Record<string, unknown>[], acessos: Record<string, unknown>[]) {
-  const actions: Record<string, boolean> = {};
-  (perfis || []).forEach((perfil) => {
-    aplicarPermissoes(perfil, actions);
-    aplicarPermissoes(extrairMatrizPermissoes(perfil?.descricao) as Record<string, unknown>, actions);
-  });
-  (acessos || []).forEach((acesso) => aplicarPermissoes(acesso, actions));
-  return actions;
 }
 
 function descreverEscopoSeguro(acessos: Record<string, unknown>[], isAdmin: boolean) {
@@ -217,57 +178,21 @@ function sanitizePayload(payload: Record<string, unknown> | null | undefined) {
 }
 
 async function resolverUsuarioEfetivo(base44: ReturnType<typeof createClientFromRequest>, authUser: Record<string, unknown>, payload: Record<string, unknown>) {
-  const authUserEmail = normalizeEmail(authUser.email);
-  const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
-  const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
-
-  const acessosAuth = await fetchWithRetry(
-    () => base44.asServiceRole.entities.UsuarioAcesso.filter(
-      { user_email: authUser.email, ativo: true },
-      undefined,
-      100,
-      0,
-      CAMPOS_USUARIO_ACESSO,
-    ),
-    'usuarioAcesso.auth',
-  ) as Record<string, unknown>[];
-
-  const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
-  const authIsAdminByAccess = (acessosAuth || []).some((acesso) => normalizeTipo(acesso.tipo_acesso) === 'admin');
-  const authIsAdmin = authIsAdminByRole || authIsAdminByAccess;
-
-  if (wantsImpersonation && !authIsAdmin) {
-    return { blocked: true, reason: 'IMPERSONATION_FORBIDDEN', authUserEmail, effectiveResolvedEmail: authUserEmail, isImpersonating: false, acessos: [] as Record<string, unknown>[], perfis: [] as Record<string, unknown>[], isAdmin: false };
-  }
-
-  const isImpersonating = wantsImpersonation && authIsAdmin;
-  const effectiveResolvedEmail = isImpersonating ? effectiveEmailNorm : authUserEmail;
-  const acessos = isImpersonating
-    ? await fetchWithRetry(
-      () => base44.asServiceRole.entities.UsuarioAcesso.filter(
-        { user_email: effectiveResolvedEmail, ativo: true },
-        undefined,
-        100,
-        0,
-        CAMPOS_USUARIO_ACESSO,
-      ),
-      'usuarioAcesso.effective',
-    ) as Record<string, unknown>[]
-    : acessosAuth;
-
-  const perfilIds = Array.from(new Set((acessos || []).map((acesso) => acesso?.perfil_id).filter(Boolean)));
-  const perfis = perfilIds.length > 0
-    ? await fetchWithRetry(
-      () => base44.asServiceRole.entities.PerfilPermissao.filter({ id: { $in: perfilIds }, ativo: true }),
-      'perfilPermissao.in',
-    ) as Record<string, unknown>[]
-    : [];
-
-  const isAdminByRole = isImpersonating ? false : authIsAdminByRole;
-  const isAdminByAccess = (acessos || []).some((acesso) => normalizeTipo(acesso.tipo_acesso) === 'admin');
-  const isAdmin = isAdminByRole || isAdminByAccess;
-
-  return { blocked: false, reason: null, authUserEmail, effectiveResolvedEmail, isImpersonating, acessos, perfis, isAdmin };
+  const requestPayload = payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  const authz = response?.data ?? response ?? {};
+  const blocked = Boolean(authz?.error);
+  return {
+    blocked,
+    reason: blocked ? 'AUTHORIZATION_FAILED' : null,
+    authUserEmail: normalizeEmail(authz?.authUserEmail || authUser?.email),
+    effectiveResolvedEmail: normalizeEmail(authz?.effectiveUserEmail || authUser?.email),
+    isImpersonating: authz?.isImpersonating === true,
+    acessos: Array.isArray(authz?.acessos) ? authz.acessos : [],
+    actions: authz?.actions && typeof authz.actions === 'object' ? authz.actions : {},
+    isPlatformAdmin: authz?.isAdmin === true,
+    hasGlobalScope: authz?.hasGlobalScope === true,
+  };
 }
 
 async function criarLog(base44: ReturnType<typeof createClientFromRequest>, data: Record<string, unknown>) {
@@ -296,8 +221,7 @@ Deno.serve(async (req) => {
 
     const usuario = await resolverUsuarioEfetivo(base44, authUser as Record<string, unknown>, payload);
     const sanitized = sanitizePayload(payload);
-    const actions = consolidarActions(usuario.perfis, usuario.acessos);
-    const hasPermission = usuario.isAdmin || actions[REQUIRED_ACTION] === true;
+    const hasPermission = usuario.isPlatformAdmin || usuario.actions?.[REQUIRED_ACTION] === true;
     const commonLog = {
       acao: REQUIRED_ACTION,
       usuario_real_email: usuario.authUserEmail,
@@ -311,7 +235,7 @@ Deno.serve(async (req) => {
       filtros_sanitizados_json: safeStringify(sanitized.filtros, {}),
       consulta_meta_json: safeStringify({
         ...sanitized.consultaMeta,
-        escopo_resumido: descreverEscopoSeguro(usuario.acessos, usuario.isAdmin),
+        escopo_resumido: descreverEscopoSeguro(usuario.acessos, usuario.hasGlobalScope),
       }, {}),
       nome_arquivo: sanitized.nomeArquivo,
       versao: AUDIT_VERSION,
