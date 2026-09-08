@@ -128,6 +128,22 @@ async function sha256(value: string) {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function resolverAutorizacaoJiso(base44: any, payload: any, militarId: string) {
+  const response = await base44.functions.invoke('getUserPermissions', {
+    ...(payload?.effectiveEmail ? { effectiveEmail: payload.effectiveEmail } : {}),
+    scopeMilitarIds: [militarId],
+  });
+  const authz = response?.data ?? response ?? {};
+  if (authz?.error) throw Object.assign(new Error(authz.error), { status: 403 });
+  if (authz?.isAdmin !== true && authz?.actions?.gerir_jiso !== true) {
+    throw Object.assign(new Error('Acesso negado: requer gerir_jiso.'), { status: 403 });
+  }
+  if (authz?.scopeCheck?.allAllowed !== true) {
+    throw Object.assign(new Error('Acesso negado: militar fora do escopo organizacional.'), { status: 403 });
+  }
+  return authz;
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   if (req.method !== 'POST') {
@@ -147,6 +163,9 @@ Deno.serve(async (req) => {
 
     if (!atestadoId) return jsonResponse({ success: false, error: 'atestado_id obrigatório' }, 400);
     if (!militarId) return jsonResponse({ success: false, error: 'militar_id obrigatório' }, 400);
+
+    const authz = await resolverAutorizacaoJiso(base44, payload, militarId);
+    const effectiveEmail = normalizeText(authz?.effectiveUserEmail || authUser.email);
 
     const atestados = await base44.asServiceRole.entities.Atestado.filter({ id: atestadoId });
     const atestado = atestados?.[0];
@@ -261,7 +280,7 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.Atestado.update(atestadoId, {
         jiso_whatsapp_status: 'enviado',
         jiso_whatsapp_enviado_em: enviadoEm,
-        jiso_whatsapp_enviado_por: authUser.email,
+        jiso_whatsapp_enviado_por: effectiveEmail,
         jiso_whatsapp_mensagem: mensagemFinal,
         jiso_whatsapp_data_agendada_snapshot: atestado.data_jiso_agendada || '',
         jiso_whatsapp_hora_agendada_snapshot: atestado.hora_jiso_agendada || '',
@@ -272,7 +291,7 @@ Deno.serve(async (req) => {
         success: true,
         tracking_saved: false,
         enviado_em: enviadoEm,
-        enviado_por: authUser.email,
+        enviado_por: effectiveEmail,
         data_jiso_snapshot: atestado.data_jiso_agendada || '',
         hora_jiso_snapshot: atestado.hora_jiso_agendada || '',
         template_id: template.id,
