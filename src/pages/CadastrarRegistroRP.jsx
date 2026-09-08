@@ -539,13 +539,19 @@ export default function CadastrarRegistroRP() {
 
   const tiposFiltrados = useMemo(() => {
     const sexo = militarSelecionado?.sexo;
-    return getTiposRPFiltrados({
+    const tiposBase = getTiposRPFiltrados({
       sexo,
       tiposCustom,
       templatesAtivos,
       tipoAtualEdicao: isEditing ? registroEdicao?.tipo_registro || registroEdicao?.tipo : null,
     });
-  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao]);
+    if (isEditing) return tiposBase;
+    return tiposBase.filter((tipo) => {
+      if (tipo?.value === 'Apostila') return canApostilarPublicacao;
+      if (tipo?.value === 'Tornar sem Efeito') return canTornarSemEfeitoPublicacao;
+      return canAdicionarPublicacoes;
+    });
+  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao, canAdicionarPublicacoes, canApostilarPublicacao, canTornarSemEfeitoPublicacao]);
 
   const tiposFiltradosBusca = useMemo(() => {
     return tiposFiltrados.filter(t => matchesTipoRPSearch(t, tipoSearch));
@@ -1055,8 +1061,15 @@ export default function CadastrarRegistroRP() {
 
     if (templateObrigatorioAusenteNoSubmit) return;
     if (conflitoTemplateNoSubmit.temConflito) return;
-    if (!canGerirPublicacoes) {
-      alert('Ação negada: você não tem permissão para criar/editar publicações.');
+    const acaoObrigatoria = isEditing
+      ? 'editar_publicacoes'
+      : formData.tipo_registro === 'Apostila'
+        ? 'apostilar_publicacao'
+        : formData.tipo_registro === 'Tornar sem Efeito'
+          ? 'tornar_sem_efeito_publicacao'
+          : 'adicionar_publicacoes';
+    if (!canAccessAction(acaoObrigatoria)) {
+      alert(`Ação negada: permissão necessária ${acaoObrigatoria}.`);
       return;
     }
 
@@ -1166,11 +1179,11 @@ export default function CadastrarRegistroRP() {
   ].filter(Boolean);
 
   if (!loadingUser && isAccessResolved && !hasAccess) {
-    return <AccessDenied modulo="RP — Registro de Publicações" />;
+    return <AccessDenied modulo="Registro de Publicações" />;
   }
 
-  if (!loadingUser && isAccessResolved && !canGerirPublicacoes) {
-    return <AccessDenied modulo="Cadastro/Edição de Publicações" />;
+  if (!loadingUser && isAccessResolved && !canAcessarFormulario) {
+    return <AccessDenied modulo={isEditing ? 'Editar Publicações' : 'Criar Publicações'} />;
   }
 
   const carregandoCatalogoInicial = canRunScopedQueries && (loadingTiposCustom || loadingTemplatesAtivos);
