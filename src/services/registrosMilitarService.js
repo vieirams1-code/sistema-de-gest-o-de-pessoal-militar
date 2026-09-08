@@ -70,28 +70,30 @@ export async function listarRegistrosMilitar() {
   });
 }
 
-function getEntityFromRegistro(registro) {
-  if (registro?.origem_fonte === 'PublicacaoExOfficio') return base44.entities.PublicacaoExOfficio;
-  return base44.entities.RegistroLivro;
+function getEntityNameFromRegistro(registro) {
+  return registro?.origem_fonte === 'PublicacaoExOfficio' ? 'PublicacaoExOfficio' : 'RegistroLivro';
 }
 
-export async function atualizarTipoRegistroMilitar(registro, novoTipo, audit = {}) {
-  const entity = getEntityFromRegistro(registro);
-  const tipoNormalizado = limparTexto(novoTipo);
+async function invokeRegistrosGateway(action, registro, data = {}) {
+  const response = await base44.functions.invoke('registrosMilitarGateway', {
+    action,
+    entityName: getEntityNameFromRegistro(registro),
+    id: registro?.id,
+    data,
+  });
+  const body = response?.data ?? response ?? {};
+  if (body?.error) throw new Error(body.error);
+  return body?.data ?? body;
+}
 
+export async function atualizarTipoRegistroMilitar(registro, novoTipo) {
+  const tipoNormalizado = limparTexto(novoTipo);
   const payload = registro?.origem_fonte === 'PublicacaoExOfficio'
     ? { tipo: tipoNormalizado }
     : { tipo_registro: tipoNormalizado };
-
-  if (audit?.userEmail) {
-    payload.tipo_alterado_por = audit.userEmail;
-    payload.tipo_alterado_em = new Date().toISOString();
-  }
-
-  return entity.update(registro.id, payload);
+  return invokeRegistrosGateway('UPDATE_TYPE', registro, payload);
 }
 
 export async function excluirRegistroMilitar(registro) {
-  const entity = getEntityFromRegistro(registro);
-  return entity.delete(registro.id);
+  return invokeRegistrosGateway('DELETE', registro);
 }
