@@ -487,19 +487,9 @@ function canSeeSensitiveColumn({ column, userContext }) {
   if (userContext?.isAdmin) return true;
 
   const canAccessSensitiveAction = typeof userContext?.canAccessAction === 'function'
-    ? userContext.canAccessAction('acesso_dados_sensiveis')
+    ? userContext.canAccessAction('ver_dados_sensiveis_militar')
     : false;
-  if (canAccessSensitiveAction) return true;
-
-  const visibleFor = Array.isArray(column?.visibleFor) ? column.visibleFor : [];
-  if (visibleFor.length === 0) return false;
-
-  const roles = Array.isArray(userContext?.roles) ? userContext.roles.map((role) => String(role || '').toLowerCase()) : [];
-  const modoAcesso = String(userContext?.modoAcesso || '').toLowerCase();
-  return visibleFor.some((role) => {
-    const normalized = String(role || '').toLowerCase();
-    return normalized === modoAcesso || roles.includes(normalized);
-  });
+  return canAccessSensitiveAction;
 }
 
 export function getAllowedConsultaMilitarColumns({ userContext } = {}) {
