@@ -40,6 +40,16 @@ export async function listarProcessosEscopado() {
   return resp?.processos || [];
 }
 
+export async function listarTramitesProcessoEscopado(id) {
+  const resp = await invocar({ action: 'listarTramitesProcessoEscopado', id: String(id) });
+  return resp?.tramites || [];
+}
+
+export async function listarEventosProcessoEscopado(id) {
+  const resp = await invocar({ action: 'listarEventosProcessoEscopado', id: String(id) });
+  return resp?.eventos || [];
+}
+
 export async function criarCaixaEscopado(data) {
   const resp = await invocar({ action: 'criarCaixaProcessual', data });
   return resp?.caixa;
