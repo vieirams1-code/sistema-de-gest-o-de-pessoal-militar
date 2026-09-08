@@ -1374,6 +1374,20 @@ Deno.serve(async (req: Request) => {
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha atualizada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
+        case 'CADASTRO_SOLICITACOES_LISTAR': {
+          const statusFiltro = textoId((payload as any)?.status);
+          let solicitacoes: any[] = [];
+          if (statusFiltro && statusFiltro.toLowerCase() !== 'todos') {
+            solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.filter({ status: statusFiltro });
+          } else {
+            solicitacoes = await base44.asServiceRole.entities.SolicitacaoAtualizacao.list('-data_solicitacao');
+          }
+          return new Response(JSON.stringify({ ok: true, solicitacoes: solicitacoes || [] }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
         // Decisão de Solicitação de Atualização Cadastral pelo RH (Aprovar / Rejeitar com suporte a Retificação pelo Gestor)
         case 'CADASTRO_DECIDIR_SOLICITACAO': {
           const { solicitacao_id, decisao, valor_corrigido, observacao } = payload;
