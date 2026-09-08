@@ -27,7 +27,6 @@ import {
   publicarPromocaoOficial,
   reverterPublicacaoPromocaoMilitar,
   detectarVinculoCursoPromocao,
-  MENSAGEM_BLOQUEIO_REVERSAO_CURSO,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
@@ -323,7 +322,7 @@ function MilitarCard({
           </Badge>
           {(() => {
             const podeRemover = isAdmin && canRemoverDaTurma(registro, { promocao, itens: promocaoContext?.itens || [] });
-            const podeReverter = canReverterPublicacao && canReverterItem(registro, { isAdmin });
+            const podeReverter = canReverterPublicacao && canReverterItem(registro, { isAdmin: true });
             const podeExcluirDefinitivo = canExcluirDefinitivo(registro, { isAdmin });
             if (podeReverter) {
               return (
@@ -359,7 +358,8 @@ function MilitarCard({
 }
 
 export default function DetalhePromocao() {
-  const { isAdmin, user } = useCurrentUser();
+  const { isAdmin, user, canAccessAction } = useCurrentUser();
+  const canReverterPromocaoExcepcional = canAccessAction('reverter_promocao_excepcional');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -809,10 +809,14 @@ export default function DetalhePromocao() {
 
   const reverterPublicacaoMutation = useMutation({
     mutationFn: async ({ registro, motivo, observacao, fraseConfirmacao }) => {
-      if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
-      if (!canReverterItem(registro, { isAdmin })) throw new Error('Somente item publicado pode ser revertido.');
-      // Promoções originadas de curso não são revertidas pela UI (bloqueio institucional).
-      if (vinculoCurso.originadaDeCurso) throw new Error(MENSAGEM_BLOQUEIO_REVERSAO_CURSO);
+      if (!isAdmin && !canReverterPromocaoExcepcional) throw new Error('Sem permissão para reverter publicação.');
+      if (!canReverterItem(registro, { isAdmin: isAdmin || canReverterPromocaoExcepcional })) throw new Error('Somente item publicado pode ser revertido.');
+      if (vinculoCurso.originadaDeCurso && !canReverterPromocaoExcepcional && !isAdmin) {
+        throw new Error('Sem permissão para reversão excepcional de promoção originada de curso.');
+      }
+      if (!vinculoCurso.originadaDeCurso && !isAdmin) {
+        throw new Error('Reversão comum permanece restrita ao administrador da plataforma.');
+      }
       return reverterPublicacaoPromocaoMilitar({
         promocao,
         item: registro,
@@ -822,6 +826,7 @@ export default function DetalhePromocao() {
         observacoes: observacao,
         observacao,
         usuario: user,
+        modoAdmin: vinculoCurso.originadaDeCurso,
         fraseConfirmacao,
       });
     },
@@ -1265,7 +1270,7 @@ export default function DetalhePromocao() {
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
                         onExcluirDefinitivo={setRegistroParaExcluirDefinitivo}
-                        canReverterPublicacao={isAdmin === true}
+                        canReverterPublicacao={isAdmin === true || canReverterPromocaoExcepcional}
                         onReverterPublicacao={setRegistroParaReverter}
                         isAdmin={isAdmin === true}
                       />
