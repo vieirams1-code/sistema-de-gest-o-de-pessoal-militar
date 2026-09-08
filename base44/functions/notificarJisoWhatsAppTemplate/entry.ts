@@ -316,11 +316,12 @@ Deno.serve(async (req) => {
       telefone: rawTelefone,
     });
   } catch (error: any) {
+    const status = Number(error?.status || error?.response?.status || 500);
     console.error('[notificarJisoWhatsAppTemplate] Erro interno:', error);
     return jsonResponse({
       success: false,
-      error: 'Erro interno ao processar notificação',
+      error: status === 403 ? (error?.message || 'Acesso negado.') : 'Erro interno ao processar notificação',
       details: error?.message || String(error),
-    }, 500);
+    }, Number.isFinite(status) ? status : 500);
   }
 });
