@@ -78,7 +78,7 @@ const moduleGuardByPage = {
   CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   Livro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   RP: { moduleKey: 'rp', moduleName: 'Registro de Publicações' },
-  CadastrarRegistroRP: { moduleKey: 'rp', moduleName: 'Registro de Publicações' },
+  CadastrarRegistroRP: { moduleKeys: ['controle_publicacoes', 'rp'], actionKeys: ['adicionar_publicacoes', 'editar_publicacoes', 'apostilar_publicacao', 'tornar_sem_efeito_publicacao'], moduleName: 'Registro de Publicações' },
   AvaliacaoComportamento: { moduleKey: 'controle_comportamento', moduleName: 'Controle de Comportamento' },
   DetalheComportamento: { moduleKey: 'controle_comportamento', moduleName: 'Controle de Comportamento' },
   FolhaAlteracoes: { moduleKey: 'folha_alteracoes', moduleName: 'Folha de Alterações' },
