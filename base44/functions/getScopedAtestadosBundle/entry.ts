@@ -69,6 +69,16 @@ Deno.serve(async (req) => {
 
     const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
     if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
+    const canViewAtestados = authz?.isAdmin === true || (
+      authz?.modules?.atestados === true && authz?.actions?.visualizar_atestados === true
+    );
+    if (!canViewAtestados) {
+      return Response.json({
+        error: 'Acesso negado: é necessário acesso a Atestados e a permissão visualizar_atestados.',
+        requiredModule: 'atestados',
+        requiredPermission: 'visualizar_atestados',
+      }, { status: 403 });
+    }
     const targetEscopo = await resolverEscopoConsolidado(base44, authz?.acessos || []);
     const podeEscopoGlobal = authz?.hasGlobalScope === true || targetEscopo?.isAdmin === true;
 
