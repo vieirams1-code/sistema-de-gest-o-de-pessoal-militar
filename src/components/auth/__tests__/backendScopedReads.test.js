@@ -22,10 +22,13 @@ function extractArray(source, constName) {
   return match[1];
 }
 
-test('bundles escopados exigem módulo e permissão funcional de visualização antes do service role', () => {
+test('bundles escopados exigem capacidade funcional explícita antes do service role', () => {
   assert.match(atestados, /modules\?\.atestados === true && authz\?\.actions\?\.visualizar_atestados === true/);
   assert.match(armamentos, /modules\?\.armamentos===true&&authz\?\.actions\?\.visualizar_armamentos===true/);
-  assert.match(medalhas, /modules\?\.medalhas===true&&authz\?\.actions\?\.visualizar_medalhas===true/);
+  assert.match(medalhas, /purpose === 'EDIT'[\s\S]*modules\?\.medalhas === true && authz\?\.actions\?\.editar_medalhas === true/);
+  assert.match(medalhas, /purpose === 'MIGRATION'[\s\S]*modules\?\.migracao_alteracoes_legado === true/);
+  assert.match(medalhas, /purpose === 'APURACAO'[\s\S]*modules\?\.medalhas === true[\s\S]*acoesApuracao\.some/);
+  assert.match(medalhas, /modules\?\.medalhas === true && authz\?\.actions\?\.visualizar_medalhas === true/);
   assert.match(creditos, /modules\?\.ferias === true && acoesCredito\.some/);
   assert.match(gratificacoes, /modules\?\.gratificacoes_funcao === true && authz\?\.actions\?\.visualizar_gratificacoes_funcao === true/);
   assert.match(cotasGratificacoes, /modules\?\.gratificacoes_funcao === true && authz\?\.actions\?\.visualizar_gratificacoes_funcao === true/);
