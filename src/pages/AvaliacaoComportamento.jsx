@@ -454,9 +454,11 @@ export default function AvaliacaoComportamento() {
   const {
     isLoading: loadingUser,
     isAccessResolved,
+    canAccessModule,
     canAccessAction,
     userEmail,
   } = useCurrentUser();
+  const canVisualizar = canAccessModule('controle_comportamento') && canAccessAction('visualizar_controle_comportamento');
   const canGerarPendencias = canAccessAction('gerar_pendencias_comportamento');
   const canAprovarMudanca = canAccessAction('aprovar_mudanca_comportamento');
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
@@ -485,7 +487,7 @@ export default function AvaliacaoComportamento() {
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
     },
-    enabled: isAccessResolved && scopedReady,
+    enabled: isAccessResolved && scopedReady && canVisualizar,
   });
   const { data: punicoes = [], isLoading: loadingPunicoes } = useQuery({
     queryKey: ['avaliacao-comportamento-punicoes', scopeKey],
@@ -493,7 +495,7 @@ export default function AvaliacaoComportamento() {
       const lista = await punicaoEntity.list();
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
     },
-    enabled: scopedReady,
+    enabled: scopedReady && canVisualizar,
   });
   const { data: pendencias = [] } = useQuery({
     queryKey: ['pendencias-comportamento', scopeKey],
@@ -503,13 +505,13 @@ export default function AvaliacaoComportamento() {
         : [];
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
     },
-    enabled: scopedReady,
+    enabled: scopedReady && canVisualizar,
   });
 
   const { data: templatesTexto = [] } = useQuery({
     queryKey: ['templates-texto-comportamento'],
     queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
-    enabled: isAccessResolved,
+    enabled: isAccessResolved && canVisualizar,
   });
 
   const avaliacao = useMemo(() => {
@@ -847,9 +849,7 @@ export default function AvaliacaoComportamento() {
   };
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!canGerarPendencias && !canAprovarMudanca) {
-    return <AccessDenied modulo="Avaliação de Comportamento" />;
-  }
+  if (!canVisualizar) return <AccessDenied modulo="Avaliação de Comportamento" />;
 
   return (
     <div className="min-h-screen bg-slate-50">
