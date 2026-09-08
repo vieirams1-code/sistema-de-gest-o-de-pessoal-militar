@@ -96,12 +96,22 @@ async function listarPorEscopoIds(base44: any, militarIds: string[]) {
   return { rows, partialFailures };
 }
 
+function idsMilitaresSolicitados(payload: any = {}) {
+  const unico = String(payload?.militarId || '').trim();
+  const varios = Array.isArray(payload?.militarIds)
+    ? payload.militarIds.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+    : [];
+  return [...new Set([...(unico ? [unico] : []), ...varios])];
+}
+
 function filtrarSolicitacao(rows: any[] = [], payload: any = {}) {
   const medalhaId = String(payload?.medalhaId || '').trim();
   const tipoMedalhaCodigo = String(payload?.tipoMedalhaCodigo || '').trim();
+  const militarIds = new Set(idsMilitaresSolicitados(payload));
   return (rows || []).filter((item) => {
     if (medalhaId && String(item?.id || '') !== medalhaId) return false;
     if (tipoMedalhaCodigo && String(item?.tipo_medalha_codigo || '') !== tipoMedalhaCodigo) return false;
+    if (militarIds.size > 0 && !militarIds.has(String(item?.militar_id || ''))) return false;
     return true;
   });
 }
@@ -109,12 +119,23 @@ function filtrarSolicitacao(rows: any[] = [], payload: any = {}) {
 async function listarGlobaisFiltradas(base44: any, payload: any) {
   const medalhaId = String(payload?.medalhaId || '').trim();
   const tipoMedalhaCodigo = String(payload?.tipoMedalhaCodigo || '').trim();
+  const militarIds = idsMilitaresSolicitados(payload);
   if (medalhaId) {
     return fetchWithRetry(() => base44.asServiceRole.entities.Medalha.filter({ id: medalhaId }, '-data_indicacao', 10, 0));
+  }
+  if (tipoMedalhaCodigo && militarIds.length > 0) {
+    return fetchWithRetry(() => base44.asServiceRole.entities.Medalha.filter(
+      { tipo_medalha_codigo: tipoMedalhaCodigo, militar_id: { $in: militarIds } }, '-data_indicacao', 1000, 0,
+    ));
   }
   if (tipoMedalhaCodigo) {
     return fetchWithRetry(() => base44.asServiceRole.entities.Medalha.filter(
       { tipo_medalha_codigo: tipoMedalhaCodigo }, '-data_indicacao', 1000, 0,
+    ));
+  }
+  if (militarIds.length > 0) {
+    return fetchWithRetry(() => base44.asServiceRole.entities.Medalha.filter(
+      { militar_id: { $in: militarIds } }, '-data_indicacao', 1000, 0,
     ));
   }
   return fetchWithRetry(() => base44.asServiceRole.entities.Medalha.list('-data_indicacao'));
