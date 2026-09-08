@@ -529,6 +529,16 @@ function sanitizarItemAnexoCampanha(item: any, incluirUrl = false): any {
   return seguro;
 }
 
+async function obterCampanhaGeralOuErro(base44: any, campanhaId: string): Promise<any> {
+  const campanha = campanhaId ? await base44.asServiceRole.entities.CampanhaPortal.get(campanhaId) : null;
+  if (!campanha || campanha.tipo === 'PLANO_FERIAS') {
+    const err = new Error('Campanha geral não encontrada ou pertencente ao módulo de Férias.');
+    (err as any).status = 404;
+    throw err;
+  }
+  return campanha;
+}
+
 function sanitizarRespostaCampanha(resposta: any, modo: 'VISUALIZAR' | 'EXPORTAR' | 'ANEXOS' = 'VISUALIZAR'): any {
   if (!resposta) return null;
   const incluirUrl = modo === 'ANEXOS';
