@@ -27,10 +27,12 @@ export default function CadastrarMedalha() {
   const { canAccessModule, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasMedalhasAccess = canAccessModule('medalhas');
-  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
 
   const [searchParams] = useSearchParams();
   const medalhaId = searchParams.get('id');
+  const podeAdicionar = canAccessAction(ACOES_MEDALHAS.ADICIONAR);
+  const podeEditar = canAccessAction(ACOES_MEDALHAS.EDITAR);
+  const podeSalvar = medalhaId ? podeEditar : podeAdicionar;
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     militar_id: '',
@@ -131,8 +133,8 @@ export default function CadastrarMedalha() {
     try {
       validarPermissaoAcaoMedalhas({
         canAccessAction,
-        acao: ACOES_MEDALHAS.INDICAR,
-        mensagem: 'Sem permissão para registrar indicação de medalha.',
+        acao: medalhaId ? ACOES_MEDALHAS.EDITAR : ACOES_MEDALHAS.ADICIONAR,
+        mensagem: medalhaId ? 'Sem permissão para editar medalha.' : 'Sem permissão para adicionar medalha.',
       });
       const payload = {
         ...formData,
@@ -157,7 +159,7 @@ export default function CadastrarMedalha() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
-  if (!podeIndicar) return <AccessDenied modulo="Indicação de Medalhas" />;
+  if (!podeSalvar) return <AccessDenied modulo={medalhaId ? 'Editar Medalhas' : 'Adicionar Medalhas'} />;
 
   if (loadingMedalha) {
     return (
