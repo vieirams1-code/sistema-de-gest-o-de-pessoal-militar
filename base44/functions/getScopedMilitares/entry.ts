@@ -1178,6 +1178,19 @@ Deno.serve(async (req) => {
         }
 
         const militaresProjetados = militares.map((m) => projetarMilitar(m, campos));
+        const idsMilitaresRetornados = militaresProjetados.map((m) => m?.id).filter(Boolean);
+        const matriculasMilitar = includeMatriculas === true && idsMilitaresRetornados.length > 0
+            ? await fetchWithRetry(
+                () => base44.asServiceRole.entities.MatriculaMilitar.filter(
+                    { militar_id: { $in: idsMilitaresRetornados } },
+                    '-data_inicio',
+                    LIMIT_MAX,
+                    0,
+                    CAMPOS_MATRICULA_MILITAR
+                ),
+                'matriculaMilitar.filter.retornados'
+            )
+            : [];
         const sampleKeysRaw = Object.keys((militares || [])[0] || {});
         const sampleKeysProjected = Object.keys((militaresProjetados || [])[0] || {});
         const requiredDebugFields = ['cpf', 'rg', 'telefone', 'email_funcional', 'email_particular', 'data_nascimento', 'data_inclusao', 'cidade', 'condicao', 'status_cadastro', 'condicao_origem_destino', 'estrutura_nome', 'estrutura_tipo', 'sexo', 'tipo_sanguineo'];
@@ -1192,6 +1205,7 @@ Deno.serve(async (req) => {
 
         return Response.json({
             militares: militaresProjetados,
+            matriculasMilitar: (matriculasMilitar || []).map((m) => projetarMilitar(m, CAMPOS_MATRICULA_MILITAR)),
             meta: {
                 ...baseMeta,
                 returned: militaresProjetados.length,
@@ -1221,6 +1235,8 @@ Deno.serve(async (req) => {
                 busca_aplicada: buscaAplicada,
                 busca_limitada_por_amostra: buscaLimitadaPorAmostra,
                 include_foto: effIncludeFoto,
+                include_matriculas: includeMatriculas === true,
+                sensitive_fields_included: canViewSensitiveMilitar,
                 debugFields: effDebugFields ? { sampleKeysRaw, sampleKeysProjected, hasFields } : undefined,
             },
         });
