@@ -1355,7 +1355,7 @@ export default function PainelPlanoFerias() {
                           <Ban className="w-4 h-4 mr-1.5 text-rose-600" />
                           {painelConsolidado ? 'Militar Não Contemplado neste Plano' : 'Militar Não Contemplado nesta Campanha'}
                         </span>
-                        <Button
+                        {podeAprovarFerias && <Button
                           type="button"
                           variant="outline"
                           size="sm"
@@ -1364,7 +1364,7 @@ export default function PainelPlanoFerias() {
                         >
                           <Edit3 className="w-3 h-3 mr-1" />
                           Alterar / Contemplar
-                        </Button>
+                        </Button>}
                       </div>
                       <p className="text-rose-800 text-[11px]">
                         {op.justificativa_ajuste_gestor || (painelConsolidado ? 'Nenhuma fração será gerada para este militar neste plano.' : 'Nenhuma fração será gerada para este militar nesta campanha.')}
@@ -1377,7 +1377,7 @@ export default function PainelPlanoFerias() {
                           <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-700" />
                           Escala Definida e Pronta:
                         </span>
-                        <Button
+                        {podeAprovarFerias && <Button
                           type="button"
                           variant="outline"
                           size="sm"
@@ -1386,7 +1386,7 @@ export default function PainelPlanoFerias() {
                         >
                           <Edit3 className="w-3 h-3 mr-1" />
                           Editar Escala
-                        </Button>
+                        </Button>}
                       </div>
                       <p className="text-sm font-extrabold text-emerald-900">{op.decisao_camada_1_meses}</p>
                     </div>
@@ -1465,13 +1465,13 @@ export default function PainelPlanoFerias() {
 
                 {/* Drawer Footer */}
                 <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
-                  <button
+                  {podeAprovarFerias ? <button
                     type="button"
                     onClick={() => setModalNaoContemplado({ open: true, opcao: op, justificativa: '' })}
                     className="text-red-600 hover:bg-red-50 font-medium text-sm flex items-center gap-2 px-4 py-2.5 rounded-lg border border-transparent cursor-pointer transition-colors"
                   >
                     <i className="ph ph-prohibit text-lg"></i> Negar Solicitação
-                  </button>
+                  </button> : <span />}
 
                   <div className="flex gap-3">
                     <button
@@ -1482,7 +1482,7 @@ export default function PainelPlanoFerias() {
                       Cancelar
                     </button>
 
-                    {(!isSalvo || isEditing) && !isGerado && (
+                    {podeAprovarFerias && (!isSalvo || isEditing) && !isGerado && (
                       <button
                         type="button"
                         disabled={actionLoading || temMesesDuplicados}
@@ -1504,7 +1504,7 @@ export default function PainelPlanoFerias() {
         })()}
 
         {/* MODAL PARA JUSTIFICATIVA DE NÃO CONTEMPLADO */}
-        {modalNaoContemplado.open && (
+        {modalNaoContemplado.open && podeAprovarFerias && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs animate-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
