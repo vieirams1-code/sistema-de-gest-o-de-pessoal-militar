@@ -89,6 +89,7 @@ export async function carregarMilitarParaEdicao(militarId) {
   return {
     militar: result?.militar || null,
     matriculas: Array.isArray(result?.matriculas) ? result.matriculas : [],
+    sensitiveFieldsIncluded: result?.sensitiveFieldsIncluded === true,
   };
 }
 
