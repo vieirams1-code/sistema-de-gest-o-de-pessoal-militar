@@ -28,11 +28,9 @@ const CAMPOS_USUARIO_ACESSO = [
     'perfil_id',
 ];
 
-// Permissões que autorizam a movimentação. OR aditivo:
-// - admin (role/access)
-// - action gerir_estrutura (mesma usada hoje no frontend para o botão)
-// - action gerir_lotacao_militares (chave futura/explícita)
-const ACTIONS_AUTORIZADAS = ['gerir_estrutura', 'gerir_lotacao_militares', 'gerir_permissoes'];
+// Capacidade funcional canônica da movimentação de lotação.
+// Estrutura e administração de permissões são domínios independentes.
+const ACTIONS_AUTORIZADAS = ['gerir_lotacao_militares'];
 
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 
