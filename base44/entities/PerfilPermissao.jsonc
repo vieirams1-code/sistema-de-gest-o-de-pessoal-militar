@@ -184,5 +184,11 @@
   "required": [
     "nome_perfil",
     "ativo"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
