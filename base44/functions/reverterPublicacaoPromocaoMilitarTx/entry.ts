@@ -112,6 +112,13 @@ Deno.serve(async (req) => {
     }
 
     const militarId = texto(itemAtual?.militar_id) || texto(item?.militar_id);
+    if (!authIsAdmin) {
+      const scopeResponse = await base44.functions.invoke('getUserPermissions', { scopeMilitarIds: militarId ? [militarId] : [] });
+      const scopeAuthz = scopeResponse?.data ?? scopeResponse ?? {};
+      if (!scopeAuthz?.scopeCheck?.allAllowed) {
+        return erro({ status: 403, etapa: 'autorizacao', motivo: 'militar_fora_escopo', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+      }
+    }
 
     // O histórico é resolvido pelo registro do banco; só caímos no payload se faltar.
     const historicoId = texto(itemAtual?.historico_promocao_v2_id) || texto(item?.historico_promocao_v2_id);
