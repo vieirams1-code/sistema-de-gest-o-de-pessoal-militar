@@ -713,7 +713,7 @@ export default function VerMilitar() {
         key: 'comportamento',
         label: 'Comportamento',
         icon: Activity,
-        visible: comportamentoElegivel,
+        visible: comportamentoElegivel && podeVisualizarComportamento,
         content: (
           <div className="space-y-6">
             <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
@@ -921,7 +921,7 @@ export default function VerMilitar() {
         key: 'ferias',
         label: 'Férias',
         icon: Calendar,
-        visible: true,
+        visible: podeVisualizarFerias,
         content: (
           <div className="space-y-4">
             <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
@@ -1007,7 +1007,7 @@ export default function VerMilitar() {
         key: 'medalhas',
         label: 'Medalhas',
         icon: Award,
-        visible: true,
+        visible: podeVisualizarMedalhas,
         content: (
           <div className="space-y-3">
             <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
@@ -1181,7 +1181,7 @@ export default function VerMilitar() {
         key: 'antiguidade',
         label: 'Carreira e Antiguidade',
         icon: FileText,
-        visible: true,
+        visible: podeVisualizarAntiguidade,
         content: (
           <CarreiraAntiguidadePanel
             militar={militar}
@@ -1203,7 +1203,7 @@ export default function VerMilitar() {
         key: 'acervo-historico',
         label: `Acervo Histórico (${acervoHistorico.length})`,
         icon: FileText,
-        visible: canAccessAction('visualizar_acervo_historico'),
+        visible: podeVisualizarAcervo,
         content: (
           <div className="space-y-6">
             <CoberturaHistorica acervo={acervoHistorico} dataInclusao={militar.data_inclusao} />
@@ -1524,10 +1524,23 @@ export default function VerMilitar() {
         key: 'timeline',
         label: 'Linha do Tempo',
         icon: Clock,
-        visible: true,
+        visible: podeVisualizarRegistrosMilitar,
         content: (
           <div className="pt-4">
-            <MilitarTimelineTab militarId={id} />
+            <MilitarTimelineTab
+              militarId={id}
+              permissions={{
+                livro: podeVisualizarLivro,
+                publicacoes: podeVisualizarPublicacoes,
+                ferias: podeVisualizarFerias,
+                atestados: podeVisualizarAtestados,
+                atestadoSensitive: podeVerDadosSensiveisAtestado,
+                antiguidade: podeVisualizarAntiguidade,
+                medalhas: podeVisualizarMedalhas,
+                funcoes: true,
+                gratificacoes: podeVisualizarGratificacoes,
+              }}
+            />
           </div>
         )
       }
