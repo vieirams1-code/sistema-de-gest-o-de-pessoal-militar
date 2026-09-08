@@ -373,7 +373,6 @@ export default function Publicacoes() {
   const [exibirPublicados, setExibirPublicados] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
-  const [modoAdmin, setModoAdmin] = useState(false);
   const {
     user,
     isAdmin,
@@ -671,8 +670,8 @@ export default function Publicacoes() {
   }, [filteredRegistros]);
 
   const handleUpdate = (id, data, tipo) => {
-    if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
-    const permitirReversaoPublicado = !!(isAdmin && canAccessAction('admin_mode') && modoAdmin);
+    if (!canAccessAction('publicar_bg')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
+    const permitirReversaoPublicado = isAdmin === true;
     const registroAtual = todosRegistros.find((item) => item.id === id);
     const escopoUpd = validarEscopoMilitar(registroAtual?.militar_id);
     if (!escopoUpd.permitido) return alert(escopoUpd.motivo);
@@ -702,7 +701,7 @@ export default function Publicacoes() {
   };
 
   const handleDelete = (id, tipo) => {
-    if ((!canAccessAction('excluir_publicacoes') && !canAccessAction('admin_mode')) || !modoAdmin) return alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
+    if (!canAccessAction('excluir_publicacoes')) return alert('Ação restrita. Exige permissão de exclusão de publicações.');
     const registro = todosRegistros.find((r) => r.id === id);
     if (!registro) return;
     const escopoDel = validarEscopoMilitar(registro?.militar_id);
@@ -752,11 +751,6 @@ export default function Publicacoes() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 lg:justify-end">
-                {canAccessAction('admin_mode') && (
-                  <Button variant="outline" onClick={() => setModoAdmin((v) => !v)} className={modoAdmin ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' : 'border-red-200 text-red-700 hover:bg-red-50'}>
-                    <ShieldAlert className="mr-2 h-4 w-4" /> {modoAdmin ? 'Modo admin ativo' : 'Modo admin'}
-                  </Button>
-                )}
                 <Button
                   asChild
                   variant="outline"
@@ -848,7 +842,6 @@ export default function Publicacoes() {
                         onDelete={handleDelete}
                         onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                         canAccessAction={canAccessAction}
-                        modoAdmin={modoAdmin}
                         isAdmin={isAdmin}
                       />
                     ))}
