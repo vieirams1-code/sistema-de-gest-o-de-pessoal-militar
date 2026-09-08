@@ -328,7 +328,7 @@ export default function ConfiguracoesPortal() {
             { id: 'ferias', label: 'Gestão de Férias', icon: Calendar },
             { id: 'cadastro', label: 'Gestão de Cadastro', icon: UserCheck },
             { id: 'canais', label: 'Canais & OTP', icon: Smartphone },
-            { id: 'solicitacoes', label: `Mesa do RH (${solicitacoes.filter(s => s.status === 'Pendente').length})`, icon: Inbox },
+            ...(canViewSolicitacoes ? [{ id: 'solicitacoes', label: `Mesa do RH (${solicitacoes.filter(s => s.status === 'Pendente').length})`, icon: Inbox }] : []),
           ].map((t) => {
             const Icon = t.icon;
             return (
@@ -720,7 +720,7 @@ export default function ConfiguracoesPortal() {
                           </div>
                         </div>
 
-                        {temPendentes && (
+                        {canDecidirSolicitacoes && temPendentes && (
                           <div className="flex items-center space-x-2 self-end sm:self-center">
                             <Button
                               type="button"
@@ -806,7 +806,7 @@ export default function ConfiguracoesPortal() {
                                         {foiModificadoPeloGestor ? 'Valor Corrigido a ser Aplicado' : 'Valor Solicitado pelo Militar'}
                                       </span>
 
-                                      {sol.status === 'Pendente' && (
+                                      {canDecidirSolicitacoes && sol.status === 'Pendente' && (
                                         <button
                                           type="button"
                                           onClick={() => handleToggleEdicao(sol.id, sol.valor_proposto)}
@@ -869,7 +869,7 @@ export default function ConfiguracoesPortal() {
                               </div>
 
                               {/* AÇÕES INDIVIDUAIS DO CAMPO */}
-                              {sol.status === 'Pendente' && (
+                              {canDecidirSolicitacoes && sol.status === 'Pendente' && (
                                 <div className="flex sm:flex-col lg:flex-row items-center gap-2 shrink-0 self-end lg:self-center">
                                   <Button
                                     type="button"
