@@ -30,7 +30,7 @@ function formatDate(d) {
 
 export default function SolicitacoesAtualizacao() {
   const queryClient = useQueryClient();
-  const { user, canAccessAction } = useCurrentUser();
+  const { canAccessAction } = useCurrentUser();
   const canViewSolicitacoes = canAccessAction('visualizar_solicitacoes_cadastrais') || canAccessAction('decidir_solicitacoes_cadastrais');
   const canDecidirSolicitacoes = canAccessAction('decidir_solicitacoes_cadastrais');
   const [filtroStatus, setFiltroStatus] = useState('Pendente');
@@ -466,7 +466,7 @@ export default function SolicitacoesAtualizacao() {
                                         {foiModificadoPeloGestor ? 'Valor Corrigido a ser Aplicado' : 'Valor Solicitado pelo Militar'}
                                       </span>
 
-                                      {isAdmin && sol.status === 'Pendente' && (
+                                      {canDecidirSolicitacoes && sol.status === 'Pendente' && (
                                         <button
                                           type="button"
                                           onClick={() => handleToggleEdicao(sol.id, sol.valor_proposto)}
@@ -529,7 +529,7 @@ export default function SolicitacoesAtualizacao() {
                               </div>
 
                               {/* AÇÕES INDIVIDUAIS */}
-                              {isAdmin && sol.status === 'Pendente' && (
+                              {canDecidirSolicitacoes && sol.status === 'Pendente' && (
                                 <div className="flex sm:flex-col lg:flex-row items-center gap-2 shrink-0 self-end lg:self-center">
                                   <Button
                                     type="button"
