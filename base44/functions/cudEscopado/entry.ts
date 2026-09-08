@@ -277,9 +277,9 @@ async function sincronizarAjusteCreditoExtraFerias(base44, credito, userEmail) {
 // PERMISSIONS_MAP — Validação funcional por entidade × operação
 // ---------------------------------------------------------------------
 // Chaves extraídas de config/permissionStructure.js (chaves reais já
-// existentes no projeto). NÃO inventar permissões novas. CreditoExtra
-// Ferias e PeriodoAquisitivo herdam as chaves de Férias por estarem no
-// mesmo módulo (acesso_ferias) e não possuírem chaves próprias.
+// existentes no projeto). NÃO inventar permissões novas. Períodos
+// Aquisitivos e Créditos Extraordinários usam suas capacidades granulares
+// próprias, sem herdar CRUD genérico de Férias.
 // Admin sempre passa por bypass — esta tabela só é consultada para
 // usuários não-admin.
 // =====================================================================
@@ -1360,9 +1360,25 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
+      } else if (entityName === 'RegistroLivro' && operation === 'update') {
+        const statusDestino = String(data?.status || '').trim().toLowerCase();
+        const alteraBg = Object.prototype.hasOwnProperty.call(data || {}, 'numero_bg')
+          || Object.prototype.hasOwnProperty.call(data || {}, 'data_bg')
+          || statusDestino === 'publicado';
+        const requiredPermission = alteraBg ? 'publicar_bg' : 'editar_livro';
+        if (targetPerms.actions?.[requiredPermission] !== true) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
       } else if (entityName === 'Atestado' && operation === 'update') {
         const chaves = Object.keys(data || {});
         const apenas = (permitidas) => chaves.length > 0 && chaves.every((chave) => permitidas.has(chave));
+        const statusPublicacaoDestino = String(data?.status_publicacao || '').trim().toLowerCase();
+        const alteraBg = Object.prototype.hasOwnProperty.call(data || {}, 'numero_bg')
+          || Object.prototype.hasOwnProperty.call(data || {}, 'data_bg')
+          || statusPublicacaoDestino === 'publicado';
 
         const camposGestaoJiso = new Set(['necessita_jiso', 'status_jiso', 'data_jiso_agendada', 'hora_jiso_agendada']);
         const statusGestaoPermitidos = new Set(['Aguardando JISO', 'Em análise']);
@@ -1384,7 +1400,10 @@ Deno.serve(async (req) => {
 
         let allowed = false;
         let requiredPermission = 'editar_atestados';
-        if (ehGestaoJiso) {
+        if (alteraBg) {
+          requiredPermission = 'publicar_bg';
+          allowed = targetPerms.actions?.['publicar_bg'] === true;
+        } else if (ehGestaoJiso) {
           requiredPermission = 'gerir_jiso';
           allowed = targetPerms.actions?.['gerir_jiso'] === true;
         } else if (ehReflexoDecisaoJiso) {
@@ -1543,12 +1562,16 @@ Deno.serve(async (req) => {
         }
       } else if (entityName === 'PublicacaoExOfficio' && operation === 'create') {
         const tipoPublicacao = String(data?.tipo || '').trim();
-        let requiredPermission = 'adicionar_publicacoes';
-        if (tipoPublicacao === 'Ata JISO') requiredPermission = 'publicar_ata_jiso';
-        if (tipoPublicacao === 'Homologação de Atestado') requiredPermission = 'publicar_homologacao';
-        if (targetPerms.actions?.[requiredPermission] !== true) {
+        let requiredPermissions = ['adicionar_publicacoes'];
+        if (tipoPublicacao === 'Ata JISO') requiredPermissions = ['publicar_ata_jiso'];
+        else if (tipoPublicacao === 'Homologação de Atestado') requiredPermissions = ['publicar_homologacao'];
+        else if ((data?.numero_bg && data?.data_bg) || String(data?.status || '').trim().toLowerCase() === 'publicado') {
+          requiredPermissions = ['adicionar_publicacoes', 'publicar_bg'];
+        }
+        const faltantes = requiredPermissions.filter((permission) => targetPerms.actions?.[permission] !== true);
+        if (faltantes.length > 0) {
           return Response.json(
-            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission: faltantes.join(' e ') },
             { status: 403 },
           );
         }
