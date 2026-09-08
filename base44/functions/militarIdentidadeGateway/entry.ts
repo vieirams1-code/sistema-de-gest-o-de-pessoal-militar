@@ -8,6 +8,12 @@ const STATUS = {
 };
 
 const VINCULOS_MERGE = ['HistoricoComportamento', 'PendenciaComportamento', 'PunicaoDisciplinar'];
+const CAMPOS_SENSIVEIS_MILITAR = new Set([
+  'cpf', 'rg', 'orgao_expedidor_rg', 'uf_rg', 'data_nascimento', 'sexo', 'estado_civil',
+  'tipo_sanguineo', 'religiao', 'etnia', 'nome_pai', 'nome_mae', 'cnh_categoria',
+  'cnh_validade', 'cnh_numero', 'email_particular', 'telefone', 'banco', 'agencia', 'conta',
+  'logradouro', 'numero_endereco', 'cep', 'bairro', 'cidade', 'uf', 'complemento', 'altura', 'peso',
+]);
 const onlyDigits = (v = '') => String(v || '').replace(/\D/g, '');
 const normMat = (v = '') => onlyDigits(v).slice(0, 9);
 const fmtMat = (v = '') => {
@@ -37,6 +43,15 @@ function minimalSnapshot(m) {
     status_cadastro: m.status_cadastro || '',
     merged_into_id: m.merged_into_id || '',
   };
+}
+
+function projectMilitarForEdit(m = {}, includeSensitive = false) {
+  const out = {};
+  for (const [key, value] of Object.entries(m || {})) {
+    if (!includeSensitive && CAMPOS_SENSIVEIS_MILITAR.has(key)) continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 function minimalPayloadCadastro(p = {}) {
@@ -358,7 +373,8 @@ Deno.serve(async (req) => {
         base44.asServiceRole.entities.MatriculaMilitar.filter({ militar_id: payload.militarId }, '-data_inicio'),
       ]);
       if (!militar) throw Object.assign(new Error('Militar não encontrado para edição.'), { status: 404 });
-      return Response.json({ result: { militar, matriculas: matriculas || [] } });
+      const includeSensitive = a?.isAdmin === true || a?.actions?.ver_dados_sensiveis_militar === true;
+      return Response.json({ result: { militar: projectMilitarForEdit(militar, includeSensitive), matriculas: matriculas || [], sensitiveFieldsIncluded: includeSensitive } });
     }
     if (action === 'UPDATE_MILITAR') {
       requireModuleAction(a, 'militares', 'editar_militares', 'Sem permissão para editar militares.');
