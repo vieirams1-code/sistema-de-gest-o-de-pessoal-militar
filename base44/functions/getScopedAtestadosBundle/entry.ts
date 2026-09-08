@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
         requiredPermission: 'visualizar_atestados',
       }, { status: 403 });
     }
+    const podeVerDadosSensiveis = authz?.isAdmin === true || authz?.actions?.ver_dados_sensiveis_atestado === true;
     const targetEscopo = await resolverEscopoConsolidado(base44, authz?.acessos || []);
     const podeEscopoGlobal = authz?.hasGlobalScope === true || targetEscopo?.isAdmin === true;
 
@@ -129,7 +130,9 @@ Deno.serve(async (req) => {
         fetchWithRetry(() => base44.asServiceRole.entities.Atestado.list('-created_date')),
         fetchWithRetry(() => base44.asServiceRole.entities.JISO.list('-created_date')),
       ]);
-      return Response.json({ atestados: atestados || [], jisos: jisos || [], meta: { totalMilitaresEscopo: null, totalAtestados: (atestados || []).length, totalJiso: (jisos || []).length, partialFailures: 0, warnings: [] } });
+      const atestadosSanitizados = sanitizarAtestados(atestados, podeVerDadosSensiveis);
+      const jisosSanitizados = sanitizarJisos(jisos, podeVerDadosSensiveis);
+      return Response.json({ atestados: atestadosSanitizados, jisos: jisosSanitizados, meta: { totalMilitaresEscopo: null, totalAtestados: atestadosSanitizados.length, totalJiso: jisosSanitizados.length, partialFailures: 0, warnings: [], sensitiveFieldsIncluded: podeVerDadosSensiveis } });
     }
 
     const militarIds = await listarMilitarIdsEscopo(base44, targetEscopo);
@@ -137,7 +140,9 @@ Deno.serve(async (req) => {
 
     const [atestadosResult, jisoResult] = await Promise.all([listarPorEscopoIds(base44, 'Atestado', militarIds, '-created_date'), listarPorEscopoIds(base44, 'JISO', militarIds, '-created_date')]);
     const partialFailures = atestadosResult.partialFailures + jisoResult.partialFailures;
-    return Response.json({ atestados: atestadosResult.rows, jisos: jisoResult.rows, meta: { totalMilitaresEscopo: militarIds.length, totalAtestados: atestadosResult.rows.length, totalJiso: jisoResult.rows.length, partialFailures, warnings: partialFailures > 0 ? ['PARTIAL_FAILURES'] : [] } });
+    const atestadosSanitizados = sanitizarAtestados(atestadosResult.rows, podeVerDadosSensiveis);
+    const jisosSanitizados = sanitizarJisos(jisoResult.rows, podeVerDadosSensiveis);
+    return Response.json({ atestados: atestadosSanitizados, jisos: jisosSanitizados, meta: { totalMilitaresEscopo: militarIds.length, totalAtestados: atestadosSanitizados.length, totalJiso: jisosSanitizados.length, partialFailures, warnings: partialFailures > 0 ? ['PARTIAL_FAILURES'] : [], sensitiveFieldsIncluded: podeVerDadosSensiveis } });
   } catch (error) {
     const status = error?.response?.status || error?.status || 500;
     return Response.json({ error: error?.message || 'Erro ao carregar getScopedAtestadosBundle.', meta: { status } }, { status });
