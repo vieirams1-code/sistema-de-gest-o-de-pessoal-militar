@@ -216,7 +216,8 @@ test('functions transacionais de promoção exigem administrador real', () => {
 
 test('períodos aquisitivos e acervo residual usam cudEscopado', () => {
   assert.match(periodoGenerator, /bulkEscopado\('PeriodoAquisitivo'/);
-  assert.match(backendCud, /entityName === 'PeriodoAquisitivo' && subOp === 'create'[\s\S]*'gerar_periodos_aquisitivos'/);
+  assert.match(backendCud, /PeriodoAquisitivo:\s*\{\s*create: 'gerar_periodos_aquisitivos',\s*update: 'editar_periodo_aquisitivo',\s*delete: 'excluir_periodo_aquisitivo'/s);
+  assert.match(backendCud, /entityName === 'PeriodoAquisitivo' && operation === 'update'[\s\S]*'alterar_status_periodo_aquisitivo'/);
   assert.doesNotMatch(periodoGenerator, /base44\.entities\.PeriodoAquisitivo\.bulkCreate/);
   assert.match(acervoHistoricoService, /atualizarEscopado\('AcervoFuncionalHistorico'/);
   assert.doesNotMatch(acervoHistoricoService, /base44\.entities\.AcervoFuncionalHistorico\.update/);
@@ -236,6 +237,6 @@ test('ações JISO independentes conseguem persistir apenas seus próprios refle
   assert.match(backendCud, /const camposGestaoJiso = new Set\(\['necessita_jiso', 'status_jiso', 'data_jiso_agendada', 'hora_jiso_agendada'\]\);/);
   assert.match(backendCud, /requiredPermission = 'gerir_jiso';\s*allowed = targetPerms\.actions\?\.\['gerir_jiso'\] === true;/s);
   assert.match(backendCud, /const camposDecisaoJiso = new Set\(\['dias_original', 'dias_jiso', 'data_termino_jiso', 'data_retorno_jiso', 'jiso_id'\]\);/);
-  assert.match(backendCud, /if \(tipoPublicacao === 'Ata JISO'\) requiredPermission = 'publicar_ata_jiso';/);
-  assert.match(backendCud, /if \(tipoPublicacao === 'Homologação de Atestado'\) requiredPermission = 'publicar_homologacao';/);
+  assert.match(backendCud, /if \(tipoPublicacao === 'Ata JISO'\) requiredPermissions = \['publicar_ata_jiso'\];/);
+  assert.match(backendCud, /else if \(tipoPublicacao === 'Homologação de Atestado'\) requiredPermissions = \['publicar_homologacao'\];/);
 });
