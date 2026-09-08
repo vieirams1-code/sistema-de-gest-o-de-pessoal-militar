@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
-import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   Megaphone,
   Plus,
@@ -41,6 +41,17 @@ const TIPOS_CAMPOS_FORMULARIO = [
 
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
+  const { canAccessAction } = useCurrentUser();
+  const canViewCampaigns = canAccessAction('visualizar_campanhas_gerais');
+  const canCreateCampaigns = canAccessAction('criar_campanhas');
+  const canEditCampaigns = canAccessAction('editar_campanhas');
+  const canDeleteCampaigns = canAccessAction('excluir_campanhas');
+  const canViewResponses = canAccessAction('visualizar_respostas_campanhas');
+  const canApproveResponses = canAccessAction('aprovar_respostas_campanhas');
+  const canExportResponses = canAccessAction('exportar_respostas_campanhas');
+  const canDownloadAttachments = canAccessAction('baixar_anexos_respostas_campanhas');
+  const canSendReminders = canAccessAction('enviar_lembretes_campanhas');
+  const canOpenResponses = canViewResponses || canApproveResponses || canExportResponses || canDownloadAttachments;
   const [campanhas, setCampanhas] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [gruposList, setGruposList] = useState([]);
@@ -85,44 +96,19 @@ export default function GerirCampanhasPortal() {
     setLoading(true);
     setFeedback({ type: '', msg: '' });
     try {
-      const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
-      setCampanhas((res.data?.campanhas || []).filter((campanha) => campanha.tipo !== 'PLANO_FERIAS'));
-
-      let unidades = [];
-      try {
-        const lotRes = await fetchScopedLotacoes({});
-        if (Array.isArray(lotRes?.lotacoes) && lotRes.lotacoes.length > 0) {
-          unidades = lotRes.lotacoes.map((l) => ({
-            id: String(l.id || l.nome || '').trim(),
-            nome: l.nome || l.sigla || l.label || l.id,
-          }));
-        }
-      } catch (lotErr) {
-        console.warn('Falha no fetchScopedLotacoes, tentando entidades:', lotErr);
+      if (canViewCampaigns) {
+        const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
+        setCampanhas(res.data?.campanhas || []);
+      } else {
+        setCampanhas([]);
       }
 
-      if (unidades.length === 0) {
-        try {
-          const milList = await base44.entities.Militar.list();
-          const distinct = new Set();
-          (milList || []).forEach((m) => {
-            const loc = (m.lotacao || m.estrutura_nome || '').trim();
-            if (loc) distinct.add(loc);
-          });
-          unidades = Array.from(distinct)
-            .sort()
-            .map((nome) => ({
-              id: nome,
-              nome: nome,
-            }));
-        } catch (_err) {}
-      }
-
-      setUnidadesList(unidades || []);
-      try {
-        const grupos = await base44.entities.GrupoEfetivo.filter({ ativo: true });
-        setGruposList((grupos || []).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
-      } catch (_grupoErr) {
+      if (canCreateCampaigns || canEditCampaigns) {
+        const scopeRes = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_SCOPE_OPTIONS' });
+        setUnidadesList(scopeRes.data?.unidades || []);
+        setGruposList(scopeRes.data?.grupos || []);
+      } else {
+        setUnidadesList([]);
         setGruposList([]);
       }
     } catch (err) {
