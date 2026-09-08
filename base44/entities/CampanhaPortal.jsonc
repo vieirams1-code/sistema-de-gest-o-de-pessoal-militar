@@ -60,6 +60,7 @@
       "enum": [
         "TODOS",
         "UNIDADES",
+        "SEM_ESCOPO",
         "SELECAO_MILITARES",
         "QUADROS"
       ],
@@ -70,7 +71,7 @@
       "items": {
         "type": "string"
       },
-      "description": "IDs das lota\u00e7\u00f5es inclu\u00eddas"
+      "description": "IDs das lota\u00e7\u00f5es inclu\u00eddas; vazio em campanhas somente por grupo"
     },
     "escopo_unidades_nomes": {
       "type": "string"
@@ -94,7 +95,7 @@
       "items": {
         "type": "string"
       },
-      "description": "IDs de grupos reutiliz\u00e1veis inclu\u00eddos; combinam com o escopo base"
+      "description": "IDs de grupos reutiliz\u00e1veis inclu\u00eddos; podem ser usados sozinhos ou combinados com a lota\u00e7\u00e3o"
     },
     "escopo_grupos_nomes": {
       "type": "string",
