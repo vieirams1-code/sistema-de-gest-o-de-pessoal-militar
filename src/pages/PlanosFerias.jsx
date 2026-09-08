@@ -124,12 +124,14 @@ export default function PlanosFerias() {
   );
 
   const abrirNovo = () => {
+    if (!podeCriarPlanos) return;
     setForm(novoPlano());
     setModoFormulario('novo');
     setFeedback({ tipo: '', texto: '' });
   };
 
   const abrirEdicao = (plano) => {
+    if (!podeEditarPlanos) return;
     setForm({
       titulo: plano.titulo || '',
       ano_referencia: Number(plano.ano_referencia) || new Date().getFullYear() + 1,
@@ -144,6 +146,7 @@ export default function PlanosFerias() {
 
   const salvar = async (evento) => {
     evento.preventDefault();
+    if (modoFormulario === 'editar' ? !podeEditarPlanos : !podeCriarPlanos) return;
     setSalvando(true);
     try {
       const payload = {
@@ -169,6 +172,7 @@ export default function PlanosFerias() {
   };
 
   const arquivar = async (plano) => {
+    if (!podeEditarPlanos) return;
     if (!window.confirm(`Arquivar o plano "${plano.titulo}"? O histórico será preservado e novas campanhas não poderão ser incluídas.`)) return;
     setSalvando(true);
     try {
@@ -184,7 +188,7 @@ export default function PlanosFerias() {
   };
 
   const gerarFeriasDoPlano = async () => {
-    if (!selecionado) return;
+    if (!selecionado || !podeGerarFerias) return;
     if (!window.confirm(`Gerar férias pendentes no plano "${selecionado.titulo}"? Somente novas respostas com escala salva serão incluídas; férias já geradas não serão alteradas.`)) return;
     setSalvando(true);
     try {
@@ -203,7 +207,7 @@ export default function PlanosFerias() {
   };
 
   const abrirNovaCampanha = () => {
-    if (!selecionado || selecionado.status === 'ARQUIVADO') return;
+    if (!podeCriarCampanhas || !selecionado || selecionado.status === 'ARQUIVADO') return;
     const ano = Number(selecionado.ano_referencia);
     setCampanhaForm({
       titulo: `Campanha de Férias — ${selecionado.titulo}`,
@@ -222,7 +226,7 @@ export default function PlanosFerias() {
 
   const salvarCampanha = async (evento) => {
     evento.preventDefault();
-    if (!selecionado || !campanhaForm?.titulo.trim()) return;
+    if (!podeCriarCampanhas || !selecionado || !campanhaForm?.titulo.trim()) return;
     if (campanhaForm.tipo_escopo === 'UNIDADES' && campanhaForm.escopo_unidades_ids.length === 0) {
       setFeedback({ tipo: 'erro', texto: 'Selecione ao menos uma unidade para o escopo da campanha.' });
       return;
@@ -233,7 +237,7 @@ export default function PlanosFerias() {
         .map((id) => unidades.find((unidade) => unidade.id === id)?.nome || id)
         .join(', ');
       await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_CRIAR',
+        acao: 'PLANO_CAMPANHA_CRIAR',
         campanha_payload: {
           titulo: campanhaForm.titulo.trim(),
           tipo: 'PLANO_FERIAS',
@@ -269,15 +273,15 @@ export default function PlanosFerias() {
   };
 
   const excluirCampanha = async (campanha) => {
-    if (!modoAdmin) {
-      setFeedback({ tipo: 'erro', texto: 'Ative o Modo Admin para excluir campanhas.' });
+    if (!podeExcluirCampanhas || !modoAdmin || !podeAdminFerias) {
+      setFeedback({ tipo: 'erro', texto: 'A exclusão exige a permissão de excluir campanhas de férias e o Modo Admin de férias ativo.' });
       return;
     }
     if (!window.confirm(`Excluir a campanha "${campanha.titulo}"? As respostas enviadas nela também serão excluídas. O militar continuará podendo responder em outra campanha ativa do mesmo plano.`)) return;
     setSalvando(true);
     try {
       const resposta = await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_EXCLUIR',
+        acao: 'PLANO_CAMPANHA_EXCLUIR',
         campanha_id: campanha.id,
       });
       setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Campanha e respostas excluídas com sucesso.' });
@@ -292,7 +296,7 @@ export default function PlanosFerias() {
 
   const salvarPermissao = async (evento) => {
     evento.preventDefault();
-    if (!selecionado?.id || !permissaoForm.usuario_id) return;
+    if (!podeAtribuirPermissoes || !selecionado?.id || !permissaoForm.usuario_id) return;
     setSalvando(true);
     try {
       await base44.functions.invoke('portal_servicos', {
@@ -312,6 +316,7 @@ export default function PlanosFerias() {
   };
 
   const removerPermissao = async (permissao) => {
+    if (!podeAtribuirPermissoes) return;
     if (!window.confirm('Remover esta atribuição de acesso?')) return;
     setSalvando(true);
     try {
@@ -325,15 +330,29 @@ export default function PlanosFerias() {
   };
 
   const abrirRespostas = async (campanha) => {
+    if (!podeVisualizarRespostas) return;
     setModalRespostas(campanha);
     setRespostasCampanha(null);
     setCarregandoRespostas(true);
     try {
       const resposta = await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_DETALHES_RETORNO',
+        acao: 'PLANO_ESCALA_LISTAR',
         campanha_id: campanha.id,
       });
-      setRespostasCampanha(resposta.data || {});
+      const opcoes = resposta.data?.opcoes || [];
+      setRespostasCampanha({
+        militares: opcoes.map((op) => ({
+          militar_id: op.militar_id,
+          militar_nome: op.militar_nome,
+          militar_matricula: op.militar_matricula,
+          militar_lotacao: op.lotacao_nome,
+          status_resposta: 'Respondido',
+        })),
+        total_alvo: campanha.total_publico_alvo || opcoes.length,
+        total_respondidos: opcoes.length,
+        total_pendentes: Math.max(0, Number(campanha.total_publico_alvo || 0) - opcoes.length),
+        percentual: Number(campanha.total_publico_alvo || 0) > 0 ? Math.round((opcoes.length / Number(campanha.total_publico_alvo)) * 100) : 0,
+      });
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível carregar as respostas desta campanha.') });
     } finally {
@@ -342,8 +361,8 @@ export default function PlanosFerias() {
   };
 
   const excluir = async (plano) => {
-    if (!modoAdmin) {
-      setFeedback({ tipo: 'erro', texto: 'Ative o Modo Admin para excluir planos de férias.' });
+    if (!podeExcluirPlanos || !modoAdmin || !podeAdminFerias) {
+      setFeedback({ tipo: 'erro', texto: 'A exclusão exige permissão de excluir planos e o Modo Admin de férias ativo.' });
       return;
     }
     const geradas = Number(metricas?.ferias_geradas_unicas || 0);
