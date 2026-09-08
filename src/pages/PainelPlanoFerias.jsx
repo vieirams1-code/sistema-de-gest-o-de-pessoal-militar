@@ -87,10 +87,12 @@ function extrairParcelas(op) {
 
 export default function PainelPlanoFerias() {
   const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
-  const podeAdminFerias = isAdmin || canAccessAction('perm_admin_campanhas_ferias') || canAccessAction('perm_admin_mode');
+  const podeAdminFerias = isAdmin || canAccessAction('perm_admin_campanhas_ferias');
   const podeAprovarFerias = isAdmin || canAccessAction('perm_aprovar_ferias');
   const podeGerarFerias = isAdmin || canAccessAction('perm_gerar_ferias_campanhas');
   const podeAtribuirPermissoesFerias = isAdmin || canAccessAction('perm_atribuir_permissoes_ferias');
+  const podeEditarCampanhasFerias = isAdmin || canAccessAction('perm_editar_campanhas_ferias');
+  const podeExcluirCampanhasFerias = isAdmin || canAccessAction('perm_excluir_campanhas_ferias');
 
   // Lista de Campanhas e Campanha Selecionada
   const [campanhas, setCampanhas] = useState([]);
@@ -244,16 +246,15 @@ export default function PainelPlanoFerias() {
       if (carregamentoId !== carregamentoPainelRef.current) return;
       setOpcoes(listaOpcoes);
 
-      // 3. Carrega o quantitativo total de militares ativos para cálculo real de cotas e percentual
-      try {
-        const milList = await base44.entities.Militar.list();
-        const ativos = (milList || []).filter(
-          (m) => m.situacao !== 'Inativo' && m.status !== 'Inativo' && m.situacao !== 'Excluído' && m.situacao !== 'Falecido'
-        );
-        setTotalEfetivoGeral(ativos.length || milList?.length || 0);
-      } catch (_milErr) {
-        console.warn('Erro ao carregar efetivo total para cotas:', _milErr);
-      }
+      // 3. O quantitativo para cotas deriva do próprio contexto autorizado da campanha/plano.
+      // Não consulta Militar diretamente, evitando dependência oculta de visualizar_militares.
+      const totalContexto = Math.max(
+        0,
+        ...listaCampanhas.map((campanha) => Number(campanha?.total_publico_alvo || 0)),
+        Number(selected?.total_publico_alvo || 0),
+        listaOpcoes.length,
+      );
+      setTotalEfetivoGeral(totalContexto);
 
       const initialMap = {};
       const initialEditing = {};
@@ -313,18 +314,12 @@ export default function PainelPlanoFerias() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!modoAdmin || painelConsolidado || !campanhaSelecionada?.id || !planoSelecionadoId) {
+    if (!modoAdmin || !podeAtribuirPermissoesFerias || painelConsolidado || !campanhaSelecionada?.id || !planoSelecionadoId) {
       setUsuariosPermitidos([]);
       setPermissoesCampanha([]);
       return;
     }
     const carregarUsuarios = async () => {
-      try {
-        const diretos = await base44.entities.User.list();
-        if (Array.isArray(diretos) && diretos.length > 0) return diretos;
-        const filtrados = await base44.entities.User.filter({});
-        if (Array.isArray(filtrados) && filtrados.length > 0) return filtrados;
-      } catch (_erroUsuariosDiretos) {}
       const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' });
       return resposta.data?.usuarios || [];
     };
