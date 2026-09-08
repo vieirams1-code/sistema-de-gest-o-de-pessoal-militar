@@ -1352,17 +1352,8 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
-          const campanhaAtual = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
-          const planoIdEditado = String(campanha_payload?.plano_ferias_institucional_id || '').trim();
-          if (campanhaAtual?.tipo === 'PLANO_FERIAS' && planoIdEditado) {
-            const planoEditado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoIdEditado);
-            if (!planoEditado) {
-              return new Response(JSON.stringify({ error: 'Plano de Férias informado não foi encontrado.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-            if (Number(planoEditado.ano_referencia) !== Number(campanha_payload.ano_referencia)) {
-              return new Response(JSON.stringify({ error: 'O ano da campanha deve ser igual ao ano do Plano de Férias.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-          }
+          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          const planoIdEditado = '';
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             titulo: campanha_payload.titulo,
             plano_ferias_institucional_id: planoIdEditado,
@@ -1637,6 +1628,7 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
+          await obterCampanhaGeralOuErro(base44, campanha_id);
           // 1. Exclui a campanha
           await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
 
@@ -1675,6 +1667,7 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          await obterCampanhaGeralOuErro(base44, campanha_id);
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Arquivada' });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha arquivada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
@@ -1685,6 +1678,7 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          await obterCampanhaGeralOuErro(base44, campanha_id);
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Desativada' });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha desativada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
@@ -1692,6 +1686,7 @@ Deno.serve(async (req: Request) => {
         // Encerrar Campanha
         case 'CAMPANHA_ENCERRAR': {
           const { campanha_id } = payload;
+          await obterCampanhaGeralOuErro(base44, campanha_id);
           await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             status: 'Encerrada',
           });
@@ -1708,6 +1703,7 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          await obterCampanhaGeralOuErro(base44, campanha_id);
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             status: 'Aberta_Coleta',
           });
