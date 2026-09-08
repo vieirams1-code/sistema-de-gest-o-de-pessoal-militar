@@ -198,6 +198,85 @@ function descreverScope(acessos, isAdmin) {
     return { tipo: 'vazio', estruturaIds: [], militarId: null, reason: 'TIPO_ACESSO_DESCONHECIDO' };
 }
 
+function sanitizarScopeMilitarIds(raw) {
+    if (!Array.isArray(raw)) return null;
+    return [...new Set(raw.map((id) => String(id || '').trim()).filter(Boolean))].slice(0, 500);
+}
+
+async function resolverScopeCheckMilitares(base44, requestedIds, acessos, hasGlobalScope) {
+    if (requestedIds === null) return null;
+    if (requestedIds.length === 0) {
+        return { requestedIds: [], allowedIds: [], deniedIds: [], allAllowed: true };
+    }
+    if (hasGlobalScope) {
+        return { requestedIds, allowedIds: requestedIds, deniedIds: [], allAllowed: true };
+    }
+
+    const militares = await fetchWithRetry(
+        () => base44.asServiceRole.entities.Militar.filter(
+            { id: { $in: requestedIds } },
+            undefined,
+            requestedIds.length,
+            0,
+            ['id', 'estrutura_id', 'subgrupamento_id', 'grupamento_id', 'grupamento_raiz_id'],
+        ),
+        'militar.scope_check',
+    );
+    const militarPorId = new Map((militares || []).map((m) => [String(m?.id || ''), m]));
+
+    const setorIds = new Set((acessos || [])
+        .filter((a) => normalizeTipo(a?.tipo_acesso) === 'setor' && a?.grupamento_id)
+        .map((a) => String(a.grupamento_id)));
+    const subsetorIds = new Set((acessos || [])
+        .filter((a) => normalizeTipo(a?.tipo_acesso) === 'subsetor' && a?.subgrupamento_id)
+        .map((a) => String(a.subgrupamento_id)));
+    const unidadeIds = new Set((acessos || [])
+        .filter((a) => normalizeTipo(a?.tipo_acesso) === 'unidade' && a?.subgrupamento_id)
+        .map((a) => String(a.subgrupamento_id)));
+    const proprioIds = new Set((acessos || [])
+        .filter((a) => normalizeTipo(a?.tipo_acesso) === 'proprio' && a?.militar_id)
+        .map((a) => String(a.militar_id)));
+
+    const subsetorComFilhos = new Set(subsetorIds);
+    if (subsetorIds.size > 0) {
+        const filhos = await fetchWithRetry(
+            () => base44.asServiceRole.entities.Subgrupamento.filter(
+                { parent_id: { $in: [...subsetorIds] } },
+                undefined,
+                1000,
+                0,
+                ['id'],
+            ),
+            'subgrupamento.scope_check_filhos',
+        );
+        (filhos || []).forEach((filho) => filho?.id && subsetorComFilhos.add(String(filho.id)));
+    }
+
+    const allowed = new Set();
+    for (const id of requestedIds) {
+        if (proprioIds.has(id)) {
+            allowed.add(id);
+            continue;
+        }
+        const militar = militarPorId.get(id);
+        if (!militar) continue;
+        const estruturaId = String(militar?.estrutura_id || '');
+        const subgrupamentoId = String(militar?.subgrupamento_id || '');
+        const grupamentoId = String(militar?.grupamento_id || '');
+        const grupamentoRaizId = String(militar?.grupamento_raiz_id || '');
+
+        const setorPermitido = [...setorIds].some((setorId) =>
+            [estruturaId, grupamentoId, grupamentoRaizId].includes(setorId));
+        const subsetorPermitido = [estruturaId, subgrupamentoId].some((value) => subsetorComFilhos.has(value));
+        const unidadePermitida = [estruturaId, subgrupamentoId].some((value) => unidadeIds.has(value));
+        if (setorPermitido || subsetorPermitido || unidadePermitida) allowed.add(id);
+    }
+
+    const allowedIds = requestedIds.filter((id) => allowed.has(id));
+    const deniedIds = requestedIds.filter((id) => !allowed.has(id));
+    return { requestedIds, allowedIds, deniedIds, allAllowed: deniedIds.length === 0 };
+}
+
 // =====================================================================
 // Handler
 // =====================================================================
@@ -256,6 +335,7 @@ Deno.serve(async (req) => {
         }
 
         const effectiveEmailRaw = payload?.effectiveEmail;
+        const scopeMilitarIds = sanitizarScopeMilitarIds(payload?.scopeMilitarIds);
         const authUserEmail = normalizeEmail(authUser.email);
         const effectiveEmailNorm = normalizeEmail(effectiveEmailRaw);
         const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
@@ -359,6 +439,12 @@ Deno.serve(async (req) => {
 
         // 6. scope estável. Escopo global não equivale a permissão total.
         const scope = descreverScope(acessos || [], hasGlobalScope);
+        const scopeCheck = await resolverScopeCheckMilitares(
+            base44,
+            scopeMilitarIds,
+            acessos || [],
+            hasGlobalScope,
+        );
 
         // 7. accessMode descreve ESCOPO; permissionsResolvedAs descreve a
         // origem da autorização funcional.
@@ -394,6 +480,7 @@ Deno.serve(async (req) => {
             acessos: acessos || [],
             perfis: perfisMap,
             scope,
+            scopeCheck,
             modules,
             actions,
             meta: {
