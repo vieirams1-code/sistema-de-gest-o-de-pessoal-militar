@@ -245,16 +245,18 @@ export default function VerMilitar() {
     }),
   });
 
-  const { data: militar, isLoading } = useQuery({
-    queryKey: ['militar', id],
-    queryFn: async () => {const list = await base44.entities.Militar.filter({ id });return list[0] || null;},
-    enabled: !!id && isAccessResolved
+  const { data: militarScopedData = { militares: [], matriculasMilitar: [], meta: {} }, isLoading } = useQuery({
+    queryKey: ['militar', id, effectiveEmail || null, podeVerDadosSensiveisMilitar],
+    queryFn: () => fetchScopedMilitares({
+      militarIds: [id],
+      limit: 1,
+      includeFoto: true,
+      includeMatriculas: true,
+    }),
+    enabled: !!id && isAccessResolved && canAccessModule('militares') && canAccessAction('visualizar_militares'),
   });
-  const { data: matriculasMilitar = [] } = useQuery({
-    queryKey: ['militar-matriculas', id],
-    queryFn: () => base44.entities.MatriculaMilitar.filter({ militar_id: id }, '-data_inicio'),
-    enabled: !!id && isAccessResolved
-  });
+  const militar = militarScopedData?.militares?.[0] || null;
+  const matriculasMilitar = Array.isArray(militarScopedData?.matriculasMilitar) ? militarScopedData.matriculasMilitar : [];
   const militarEnriquecido = React.useMemo(() => {
     if (!militar) return null;
     const indice = montarIndiceMatriculas(matriculasMilitar);
