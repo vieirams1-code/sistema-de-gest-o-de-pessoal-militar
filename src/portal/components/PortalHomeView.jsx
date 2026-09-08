@@ -8,7 +8,6 @@ import { getCampanhasAtivas } from '../api/PortalApiClient';
 import {
   UserCheck,
   Calendar,
-  FileText,
   Clock,
   ShieldCheck,
   LogOut,
@@ -311,43 +310,6 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
             </CardHeader>
           </Card>
 
-          {/* Card 3: Atestados Médicos (Informativo) */}
-          <Card className="border-slate-200 opacity-60 bg-slate-50">
-            <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-sm font-bold text-slate-700">
-                    Atestados & JISO
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    Em breve • Envio de atestados pelo celular
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-
-          {/* Card 4: Central de Pendências (Informativo) */}
-          <Card className="border-slate-200 opacity-60 bg-slate-50">
-            <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between pb-2 space-y-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-sm font-bold text-slate-700">
-                    Central de Pendências
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    Em breve • Prazos e avisos da unidade
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
         </div>
       </div>
 
