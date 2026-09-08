@@ -19,6 +19,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   baixarAnexosCampanhaZip,
   exportarPlanilhaCampanhaExcel,
@@ -29,6 +30,12 @@ export default function CentralRespostasCampanhas() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const campanhaParamId = searchParams.get('campanhaId');
+  const { canAccessAction } = useCurrentUser();
+  const canViewResponses = canAccessAction('visualizar_respostas_campanhas');
+  const canApproveResponses = canAccessAction('aprovar_respostas_campanhas');
+  const canExportResponses = canAccessAction('exportar_respostas_campanhas');
+  const canDownloadAttachments = canAccessAction('baixar_anexos_respostas_campanhas');
+  const canLoadResponseRows = canViewResponses || canApproveResponses;
 
   const [campanhas, setCampanhas] = useState([]);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState(null);
@@ -56,25 +63,27 @@ export default function CentralRespostasCampanhas() {
     observacaoRH: '',
   });
 
-  // Carrega todas as campanhas disponíveis
+  // Carrega somente o contexto da campanha aberta; não exige permissão de listar todas as campanhas.
   const carregarCampanhas = async () => {
     setLoading(true);
     try {
-      const res = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_LISTAR' });
-      const lista = res.data?.campanhas || [];
-      setCampanhas(lista);
-
-      const selecionada = campanhaParamId ? lista.find((c) => c.id === campanhaParamId) : null;
-      if (!selecionada) {
+      if (!campanhaParamId) {
         setCampanhaSelecionada(null);
         setRespostasData(null);
         setFeedback({ type: 'error', msg: 'Abra uma campanha pela tela Campanhas para consultar suas respostas.' });
         return;
       }
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_CONTEXTO_RETORNO',
+        campanha_id: campanhaParamId,
+      });
+      const selecionada = res.data?.campanha || null;
+      setCampanhas(selecionada ? [selecionada] : []);
       setCampanhaSelecionada(selecionada);
-      await carregarRespostas(selecionada);
+      if (selecionada && canLoadResponseRows) await carregarRespostas(selecionada);
+      else setRespostasData(null);
     } catch (err) {
-      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar campanhas.' });
+      setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar o contexto da campanha.' });
     } finally {
       setLoading(false);
     }
@@ -87,7 +96,7 @@ export default function CentralRespostasCampanhas() {
     setFeedback({ type: '', msg: '' });
     try {
       const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CAMPANHA_DETALHES_RETORNO',
+        acao: canViewResponses ? 'CAMPANHA_DETALHES_RETORNO' : 'CAMPANHA_APROVACAO_RETORNO',
         campanha_id: camp.id,
       });
       setRespostasData(res.data);
@@ -109,15 +118,17 @@ export default function CentralRespostasCampanhas() {
 
   // Download em Lote de Anexos com Renomeação Institucional
   const handleBaixarZipLote = async () => {
-    if (!campanhaSelecionada || !respostasData?.militares) {
-      alert('Não há dados carregados para download de anexos.');
-      return;
-    }
+    if (!campanhaSelecionada || !canDownloadAttachments) return;
     setZipProgress({ open: true, atual: 0, total: 0, texto: 'Iniciando download dos anexos...', loading: true });
     try {
+      const dadosRes = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_ANEXOS_RETORNO',
+        campanha_id: campanhaSelecionada.id,
+      });
+      const militaresAnexos = dadosRes.data?.militares || [];
       const res = await baixarAnexosCampanhaZip(
         campanhaSelecionada,
-        respostasData.militares,
+        militaresAnexos,
         (atual, total, texto) => {
           setZipProgress({ open: true, atual, total, texto, loading: true });
         }
@@ -139,13 +150,14 @@ export default function CentralRespostasCampanhas() {
   };
 
   // Exportação Excel (.xlsx)
-  const handleExportarExcel = () => {
-    if (!campanhaSelecionada || !respostasData?.militares) {
-      alert('Não há dados para exportação.');
-      return;
-    }
+  const handleExportarExcel = async () => {
+    if (!campanhaSelecionada || !canExportResponses) return;
     try {
-      exportarPlanilhaCampanhaExcel(campanhaSelecionada, respostasData.militares);
+      const dadosRes = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_EXPORTAR_RETORNO',
+        campanha_id: campanhaSelecionada.id,
+      });
+      exportarPlanilhaCampanhaExcel(campanhaSelecionada, dadosRes.data?.militares || []);
       setFeedback({ type: 'success', msg: 'Planilha Excel (.xlsx) exportada com sucesso!' });
     } catch (err) {
       alert(err.message || 'Falha ao exportar planilha Excel.');
@@ -153,13 +165,14 @@ export default function CentralRespostasCampanhas() {
   };
 
   // Exportação CSV (UTF-8 BOM)
-  const handleExportarCsv = () => {
-    if (!campanhaSelecionada || !respostasData?.militares) {
-      alert('Não há dados para exportação.');
-      return;
-    }
+  const handleExportarCsv = async () => {
+    if (!campanhaSelecionada || !canExportResponses) return;
     try {
-      exportarPlanilhaCampanhaCsv(campanhaSelecionada, respostasData.militares);
+      const dadosRes = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_EXPORTAR_RETORNO',
+        campanha_id: campanhaSelecionada.id,
+      });
+      exportarPlanilhaCampanhaCsv(campanhaSelecionada, dadosRes.data?.militares || []);
       setFeedback({ type: 'success', msg: 'Arquivo CSV gerado com sucesso!' });
     } catch (err) {
       alert(err.message || 'Falha ao exportar CSV.');
