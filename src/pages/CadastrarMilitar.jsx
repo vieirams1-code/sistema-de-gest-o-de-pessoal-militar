@@ -87,6 +87,13 @@ const initialFormData = {
 };
 
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+const SENSITIVE_EDIT_FIELDS = [
+  'cpf', 'rg', 'orgao_expedidor_rg', 'uf_rg', 'data_nascimento', 'sexo', 'estado_civil',
+  'tipo_sanguineo', 'religiao', 'etnia', 'nome_pai', 'nome_mae', 'cnh_categoria', 'cnh_validade',
+  'cnh_numero', 'email_particular', 'telefone', 'banco', 'agencia', 'conta', 'logradouro',
+  'numero_endereco', 'cep', 'bairro', 'cidade', 'uf', 'complemento', 'altura', 'peso',
+  'naturalidade', 'naturalidade_uf',
+];
 
 const POSTOS_GRADUACOES = [
   // Oficiais
@@ -185,6 +192,7 @@ export default function CadastrarMilitar() {
     enabled: !!editId && isAccessResolved && hasMilitaresAccess && hasRequiredAction,
   });
   const editingMilitar = editingData?.militar || null;
+  const podeVerCamposSensiveisEdicao = !editId || editingData?.sensitiveFieldsIncluded === true;
 
   React.useEffect(() => {
     if (editingMilitar) {
@@ -353,6 +361,9 @@ export default function CadastrarMilitar() {
         altura: formData.altura ? parseFloat(formData.altura) : null,
         peso: formData.peso ? parseFloat(formData.peso) : null
       };
+      if (editId && !podeVerCamposSensiveisEdicao) {
+        for (const campo of SENSITIVE_EDIT_FIELDS) delete dataToSave[campo];
+      }
 
       // Quando condição não usa Movimento (Efetivo, LTIP, vazia), limpa campos relacionados
       if (!condicaoNaoEfetiva) {
