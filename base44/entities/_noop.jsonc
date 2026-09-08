@@ -1,0 +1,16 @@
+{
+  "name": "_noop",
+  "type": "object",
+  "properties": {
+    "x": {
+      "type": "string"
+    }
+  },
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  },
+  "required": []
+}
