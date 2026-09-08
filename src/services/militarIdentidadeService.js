@@ -84,6 +84,14 @@ export async function criarMilitarComMatricula(payload = {}, { origemRegistro = 
   return invokeGateway('CREATE_MILITAR', { data: payload, origemRegistro });
 }
 
+export async function carregarMilitarParaEdicao(militarId) {
+  const result = await invokeGateway('GET_MILITAR_FOR_EDIT', { militarId });
+  return {
+    militar: result?.militar || null,
+    matriculas: Array.isArray(result?.matriculas) ? result.matriculas : [],
+  };
+}
+
 export async function atualizarMilitarSemTrocarMatricula(militarId, payload = {}) {
   return invokeGateway('UPDATE_MILITAR', { militarId, data: payload });
 }
