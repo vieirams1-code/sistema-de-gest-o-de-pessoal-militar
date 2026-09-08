@@ -604,34 +604,36 @@ export default function GerirCampanhasPortal() {
           </div>
 
           {/* CRIAÇÃO DE CAMPANHAS */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              onClick={() => abrirCriacaoCampanha('ATUALIZACAO_CADASTRAL')}
-              className="bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
-            >
-              <UserCheck className="w-3.5 h-3.5 mr-1" />
-              Nova Atualização Cadastral
-            </Button>
+          {canCreateCampaigns && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => abrirCriacaoCampanha('ATUALIZACAO_CADASTRAL')}
+                className="bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
+              >
+                <UserCheck className="w-3.5 h-3.5 mr-1" />
+                Nova Atualização Cadastral
+              </Button>
 
-            <Button
-              type="button"
-              onClick={() => abrirCriacaoCampanha('ASSINATURA_DOCUMENTO')}
-              className="bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
-            >
-              <FileSignature className="w-3.5 h-3.5 mr-1" />
-              Nova Assinatura Doc
-            </Button>
+              <Button
+                type="button"
+                onClick={() => abrirCriacaoCampanha('ASSINATURA_DOCUMENTO')}
+                className="bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
+              >
+                <FileSignature className="w-3.5 h-3.5 mr-1" />
+                Nova Assinatura Doc
+              </Button>
 
-            <Button
-              type="button"
-              onClick={() => abrirCriacaoCampanha('FORMULARIO_DINAMICO')}
-              className="bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
-            >
-              <Layers className="w-3.5 h-3.5 mr-1" />
-              Novo Formulário
-            </Button>
-          </div>
+              <Button
+                type="button"
+                onClick={() => abrirCriacaoCampanha('FORMULARIO_DINAMICO')}
+                className="bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-semibold shadow-xs h-9 px-3"
+              >
+                <Layers className="w-3.5 h-3.5 mr-1" />
+                Novo Formulário
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* FEEDBACK ALERTS */}
@@ -811,7 +813,7 @@ export default function GerirCampanhasPortal() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
-                            {camp.status !== 'Aberta_Coleta' && (
+                            {canEditCampaigns && camp.status !== 'Aberta_Coleta' && (
                               <button
                                 onClick={() => handleReabrirCampanha(camp)}
                                 disabled={actionLoading}
@@ -821,7 +823,7 @@ export default function GerirCampanhasPortal() {
                                 <Play className="w-4 h-4" />
                               </button>
                             )}
-                            {camp.status === 'Aberta_Coleta' && (
+                            {canSendReminders && camp.status === 'Aberta_Coleta' && (
                               <button
                                 onClick={() => handleDispararLembretes(camp.id)}
                                 disabled={actionLoading}
@@ -831,26 +833,30 @@ export default function GerirCampanhasPortal() {
                                 <Bell className="w-4 h-4" />
                               </button>
                             )}
-                            <button
-                              onClick={() => handleAbrirCentralRespostas(camp)}
-                              disabled={actionLoading}
-                              className="p-1.5 text-indigo-700 hover:bg-indigo-50 rounded transition-colors font-bold"
-                              title="Ver Resultados & Entregas Nominais"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirEdicaoCampanha(camp)}
-                              disabled={actionLoading}
-                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
-                              title="Editar Campanha"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
+                            {canOpenResponses && (
+                              <button
+                                onClick={() => handleAbrirCentralRespostas(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-indigo-700 hover:bg-indigo-50 rounded transition-colors font-bold"
+                                title="Ver Resultados & Entregas Nominais"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                            {canEditCampaigns && (
+                              <button
+                                onClick={() => abrirEdicaoCampanha(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
+                                title="Editar Campanha"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
 
-                            {!isArquivada && <div className="w-px h-4 bg-slate-300 mx-1"></div>}
+                            {canEditCampaigns && !isArquivada && <div className="w-px h-4 bg-slate-300 mx-1"></div>}
 
-                            {!isArquivada && (
+                            {canEditCampaigns && !isArquivada && (
                               <button
                                 onClick={() => handleArquivarCampanha(camp)}
                                 disabled={actionLoading}
@@ -861,7 +867,7 @@ export default function GerirCampanhasPortal() {
                               </button>
                             )}
 
-                            {!isArquivada && (
+                            {canDeleteCampaigns && !isArquivada && (
                               <button
                                 onClick={() => handleExcluirCampanha(camp)}
                                 disabled={actionLoading}
