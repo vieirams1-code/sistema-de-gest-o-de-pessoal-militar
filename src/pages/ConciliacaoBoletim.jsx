@@ -9,9 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeftRight, FileSearch, Link2, Unlink2 } from 'lucide-react';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
-import { listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
+import { listarAtestadosPublicacaoEscopo, listarLivroPublicacoesEscopo } from '@/services/publicacoesPainelService';
 
 const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
 const PDFJS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
@@ -557,33 +556,16 @@ export default function ConciliacaoBoletim() {
   const [desvinculosManuais, setDesvinculosManuais] = useState([]);
   const [erroVinculo, setErroVinculo] = useState('');
   
-  const { isAdmin, hasGlobalScope, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
-  const hasAccess = canAccessModule('conciliacao_boletim');
-  const semRestricaoEscopo = Boolean(isAdmin || hasGlobalScope);
+  const { isAdmin, hasGlobalScope, getMilitarScopeFilters, canAccessModule, canAccessAction, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const hasAccess = canAccessModule('conciliacao_boletim') && canAccessAction('visualizar_conciliacao_boletim');
 
-  const { data: registrosLivro = [], isLoading: isLoadingLivro } = useQuery({
-    queryKey: ['conciliacao-registros-livro'],
-    queryFn: async () => {
-      if (semRestricaoEscopo) return base44.entities.RegistroLivro.list('-created_date');
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-
-      const bundle = await fetchScopedFeriasBundle();
-      const m = new Map();
-      (bundle?.registrosLivro || []).forEach((item) => {
-        if (!item?.id) return;
-        m.set(item.id, item);
-      });
-      return Array.from(m.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-    },
+  const { data: publicacoesBundle = {}, isLoading: isLoadingPublicacoesBundle } = useQuery({
+    queryKey: ['conciliacao-publicacoes-bundle'],
+    queryFn: () => listarLivroPublicacoesEscopo({ purpose: 'CONCILIACAO' }),
     enabled: isAccessResolved && hasAccess
   });
-
-  const { data: publicacoesExOfficio = [], isLoading: isLoadingExOfficio } = useQuery({
-    queryKey: ['conciliacao-publicacoes-ex-officio'],
-    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
-    enabled: isAccessResolved && hasAccess
-  });
+  const registrosLivro = publicacoesBundle?.registrosLivro || [];
+  const publicacoesExOfficio = publicacoesBundle?.publicacoesExOfficio || [];
 
 
   const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
