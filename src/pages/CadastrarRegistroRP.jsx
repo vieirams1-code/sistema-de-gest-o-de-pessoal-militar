@@ -50,11 +50,7 @@ import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templa
 import { buildTemplateRenderMetadata, parseTemplateRenderMetadata, warnIfMissingRenderMetadata } from '@/services/templateRenderMetadata';
 import { getTipoTemplatePublicacaoAtestado } from '@/components/atestado/atestadoTemplateVars';
 import { montarVariaveisTemplateRP } from '@/utils/rp/rpVarsService';
-
-
-function mapearEntityPublicacaoPorModulo(modulo) {
-  return modulo === MODULO_LIVRO ? base44.entities.RegistroLivro : base44.entities.PublicacaoExOfficio;
-}
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 
 function nomeEntidadePorModulo(modulo) {
   return modulo === MODULO_LIVRO ? 'RegistroLivro' : 'PublicacaoExOfficio';
@@ -329,15 +325,13 @@ export default function CadastrarRegistroRP() {
   } = useQuery({
     queryKey: ['registro-rp-edicao', registroId || null, escopoQueryKey],
     queryFn: async () => {
-      // Try RegistroLivro first, then PublicacaoExOfficio
-      try {
-        const livros = await base44.entities.RegistroLivro.filter({ id: registroId });
-        if (livros.length > 0) return { ...livros[0], _modulo: 'Livro' };
-      } catch (_) {}
-      try {
-        const exoffiicio = await base44.entities.PublicacaoExOfficio.filter({ id: registroId });
-        if (exoffiicio.length > 0) return { ...exoffiicio[0], _modulo: 'ExOfficio' };
-      } catch (_) {}
+      const bundle = await fetchScopedPublicacoesBundle({
+        purpose: 'REGISTRO_RP',
+        registroLivroId: registroId,
+        publicacaoId: registroId,
+      });
+      if (bundle?.registrosLivro?.[0]) return { ...bundle.registrosLivro[0], _modulo: 'Livro' };
+      if (bundle?.publicacoesExOfficio?.[0]) return { ...bundle.publicacoesExOfficio[0], _modulo: 'ExOfficio' };
       return null;
     },
     enabled: Boolean(isEditing && registroId && canRunScopedQueries),
@@ -504,13 +498,10 @@ export default function CadastrarRegistroRP() {
   } = useQuery({
     queryKey: ['publicacoes-militar-rp', militarIdSelecionado || null, formData.tipo_registro || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
     queryFn: async () => {
-      const [livros, exoff] = await Promise.all([
-        base44.entities.RegistroLivro.filter({ militar_id: militarIdSelecionado }),
-        base44.entities.PublicacaoExOfficio.filter({ militar_id: militarIdSelecionado }),
-      ]);
+      const bundle = await fetchScopedPublicacoesBundle({ purpose: 'REGISTRO_RP', militarId: militarIdSelecionado });
       return [
-        ...livros.map(r => ({ ...r, origem_tipo: 'Livro', tipo_label: r.tipo_registro })),
-        ...exoff.map(r => ({ ...r, origem_tipo: 'ExOfficio', tipo_label: r.tipo })),
+        ...(bundle?.registrosLivro || []).map(r => ({ ...r, origem_tipo: 'Livro', tipo_label: r.tipo_registro })),
+        ...(bundle?.publicacoesExOfficio || []).map(r => ({ ...r, origem_tipo: 'ExOfficio', tipo_label: r.tipo })),
       ].filter(p => p.numero_bg && p.data_bg);
     },
     enabled: deveCarregarPublicacoes,
@@ -987,8 +978,15 @@ export default function CadastrarRegistroRP() {
 
           const resolverRegistroPorOrigem = async (tipo) => {
             const entityNameOriginal = tipo === 'livro' ? 'RegistroLivro' : tipo === 'atestado' ? 'Atestado' : 'PublicacaoExOfficio';
-            const entityOriginal = tipo === 'livro' ? base44.entities.RegistroLivro : tipo === 'atestado' ? base44.entities.Atestado : base44.entities.PublicacaoExOfficio;
-            const [original] = await entityOriginal.filter({ id: refId });
+            if (tipo === 'atestado') {
+              const [original] = await base44.entities.Atestado.filter({ id: refId });
+              return original ? { entityNameOriginal, original } : null;
+            }
+            const bundle = await fetchScopedPublicacoesBundle({
+              purpose: 'REGISTRO_RP',
+              ...(tipo === 'livro' ? { registroLivroId: refId } : { publicacaoId: refId }),
+            });
+            const original = tipo === 'livro' ? bundle?.registrosLivro?.[0] : bundle?.publicacoesExOfficio?.[0];
             return original ? { entityNameOriginal, original } : null;
           };
 
