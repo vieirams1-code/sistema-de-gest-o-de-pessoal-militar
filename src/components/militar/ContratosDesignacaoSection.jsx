@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { base44 } from '@/api/base44Client';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
 import EncerrarContratoDesignacaoModal from '@/components/militar/EncerrarContratoDesignacaoModal';
 import CancelarContratoDesignacaoModal from '@/components/militar/CancelarContratoDesignacaoModal';
@@ -98,7 +97,7 @@ export default function ContratosDesignacaoSection({
   const handleAbrirEdicao = async (contrato) => {
     if (!contrato) return;
     try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contrato.id);
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contrato.militar_id || militarId, contrato.id);
       setEdicaoBloqueiaCadeia(periodosComEfeito.length > 0);
       setEdicao(contrato);
     } catch (error) {
@@ -112,7 +111,7 @@ export default function ContratosDesignacaoSection({
 
   const handleEdit = async (payload) => {
     if (!edicao?.id) return;
-    const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, edicao.id);
+    const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(edicao.militar_id || militarId, edicao.id);
     if (periodosComEfeito.length > 0) {
       const campoAlterado = getCampoCadeiaFeriasAlterado(edicao, payload);
       if (campoAlterado) throw new Error(`Campo ${campoAlterado} bloqueado: ${MENSAGEM_CONTRATO_COM_EFEITOS}`);
@@ -136,7 +135,7 @@ export default function ContratosDesignacaoSection({
 
   const handleDelete = async (contrato) => {
     if (!contrato?.id) return;
-    const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contrato.id);
+    const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contrato.militar_id || militarId, contrato.id);
     if (periodosComEfeito.length > 0) {
       toast({ title: 'Exclusão bloqueada', description: MENSAGEM_CONTRATO_COM_EFEITOS, variant: 'destructive' });
       return;
