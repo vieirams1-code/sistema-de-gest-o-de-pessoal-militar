@@ -172,16 +172,36 @@ export default function PlanosFerias() {
   };
 
   const arquivar = async (plano) => {
-    if (!podeEditarPlanos) return;
+    if (!modoAdmin || !podeAdminFerias || !podeEditarPlanos) {
+      setFeedback({ tipo: 'erro', texto: 'O arquivamento exige o Modo Admin de férias ativo.' });
+      return;
+    }
     if (!window.confirm(`Arquivar o plano "${plano.titulo}"? O histórico será preservado e novas campanhas não poderão ser incluídas.`)) return;
     setSalvando(true);
     try {
       await base44.functions.invoke('planos_ferias_servicos', { acao: 'ARQUIVAR', plano_id: plano.id });
-      setSelecionado(null);
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: 'Plano arquivado. O histórico foi preservado.' });
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível arquivar o plano.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const desarquivar = async (plano) => {
+    if (!modoAdmin || !podeAdminFerias || !podeEditarPlanos) {
+      setFeedback({ tipo: 'erro', texto: 'O desarquivamento exige o Modo Admin de férias ativo.' });
+      return;
+    }
+    if (!window.confirm(`Desarquivar o plano "${plano.titulo}" e permitir novamente sua gestão?`)) return;
+    setSalvando(true);
+    try {
+      await base44.functions.invoke('planos_ferias_servicos', { acao: 'DESARQUIVAR', plano_id: plano.id });
+      await carregar();
+      setFeedback({ tipo: 'sucesso', texto: 'Plano desarquivado com sucesso.' });
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível desarquivar o plano.') });
     } finally {
       setSalvando(false);
     }
@@ -370,11 +390,19 @@ export default function PlanosFerias() {
       return;
     }
     const geradas = Number(metricas?.ferias_geradas_unicas || 0);
-    if (geradas > 0 && !window.confirm('ATENÇÃO: este plano possui ' + geradas + ' registro(s) de férias já gerado(s). A exclusão manterá as férias no SGP, mas removerá o vínculo com o plano e impedirá seu rastreamento por ele. Deseja continuar?')) return;
-    if (!window.confirm(`Excluir o plano "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
+    const impactoFerias = geradas > 0
+      ? ` O plano possui ${geradas} registro(s) de férias já gerado(s), que serão mantidos no SGP, mas perderão o vínculo com o plano.`
+      : '';
+    if (!window.confirm(`Primeira confirmação: excluir o plano "${plano.titulo}" também excluirá suas campanhas e respostas.${impactoFerias}`)) return;
+    if (!window.confirm(`Segunda confirmação: deseja excluir definitivamente o plano "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
     try {
-      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_INSTITUCIONAL_EXCLUIR', plano_id: plano.id, confirmar_perda_vinculo: geradas > 0 });
+      const resposta = await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_INSTITUCIONAL_EXCLUIR',
+        plano_id: plano.id,
+        confirmar_perda_vinculo: geradas > 0,
+        confirmacao_dupla: true,
+      });
       setSelecionado(null);
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Plano excluído.' });
@@ -437,7 +465,8 @@ export default function PlanosFerias() {
               {modoAdmin && podeAdminFerias && podeExcluirPlanos && <Button type="button" variant="outline" onClick={() => excluir(selecionado)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir plano</Button>}
               {(podeVisualizarRespostas || podeGerarFerias || podeAtribuirPermissoes) && <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>}
               {podeEditarPlanos && <Button type="button" variant="outline" onClick={() => abrirEdicao(selecionado)}><Edit3 className="w-4 h-4 mr-1.5" />Editar plano</Button>}
-              {podeEditarPlanos && selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
+              {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)} disabled={salvando}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
+              {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status === 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => desarquivar(selecionado)} disabled={salvando}><RefreshCw className="w-4 h-4 mr-1.5" />Desarquivar</Button>
             </div>
           </div>
           {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{feedback.texto}</div>}
