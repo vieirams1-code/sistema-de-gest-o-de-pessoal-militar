@@ -1,5 +1,6 @@
 import { base44 } from '../api/base44Client.js';
 import { fetchScopedMedalhasBundle } from './getScopedMedalhasBundleClient.js';
+import { fetchScopedPeriodosAquisitivosBundle } from './getScopedPeriodosAquisitivosBundleClient.js';
 
 let runtimeClient = null;
 
@@ -44,6 +45,14 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
     });
     return medalhas;
   };
+  const carregarFeriasTimeline = async () => {
+    if (runtimeClient) {
+      // Fallback exclusivo para o cliente injetado pelos testes unitários.
+      return client.entities.Ferias.filter({ militar_id: militarId });
+    }
+    const { ferias = [] } = await fetchScopedPeriodosAquisitivosBundle();
+    return ferias.filter((item) => String(item?.militar_id || '') === String(militarId));
+  };
 
   const [
     registrosLivro,
@@ -59,7 +68,7 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
   ] = await Promise.all([
     maybe(allowed.livro, () => client.entities.RegistroLivro.filter({ militar_id: militarId })),
     maybe(allowed.publicacoes, () => client.entities.PublicacaoExOfficio.filter({ militar_id: militarId })),
-    maybe(allowed.ferias, () => client.entities.Ferias.filter({ militar_id: militarId })),
+    maybe(allowed.ferias, carregarFeriasTimeline),
     maybe(allowed.atestados, () => client.entities.Atestado.filter({ militar_id: militarId })),
     maybe(allowed.antiguidade, () => client.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: militarId })),
     maybe(allowed.medalhas, carregarMedalhasTimeline),
