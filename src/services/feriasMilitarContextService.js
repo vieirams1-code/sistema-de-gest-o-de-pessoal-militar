@@ -1,7 +1,9 @@
 import {
   carregarMilitaresComMatriculas,
+  enriquecerMilitarComMatriculas,
   filtrarMilitaresOperacionais,
   isMilitarMesclado,
+  montarIndiceMatriculas,
   resolverMatriculaAtual,
 } from './matriculaMilitarViewService.js';
 
@@ -91,6 +93,27 @@ export function montarPayloadRegistroLivroFerias(ferias = {}, basePayload = {}) 
     militar_matricula_vinculo: matriculaDocumental,
     militar_matricula_atual: pickFirstText(ferias?.militar_matricula_atual, ferias?.matricula_atual_operacional, ferias?.militar_matricula),
   };
+}
+
+export function enriquecerFeriasComContextoMilitarCarregado(
+  ferias = [],
+  militaresBase = [],
+  matriculas = [],
+  { contexto = 'operacional', filtrarMesclados = false } = {},
+) {
+  const indiceMatriculas = montarIndiceMatriculas(matriculas || []);
+  const militares = (militaresBase || []).map((militar) => enriquecerMilitarComMatriculas(militar, indiceMatriculas));
+  const byId = new Map(militares.map((m) => [String(m.id), m]));
+  const operacionais = filtrarMesclados
+    ? new Set(filtrarMilitaresOperacionais(militares, { incluirInativos: true }).map((m) => String(m.id)))
+    : null;
+
+  return (ferias || [])
+    .filter((item) => {
+      if (!filtrarMesclados) return true;
+      return operacionais.has(String(item?.militar_id || ''));
+    })
+    .map((item) => aplicarContextoMilitarNaFerias(item, byId.get(String(item?.militar_id || '')) || null, { contexto }));
 }
 
 export async function enriquecerFeriasComContextoMilitar(ferias = [], { contexto = 'operacional', filtrarMesclados = false } = {}) {
