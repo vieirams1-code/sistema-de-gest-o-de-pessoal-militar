@@ -5,6 +5,11 @@ import { readFile } from 'node:fs/promises';
 
 const paginaPlanosSource = await readFile(new URL('../../pages/PlanosFerias.jsx', import.meta.url), 'utf8');
 const paginaCampanhasSource = await readFile(new URL('../../pages/GerirCampanhasPortal.jsx', import.meta.url), 'utf8');
+const paginaConfiguracoesSource = await readFile(new URL('../../pages/ConfiguracoesPortal.jsx', import.meta.url), 'utf8');
+const portalFeriasSource = await readFile(new URL('../components/PortalFeriasView.jsx', import.meta.url), 'utf8');
+const portalServicosSource = await readFile(new URL('../../../base44/functions/portal_servicos/entry.ts', import.meta.url), 'utf8');
+const otpServiceSource = await readFile(new URL('../../../base44/shared/portal/otp/otpService.ts', import.meta.url), 'utf8');
+const portalConfigSchemaSource = await readFile(new URL('../../../base44/entities/PortalAuthConfig.jsonc', import.meta.url), 'utf8');
 const campanhaSchemaSource = await readFile(new URL('../../../base44/entities/CampanhaPortal.jsonc', import.meta.url), 'utf8');
 const opcaoSchemaSource = await readFile(new URL('../../../base44/entities/OpcaoFeriasMilitar.jsonc', import.meta.url), 'utf8');
 
@@ -152,6 +157,30 @@ describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automáti
     assert.equal(regraMes('10').permitido, false);
     assert.deepEqual(regraMes('11'), { permitido: true, dataInicio: '2027-11-13' });
     assert.deepEqual(regraMes('12'), { permitido: true, dataInicio: '2027-12-01' });
+  });
+
+  it('8. Aquisição concluída antes do ano do plano não exibe alerta nem restringe meses', () => {
+    const meses2027 = Array.from({ length: 12 }, (_, indice) => ({
+      mes: String(indice + 1).padStart(2, '0'),
+      permitido: true,
+      inicio_ajustado: false,
+    }));
+    const restricaoAfetaPlano = meses2027.some((mes) => mes.permitido === false || mes.inicio_ajustado === true);
+
+    assert.equal(restricaoAfetaPlano, false);
+    assert.match(portalFeriasSource, /primeira_data_legal_gozo && restricaoAquisicaoAfetaPlano/);
+  });
+
+  it('9. Configurações globais de modalidades chegam ao Portal e são validadas na submissão', () => {
+    assert.match(otpServiceSource, /\.\.\.c,/);
+    assert.match(portalFeriasSource, /permitir_3_etapas === true/);
+    assert.match(portalServicosSource, /modalidadesPermitidas\[modalidadeSolicitada\] !== true/);
+  });
+
+  it('10. Exigência global de atualização cadastral está disponível e persiste nas configurações', () => {
+    assert.match(portalConfigSchemaSource, /"ferias_exigir_atualizacao_cadastral"/);
+    assert.match(paginaConfiguracoesSource, /ferias_exigir_atualizacao_cadastral: feriasExigirAtualizacaoCadastral/);
+    assert.match(paginaConfiguracoesSource, /Exigir atualização cadastral antes das férias/);
   });
 });
 
