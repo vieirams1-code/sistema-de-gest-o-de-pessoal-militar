@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { obterVinculoAtestado, avaliarFluxoJiso } from '@/components/quadro/quadroHelpers';
 import { getStatusDocumentalAtaJiso } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 import {
   Calendar,
   MessageSquare,
@@ -88,7 +89,10 @@ export default function CardItem({ card, onClick }) {
 
   const { data: publicacoesVinculadas = [] } = useQuery({
     queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
-    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
+    queryFn: async () => {
+      const bundle = await fetchScopedPublicacoesBundle({ purpose: 'QUADRO', militarId: atestadoVinculado?.militar_id });
+      return bundle?.publicacoesExOfficio || [];
+    },
     enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
     select: (data) => data.filter((p) =>
       p.atestado_homologado_id === vinculoAtestado?.referencia_id ||
