@@ -29,7 +29,7 @@ test('gera publicação com sucesso', async () => {
   const entities = {
     PublicacaoExOfficio: createEntity([]),
     TemplateTexto: createEntity([
-      { id: 't1', ativo: true, template: 'Template {militar_nome}', tipo_registro: 'COMPORTAMENTO_OTIMO' },
+      { id: 't1', ativo: true, template: 'Template {{militar_nome}}', tipo_registro: 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR', modulo: 'ExOfficio' },
     ]),
     MatriculaMilitar: createEntity([]),
   };
