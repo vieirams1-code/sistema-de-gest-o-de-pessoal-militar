@@ -16,6 +16,8 @@ const timelineService = await readFile(new URL('../../../services/militarTimelin
 const cudBackend = await readFile(new URL('../../../../base44/functions/cudEscopado/entry.ts', import.meta.url), 'utf8');
 const processosBackend = await readFile(new URL('../../../../base44/functions/controleProcessosEscopado/entry.ts', import.meta.url), 'utf8');
 const processosService = await readFile(new URL('../../../services/controleProcessosService.js', import.meta.url), 'utf8');
+const registrosMilitarService = await readFile(new URL('../../../services/registrosMilitarService.js', import.meta.url), 'utf8');
+const registrosMilitarGateway = await readFile(new URL('../../../../base44/functions/registrosMilitarGateway/entry.ts', import.meta.url), 'utf8');
 const feriasBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedFeriasBundle/entry.ts', import.meta.url), 'utf8');
 const periodosBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedPeriodosAquisitivosBundle/entry.ts', import.meta.url), 'utf8');
 const descontoFeriasService = await readFile(new URL('../../../services/descontoFeriasService.js', import.meta.url), 'utf8');
@@ -236,6 +238,16 @@ test('L09D: Plano Anual e suporte de Publicações têm finalidades explícitas 
   assert.match(feriasBundleBackend, /targetPerms\.actions\?\.publicar_bg === true/);
   assert.match(feriasBundleBackend, /feriasId é obrigatório para suporte de Publicações/);
   assert.match(feriasBundleBackend, /CAMPOS_PERIODO_PUBLICACOES_SUPORTE/);
+});
+
+test('L09D bloco 3: Registros do Militar lista Livro e ExOfficio somente pelo gateway escopado', () => {
+  assert.doesNotMatch(registrosMilitarService, /base44\.entities\.(RegistroLivro|PublicacaoExOfficio)\.(list|filter|get)/);
+  assert.match(registrosMilitarService, /functions\.invoke\('registrosMilitarGateway', \{ action: 'LIST' \}\)/);
+  assert.match(registrosMilitarGateway, /action === 'LIST'/);
+  assert.match(registrosMilitarGateway, /modules\?\.registros_militar === true/);
+  assert.match(registrosMilitarGateway, /visualizar_registros_militar/);
+  assert.match(registrosMilitarGateway, /listarMilitarIdsDoEscopo/);
+  assert.match(registrosMilitarGateway, /asServiceRole\.entities\[entityName\]/);
 });
 
 test('L09D: entidades de Férias do bloco 1 e 2 permanecem service-only', async () => {
