@@ -24,6 +24,7 @@ import { buildAfastamentosVigentes } from '@/services/afastamentosVigentesServic
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { listarLivroPublicacoesEscopo } from '@/services/publicacoesPainelService';
 import { montarAgendaJiso } from '@/utils/jiso/montarAgendaJiso';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
@@ -280,48 +281,13 @@ export default function Home() {
     enabled: dashboardEnabled && podeVerAtestados,
   });
 
-  const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['dashboard-registros-livro', scopeKey],
-    queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return base44.entities.RegistroLivro.list('-created_date');
-      }
-      if (!scopedIds?.length) return [];
-      try {
-        // ⚡ [Performance]: Use server-side filtering to avoid loading full table for non-admin users
-        const listaEscopo = await base44.entities.RegistroLivro.filter({
-          militar_id: { in: scopedIds },
-        }, '-created_date');
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await base44.entities.RegistroLivro.list('-created_date');
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
-    },
+  const { data: dashboardPublicacoesBundle = {} } = useQuery({
+    queryKey: ['dashboard-publicacoes-bundle', scopeKey],
+    queryFn: () => listarLivroPublicacoesEscopo({ purpose: 'CONTROL' }),
     enabled: dashboardEnabled && podeVerPublicacoes,
   });
-
-  const { data: publicacoesExOfficio = [] } = useQuery({
-    queryKey: ['dashboard-publicacoes-exofficio', scopeKey],
-    queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return base44.entities.PublicacaoExOfficio.list('-created_date');
-      }
-
-      if (!scopedIds?.length) return [];
-
-      try {
-        const listaEscopo = await base44.entities.PublicacaoExOfficio.filter({
-          militar_id: { in: scopedIds },
-        }, '-created_date');
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await base44.entities.PublicacaoExOfficio.list('-created_date');
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
-    },
-    enabled: dashboardEnabled && podeVerPublicacoes,
-  });
+  const registrosLivro = dashboardPublicacoesBundle?.registrosLivro || [];
+  const publicacoesExOfficio = dashboardPublicacoesBundle?.publicacoesExOfficio || [];
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['dashboard-pendencias-comportamento', scopeKey],
     queryFn: async () => {
