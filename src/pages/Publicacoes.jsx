@@ -391,7 +391,7 @@ export default function Publicacoes() {
     isLoading: loadingUser,
   } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
-  const hasPublicacoesAccess = canAccessModule('controle_publicacoes');
+  const hasPublicacoesAccess = canAccessModule('controle_publicacoes') && canAccessAction('visualizar_controle_publicacoes');
   // Permissão estrita: criar publicação depende somente da ação de criação.
   // editar_publicacoes e admin_mode não podem conceder criação por efeito colateral.
   const canCriarPublicacoes = canAccessAction('adicionar_publicacoes');
@@ -411,18 +411,18 @@ export default function Publicacoes() {
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: registrosLivroQueryKey,
-    queryFn: () => getLivroRegistrosContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+    queryFn: () => getLivroRegistrosContrato(),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
     queryKey: publicacoesExOfficioQueryKey,
     queryFn: async () => {
-      const publicacoes = await listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
+      const publicacoes = await listarPublicacoesExOfficioEscopo({ purpose: 'CONTROL' });
       const sincronizadas = await sincronizarStatusPublicacoesComBgCompleto(publicacoes);
       if (sincronizadas > 0) {
         queryClient.invalidateQueries({ queryKey: rpListaQueryKey, exact: true });
-        return listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email });
+        return listarPublicacoesExOfficioEscopo({ purpose: 'CONTROL' });
       }
       return publicacoes;
     },
