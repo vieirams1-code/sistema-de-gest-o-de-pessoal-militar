@@ -58,11 +58,14 @@ test('Publicações não carrega Ferias na carga inicial do Livro', async () => 
   assert.match(getLivroRegistrosContrato, /ferias:\s*\[\]/);
 });
 
-test('Texto lazy do Livro continua resolvendo Ferias por ferias_id sob demanda', async () => {
+test('Texto lazy do Livro resolve Férias e período pelo suporte escopado de Publicações', async () => {
   const source = await read('components/livro/livroService.js');
   const getLivroTextoPublicacaoRegistro = extractFunctionBody(source, 'getLivroTextoPublicacaoRegistro');
 
-  assert.match(getLivroTextoPublicacaoRegistro, /registro\?\.ferias_id \? base44\.entities\.Ferias\.filter\(\{ id: registro\.ferias_id \}\)/);
+  assert.match(getLivroTextoPublicacaoRegistro, /fetchScopedFeriasBundle\(\{ supportPurpose: 'PUBLICACOES', feriasId: registro\.ferias_id \}\)/);
+  assert.match(getLivroTextoPublicacaoRegistro, /feriasBundle\?\.ferias\?\.\[0\]/);
+  assert.match(getLivroTextoPublicacaoRegistro, /feriasBundle\?\.periodosAquisitivos/);
+  assert.doesNotMatch(getLivroTextoPublicacaoRegistro, /base44\.entities\.(Ferias|PeriodoAquisitivo)/);
 });
 
 test('Publicações não carrega PeriodoAquisitivo na carga inicial do Livro', async () => {
