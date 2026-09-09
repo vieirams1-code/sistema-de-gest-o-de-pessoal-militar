@@ -16,6 +16,17 @@ const timelineService = await readFile(new URL('../../../services/militarTimelin
 const cudBackend = await readFile(new URL('../../../../base44/functions/cudEscopado/entry.ts', import.meta.url), 'utf8');
 const processosBackend = await readFile(new URL('../../../../base44/functions/controleProcessosEscopado/entry.ts', import.meta.url), 'utf8');
 const processosService = await readFile(new URL('../../../services/controleProcessosService.js', import.meta.url), 'utf8');
+const feriasBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedFeriasBundle/entry.ts', import.meta.url), 'utf8');
+const periodosBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedPeriodosAquisitivosBundle/entry.ts', import.meta.url), 'utf8');
+const descontoFeriasService = await readFile(new URL('../../../services/descontoFeriasService.js', import.meta.url), 'utf8');
+const feriasPage = await readFile(new URL('../../../pages/Ferias.jsx', import.meta.url), 'utf8');
+const periodosPage = await readFile(new URL('../../../pages/PeriodosAquisitivos.jsx', import.meta.url), 'utf8');
+const cadastrarFeriasPage = await readFile(new URL('../../../pages/CadastrarFerias.jsx', import.meta.url), 'utf8');
+const ajustesSaldoPage = await readFile(new URL('../../../pages/AjustesSaldoFerias.jsx', import.meta.url), 'utf8');
+const diagnosticoSaldoPage = await readFile(new URL('../../../pages/DiagnosticoSaldoFerias.jsx', import.meta.url), 'utf8');
+const registroLivroModal = await readFile(new URL('../../../components/ferias/RegistroLivroModal.jsx', import.meta.url), 'utf8');
+const recalcularPeriodoJs = await readFile(new URL('../../../components/ferias/recalcularPeriodoAquisitivo.js', import.meta.url), 'utf8');
+const recalcularPeriodoJsx = await readFile(new URL('../../../components/ferias/recalcularPeriodoAquisitivo.jsx', import.meta.url), 'utf8');
 const entidadesProcessuaisServiceOnly = [
   'CaixaProcessual',
   'ProcessoControle',
@@ -134,4 +145,45 @@ test('L09: entidades processuais ativas e legadas permanecem service-only', asyn
       `${entityName} deve permanecer fechado para o SDK cliente`,
     );
   }
+});
+
+test('L09D: AjusteSaldoFerias e DescontoFerias não são lidos diretamente no frontend', () => {
+  const frontendSources = [
+    descontoFeriasService,
+    feriasPage,
+    periodosPage,
+    cadastrarFeriasPage,
+    ajustesSaldoPage,
+    diagnosticoSaldoPage,
+    registroLivroModal,
+    recalcularPeriodoJs,
+    recalcularPeriodoJsx,
+  ];
+  for (const source of frontendSources) {
+    assert.doesNotMatch(source, /(base44\.entities\.)?(AjusteSaldoFerias|DescontoFerias)\.(list|filter|get|create|update|delete|bulkCreate|bulkUpdate)/);
+  }
+  assert.match(descontoFeriasService, /fetchScopedFeriasBundle\(\{ includeDescontos: true \}\)/);
+  assert.match(feriasPage, /fetchScopedFeriasBundle\(\{ includeDescontos: true \}\)/);
+  assert.match(periodosPage, /paBundle\?\.ajustesSaldoFerias/);
+  assert.match(cadastrarFeriasPage, /paBundle\?\.ajustesSaldoFerias/);
+  assert.match(ajustesSaldoPage, /includeAjustesDetalhados: true/);
+  assert.match(diagnosticoSaldoPage, /includeAjustesDetalhados: true/);
+});
+
+test('L09D: bundle de períodos separa ajuste operacional de detalhes administrativos', () => {
+  assert.match(periodosBundleBackend, /CAMPOS_AJUSTE_SALDO_SUPORTE/);
+  assert.match(periodosBundleBackend, /CAMPOS_AJUSTE_SALDO_DETALHADO/);
+  assert.match(periodosBundleBackend, /includeAjustesDetalhados/);
+  assert.match(periodosBundleBackend, /visualizar_creditos_ferias/);
+  assert.match(periodosBundleBackend, /detalhes de ajustes de saldo exigem visualizar créditos de férias/);
+  assert.match(periodosBundleBackend, /asServiceRole\.entities\.AjusteSaldoFerias/);
+});
+
+test('L09D: descontos são escopados no backend e publicações vinculadas são projetadas minimamente', () => {
+  assert.match(feriasBundleBackend, /includeDescontos/);
+  assert.match(feriasBundleBackend, /listarPorEscopoIds\(base44, 'DescontoFerias'/);
+  assert.match(feriasBundleBackend, /asServiceRole\.entities\.DescontoFerias/);
+  assert.match(feriasBundleBackend, /CAMPOS_PUBLICACAO_DESCONTO/);
+  assert.match(feriasBundleBackend, /asServiceRole\.entities\.PublicacaoExOfficio\.filter/);
+  assert.doesNotMatch(descontoFeriasService, /base44\.entities\.(DescontoFerias|PublicacaoExOfficio)/);
 });
