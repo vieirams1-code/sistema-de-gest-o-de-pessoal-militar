@@ -289,8 +289,8 @@ test('L09D bloco 3: reader canônico separa finalidades e só lê Livro/ExOffici
   assert.match(publicacoesBundleBackend, /purpose === 'COMPORTAMENTO'/);
 });
 
-test('L09D: entidades de Férias do bloco 1 e 2 permanecem service-only', async () => {
-  for (const entityName of ['AjusteSaldoFerias', 'DescontoFerias', 'Ferias', 'PeriodoAquisitivo']) {
+test('L09D: entidades fechadas dos blocos 1, 2 e 3 permanecem service-only', async () => {
+  for (const entityName of ['AjusteSaldoFerias', 'DescontoFerias', 'Ferias', 'PeriodoAquisitivo', 'RegistroLivro', 'PublicacaoExOfficio']) {
     const source = await readFile(
       new URL(`../../../../base44/entities/${entityName}.jsonc`, import.meta.url),
       'utf8',
