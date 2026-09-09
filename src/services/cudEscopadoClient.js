@@ -1,5 +1,5 @@
-import { base44 as defaultBase44 } from '@/api/base44Client';
-import { isDataIsoDateOnly } from '@/services/contratosDesignacaoMilitarService';
+import { base44 as defaultBase44 } from '../api/base44Client.js';
+import { isDataIsoDateOnly } from './contratosDesignacaoMilitarService.js';
 
 let client = defaultBase44;
 
