@@ -53,6 +53,7 @@ import {
   existePublicacaoAtivaParaAtestado,
   getStatusDocumentalAtaJiso,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 
 const PRIORIDADE_COR = {
   Urgente: 'text-red-600',
@@ -709,7 +710,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const { data: publicacoesAtestado = [] } = useQuery({
     queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
-    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
+    queryFn: async () => {
+      const bundle = await fetchScopedPublicacoesBundle({ purpose: 'QUADRO', militarId: atestadoVinculado?.militar_id });
+      return bundle?.publicacoesExOfficio || [];
+    },
     enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
     select: (data) => data.filter((p) =>
       p.atestado_homologado_id === vinculoAtestado?.referencia_id ||
