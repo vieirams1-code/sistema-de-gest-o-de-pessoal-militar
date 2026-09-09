@@ -23,6 +23,7 @@ import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/
 import { buildAfastamentosVigentes } from '@/services/afastamentosVigentesService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { montarAgendaJiso } from '@/utils/jiso/montarAgendaJiso';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
@@ -81,7 +82,7 @@ function AfastamentosVigentesResumoCard({ totalParcial, onOpen }) {
             <h2 className="font-semibold text-slate-800">Afastamentos vigentes</h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Resumo inicial com dados já carregados. Férias e LTIP serão consultados apenas ao abrir os detalhes.
+            Resumo inicial com dados já autorizados. LTIP será consultado apenas ao abrir os detalhes.
           </p>
         </div>
         <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] border border-[#1e3a5f]/20">
@@ -91,7 +92,7 @@ function AfastamentosVigentesResumoCard({ totalParcial, onOpen }) {
 
       <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
         <p className="text-sm text-slate-600">
-          Abra o painel para calcular a visão completa, incluindo férias e militares em LTIP.
+          Abra o painel para calcular a visão completa com as fontes autorizadas, incluindo militares em LTIP.
         </p>
         <Button
           type="button"
@@ -250,27 +251,13 @@ export default function Home() {
   const dashboardEnabled = isAccessResolved && scopedReady;
   const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
 
-  const { data: periodos = [] } = useQuery({
-    queryKey: ['periodos-aquisitivos', scopeKey],
-    queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return base44.entities.PeriodoAquisitivo.list();
-      }
-
-      if (!scopedIds?.length) return [];
-
-      try {
-        const listaEscopo = await base44.entities.PeriodoAquisitivo.filter({
-          militar_id: { in: scopedIds },
-        });
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await base44.entities.PeriodoAquisitivo.list();
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
-    },
+  const { data: feriasDashboardBundle = {} } = useQuery({
+    queryKey: ['dashboard-ferias-bundle', scopeKey],
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
     enabled: dashboardEnabled && podeVerFerias,
   });
+  const periodos = feriasDashboardBundle?.periodosAquisitivos || [];
+  const ferias = feriasDashboardBundle?.ferias || [];
 
   const { data: atestados = [] } = useQuery({
     queryKey: ['dashboard-atestados', scopeKey],
@@ -363,28 +350,6 @@ export default function Home() {
     },
     enabled: dashboardEnabled && podeVerAtestados,
   });
-  const { data: ferias = [] } = useQuery({
-    queryKey: ['dashboard-ferias', scopeKey],
-    queryFn: async () => {
-      if (scopedIsAdmin || scopedIds === null) {
-        return base44.entities.Ferias.list('-data_inicio');
-      }
-
-      if (!scopedIds?.length) return [];
-
-      try {
-        const listaEscopo = await base44.entities.Ferias.filter({
-          militar_id: { in: scopedIds },
-        }, '-data_inicio');
-        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
-      } catch (_error) {
-        const lista = await base44.entities.Ferias.list('-data_inicio');
-        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-      }
-    },
-    enabled: dashboardEnabled && podeVerFerias,
-  });
-
   // Alertas de férias por nível
   const feriasPorPeriodoAquisitivo = React.useMemo(() => {
     const mapa = new Map();
@@ -597,7 +562,12 @@ export default function Home() {
 
         {(podeVerAtestados || podeVerPublicacoes) && <div className="mb-6">
           {afastamentosPanelOpen ? (
-            <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
+            <AfastamentosVigentesPanel
+              atestados={atestados}
+              registrosLivro={registrosLivro}
+              ferias={podeVerFerias ? ferias : []}
+              enabled={afastamentosPanelOpen}
+            />
           ) : (
             <AfastamentosVigentesResumoCard
               totalParcial={afastamentosParciais}
