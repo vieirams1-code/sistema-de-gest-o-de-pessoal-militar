@@ -217,7 +217,7 @@ async function listarCatalogoTagsParaFeriasTags(base44, feriasTags) {
 
 const CAMPOS_EVENTO_FERIAS = [
   'id', 'militar_id', 'ferias_id', 'tipo_registro', 'data_registro', 'data_inicio', 'created_date',
-  'dias', 'dias_no_momento', 'saldo_remanescente', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref',
+  'dias', 'dias_no_momento', 'dias_gozados', 'saldo_remanescente', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref',
   'referencia_id', 'numero_bg', 'data_bg', 'nota_para_bg', 'status',
   'dias_base_gozo', 'dias_extras_creditos', 'dias_totais_gozo', 'creditos_extra_resumo',
 ];
@@ -335,6 +335,8 @@ Deno.serve(async (req) => {
     const authUserEmail = normalizeEmail(authUser.email);
     const effectiveEmailNorm = normalizeEmail(payload?.effectiveEmail);
     const includeDescontos = payload?.includeDescontos === true;
+    const supportPurpose = String(payload?.supportPurpose || '').trim().toUpperCase();
+    const supportFeriasId = String(payload?.feriasId || '').trim();
     const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
 
     const authPerms = await resolverPermissoes(base44, authUser.email);
@@ -346,15 +348,71 @@ Deno.serve(async (req) => {
     const isImpersonating = wantsImpersonation && authIsAdminByRole;
     const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
     const targetPerms = isImpersonating ? await resolverPermissoes(base44, targetEmail) : authPerms;
-    const targetCanViewFerias = !isImpersonating && authIsAdminByRole ? true : targetPerms.canViewFerias;
+    const targetIsRealAdmin = !isImpersonating && authIsAdminByRole;
+    const targetHasGlobalScope = targetIsRealAdmin || targetPerms.hasGlobalScope;
+
+    if (supportPurpose === 'PUBLICACOES') {
+      if (!supportFeriasId) {
+        return Response.json({ error: 'feriasId é obrigatório para suporte de Publicações.' }, { status: 400 });
+      }
+      const canSupportPublicacoes = targetIsRealAdmin || (
+        targetPerms.modules?.controle_publicacoes === true
+        && targetPerms.actions?.publicar_bg === true
+      );
+      if (!canSupportPublicacoes) {
+        return Response.json({
+          error: 'Acesso negado: suporte de Férias para Publicações exige Controle de Publicações e Publicar em BG.',
+          requiredModule: 'controle_publicacoes',
+          requiredPermission: 'publicar_bg',
+        }, { status: 403 });
+      }
+
+      const [feriasAlvo] = await fetchWithRetry(
+        () => base44.asServiceRole.entities.Ferias.filter({ id: supportFeriasId }, undefined, 1, 0),
+        'ferias.publicacoesSupport',
+      );
+      if (!feriasAlvo?.id) {
+        return Response.json({ error: 'Férias não encontrada.' }, { status: 404 });
+      }
+
+      if (!targetHasGlobalScope) {
+        const militarIdsEscopo = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
+        const militarPermitido = Array.isArray(militarIdsEscopo)
+          && militarIdsEscopo.map(String).includes(String(feriasAlvo.militar_id || ''));
+        if (!militarPermitido) {
+          return Response.json({ error: 'Acesso negado: férias fora do escopo organizacional.' }, { status: 403 });
+        }
+      }
+
+      const registrosAlvo = await fetchWithRetry(
+        () => base44.asServiceRole.entities.RegistroLivro.filter({ ferias_id: supportFeriasId }, 'data_registro', 1000, 0),
+        'registroLivro.publicacoesSupport',
+      );
+      return Response.json({
+        ferias: [feriasAlvo],
+        registrosLivro: projetarEventosFerias(registrosAlvo, { incluirDetalhesAdministrativos: true }),
+        ajustesSaldoFerias: [],
+        descontosFerias: [],
+        feriasTags: [],
+        tagsCatalogo: [],
+        meta: {
+          supportPurpose: 'PUBLICACOES',
+          totalFerias: 1,
+          totalRegistrosLivro: (registrosAlvo || []).length,
+          hasGlobalScope: targetHasGlobalScope,
+          partialFailures: 0,
+          warnings: [],
+        },
+      });
+    }
+
+    const targetCanViewFerias = targetIsRealAdmin ? true : targetPerms.canViewFerias;
     const incluirDetalhesAdministrativosEventos = (!isImpersonating && authIsAdminByRole)
       || targetPerms.actions?.gerir_cadeia_ferias === true
       || targetPerms.actions?.recalcular_ferias === true;
     if (!targetCanViewFerias) {
       return Response.json({ error: 'Acesso negado: é necessária a permissão de visualizar férias.', requiredPermission: 'visualizar_ferias' }, { status: 403 });
     }
-    const targetHasGlobalScope = (!isImpersonating && authIsAdminByRole) || targetPerms.hasGlobalScope;
-
     if (targetHasGlobalScope) {
       const [ferias, registrosLivro, ajustesSaldoFerias, descontosFeriasRaw] = await Promise.all([
         fetchWithRetry(() => base44.asServiceRole.entities.Ferias.list('-data_inicio'), 'ferias.admin'),
