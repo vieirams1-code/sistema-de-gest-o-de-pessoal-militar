@@ -188,7 +188,7 @@ export default function PlanosFerias() {
   };
 
   const gerarFeriasDoPlano = async () => {
-    if (!selecionado || !podeGerarFerias) return;
+    if (!selecionado || !modoAdmin || !podeGerarFerias) return;
     if (!window.confirm(`Gerar férias pendentes no plano "${selecionado.titulo}"? Somente novas respostas com escala salva serão incluídas; férias já geradas não serão alteradas.`)) return;
     setSalvando(true);
     try {
@@ -490,7 +490,7 @@ export default function PlanosFerias() {
               ].map(([rotulo, valor]) => <div key={rotulo} className="rounded-xl bg-slate-50 border border-slate-200 p-3"><p className="text-xs text-slate-500">{rotulo}</p><p className="text-xl font-black text-slate-900 mt-1">{valor}</p></div>)}
             </div>
             {modoAdmin && podeAdminFerias && <p className="mt-4 text-xs text-rose-700">Modo Admin ativo: a exclusão remove campanhas e respostas vinculadas; férias geradas só perdem o vínculo com o plano após confirmação.</p>}
-            {podeGerarFerias && <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 pt-4">
+            {modoAdmin && podeGerarFerias && <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 pt-4">
               <p className="text-xs text-slate-500">A geração inclui somente respostas novas, com escala salva, e preserva tudo o que já foi gerado.</p>
               <Button type="button" onClick={gerarFeriasDoPlano} disabled={salvando || selecionado.status === 'ARQUIVADO'} className="bg-emerald-700 hover:bg-emerald-800"><CalendarDays className="w-4 h-4 mr-1.5" />{salvando ? 'Gerando...' : 'Gerar férias do plano'}</Button>
             </div>}
