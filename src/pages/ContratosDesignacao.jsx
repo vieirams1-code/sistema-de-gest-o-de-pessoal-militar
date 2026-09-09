@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { atualizarEscopado, criarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
@@ -366,10 +365,15 @@ export default function ContratosDesignacao() {
   };
 
 
-  const buscarEfeitosContratoControlado = (contratoId) => buscarEfeitosContratoDesignacaoComCache(
-    contratoId,
-    (id) => buscarEfeitosContratoEmPeriodos(base44, id),
-  );
+  const buscarEfeitosContratoControlado = (contrato) => {
+    const contratoId = String(contrato?.id || '');
+    const militarId = String(contrato?.militar_id || '');
+    if (!contratoId || !militarId) return Promise.resolve([]);
+    return buscarEfeitosContratoDesignacaoComCache(
+      contratoId,
+      (id) => buscarEfeitosContratoEmPeriodos(militarId, id),
+    );
+  };
 
   const handleAbrirEdicaoContrato = (contrato) => {
     if (!contrato) return;
@@ -383,7 +387,7 @@ export default function ContratosDesignacao() {
     try {
       const campoAlterado = getCampoCadeiaFeriasAlterado(contratoEdicao, payload);
       if (campoAlterado) {
-        const periodosComEfeito = await buscarEfeitosContratoControlado(contratoEdicao.id);
+        const periodosComEfeito = await buscarEfeitosContratoControlado(contratoEdicao);
         const temEfeitos = periodosComEfeito.length > 0;
         setContratoEdicaoBloqueiaCadeia(temEfeitos);
         if (temEfeitos) {
@@ -417,7 +421,7 @@ export default function ContratosDesignacao() {
     const contrato = excluindoContrato;
     if (!contrato?.id) return;
     try {
-      const periodosComEfeito = await buscarEfeitosContratoControlado(contrato.id);
+      const periodosComEfeito = await buscarEfeitosContratoControlado(contrato);
       if (periodosComEfeito.length > 0) {
         toast({ title: 'Exclusão bloqueada', description: MENSAGEM_CONTRATO_COM_EFEITOS, variant: 'destructive' });
         setExcluindoContrato(null);
