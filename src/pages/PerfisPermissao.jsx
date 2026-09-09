@@ -13,6 +13,7 @@ import {
   mergeProfileDescriptionWithMatrix,
   buildPermissionsFromSource,
   isLegacyCustomProfile,
+  resolveProfilePermissions,
 } from '@/services/permissionMatrixService';
 import {
   AlertDialog,
