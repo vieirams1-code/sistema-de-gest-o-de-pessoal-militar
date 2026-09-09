@@ -160,7 +160,7 @@ describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automáti
     assert.deepEqual(regraMes('12'), { permitido: true, dataInicio: '2027-12-01' });
   });
 
-  it('8. Aquisição concluída antes do ano do plano não exibe alerta nem restringe meses', () => {
+  it('8. Regras de elegibilidade continuam aplicadas sem expor saldo ou período aquisitivo no Portal', () => {
     const meses2027 = Array.from({ length: 12 }, (_, indice) => ({
       mes: String(indice + 1).padStart(2, '0'),
       permitido: true,
@@ -169,7 +169,12 @@ describe('Plano Anual de Férias — Workflow em 2 Camadas & Geração Automáti
     const restricaoAfetaPlano = meses2027.some((mes) => mes.permitido === false || mes.inicio_ajustado === true);
 
     assert.equal(restricaoAfetaPlano, false);
-    assert.match(portalFeriasSource, /primeira_data_legal_gozo && restricaoAquisicaoAfetaPlano/);
+    assert.match(portalFeriasSource, /disabled={!mesPermitido\(m\.valor\)/);
+    assert.doesNotMatch(portalFeriasSource, /Regra de aquisição do direito/);
+    assert.doesNotMatch(portalFeriasSource, /Saldo remanescente/);
+    assert.doesNotMatch(portalFeriasSource, /Período Aquisitivo/);
+    assert.doesNotMatch(portalFeriasSource, /primeira data legal/);
+    assert.match(portalServicosSource, /Uma ou mais opções de mês não estão disponíveis para este plano/);
   });
 
   it('9. Configurações globais de modalidades chegam ao Portal e são validadas na submissão', () => {
