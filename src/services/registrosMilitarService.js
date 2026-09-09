@@ -34,13 +34,15 @@ function normalizarRegistro(registro, origemFonte) {
 export { vinculaRegistroAoMilitar };
 
 export async function listarRegistrosMilitar() {
-  const [registrosSistema, registrosExOfficio] = await Promise.all([
-    base44.entities.RegistroLivro.list('-created_date', 10000),
-    base44.entities.PublicacaoExOfficio.list('-created_date', 10000),
-  ]);
+  const response = await base44.functions.invoke('registrosMilitarGateway', { action: 'LIST' });
+  const body = response?.data ?? response ?? {};
+  if (body?.error) throw new Error(body.error);
+  const data = body?.data ?? body;
+  const registrosSistema = Array.isArray(data?.registrosLivro) ? data.registrosLivro : [];
+  const registrosExOfficio = Array.isArray(data?.publicacoesExOfficio) ? data.publicacoesExOfficio : [];
 
-  const sistemaNormalizado = (Array.isArray(registrosSistema) ? registrosSistema : []).map((registro) => normalizarRegistro(registro, 'RegistroLivro'));
-  const exOfficioNormalizado = (Array.isArray(registrosExOfficio) ? registrosExOfficio : []).map((registro) => normalizarRegistro(registro, 'PublicacaoExOfficio'));
+  const sistemaNormalizado = registrosSistema.map((registro) => normalizarRegistro(registro, 'RegistroLivro'));
+  const exOfficioNormalizado = registrosExOfficio.map((registro) => normalizarRegistro(registro, 'PublicacaoExOfficio'));
   const registrosUnificados = [...sistemaNormalizado, ...exOfficioNormalizado];
 
   return registrosUnificados.map((registro) => {
