@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 
 const perfisPage = await readFile(new URL('../../../pages/PerfisPermissao.jsx', import.meta.url), 'utf8');
 const usuariosPage = await readFile(new URL('../../../pages/PermissoesUsuarios.jsx', import.meta.url), 'utf8');
@@ -27,6 +27,21 @@ const diagnosticoSaldoPage = await readFile(new URL('../../../pages/DiagnosticoS
 const registroLivroModal = await readFile(new URL('../../../components/ferias/RegistroLivroModal.jsx', import.meta.url), 'utf8');
 const recalcularPeriodoJs = await readFile(new URL('../../../components/ferias/recalcularPeriodoAquisitivo.js', import.meta.url), 'utf8');
 const recalcularPeriodoJsx = await readFile(new URL('../../../components/ferias/recalcularPeriodoAquisitivo.jsx', import.meta.url), 'utf8');
+async function listarFontesRecursivamente(dirUrl) {
+  const entries = await readdir(dirUrl, { withFileTypes: true });
+  const fontes = [];
+  for (const entry of entries) {
+    const childUrl = new URL(entry.isDirectory() ? `${entry.name}/` : entry.name, dirUrl);
+    if (entry.isDirectory()) {
+      fontes.push(...await listarFontesRecursivamente(childUrl));
+      continue;
+    }
+    if (!/\.(js|jsx|ts|tsx)$/.test(entry.name)) continue;
+    fontes.push({ path: childUrl.pathname, source: await readFile(childUrl, 'utf8') });
+  }
+  return fontes;
+}
+
 const entidadesProcessuaisServiceOnly = [
   'CaixaProcessual',
   'ProcessoControle',
@@ -186,6 +201,22 @@ test('L09D: descontos são escopados no backend e publicações vinculadas são 
   assert.match(feriasBundleBackend, /CAMPOS_PUBLICACAO_DESCONTO/);
   assert.match(feriasBundleBackend, /asServiceRole\.entities\.PublicacaoExOfficio\.filter/);
   assert.doesNotMatch(descontoFeriasService, /base44\.entities\.(DescontoFerias|PublicacaoExOfficio)/);
+});
+
+test('L09D: nenhum consumidor frontend lê Ferias ou PeriodoAquisitivo diretamente', async () => {
+  const fontes = await listarFontesRecursivamente(new URL('../../../', import.meta.url));
+  const padroes = [
+    /(?:base44|client|serviceClient)\.entities\.(Ferias|PeriodoAquisitivo)\.(list|filter|get|create|update|delete|bulkCreate|bulkUpdate)/,
+    /\b(Ferias|PeriodoAquisitivo)\.(list|filter|get|create|update|delete|bulkCreate|bulkUpdate)/,
+  ];
+  for (const { path, source } of fontes) {
+    for (const padrao of padroes) {
+      assert.doesNotMatch(source, padrao, `${path} não deve acessar Ferias/PeriodoAquisitivo diretamente`);
+    }
+  }
+  assert.match(feriasBundleBackend, /asServiceRole\.entities\.Ferias/);
+  assert.match(periodosBundleBackend, /asServiceRole\.entities\.PeriodoAquisitivo/);
+  assert.match(periodosBundleBackend, /asServiceRole\.entities\.Ferias/);
 });
 
 test('L09D: AjusteSaldoFerias e DescontoFerias permanecem service-only', async () => {
