@@ -7,6 +7,8 @@ import {
   atualizarEscopado,
   desativarEscopado,
   excluirEscopado,
+  listarAdminEscopado,
+  obterAdminEscopado,
 } from '../cudEscopadoClient.js';
 
 const originalInvoke = base44.functions?.invoke;
@@ -107,6 +109,41 @@ test('normaliza sucesso da função CUD', async () => {
 
   const result = await criarEscopado('MilitarTag', { militar_id: 'm2', tag_id: 't1' });
   assert.deepEqual(result, { id: 'ok-1' });
+});
+
+test('listarAdminEscopado usa o cudEscopado e preserva a lista retornada', async () => {
+  let functionName = null;
+  let payload = null;
+  const rows = [{ id: 'p1', nome_perfil: 'Perfil A' }, { id: 'p2', nome_perfil: 'Perfil B' }];
+  base44.functions.invoke = async (name, body) => {
+    functionName = name;
+    payload = body;
+    return { data: { ok: true, data: rows } };
+  };
+
+  const result = await listarAdminEscopado('PerfilPermissao');
+  assert.equal(functionName, 'cudEscopado');
+  assert.deepEqual(payload, { entityName: 'PerfilPermissao', operation: 'admin_list' });
+  assert.deepEqual(result, rows);
+});
+
+test('obterAdminEscopado usa admin_get com registroId', async () => {
+  let payload = null;
+  base44.functions.invoke = async (_name, body) => {
+    payload = body;
+    return { data: { ok: true, data: { id: body.registroId, user_email: 'usuario@teste.local' } } };
+  };
+
+  const result = await obterAdminEscopado('UsuarioAcesso', 'u1');
+  assert.deepEqual(payload, { entityName: 'UsuarioAcesso', operation: 'admin_get', registroId: 'u1' });
+  assert.equal(result.id, 'u1');
+});
+
+test('leitura administrativa rejeita entidade fora da allowlist específica', async () => {
+  await assert.rejects(
+    () => listarAdminEscopado('Militar'),
+    /leitura administrativa não permitida/,
+  );
 });
 
 test.after(() => {
