@@ -1,28 +1,33 @@
-import { listarAdminEscopado, obterAdminEscopado } from './cudEscopadoClient.js';
+import { base44 } from '@/api/base44Client';
+
+async function invoke(action, payload = {}) {
+  const response = await base44.functions.invoke('permissoesAdminGateway', { action, payload });
+  const data = response?.data ?? response ?? {};
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
 
 export async function listarPerfisPermissaoAdmin() {
-  return listarAdminEscopado('PerfilPermissao');
+  const data = await invoke('LIST_PROFILES');
+  return data?.perfis || [];
 }
 
 export async function obterPerfilPermissaoAdmin(profileId) {
-  return obterAdminEscopado('PerfilPermissao', profileId);
+  const data = await invoke('GET_PROFILE', { profileId });
+  return data?.perfil || null;
 }
 
 export async function listarAcessosUsuariosAdmin() {
-  return listarAdminEscopado('UsuarioAcesso');
+  const data = await invoke('LIST_ACCESS');
+  return data?.acessos || [];
 }
 
 export async function obterAcessoUsuarioAdmin(accessId) {
-  return obterAdminEscopado('UsuarioAcesso', accessId);
+  const data = await invoke('GET_ACCESS', { accessId });
+  return data?.acesso || null;
 }
 
 export async function listarUsoPerfisAdmin() {
-  const acessos = await listarAdminEscopado('UsuarioAcesso');
-  return (acessos || []).map((item) => ({
-    id: item?.id || '',
-    perfil_id: item?.perfil_id || '',
-    ativo: item?.ativo !== false,
-    nome_usuario: item?.nome_usuario || '',
-    user_email: item?.user_email || '',
-  }));
+  const data = await invoke('LIST_PROFILE_USAGE');
+  return data?.uso || [];
 }
