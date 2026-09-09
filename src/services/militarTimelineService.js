@@ -53,6 +53,18 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
     const { ferias = [] } = await fetchScopedPeriodosAquisitivosBundle();
     return ferias.filter((item) => String(item?.militar_id || '') === String(militarId));
   };
+  const carregarLivroTimeline = async () => {
+    if (runtimeClient) return client.entities.RegistroLivro.filter({ militar_id: militarId });
+    const { fetchScopedPublicacoesBundle } = await import('./getScopedPublicacoesBundleClient.js');
+    const bundle = await fetchScopedPublicacoesBundle({ purpose: 'LIVRO', militarId });
+    return bundle?.registrosLivro || [];
+  };
+  const carregarPublicacoesTimeline = async () => {
+    if (runtimeClient) return client.entities.PublicacaoExOfficio.filter({ militar_id: militarId });
+    const { fetchScopedPublicacoesBundle } = await import('./getScopedPublicacoesBundleClient.js');
+    const bundle = await fetchScopedPublicacoesBundle({ purpose: 'PUBLICACOES', militarId });
+    return bundle?.publicacoesExOfficio || [];
+  };
 
   const [
     registrosLivro,
@@ -66,8 +78,8 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
     funcoesCatalogo,
     tiposGratificacao
   ] = await Promise.all([
-    maybe(allowed.livro, () => client.entities.RegistroLivro.filter({ militar_id: militarId })),
-    maybe(allowed.publicacoes, () => client.entities.PublicacaoExOfficio.filter({ militar_id: militarId })),
+    maybe(allowed.livro, carregarLivroTimeline),
+    maybe(allowed.publicacoes, carregarPublicacoesTimeline),
     maybe(allowed.ferias, carregarFeriasTimeline),
     maybe(allowed.atestados, () => client.entities.Atestado.filter({ militar_id: militarId })),
     maybe(allowed.antiguidade, () => client.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: militarId })),
