@@ -51,8 +51,9 @@ test('campanhas gerais não operam campanha de férias', () => {
 test('planos de férias exigem ações específicas por operação', () => {
   assert.match(planosFerias, /LISTAR' \|\| acao === 'DETALHES'.*perm_visualizar_planos_ferias/s);
   assert.match(planosFerias, /acao === 'CRIAR'.*perm_criar_planos_ferias/s);
-  assert.match(planosFerias, /ATUALIZAR' \|\| acao === 'ARQUIVAR'.*perm_editar_planos_ferias/s);
-  assert.match(planosFerias, /acao === 'EXCLUIR'.*perm_excluir_planos_ferias/s);
+  assert.match(planosFerias, /acao === 'ATUALIZAR'.*perm_editar_planos_ferias/s);
+  assert.match(planosFerias, /acao === 'ARQUIVAR' \|\| acao === 'DESARQUIVAR'.*perm_editar_planos_ferias.*perm_admin_campanhas_ferias/s);
+  assert.match(planosFerias, /acao === 'EXCLUIR'.*perm_excluir_planos_ferias.*perm_admin_campanhas_ferias/s);
   assert.match(portalServicos, /PLANO_CAMPANHA_CRIAR'\) return \['perm_criar_campanhas_ferias'/);
   assert.match(portalServicos, /PLANO_CAMPANHA_EXCLUIR'\) return \['perm_excluir_campanhas_ferias'/);
   assert.match(portalServicos, /PLANO_CAMPANHA_ARQUIVAR'.*perm_editar_campanhas_ferias/s);
