@@ -1,7 +1,7 @@
 import { addDays, differenceInDays, format } from 'date-fns';
-import { base44 } from '@/api/base44Client';
 import { sincronizarPeriodoAquisitivoDaFerias } from './feriasService';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 
 export const TIPOS_EVENTO_FERIAS = [
   'Saída Férias',
@@ -147,17 +147,21 @@ async function invalidarEvento(evento, motivo) {
   });
 }
 
-export async function reconciliarCadeiaFerias({ feriasId, ferias: feriasInput = null }) {
+export async function reconciliarCadeiaFerias({ feriasId, ferias: feriasInput = null, supportPurpose = null }) {
   if (!feriasId && !feriasInput?.id) return null;
 
-  let ferias = feriasInput;
-  if (!ferias?.id) {
-    const lista = await base44.entities.Ferias.filter({ id: feriasId });
-    ferias = lista[0] || null;
-  }
+  const idAlvo = String(feriasInput?.id || feriasId || '');
+  const bundle = await fetchScopedFeriasBundle(
+    supportPurpose
+      ? { supportPurpose, feriasId: idAlvo }
+      : {},
+  );
+  const ferias = feriasInput?.id
+    ? feriasInput
+    : (bundle?.ferias || []).find((item) => String(item?.id || '') === idAlvo) || null;
   if (!ferias?.id) return null;
 
-  const eventosBrutos = await base44.entities.RegistroLivro.filter({ ferias_id: ferias.id }, 'data_registro');
+  const eventosBrutos = (bundle?.registrosLivro || []).filter((item) => String(item?.ferias_id || '') === String(ferias.id));
   const cadeia = eventosBrutos.filter((e) => TIPOS_EVENTO_FERIAS.includes(e.tipo_registro)).sort(compareEventosFerias);
 
   const validos = [];
