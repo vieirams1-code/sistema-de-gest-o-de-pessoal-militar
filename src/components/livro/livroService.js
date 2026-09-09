@@ -3,6 +3,7 @@ import { getTextoPublicacaoRegistro, mapLivroRegistrosPresenter } from '@/compon
 import { mapLivroRegistrosMetricasRP } from '@/components/livro/livroMetricasMapper';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 
 // GOVERNANÇA TEMPLATE (Livro persistido):
 // source_of_truth = persistido
@@ -12,25 +13,12 @@ export const LIVRO_PERSISTIDO_TEMPLATE_GOVERNANCA = {
   edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
 };
 
-function temEscopoSemRestricao({ isAdmin, hasGlobalScope } = {}) {
-  return Boolean(isAdmin || hasGlobalScope);
-}
-
 function emptyLivroPresenterContrato() {
   return mapLivroRegistrosPresenter({ registros: [], militares: [], ferias: [], periodos: [] });
 }
 
 function emptyLivroMetricasRPContrato() {
   return mapLivroRegistrosMetricasRP({ registros: [] });
-}
-
-
-async function listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters } = {}) {
-  const scopeFilters = getMilitarScopeFilters?.();
-  if (!scopeFilters || !scopeFilters.length) return [];
-
-  const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-  return [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
 }
 
 /**
@@ -43,39 +31,13 @@ async function listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters } = {}) {
  * campo de escopo padronizado, portanto a consulta ampla é necessária aqui — o
  * acesso já foi validado pela camada de módulo antes de invocar esta função.
  */
-export async function getLivroRegistrosContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters } = {}) {
-  const semRestricaoEscopo = temEscopoSemRestricao({ isAdmin, hasGlobalScope });
-
-  if (!semRestricaoEscopo && !getMilitarScopeFilters) {
-    return emptyLivroPresenterContrato();
-  }
-
-  if (semRestricaoEscopo) {
-    const [registros, militares] = await Promise.all([
-      base44.entities.RegistroLivro.list('-created_date'),
-      base44.entities.Militar.list(),
-    ]);
-    return mapLivroRegistrosPresenter({ registros, militares, ferias: [], periodos: [] });
-  }
-
-  const scopeFilters = getMilitarScopeFilters();
-  if (!scopeFilters || !scopeFilters.length) {
-    return emptyLivroPresenterContrato();
-  }
-
-  const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-  const militares = militarQueries.flat();
-  const militarIds = [...new Set(militares.map((m) => m.id).filter(Boolean))];
-
-  if (!militarIds.length) {
-    return emptyLivroPresenterContrato();
-  }
-
-  const registros = await base44.entities.RegistroLivro.filter({ militar_id: { $in: militarIds } }, '-created_date');
-
+export async function getLivroRegistrosContrato() {
+  const bundle = await fetchScopedPublicacoesBundle({ purpose: 'CONTROL' });
+  const registros = bundle?.registrosLivro || [];
+  if (!registros.length) return emptyLivroPresenterContrato();
   return mapLivroRegistrosPresenter({
     registros,
-    militares,
+    militares: bundle?.militares || [],
     ferias: [],
     periodos: [],
   });
@@ -84,18 +46,18 @@ export async function getLivroRegistrosContrato({ isAdmin, hasGlobalScope, getMi
 export async function getLivroTextoPublicacaoRegistro({ registroId } = {}) {
   if (!registroId) return { texto_publicacao: '' };
 
-  const registros = await base44.entities.RegistroLivro.filter({ id: registroId });
-  const registro = registros?.[0];
+  const publicacoesBundle = await fetchScopedPublicacoesBundle({ purpose: 'CONTROL', registroLivroId: registroId });
+  const registro = publicacoesBundle?.registrosLivro?.[0];
   if (!registro) return { texto_publicacao: '' };
   if (registro?.texto_publicacao) return { texto_publicacao: registro.texto_publicacao, congelado: true };
 
-  const [militares, feriasBundle, templates] = await Promise.all([
-    registro?.militar_id ? base44.entities.Militar.filter({ id: registro.militar_id }) : Promise.resolve([]),
+  const [feriasBundle, templates] = await Promise.all([
     registro?.ferias_id
       ? fetchScopedFeriasBundle({ supportPurpose: 'PUBLICACOES', feriasId: registro.ferias_id })
       : Promise.resolve({ ferias: [], periodosAquisitivos: [] }),
     base44.entities.TemplateTexto.filter({ ativo: true, modulo: 'Livro' }),
   ]);
+  const militares = publicacoesBundle?.militares || [];
 
   const feriasRegistro = feriasBundle?.ferias?.[0] || null;
   const periodos = feriasBundle?.periodosAquisitivos || [];
@@ -119,24 +81,9 @@ export async function getLivroTextoPublicacaoRegistro({ registroId } = {}) {
  * períodos aquisitivos, templates ativos do Livro nem executa o mapper que
  * monta vínculos, cadeia de eventos completa e texto_publicacao renderizado.
  */
-export async function getLivroMetricasRPContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters } = {}) {
-  const semRestricaoEscopo = temEscopoSemRestricao({ isAdmin, hasGlobalScope });
-
-  if (!semRestricaoEscopo && !getMilitarScopeFilters) {
-    return emptyLivroMetricasRPContrato();
-  }
-
-  if (semRestricaoEscopo) {
-    const registros = await base44.entities.RegistroLivro.list('-created_date');
-    return mapLivroRegistrosMetricasRP({ registros });
-  }
-
-  const militarIds = await listarMilitarIdsLivroPorEscopo({ getMilitarScopeFilters });
-  if (!militarIds.length) {
-    return emptyLivroMetricasRPContrato();
-  }
-
-  const registros = await base44.entities.RegistroLivro.filter({ militar_id: { $in: militarIds } }, '-created_date');
-
+export async function getLivroMetricasRPContrato() {
+  const bundle = await fetchScopedPublicacoesBundle({ purpose: 'RP' });
+  const registros = bundle?.registrosLivro || [];
+  if (!registros.length) return emptyLivroMetricasRPContrato();
   return mapLivroRegistrosMetricasRP({ registros });
 }
