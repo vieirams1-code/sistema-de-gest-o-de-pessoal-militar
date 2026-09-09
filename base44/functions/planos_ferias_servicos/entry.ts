@@ -36,8 +36,9 @@ function permissoesNecessariasPlano(acao: string): string[] {
   // F8-L08: somente capacidades canônicas; aliases são resolvidos em getUserPermissions.
   if (acao === 'LISTAR' || acao === 'DETALHES') return ['perm_visualizar_planos_ferias'];
   if (acao === 'CRIAR') return ['perm_criar_planos_ferias'];
-  if (acao === 'ATUALIZAR' || acao === 'ARQUIVAR') return ['perm_editar_planos_ferias'];
-  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias'];
+  if (acao === 'ATUALIZAR') return ['perm_editar_planos_ferias'];
+  if (acao === 'ARQUIVAR' || acao === 'DESARQUIVAR') return ['perm_editar_planos_ferias', 'perm_admin_campanhas_ferias'];
+  if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias'];
   return [];
 }
 
@@ -48,7 +49,10 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
   const authzResponse = await base44.functions.invoke('getUserPermissions', {});
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasPlano(acao);
-  return necessarias.length > 0 && necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true);
+  const exigeTodas = ['ARQUIVAR', 'DESARQUIVAR', 'EXCLUIR'].includes(acao);
+  return necessarias.length > 0 && (exigeTodas
+    ? necessarias.every((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true)
+    : necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true));
 }
 
 function militarNoEscopo(militar: any, campanha: any): boolean {
@@ -166,7 +170,18 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, plano });
     }
 
+    if (acao === 'DESARQUIVAR') {
+      const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
+        status: 'ATIVO',
+        data_encerramento: '',
+      });
+      return json({ ok: true, plano });
+    }
+
     if (acao === 'EXCLUIR') {
+      if (payload?.confirmacao_dupla !== true) {
+        return json({ error: 'A exclusão do plano exige confirmação dupla.' }, 400);
+      }
       const campanhas = await base44.asServiceRole.entities.CampanhaPortal.filter({
         plano_ferias_institucional_id: planoId,
       });
