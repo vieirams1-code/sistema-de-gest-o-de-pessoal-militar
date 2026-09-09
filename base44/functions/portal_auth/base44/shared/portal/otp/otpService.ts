@@ -79,6 +79,10 @@ export async function loadAuthConfig(base44Client: any): Promise<PortalAuthConfi
 
     const c = configs[0];
     return {
+      // Mantém também as configurações funcionais do Portal (férias, cadastro etc.).
+      // Antes, a normalização retornava apenas campos de OTP e descartava valores
+      // como ferias_permitir_3_etapas_10d=false.
+      ...c,
       id: c.id,
       email_enabled: typeof c.email_enabled === 'boolean' ? c.email_enabled : false,
       sms_enabled: typeof c.sms_enabled === 'boolean' ? c.sms_enabled : false,
