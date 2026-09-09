@@ -229,8 +229,17 @@ test('L09D: Timeline usa gateway de Férias no runtime e acesso direto apenas no
   assert.match(timelineService, /maybe\(allowed\.ferias, carregarFeriasTimeline\)/);
 });
 
-test('L09D: AjusteSaldoFerias e DescontoFerias permanecem service-only', async () => {
-  for (const entityName of ['AjusteSaldoFerias', 'DescontoFerias']) {
+test('L09D: Plano Anual e suporte de Publicações têm finalidades explícitas de leitura', () => {
+  assert.match(periodosBundleBackend, /'visualizar_plano_ferias'/);
+  assert.match(feriasBundleBackend, /supportPurpose === 'PUBLICACOES'/);
+  assert.match(feriasBundleBackend, /targetPerms\.modules\?\.controle_publicacoes === true/);
+  assert.match(feriasBundleBackend, /targetPerms\.actions\?\.publicar_bg === true/);
+  assert.match(feriasBundleBackend, /feriasId é obrigatório para suporte de Publicações/);
+  assert.match(feriasBundleBackend, /CAMPOS_PERIODO_PUBLICACOES_SUPORTE/);
+});
+
+test('L09D: entidades de Férias do bloco 1 e 2 permanecem service-only', async () => {
+  for (const entityName of ['AjusteSaldoFerias', 'DescontoFerias', 'Ferias', 'PeriodoAquisitivo']) {
     const source = await readFile(
       new URL(`../../../../base44/entities/${entityName}.jsonc`, import.meta.url),
       'utf8',
