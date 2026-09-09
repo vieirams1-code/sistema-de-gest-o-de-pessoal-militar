@@ -76,6 +76,13 @@ export default function PortalFeriasView({ onBack }) {
         const periodoPlano = (res?.periodos || []).find((p) => p.id === res.periodo_mais_antigo_id);
         if (periodoPlano && Number(periodoPlano.dias_sem_previsao || 0) !== 30) {
           setModalidade('CUSTOM');
+        } else {
+          const modalidadePadrao = [
+            [res?.config?.permitir_1_etapa, '1_ETAPA_30'],
+            [res?.config?.permitir_2_etapas, '2_ETAPAS_15'],
+            [res?.config?.permitir_3_etapas, '3_ETAPAS_10'],
+          ].find(([permitida]) => permitida === true)?.[1];
+          if (modalidadePadrao) setModalidade(modalidadePadrao);
         }
       } else {
         setSelectedPeriodoId('');
@@ -216,6 +223,8 @@ export default function PortalFeriasView({ onBack }) {
       ? ` — início em ${formatarDataBR(regra.data_inicio)}`
       : '';
   };
+  const restricaoAquisicaoAfetaPlano = (periodoMaisAntigo?.meses_elegiveis || [])
+    .some((mes) => mes?.permitido === false || mes?.inicio_ajustado === true);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -517,7 +526,7 @@ export default function PortalFeriasView({ onBack }) {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {!saldoParcial && (data?.config?.permitir_1_etapa !== false) && (
+                  {!saldoParcial && data?.config?.permitir_1_etapa === true && (
                     <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
                       <input
                         type="radio"
@@ -534,7 +543,7 @@ export default function PortalFeriasView({ onBack }) {
                     </label>
                   )}
 
-                  {!saldoParcial && (data?.config?.permitir_2_etapas !== false) && (
+                  {!saldoParcial && data?.config?.permitir_2_etapas === true && (
                     <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
                       <input
                         type="radio"
@@ -551,7 +560,7 @@ export default function PortalFeriasView({ onBack }) {
                     </label>
                   )}
 
-                  {!saldoParcial && (data?.config?.permitir_3_etapas !== false) && (
+                  {!saldoParcial && data?.config?.permitir_3_etapas === true && (
                     <label className="relative flex cursor-pointer rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus:outline-none hover:bg-slate-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500 transition-all">
                       <input
                         type="radio"
@@ -576,7 +585,7 @@ export default function PortalFeriasView({ onBack }) {
                   <i className="ph ph-calendar-star text-green-600 text-xl"></i> Passo 2: Preferência de Meses no Ano de {anoCampanha}
                 </h4>
 
-                {periodoMaisAntigo?.primeira_data_legal_gozo && (
+                {periodoMaisAntigo?.primeira_data_legal_gozo && restricaoAquisicaoAfetaPlano && (
                   <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900">
                     <strong>Regra de aquisição do direito:</strong> suas férias deste período só podem iniciar a partir de{' '}
                     <strong>{formatarDataBR(periodoMaisAntigo.primeira_data_legal_gozo)}</strong>.
