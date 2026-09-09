@@ -27,6 +27,7 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 
 const STATUS_FLUXO_FINALIZADO = new Set([
   'Homologado pela JISO',
@@ -63,7 +64,7 @@ export default function Atestados() {
   const queryClient = useQueryClient();
   const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
-  const hasAtestadosAccess = canAccessModule('atestados');
+  const hasAtestadosAccess = canAccessModule('atestados') && canAccessAction('visualizar_atestados');
   const canAdicionarAtestado = canAccessAction('adicionar_atestados');
   const canEditarAtestado = canAccessAction('editar_atestados');
   const canExcluirAtestado = canAccessAction('excluir_atestado');
@@ -98,7 +99,7 @@ export default function Atestados() {
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
-      const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+      const { publicacoesExOfficio: publicacoesMilitar = [] } = await fetchScopedPublicacoesBundle({ purpose: 'ATESTADOS', militarId: atestado.militar_id });
       const possuiPublicacaoVinculada = publicacoesMilitar.some(
         (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
       );
@@ -161,7 +162,7 @@ export default function Atestados() {
     }
     setVerificandoEdicao(true);
     try {
-      const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+      const { publicacoesExOfficio: publicacoesMilitar = [] } = await fetchScopedPublicacoesBundle({ purpose: 'ATESTADOS', militarId: atestado.militar_id });
       const possuiPublicacaoVinculada = publicacoesMilitar.some(
         (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
       );
