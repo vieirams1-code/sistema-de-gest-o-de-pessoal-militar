@@ -443,11 +443,9 @@ function processarLinhasAnalise(rows, colunas, numerosNotaJaExistentes, contagem
  */
 async function listarNumerosNotaExistentesPorMilitar(militarId) {
   if (!militarId) return new Set();
-  const publicacoes = await base44.entities.PublicacaoExOfficio.filter(
-    { militar_id: militarId },
-    '-created_date',
-    5000,
-  );
+  const { fetchScopedPublicacoesBundle } = await import('./getScopedPublicacoesBundleClient.js');
+  const bundle = await fetchScopedPublicacoesBundle({ purpose: 'MIGRACAO', militarId });
+  const publicacoes = bundle?.publicacoesExOfficio || [];
   const conjunto = new Set();
   publicacoes.forEach((p) => {
     const candidatos = [p?.nota_id_legado, p?.numero_nota, p?.nota_para_bg];
