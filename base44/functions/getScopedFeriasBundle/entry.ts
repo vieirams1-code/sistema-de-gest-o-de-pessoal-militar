@@ -241,6 +241,17 @@ function projetarEventosFerias(registros, options) {
   return (registros || []).map((registro) => projetarEventoFerias(registro, options));
 }
 
+const CAMPOS_PERIODO_PUBLICACOES_SUPORTE = [
+  'id', 'militar_id', 'inicio_aquisitivo', 'fim_aquisitivo', 'ano_referencia',
+];
+
+function projetarPeriodoPublicacoes(periodo) {
+  if (!periodo || typeof periodo !== 'object') return null;
+  const out = {};
+  for (const campo of CAMPOS_PERIODO_PUBLICACOES_SUPORTE) if (campo in periodo) out[campo] = periodo[campo];
+  return out;
+}
+
 const CAMPOS_AJUSTE_SALDO_SUPORTE = [
   'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'ano_referencia',
   'tipo', 'dias', 'status', 'created_date',
@@ -384,12 +395,21 @@ Deno.serve(async (req) => {
         }
       }
 
-      const registrosAlvo = await fetchWithRetry(
-        () => base44.asServiceRole.entities.RegistroLivro.filter({ ferias_id: supportFeriasId }, 'data_registro', 1000, 0),
-        'registroLivro.publicacoesSupport',
-      );
+      const [registrosAlvo, periodoAlvo] = await Promise.all([
+        fetchWithRetry(
+          () => base44.asServiceRole.entities.RegistroLivro.filter({ ferias_id: supportFeriasId }, 'data_registro', 1000, 0),
+          'registroLivro.publicacoesSupport',
+        ),
+        feriasAlvo?.periodo_aquisitivo_id
+          ? fetchWithRetry(
+              () => base44.asServiceRole.entities.PeriodoAquisitivo.get(feriasAlvo.periodo_aquisitivo_id),
+              'periodo.publicacoesSupport',
+            ).catch(() => null)
+          : Promise.resolve(null),
+      ]);
       return Response.json({
         ferias: [feriasAlvo],
+        periodosAquisitivos: periodoAlvo ? [projetarPeriodoPublicacoes(periodoAlvo)] : [],
         registrosLivro: projetarEventosFerias(registrosAlvo, { incluirDetalhesAdministrativos: true }),
         ajustesSaldoFerias: [],
         descontosFerias: [],
@@ -437,6 +457,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         ferias: ferias || [],
+        periodosAquisitivos: [],
         registrosLivro: projetarEventosFerias(registrosLivro, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
         ajustesSaldoFerias: projetarAjustesSaldo(ajustesSaldoFerias),
         descontosFerias,
@@ -463,6 +484,7 @@ Deno.serve(async (req) => {
     if (!militarIds || militarIds.length === 0) {
       return Response.json({
         ferias: [],
+        periodosAquisitivos: [],
         registrosLivro: [],
         ajustesSaldoFerias: [],
         descontosFerias: [],
@@ -510,6 +532,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       ferias: feriasResult.rows,
+      periodosAquisitivos: [],
       registrosLivro: projetarEventosFerias(registrosResult.rows, { incluirDetalhesAdministrativos: incluirDetalhesAdministrativosEventos }),
       ajustesSaldoFerias: projetarAjustesSaldo(ajustesResult.rows),
       descontosFerias,
