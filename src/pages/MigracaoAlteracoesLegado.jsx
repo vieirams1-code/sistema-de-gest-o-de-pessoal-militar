@@ -35,6 +35,7 @@ import {
   revalidarLinhasRevisaoSimplificada,
 } from '@/services/migracaoAlteracoesLegadoSimplificadoEdicao';
 import { criarEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 import {
   listarClassificacoesHistoricasAlteracoes,
   salvarClassificacaoHistoricaAlteracao,
@@ -341,7 +342,8 @@ export default function MigracaoAlteracoesLegado() {
     const militarId = linhasParaImportar[0].transformado.militar_id;
     let notasExistentes = new Set();
     try {
-      const existingPubs = await base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, 'nota_id_legado');
+      const bundlePublicacoes = await fetchScopedPublicacoesBundle({ purpose: 'MIGRACAO', militarId });
+      const existingPubs = bundlePublicacoes?.publicacoesExOfficio || [];
       notasExistentes = new Set(existingPubs.map((p) => normalizarNumeroNota(p.nota_id_legado)).filter(Boolean));
     } catch (e) {
       console.warn("Falha ao buscar publicações existentes", e);
