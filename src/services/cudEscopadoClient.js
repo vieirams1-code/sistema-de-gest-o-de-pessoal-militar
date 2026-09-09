@@ -146,6 +146,30 @@ async function invocar(payload) {
   return body;
 }
 
+export async function listarAdminEscopado(entityName) {
+  assertEntidadePermitida(entityName);
+  if (!['PerfilPermissao', 'UsuarioAcesso'].includes(entityName)) {
+    throw new Error(`cudEscopado: leitura administrativa não permitida para "${entityName}".`);
+  }
+  const resp = await invocar({ entityName, operation: 'admin_list' });
+  const rows = resp?.data ?? resp;
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function obterAdminEscopado(entityName, registroId) {
+  assertEntidadePermitida(entityName);
+  if (!['PerfilPermissao', 'UsuarioAcesso'].includes(entityName)) {
+    throw new Error(`cudEscopado: leitura administrativa não permitida para "${entityName}".`);
+  }
+  if (!registroId) throw new Error('cudEscopado: registroId é obrigatório em obterAdminEscopado.');
+  const resp = await invocar({
+    entityName,
+    operation: 'admin_get',
+    registroId: String(registroId),
+  });
+  return resp?.data ?? resp ?? null;
+}
+
 export async function criarEscopado(entityName, data) {
   assertEntidadePermitida(entityName);
   validarDatasIsoEntity(entityName, data || {});
