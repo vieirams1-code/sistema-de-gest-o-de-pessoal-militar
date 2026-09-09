@@ -466,7 +466,7 @@ export default function PlanosFerias() {
               {(podeVisualizarRespostas || podeGerarFerias || podeAtribuirPermissoes) && <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>}
               {podeEditarPlanos && <Button type="button" variant="outline" onClick={() => abrirEdicao(selecionado)}><Edit3 className="w-4 h-4 mr-1.5" />Editar plano</Button>}
               {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)} disabled={salvando}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
-              {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status === 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => desarquivar(selecionado)} disabled={salvando}><RefreshCw className="w-4 h-4 mr-1.5" />Desarquivar</Button>
+              {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status === 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => desarquivar(selecionado)} disabled={salvando}><RefreshCw className="w-4 h-4 mr-1.5" />Desarquivar</Button>}
             </div>
           </div>
           {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{feedback.texto}</div>}
