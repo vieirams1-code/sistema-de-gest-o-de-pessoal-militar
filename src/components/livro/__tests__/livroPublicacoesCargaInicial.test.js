@@ -164,7 +164,7 @@ test('Publicações identifica férias operacionais pelo tipo mais ferias_id top
   const source = await read('pages/Publicacoes.jsx');
   const isFeriasOperacional = source.slice(
     source.indexOf('function isFeriasOperacional'),
-    source.indexOf('function normalizarOrigemTipoRegistro')
+    source.indexOf('function mapearEntityPublicacao')
   );
 
   assert.match(isFeriasOperacional, /registro\.ferias_id \|\| registro\?\.vinculos\?\.ferias\?\.id/);
