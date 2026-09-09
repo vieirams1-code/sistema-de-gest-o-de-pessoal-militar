@@ -2,13 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const vazio = { usuario_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false };
 const erroTexto = (erro, fallback) => erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
 export default function ConfigurarCampanhaFerias() {
   const navigate = useNavigate();
+  const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
+  const podeEditarCampanha = isAdmin || canAccessAction('editar_campanhas_ferias');
   const [params] = useSearchParams();
   const campanhaId = params.get('campanhaId') || '';
   const planoId = params.get('planoId') || '';
@@ -17,6 +21,7 @@ export default function ConfigurarCampanhaFerias() {
   const [usuarios, setUsuarios] = useState([]);
   const [permissoes, setPermissoes] = useState([]);
   const [form, setForm] = useState(vazio);
+  const [dadosCampanhaForm, setDadosCampanhaForm] = useState({ titulo: '', data_inicio: '', data_fim_militar: '' });
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
@@ -33,6 +38,11 @@ export default function ConfigurarCampanhaFerias() {
       const encontrada = await base44.entities.CampanhaPortal.get(campanhaId);
       if (!encontrada) throw new Error('Campanha não encontrada ou sem acesso.');
       setCampanha(encontrada);
+      setDadosCampanhaForm({
+        titulo: encontrada.titulo || '',
+        data_inicio: encontrada.data_inicio || '',
+        data_fim_militar: encontrada.data_fim_militar || '',
+      });
       const planoAtualId = planoId || encontrada.plano_ferias_institucional_id || '';
       if (planoAtualId) {
         try {
@@ -108,6 +118,37 @@ export default function ConfigurarCampanhaFerias() {
     }
   };
 
+  const salvarDadosCampanha = async (evento) => {
+    evento.preventDefault();
+    const titulo = dadosCampanhaForm.titulo.trim();
+    if (!podeEditarCampanha || !campanha?.id || !titulo || !dadosCampanhaForm.data_inicio || !dadosCampanhaForm.data_fim_militar) return;
+    if (dadosCampanhaForm.data_fim_militar < dadosCampanhaForm.data_inicio) {
+      setFeedback({ tipo: 'erro', texto: 'A data final de disponibilidade não pode ser anterior à data inicial.' });
+      return;
+    }
+    setSalvando(true);
+    setFeedback({ tipo: '', texto: '' });
+    try {
+      const resposta = await base44.functions.invoke('portal_servicos', {
+        acao: 'PLANO_CAMPANHA_SALVAR',
+        campanha_id: campanha.id,
+        plano_id: planoId || campanha.plano_ferias_institucional_id || '',
+        campanha_payload: {
+          titulo,
+          data_inicio: dadosCampanhaForm.data_inicio,
+          data_fim_militar: dadosCampanhaForm.data_fim_militar,
+        },
+      });
+      setCampanha(resposta.data?.campanha || { ...campanha, ...dadosCampanhaForm, titulo });
+      setDadosCampanhaForm((atual) => ({ ...atual, titulo }));
+      setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Dados da campanha atualizados.' });
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível atualizar os dados da campanha.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const remover = async (permissao) => {
     if (!window.confirm('Remover este responsável da campanha?')) return;
     setSalvando(true);
@@ -145,6 +186,35 @@ export default function ConfigurarCampanhaFerias() {
           </div>
         </div>
         {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{feedback.texto}</div>}
+        {podeEditarCampanha && (
+          <section className="rounded-2xl border border-blue-200 bg-white p-5">
+            <div>
+              <h2 className="font-bold text-slate-900">Dados e disponibilidade da campanha</h2>
+              <p className="mt-1 text-xs text-slate-500">Altere o nome e o período em que a campanha ficará disponível aos militares.</p>
+            </div>
+            <form onSubmit={salvarDadosCampanha} className="mt-5 grid gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700">Nome da campanha *</label>
+                <Input required value={dadosCampanhaForm.titulo} onChange={(e) => setDadosCampanhaForm({ ...dadosCampanhaForm, titulo: e.target.value })} className="mt-1" />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Disponível a partir de *</label>
+                  <Input required type="date" value={dadosCampanhaForm.data_inicio} onChange={(e) => setDadosCampanhaForm({ ...dadosCampanhaForm, data_inicio: e.target.value })} className="mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Disponível até *</label>
+                  <Input required type="date" min={dadosCampanhaForm.data_inicio || undefined} value={dadosCampanhaForm.data_fim_militar} onChange={(e) => setDadosCampanhaForm({ ...dadosCampanhaForm, data_fim_militar: e.target.value })} className="mt-1" />
+                </div>
+              </div>
+              <div>
+                <Button type="submit" disabled={salvando || !dadosCampanhaForm.titulo.trim()} className="bg-blue-700 hover:bg-blue-800">
+                  {salvando ? 'Salvando...' : 'Salvar dados da campanha'}
+                </Button>
+              </div>
+            </form>
+          </section>
+        )}
         <section className="rounded-2xl border border-rose-200 bg-white p-5">
           <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-rose-700" /><div><h2 className="font-bold text-slate-900">Usuários autorizados nesta campanha</h2><p className="text-xs text-slate-500">Atribua vários responsáveis, cada um com permissões independentes.</p></div></div>
           <form onSubmit={salvar} className="mt-5 grid gap-4 rounded-xl bg-rose-50/40 p-4">
