@@ -59,7 +59,7 @@ export default function PerfisPermissao() {
   const [formData, setFormData] = useState(initialForm);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
-  const { data: perfis = [], isLoading } = useQuery({
+  const { data: perfis = [], isLoading, error: perfisError } = useQuery({
     queryKey: ['perfisPermissao'],
     queryFn: listarPerfisPermissaoAdmin,
     enabled: canManageProfiles,
@@ -249,6 +249,15 @@ export default function PerfisPermissao() {
             </Button>
           )}
         </div>
+
+        {perfisError && !showForm && (
+          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 flex gap-3">
+            <div className="text-sm space-y-1">
+              <p className="font-medium">Falha ao carregar perfis de permissão.</p>
+              <p className="text-xs break-words">{perfisError?.message || 'O backend administrativo não retornou a lista de PerfilPermissao.'}</p>
+            </div>
+          </div>
+        )}
 
         {showForm ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
