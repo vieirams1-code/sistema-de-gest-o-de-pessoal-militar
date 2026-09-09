@@ -171,6 +171,14 @@ Deno.serve(async (req) => {
       const origemRegistro = String(body?.origemRegistro || '').trim();
       if (origemRegistro) filtroExOfficio.origem_registro = origemRegistro;
     }
+    if (purpose === 'COMPORTAMENTO') {
+      const historicoComportamentoId = String(body?.historicoComportamentoId || '').trim();
+      const origemTipo = String(body?.origemTipo || '').trim();
+      const origemId = String(body?.origemId || '').trim();
+      if (historicoComportamentoId) filtroExOfficio.historico_comportamento_id = historicoComportamentoId;
+      if (origemTipo) filtroExOfficio.origem_tipo = origemTipo;
+      if (origemId) filtroExOfficio.origem_id = origemId;
+    }
 
     const [registrosLivroBase, publicacoesEscopo] = await Promise.all([
       config.livro ? listarEscopado(base44, 'RegistroLivro', militarIds, filtroLivro) : Promise.resolve([]),
