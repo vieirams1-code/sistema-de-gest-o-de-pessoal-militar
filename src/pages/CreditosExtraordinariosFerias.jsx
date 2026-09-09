@@ -34,6 +34,7 @@ import {
   salvarCreditoExtraFerias,
 } from '@/services/creditoExtraFeriasService';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 
 const initialForm = {
   id: '',
@@ -154,8 +155,11 @@ export default function CreditosExtraordinariosFerias() {
 
   const { data: gozosFerias = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-gozos'],
-    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
-    enabled: isAccessResolved && canAccessModule('ferias'),
+    queryFn: async () => {
+      const bundle = await fetchScopedPeriodosAquisitivosBundle();
+      return bundle?.ferias || [];
+    },
+    enabled: isAccessResolved && canAccessModule('ferias') && canVisualizarCreditosFerias,
   });
 
   const gozoById = useMemo(
