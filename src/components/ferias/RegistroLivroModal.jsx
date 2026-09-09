@@ -36,6 +36,7 @@ import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContex
 import { calcularSaldoOperacionalPeriodoComTodosAjustes, obterDiasBase } from '@/services/saldoFeriasOperacionalService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import {
   calcularTotaisGozoComCreditos,
@@ -350,7 +351,10 @@ export default function RegistroLivroModal({
     queryKey: ['registros-livro-ferias-modal', feriasOperacional?.id],
     queryFn: async () => {
       if (!feriasOperacional?.id) return [];
-      return base44.entities.RegistroLivro.filter({ ferias_id: feriasOperacional.id });
+      const bundle = await fetchScopedFeriasBundle();
+      return (bundle?.registrosLivro || []).filter(
+        (registro) => String(registro?.ferias_id || '') === String(feriasOperacional.id),
+      );
     },
     initialData: () => contextoInicial?.registrosLivroDaFerias,
     enabled: open && !!feriasOperacional?.id && !contextoInicial?.registrosLivroDaFerias,
