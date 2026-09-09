@@ -75,7 +75,7 @@ export default function RP() {
     queryFn: async () => {
       const [contratoLivro, publicacoesExOfficio, atestados] = await Promise.all([
         getLivroMetricasRPContrato({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
-        listarPublicacoesExOfficioEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters, effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail }),
+        listarPublicacoesExOfficioEscopo({ purpose: 'RP' }),
         listarAtestadosPublicacaoEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
       ]);
 
