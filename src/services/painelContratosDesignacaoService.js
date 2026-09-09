@@ -1,5 +1,4 @@
 import { normalizarStatusContratoDesignacao, STATUS_CONTRATO_DESIGNACAO } from './contratosDesignacaoMilitarService.js';
-import { fetchScopedContratosDesignacaoMilitar } from './getScopedContratosDesignacaoMilitarClient.js';
 
 const MS_DIA = 86400000;
 
@@ -57,6 +56,7 @@ export const MENSAGEM_CONTRATO_COM_EFEITOS = 'Este contrato já possui efeitos e
 
 export async function buscarEfeitosContratoEmPeriodos(militarId, contratoId) {
   if (!militarId || !contratoId) return [];
+  const { fetchScopedContratosDesignacaoMilitar } = await import('./getScopedContratosDesignacaoMilitarClient.js');
   const bundle = await fetchScopedContratosDesignacaoMilitar({
     militarId,
     contratoIdEfeitos: contratoId,
