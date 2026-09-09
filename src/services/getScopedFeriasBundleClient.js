@@ -19,6 +19,7 @@ export async function fetchScopedFeriasBundle(payload = {}) {
 
   return {
     ferias: Array.isArray(body?.ferias) ? body.ferias : [],
+    periodosAquisitivos: Array.isArray(body?.periodosAquisitivos) ? body.periodosAquisitivos : [],
     registrosLivro: Array.isArray(body?.registrosLivro) ? body.registrosLivro : [],
     ajustesSaldoFerias: Array.isArray(body?.ajustesSaldoFerias) ? body.ajustesSaldoFerias : [],
     descontosFerias: Array.isArray(body?.descontosFerias) ? body.descontosFerias : [],
