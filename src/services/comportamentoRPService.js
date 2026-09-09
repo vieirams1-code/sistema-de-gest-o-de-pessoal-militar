@@ -1,15 +1,16 @@
-import { base44 as base44Client } from '@/api/base44Client';
-import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
-import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { base44 as base44Client } from '../api/base44Client.js';
+import { getTemplateAtivoPorTipo } from '../components/rp/templateValidation.js';
 import {
   TIPO_TEMPLATE_COMPORTAMENTO,
   escolherTipoTemplateComportamento,
   gerarTextoRPComportamento,
   marcoEhValidoParaGeracaoRP,
-} from '@/utils/comportamentoTemplateUtils';
-import { formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
-import { isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
-import { criarEscopado as criarEscopadoClient } from '@/services/cudEscopadoClient';
+} from '../utils/comportamentoTemplateUtils.js';
+import { formatarMatriculaPadrao } from './militarIdentidadeService.js';
+import { isMilitarMesclado, resolverMatriculaAtual } from './matriculaMilitarViewService.js';
+import { criarEscopado as criarEscopadoClient } from './cudEscopadoClient.js';
+
+const MODULO_EX_OFFICIO = 'ExOfficio';
 
 let serviceClient = base44Client;
 let serviceDeps = { criarEscopado: criarEscopadoClient };
