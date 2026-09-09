@@ -9,6 +9,7 @@ const paginaCampanhasSource = await readFile(new URL('../../pages/GerirCampanhas
 const paginaConfiguracoesSource = await readFile(new URL('../../pages/ConfiguracoesPortal.jsx', import.meta.url), 'utf8');
 const portalFeriasSource = await readFile(new URL('../components/PortalFeriasView.jsx', import.meta.url), 'utf8');
 const portalServicosSource = await readFile(new URL('../../../base44/functions/portal_servicos/entry.ts', import.meta.url), 'utf8');
+const planosFeriasServicosSource = await readFile(new URL('../../../base44/functions/planos_ferias_servicos/entry.ts', import.meta.url), 'utf8');
 const otpServiceSource = await readFile(new URL('../../../base44/shared/portal/otp/otpService.ts', import.meta.url), 'utf8');
 const portalConfigSchemaSource = await readFile(new URL('../../../base44/entities/PortalAuthConfig.jsonc', import.meta.url), 'utf8');
 const campanhaSchemaSource = await readFile(new URL('../../../base44/entities/CampanhaPortal.jsonc', import.meta.url), 'utf8');
@@ -223,5 +224,22 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(configurarCampanhaSource, /data_fim_militar/);
     assert.match(portalServicosSource, /CAMPANHA_FERIAS_DADOS_ATUALIZADOS/);
     assert.match(portalServicosSource, /A data final de disponibilidade não pode ser anterior à data inicial/);
+  });
+
+  it('restringe arquivamento e desarquivamento ao Modo Admin', () => {
+    assert.match(paginaPlanosSource, /if \(!modoAdmin \|\| !podeAdminFerias \|\| !podeEditarPlanos\)/);
+    assert.match(paginaPlanosSource, /acao: 'DESARQUIVAR'/);
+    assert.match(paginaPlanosSource, /selecionado\.status === 'ARQUIVADO'.*>Desarquivar</s);
+    assert.match(planosFeriasServicosSource, /acao === 'ARQUIVAR' \|\| acao === 'DESARQUIVAR'.*perm_admin_campanhas_ferias/);
+    assert.match(planosFeriasServicosSource, /status: 'ATIVO',[\s\S]*data_encerramento: ''/);
+    assert.match(planosFeriasServicosSource, /exigeTodas[\s\S]*necessarias\.every/);
+  });
+
+  it('exige duas confirmações para excluir um plano no Modo Admin', () => {
+    assert.match(paginaPlanosSource, /Primeira confirmação: excluir o plano/);
+    assert.match(paginaPlanosSource, /Segunda confirmação: deseja excluir definitivamente o plano/);
+    assert.match(paginaPlanosSource, /confirmacao_dupla: true/);
+    assert.match(portalServicosSource, /payload\.confirmacao_dupla !== true/);
+    assert.match(portalServicosSource, /perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias/);
   });
 });
