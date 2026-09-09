@@ -1776,6 +1776,78 @@ Deno.serve(async (req: Request) => {
         case 'PLANO_INSTITUCIONAL_GERAR_FERIAS': {
           const ano = payload.ano_referencia || (new Date().getFullYear() + 1);
 
+          if (acao === 'PLANO_CAMPANHA_SALVAR') {
+            const campanhaId = textoId(payload.campanha_id);
+            const planoIdInformado = textoId(payload.plano_id);
+            const dados = payload.campanha_payload || {};
+            const campanha = campanhaId
+              ? await base44.asServiceRole.entities.CampanhaPortal.get(campanhaId)
+              : null;
+
+            if (!campanha || campanha.tipo !== 'PLANO_FERIAS') {
+              return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), {
+                status: 404,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (planoIdInformado && textoId(campanha.plano_ferias_institucional_id) !== planoIdInformado) {
+              return new Response(JSON.stringify({ error: 'A campanha não pertence ao plano informado.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+
+            const titulo = String(dados.titulo || '').trim();
+            const dataInicio = String(dados.data_inicio || '').slice(0, 10);
+            const dataFimMilitar = String(dados.data_fim_militar || '').slice(0, 10);
+            const formatoDataValido = /^\d{4}-\d{2}-\d{2}$/;
+
+            if (!titulo) {
+              return new Response(JSON.stringify({ error: 'Informe o nome da campanha.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (!formatoDataValido.test(dataInicio) || !formatoDataValido.test(dataFimMilitar)) {
+              return new Response(JSON.stringify({ error: 'Informe o período de disponibilidade da campanha.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (dataFimMilitar < dataInicio) {
+              return new Response(JSON.stringify({ error: 'A data final de disponibilidade não pode ser anterior à data inicial.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+
+            const campanhaAtualizada = await base44.asServiceRole.entities.CampanhaPortal.update(campanha.id, {
+              titulo,
+              data_inicio: dataInicio,
+              data_fim_militar: dataFimMilitar,
+            });
+            await registrarAuditoriaFerias(base44, user, 'CAMPANHA_FERIAS_DADOS_ATUALIZADOS', {
+              plano_id: campanha.plano_ferias_institucional_id,
+              campanha_id: campanha.id,
+            }, {
+              titulo_anterior: campanha.titulo || '',
+              titulo_novo: titulo,
+              data_inicio_anterior: campanha.data_inicio || '',
+              data_inicio_nova: dataInicio,
+              data_fim_anterior: campanha.data_fim_militar || '',
+              data_fim_nova: dataFimMilitar,
+            });
+
+            return new Response(JSON.stringify({
+              ok: true,
+              campanha: campanhaAtualizada,
+              message: 'Nome e período de disponibilidade atualizados com sucesso.',
+            }), {
+              status: 200,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+
           if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR') {
             let campanhas = await base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS', ano_referencia: ano });
             let campanha = campanhas?.[0];
