@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
     if (authz?.error) return Response.json({ error: authz.error }, { status: 403 });
     const incluirAjustesDetalhadosSolicitado = payload?.includeAjustesDetalhados === true;
     const acoesLeituraSuporte = [
-      'visualizar_periodos_aquisitivos', 'visualizar_ferias', 'visualizar_creditos_ferias',
+      'visualizar_periodos_aquisitivos', 'visualizar_ferias', 'visualizar_plano_ferias', 'visualizar_creditos_ferias',
       'criar_ferias', 'editar_ferias', 'gerar_periodos_aquisitivos',
       'criar_credito_extra_ferias', 'cancelar_credito_extra_ferias',
     ];
