@@ -2913,6 +2913,32 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        if (diasPlanejar === 30) {
+          const modalidadeSolicitada = modalidade || '2_ETAPAS_15';
+          const modalidadesPermitidas: Record<string, boolean> = {
+            '1_ETAPA_30': regrasCampanhaSubmissao.permitir_1_etapa_30d !== undefined
+              ? Boolean(regrasCampanhaSubmissao.permitir_1_etapa_30d)
+              : portalConfig?.ferias_permitir_1_etapa_30d !== false,
+            '2_ETAPAS_15': regrasCampanhaSubmissao.permitir_2_etapas_15d !== undefined
+              ? Boolean(regrasCampanhaSubmissao.permitir_2_etapas_15d)
+              : portalConfig?.ferias_permitir_2_etapas_15d !== false,
+            '3_ETAPAS_10': regrasCampanhaSubmissao.permitir_3_etapas_10d !== undefined
+              ? Boolean(regrasCampanhaSubmissao.permitir_3_etapas_10d)
+              : portalConfig?.ferias_permitir_3_etapas_10d !== false,
+            'CUSTOM': regrasCampanhaSubmissao.permitir_custom !== undefined
+              ? Boolean(regrasCampanhaSubmissao.permitir_custom)
+              : portalConfig?.ferias_permitir_custom === true,
+          };
+          if (modalidadesPermitidas[modalidadeSolicitada] !== true) {
+            return new Response(JSON.stringify({
+              error: 'A modalidade de parcelamento selecionada não está autorizada nas configurações de férias.',
+            }), {
+              status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         const preferenciasNormalizadas = [
           normalizarPreferenciaMes(opcao_1, resumoPeriodoSubmissao, diasPlanejar),
           normalizarPreferenciaMes(opcao_2, resumoPeriodoSubmissao, diasPlanejar),
