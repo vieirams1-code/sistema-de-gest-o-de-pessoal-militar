@@ -72,20 +72,22 @@ test('L09: páginas administrativas não leem UsuarioAcesso ou PerfilPermissao d
   assert.match(usuariosPage, /obterAcessoUsuarioAdmin/);
 });
 
-test('L09: gateway administrativo usa getUserPermissions e separa gestão de perfis da gestão de usuários', () => {
-  assert.match(gatewayBackend, /functions\.invoke\('getUserPermissions'/);
-  assert.match(gatewayBackend, /gerir_perfis_permissao/);
-  assert.match(gatewayBackend, /gerir_permissoes_usuarios/);
-  assert.match(gatewayBackend, /if \(!podeGerirUsuarios\)/);
-  assert.match(gatewayBackend, /if \(!podeGerirPerfis\)/);
-  assert.match(gatewayBackend, /asServiceRole\.entities\.PerfilPermissao/);
-  assert.match(gatewayBackend, /asServiceRole\.entities\.UsuarioAcesso/);
+test('L09 hotfix: leitura administrativa de perfis/usuários usa cudEscopado service-only com autorização separada', () => {
+  assert.match(gatewayClient, /listarAdminEscopado\('PerfilPermissao'\)/);
+  assert.match(gatewayClient, /listarAdminEscopado\('UsuarioAcesso'\)/);
+  assert.match(gatewayClient, /obterAdminEscopado\('PerfilPermissao'/);
+  assert.match(gatewayClient, /obterAdminEscopado\('UsuarioAcesso'/);
+  assert.match(cudBackend, /ENTIDADES_LEITURA_ADMIN_PERMISSOES/);
+  assert.match(cudBackend, /operation === 'admin_list' \|\| operation === 'admin_get'/);
+  assert.match(cudBackend, /gerir_perfis_permissao/);
+  assert.match(cudBackend, /gerir_permissoes_usuarios/);
+  assert.match(cudBackend, /asServiceRole\.entities\[entityName\]\.list/);
+  assert.match(cudBackend, /asServiceRole\.entities\[entityName\]\.get/);
 });
 
-test('L09: uso de perfil expõe somente vínculo mínimo e não o UsuarioAcesso completo', () => {
-  assert.match(gatewayBackend, /LIST_PROFILE_USAGE/);
-  assert.match(gatewayBackend, /perfil_id: item\?\.perfil_id/);
-  assert.match(gatewayBackend, /ativo: item\?\.ativo !== false/);
+test('L09 hotfix: uso de perfil é derivado da leitura administrativa e frontend não acessa entidades diretamente', () => {
+  assert.match(gatewayClient, /perfil_id: item\?\.perfil_id/);
+  assert.match(gatewayClient, /ativo: item\?\.ativo !== false/);
   assert.doesNotMatch(gatewayClient, /base44\.entities\.(UsuarioAcesso|PerfilPermissao)/);
 });
 
