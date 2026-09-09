@@ -3,11 +3,34 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const CHUNK = 200;
 const normalizeTipo = (valor: unknown) => String(valor || '').trim().toLowerCase();
 
-const PURPOSES: Record<string, { module: string; action: string; livro: boolean; exOfficio: boolean }> = {
-  CONTROL: { module: 'controle_publicacoes', action: 'visualizar_controle_publicacoes', livro: true, exOfficio: true },
-  LIVRO: { module: 'livro', action: 'visualizar_livro', livro: true, exOfficio: false },
-  CONCILIACAO: { module: 'conciliacao_boletim', action: 'visualizar_conciliacao_boletim', livro: true, exOfficio: true },
-  RP: { module: 'rp', action: 'visualizar_rp', livro: true, exOfficio: true },
+type PurposeConfig = {
+  modulesAny: string[];
+  actionsAny: string[];
+  livro: boolean;
+  exOfficio: boolean;
+};
+
+const PURPOSES: Record<string, PurposeConfig> = {
+  CONTROL: { modulesAny: ['controle_publicacoes'], actionsAny: ['visualizar_controle_publicacoes'], livro: true, exOfficio: true },
+  PUBLICACOES: { modulesAny: ['publicacoes'], actionsAny: ['visualizar_publicacoes'], livro: false, exOfficio: true },
+  LIVRO: { modulesAny: ['livro'], actionsAny: ['visualizar_livro'], livro: true, exOfficio: false },
+  CONCILIACAO: { modulesAny: ['conciliacao_boletim'], actionsAny: ['visualizar_conciliacao_boletim'], livro: true, exOfficio: true },
+  RP: { modulesAny: ['rp'], actionsAny: ['visualizar_rp'], livro: true, exOfficio: true },
+  REGISTRO_RP: {
+    modulesAny: ['controle_publicacoes', 'rp', 'publicacoes'],
+    actionsAny: ['adicionar_publicacoes', 'editar_publicacoes', 'apostilar_publicacao', 'tornar_sem_efeito_publicacao'],
+    livro: true,
+    exOfficio: true,
+  },
+  MIGRACAO: { modulesAny: ['migracao_alteracoes_legado'], actionsAny: ['migrar_alteracoes_legado'], livro: false, exOfficio: true },
+  ATESTADOS: { modulesAny: ['atestados'], actionsAny: ['visualizar_atestados'], livro: false, exOfficio: true },
+  QUADRO: { modulesAny: ['quadro_operacional'], actionsAny: ['visualizar_quadro_operacional'], livro: false, exOfficio: true },
+  COMPORTAMENTO: {
+    modulesAny: ['controle_comportamento'],
+    actionsAny: ['visualizar_controle_comportamento', 'aprovar_mudanca_comportamento'],
+    livro: false,
+    exOfficio: true,
+  },
 };
 
 const CAMPOS_MILITAR_APOIO = [
@@ -26,10 +49,11 @@ async function resolverAutorizacao(base44: any, effectiveEmail?: string) {
   return body;
 }
 
-function temCapacidade(authz: any, config: { module: string; action: string }) {
-  return authz?.isAdmin === true || (
-    authz?.modules?.[config.module] === true && authz?.actions?.[config.action] === true
-  );
+function temCapacidade(authz: any, config: PurposeConfig) {
+  if (authz?.isAdmin === true) return true;
+  const temModulo = config.modulesAny.some((moduleKey) => authz?.modules?.[moduleKey] === true);
+  const temAcao = config.actionsAny.some((actionKey) => authz?.actions?.[actionKey] === true);
+  return temModulo && temAcao;
 }
 
 async function listarMilitarIdsDoEscopo(base44: any, acessos: any[] = []) {
@@ -112,7 +136,7 @@ Deno.serve(async (req) => {
 
     const authz = await resolverAutorizacao(base44, body?.effectiveEmail);
     if (!temCapacidade(authz, config)) {
-      return erro(403, 'Sem permissão para esta leitura de Livro/Publicações.', config.action);
+      return erro(403, 'Sem permissão para esta leitura de Livro/Publicações.', config.actionsAny.join('|'));
     }
 
     const militarIds = authz?.isAdmin === true || authz?.hasGlobalScope === true
