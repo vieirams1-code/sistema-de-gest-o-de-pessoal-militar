@@ -111,13 +111,14 @@ export default function CadastrarFerias() {
   // Só períodos disponíveis operacionalmente para novas férias.
   const periodosAtivos = periodosExistentes.filter(isPeriodoDisponivelOperacional);
 
-  // Carregar férias para edição
+  // Carregar férias para edição pelo bundle escopado de suporte. O backend
+  // aceita explicitamente editar_ferias e aplica o escopo organizacional.
   const { data: editingFerias, isLoading: loadingEdit } = useQuery({
-    queryKey: ['ferias', editId],
+    queryKey: ['ferias-edicao-escopada', editId, effectiveEmail || null],
     queryFn: async () => {
       if (!editId) return null;
-      const list = await base44.entities.Ferias.filter({ id: editId });
-      return list[0] || null;
+      const bundle = await fetchScopedPeriodosAquisitivosBundle();
+      return (bundle?.ferias || []).find((item) => String(item?.id || '') === String(editId)) || null;
     },
     enabled: !!editId && isAccessResolved && hasFeriasAccess && hasRequiredFeriasAction
   });
