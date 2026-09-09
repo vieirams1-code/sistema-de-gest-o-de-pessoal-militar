@@ -72,6 +72,14 @@ test('L09: páginas administrativas não leem UsuarioAcesso ou PerfilPermissao d
   assert.match(usuariosPage, /obterAcessoUsuarioAdmin/);
 });
 
+test('L09 hotfix: PerfisPermissao importa o resolvedor usado durante a renderização da lista', () => {
+  assert.match(
+    perfisPage,
+    /import\s*\{[\s\S]*resolveProfilePermissions[\s\S]*\}\s*from\s*['"]@\/services\/permissionMatrixService['"]/,
+  );
+  assert.match(perfisPage, /resolveProfilePermissions\(\{ profileSource: p \}\)\.permissions/);
+});
+
 test('L09 hotfix: gateway administrativo é autossuficiente e usa entidades explícitas service-role', () => {
   assert.match(gatewayClient, /functions\.invoke\('permissoesAdminGateway'/);
   assert.match(gatewayBackend, /resolverCapacidadesAdministrativas/);
