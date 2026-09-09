@@ -18,6 +18,9 @@ const processosBackend = await readFile(new URL('../../../../base44/functions/co
 const processosService = await readFile(new URL('../../../services/controleProcessosService.js', import.meta.url), 'utf8');
 const registrosMilitarService = await readFile(new URL('../../../services/registrosMilitarService.js', import.meta.url), 'utf8');
 const registrosMilitarGateway = await readFile(new URL('../../../../base44/functions/registrosMilitarGateway/entry.ts', import.meta.url), 'utf8');
+const publicacoesBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedPublicacoesBundle/entry.ts', import.meta.url), 'utf8');
+const comportamentoRPService = await readFile(new URL('../../../services/comportamentoRPService.js', import.meta.url), 'utf8');
+const migracaoLegadoService = await readFile(new URL('../../../services/migracaoAlteracoesLegadoService.js', import.meta.url), 'utf8');
 const feriasBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedFeriasBundle/entry.ts', import.meta.url), 'utf8');
 const periodosBundleBackend = await readFile(new URL('../../../../base44/functions/getScopedPeriodosAquisitivosBundle/entry.ts', import.meta.url), 'utf8');
 const descontoFeriasService = await readFile(new URL('../../../services/descontoFeriasService.js', import.meta.url), 'utf8');
@@ -248,6 +251,42 @@ test('L09D bloco 3: Registros do Militar lista Livro e ExOfficio somente pelo ga
   assert.match(registrosMilitarGateway, /visualizar_registros_militar/);
   assert.match(registrosMilitarGateway, /listarMilitarIdsDoEscopo/);
   assert.match(registrosMilitarGateway, /asServiceRole\.entities\[entityName\]/);
+});
+
+test('L09D bloco 3: Livro e ExOfficio não têm acesso direto de produção no frontend', async () => {
+  const fontes = await listarFontesRecursivamente(new URL('../../../', import.meta.url));
+  const padrao = /(?:base44|client|serviceClient)\.entities\.(RegistroLivro|PublicacaoExOfficio)\.(list|filter|get|create|update|delete|bulkCreate|bulkUpdate)/;
+  const excecoesMock = new Set([
+    '/src/services/militarTimelineService.js',
+    '/src/services/comportamentoRPService.js',
+    '/src/services/migracaoAlteracoesLegadoService.js',
+  ]);
+
+  for (const { path, source } of fontes) {
+    if (!padrao.test(source)) continue;
+    const excecao = [...excecoesMock].find((suffix) => path.endsWith(suffix));
+    assert.ok(excecao, `${path} não deve acessar RegistroLivro/PublicacaoExOfficio diretamente`);
+  }
+
+  assert.match(timelineService, /if \(runtimeClient\) return client\.entities\.RegistroLivro\.filter/);
+  assert.match(timelineService, /if \(runtimeClient\) return client\.entities\.PublicacaoExOfficio\.filter/);
+  assert.match(timelineService, /fetchScopedPublicacoesBundle\(\{ purpose: 'LIVRO', militarId \}\)/);
+  assert.match(timelineService, /fetchScopedPublicacoesBundle\(\{ purpose: 'PUBLICACOES', militarId \}\)/);
+  assert.match(comportamentoRPService, /if \(serviceClient !== base44Client\)[\s\S]*serviceClient\.entities\.PublicacaoExOfficio\.filter/);
+  assert.match(comportamentoRPService, /purpose: 'COMPORTAMENTO'/);
+  assert.match(migracaoLegadoService, /if \(client !== defaultBase44\)[\s\S]*client\.entities\.PublicacaoExOfficio\.filter/);
+  assert.match(migracaoLegadoService, /purpose: 'MIGRACAO'/);
+});
+
+test('L09D bloco 3: reader canônico separa finalidades e só lê Livro/ExOfficio por service role', () => {
+  for (const purpose of ['CONTROL', 'PUBLICACOES', 'LIVRO', 'CONCILIACAO', 'RP', 'REGISTRO_RP', 'MIGRACAO', 'ATESTADOS', 'QUADRO', 'COMPORTAMENTO']) {
+    assert.match(publicacoesBundleBackend, new RegExp(`${purpose}:`));
+  }
+  assert.match(publicacoesBundleBackend, /functions\.invoke\('getUserPermissions'/);
+  assert.match(publicacoesBundleBackend, /asServiceRole\.entities\[entityName\]/);
+  assert.match(publicacoesBundleBackend, /listarMilitarIdsDoEscopo/);
+  assert.match(publicacoesBundleBackend, /purpose === 'MIGRACAO'/);
+  assert.match(publicacoesBundleBackend, /purpose === 'COMPORTAMENTO'/);
 });
 
 test('L09D: entidades de Férias do bloco 1 e 2 permanecem service-only', async () => {
