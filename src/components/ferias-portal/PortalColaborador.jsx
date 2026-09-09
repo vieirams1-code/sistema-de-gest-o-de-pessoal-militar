@@ -18,7 +18,6 @@ const MESES = [
 export default function PortalColaborador({
   militarNome = '2º Tenente Edson Vieira de Souza',
   tituloCampanha = 'Plano Anual de Férias 2027',
-  periodoAquisitivo = '13/09/2024 a 12/09/2025',
   onSubmit,
 }) {
   const [modalidade, setModalidade] = useState('2');
@@ -54,7 +53,6 @@ export default function PortalColaborador({
       <div className="p-8 max-w-4xl mx-auto w-full">
         <div className="mb-6">
           <h3 className="text-2xl font-bold text-slate-900">{tituloCampanha}</h3>
-          <p className="text-slate-600 mt-1">Período Aquisitivo: {periodoAquisitivo}</p>
         </div>
 
         <form onSubmit={handleSubmit}>
