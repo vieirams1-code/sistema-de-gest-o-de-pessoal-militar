@@ -45,6 +45,7 @@ import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { buildAtestadoTemplateVarsContrato, getTipoTemplateHomologacaoAtestado } from './atestadoTemplateVars';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -223,7 +224,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return;
     }
     setSavingPublicacao(true);
-    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+    const { publicacoesExOfficio: publicacoesMilitar = [] } = await fetchScopedPublicacoesBundle({ purpose: 'ATESTADOS', militarId: atestado.militar_id });
     const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
       publicacoesMilitar,
       atestado.id,
@@ -300,7 +301,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return;
     }
     setSavingPublicacao(true);
-    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+    const { publicacoesExOfficio: publicacoesMilitar = [] } = await fetchScopedPublicacoesBundle({ purpose: 'ATESTADOS', militarId: atestado.militar_id });
     const jaExisteAtaJiso = existePublicacaoAtivaParaAtestado(
       publicacoesMilitar,
       atestado.id,
@@ -399,7 +400,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   // Buscar publicações vinculadas a este atestado
   const { data: publicacoesVinculadas = [] } = useQuery({
     queryKey: ['publicacoes-atestado', atestado.id],
-    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id }),
+    queryFn: async () => {
+      const bundle = await fetchScopedPublicacoesBundle({ purpose: 'ATESTADOS', militarId: atestado.militar_id });
+      return bundle?.publicacoesExOfficio || [];
+    },
     select: (data) => data.filter(p =>
       p.atestado_homologado_id === atestado.id ||
       (p.atestados_jiso_ids && p.atestados_jiso_ids.includes(atestado.id))
