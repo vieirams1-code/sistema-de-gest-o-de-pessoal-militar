@@ -11,6 +11,7 @@ const publicacoesSource = readFileSync(new URL('../../../pages/Publicacoes.jsx',
 const rpSource = readFileSync(new URL('../../../pages/RP.jsx', import.meta.url), 'utf8');
 const publicacoesPainelServiceSource = readFileSync(new URL('../../../services/publicacoesPainelService.js', import.meta.url), 'utf8');
 const livroServiceSource = readFileSync(new URL('../../livro/livroService.js', import.meta.url), 'utf8');
+const publicacoesBundleSource = readFileSync(new URL('../../../../base44/functions/getScopedPublicacoesBundle/entry.ts', import.meta.url), 'utf8');
 const agendaAcoesSource = readFileSync(new URL('../../../pages/AgendaAcoesOperacionais.jsx', import.meta.url), 'utf8');
 const quadroOperacionalSource = readFileSync(new URL('../../../pages/QuadroOperacional.jsx', import.meta.url), 'utf8');
 const cardDetalheSource = readFileSync(new URL('../../quadro/CardDetalheModal.jsx', import.meta.url), 'utf8');
@@ -43,13 +44,17 @@ test('escopo Administrador Global continua abrangendo todos os registros sem lib
   assert.match(frontendSource, /return Boolean\(key\) && actions\[key\] === true;/);
 });
 
-test('escopo geral é propagado às consultas de Publicações/RP sem elevar privilégio funcional', () => {
-  assert.match(publicacoesPainelServiceSource, /Boolean\(isAdmin \|\| hasGlobalScope\)/);
-  assert.match(publicacoesSource, /getLivroRegistrosContrato\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
-  assert.match(publicacoesSource, /listarPublicacoesExOfficioEscopo\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters/);
+test('escopo de Livro/Publicações/RP é resolvido no backend sem elevar privilégio funcional', () => {
+  assert.match(publicacoesSource, /getLivroRegistrosContrato\(\)/);
+  assert.match(publicacoesSource, /listarPublicacoesExOfficioEscopo\(\{ purpose: 'CONTROL' \}\)/);
   assert.match(publicacoesSource, /listarAtestadosPublicacaoEscopo\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
-  assert.match(rpSource, /getLivroMetricasRPContrato\(\{ isAdmin, hasGlobalScope, getMilitarScopeFilters \}\)/);
-  assert.match(livroServiceSource, /const semRestricaoEscopo = temEscopoSemRestricao\(\{ isAdmin, hasGlobalScope \}\);/);
+  assert.match(rpSource, /listarPublicacoesExOfficioEscopo\(\{ purpose: 'RP' \}\)/);
+  assert.match(livroServiceSource, /fetchScopedPublicacoesBundle\(\{ purpose: 'CONTROL' \}\)/);
+  assert.match(livroServiceSource, /fetchScopedPublicacoesBundle\(\{ purpose: 'RP' \}\)/);
+  assert.match(publicacoesBundleSource, /functions\.invoke\('getUserPermissions'/);
+  assert.match(publicacoesBundleSource, /authz\?\.isAdmin === true \|\| authz\?\.hasGlobalScope === true/);
+  assert.match(publicacoesBundleSource, /listarMilitarIdsDoEscopo/);
+  assert.match(publicacoesBundleSource, /asServiceRole\.entities\[entityName\]/);
 });
 
 test('chave canônica de cache distingue escopos efetivos diferentes', () => {
