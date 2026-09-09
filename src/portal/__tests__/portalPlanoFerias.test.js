@@ -212,6 +212,7 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
   });
 
   it('permite alterar nome e disponibilidade ao abrir a campanha', () => {
+    assert.match(paginaPlanosSource, /podeEditarCampanhas \|\| podeAtribuirPermissoes \|\| podeAdminFerias/);
     assert.match(configurarCampanhaSource, /Dados e disponibilidade da campanha/);
     assert.match(configurarCampanhaSource, /acao: 'PLANO_CAMPANHA_SALVAR'/);
     assert.match(configurarCampanhaSource, /data_fim_militar/);
