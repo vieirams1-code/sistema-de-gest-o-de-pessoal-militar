@@ -207,13 +207,16 @@ test('L09D: nenhum consumidor frontend lê Ferias ou PeriodoAquisitivo diretamen
   const fontes = await listarFontesRecursivamente(new URL('../../../', import.meta.url));
   const padroes = [
     /(?:base44|client|serviceClient)\.entities\.(Ferias|PeriodoAquisitivo)\.(list|filter|get|create|update|delete|bulkCreate|bulkUpdate)/,
-    /\b(Ferias|PeriodoAquisitivo)\.(list|filter|get|create|update|delete|bulkCreate|bulkUpdate)/,
+    /\b(?:const|let|var)\s+\w+\s*=\s*(?:base44|client|serviceClient)\.entities\.(Ferias|PeriodoAquisitivo)\b/,
+    /(?:base44|client|serviceClient)\.entities\[['"](Ferias|PeriodoAquisitivo)['"]\]/,
   ];
   for (const { path, source } of fontes) {
     for (const padrao of padroes) {
       assert.doesNotMatch(source, padrao, `${path} não deve acessar Ferias/PeriodoAquisitivo diretamente`);
     }
   }
+  const apiEntitiesSource = await readFile(new URL('../../../api/entities.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(apiEntitiesSource, /export const (Ferias|PeriodoAquisitivo)\s*=/);
   assert.match(feriasBundleBackend, /asServiceRole\.entities\.Ferias/);
   assert.match(periodosBundleBackend, /asServiceRole\.entities\.PeriodoAquisitivo/);
   assert.match(periodosBundleBackend, /asServiceRole\.entities\.Ferias/);
