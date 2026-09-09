@@ -367,7 +367,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (['PLANO_INSTITUCIONAL_ATUALIZAR', 'PLANO_INSTITUCIONAL_ARQUIVAR'].includes(acao)) {
     return ['perm_editar_planos_ferias'];
   }
-  if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias'];
+  if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias'];
   if (acao === 'PLANO_ESCALA_LISTAR') return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas', 'perm_atribuir_permissoes_ferias'];
   if (acao === 'PLANO_DECISAO_CAMADA_1' || acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
     return ['perm_aprovar_ferias'];
@@ -417,7 +417,11 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const authzResponse = await base44.functions.invoke('getUserPermissions', {});
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
-  if (necessarias.length > 0 && necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)) return true;
+  const exigeTodas = acao === 'PLANO_INSTITUCIONAL_EXCLUIR';
+  const autorizadoPorPermissao = necessarias.length > 0 && (exigeTodas
+    ? necessarias.every((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)
+    : necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true));
+  if (autorizadoPorPermissao) return true;
 
   // Delegação por plano/campanha: um usuário pode atuar nas férias apenas
   // quando recebeu uma autorização ativa e explícita naquele plano.
@@ -885,6 +889,12 @@ Deno.serve(async (req: Request) => {
         case 'PLANO_INSTITUCIONAL_EXCLUIR': {
           const planoId = String(payload.plano_id || '').trim();
           const confirmarPerdaVinculo = Boolean(payload.confirmar_perda_vinculo);
+          if (payload.confirmacao_dupla !== true) {
+            return new Response(JSON.stringify({ error: 'A exclusão do plano exige confirmação dupla.' }), {
+              status: 400,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           const existente = planoId ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId) : null;
           if (!existente) {
             return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
