@@ -1,4 +1,5 @@
 import { normalizarStatusContratoDesignacao, STATUS_CONTRATO_DESIGNACAO } from './contratosDesignacaoMilitarService.js';
+import { fetchScopedContratosDesignacaoMilitar } from './getScopedContratosDesignacaoMilitarClient.js';
 
 const MS_DIA = 86400000;
 
@@ -54,16 +55,13 @@ export const CAMPOS_CADEIA_FERIAS_CONTRATO = [
 
 export const MENSAGEM_CONTRATO_COM_EFEITOS = 'Este contrato já possui efeitos em períodos aquisitivos. Use cancelamento/encerramento para preservar histórico.';
 
-export async function buscarEfeitosContratoEmPeriodos(base44, contratoId) {
-  if (!contratoId) return [];
-  const resultados = await Promise.all(CAMPOS_EFEITO_CONTRATO_EM_PERIODOS.map((campo) => (
-    base44.entities.PeriodoAquisitivo.filter({ [campo]: contratoId })
-  )));
-  const porId = new Map();
-  resultados.flat().forEach((periodo) => {
-    if (periodo?.id) porId.set(String(periodo.id), periodo);
+export async function buscarEfeitosContratoEmPeriodos(militarId, contratoId) {
+  if (!militarId || !contratoId) return [];
+  const bundle = await fetchScopedContratosDesignacaoMilitar({
+    militarId,
+    contratoIdEfeitos: contratoId,
   });
-  return Array.from(porId.values());
+  return bundle?.periodosComEfeito || [];
 }
 
 export function valoresContratoDiferentes(original, payload, campo) {
