@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { reconciliarCadeiaFerias } from './reconciliacaoCadeiaFerias';
 import { liberarCreditosDoGozo } from '@/services/creditoExtraFeriasService';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 
 /**
  * Tipos de eventos que representam operações na cadeia de férias.
@@ -115,6 +116,16 @@ async function invalidarPublicacaoDeEvento(evento, inconsistencia) {
 
   await atualizarEscopado('RegistroLivro', evento.id, payload);
   return { id: evento.id, tipo_registro: evento?.tipo_registro };
+}
+
+async function carregarFeriasEscopadaFresh(ferias) {
+  if (!ferias?.id) return ferias;
+  try {
+    const bundle = await fetchScopedFeriasBundle();
+    return (bundle?.ferias || []).find((item) => String(item?.id || '') === String(ferias.id)) || ferias;
+  } catch (_) {
+    return ferias;
+  }
 }
 
 async function auditarDependenciasPosExclusao({ eventosSobreviventes = [] }) {
@@ -243,13 +254,9 @@ export async function executarExclusaoAdminCadeia({
   // Calcular eventos sobreviventes (excluindo os removidos)
   const sobreviventes = cadeia.filter(e => !idsParaExcluir.includes(e.id));
 
-  // Reler a férias do banco para garantir dias_base atualizado
-  // (evita usar objeto React stale que pode ter dias_base ausente)
-  let feriasFresh = ferias;
-  try {
-    const lista = await base44.entities.Ferias.filter({ id: ferias.id });
-    if (lista[0]) feriasFresh = lista[0];
-  } catch (_) { /* fallback para ferias da prop */ }
+  // Reler a férias via gateway escopado para garantir dias_base atualizado
+  // (evita usar objeto React stale sem reabrir acesso direto à entidade).
+  const feriasFresh = await carregarFeriasEscopadaFresh(ferias);
 
   await auditarDependenciasPosExclusao({
     eventosSobreviventes: sobreviventes,
@@ -278,11 +285,7 @@ export async function executarExclusaoAdminCadeia({
  * Relê a férias do banco para garantir dias_base atualizado.
  */
 export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) {
-  let feriasFresh = ferias;
-  try {
-    const lista = await base44.entities.Ferias.filter({ id: ferias.id });
-    if (lista[0]) feriasFresh = lista[0];
-  } catch (_) { /* fallback */ }
+  const feriasFresh = await carregarFeriasEscopadaFresh(ferias);
   const resultado = await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias: feriasFresh });
 
   queryClient.invalidateQueries({ queryKey: ['ferias'] });
