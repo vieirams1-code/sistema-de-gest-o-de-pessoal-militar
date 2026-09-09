@@ -124,7 +124,8 @@ const CAMPOS_MILITAR_SUPORTE = [
 ];
 const CAMPOS_MATRICULA_SUPORTE = ['id', 'militar_id', 'matricula', 'matricula_normalizada', 'data_inicio', 'data_fim', 'is_atual', 'situacao'];
 const CAMPOS_FERIAS_SUPORTE = [
-  'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'status', 'dias', 'fracionamento',
+  'id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula',
+  'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'status', 'dias', 'fracionamento',
   'data_inicio', 'data_fim', 'data_retorno', 'data_termino',
 ];
 const CAMPOS_REGISTRO_LIVRO_SUPORTE = [
