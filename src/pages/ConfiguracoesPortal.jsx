@@ -42,6 +42,7 @@ export default function ConfiguracoesPortal() {
   const [feriasPermitir2Etapas, setFeriasPermitir2Etapas] = useState(true);
   const [feriasPermitir3Etapas, setFeriasPermitir3Etapas] = useState(true);
   const [feriasPermitirCustom, setFeriasPermitirCustom] = useState(false);
+  const [feriasExigirAtualizacaoCadastral, setFeriasExigirAtualizacaoCadastral] = useState(false);
   const [feriasPrazoLimite, setFeriasPrazoLimite] = useState('');
   const [feriasInstrucoes, setFeriasInstrucoes] = useState('');
 
@@ -81,6 +82,7 @@ export default function ConfiguracoesPortal() {
         setFeriasPermitir2Etapas(c.ferias_permitir_2_etapas_15d !== false);
         setFeriasPermitir3Etapas(c.ferias_permitir_3_etapas_10d !== false);
         setFeriasPermitirCustom(Boolean(c.ferias_permitir_custom));
+        setFeriasExigirAtualizacaoCadastral(c.ferias_exigir_atualizacao_cadastral === true);
         setFeriasPrazoLimite(c.ferias_prazo_limite || '');
         setFeriasInstrucoes(c.ferias_instrucoes || '');
 
@@ -135,6 +137,7 @@ export default function ConfiguracoesPortal() {
       ferias_permitir_2_etapas_15d: feriasPermitir2Etapas,
       ferias_permitir_3_etapas_10d: feriasPermitir3Etapas,
       ferias_permitir_custom: feriasPermitirCustom,
+      ferias_exigir_atualizacao_cadastral: feriasExigirAtualizacaoCadastral,
       ferias_prazo_limite: feriasPrazoLimite,
       ferias_instrucoes: feriasInstrucoes,
       cadastro_ativo: cadastroAtivo,
@@ -502,6 +505,23 @@ export default function ConfiguracoesPortal() {
                       />
                     </label>
                   </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-50">
+                    <div>
+                      <span className="font-semibold text-slate-800 block">Exigir atualização cadastral antes das férias</span>
+                      <span className="text-[11px] text-slate-500">
+                        Quando ativado, o militar precisa concluir a conferência cadastral antes de enviar suas preferências.
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={feriasExigirAtualizacaoCadastral}
+                      onChange={(e) => setFeriasExigirAtualizacaoCadastral(e.target.checked)}
+                      className="w-4 h-4 accent-[#1e3a5f] rounded shrink-0"
+                    />
+                  </label>
                 </div>
 
                 {/* Prazo Limite e Instruções */}
