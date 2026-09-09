@@ -163,6 +163,14 @@ Deno.serve(async (req) => {
       filtroLivro.militar_id = militarId;
       filtroExOfficio.militar_id = militarId;
     }
+    if (purpose === 'MIGRACAO') {
+      if (body?.importadoLegado === true) filtroExOfficio.importado_legado = true;
+      if (body?.classificacaoPendente === true) filtroExOfficio.classificacao_pendente = true;
+      const tipoMigracao = String(body?.tipo || '').trim();
+      if (tipoMigracao) filtroExOfficio.tipo = tipoMigracao;
+      const origemRegistro = String(body?.origemRegistro || '').trim();
+      if (origemRegistro) filtroExOfficio.origem_registro = origemRegistro;
+    }
 
     const [registrosLivroBase, publicacoesEscopo] = await Promise.all([
       config.livro ? listarEscopado(base44, 'RegistroLivro', militarIds, filtroLivro) : Promise.resolve([]),
