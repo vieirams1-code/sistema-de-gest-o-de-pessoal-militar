@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { enriquecerFeriasComContextoMilitar } from '@/services/feriasMilitarContextService';
+import { enriquecerFeriasComContextoMilitarCarregado } from '@/services/feriasMilitarContextService';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 
 const meses = [
   { nome: 'Janeiro', valor: 'Janeiro', numero: 1 },
@@ -39,13 +40,18 @@ export default function PlanoAnualFerias() {
   const { data: ferias = [], isLoading: loadingFerias } = useQuery({
     queryKey: ['ferias-ano', anoSelecionado],
     queryFn: async () => {
-      const todasFerias = await base44.entities.Ferias.list();
-      const filtradas = todasFerias.filter(f => {
+      const bundle = await fetchScopedPeriodosAquisitivosBundle();
+      const filtradas = (bundle?.ferias || []).filter(f => {
         if (!f.data_inicio) return false;
         const ano = new Date(f.data_inicio + 'T00:00:00').getFullYear();
         return ano === anoSelecionado;
       });
-      return enriquecerFeriasComContextoMilitar(filtradas, { contexto: 'operacional' });
+      return enriquecerFeriasComContextoMilitarCarregado(
+        filtradas,
+        bundle?.militares || [],
+        bundle?.matriculasMilitar || [],
+        { contexto: 'operacional' },
+      );
     }
   });
 
