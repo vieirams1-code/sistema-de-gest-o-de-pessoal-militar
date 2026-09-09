@@ -35,16 +35,6 @@ const MESES_ANO = [
   { valor: '12', nome: 'Dezembro' },
 ];
 
-function formatarDataBR(dataStr) {
-  if (!dataStr) return '-';
-  const str = String(dataStr).trim();
-  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) {
-    return `${match[3]}/${match[2]}/${match[1]}`;
-  }
-  return str;
-}
-
 export default function PortalFeriasView({ onBack }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -142,7 +132,7 @@ export default function PortalFeriasView({ onBack }) {
     setSuccessMsg(null);
 
     if (!selectedPeriodoId) {
-      setErrorMsg('Selecione o período aquisitivo de férias.');
+      setErrorMsg('Não foi possível preparar suas opções de férias. Atualize a página e tente novamente.');
       return;
     }
 
@@ -154,7 +144,7 @@ export default function PortalFeriasView({ onBack }) {
     const periodoPlano = (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
     const mesesPermitidos = new Set((periodoPlano?.meses_elegiveis || []).filter((m) => m.permitido).map((m) => m.mes));
     if (![mesOpcao1, mesOpcao2, mesOpcao3].every((mes) => mesesPermitidos.has(mes))) {
-      setErrorMsg(`Uma das opções escolhidas é anterior à aquisição do direito. A primeira data legal deste período é ${formatarDataBR(periodoPlano?.primeira_data_legal_gozo)}.`);
+      setErrorMsg('Uma das opções escolhidas não está disponível para este plano.');
       return;
     }
 
@@ -217,14 +207,6 @@ export default function PortalFeriasView({ onBack }) {
   const saldoParcial = diasPlanejar > 0 && diasPlanejar !== 30;
   const regraMes = (mes) => (periodoMaisAntigo?.meses_elegiveis || []).find((item) => item.mes === mes);
   const mesPermitido = (mes) => Boolean(regraMes(mes)?.permitido);
-  const labelAjusteMes = (mes) => {
-    const regra = regraMes(mes);
-    return regra?.inicio_ajustado && regra?.data_inicio
-      ? ` — início em ${formatarDataBR(regra.data_inicio)}`
-      : '';
-  };
-  const restricaoAquisicaoAfetaPlano = (periodoMaisAntigo?.meses_elegiveis || [])
-    .some((mes) => mes?.permitido === false || mes?.inicio_ajustado === true);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -349,18 +331,6 @@ export default function PortalFeriasView({ onBack }) {
               </p>
             </div>
 
-            {/* Consulta Informativa do Período mais Antigo */}
-            {periodoMaisAntigo && (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 max-w-lg mx-auto text-left text-xs space-y-1">
-                <span className="font-bold text-slate-700 flex items-center">
-                  <Info className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-                  Seu Período Aquisitivo Mais Antigo Pendente:
-                </span>
-                <p className="text-slate-600 text-[11px]">
-                  Período: <strong>{periodoMaisAntigo.inicio_aquisitivo}</strong> até <strong>{periodoMaisAntigo.fim_aquisitivo}</strong> • Saldo: <strong>{periodoMaisAntigo.saldo_disponivel || 30} dias de direito</strong>
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
       ) : (
@@ -444,7 +414,7 @@ export default function PortalFeriasView({ onBack }) {
                   <span>
                     Modalidade selecionada: <strong>
                       {opcaoEnviada.modalidade === 'CUSTOM'
-                        ? `Saldo remanescente (${opcaoEnviada.dias_direito || 0} dias)`
+                        ? 'Parcela única'
                         : opcaoEnviada.modalidade === '1_ETAPA_30'
                         ? 'Integral (30 dias)'
                         : opcaoEnviada.modalidade === '2_ETAPAS_15'
@@ -457,39 +427,11 @@ export default function PortalFeriasView({ onBack }) {
             </Card>
           )}
 
-          {/* PERÍODO AQUISITIVO — VISÃO SIMPLIFICADA PARA O MILITAR */}
-          {periodoMaisAntigo && (
-            <Card className="border-2 border-emerald-500 bg-emerald-50/20 shadow-sm rounded-2xl sm:rounded-3xl">
-              <CardHeader className="p-4 sm:p-5 pb-2">
-                <CardTitle className="text-sm sm:text-base font-bold text-emerald-950">
-                  Período Aquisitivo
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-5 pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs">
-                  <div className="p-3 bg-white rounded-xl border border-emerald-200">
-                    <span className="text-slate-500 block text-[11px]">Início do Período</span>
-                    <strong className="text-slate-800 text-sm">{formatarDataBR(periodoMaisAntigo.inicio_aquisitivo)}</strong>
-                  </div>
-                  <div className="p-3 bg-white rounded-xl border border-emerald-200">
-                    <span className="text-slate-500 block text-[11px]">Fim do Período</span>
-                    <strong className="text-slate-800 text-sm">{formatarDataBR(periodoMaisAntigo.fim_aquisitivo)}</strong>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {!periodoMaisAntigo && (
             <Card className="border-amber-200 bg-amber-50/60 shadow-sm">
               <CardContent className="p-5 flex items-start gap-3 text-sm text-amber-900">
                 <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                <div>
-                  <strong>Nenhum período aquisitivo elegível para novas opções neste plano.</strong>
-                  <p className="mt-1 text-xs leading-relaxed">
-                    O sistema considera direito líquido, dias já gozados e dias que já possuem previsão. Períodos integralmente gozados ou já totalmente previstos não são reutilizados em uma nova campanha.
-                  </p>
-                </div>
+                <strong>Não há opções de férias disponíveis para preenchimento neste plano.</strong>
               </CardContent>
             </Card>
           )}
@@ -517,11 +459,8 @@ export default function PortalFeriasView({ onBack }) {
                 </div>
 
                 {saldoParcial && (
-                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    <strong>Saldo remanescente: {diasPlanejar} dia(s).</strong>
-                    <p className="mt-1 text-xs leading-relaxed">
-                      Como este período possui saldo diferente de 30 dias ainda sem previsão, o plano tratará esse saldo como parcela remanescente única. As três escolhas abaixo continuam sendo apenas preferências alternativas de mês.
-                    </p>
+                  <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-800">
+                    Parcela única
                   </div>
                 )}
 
@@ -585,14 +524,6 @@ export default function PortalFeriasView({ onBack }) {
                   <i className="ph ph-calendar-star text-green-600 text-xl"></i> Passo 2: Preferência de Meses no Ano de {anoCampanha}
                 </h4>
 
-                {periodoMaisAntigo?.primeira_data_legal_gozo && restricaoAquisicaoAfetaPlano && (
-                  <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900">
-                    <strong>Regra de aquisição do direito:</strong> suas férias deste período só podem iniciar a partir de{' '}
-                    <strong>{formatarDataBR(periodoMaisAntigo.primeira_data_legal_gozo)}</strong>.
-                    Meses anteriores ficam indisponíveis. Se o próprio mês da aquisição estiver disponível, a data será ajustada automaticamente do dia 01 para a primeira data legal.
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">1ª Opção (Preferencial)</label>
@@ -614,9 +545,6 @@ export default function PortalFeriasView({ onBack }) {
                           disabled={!mesPermitido(m.valor) || m.valor === mesOpcao2 || m.valor === mesOpcao3}
                         >
                           {m.nome}
-                          {!mesPermitido(m.valor)
-                            ? ' (Indisponível antes da aquisição do direito)'
-                            : labelAjusteMes(m.valor)}
                           {m.valor === mesOpcao2 ? ' (Em uso na 2ª Opção)' : m.valor === mesOpcao3 ? ' (Em uso na 3ª Opção)' : ''}
                         </option>
                       ))}
@@ -643,9 +571,6 @@ export default function PortalFeriasView({ onBack }) {
                           disabled={!mesPermitido(m.valor) || m.valor === mesOpcao1 || m.valor === mesOpcao3}
                         >
                           {m.nome}
-                          {!mesPermitido(m.valor)
-                            ? ' (Indisponível antes da aquisição do direito)'
-                            : labelAjusteMes(m.valor)}
                           {m.valor === mesOpcao1 ? ' (Em uso na 1ª Opção)' : m.valor === mesOpcao3 ? ' (Em uso na 3ª Opção)' : ''}
                         </option>
                       ))}
@@ -672,9 +597,6 @@ export default function PortalFeriasView({ onBack }) {
                           disabled={!mesPermitido(m.valor) || m.valor === mesOpcao1 || m.valor === mesOpcao2}
                         >
                           {m.nome}
-                          {!mesPermitido(m.valor)
-                            ? ' (Indisponível antes da aquisição do direito)'
-                            : labelAjusteMes(m.valor)}
                           {m.valor === mesOpcao1 ? ' (Em uso na 1ª Opção)' : m.valor === mesOpcao2 ? ' (Em uso na 2ª Opção)' : ''}
                         </option>
                       ))}
@@ -682,10 +604,7 @@ export default function PortalFeriasView({ onBack }) {
                   </div>
                 </div>
 
-                <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
-                  <p className="text-xs text-slate-500">
-                    * Regra geral: início no dia 01. No mês em que o direito é adquirido, o sistema ajusta automaticamente para o primeiro dia legal após o fim do período aquisitivo.
-                  </p>
+                <div className="mt-8 flex justify-end pt-4 border-t border-slate-100">
                   <button
                     type="submit"
                     disabled={submitting}
