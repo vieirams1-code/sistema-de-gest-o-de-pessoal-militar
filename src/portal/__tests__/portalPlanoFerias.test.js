@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const paginaPlanosSource = await readFile(new URL('../../pages/PlanosFerias.jsx', import.meta.url), 'utf8');
+const configurarCampanhaSource = await readFile(new URL('../../pages/ConfigurarCampanhaFerias.jsx', import.meta.url), 'utf8');
 const paginaCampanhasSource = await readFile(new URL('../../pages/GerirCampanhasPortal.jsx', import.meta.url), 'utf8');
 const paginaConfiguracoesSource = await readFile(new URL('../../pages/ConfiguracoesPortal.jsx', import.meta.url), 'utf8');
 const portalFeriasSource = await readFile(new URL('../components/PortalFeriasView.jsx', import.meta.url), 'utf8');
@@ -203,5 +204,18 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.doesNotMatch(paginaPlanosSource, /GerirCampanhasPortal|CentralRespostasCampanhas/);
     assert.doesNotMatch(paginaCampanhasSource, /onClick=\{\(\) => abrirCriacaoCampanha\('PLANO_FERIAS'\)\}/);
     assert.doesNotMatch(paginaCampanhasSource, /option value="PLANO_FERIAS"/);
+  });
+
+  it('exibe e executa a geração de férias somente com o Modo Admin ativo', () => {
+    assert.match(paginaPlanosSource, /if \(!selecionado \|\| !modoAdmin \|\| !podeGerarFerias\) return/);
+    assert.match(paginaPlanosSource, /\{modoAdmin && podeGerarFerias && <div/);
+  });
+
+  it('permite alterar nome e disponibilidade ao abrir a campanha', () => {
+    assert.match(configurarCampanhaSource, /Dados e disponibilidade da campanha/);
+    assert.match(configurarCampanhaSource, /acao: 'PLANO_CAMPANHA_SALVAR'/);
+    assert.match(configurarCampanhaSource, /data_fim_militar/);
+    assert.match(portalServicosSource, /CAMPANHA_FERIAS_DADOS_ATUALIZADOS/);
+    assert.match(portalServicosSource, /A data final de disponibilidade não pode ser anterior à data inicial/);
   });
 });
