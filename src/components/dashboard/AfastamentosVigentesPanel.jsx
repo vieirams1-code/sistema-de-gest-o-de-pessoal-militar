@@ -42,17 +42,6 @@ function computeTotaisPorOrigem(afastamentos) {
   }, {});
 }
 
-function useFeriasVigentesQuery({ scopedIds, scopeKey, enabled }) {
-  return useQuery({
-    queryKey: ['painel-afastamentos-ferias', scopeKey],
-    queryFn: async () => {
-      const lista = await base44.entities.Ferias.list('-data_inicio');
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-    },
-    enabled,
-  });
-}
-
 function useMilitaresLtipQuery({ scopedIds, scopeKey, enabled }) {
   return useQuery({
     queryKey: ['painel-afastamentos-ltip', scopeKey],
@@ -67,17 +56,11 @@ function useMilitaresLtipQuery({ scopedIds, scopeKey, enabled }) {
   });
 }
 
-function useAfastamentosVigentesData({ atestados, registrosLivro, enabled }) {
+function useAfastamentosVigentesData({ atestados, registrosLivro, ferias = [], enabled }) {
   // Lote 1D-E: escopo transversal — filtra todas as entidades por militar_id
   // dentro do escopo do usuário. Para admin (scopedIds === null), mantém global.
   const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
   const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
-
-  const { data: ferias = [] } = useFeriasVigentesQuery({
-    scopedIds,
-    scopeKey,
-    enabled: enabled && scopedReady,
-  });
 
   const { data: militaresLtip = [] } = useMilitaresLtipQuery({
     scopedIds,
@@ -236,12 +219,12 @@ function AfastamentosTable({ items }) {
   );
 }
 
-export default function AfastamentosVigentesPanel({ atestados = [], registrosLivro = [], enabled = true }) {
+export default function AfastamentosVigentesPanel({ atestados = [], registrosLivro = [], ferias = [], enabled = true }) {
   const [militarFilter, setMilitarFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [origemFilter, setOrigemFilter] = useState('all');
 
-  const { afastamentos, isReady } = useAfastamentosVigentesData({ atestados, registrosLivro, enabled });
+  const { afastamentos, isReady } = useAfastamentosVigentesData({ atestados, registrosLivro, ferias, enabled });
 
   const tipoOptions = useMemo(() => getTipoOptions(afastamentos), [afastamentos]);
   const origemOptions = useMemo(() => getOrigemOptions(afastamentos), [afastamentos]);
