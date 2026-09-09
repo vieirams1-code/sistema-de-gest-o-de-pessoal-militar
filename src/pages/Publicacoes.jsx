@@ -25,6 +25,7 @@ import {
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { calcularMetricasPublicacao, listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
+import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 import { calcularFoiApostilada } from '@/components/publicacao/apostilaUtils';
@@ -343,11 +344,18 @@ function isFeriasOperacional(registro) {
 
 
 
-function mapearEntityPublicacao(tipo) {
-  if (tipo === 'atestado') return base44.entities.Atestado;
-  if (tipo === 'livro') return base44.entities.RegistroLivro;
-  return base44.entities.PublicacaoExOfficio;
-}
+const publicacaoExOfficioScopedReader = {
+  async filter(filtro = {}) {
+    const militarId = String(filtro?.militar_id || '').trim();
+    const publicacaoId = String(filtro?.id || '').trim();
+    const bundle = await fetchScopedPublicacoesBundle({
+      purpose: 'CONTROL',
+      ...(militarId ? { militarId } : {}),
+      ...(publicacaoId ? { publicacaoId } : {}),
+    });
+    return bundle?.publicacoesExOfficio || [];
+  },
+};
 
 function mapearEntityNamePublicacao(tipo) {
   if (tipo === 'atestado') return 'Atestado';
@@ -574,9 +582,19 @@ export default function Publicacoes() {
           const refId = registro.publicacao_referencia_id;
           const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
           if (refId) {
-            const entityOriginal = origemTipoHint === 'atestado' ? base44.entities.Atestado : origemTipoHint === 'livro' ? base44.entities.RegistroLivro : base44.entities.PublicacaoExOfficio;
             const entityNameOriginal = origemTipoHint === 'atestado' ? 'Atestado' : origemTipoHint === 'livro' ? 'RegistroLivro' : 'PublicacaoExOfficio';
-            const [original] = await entityOriginal.filter({ id: refId });
+            let original = null;
+            if (origemTipoHint === 'atestado') {
+              [original] = await base44.entities.Atestado.filter({ id: refId });
+            } else {
+              const bundleReferencia = await fetchScopedPublicacoesBundle({
+                purpose: 'CONTROL',
+                ...(origemTipoHint === 'livro' ? { registroLivroId: refId } : { publicacaoId: refId }),
+              });
+              original = origemTipoHint === 'livro'
+                ? bundleReferencia?.registrosLivro?.[0]
+                : bundleReferencia?.publicacoesExOfficio?.[0];
+            }
             if (original) {
               const payload = { ...(origemTipoHint === 'atestado' ? {} : { status: calcStatusPublicacao(original) }) };
               if (isApostila) { payload.apostilada_por_id = null; payload.foi_apostilada = false; }
@@ -587,14 +605,14 @@ export default function Publicacoes() {
           }
 
           if (isTSE && refId && (!origemTipoHint || origemTipoHint === 'ex-officio')) {
-            const [publicacaoReferencia] = await base44.entities.PublicacaoExOfficio.filter({ id: refId });
+            const [publicacaoReferencia] = await publicacaoExOfficioScopedReader.filter({ id: refId });
             for (const atestadoId of getAtestadoIdsVinculados(publicacaoReferencia)) {
-              await atualizarEstadoAtestadoPelasPublicacoes(atestadoId, base44.entities.Atestado, base44.entities.PublicacaoExOfficio, atualizarEscopado);
+              await atualizarEstadoAtestadoPelasPublicacoes(atestadoId, base44.entities.Atestado, publicacaoExOfficioScopedReader, atualizarEscopado);
             }
           }
         }
 
-        await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, base44.entities.PublicacaoExOfficio, atualizarEscopado);
+        await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, publicacaoExOfficioScopedReader, atualizarEscopado);
         return excluirEscopado('PublicacaoExOfficio', id);
       }
 
