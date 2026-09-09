@@ -187,3 +187,18 @@ test('L09D: descontos são escopados no backend e publicações vinculadas são 
   assert.match(feriasBundleBackend, /asServiceRole\.entities\.PublicacaoExOfficio\.filter/);
   assert.doesNotMatch(descontoFeriasService, /base44\.entities\.(DescontoFerias|PublicacaoExOfficio)/);
 });
+
+test('L09D: AjusteSaldoFerias e DescontoFerias permanecem service-only', async () => {
+  for (const entityName of ['AjusteSaldoFerias', 'DescontoFerias']) {
+    const source = await readFile(
+      new URL(`../../../../base44/entities/${entityName}.jsonc`, import.meta.url),
+      'utf8',
+    );
+    const schema = JSON.parse(source);
+    assert.deepEqual(
+      schema.rls,
+      { create: false, read: false, update: false, delete: false },
+      `${entityName} deve permanecer fechado para o SDK cliente`,
+    );
+  }
+});
