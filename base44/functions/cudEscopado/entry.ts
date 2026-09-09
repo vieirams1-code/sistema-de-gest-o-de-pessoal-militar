@@ -78,7 +78,8 @@ const ENTIDADES_PERMITIDAS = new Set([
   'GratificacaoFuncao',
 ]);
 
-const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar']);
+const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar', 'admin_list', 'admin_get']);
+const ENTIDADES_LEITURA_ADMIN_PERMISSOES = new Set(['PerfilPermissao', 'UsuarioAcesso']);
 
 // =====================================================================
 // Barreira de integridade da família de Férias.
@@ -1192,7 +1193,7 @@ Deno.serve(async (req) => {
         { status: 400 },
       );
     }
-    if ((operation === 'update' || operation === 'delete') && !registroId) {
+    if ((operation === 'update' || operation === 'delete' || operation === 'admin_get') && !registroId) {
       return Response.json(
         { error: `registroId é obrigatório para operação ${operation}.` },
         { status: 400 },
@@ -1224,6 +1225,39 @@ Deno.serve(async (req) => {
     // Bypass funcional cabe apenas ao administrador real da plataforma e
     // nunca deve ser herdado pelo usuário efetivo durante impersonação.
     const targetIsAdmin = !isImpersonating && authIsAdminByRole;
+
+    // ---- Leitura administrativa de permissões (service-only) ----
+    // Mantém PerfilPermissao/UsuarioAcesso com RLS fechada e concentra a leitura
+    // no mesmo gateway já utilizado pelas gravações administrativas.
+    if (operation === 'admin_list' || operation === 'admin_get') {
+      if (!ENTIDADES_LEITURA_ADMIN_PERMISSOES.has(entityName)) {
+        return Response.json(
+          { error: `Leitura administrativa não permitida para ${entityName}.` },
+          { status: 400 },
+        );
+      }
+
+      const requiredActions = entityName === 'PerfilPermissao'
+        ? ['gerir_perfis_permissao', 'gerir_permissoes']
+        : ['gerir_permissoes_usuarios', 'gerir_permissoes'];
+      const allowed = targetIsAdmin || requiredActions.some((action) => targetPerms.actions?.[action] === true);
+      if (!allowed) {
+        return Response.json(
+          { error: `Acesso negado: permissão administrativa insuficiente para consultar ${entityName}.` },
+          { status: 403 },
+        );
+      }
+
+      if (operation === 'admin_get') {
+        const row = await base44.asServiceRole.entities[entityName].get(registroId).catch(() => null);
+        if (!row) return Response.json({ error: `${entityName} ${registroId} não encontrado.` }, { status: 404 });
+        return Response.json({ ok: true, data: row });
+      }
+
+      const sort = entityName === 'PerfilPermissao' ? 'nome_perfil' : 'nome_usuario';
+      const rows = await base44.asServiceRole.entities[entityName].list(sort, 1000, 0);
+      return Response.json({ ok: true, data: Array.isArray(rows) ? rows : [] });
+    }
 
     // ---- Identificar militar_id alvo ----
     // Entidades administrativas não pertencem ao escopo de um militar específico.
