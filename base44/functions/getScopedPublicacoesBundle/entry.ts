@@ -7,7 +7,7 @@ const PURPOSES: Record<string, { module: string; action: string; livro: boolean;
   CONTROL: { module: 'controle_publicacoes', action: 'visualizar_controle_publicacoes', livro: true, exOfficio: true },
   LIVRO: { module: 'livro', action: 'visualizar_livro', livro: true, exOfficio: false },
   CONCILIACAO: { module: 'conciliacao_boletim', action: 'visualizar_conciliacao_boletim', livro: true, exOfficio: true },
-  RP: { module: 'rp', action: 'visualizar_rp', livro: true, exOfficio: false },
+  RP: { module: 'rp', action: 'visualizar_rp', livro: true, exOfficio: true },
 };
 
 const CAMPOS_MILITAR_APOIO = [
