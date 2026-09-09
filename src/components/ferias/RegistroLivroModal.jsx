@@ -356,45 +356,40 @@ export default function RegistroLivroModal({
     enabled: open && !!feriasOperacional?.id && !contextoInicial?.registrosLivroDaFerias,
   });
 
-  const { data: todasFeriasDoMilitar = [] } = useQuery({
-    queryKey: ['ferias-militar-modal', feriasOperacional?.militar_id],
-    queryFn: async () => {
-      if (!feriasOperacional?.militar_id) return [];
-      return base44.entities.Ferias.filter({ militar_id: feriasOperacional.militar_id });
-    },
-    initialData: () => contextoInicial?.feriasDoMilitar,
-    enabled: open && !!feriasOperacional?.militar_id && !contextoInicial?.feriasDoMilitar,
-  });
-
-  const { data: periodosDoMilitar = [], isLoading: periodosDoMilitarLoading, isFetching: periodosDoMilitarFetching } = useQuery({
-    queryKey: ['periodos-militar-modal', feriasOperacional?.militar_id],
-    queryFn: async () => {
-      if (!feriasOperacional?.militar_id) return [];
-      return base44.entities.PeriodoAquisitivo.filter({ militar_id: feriasOperacional.militar_id });
-    },
-    // Sem contexto inicial, busca o período necessário; com contexto, a primeira renderização útil
-    // usa o snapshot da tela Férias e evita loading redundante no modal.
+  const precisaBundleOperacional = open && !!feriasOperacional?.militar_id && (
+    !contextoInicial?.feriasDoMilitar
+    || !contextoInicial?.periodoAquisitivo
+    || !contextoInicial?.ajustesSaldoFerias
+  );
+  const {
+    data: modalPeriodoBundle = {},
+    isLoading: periodosDoMilitarLoading,
+    isFetching: periodosDoMilitarFetching,
+  } = useQuery({
+    queryKey: ['ferias-modal-periodo-bundle', feriasOperacional?.militar_id],
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
     refetchOnMount: 'always',
     staleTime: 0,
-    initialData: () => (contextoInicial?.periodoAquisitivo ? [contextoInicial.periodoAquisitivo] : undefined),
-    enabled: open && !!feriasOperacional?.militar_id && !contextoInicial?.periodoAquisitivo,
+    enabled: precisaBundleOperacional,
   });
 
+  const todasFeriasDoMilitar = useMemo(() => {
+    if (contextoInicial?.feriasDoMilitar) return contextoInicial.feriasDoMilitar;
+    const militarId = String(feriasOperacional?.militar_id || '');
+    return (modalPeriodoBundle?.ferias || []).filter((item) => String(item?.militar_id || '') === militarId);
+  }, [contextoInicial, feriasOperacional?.militar_id, modalPeriodoBundle]);
 
-  const { data: ajustesSaldoFerias = [] } = useQuery({
-    queryKey: ['ajustes-saldo-ferias-modal', feriasOperacional?.militar_id],
-    queryFn: async () => {
-      if (!feriasOperacional?.militar_id) return [];
-      const bundle = await fetchScopedPeriodosAquisitivosBundle();
-      return (bundle?.ajustesSaldoFerias || []).filter(
-        (ajuste) => String(ajuste?.militar_id || '') === String(feriasOperacional.militar_id),
-      );
-    },
-    refetchOnMount: 'always',
-    staleTime: 0,
-    initialData: () => contextoInicial?.ajustesSaldoFerias,
-    enabled: open && !!feriasOperacional?.militar_id && !contextoInicial?.ajustesSaldoFerias,
-  });
+  const periodosDoMilitar = useMemo(() => {
+    if (contextoInicial?.periodoAquisitivo) return [contextoInicial.periodoAquisitivo];
+    const militarId = String(feriasOperacional?.militar_id || '');
+    return (modalPeriodoBundle?.periodosAquisitivos || []).filter((item) => String(item?.militar_id || '') === militarId);
+  }, [contextoInicial, feriasOperacional?.militar_id, modalPeriodoBundle]);
+
+  const ajustesSaldoFerias = useMemo(() => {
+    if (contextoInicial?.ajustesSaldoFerias) return contextoInicial.ajustesSaldoFerias;
+    const militarId = String(feriasOperacional?.militar_id || '');
+    return (modalPeriodoBundle?.ajustesSaldoFerias || []).filter((item) => String(item?.militar_id || '') === militarId);
+  }, [contextoInicial, feriasOperacional?.militar_id, modalPeriodoBundle]);
 
   const { data: creditosExtra = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-modal', feriasOperacional?.militar_id],
