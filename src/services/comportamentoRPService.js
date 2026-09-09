@@ -44,20 +44,33 @@ async function buscarPublicacaoExistentePorHistorico(historicoId) {
   const historicoComportamentoId = normalizarTexto(historicoId);
   if (!historicoComportamentoId) return null;
 
-  const porHistorico = await serviceClient.entities.PublicacaoExOfficio.filter({
-    historico_comportamento_id: historicoComportamentoId,
-  });
+  if (serviceClient !== base44Client) {
+    const porHistorico = await serviceClient.entities.PublicacaoExOfficio.filter({
+      historico_comportamento_id: historicoComportamentoId,
+    });
+    if (Array.isArray(porHistorico) && porHistorico.length > 0) return porHistorico[0];
 
-  if (Array.isArray(porHistorico) && porHistorico.length > 0) {
-    return porHistorico[0];
+    const porOrigem = await serviceClient.entities.PublicacaoExOfficio.filter({
+      origem_tipo: 'historico_comportamento',
+      origem_id: historicoComportamentoId,
+    });
+    return Array.isArray(porOrigem) && porOrigem.length > 0 ? porOrigem[0] : null;
   }
 
-  const porOrigem = await serviceClient.entities.PublicacaoExOfficio.filter({
-    origem_tipo: 'historico_comportamento',
-    origem_id: historicoComportamentoId,
+  const { fetchScopedPublicacoesBundle } = await import('./getScopedPublicacoesBundleClient.js');
+  const porHistoricoBundle = await fetchScopedPublicacoesBundle({
+    purpose: 'COMPORTAMENTO',
+    historicoComportamentoId,
   });
+  const porHistorico = porHistoricoBundle?.publicacoesExOfficio || [];
+  if (porHistorico.length > 0) return porHistorico[0];
 
-  return Array.isArray(porOrigem) && porOrigem.length > 0 ? porOrigem[0] : null;
+  const porOrigemBundle = await fetchScopedPublicacoesBundle({
+    purpose: 'COMPORTAMENTO',
+    origemTipo: 'historico_comportamento',
+    origemId: historicoComportamentoId,
+  });
+  return porOrigemBundle?.publicacoesExOfficio?.[0] || null;
 }
 
 async function obterMatriculaAtualMilitar(militar = {}) {
