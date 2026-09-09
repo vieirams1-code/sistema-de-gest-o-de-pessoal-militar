@@ -1,6 +1,6 @@
 import { formatarMatriculaPadrao, normalizarMatricula } from './militarIdentidadeService.js';
-import { normalizarTextoBusca, somenteDigitos } from '@/utils/normalizarBuscaMilitar';
-import { isMilitarAtivo } from '@/utils/militarStatus';
+import { normalizarTextoBusca, somenteDigitos } from '../utils/normalizarBuscaMilitar.js';
+import { isMilitarAtivo } from '../utils/militarStatus.js';
 
 const STATUS_MESCLADO = 'mesclado';
 
