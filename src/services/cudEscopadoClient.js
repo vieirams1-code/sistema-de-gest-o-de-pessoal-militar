@@ -135,6 +135,11 @@ async function invocar(payload) {
   } catch (err) {
     const msg = extrairMensagemErro(err, 'Falha ao executar cudEscopado.');
     const e = new Error(msg);
+    const errorData = err?.response?.data || err?.data;
+    if (errorData && typeof errorData === 'object') {
+      Object.assign(e, errorData);
+      e.message = msg;
+    }
     e.cause = err;
     throw e;
   }
