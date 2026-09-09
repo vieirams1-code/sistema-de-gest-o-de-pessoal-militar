@@ -299,10 +299,10 @@ export default function PortalHomeView({ initialView, campanhaIdParam }) {
                 </div>
                 <div>
                   <CardTitle className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">
-                    Plano de Férias & Saldos
+                    Plano de Férias
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Escolha suas 3 opções de meses e consulte saldos
+                    Escolha suas 3 opções de meses
                   </CardDescription>
                 </div>
               </div>
