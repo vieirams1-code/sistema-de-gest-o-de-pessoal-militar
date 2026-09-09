@@ -4,7 +4,7 @@ import {
   formatDateBR,
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
-} from '@/components/utils/templateUtils.js';
+} from '../components/utils/templateUtils.js';
 
 let deps = { aplicarTemplate, formatDateBR };
 
