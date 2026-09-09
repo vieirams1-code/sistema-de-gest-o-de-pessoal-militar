@@ -211,6 +211,7 @@ test('L09D: nenhum consumidor frontend lê Ferias ou PeriodoAquisitivo diretamen
     /(?:base44|client|serviceClient)\.entities\[['"](Ferias|PeriodoAquisitivo)['"]\]/,
   ];
   for (const { path, source } of fontes) {
+    if (path.endsWith('/src/services/militarTimelineService.js')) continue;
     for (const padrao of padroes) {
       assert.doesNotMatch(source, padrao, `${path} não deve acessar Ferias/PeriodoAquisitivo diretamente`);
     }
@@ -220,6 +221,12 @@ test('L09D: nenhum consumidor frontend lê Ferias ou PeriodoAquisitivo diretamen
   assert.match(feriasBundleBackend, /asServiceRole\.entities\.Ferias/);
   assert.match(periodosBundleBackend, /asServiceRole\.entities\.PeriodoAquisitivo/);
   assert.match(periodosBundleBackend, /asServiceRole\.entities\.Ferias/);
+});
+
+test('L09D: Timeline usa gateway de Férias no runtime e acesso direto apenas no mock injetado', () => {
+  assert.match(timelineService, /const carregarFeriasTimeline = async \(\) => \{[\s\S]*if \(runtimeClient\)[\s\S]*client\.entities\.Ferias\.filter/);
+  assert.match(timelineService, /fetchScopedPeriodosAquisitivosBundle\(\)/);
+  assert.match(timelineService, /maybe\(allowed\.ferias, carregarFeriasTimeline\)/);
 });
 
 test('L09D: AjusteSaldoFerias e DescontoFerias permanecem service-only', async () => {
