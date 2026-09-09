@@ -9,7 +9,6 @@ const frontendSource = readFileSync(new URL('../useCurrentUser.jsx', import.meta
 const layoutSource = readFileSync(new URL('../../../Layout.jsx', import.meta.url), 'utf8');
 const publicacoesSource = readFileSync(new URL('../../../pages/Publicacoes.jsx', import.meta.url), 'utf8');
 const rpSource = readFileSync(new URL('../../../pages/RP.jsx', import.meta.url), 'utf8');
-const publicacoesPainelServiceSource = readFileSync(new URL('../../../services/publicacoesPainelService.js', import.meta.url), 'utf8');
 const livroServiceSource = readFileSync(new URL('../../livro/livroService.js', import.meta.url), 'utf8');
 const publicacoesBundleSource = readFileSync(new URL('../../../../base44/functions/getScopedPublicacoesBundle/entry.ts', import.meta.url), 'utf8');
 const agendaAcoesSource = readFileSync(new URL('../../../pages/AgendaAcoesOperacionais.jsx', import.meta.url), 'utf8');
