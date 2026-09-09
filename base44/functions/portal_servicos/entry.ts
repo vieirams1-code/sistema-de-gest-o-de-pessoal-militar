@@ -2945,7 +2945,7 @@ Deno.serve(async (req: Request) => {
 
         const periodo = await base44.asServiceRole.entities.PeriodoAquisitivo.get(periodo_aquisitivo_id);
         if (!periodo || periodo.militar_id !== militarId) {
-          return new Response(JSON.stringify({ error: 'Período aquisitivo inválido para este militar.' }), {
+          return new Response(JSON.stringify({ error: 'Não foi possível validar as opções de férias. Atualize a página e tente novamente.' }), {
             status: 403,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
@@ -2968,7 +2968,7 @@ Deno.serve(async (req: Request) => {
         const maisAntigoElegivelSubmissao = resumosSubmissao.find((item: any) => item.resumo.elegivel_plano && item.resumo.dias_sem_previsao > 0);
         if (!maisAntigoElegivelSubmissao || maisAntigoElegivelSubmissao.periodo.id !== periodo.id) {
           return new Response(JSON.stringify({
-            error: 'O período aquisitivo informado não é o período mais antigo com férias ainda sem previsão para este plano. Atualize a página e tente novamente.',
+            error: 'Não foi possível validar as opções de férias. Atualize a página e tente novamente.',
             periodo_correto_id: maisAntigoElegivelSubmissao?.periodo?.id || null,
           }), {
             status: 409,
@@ -2979,7 +2979,7 @@ Deno.serve(async (req: Request) => {
         const resumoPeriodoSubmissao = maisAntigoElegivelSubmissao.resumo;
         const diasPlanejar = Number(resumoPeriodoSubmissao.dias_sem_previsao || 0);
         if (diasPlanejar <= 0) {
-          return new Response(JSON.stringify({ error: 'Este período não possui dias sem previsão disponíveis para o plano.' }), {
+          return new Response(JSON.stringify({ error: 'Não há opções de férias disponíveis para preenchimento neste plano.' }), {
             status: 409,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
@@ -3018,7 +3018,7 @@ Deno.serve(async (req: Request) => {
         ];
         if (preferenciasNormalizadas.some((op: any) => !op)) {
           return new Response(JSON.stringify({
-            error: `Uma ou mais opções estão antes da aquisição do direito. A primeira data legal de gozo deste período é ${resumoPeriodoSubmissao.primeira_data_legal_gozo}.`,
+            error: 'Uma ou mais opções de mês não estão disponíveis para este plano.',
           }), {
             status: 400,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
