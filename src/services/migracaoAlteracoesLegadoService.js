@@ -16,6 +16,22 @@ export function __resetMigracaoAlteracoesLegadoClientForTests() {
   client = defaultBase44;
 }
 
+async function listarPublicacoesLegadoEscopadas(payload = {}) {
+  if (client !== defaultBase44) {
+    const filtro = {};
+    if (payload?.militarId) filtro.militar_id = payload.militarId;
+    if (payload?.importadoLegado === true) filtro.importado_legado = true;
+    if (payload?.classificacaoPendente === true) filtro.classificacao_pendente = true;
+    if (payload?.tipo) filtro.tipo = payload.tipo;
+    if (payload?.origemRegistro) filtro.origem_registro = payload.origemRegistro;
+    return client.entities.PublicacaoExOfficio.filter(filtro, '-created_date');
+  }
+
+  const { fetchScopedPublicacoesBundle } = await import('./getScopedPublicacoesBundleClient.js');
+  const bundle = await fetchScopedPublicacoesBundle({ purpose: 'MIGRACAO', ...payload });
+  return bundle?.publicacoesExOfficio || [];
+}
+
 export function __isLinhaImportavelForTests(...args) {
   return isLinhaImportavel(...args);
 }
@@ -639,7 +655,7 @@ function gerarResumo(linhas) {
 async function buscarDadosDependenciasAnalise() {
   const [militares, publicacoesLegadoExistentes, tiposPublicacaoCustom, historicosExistentes] = await Promise.all([
     client.entities.Militar.list('-created_date', 10000),
-    client.entities.PublicacaoExOfficio.filter({ importado_legado: true }, '-created_date'),
+    listarPublicacoesLegadoEscopadas({ importadoLegado: true }),
     client.entities.TipoPublicacaoCustom.list('-created_date').catch(() => []),
     client.entities.ImportacaoAlteracoesLegado?.list?.('-created_date', 500).catch(() => []),
   ]);
@@ -1237,7 +1253,7 @@ function isLinhaImportavel(linha, { incluirAlertas, incluirPendentesClassificaca
 async function buscarPublicacoesJaImportadas(chaves) {
   if (!chaves.length) return new Map();
 
-  const itens = await client.entities.PublicacaoExOfficio.filter({ importado_legado: true }, '-created_date');
+  const itens = await listarPublicacoesLegadoEscopadas({ importadoLegado: true });
 
   return new Map(
     (itens ?? [])
@@ -1499,11 +1515,11 @@ export function exportarModeloMigracaoAlteracoesLegado(nomeArquivo = 'modelo-alt
 
 
 export async function listarPublicacoesLegadoPendentesClassificacao() {
-  return client.entities.PublicacaoExOfficio.filter({
-    origem_registro: 'legado',
-    classificacao_pendente: true,
+  return listarPublicacoesLegadoEscopadas({
+    origemRegistro: 'legado',
+    classificacaoPendente: true,
     tipo: TIPO_NEUTRO_LEGADO,
-  }, '-created_date');
+  });
 }
 
 export async function classificarPublicacaoLegadoPendente({ publicacaoId, tipoPublicacaoConfirmado, usuario, tiposPublicacaoCustom = [] }) {
