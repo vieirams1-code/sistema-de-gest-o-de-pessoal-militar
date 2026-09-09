@@ -1,6 +1,5 @@
 import { base44 } from '../api/base44Client.js';
 import { fetchScopedMedalhasBundle } from './getScopedMedalhasBundleClient.js';
-import { fetchScopedPeriodosAquisitivosBundle } from './getScopedPeriodosAquisitivosBundleClient.js';
 
 let runtimeClient = null;
 
@@ -50,6 +49,7 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
       // Fallback exclusivo para o cliente injetado pelos testes unitários.
       return client.entities.Ferias.filter({ militar_id: militarId });
     }
+    const { fetchScopedPeriodosAquisitivosBundle } = await import('./getScopedPeriodosAquisitivosBundleClient.js');
     const { ferias = [] } = await fetchScopedPeriodosAquisitivosBundle();
     return ferias.filter((item) => String(item?.militar_id || '') === String(militarId));
   };
