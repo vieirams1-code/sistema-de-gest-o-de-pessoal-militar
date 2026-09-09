@@ -1,8 +1,8 @@
 {
   "name": "PortalAuthConfig",
   "type": "object",
-  "title": "Configuração Geral e Autoatendimento do Portal",
-  "description": "Configurações globais de canais, parâmetros de segurança, regras de férias e conferência cadastral do Portal do Militar.",
+  "title": "Configura\u00e7\u00e3o Geral e Autoatendimento do Portal",
+  "description": "Configura\u00e7\u00f5es globais de canais, par\u00e2metros de seguran\u00e7a, regras de f\u00e9rias e confer\u00eancia cadastral do Portal do Militar.",
   "properties": {
     "email_enabled": {
       "type": "boolean",
@@ -37,64 +37,71 @@
     "allow_channel_choice": {
       "type": "boolean",
       "default": true,
-      "description": "Permite que o usuário selecione o canal se houver múltiplos disponíveis"
+      "description": "Permite que o usu\u00e1rio selecione o canal se houver m\u00faltiplos dispon\u00edveis"
     },
     "default_channel": {
       "type": "string",
-      "enum": ["EMAIL", "SMS", "WHATSAPP"],
+      "enum": [
+        "EMAIL",
+        "SMS",
+        "WHATSAPP"
+      ],
       "default": "WHATSAPP",
-      "description": "Canal prioritário padrão"
+      "description": "Canal priorit\u00e1rio padr\u00e3o"
     },
     "otp_ttl_seconds": {
       "type": "number",
       "default": 300,
-      "description": "Tempo de vida útil (TTL) do código OTP em segundos (padrão: 300s = 5min)"
+      "description": "Tempo de vida \u00fatil (TTL) do c\u00f3digo OTP em segundos (padr\u00e3o: 300s = 5min)"
     },
     "otp_resend_seconds": {
       "type": "number",
       "default": 60,
-      "description": "Tempo mínimo de espera para reenvio de novo código OTP em segundos"
+      "description": "Tempo m\u00ednimo de espera para reenvio de novo c\u00f3digo OTP em segundos"
     },
     "otp_max_attempts": {
       "type": "number",
       "default": 3,
-      "description": "Número máximo de tentativas incorretas permitidas antes do bloqueio"
+      "description": "N\u00famero m\u00e1ximo de tentativas incorretas permitidas antes do bloqueio"
     },
     "hourly_limit_per_militar": {
       "type": "number",
       "default": 5,
-      "description": "Limite máximo de disparos de OTP por hora para o mesmo militar"
+      "description": "Limite m\u00e1ximo de disparos de OTP por hora para o mesmo militar"
     },
     "app_base_url": {
       "type": "string",
       "default": "https://sistema-de-gestao-de-pessoal-milita-7aa75a23.base44.app/portal",
-      "description": "URL base pública do Portal do Militar"
+      "description": "URL base p\u00fablica do Portal do Militar"
     },
     "ferias_ativo": {
       "type": "boolean",
       "default": true,
-      "description": "Habilita o módulo de férias no Portal do Militar"
+      "description": "Habilita o m\u00f3dulo de f\u00e9rias no Portal do Militar"
     },
     "ferias_modo_selecao_periodo": {
       "type": "string",
-      "enum": ["mais_antigo", "todos"],
+      "enum": [
+        "mais_antigo",
+        "todos"
+      ],
       "default": "mais_antigo",
-      "description": "Modo de exibição dos períodos de férias: mais_antigo (prioriza o mais antigo com saldo) ou todos"
+      "description": "Modo de exibi\u00e7\u00e3o dos per\u00edodos de f\u00e9rias: mais_antigo (prioriza o mais antigo com saldo) ou todos"
     },
     "ferias_permitir_1_etapa_30d": {
       "type": "boolean",
       "default": true,
-      "description": "Permite opção em 1 etapa integral de 30 dias"
+      "description": "Permite op\u00e7\u00e3o em 1 etapa integral de 30 dias"
     },
     "ferias_permitir_2_etapas_15d": {
       "type": "boolean",
       "default": true,
-      "description": "Permite opção em 2 etapas de 15 + 15 dias"
+      "description": "Permite op\u00e7\u00e3o em 2 etapas de 15 + 15 dias"
     },
     "ferias_permitir_3_etapas_10d": {
       "type": "boolean",
       "default": true,
-      "description": "Permite opção em 3 etapas de 10 + 10 + 10 dias"
+      "description": "Permite op\u00e7\u00e3o em 3 etapas de 10 + 10 + 10 dias"
     },
     "ferias_permitir_custom": {
       "type": "boolean",
@@ -104,27 +111,32 @@
     "ferias_prazo_limite": {
       "type": "string",
       "default": "",
-      "description": "Data limite para envio da opção de férias pelo militar"
+      "description": "Data limite para envio da op\u00e7\u00e3o de f\u00e9rias pelo militar"
     },
     "ferias_instrucoes": {
       "type": "string",
-      "default": "Prezados militares, registrem a opção de parcelamento de férias para a elaboração da escala anual da unidade.",
-      "description": "Instruções da Chefia aos militares exibidas no módulo de férias"
+      "default": "Prezados militares, registrem a op\u00e7\u00e3o de parcelamento de f\u00e9rias para a elabora\u00e7\u00e3o da escala anual da unidade.",
+      "description": "Instru\u00e7\u00f5es da Chefia aos militares exibidas no m\u00f3dulo de f\u00e9rias"
+    },
+    "ferias_exigir_atualizacao_cadastral": {
+      "type": "boolean",
+      "default": false,
+      "description": "Exige a conclus\u00e3o da atualiza\u00e7\u00e3o cadastral antes do envio das prefer\u00eancias de f\u00e9rias"
     },
     "cadastro_ativo": {
       "type": "boolean",
       "default": true,
-      "description": "Habilita o módulo de conferência cadastral no Portal"
+      "description": "Habilita o m\u00f3dulo de confer\u00eancia cadastral no Portal"
     },
     "cadastro_permitir_solicitacao": {
       "type": "boolean",
       "default": true,
-      "description": "Permite que os militares enviem solicitações de alteração de cadastro"
+      "description": "Permite que os militares enviem solicita\u00e7\u00f5es de altera\u00e7\u00e3o de cadastro"
     },
     "cadastro_instrucoes": {
       "type": "string",
-      "default": "Confira atentamente seus dados pessoais, de contato e endereço. Caso haja divergência, solicite a alteração.",
-      "description": "Instruções exibidas no topo do módulo de conferência cadastral"
+      "default": "Confira atentamente seus dados pessoais, de contato e endere\u00e7o. Caso haja diverg\u00eancia, solicite a altera\u00e7\u00e3o.",
+      "description": "Instru\u00e7\u00f5es exibidas no topo do m\u00f3dulo de confer\u00eancia cadastral"
     }
   }
 }
