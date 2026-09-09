@@ -2,6 +2,7 @@ import { base44 } from '@/api/base44Client';
 import { getTextoPublicacaoRegistro, mapLivroRegistrosPresenter } from '@/components/livro/livroRegistrosMapper';
 import { mapLivroRegistrosMetricasRP } from '@/components/livro/livroMetricasMapper';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 
 // GOVERNANÇA TEMPLATE (Livro persistido):
 // source_of_truth = persistido
@@ -88,17 +89,16 @@ export async function getLivroTextoPublicacaoRegistro({ registroId } = {}) {
   if (!registro) return { texto_publicacao: '' };
   if (registro?.texto_publicacao) return { texto_publicacao: registro.texto_publicacao, congelado: true };
 
-  const [militares, ferias, templates] = await Promise.all([
+  const [militares, feriasBundle, templates] = await Promise.all([
     registro?.militar_id ? base44.entities.Militar.filter({ id: registro.militar_id }) : Promise.resolve([]),
-    registro?.ferias_id ? base44.entities.Ferias.filter({ id: registro.ferias_id }) : Promise.resolve([]),
+    registro?.ferias_id
+      ? fetchScopedFeriasBundle({ supportPurpose: 'PUBLICACOES', feriasId: registro.ferias_id })
+      : Promise.resolve({ ferias: [], periodosAquisitivos: [] }),
     base44.entities.TemplateTexto.filter({ ativo: true, modulo: 'Livro' }),
   ]);
 
-  const feriasRegistro = ferias?.[0] || null;
-  const periodoAquisitivoId = registro?.periodo_aquisitivo_id || feriasRegistro?.periodo_aquisitivo_id;
-  const periodos = periodoAquisitivoId
-    ? await base44.entities.PeriodoAquisitivo.filter({ id: periodoAquisitivoId })
-    : [];
+  const feriasRegistro = feriasBundle?.ferias?.[0] || null;
+  const periodos = feriasBundle?.periodosAquisitivos || [];
 
   return {
     texto_publicacao: getTextoPublicacaoRegistro({
