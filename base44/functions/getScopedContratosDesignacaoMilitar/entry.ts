@@ -15,6 +15,12 @@ const CAMPOS_PERIODO_LEGADO = [
   'updated_date',
   'created_date',
 ];
+const CAMPOS_EFEITO_CONTRATO_EM_PERIODOS = [
+  'transicao_designacao_contrato_id',
+  'legado_ativa_contrato_designacao_id',
+  'cancelado_transicao_contrato_designacao_id',
+];
+const CAMPOS_PERIODO_EFEITO = ['id', 'militar_id'];
 
 function montarLegado(periodos) {
   return (Array.isArray(periodos) ? periodos : []).reduce((acc, periodo) => {
@@ -124,6 +130,7 @@ Deno.serve(async (req) => {
     try { payload = await req.json(); } catch (_e) { payload = {}; }
 
     const militarId = payload?.militarId ? String(payload.militarId) : '';
+    const contratoIdEfeitos = payload?.contratoIdEfeitos ? String(payload.contratoIdEfeitos) : '';
     if (!militarId) return Response.json({ error: 'militarId é obrigatório.' }, { status: 400 });
 
     const authz = await resolverAutorizacaoCanonica(base44, payload?.effectiveEmail);
@@ -174,9 +181,32 @@ Deno.serve(async (req) => {
     const contratoIds = new Set((contratos || []).map((c) => String(c?.id || '')).filter(Boolean));
     const legadoAtivaPorContrato = montarLegado((periodosLegado || []).filter((p) => contratoIds.has(String(p?.legado_ativa_contrato_designacao_id || ''))));
 
+    let periodosComEfeito = [];
+    if (contratoIdEfeitos) {
+      if (!contratoIds.has(contratoIdEfeitos)) {
+        return Response.json({ error: 'Contrato não encontrado para o militar informado.' }, { status: 404 });
+      }
+      const resultadosEfeito = await Promise.all(CAMPOS_EFEITO_CONTRATO_EM_PERIODOS.map((campo) => (
+        fetchWithRetry(
+          () => base44.asServiceRole.entities.PeriodoAquisitivo.filter(
+            { militar_id: militarId, [campo]: contratoIdEfeitos },
+            undefined,
+            1000,
+            0,
+            CAMPOS_PERIODO_EFEITO,
+          ),
+          `PeriodoAquisitivo.efeito:${campo}:${contratoIdEfeitos}`,
+        )
+      )));
+      const porId = new Map();
+      for (const periodo of resultadosEfeito.flat()) if (periodo?.id) porId.set(String(periodo.id), periodo);
+      periodosComEfeito = Array.from(porId.values());
+    }
+
     return Response.json({
       contratos: contratos || [],
       legadoAtivaPorContrato,
+      periodosComEfeito,
       meta: {
         isAdmin: targetIsAdmin,
         hasGlobalScope: targetHasGlobalScope,
