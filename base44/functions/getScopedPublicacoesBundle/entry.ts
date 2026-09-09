@@ -23,7 +23,12 @@ const PURPOSES: Record<string, PurposeConfig> = {
     exOfficio: true,
   },
   MIGRACAO: { modulesAny: ['migracao_alteracoes_legado'], actionsAny: ['migrar_alteracoes_legado'], livro: false, exOfficio: true },
-  ATESTADOS: { modulesAny: ['atestados'], actionsAny: ['visualizar_atestados'], livro: false, exOfficio: true },
+  ATESTADOS: {
+    modulesAny: ['atestados'],
+    actionsAny: ['visualizar_atestados', 'editar_atestados', 'excluir_atestado', 'publicar_ata_jiso', 'publicar_homologacao', 'gerir_jiso', 'registrar_decisao_jiso'],
+    livro: false,
+    exOfficio: true,
+  },
   QUADRO: { modulesAny: ['quadro_operacional'], actionsAny: ['visualizar_quadro_operacional'], livro: false, exOfficio: true },
   COMPORTAMENTO: {
     modulesAny: ['controle_comportamento'],
