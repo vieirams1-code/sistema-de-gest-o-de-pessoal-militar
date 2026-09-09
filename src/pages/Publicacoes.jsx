@@ -491,7 +491,12 @@ export default function Publicacoes() {
 
       if (origemTipo === 'livro') {
         await atualizarEscopado('RegistroLivro', id, payloadComAuditoria);
-        if (isFeriasOperacional(registroAtual)) await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
+        if (isFeriasOperacional(registroAtual)) {
+          await reconciliarCadeiaFerias({
+            feriasId: registroAtual.ferias_id,
+            supportPurpose: 'PUBLICACOES',
+          });
+        }
         return null;
       }
 
