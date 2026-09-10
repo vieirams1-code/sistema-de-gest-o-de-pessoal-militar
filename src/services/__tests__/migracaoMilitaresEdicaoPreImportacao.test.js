@@ -290,16 +290,35 @@ test('importação final utiliza dados corrigidos e minimiza o snapshot permanen
       {
         linhaNumero: 2,
         status: 'APTO',
-        alertas: [],
+        alertas: ['CPF: 529.982.247-25 validado', 'Telefone: (67) 99999-0000 conferido'],
         erros: [],
+        original: {
+          nome_completo: 'Militar Corrigido',
+          matricula: '999888777',
+          cpf: '52998224725',
+          telefone: '67999990000',
+          rg: '123456 SSP/MS',
+          logradouro: 'Rua Sensível, 123',
+          cep: '79000-000',
+          banco: '001',
+          agencia: '1234',
+          conta: '98765-4',
+        },
         transformado: {
           nome_completo: 'Militar Corrigido',
           nome_guerra: 'Corrigido',
           matricula: '999.888-777',
           cpf: '529.982.247-25',
+          telefone: '(67) 99999-0000',
+          rg: '123456 SSP/MS',
+          logradouro: 'Rua Sensível, 123',
+          cep: '79000-000',
+          banco: '001',
+          agencia: '1234',
+          conta: '98765-4',
           data_inclusao: '2022-05-01',
           posto_graduacao: 'Soldado',
-          data_nascimento: '',
+          data_nascimento: '1990-01-02',
         },
       },
     ],
@@ -325,8 +344,27 @@ test('importação final utiliza dados corrigidos e minimiza o snapshot permanen
   assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'transformado'), false);
   assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'cpf'), false);
   assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'telefone'), false);
-  assert.equal(relatorioSerializado.includes('529.982.247-25'), false);
-  assert.equal(relatorioSerializado.includes('52998224725'), false);
+
+  const chavesProibidas = new Set([
+    'cpf', 'telefone', 'rg', 'logradouro', 'cep', 'banco', 'agencia', 'conta',
+    'data_nascimento', 'original', 'transformado', 'dadosOriginais', 'dadosTransformados',
+  ]);
+  const percorrerChaves = (valor) => {
+    if (!valor || typeof valor !== 'object') return [];
+    if (Array.isArray(valor)) return valor.flatMap(percorrerChaves);
+    return Object.entries(valor).flatMap(([chave, filho]) => [chave, ...percorrerChaves(filho)]);
+  };
+  const chavesPersistidas = percorrerChaves(relatorioPersistido);
+  assert.deepEqual(chavesPersistidas.filter((chave) => chavesProibidas.has(chave)), []);
+
+  for (const valorSensivel of [
+    '529.982.247-25', '52998224725', '(67) 99999-0000', '67999990000',
+    '123456 SSP/MS', 'Rua Sensível, 123', '79000-000', '98765-4', '1990-01-02',
+  ]) {
+    assert.equal(relatorioSerializado.includes(valorSensivel), false, `valor sensível persistido: ${valorSensivel}`);
+  }
+  assert.match(relatorioSerializado, /CPF \[suprimido\]/);
+  assert.match(relatorioSerializado, /telefone \[suprimido\]/i);
   assert.equal(await carregarAnaliseHistorico(historico.id), null);
 });
 
