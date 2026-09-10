@@ -29,7 +29,6 @@ export default function PlanosFerias() {
   const podeExcluirCampanhas = isAdmin || canAccessAction('excluir_campanhas_ferias');
   const podeVisualizarRespostas = isAdmin || canAccessAction('visualizar_respostas_ferias');
   const podeGerarFerias = isAdmin || canAccessAction('gerar_ferias_campanhas');
-  const podeAtribuirPermissoes = isAdmin || canAccessAction('atribuir_permissoes_ferias');
   const podeAdminFerias = isAdmin || canAccessAction('admin_campanhas_ferias');
   const [planos, setPlanos] = useState([]);
   const [campanhas, setCampanhas] = useState([]);
@@ -49,10 +48,7 @@ export default function PlanosFerias() {
   const [modalRespostas, setModalRespostas] = useState(null);
   const [respostasCampanha, setRespostasCampanha] = useState(null);
   const [carregandoRespostas, setCarregandoRespostas] = useState(false);
-  const [usuariosSistema, setUsuariosSistema] = useState([]);
-  const [permissoes, setPermissoes] = useState([]);
   const [auditoria, setAuditoria] = useState([]);
-  const [permissaoForm, setPermissaoForm] = useState({ usuario_id: '', campanha_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
 
   const carregar = async () => {
     setLoading(true);
@@ -95,7 +91,6 @@ export default function PlanosFerias() {
   useEffect(() => {
     if (!selecionado?.id) {
       setMetricas(null);
-      setPermissoes([]);
       setAuditoria([]);
       return;
     }
@@ -463,7 +458,7 @@ export default function PlanosFerias() {
             <div className="flex gap-2 flex-wrap">
               {podeAdminFerias && <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}><ShieldCheck className="w-4 h-4 mr-1.5" />{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>}
               {modoAdmin && podeAdminFerias && podeExcluirPlanos && <Button type="button" variant="outline" onClick={() => excluir(selecionado)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir plano</Button>}
-              {(podeVisualizarRespostas || podeGerarFerias || podeAtribuirPermissoes) && <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>}
+              {(podeVisualizarRespostas || podeGerarFerias || podeAdminFerias) && <Button type="button" onClick={() => navigate('/PainelPlanoFerias?planoId=' + selecionado.id)} className="bg-blue-700 hover:bg-blue-800"><CalendarDays className="w-4 h-4 mr-1.5" />Abrir painel consolidado</Button>}
               {podeEditarPlanos && <Button type="button" variant="outline" onClick={() => abrirEdicao(selecionado)}><Edit3 className="w-4 h-4 mr-1.5" />Editar plano</Button>}
               {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status !== 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => arquivar(selecionado)} disabled={salvando}><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
               {modoAdmin && podeAdminFerias && podeEditarPlanos && selecionado.status === 'ARQUIVADO' && <Button type="button" variant="outline" onClick={() => desarquivar(selecionado)} disabled={salvando}><RefreshCw className="w-4 h-4 mr-1.5" />Desarquivar</Button>}
@@ -486,7 +481,7 @@ export default function PlanosFerias() {
                   <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.tipo_escopo === 'SEM_ESCOPO' ? 'Somente grupos' : (campanha.escopo_unidades_nomes || 'Toda a Corporação')}{campanha.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
                     <div className="flex gap-2 flex-wrap">
-                      {(podeEditarCampanhas || podeAtribuirPermissoes || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
+                      {(podeEditarCampanhas || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
                       {podeVisualizarRespostas && <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>}
                       {modoAdmin && podeAdminFerias && podeExcluirCampanhas && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
                     </div>
@@ -496,7 +491,7 @@ export default function PlanosFerias() {
             )}
           </div>
 
-          {modoAdmin && podeAtribuirPermissoes && (
+          {modoAdmin && podeAdminFerias && (
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <h2 className="font-bold text-slate-900">Histórico de ações</h2>
               <p className="text-xs text-slate-500 mt-1">Registro de quem salvou, aprovou, rejeitou ou alterou cada decisão.</p>
