@@ -268,33 +268,35 @@ Deno.serve(async (req) => {
       if (authz?.isAdmin !== true) {
         throw Object.assign(new Error('A migração de snapshots históricos é restrita a administrador.'), { status: 403 });
       }
-      const finalStatuses = new Set(['Importado', 'Importado Parcial', 'Falhou']);
+      const finalStatuses = new Set(['Importado', 'Importado Parcial', 'Falhou', 'Concluído', 'Concluido', 'Cancelado', 'Cancelada']);
+      const executar = payload?.executar === true;
       const rows = await base44.asServiceRole.entities[ENTITY].list('-created_date', 1000);
-      const candidates = (rows || []).filter((row: any) => finalStatuses.has(limparTexto(row?.status_importacao)));
+      const terminalRows = (rows || []).filter((row: any) => finalStatuses.has(limparTexto(row?.status_importacao)));
+      const candidates = terminalRows
+        .map((row: any) => ({ row, minimal: relatorioAuditoriaMinimaPersistente(row) }))
+        .filter((item: any) => Boolean(item.minimal));
       let migrated = 0;
-      let alreadyMinimal = 0;
       let failed = 0;
 
-      for (const row of candidates) {
-        try {
-          const minimal = relatorioAuditoriaMinimaPersistente(row);
-          if (!minimal) {
-            alreadyMinimal += 1;
-            continue;
+      if (executar) {
+        for (const { row, minimal } of candidates) {
+          try {
+            await base44.asServiceRole.entities[ENTITY].update(row.id, { relatorio_json: minimal });
+            migrated += 1;
+          } catch (migrationError) {
+            failed += 1;
+            console.error('[importacaoMilitaresHistoricoGateway] falha ao minimizar lote', row?.id, migrationError?.message || migrationError);
           }
-          await base44.asServiceRole.entities[ENTITY].update(row.id, { relatorio_json: minimal });
-          migrated += 1;
-        } catch (migrationError) {
-          failed += 1;
-          console.error('[importacaoMilitaresHistoricoGateway] falha ao minimizar lote', row?.id, migrationError?.message || migrationError);
         }
       }
 
       return Response.json({
         result: {
-          examined: candidates.length,
+          dryRun: !executar,
+          examined: terminalRows.length,
+          candidates: candidates.length,
           migrated,
-          alreadyMinimal,
+          alreadyMinimal: terminalRows.length - candidates.length,
           failed,
         },
       });
