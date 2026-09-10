@@ -285,7 +285,6 @@ const menuGroups = [
               { type: 'action', key: 'perm_visualizar_respostas_ferias' },
               { type: 'action', key: 'perm_aprovar_ferias' },
               { type: 'action', key: 'perm_gerar_ferias_campanhas' },
-              { type: 'action', key: 'perm_atribuir_permissoes_ferias' },
             ],
             menuGroup: 'Gestão RH / Comando',
           },
