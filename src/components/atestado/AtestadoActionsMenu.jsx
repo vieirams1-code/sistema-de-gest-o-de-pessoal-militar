@@ -22,7 +22,6 @@ export default function AtestadoActionsMenu({
 }) {
   const { canAccessAction } = useCurrentUser();
   const canDownloadAttachments = canAccessAction('baixar_anexos_atestados');
-  const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
 
   const {
     onView,
@@ -72,9 +71,9 @@ export default function AtestadoActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {atestado?.arquivo_atestado && canDownloadAttachments && canViewSensitive && (
+        {atestado?.arquivo_atestado && canDownloadAttachments && (
           <DropdownMenuItem onClick={() => {
-            if (!canDownloadAttachments || !canViewSensitive) {
+            if (!canDownloadAttachments) {
               toast.error('Você não tem permissão para baixar anexos médicos.');
               return;
             }
@@ -83,9 +82,9 @@ export default function AtestadoActionsMenu({
             <Download className="w-4 h-4 mr-2 text-slate-600" />Baixar atestado anexado
           </DropdownMenuItem>
         )}
-        {atestado?.arquivo_ata_jiso && canDownloadAttachments && canViewSensitive && (
+        {atestado?.arquivo_ata_jiso && canDownloadAttachments && (
           <DropdownMenuItem onClick={() => {
-            if (!canDownloadAttachments || !canViewSensitive) {
+            if (!canDownloadAttachments) {
               toast.error('Você não tem permissão para baixar anexos médicos.');
               return;
             }
