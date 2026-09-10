@@ -1325,7 +1325,12 @@ export async function carregarAnaliseHistorico(historicoId) {
   const historico = Array.isArray(itens) ? itens[0] : null;
   if (!historico?.relatorio_json) return null;
   const relatorio = JSON.parse(historico.relatorio_json);
-  if (relatorio?.tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA || relatorio?.permite_retomada === false) {
+  if (
+    isImportacaoMilitaresStatusTerminal(historico?.status_importacao)
+    || relatorio?.tipo_snapshot === IMPORTACAO_MILITARES_SNAPSHOT_HISTORICO_MINIMO
+    || relatorio?.tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA
+    || relatorio?.permite_retomada === false
+  ) {
     return null;
   }
   if (!relatorio?.linhas || !relatorio?.resumo) return null;
@@ -1345,6 +1350,16 @@ export async function persistirCorrecaoPreImportacaoHistorico({
     ? await historicoEntity.filter({ id: historicoId })
     : (historicoEntity.list ? await historicoEntity.list() : []).filter((item) => item?.id === historicoId);
   const historicoAtual = Array.isArray(itens) ? itens[0] : null;
+  if (!historicoAtual) return null;
+  const relatorioAtual = historicoAtual?.relatorio_json ? JSON.parse(historicoAtual.relatorio_json) : {};
+  if (
+    isImportacaoMilitaresStatusTerminal(historicoAtual?.status_importacao)
+    || relatorioAtual?.tipo_snapshot === IMPORTACAO_MILITARES_SNAPSHOT_HISTORICO_MINIMO
+    || relatorioAtual?.tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA
+    || relatorioAtual?.permite_retomada === false
+  ) {
+    throw new Error('Este lote já foi finalizado e o snapshot de trabalho foi descartado.');
+  }
   const timestamp = new Date().toISOString();
   const trilha = `Correção pré-importação linha ${linhaNumero} por ${usuario?.email || 'sistema'} em ${timestamp} (campos: ${alteracoes.join(', ') || 'N/D'}).`;
   const observacoesAnteriores = limparTexto(historicoAtual?.observacoes);
