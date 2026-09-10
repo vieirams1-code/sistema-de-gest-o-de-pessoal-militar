@@ -89,6 +89,12 @@ async function fetchUserPermissions(effectiveEmail) {
     appFunctionsVersion: appParams.functionsVersion || 'default',
   };
   window.__SGP_NATIVE_TRACE = nativeTrace;
+  const diagnostic = document.getElementById('sgp-native-diagnostic') || document.createElement('div');
+  diagnostic.id = 'sgp-native-diagnostic';
+  diagnostic.setAttribute('role', 'status');
+  diagnostic.style.cssText = 'position:fixed;z-index:2147483647;right:8px;bottom:8px;background:#111;color:#0f0;padding:6px 8px;font:11px monospace;border-radius:4px;opacity:.9';
+  diagnostic.textContent = `TRACE ${nativeTrace.appFunctionsVersion} ${nativeTrace.modulesTrue}/${nativeTrace.actionsTrue} M:${nativeTrace.militares ? '1' : '0'} A:${nativeTrace.visualizarMilitares ? '1' : '0'}`;
+  if (!diagnostic.parentNode) document.body.appendChild(diagnostic);
   console.info('[SGP_NATIVE_TRACE]', nativeTrace);
 
   if (!payload) {
