@@ -16,6 +16,7 @@ export default function BackupSistema() {
     setGerando(true);
     try {
       const incluirArquivos = modo === 'dados_e_arquivos';
+      const backupPlanosFerias = modo === 'planos_ferias';
       toast({
         title: 'Gerando backup...',
         description: incluirArquivos
@@ -23,9 +24,10 @@ export default function BackupSistema() {
           : 'Coletando todos os dados do sistema.',
       });
 
-      const response = await base44.functions.invoke('gerarBackupSistema', {
-        incluir_arquivos: incluirArquivos,
-      });
+      const response = await base44.functions.invoke(
+        backupPlanosFerias ? 'gerarBackupPlanosFerias' : 'gerarBackupSistema',
+        backupPlanosFerias ? {} : { incluir_arquivos: incluirArquivos },
+      );
 
       // A resposta vem como Blob/ArrayBuffer. O SDK retorna {data, status, headers}.
       const data = response?.data;
@@ -34,7 +36,9 @@ export default function BackupSistema() {
       // Converte em Blob para download
       const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/zip' });
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = `sgp-backup-${stamp}${incluirArquivos ? '-completo' : '-dados'}.zip`;
+      const filename = backupPlanosFerias
+        ? `sgp-planos-ferias-backup-${stamp}.zip`
+        : `sgp-backup-${stamp}${incluirArquivos ? '-completo' : '-dados'}.zip`;
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -81,6 +85,26 @@ export default function BackupSistema() {
         </CardHeader>
         <CardContent className="space-y-6">
           <RadioGroup value={modo} onValueChange={setModo} className="gap-4">
+            <label
+              htmlFor="planos_ferias"
+              className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                modo === 'planos_ferias' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <RadioGroupItem value="planos_ferias" id="planos_ferias" className="mt-1" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 font-semibold text-slate-900">
+                  <Archive className="w-4 h-4" />
+                  Planos de Férias e respostas (recomendado antes de alterações)
+                </div>
+                <p className="text-sm text-slate-600 mt-1">
+                  Exporta os planos, campanhas, opções enviadas, respostas, decisões, permissões,
+                  grupos, militares envolvidos, períodos aquisitivos, auditoria e férias geradas vinculadas.
+                </p>
+                <p className="text-xs text-slate-500 mt-2">Backup direcionado, sem modificar nenhum registro.</p>
+              </div>
+            </label>
+
             <label
               htmlFor="somente_dados"
               className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
@@ -167,13 +191,13 @@ export default function BackupSistema() {
         <CardContent className="text-sm text-slate-600 space-y-2">
           <p>
             O ZIP gerado contém um arquivo <code className="bg-slate-100 px-1 rounded">manifesto.json</code>{' '}
-            com a data, contagem de registros e eventuais erros, e uma pasta{' '}
+            com a data, planos incluídos, contagem de registros e checksums, e uma pasta{' '}
             <code className="bg-slate-100 px-1 rounded">dados/</code> com um JSON por entidade.
           </p>
           <p>
-            Para restaurar registros, a função de importação pode ser executada por um administrador
-            sob demanda. Caso precise restaurar dados, abra um chamado descrevendo o que deseja
-            recuperar e anexe o backup correspondente.
+            A restauração dos Planos de Férias será feita em duas etapas: primeiro uma simulação
+            para identificar conflitos e depois a confirmação administrativa. O backup deve ser guardado
+            em local seguro; a restauração nunca deverá sobrescrever respostas sem mostrar o impacto.
           </p>
         </CardContent>
       </Card>
