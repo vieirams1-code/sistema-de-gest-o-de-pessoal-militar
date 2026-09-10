@@ -37,6 +37,9 @@ function limparDescricaoTecnica(descricao: unknown): string {
 }
 
 function matrizesCanonicasIguais(a: Record<string, unknown> = {}, b: Record<string, unknown> = {}): boolean {
+  const keysA = Object.keys(a || {});
+  if (keysA.length !== CANONICAL_PERMISSION_KEYS.length) return false;
+  if (keysA.some((key) => !CANONICAL_KEY_SET.has(key))) return false;
   return CANONICAL_PERMISSION_KEYS.every((key: string) => (a?.[key] === true) === (b?.[key] === true));
 }
 
