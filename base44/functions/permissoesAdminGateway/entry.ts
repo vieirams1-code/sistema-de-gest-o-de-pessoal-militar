@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
-import { CANONICAL_PERMISSION_KEYS, PERMISSION_MODULES, PROFILE_MATRIX_VERSION } from '../getUserPermissions/permissionManifest.ts';
+import { CANONICAL_PERMISSION_KEYS, PERMISSION_MODULES, PROFILE_MATRIX_VERSION } from './permissionManifest.ts';
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
