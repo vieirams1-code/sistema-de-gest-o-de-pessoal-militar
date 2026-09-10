@@ -83,10 +83,10 @@ test('histórico legado não expõe CPF, telefone ou snapshots brutos ao fronten
 
   assert.equal(linha.nome, 'Militar Legado');
   assert.equal(linha.matricula_atual, '111.222-333');
-  assert.equal(linha.cpf, '');
-  assert.equal(linha.telefone, '');
-  assert.deepEqual(linha.dadosOriginais, {});
-  assert.deepEqual(linha.dadosTransformados, {});
+  assert.equal(Object.hasOwn(linha, 'cpf'), false);
+  assert.equal(Object.hasOwn(linha, 'telefone'), false);
+  assert.equal(Object.hasOwn(linha, 'dadosOriginais'), false);
+  assert.equal(Object.hasOwn(linha, 'dadosTransformados'), false);
   assert.equal(JSON.stringify(linha).includes('529.982.247-25'), false);
   assert.equal(JSON.stringify(linha).includes('67999999999'), false);
   assert.equal(JSON.stringify(linha).includes('123456'), false);
@@ -141,10 +141,10 @@ test('histórico novo minimizado é lido sem PII e CSV não reintroduz CPF/telef
   const [lote] = await listarHistoricoImportacoesMilitares();
   assert.equal(lote.relatorioMinimizado, true);
   assert.equal(lote.relatorioRaw.tipo_snapshot, 'HISTORICO_MINIMO');
-  assert.equal(lote.linhas[0].cpf, '');
-  assert.equal(lote.linhas[0].telefone, '');
-  assert.deepEqual(lote.linhas[0].dadosOriginais, {});
-  assert.deepEqual(lote.linhas[0].dadosTransformados, {});
+  assert.equal(Object.hasOwn(lote.linhas[0], 'cpf'), false);
+  assert.equal(Object.hasOwn(lote.linhas[0], 'telefone'), false);
+  assert.equal(Object.hasOwn(lote.linhas[0], 'dadosOriginais'), false);
+  assert.equal(Object.hasOwn(lote.linhas[0], 'dadosTransformados'), false);
 
   const csv = gerarCsvHistoricoHumano(lote);
   const cabecalho = csv.split('\n')[0].toLowerCase().split(',');
