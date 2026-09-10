@@ -34,7 +34,7 @@ function createEntity(initial = []) {
   };
 }
 
-function setupClients() {
+function setupClients({ createMilitarError = null } = {}) {
   const Militar = createEntity([]);
   const MatriculaMilitar = createEntity([]);
   const ImportacaoMilitares = createEntity([]);
@@ -77,6 +77,7 @@ function setupClients() {
         }
 
         if (action === 'CREATE_MILITAR') {
+          if (createMilitarError) throw createMilitarError;
           const data = { ...(payload.data || {}) };
           if (data.cpf) data.cpf = digits(data.cpf);
           const created = await Militar.create(data);
