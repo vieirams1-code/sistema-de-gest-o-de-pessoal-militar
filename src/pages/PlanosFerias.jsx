@@ -100,17 +100,14 @@ export default function PlanosFerias() {
   }, [selecionado?.id]);
 
   useEffect(() => {
-    if (!modoAdmin || !podeAtribuirPermissoes || !selecionado?.id) return;
-    Promise.allSettled([
-      base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' }),
-      base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id }),
-      base44.functions.invoke('portal_servicos', { acao: 'PLANO_AUDITORIA_LISTAR', plano_id: selecionado.id }),
-    ]).then(([usuariosResult, permissoesResult, auditoriaResult]) => {
-      setUsuariosSistema(usuariosResult.status === 'fulfilled' ? (usuariosResult.value.data?.usuarios || []) : []);
-      setPermissoes(permissoesResult.status === 'fulfilled' ? (permissoesResult.value.data?.permissoes || []) : []);
-      setAuditoria(auditoriaResult.status === 'fulfilled' ? (auditoriaResult.value.data?.auditoria || []) : []);
-    });
-  }, [modoAdmin, selecionado?.id]);
+    if (!modoAdmin || !podeAdminFerias || !selecionado?.id) {
+      setAuditoria([]);
+      return;
+    }
+    base44.functions.invoke('portal_servicos', { acao: 'PLANO_AUDITORIA_LISTAR', plano_id: selecionado.id })
+      .then((res) => setAuditoria(res.data?.auditoria || []))
+      .catch(() => setAuditoria([]));
+  }, [modoAdmin, podeAdminFerias, selecionado?.id]);
 
 
   const campanhasDoPlano = useMemo(
