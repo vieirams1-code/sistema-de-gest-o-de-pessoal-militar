@@ -1142,13 +1142,22 @@ function listaTextoAuditoria(valor) {
   return listaTextoSegura(valor).map(sanitizarTextoAuditoriaImportacao);
 }
 
-function linhaAuditoriaMinima(linha, index, { incluirAlertas = false, naoImportadasPorLinha = new Map() } = {}) {
+export function sanitizarLinhaHistoricoImportacao(linha, index, {
+  incluirAlertas = false,
+  naoImportadasPorLinha = new Map(),
+  idsCriadosPorLinha = new Map(),
+  linhasImportadas = new Set(),
+} = {}) {
   const original = linha?.original || {};
   const transformado = linha?.transformado || {};
   const linhaNumero = Number(linha?.linhaNumero || linha?.linha_numero || index + 1);
   const motivoNaoImportada = naoImportadasPorLinha.get(linhaNumero) || '';
   const elegivel = linha?.status === STATUS_LINHA.APTO
     || (incluirAlertas && linha?.status === STATUS_LINHA.APTO_COM_ALERTA);
+  const militarId = limparTexto(idsCriadosPorLinha.get(linhaNumero) || linha?.militar_id || linha?.id_criado);
+  const importada = linhasImportadas.size > 0
+    ? linhasImportadas.has(linhaNumero)
+    : Boolean(militarId || linha?.importada || linha?.foi_importada || linha?.importado || (elegivel && !motivoNaoImportada));
 
   return {
     linhaNumero,
@@ -1156,20 +1165,20 @@ function linhaAuditoriaMinima(linha, index, { incluirAlertas = false, naoImporta
     nome: limparTexto(transformado?.nome_completo || original?.nome_completo || original?.nome || linha?.nome),
     matricula_atual: limparTexto(transformado?.matricula_atual || transformado?.matricula || linha?.matricula_atual),
     matricula_historica: limparTexto(original?.matricula || original?.['matrícula'] || linha?.matricula_historica),
-    posto: limparTexto(transformado?.posto_graduacao || original?.posto_graduacao || original?.posto || original?.['posto/graduação']),
+    posto_graduacao: limparTexto(transformado?.posto_graduacao || original?.posto_graduacao || original?.posto || original?.['posto/graduação']),
+    importada,
+    militar_id: militarId,
     alertas: listaTextoAuditoria(linha?.alertas || linha?.avisos),
     erros: listaTextoAuditoria(linha?.erros || linha?.falhas),
-    observacoes: listaTextoAuditoria(linha?.observacoes || linha?.observacao || linha?.observacoes_importacao),
     pendencias_revisao: listaTextoAuditoria(linha?.pendencias_revisao || linha?.revisar || linha?.pendencias),
-    correcao_pre_importacao: linha?.correcao_pre_importacao ? {
+    ajustes_automaticos: listaTextoAuditoria(linha?.ajustes_automaticos || linha?.ajustesAutomaticos),
+    correcoes_manuais: linha?.correcao_pre_importacao ? {
       campos_alterados: Array.isArray(linha.correcao_pre_importacao.campos_alterados)
         ? linha.correcao_pre_importacao.campos_alterados.map((campo) => limparTexto(campo)).filter(Boolean)
         : [],
-      corrigido_por: limparTexto(linha.correcao_pre_importacao.corrigido_por),
-      corrigido_em: limparTexto(linha.correcao_pre_importacao.corrigido_em),
+      data: limparTexto(linha.correcao_pre_importacao.corrigido_em),
     } : null,
-    importada: elegivel && !motivoNaoImportada,
-    motivo_nao_importada: sanitizarTextoAuditoriaImportacao(motivoNaoImportada),
+    motivo_nao_importacao: sanitizarTextoAuditoriaImportacao(motivoNaoImportada),
   };
 }
 
