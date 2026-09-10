@@ -6,7 +6,13 @@ import { Shield, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
+import {
+  permissionStructure,
+  modulosList,
+  acoesSensiveis,
+  isModuleVisibleInAdminMatrix,
+  isPermissionVisibleInAdminMatrix,
+} from '@/config/permissionStructure';
 import {
   buildPermissionPayload,
   extractProfileMatrixFromDescription,
@@ -310,8 +316,9 @@ export default function PerfisPermissao() {
                     <div key={categoryGroup.category} className="bg-white p-4 rounded-lg border border-slate-200">
                       <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">{categoryGroup.category}</h4>
                       <div className="space-y-3">
-                        {categoryGroup.modules.map((mod) => {
+                        {categoryGroup.modules.filter(isModuleVisibleInAdminMatrix).map((mod) => {
                           const isModuleEnabled = formData[mod.key] === true;
+                          const visibleActions = (mod.actions || []).filter(isPermissionVisibleInAdminMatrix);
 
                           return (
                             <div key={mod.key} className={`rounded-lg border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-slate-50'}`}>
@@ -342,10 +349,10 @@ export default function PerfisPermissao() {
                                 </span>
                               </div>
 
-                              {mod.actions.length > 0 && isModuleEnabled && (
+                              {visibleActions.length > 0 && isModuleEnabled && (
                                 <div className="px-3 pb-3">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-blue-100 pt-3">
-                                    {mod.actions.map((act) => {
+                                    {visibleActions.map((act) => {
                                       const isActionEnabled = formData[act.key] === true;
 
                                       return (
