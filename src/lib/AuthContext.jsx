@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
-      console.info('[SGP_AUTH_TRACE]', {
+      console.info('[SGP_AUTH_TRACE] ' + JSON.stringify({
         source: 'base44.auth.me',
         hasUser: Boolean(currentUser),
         role: currentUser?.role || null,
@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }) => {
         emailFingerprint: typeof currentUser?.email === 'string'
           ? Array.from(currentUser.email.toLowerCase()).reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) >>> 0, 7).toString(16)
           : null,
-      });
+      }));
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
