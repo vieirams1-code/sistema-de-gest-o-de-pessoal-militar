@@ -336,6 +336,8 @@ test('importação final utiliza dados corrigidos e minimiza o snapshot permanen
 
   const relatorioPersistido = JSON.parse(ImportacaoMilitares._rows[0].relatorio_json);
   const relatorioSerializado = JSON.stringify(relatorioPersistido);
+  assert.equal(relatorioPersistido.tipo_snapshot, 'HISTORICO_MINIMO');
+  assert.equal(relatorioPersistido.versao_snapshot, 1);
   assert.equal(relatorioPersistido.tipo_relatorio, 'AUDITORIA_MINIMA_V1');
   assert.equal(relatorioPersistido.permite_retomada, false);
   assert.equal(relatorioPersistido.linhas[0].nome, 'Militar Corrigido');
@@ -416,6 +418,8 @@ test('falha inesperada finaliza histórico minimizado sem preservar PII do snaps
   const relatorio = JSON.parse(persistido.relatorio_json);
   const serializado = JSON.stringify(relatorio);
   assert.equal(persistido.status_importacao, 'Falhou');
+  assert.equal(relatorio.tipo_snapshot, 'HISTORICO_MINIMO');
+  assert.equal(relatorio.versao_snapshot, 1);
   assert.equal(relatorio.tipo_relatorio, 'AUDITORIA_MINIMA_V1');
   assert.equal(relatorio.permite_retomada, false);
   assert.equal(relatorio.linhas[0].nome, 'Militar Falha');
@@ -426,8 +430,8 @@ test('falha inesperada finaliza histórico minimizado sem preservar PII do snaps
   assert.equal(serializado.includes('(67) 99999-0000'), false);
   assert.equal(serializado.includes('67999990000'), false);
   assert.equal(serializado.includes('998877 SSP/MS'), false);
-  assert.match(relatorio.falha_importacao, /CPF \[suprimido\]/);
-  assert.match(relatorio.falha_importacao, /telefone \[suprimido\]/i);
+  assert.ok(relatorio.erros_operacionais.some((mensagem) => /CPF \[suprimido\]/.test(mensagem)));
+  assert.ok(relatorio.erros_operacionais.some((mensagem) => /telefone \[suprimido\]/i.test(mensagem)));
   assert.equal(await carregarAnaliseHistorico(historico.id), null);
 });
 
@@ -487,8 +491,8 @@ test('bloqueia duplicidade na importação sem criar pendência persistida', asy
   assert.equal(resultado.totalImportadas, 0);
   assert.equal(resultado.totalNaoImportadas, 2);
   assert.equal(PossivelDuplicidadeMilitar._rows.length, 0);
-  assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Possível duplicidade identificada.'));
-  assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Matrícula já cadastrada.'));
+  assert.ok(resultado.relatorio.linhas.some((item) => item.motivo_nao_importacao === 'Possível duplicidade identificada.'));
+  assert.ok(resultado.relatorio.linhas.some((item) => item.motivo_nao_importacao === 'Matrícula já cadastrada.')); 
 });
 
 test('análise detecta matrícula já cadastrada no histórico de matrícula mesmo sem cadastro legado', async () => {
@@ -549,5 +553,31 @@ test('importação não falha o lote quando a matrícula já existe apenas em Ma
 
   assert.equal(resultado.statusImportacao, 'Falhou');
   assert.equal(resultado.totalImportadas, 0);
-  assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Matrícula já cadastrada.'));
+  assert.ok(resultado.relatorio.linhas.some((item) => item.motivo_nao_importacao === 'Matrícula já cadastrada.'));
+});
+
+test('lote terminal não pode ser restaurado nem receber correção pré-importação', async () => {
+  const { ImportacaoMilitares } = setupClients();
+  const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
+  const analise = analiseBase();
+  const historico = await salvarAnaliseHistorico(analise, usuario);
+
+  await ImportacaoMilitares.update(historico.id, { status_importacao: 'Importado' });
+
+  assert.equal(await carregarAnaliseHistorico(historico.id), null);
+  await assert.rejects(
+    persistirCorrecaoPreImportacaoHistorico({
+      historicoId: historico.id,
+      analise,
+      usuario,
+      linhaNumero: 2,
+      alteracoes: ['nome_completo'],
+    }),
+    { message: /lote já foi finalizado e o snapshot de trabalho foi descartado/i },
+  );
+
+  const persistido = ImportacaoMilitares._rows[0];
+  const relatorio = JSON.parse(persistido.relatorio_json);
+  assert.equal(relatorio.tipo_snapshot, 'ANALISE_TEMPORARIA');
+  assert.equal(persistido.status_importacao, 'Importado');
 });
