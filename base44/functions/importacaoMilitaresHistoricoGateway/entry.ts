@@ -74,29 +74,27 @@ function linhaHistoricoSegura(raw: any = {}, index = 0, options: any = {}) {
   const elegivel = raw?.status === 'APTO' || (incluirAlertas && raw?.status === 'APTO_COM_ALERTA');
   const correcao = raw?.correcao_pre_importacao;
   return {
-    formato_linha: 'AUDITORIA_MINIMA_V1',
-    minimizado: true,
     linhaNumero,
     status: limparTexto(raw?.status),
     nome: limparTexto(raw?.nome || transformado?.nome_completo || original?.nome_completo || original?.nome),
-    matricula_atual: limparTexto(raw?.matricula_atual || transformado?.matricula_atual || transformado?.matricula),
     matricula_historica: limparTexto(raw?.matricula_historica || original?.matricula || original?.['matrícula'] || raw?.matricula),
-    posto: limparTexto(raw?.posto || transformado?.posto_graduacao || original?.posto_graduacao || original?.posto || original?.['posto/graduação']),
-    alertas: listaAuditoria(raw?.alertas || raw?.avisos),
-    erros: listaAuditoria(raw?.erros || raw?.falhas),
-    observacoes: listaAuditoria(raw?.observacoes || raw?.observacao || raw?.observacoes_importacao),
-    pendencias_revisao: listaAuditoria(raw?.pendencias_revisao || raw?.revisar || raw?.pendencias),
-    correcao_pre_importacao: correcao ? {
-      campos_alterados: Array.isArray(correcao?.campos_alterados)
-        ? correcao.campos_alterados.map(limparTexto).filter(Boolean)
-        : [],
-      corrigido_por: limparTexto(correcao?.corrigido_por),
-      corrigido_em: limparTexto(correcao?.corrigido_em),
-    } : null,
+    matricula_atual: limparTexto(raw?.matricula_atual || transformado?.matricula_atual || transformado?.matricula),
+    posto_graduacao: limparTexto(raw?.posto_graduacao || raw?.posto || transformado?.posto_graduacao || original?.posto_graduacao || original?.posto || original?.['posto/graduação']),
     importada: motivoNaoImportada
       ? false
       : (elegivel || Boolean(raw?.importada || raw?.foi_importada || raw?.importado || raw?.militar_id || raw?.id_criado)),
-    motivo_nao_importada: sanitizarMensagem(motivoNaoImportada),
+    militar_id: limparTexto(raw?.militar_id || raw?.id_criado),
+    alertas: listaAuditoria(raw?.alertas || raw?.avisos),
+    erros: listaAuditoria(raw?.erros || raw?.falhas),
+    pendencias_revisao: listaAuditoria(raw?.pendencias_revisao || raw?.revisar || raw?.pendencias),
+    ajustes_automaticos: listaAuditoria(raw?.ajustes_automaticos || raw?.ajustesAutomaticos),
+    correcoes_manuais: correcao ? {
+      campos_alterados: Array.isArray(correcao?.campos_alterados)
+        ? correcao.campos_alterados.map(limparTexto).filter(Boolean)
+        : [],
+      data: limparTexto(correcao?.corrigido_em),
+    } : null,
+    motivo_nao_importacao: sanitizarMensagem(motivoNaoImportada),
   };
 }
 
