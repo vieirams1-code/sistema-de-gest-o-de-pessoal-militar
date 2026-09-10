@@ -6,8 +6,48 @@ import {
   previewProfilePermissionMigration,
   previewProfilesPermissionMigration,
 } from '../permissionProfileMigrationService.js';
+import {
+  buildPermissionPayload,
+  PROFILE_MATRIX_VERSION,
+  resolveProfilePermissions,
+} from '../permissionMatrixService.js';
 
 const wrap = (matrix, prefix = '') => `${prefix}${prefix ? '\n\n' : ''}[SGP_PERMISSIONS_MATRIX]${JSON.stringify(matrix)}[/SGP_PERMISSIONS_MATRIX]`;
+
+test('payload novo persiste matriz estruturada com versão canônica', () => {
+  const payload = buildPermissionPayload({
+    acesso_militares: true,
+    perm_visualizar_militares: true,
+  });
+  assert.equal(payload.matriz_permissoes.acesso_militares, true);
+  assert.equal(payload.matriz_permissoes.perm_visualizar_militares, true);
+  assert.equal(payload.versao_matriz_permissoes, PROFILE_MATRIX_VERSION);
+});
+
+test('campo estruturado prevalece sobre descricao divergente', () => {
+  const resolved = resolveProfilePermissions({
+    profileSource: {
+      matriz_permissoes: {
+        acesso_militares: true,
+        perm_visualizar_militares: false,
+      },
+      versao_matriz_permissoes: PROFILE_MATRIX_VERSION,
+      descricao: wrap({ acesso_militares: false, perm_visualizar_militares: true }),
+    },
+  }).permissions;
+  assert.equal(resolved.acesso_militares, true);
+  assert.equal(resolved.perm_visualizar_militares, false);
+});
+
+test('perfil legado sem campo estruturado continua compatível via descricao', () => {
+  const resolved = resolveProfilePermissions({
+    profileSource: {
+      descricao: wrap({ acesso_militares: true, perm_visualizar_militares: true }),
+    },
+  }).permissions;
+  assert.equal(resolved.acesso_militares, true);
+  assert.equal(resolved.perm_visualizar_militares, true);
+});
 
 test('perfil canônico recebe versão formal sem alterar intenção', () => {
   const preview = previewProfilePermissionMigration({
