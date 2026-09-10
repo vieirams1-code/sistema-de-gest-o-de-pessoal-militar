@@ -75,7 +75,7 @@ async function fetchUserPermissions(effectiveEmail) {
   const response = await base44.functions.invoke('getUserPermissions', requestPayload);
   // Trace temporário: não registra e-mail, token ou dados pessoais.
   const rawPayload = response?.data ?? response;
-  console.info('[SGP_AUTH_TRACE]', {
+  console.info('[SGP_AUTH_TRACE] ' + JSON.stringify({
     source: 'getUserPermissions',
     requestHasEffectiveEmail: Boolean(effectiveEmail),
     status: response?.status || null,
@@ -87,7 +87,7 @@ async function fetchUserPermissions(effectiveEmail) {
     militares: rawPayload?.modules?.militares === true,
     visualizarMilitares: rawPayload?.actions?.visualizar_militares === true,
     hasGlobalScope: Boolean(rawPayload?.hasGlobalScope),
-  });
+  }));
   // base44.functions.invoke retorna axios-like: { data, status, headers }
   const payload = rawPayload;
 
