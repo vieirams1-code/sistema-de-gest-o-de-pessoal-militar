@@ -1182,43 +1182,64 @@ export function sanitizarLinhaHistoricoImportacao(linha, index, {
   };
 }
 
-function relatorioAuditoriaMinimaFromAnalise(analise, {
+function resumoMinimoAnaliseImportacaoMilitares(resumo = {}) {
+  return {
+    total_linhas: Number(resumo?.total_linhas || 0),
+    total_aptas: Number(resumo?.total_aptas || 0),
+    total_aptas_com_alerta: Number(resumo?.total_aptas_com_alerta || 0),
+    total_revisar: Number(resumo?.total_revisar || 0),
+    total_ignoradas: Number(resumo?.total_ignoradas || resumo?.total_duplicadas || 0),
+    total_erros: Number(resumo?.total_erros || 0),
+  };
+}
+
+export function criarRelatorioHistoricoMinimoImportacaoMilitares(analise, {
   incluirAlertas = false,
   totalImportadas = 0,
   totalNaoImportadas = 0,
   naoImportadas = [],
   idsCriados = [],
+  idsCriadosPorLinha = new Map(),
+  linhasImportadas = new Set(),
+  statusFinal = '',
+  usuario = null,
+  avisosOperacionais = [],
+  erroOperacional = '',
+  dataFinalizacao = new Date().toISOString(),
 } = {}) {
   const naoImportadasPorLinha = new Map(
     (naoImportadas || []).map((item) => [Number(item?.linhaNumero), limparTexto(item?.motivo)]),
   );
 
   return {
+    tipo_snapshot: IMPORTACAO_MILITARES_SNAPSHOT_HISTORICO_MINIMO,
+    versao_snapshot: IMPORTACAO_MILITARES_SNAPSHOT_VERSAO,
     tipo_relatorio: RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA,
-    versao_relatorio: '2026.09.09-v1',
     permite_retomada: false,
-    minimizado_em: new Date().toISOString(),
     arquivo: {
       nome: limparTexto(analise?.arquivo?.nome),
       tipo: limparTexto(analise?.arquivo?.tipo),
       hash: limparTexto(analise?.arquivo?.hash),
-      data_importacao: limparTexto(analise?.arquivo?.data_importacao),
     },
-    resumo: analise?.resumo || {},
-    linhas: (analise?.linhas || []).map((linha, index) => linhaAuditoriaMinima(linha, index, {
+    data_importacao: limparTexto(analise?.arquivo?.data_importacao),
+    versao_regra_migracao: limparTexto(analise?.versao_regra_migracao),
+    resumo: resumoMinimoAnaliseImportacaoMilitares(analise?.resumo),
+    status_final: limparTexto(statusFinal),
+    total_linhas: Number(analise?.resumo?.total_linhas || analise?.linhas?.length || 0),
+    total_importadas: Number(totalImportadas || 0),
+    total_nao_importadas: Number(totalNaoImportadas || 0),
+    incluirAlertas: incluirAlertas === true,
+    ids_militares_criados: (idsCriados || []).map((id) => limparTexto(id)).filter(Boolean),
+    data_finalizacao: dataFinalizacao,
+    usuario_executor: limparTexto(usuario?.email || usuario?.full_name || usuario?.name),
+    avisos_operacionais: listaTextoAuditoria(avisosOperacionais),
+    erros_operacionais: listaTextoAuditoria(erroOperacional),
+    linhas: (analise?.linhas || []).map((linha, index) => sanitizarLinhaHistoricoImportacao(linha, index, {
       incluirAlertas,
       naoImportadasPorLinha,
+      idsCriadosPorLinha,
+      linhasImportadas,
     })),
-    importacao: {
-      incluirAlertas: incluirAlertas === true,
-      total_importadas: totalImportadas,
-      total_nao_importadas: totalNaoImportadas,
-      nao_importadas: (naoImportadas || []).map((item) => ({
-        linhaNumero: Number(item?.linhaNumero || 0),
-        motivo: sanitizarTextoAuditoriaImportacao(item?.motivo),
-      })),
-      ids_criados: (idsCriados || []).map((id) => limparTexto(id)).filter(Boolean),
-    },
   };
 }
 
