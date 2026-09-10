@@ -45,30 +45,7 @@ export default function ConfigurarCampanhaFerias() {
           setPlano(await base44.entities.PlanoFeriasInstitucional.get(planoAtualId));
         } catch (_erroPlano) {}
       }
-      const carregarUsuariosAtivos = async () => {
-        try {
-          const diretos = await base44.entities.User.list();
-          if (Array.isArray(diretos) && diretos.length) return diretos;
-        } catch (_erroDireto) {}
-        const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' });
-        return resposta.data?.usuarios || [];
-      };
-      const [usersResult, acessosResult] = await Promise.allSettled([
-        carregarUsuariosAtivos(),
-        base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoAtualId, campanha_id: campanhaId }),
-      ]);
-      const users = usersResult.status === 'fulfilled' ? (usersResult.value || []) : [];
-      const acessosPayload = acessosResult.status === 'fulfilled' ? acessosResult.value?.data : null;
-      const acessos = Array.isArray(acessosPayload?.permissoes) ? acessosPayload.permissoes : [];
-      setUsuarios((users || []).filter((item) => item?.id).map((item) => ({
-        id: item.id,
-        nome: item.nome || item.full_name || item.name || item.email || 'Usuário sem nome',
-        email: item.email || '',
-      })).sort((a, b) => a.nome.localeCompare(b.nome)));
-      setPermissoes(acessos);
-      if (usersResult.status === 'rejected' && acessosResult.status === 'rejected') {
-        throw usersResult.reason || acessosResult.reason;
-      }
+
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível carregar a configuração da campanha.') });
     } finally {
