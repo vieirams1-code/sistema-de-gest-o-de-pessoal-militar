@@ -1097,11 +1097,24 @@ export async function analisarArquivoMigracao(file) {
   };
 }
 
+export const IMPORTACAO_MILITARES_SNAPSHOT_ANALISE_TEMPORARIA = 'ANALISE_TEMPORARIA';
+export const IMPORTACAO_MILITARES_SNAPSHOT_HISTORICO_MINIMO = 'HISTORICO_MINIMO';
+export const IMPORTACAO_MILITARES_SNAPSHOT_VERSAO = 1;
+
 const RELATORIO_IMPORTACAO_TIPO_ANALISE_ATIVA = 'ANALISE_ATIVA';
 const RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA = 'AUDITORIA_MINIMA_V1';
+const STATUS_TERMINAIS_IMPORTACAO_MILITARES = new Set([
+  'Importado', 'Importado Parcial', 'Falhou', 'Concluído', 'Concluido', 'Cancelado', 'Cancelada',
+]);
+
+export function isImportacaoMilitaresStatusTerminal(status) {
+  return STATUS_TERMINAIS_IMPORTACAO_MILITARES.has(limparTexto(status));
+}
 
 function relatorioFromAnalise(analise, extras = {}) {
   return {
+    tipo_snapshot: IMPORTACAO_MILITARES_SNAPSHOT_ANALISE_TEMPORARIA,
+    versao_snapshot: IMPORTACAO_MILITARES_SNAPSHOT_VERSAO,
     tipo_relatorio: RELATORIO_IMPORTACAO_TIPO_ANALISE_ATIVA,
     permite_retomada: true,
     arquivo: analise.arquivo,
