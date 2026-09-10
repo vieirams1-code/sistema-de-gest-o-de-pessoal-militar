@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { History, RefreshCcw } from 'lucide-react';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -15,6 +15,7 @@ import {
   montarResumoHistorico,
   obterOpcoesFiltrosHistorico,
 } from '@/services/historicoImportacoesMilitaresService';
+import { migrarSnapshotsFinalizadosImportacaoMilitaresGateway } from '@/services/importacaoMilitaresHistoricoGatewayClient';
 
 const FILTROS_INICIAIS = {
   busca: '',
@@ -28,7 +29,7 @@ const FILTROS_INICIAIS = {
 const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de importação?\nEsta ação remove apenas o registro do histórico e não apaga os militares já importados.`;
 
 export default function HistoricoImportacoesMilitares() {
-  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+  const { isAdmin, isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
   const podeExcluirHistorico = canAccessAction('importar_militares');
   const { toast } = useToast();
 
@@ -37,6 +38,7 @@ export default function HistoricoImportacoesMilitares() {
   const [lotes, setLotes] = useState([]);
   const [loteSelecionado, setLoteSelecionado] = useState(null);
   const [lotesExcluindo, setLotesExcluindo] = useState({});
+  const migracaoSnapshotsExecutadaRef = useRef(false);
 
   const carregar = async () => {
     try {
@@ -55,8 +57,29 @@ export default function HistoricoImportacoesMilitares() {
   };
 
   useEffect(() => {
-    carregar();
-  }, []);
+    if (!isAccessResolved) return;
+    let cancelled = false;
+
+    const prepararHistorico = async () => {
+      if (isAdmin && !migracaoSnapshotsExecutadaRef.current) {
+        migracaoSnapshotsExecutadaRef.current = true;
+        try {
+          const result = await migrarSnapshotsFinalizadosImportacaoMilitaresGateway();
+          if (result?.failed > 0) {
+            console.warn('[HistoricoImportacoesMilitares] Migração de snapshots finalizados concluída com falhas parciais.', result);
+          }
+        } catch (error) {
+          console.error('[HistoricoImportacoesMilitares] Falha controlada ao minimizar snapshots históricos finalizados.', error);
+        }
+      }
+      if (!cancelled) await carregar();
+    };
+
+    prepararHistorico();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAccessResolved, isAdmin]);
 
   const excluirLote = async (lote) => {
     if (!lote?.id) return;
