@@ -310,40 +310,7 @@ export default function PlanosFerias() {
     }
   };
 
-  const salvarPermissao = async (evento) => {
-    evento.preventDefault();
-    if (!podeAtribuirPermissoes || !selecionado?.id || !permissaoForm.usuario_id) return;
-    setSalvando(true);
-    try {
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_PERMISSAO_SALVAR',
-        plano_id: selecionado.id,
-        permissao: permissaoForm,
-      });
-      const atualizadas = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: selecionado.id });
-      setPermissoes(atualizadas.data?.permissoes || []);
-      setPermissaoForm({ usuario_id: '', campanha_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
-      setFeedback({ tipo: 'sucesso', texto: 'Permissão salva com sucesso.' });
-    } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível salvar a permissão.') });
-    } finally {
-      setSalvando(false);
-    }
-  };
 
-  const removerPermissao = async (permissao) => {
-    if (!podeAtribuirPermissoes) return;
-    if (!window.confirm('Remover esta atribuição de acesso?')) return;
-    setSalvando(true);
-    try {
-      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSAO_EXCLUIR', permissao_id: permissao.id });
-      setPermissoes((atual) => atual.filter((item) => item.id !== permissao.id));
-    } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível remover a permissão.') });
-    } finally {
-      setSalvando(false);
-    }
-  };
 
   const abrirRespostas = async (campanha) => {
     if (!podeVisualizarRespostas) return;
