@@ -471,8 +471,8 @@ const PERMISSIONS_MAP = {
   },
 };
 
-// Extrai matriz [SGP_PERMISSIONS_MATRIX]{...}[/SGP_PERMISSIONS_MATRIX]
-// do campo descricao de PerfilPermissao (espelha getUserPermissions).
+// Compatibilidade com perfis legados: extrai matriz serializada de `descricao`.
+// A fonte primária de perfis novos/migrados é `matriz_permissoes` estruturada.
 function extrairMatrizPermissoes(descricao) {
   if (typeof descricao !== 'string' || !descricao) return {};
   const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
@@ -488,10 +488,19 @@ function extrairMatrizPermissoes(descricao) {
   }
 }
 
+function obterMatrizPerfil(perfil) {
+  const estruturada = perfil?.matriz_permissoes;
+  if (estruturada && typeof estruturada === 'object' && !Array.isArray(estruturada)) {
+    const hasPermissionKey = Object.keys(estruturada).some((key) => key.startsWith('perm_') || key.startsWith('acesso_'));
+    if (hasPermissionKey) return estruturada;
+  }
+  return extrairMatrizPermissoes(perfil?.descricao);
+}
+
 // Consolida actions (chaves perm_*) por OR aditivo exclusivamente a partir
-// dos perfis ativos (campos diretos + matriz embutida). UsuarioAcesso define
-// identidade/escopo e não participa da autorização funcional, espelhando
-// getUserPermissions.
+// dos perfis ativos. Em perfil estruturado, não combinamos campos raiz legados:
+// a matriz física nova é a fonte de verdade. UsuarioAcesso define somente
+// identidade/escopo, espelhando getUserPermissions.
 function consolidarActions(perfis) {
   const actions = {};
   const aplicarFonte = (fonte) => {
@@ -509,8 +518,9 @@ function consolidarActions(perfis) {
   };
   (perfis || []).forEach((p) => {
     if (!p) return;
-    aplicarFonte(p);
-    aplicarFonte(extrairMatrizPermissoes(p.descricao));
+    const matriz = obterMatrizPerfil(p);
+    if (Object.keys(matriz).length > 0) aplicarFonte(matriz);
+    else aplicarFonte(p);
   });
   return actions;
 }
