@@ -1117,7 +1117,7 @@ function sanitizarTextoAuditoriaImportacao(valor) {
     .replace(/\bCPF\s*[:#-]?\s*[\d.\/-]+/gi, 'CPF [suprimido]')
     .replace(/\bRG\s*[:#-]?\s*[\w.\/-]+/gi, 'RG [suprimido]')
     .replace(/\b(?:telefone|celular)\s*[:#-]?\s*[+()\d\s.-]+/gi, 'telefone [suprimido]')
-    .replace(/\b(?:banco|ag[eê]ncia|conta)\s*[:#-]?\s*[\w.\/-]+/gi, '$& [suprimido]');
+    .replace(/\b(banco|ag[eê]ncia|conta)\s*[:#-]?\s*[\w.\/-]+/gi, '$1 [suprimido]');
 }
 
 function listaTextoAuditoria(valor) {
@@ -1266,6 +1266,9 @@ export async function carregarAnaliseHistorico(historicoId) {
   const historico = Array.isArray(itens) ? itens[0] : null;
   if (!historico?.relatorio_json) return null;
   const relatorio = JSON.parse(historico.relatorio_json);
+  if (relatorio?.tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA || relatorio?.permite_retomada === false) {
+    return null;
+  }
   if (!relatorio?.linhas || !relatorio?.resumo) return null;
   return relatorio;
 }
@@ -1363,14 +1366,12 @@ async function finalizarHistoricoImportacaoMilitares({
     ? 'Falhou'
     : totalNaoImportadas > 0 ? 'Importado Parcial' : 'Importado';
 
-  const relatorio = relatorioFromAnalise(analise, {
-    importacao: {
-      incluirAlertas,
-      total_importadas: totalImportadas,
-      total_nao_importadas: totalNaoImportadas,
-      nao_importadas: naoImportadas,
-      ids_criados: idsCriados,
-    },
+  const relatorio = relatorioAuditoriaMinimaFromAnalise(analise, {
+    incluirAlertas,
+    totalImportadas,
+    totalNaoImportadas,
+    naoImportadas,
+    idsCriados,
   });
 
   await atualizarHistoricoComDiagnostico(
