@@ -90,5 +90,11 @@
       "description": "Campo legado de oculta\u00e7\u00e3o (descontinuado). A exclus\u00e3o real do lote deve usar remo\u00e7\u00e3o f\u00edsica do registro."
     }
   },
-  "required": []
+  "required": [],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
