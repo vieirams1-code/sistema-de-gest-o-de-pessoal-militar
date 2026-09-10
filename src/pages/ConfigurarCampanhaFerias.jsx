@@ -88,24 +88,7 @@ export default function ConfigurarCampanhaFerias() {
     }
   };
 
-  const remover = async (permissao) => {
-    if (!window.confirm('Remover este responsável da campanha?')) return;
-    setSalvando(true);
-    try {
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_PERMISSAO_EXCLUIR',
-        permissao_id: permissao.id,
-      });
-      setPermissoes((atual) => atual.filter((item) => item.id !== permissao.id));
-      setFeedback({ tipo: 'sucesso', texto: 'Acesso removido.' });
-    } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível remover o acesso.') });
-    } finally {
-      setSalvando(false);
-    }
-  };
 
-  const nomeUsuario = (item) => item.usuario_nome || item.usuario_email || usuarios.find((u) => String(u.id) === String(item.usuario_id))?.nome || 'Usuário';
 
   if (loading) return <div className="min-h-screen bg-slate-50 p-8 text-center text-sm text-slate-500">Carregando campanha...</div>;
 
