@@ -15,6 +15,17 @@
       "default": true,
       "description": "Define se o perfil est\u00e1 ativo e dispon\u00edvel para uso"
     },
+    "matriz_permissoes": {
+      "type": "object",
+      "description": "Matriz can\u00f4nica estruturada de permiss\u00f5es do perfil. Somente chaves acesso_* e perm_* can\u00f4nicas com valores booleanos.",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "versao_matriz_permissoes": {
+      "type": "string",
+      "description": "Vers\u00e3o do contrato can\u00f4nico usado em matriz_permissoes"
+    },
     "acesso_militares": {
       "type": "boolean",
       "default": false,
