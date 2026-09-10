@@ -24,7 +24,6 @@ export default function TabelaLinhasImportacaoMilitares({ linhas, onSelecionarLi
               <th className="text-left p-2">Nome</th>
               <th className="text-left p-2">Matrículas (atual/histórica)</th>
               <th className="text-left p-2">Posto/Graduação</th>
-              <th className="text-left p-2">CPF</th>
               <th className="text-left p-2">Principal motivo</th>
               <th className="text-left p-2">Observações</th>
               <th className="text-left p-2">Importada</th>
@@ -46,7 +45,6 @@ export default function TabelaLinhasImportacaoMilitares({ linhas, onSelecionarLi
                   </span>
                 </td>
                 <td className="p-2">{linha.posto || '—'}</td>
-                <td className="p-2">{linha.cpf || '—'}</td>
                 <td className="p-2 max-w-[320px] truncate" title={linha.principalMotivo}>{linha.principalMotivo}</td>
                 <td className="p-2 max-w-[240px] truncate" title={linha.observacoes.join(' | ')}>{linha.observacoes[0] || '—'}</td>
                 <td className="p-2">{linha.importada ? 'Sim' : 'Não'}</td>
