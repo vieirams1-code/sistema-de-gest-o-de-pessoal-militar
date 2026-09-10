@@ -220,7 +220,27 @@ Deno.serve(async (req) => {
     if (action === 'LIST_HISTORY') {
       exigir(authz, 'ver_historico_importacoes');
       const rows = await base44.asServiceRole.entities[ENTITY].list('-created_date', 1000);
-      return Response.json({ result: (rows || []).map(projetarHistorico) });
+      const finalStatuses = new Set(['Importado', 'Importado Parcial', 'Falhou']);
+      const rowsSeguros = [];
+      let snapshotsMigrados = 0;
+
+      for (const row of rows || []) {
+        let rowEfetivo = row;
+        if (authz?.isAdmin === true && finalStatuses.has(limparTexto(row?.status_importacao))) {
+          const minimal = relatorioAuditoriaMinimaPersistente(row);
+          if (minimal) {
+            await base44.asServiceRole.entities[ENTITY].update(row.id, { relatorio_json: minimal });
+            rowEfetivo = { ...row, relatorio_json: minimal };
+            snapshotsMigrados += 1;
+          }
+        }
+        rowsSeguros.push(projetarHistorico(rowEfetivo));
+      }
+
+      return Response.json({
+        result: rowsSeguros,
+        meta: { snapshotsMigrados },
+      });
     }
 
     if (action === 'GET_ANALYSIS') {
