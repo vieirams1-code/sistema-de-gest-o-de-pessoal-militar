@@ -156,7 +156,6 @@ export default function ExtratoAtestadosMedicos() {
   const { canAccessModule, canAccessAction, isAdmin, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const queryClient = useQueryClient();
   const hasAccess = canAccessModule('atestados');
-  const canViewSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const [filtros, setFiltros] = useState({
     periodoInicio: '',
     periodoFim: '',
@@ -328,7 +327,7 @@ export default function ExtratoAtestadosMedicos() {
 
   const handleBaixarZip = async () => {
     if (selectedIds.size === 0) return;
-    if (!canDownloadZip || !canViewSensitive) {
+    if (!canDownloadZip) {
       toast.error('Você não tem permissão para baixar ZIP de anexos médicos.');
       return;
     }
@@ -542,7 +541,7 @@ export default function ExtratoAtestadosMedicos() {
     setErroAnexoById((prev) => ({ ...prev, [rowId]: '' }));
     setLinkAnexoById((prev) => ({ ...prev, [rowId]: '' }));
 
-    if (!canDownloadAttachments || !canViewSensitive) {
+    if (!canDownloadAttachments) {
       toast.error('Você não tem permissão para baixar anexos médicos.');
       setLoadingAnexoById((prev) => ({ ...prev, [rowId]: false }));
       return;
@@ -610,7 +609,7 @@ export default function ExtratoAtestadosMedicos() {
                 {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 PDF DP/DINTEL
               </Button>
-              {canDownloadZip && canViewSensitive && (
+              {canDownloadZip && (
                 <Button variant="outline" className="gap-2 bg-white border-purple-200 text-purple-700 hover:bg-purple-50" disabled={selectedIds.size === 0 || isGeneratingZip} onClick={handleBaixarZip}>
                   {isGeneratingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
                   Baixar ZIP
@@ -833,7 +832,7 @@ export default function ExtratoAtestadosMedicos() {
                         )}
                         {columns.anexo && (
                           <td className="p-3 align-top">
-                            {(canViewSensitive && canDownloadAttachments) ? (
+                            {canDownloadAttachments ? (
                               <div className="space-y-1">
                                 <Button variant="outline" size="sm" className="gap-2 rounded-full bg-white" disabled={Boolean(loadingAnexoById[row.id])} onClick={() => handleAbrirAnexo(row)}>
                                   {loadingAnexoById[row.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
