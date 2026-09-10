@@ -361,7 +361,9 @@ test('L09E: migração retroativa de snapshots é admin-only, idempotente e limi
   assert.match(importacaoHistoricoGateway, /permite_retomada === false/);
   assert.match(importacaoHistoricoGateway, /asServiceRole\.entities\[ENTITY\]\.update/);
   assert.match(importacaoHistoricoClient, /migrarSnapshotsFinalizadosImportacaoMilitaresGateway/);
-  assert.match(historicoImportacoesPage, /isAdmin && !migracaoSnapshotsExecutadaRef\.current/);
+  assert.match(importacaoHistoricoGateway, /action === 'LIST_HISTORY'[\s\S]*authz\?\.isAdmin === true[\s\S]*relatorioAuditoriaMinimaPersistente/);
+  assert.match(importacaoHistoricoGateway, /snapshotsMigrados/);
+  assert.doesNotMatch(historicoImportacoesPage, /migrarSnapshotsFinalizadosImportacaoMilitaresGateway/);
   assert.doesNotMatch(importacaoHistoricoGateway, /finalStatuses = new Set\(\[[^\]]*Analisado/);
 });
 
