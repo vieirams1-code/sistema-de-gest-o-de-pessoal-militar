@@ -1423,15 +1423,35 @@ async function registrarFalhaImportacaoMilitares({
   error,
   historicoIdEfetivo,
   avisosHistorico,
+  analise,
+  incluirAlertas,
+  idsCriados = [],
+  naoImportadas = [],
 }) {
   const historicoEntity = getHistoricoImportacaoEntity();
+  const totalImportadas = idsCriados.length;
+  const totalLinhas = Number(analise?.resumo?.total_linhas || analise?.linhas?.length || 0);
+  const totalNaoImportadas = Math.max(0, totalLinhas - totalImportadas);
+  const mensagemFalha = sanitizarTextoAuditoriaImportacao(error?.message || 'Falha ao importar lote.');
+  const relatorio = relatorioAuditoriaMinimaFromAnalise(analise || {}, {
+    incluirAlertas,
+    totalImportadas,
+    totalNaoImportadas,
+    naoImportadas,
+    idsCriados,
+  });
+  relatorio.falha_importacao = mensagemFalha;
+
   try {
     await atualizarHistoricoComDiagnostico(
       historicoEntity,
       historicoIdEfetivo,
       {
+        total_importadas: totalImportadas,
+        total_nao_importadas: totalNaoImportadas,
         status_importacao: 'Falhou',
-        observacoes: error?.message || 'Falha ao importar lote.',
+        relatorio_json: JSON.stringify(relatorio, null, 2),
+        observacoes: mensagemFalha,
       },
       'registrar falha da importação',
       avisosHistorico,
@@ -1528,6 +1548,10 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       error,
       historicoIdEfetivo,
       avisosHistorico,
+      analise,
+      incluirAlertas,
+      idsCriados,
+      naoImportadas,
     });
   }
 }
