@@ -142,12 +142,12 @@ const actionGuardByPage = {
   },
   ConfigurarCampanhaFerias: {
     moduleKey: 'campanhas_ferias',
-    actionKeys: ['atribuir_permissoes_ferias', 'admin_campanhas_ferias'],
+    actionKeys: ['editar_campanhas_ferias', 'admin_campanhas_ferias'],
     moduleName: 'Configuração de Campanha de Férias',
   },
   PainelPlanoFerias: {
     moduleKey: 'campanhas_ferias',
-    actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas', 'atribuir_permissoes_ferias'],
+    actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas'],
     moduleName: 'Respostas e Escalação de Férias',
   },
   CentralRespostasCampanhas: {
