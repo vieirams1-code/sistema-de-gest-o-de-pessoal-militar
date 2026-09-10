@@ -339,8 +339,7 @@ export const permissionStructure = [
           { key: 'perm_editar_planos_ferias', label: 'Editar planos de férias', sensitive: true },
           { key: 'perm_excluir_planos_ferias', label: 'Excluir planos de férias', sensitive: true },
           { key: 'perm_aprovar_ferias', label: 'Aprovar respostas e definir escala de férias', sensitive: true },
-          { key: 'perm_gerar_ferias_campanhas', label: 'Gerar férias a partir das campanhas', sensitive: true },
-          { key: 'perm_atribuir_permissoes_ferias', label: 'Atribuir usuários autorizados a aprovar férias', sensitive: true }
+          { key: 'perm_gerar_ferias_campanhas', label: 'Gerar férias a partir das campanhas', sensitive: true }
         ]
       },
       {
