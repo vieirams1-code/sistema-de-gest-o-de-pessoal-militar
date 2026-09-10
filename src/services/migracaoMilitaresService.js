@@ -1092,12 +1092,106 @@ export async function analisarArquivoMigracao(file) {
   };
 }
 
+const RELATORIO_IMPORTACAO_TIPO_ANALISE_ATIVA = 'ANALISE_ATIVA';
+const RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA = 'AUDITORIA_MINIMA_V1';
+
 function relatorioFromAnalise(analise, extras = {}) {
   return {
+    tipo_relatorio: RELATORIO_IMPORTACAO_TIPO_ANALISE_ATIVA,
+    permite_retomada: true,
     arquivo: analise.arquivo,
     resumo: analise.resumo,
     linhas: analise.linhas,
     ...extras,
+  };
+}
+
+function listaTextoSegura(valor) {
+  if (Array.isArray(valor)) return valor.map((item) => limparTexto(item)).filter(Boolean);
+  const texto = limparTexto(valor);
+  return texto ? [texto] : [];
+}
+
+function sanitizarTextoAuditoriaImportacao(valor) {
+  return limparTexto(valor)
+    .replace(/\bCPF\s*[:#-]?\s*[\d.\/-]+/gi, 'CPF [suprimido]')
+    .replace(/\bRG\s*[:#-]?\s*[\w.\/-]+/gi, 'RG [suprimido]')
+    .replace(/\b(?:telefone|celular)\s*[:#-]?\s*[+()\d\s.-]+/gi, 'telefone [suprimido]')
+    .replace(/\b(?:banco|ag[eê]ncia|conta)\s*[:#-]?\s*[\w.\/-]+/gi, '$& [suprimido]');
+}
+
+function listaTextoAuditoria(valor) {
+  return listaTextoSegura(valor).map(sanitizarTextoAuditoriaImportacao);
+}
+
+function linhaAuditoriaMinima(linha, index, { incluirAlertas = false, naoImportadasPorLinha = new Map() } = {}) {
+  const original = linha?.original || {};
+  const transformado = linha?.transformado || {};
+  const linhaNumero = Number(linha?.linhaNumero || linha?.linha_numero || index + 1);
+  const motivoNaoImportada = naoImportadasPorLinha.get(linhaNumero) || '';
+  const elegivel = linha?.status === STATUS_LINHA.APTO
+    || (incluirAlertas && linha?.status === STATUS_LINHA.APTO_COM_ALERTA);
+
+  return {
+    linhaNumero,
+    status: linha?.status || '',
+    nome: limparTexto(transformado?.nome_completo || original?.nome_completo || original?.nome || linha?.nome),
+    matricula_atual: limparTexto(transformado?.matricula_atual || transformado?.matricula || linha?.matricula_atual),
+    matricula_historica: limparTexto(original?.matricula || original?.['matrícula'] || linha?.matricula_historica),
+    posto: limparTexto(transformado?.posto_graduacao || original?.posto_graduacao || original?.posto || original?.['posto/graduação']),
+    alertas: listaTextoAuditoria(linha?.alertas || linha?.avisos),
+    erros: listaTextoAuditoria(linha?.erros || linha?.falhas),
+    observacoes: listaTextoAuditoria(linha?.observacoes || linha?.observacao || linha?.observacoes_importacao),
+    pendencias_revisao: listaTextoAuditoria(linha?.pendencias_revisao || linha?.revisar || linha?.pendencias),
+    correcao_pre_importacao: linha?.correcao_pre_importacao ? {
+      campos_alterados: Array.isArray(linha.correcao_pre_importacao.campos_alterados)
+        ? linha.correcao_pre_importacao.campos_alterados.map((campo) => limparTexto(campo)).filter(Boolean)
+        : [],
+      corrigido_por: limparTexto(linha.correcao_pre_importacao.corrigido_por),
+      corrigido_em: limparTexto(linha.correcao_pre_importacao.corrigido_em),
+    } : null,
+    importada: elegivel && !motivoNaoImportada,
+    motivo_nao_importada: sanitizarTextoAuditoriaImportacao(motivoNaoImportada),
+  };
+}
+
+function relatorioAuditoriaMinimaFromAnalise(analise, {
+  incluirAlertas = false,
+  totalImportadas = 0,
+  totalNaoImportadas = 0,
+  naoImportadas = [],
+  idsCriados = [],
+} = {}) {
+  const naoImportadasPorLinha = new Map(
+    (naoImportadas || []).map((item) => [Number(item?.linhaNumero), limparTexto(item?.motivo)]),
+  );
+
+  return {
+    tipo_relatorio: RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA,
+    versao_relatorio: '2026.09.09-v1',
+    permite_retomada: false,
+    minimizado_em: new Date().toISOString(),
+    arquivo: {
+      nome: limparTexto(analise?.arquivo?.nome),
+      tipo: limparTexto(analise?.arquivo?.tipo),
+      hash: limparTexto(analise?.arquivo?.hash),
+      data_importacao: limparTexto(analise?.arquivo?.data_importacao),
+    },
+    resumo: analise?.resumo || {},
+    linhas: (analise?.linhas || []).map((linha, index) => linhaAuditoriaMinima(linha, index, {
+      incluirAlertas,
+      naoImportadasPorLinha,
+    })),
+    importacao: {
+      incluirAlertas: incluirAlertas === true,
+      total_importadas: totalImportadas,
+      total_nao_importadas: totalNaoImportadas,
+      nao_importadas: (naoImportadas || []).map((item) => ({
+        linhaNumero: Number(item?.linhaNumero || 0),
+        motivo: sanitizarTextoAuditoriaImportacao(item?.motivo),
+      })),
+      ids_criados: (idsCriados || []).map((id) => limparTexto(id)).filter(Boolean),
+    },
   };
 }
 
