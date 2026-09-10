@@ -1429,6 +1429,8 @@ async function finalizarHistoricoImportacaoMilitares({
   analise,
   incluirAlertas,
   idsCriados,
+  idsCriadosPorLinha,
+  linhasImportadas,
   naoImportadas,
   usuario,
   avisosHistorico,
@@ -1440,12 +1442,17 @@ async function finalizarHistoricoImportacaoMilitares({
     ? 'Falhou'
     : totalNaoImportadas > 0 ? 'Importado Parcial' : 'Importado';
 
-  const relatorio = relatorioAuditoriaMinimaFromAnalise(analise, {
+  const relatorio = criarRelatorioHistoricoMinimoImportacaoMilitares(analise, {
     incluirAlertas,
     totalImportadas,
     totalNaoImportadas,
     naoImportadas,
     idsCriados,
+    idsCriadosPorLinha,
+    linhasImportadas,
+    statusFinal: statusImportacao,
+    usuario,
+    avisosOperacionais: avisosHistorico,
   });
 
   await atualizarHistoricoComDiagnostico(
@@ -1484,21 +1491,29 @@ async function registrarFalhaImportacaoMilitares({
   analise,
   incluirAlertas,
   idsCriados = [],
+  idsCriadosPorLinha = new Map(),
+  linhasImportadas = new Set(),
   naoImportadas = [],
+  usuario = null,
 }) {
   const historicoEntity = getHistoricoImportacaoEntity();
   const totalImportadas = idsCriados.length;
   const totalLinhas = Number(analise?.resumo?.total_linhas || analise?.linhas?.length || 0);
   const totalNaoImportadas = Math.max(0, totalLinhas - totalImportadas);
   const mensagemFalha = sanitizarTextoAuditoriaImportacao(error?.message || 'Falha ao importar lote.');
-  const relatorio = relatorioAuditoriaMinimaFromAnalise(analise || {}, {
+  const relatorio = criarRelatorioHistoricoMinimoImportacaoMilitares(analise || {}, {
     incluirAlertas,
     totalImportadas,
     totalNaoImportadas,
     naoImportadas,
     idsCriados,
+    idsCriadosPorLinha,
+    linhasImportadas,
+    statusFinal: 'Falhou',
+    usuario,
+    avisosOperacionais: avisosHistorico,
+    erroOperacional: mensagemFalha,
   });
-  relatorio.falha_importacao = mensagemFalha;
 
   try {
     await atualizarHistoricoComDiagnostico(
