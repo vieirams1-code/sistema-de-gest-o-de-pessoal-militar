@@ -1,7 +1,7 @@
-import { base44 } from '@/api/base44Client';
-import { isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
+import { base44 } from '../api/base44Client.js';
+import { isQuadroCompativel } from '../utils/postoQuadroCompatibilidade.js';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { normalizeLegacyDateToCanonical } from '@/utils/dateNormalization';
+import { normalizeLegacyDateToCanonical } from '../utils/dateNormalization.js';
 import {
   criarMilitarComMatricula,
   formatarMatriculaPadrao,
@@ -10,7 +10,7 @@ import {
   normalizarCPF as normalizarCpfIdentidade,
   normalizarNomeCanonico,
   validarMatriculaDisponivel,
-} from '@/services/militarIdentidadeService';
+} from './militarIdentidadeService.js';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
