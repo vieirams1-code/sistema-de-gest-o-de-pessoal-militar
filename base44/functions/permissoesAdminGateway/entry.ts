@@ -87,10 +87,10 @@ function perfilTemPermissao(perfil: any, key: string): boolean {
   return perfil?.[key] === true;
 }
 
-async function backfillPerfisAtivos(base44: any, perfis: any[]) {
+async function backfillPerfis(base44: any, perfis: any[]) {
   const saida = [];
   for (const perfil of (perfis || [])) {
-    if (!perfil || perfil?.ativo === false) {
+    if (!perfil) {
       saida.push(perfil);
       continue;
     }
@@ -175,7 +175,7 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Usuário sem permissão para consultar perfis de permissão.' }, 403);
       }
       const perfis = await base44.asServiceRole.entities.PerfilPermissao.list('nome_perfil', 1000, 0);
-      const perfisMigrados = await backfillPerfisAtivos(base44, Array.isArray(perfis) ? perfis : []);
+      const perfisMigrados = await backfillPerfis(base44, Array.isArray(perfis) ? perfis : []);
       return json({ ok: true, perfis: perfisMigrados });
     }
 
