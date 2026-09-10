@@ -103,13 +103,18 @@ export function mergeProfileMatrixVersion(rawDescricao = '', version = CURRENT_P
 }
 
 function collectRawPermissionSource(profile = {}) {
+  const structured = profile?.matriz_permissoes && typeof profile.matriz_permissoes === 'object' && !Array.isArray(profile.matriz_permissoes)
+    ? profile.matriz_permissoes
+    : null;
   const embedded = extractProfileMatrixRaw(profile.descricao);
-  return { ...profile, ...embedded };
+  return { ...profile, ...(structured || embedded) };
 }
 
 export function previewProfilePermissionMigration(profile = {}) {
   const source = collectRawPermissionSource(profile);
-  const beforeVersion = extractProfileMatrixVersion(profile.descricao) || 'LEGADO_SEM_VERSAO';
+  const beforeVersion = String(profile?.versao_matriz_permissoes || '').trim()
+    || extractProfileMatrixVersion(profile.descricao)
+    || 'LEGADO_SEM_VERSAO';
   const aliasesApplied = [];
   const deprecatedKeys = [];
   const unknownKeys = [];
@@ -151,7 +156,9 @@ export function previewProfilePermissionMigration(profile = {}) {
   const withMatrix = mergeProfileDescriptionWithMatrix(cleanDescricao, finalMatrix);
   const finalDescricao = mergeProfileMatrixVersion(withMatrix, CURRENT_PROFILE_MATRIX_VERSION);
 
-  const beforeCanonical = parsed.matrix || {};
+  const beforeCanonical = profile?.matriz_permissoes && typeof profile.matriz_permissoes === 'object' && !Array.isArray(profile.matriz_permissoes)
+    ? profile.matriz_permissoes
+    : (parsed.matrix || {});
   const changedKeys = canonicalProfilePermissionKeys.filter((key) => Boolean(beforeCanonical[key]) !== finalMatrix[key]);
 
   return {
