@@ -309,29 +309,7 @@ export default function PainelPlanoFerias() {
     carregarPainel(searchParams.get('campanhaId'), searchParams.get('planoId'));
   }, [searchParams]);
 
-  useEffect(() => {
-    if (!modoAdmin || !podeAtribuirPermissoesFerias || painelConsolidado || !campanhaSelecionada?.id || !planoSelecionadoId) {
-      setUsuariosPermitidos([]);
-      setPermissoesCampanha([]);
-      return;
-    }
-    const carregarUsuarios = async () => {
-      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PERMISSOES_LISTAR_USUARIOS' });
-      return resposta.data?.usuarios || [];
-    };
-    Promise.allSettled([
-      carregarUsuarios(),
-      base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoSelecionadoId, campanha_id: campanhaSelecionada.id }),
-    ]).then(([usuariosResult, permissoesResult]) => {
-      const usuarios = usuariosResult.status === 'fulfilled' ? usuariosResult.value : [];
-      setUsuariosPermitidos((usuarios || []).map((usuario) => ({
-        id: usuario.id,
-        email: usuario.email || '',
-        nome: usuario.nome || usuario.full_name || usuario.name || usuario.email || 'Usuário sem nome',
-      })).filter((usuario) => usuario.id));
-      setPermissoesCampanha(permissoesResult.status === 'fulfilled' ? (permissoesResult.value.data?.permissoes || []) : []);
-    });
-  }, [modoAdmin, painelConsolidado, campanhaSelecionada?.id, planoSelecionadoId]);
+
 
   const salvarPermissaoCampanha = async (evento) => {
     evento.preventDefault();
