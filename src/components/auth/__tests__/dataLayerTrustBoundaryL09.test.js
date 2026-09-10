@@ -37,6 +37,7 @@ const migracaoMilitaresService = await readFile(new URL('../../../services/migra
 const historicoImportacoesService = await readFile(new URL('../../../services/historicoImportacoesMilitaresService.js', import.meta.url), 'utf8');
 const historicoImportacoesPage = await readFile(new URL('../../../pages/HistoricoImportacoesMilitares.jsx', import.meta.url), 'utf8');
 const historicoImportacoesLista = await readFile(new URL('../../../components/migracao-militares/HistoricoImportacoesMilitaresLista.jsx', import.meta.url), 'utf8');
+const detalheImportacaoDrawer = await readFile(new URL('../../../components/migracao-militares/DetalheImportacaoMilitaresDrawer.jsx', import.meta.url), 'utf8');
 const importacaoHistoricoGateway = await readFile(new URL('../../../../base44/functions/importacaoMilitaresHistoricoGateway/entry.ts', import.meta.url), 'utf8');
 const importacaoHistoricoClient = await readFile(new URL('../../../services/importacaoMilitaresHistoricoGatewayClient.js', import.meta.url), 'utf8');
 const importacaoMilitaresSchema = await readFile(new URL('../../../../base44/entities/ImportacaoMilitares.jsonc', import.meta.url), 'utf8');
@@ -353,28 +354,37 @@ test('L09E: exclusão do histórico exige capacidade mutável além da leitura',
   assert.match(historicoImportacoesLista, /podeExcluirHistorico/);
 });
 
-test('L09E: finalização troca análise ativa por auditoria mínima sem retomada', () => {
-  assert.match(migracaoMilitaresService, /AUDITORIA_MINIMA_V1/);
+test('L09E: finalização troca análise ativa por HISTORICO_MINIMO sem retomada', () => {
+  assert.match(migracaoMilitaresService, /IMPORTACAO_MILITARES_SNAPSHOT_HISTORICO_MINIMO/);
+  assert.match(migracaoMilitaresService, /tipo_snapshot: IMPORTACAO_MILITARES_SNAPSHOT_HISTORICO_MINIMO/);
+  assert.match(migracaoMilitaresService, /tipo_relatorio: RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA/);
   assert.match(migracaoMilitaresService, /permite_retomada: false/);
-  assert.match(migracaoMilitaresService, /relatorioAuditoriaMinimaFromAnalise/);
-  assert.match(migracaoMilitaresService, /tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA/);
-  assert.doesNotMatch(historicoImportacoesService, /\bcpf:/);
-  assert.doesNotMatch(historicoImportacoesService, /\btelefone:/);
+  assert.match(migracaoMilitaresService, /criarRelatorioHistoricoMinimoImportacaoMilitares/);
+  assert.match(migracaoMilitaresService, /isImportacaoMilitaresStatusTerminal/);
 });
 
-test('L09E: migração retroativa de snapshots é admin-only, idempotente e limitada a lotes finalizados', () => {
+test('L09E: migração retroativa é explícita, admin-only, dry-run por padrão e limitada a terminais', () => {
   assert.match(importacaoHistoricoGateway, /MIGRATE_FINALIZED_SNAPSHOTS/);
   assert.match(importacaoHistoricoGateway, /authz\?\.isAdmin !== true/);
-  assert.match(importacaoHistoricoGateway, /new Set\(\['Importado', 'Importado Parcial', 'Falhou'\]\)/);
+  assert.match(importacaoHistoricoGateway, /STATUS_TERMINAIS_IMPORTACAO/);
+  assert.match(importacaoHistoricoGateway, /isStatusTerminalImportacao\(row\?\.status_importacao\)/);
+  assert.match(importacaoHistoricoGateway, /const executar = payload\?\.executar === true/);
   assert.match(importacaoHistoricoGateway, /relatorioAuditoriaMinimaPersistente/);
+  assert.match(importacaoHistoricoGateway, /tipo_snapshot === 'HISTORICO_MINIMO'/);
   assert.match(importacaoHistoricoGateway, /tipo_relatorio === 'AUDITORIA_MINIMA_V1'/);
   assert.match(importacaoHistoricoGateway, /permite_retomada === false/);
   assert.match(importacaoHistoricoGateway, /asServiceRole\.entities\[ENTITY\]\.update/);
   assert.match(importacaoHistoricoClient, /migrarSnapshotsFinalizadosImportacaoMilitaresGateway/);
-  assert.match(importacaoHistoricoGateway, /action === 'LIST_HISTORY'[\s\S]*authz\?\.isAdmin === true[\s\S]*relatorioAuditoriaMinimaPersistente/);
-  assert.match(importacaoHistoricoGateway, /snapshotsMigrados/);
   assert.doesNotMatch(historicoImportacoesPage, /migrarSnapshotsFinalizadosImportacaoMilitaresGateway/);
-  assert.doesNotMatch(importacaoHistoricoGateway, /finalStatuses = new Set\(\[[^\]]*Analisado/);
+  assert.doesNotMatch(importacaoHistoricoGateway, /snapshotsMigrados/);
+  assert.doesNotMatch(importacaoHistoricoGateway, /STATUS_TERMINAIS_IMPORTACAO[^;]*Analisado/);
+});
+
+test('L09E: drawer de histórico mínimo não reintroduz blocos de dados originais/transformados', () => {
+  assert.match(detalheImportacaoDrawer, /tipo_snapshot === 'HISTORICO_MINIMO'/);
+  assert.match(detalheImportacaoDrawer, /Dados pessoais detalhados foram descartados após a conclusão da importação/);
+  assert.doesNotMatch(detalheImportacaoDrawer, /titulo=["']Dados originais["']/i);
+  assert.doesNotMatch(detalheImportacaoDrawer, /titulo=["']Dados transformados["']/i);
 });
 
 test('L09E: ImportacaoMilitares permanece service-only', () => {
