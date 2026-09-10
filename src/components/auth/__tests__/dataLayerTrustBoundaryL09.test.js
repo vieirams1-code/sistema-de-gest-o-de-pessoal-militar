@@ -32,6 +32,12 @@ const diagnosticoSaldoPage = await readFile(new URL('../../../pages/DiagnosticoS
 const registroLivroModal = await readFile(new URL('../../../components/ferias/RegistroLivroModal.jsx', import.meta.url), 'utf8');
 const recalcularPeriodoJs = await readFile(new URL('../../../components/ferias/recalcularPeriodoAquisitivo.js', import.meta.url), 'utf8');
 const recalcularPeriodoJsx = await readFile(new URL('../../../components/ferias/recalcularPeriodoAquisitivo.jsx', import.meta.url), 'utf8');
+const migracaoMilitaresService = await readFile(new URL('../../../services/migracaoMilitaresService.js', import.meta.url), 'utf8');
+const historicoImportacoesService = await readFile(new URL('../../../services/historicoImportacoesMilitaresService.js', import.meta.url), 'utf8');
+const historicoImportacoesPage = await readFile(new URL('../../../pages/HistoricoImportacoesMilitares.jsx', import.meta.url), 'utf8');
+const historicoImportacoesLista = await readFile(new URL('../../../components/migracao-militares/HistoricoImportacoesMilitaresLista.jsx', import.meta.url), 'utf8');
+const importacaoHistoricoGateway = await readFile(new URL('../../../../base44/functions/importacaoMilitaresHistoricoGateway/entry.ts', import.meta.url), 'utf8');
+const importacaoHistoricoClient = await readFile(new URL('../../../services/importacaoMilitaresHistoricoGatewayClient.js', import.meta.url), 'utf8');
 async function listarFontesRecursivamente(dirUrl) {
   const entries = await readdir(dirUrl, { withFileTypes: true });
   const fontes = [];
@@ -297,6 +303,36 @@ test('L09D bloco 3: reader canônico separa finalidades e só lê Livro/ExOffici
   assert.match(publicacoesBundleBackend, /listarMilitarIdsDoEscopo/);
   assert.match(publicacoesBundleBackend, /purpose === 'MIGRACAO'/);
   assert.match(publicacoesBundleBackend, /purpose === 'COMPORTAMENTO'/);
+});
+
+test('L09E: histórico de ImportacaoMilitares usa gateway e não transporta snapshot bruto para a listagem', () => {
+  assert.match(migracaoMilitaresService, /criarHistoricoImportacaoMilitaresGateway/);
+  assert.match(migracaoMilitaresService, /atualizarHistoricoImportacaoMilitaresGateway/);
+  assert.match(migracaoMilitaresService, /obterAnaliseImportacaoMilitaresGateway/);
+  assert.match(historicoImportacoesService, /listarHistoricoImportacaoMilitaresGateway/);
+  assert.match(historicoImportacoesService, /excluirHistoricoImportacaoMilitaresGateway/);
+  assert.match(importacaoHistoricoClient, /functions\.invoke\('importacaoMilitaresHistoricoGateway'/);
+  assert.match(importacaoHistoricoGateway, /LIST_HISTORY/);
+  assert.match(importacaoHistoricoGateway, /relatorioHistoricoSeguro/);
+  assert.match(importacaoHistoricoGateway, /linhaHistoricoSegura/);
+  assert.doesNotMatch(historicoImportacoesService, /base44\.entities\.ImportacaoMilitares\.(list|filter|get|create|update|delete)/);
+});
+
+test('L09E: exclusão do histórico exige capacidade mutável além da leitura', () => {
+  assert.match(importacaoHistoricoGateway, /ver_historico_importacoes/);
+  assert.match(importacaoHistoricoGateway, /importar_militares/);
+  assert.match(importacaoHistoricoGateway, /exigirExclusao/);
+  assert.match(historicoImportacoesPage, /canAccessAction\('importar_militares'\)/);
+  assert.match(historicoImportacoesLista, /podeExcluirHistorico/);
+});
+
+test('L09E: finalização troca análise ativa por auditoria mínima sem retomada', () => {
+  assert.match(migracaoMilitaresService, /AUDITORIA_MINIMA_V1/);
+  assert.match(migracaoMilitaresService, /permite_retomada: false/);
+  assert.match(migracaoMilitaresService, /relatorioAuditoriaMinimaFromAnalise/);
+  assert.match(migracaoMilitaresService, /tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA/);
+  assert.doesNotMatch(historicoImportacoesService, /\bcpf:/);
+  assert.doesNotMatch(historicoImportacoesService, /\btelefone:/);
 });
 
 test('L09D: entidades fechadas dos blocos 1, 2 e 3 permanecem service-only', async () => {
