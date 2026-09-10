@@ -75,6 +75,17 @@ async function fetchUserPermissions(effectiveEmail) {
   const response = await base44.functions.invoke('getUserPermissions', requestPayload);
   // base44.functions.invoke retorna axios-like: { data, status, headers }
   const payload = response?.data ?? response;
+  console.info('[SGP_NATIVE_TRACE]', {
+    stage: 'getUserPermissions',
+    functionsVersion: base44?.functionsVersion || 'unknown',
+    status: response?.status || null,
+    requestHasEffectiveEmail: Boolean(effectiveEmail),
+    modulesTrue: Object.values(payload?.modules || {}).filter(Boolean).length,
+    actionsTrue: Object.values(payload?.actions || {}).filter(Boolean).length,
+    militares: payload?.modules?.militares === true,
+    visualizarMilitares: payload?.actions?.visualizar_militares === true,
+    hasGlobalScope: Boolean(payload?.hasGlobalScope),
+  });
 
   if (!payload) {
     throw new Error('Resposta vazia da função getUserPermissions');
