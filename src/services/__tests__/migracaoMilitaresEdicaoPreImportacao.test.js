@@ -492,7 +492,7 @@ test('bloqueia duplicidade na importação sem criar pendência persistida', asy
   assert.equal(resultado.totalNaoImportadas, 2);
   assert.equal(PossivelDuplicidadeMilitar._rows.length, 0);
   assert.ok(resultado.relatorio.linhas.some((item) => item.motivo_nao_importacao === 'Possível duplicidade identificada.'));
-  assert.ok(resultado.relatorio.linhas.some((item) => item.motivo_nao_importacao === 'Matrícula já cadastrada.')); 
+  assert.ok(resultado.relatorio.linhas.some((item) => item.motivo_nao_importacao === 'Matrícula já cadastrada.'));
 });
 
 test('análise detecta matrícula já cadastrada no histórico de matrícula mesmo sem cadastro legado', async () => {
