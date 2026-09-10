@@ -118,7 +118,8 @@ test('ARCH-002: matriz estruturada é fonte primária e descricao fica somente c
   assert.match(cudBackend, /const estruturada = perfil\?\.matriz_permissoes/);
   assert.match(cudBackend, /if \(hasPermissionKey\) return estruturada/);
   assert.match(gatewayBackend, /matrizEstruturadaValida/);
-  assert.match(gatewayBackend, /backfillPerfisAtivos/);
+  assert.match(gatewayBackend, /async function backfillPerfis\(/);
+  assert.doesNotMatch(gatewayBackend, /perfil\?\.ativo === false/);
   assert.match(gatewayBackend, /asServiceRole\.entities\.PerfilPermissao\.update/);
   assert.match(gatewayBackend, /versao_matriz_permissoes: PROFILE_MATRIX_VERSION/);
   assert.match(gatewayBackend, /from '\.\/permissionManifest\.ts'/);
