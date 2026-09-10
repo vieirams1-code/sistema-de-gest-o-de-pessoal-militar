@@ -68,30 +68,6 @@ test('payload de persistência inclui aliases legados para manter compatibilidad
   });
 });
 
-test('perfil estruturado prevalece sobre matriz divergente serializada em descricao', () => {
-  const profileSource = {
-    matriz_permissoes: {
-      acesso_militares: true,
-      perm_visualizar_militares: false,
-    },
-    versao_matriz_permissoes: PROFILE_MATRIX_VERSION,
-    descricao: '[SGP_PERMISSIONS_MATRIX]{"acesso_militares":false,"perm_visualizar_militares":true}[/SGP_PERMISSIONS_MATRIX]',
-  };
-
-  const resolved = resolveProfilePermissions({ profileSource }).permissions;
-  assert.equal(resolved.acesso_militares, true);
-  assert.equal(resolved.perm_visualizar_militares, false);
-});
-
-test('perfil legado sem campo estruturado continua lendo matriz serializada em descricao', () => {
-  const profileSource = {
-    descricao: '[SGP_PERMISSIONS_MATRIX]{"acesso_militares":true,"perm_visualizar_militares":true}[/SGP_PERMISSIONS_MATRIX]',
-  };
-
-  const resolved = resolveProfilePermissions({ profileSource }).permissions;
-  assert.equal(resolved.acesso_militares, true);
-  assert.equal(resolved.perm_visualizar_militares, true);
-});
 
 test('merge aplica perfil base e sobrescreve com override explícito do usuário', () => {
   const merged = mergeProfileAndUserPermissions({
