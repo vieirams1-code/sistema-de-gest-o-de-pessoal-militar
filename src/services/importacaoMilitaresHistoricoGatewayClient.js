@@ -30,3 +30,7 @@ export function atualizarHistoricoImportacaoMilitaresGateway(id, data) {
 export function excluirHistoricoImportacaoMilitaresGateway(id) {
   return invoke('DELETE', { id });
 }
+
+export function migrarSnapshotsFinalizadosImportacaoMilitaresGateway() {
+  return invoke('MIGRATE_FINALIZED_SNAPSHOTS');
+}
