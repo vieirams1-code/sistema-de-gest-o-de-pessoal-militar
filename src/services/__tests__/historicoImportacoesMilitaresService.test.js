@@ -5,6 +5,7 @@ import {
   __setHistoricoImportacoesClientForTests,
   listarHistoricoImportacoesMilitares,
   montarResumoHistorico,
+  gerarCsvHistoricoHumano,
   STATUS_LOTE_LABEL,
 } from '../historicoImportacoesMilitaresService.js';
 
@@ -82,11 +83,75 @@ test('histórico legado não expõe CPF, telefone ou snapshots brutos ao fronten
 
   assert.equal(linha.nome, 'Militar Legado');
   assert.equal(linha.matricula_atual, '111.222-333');
-  assert.equal(Object.hasOwn(linha, 'cpf'), false);
-  assert.equal(Object.hasOwn(linha, 'telefone'), false);
-  assert.equal(Object.hasOwn(linha, 'dadosOriginais'), false);
-  assert.equal(Object.hasOwn(linha, 'dadosTransformados'), false);
-  assert.deepEqual(Object.keys(lote.relatorioRaw).sort(), ['origem_historico', 'permite_retomada', 'tipo_relatorio', 'versao_relatorio'].sort());
+  assert.equal(linha.cpf, '');
+  assert.equal(linha.telefone, '');
+  assert.deepEqual(linha.dadosOriginais, {});
+  assert.deepEqual(linha.dadosTransformados, {});
+  assert.equal(JSON.stringify(linha).includes('529.982.247-25'), false);
+  assert.equal(JSON.stringify(linha).includes('67999999999'), false);
+  assert.equal(JSON.stringify(linha).includes('123456'), false);
+  assert.deepEqual(
+    Object.keys(lote.relatorioRaw).sort(),
+    ['origem_historico', 'permite_retomada', 'tipo_snapshot', 'versao_snapshot', 'tipo_relatorio', 'versao_relatorio'].sort(),
+  );
+
+  __setHistoricoImportacoesClientForTests(null);
+});
+
+test('histórico novo minimizado é lido sem PII e CSV não reintroduz CPF/telefone', async () => {
+  __setHistoricoImportacoesClientForTests({
+    entities: {
+      ImportacaoMilitares: {
+        list: async () => [{
+          id: 'minimo-1',
+          nome_arquivo: 'minimo.csv',
+          data_importacao: '2026-09-10T10:00:00.000Z',
+          status_importacao: 'Importado',
+          total_linhas: 1,
+          total_importadas: 1,
+          relatorio_json: JSON.stringify({
+            tipo_snapshot: 'HISTORICO_MINIMO',
+            versao_snapshot: 1,
+            tipo_relatorio: 'AUDITORIA_MINIMA_V1',
+            permite_retomada: false,
+            arquivo: { nome: 'minimo.csv' },
+            linhas: [{
+              linhaNumero: 2,
+              status: 'APTO',
+              nome: 'Militar Minimo',
+              matricula_historica: '111.222-333',
+              matricula_atual: '111.222-333',
+              posto_graduacao: 'Soldado',
+              importada: true,
+              militar_id: 'mil-1',
+              alertas: ['Dado sensível descartado após conclusão.'],
+              erros: [],
+              pendencias_revisao: [],
+              ajustes_automaticos: [],
+              correcoes_manuais: null,
+              motivo_nao_importacao: '',
+            }],
+          }),
+        }],
+      },
+      ImportacaoAlteracoesLegado: { list: async () => [] },
+    },
+  });
+
+  const [lote] = await listarHistoricoImportacoesMilitares();
+  assert.equal(lote.relatorioMinimizado, true);
+  assert.equal(lote.relatorioRaw.tipo_snapshot, 'HISTORICO_MINIMO');
+  assert.equal(lote.linhas[0].cpf, '');
+  assert.equal(lote.linhas[0].telefone, '');
+  assert.deepEqual(lote.linhas[0].dadosOriginais, {});
+  assert.deepEqual(lote.linhas[0].dadosTransformados, {});
+
+  const csv = gerarCsvHistoricoHumano(lote);
+  const cabecalho = csv.split('\n')[0].toLowerCase().split(',');
+  assert.equal(cabecalho.includes('cpf'), false);
+  assert.equal(cabecalho.includes('telefone'), false);
+  assert.equal(csv.includes('52998224725'), false);
+  assert.equal(csv.includes('67999999999'), false);
 
   __setHistoricoImportacoesClientForTests(null);
 });
