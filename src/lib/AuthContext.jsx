@@ -95,6 +95,7 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       console.info('[SGP_AUTH_TRACE] ' + JSON.stringify({
         source: 'base44.auth.me',
+        functionsVersion: appParams.functionsVersion || null,
         hasUser: Boolean(currentUser),
         role: currentUser?.role || null,
         emailLength: typeof currentUser?.email === 'string' ? currentUser.email.length : 0,
