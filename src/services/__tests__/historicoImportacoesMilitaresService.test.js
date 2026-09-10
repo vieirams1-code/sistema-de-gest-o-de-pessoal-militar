@@ -50,6 +50,47 @@ test('listarHistoricoImportacoesMilitares agrega históricos de militares e alte
   __setHistoricoImportacoesClientForTests(null);
 });
 
+test('histórico legado não expõe CPF, telefone ou snapshots brutos ao frontend', async () => {
+  __setHistoricoImportacoesClientForTests({
+    entities: {
+      ImportacaoMilitares: {
+        list: async () => [{
+          id: 'legacy-pii',
+          nome_arquivo: 'legado.csv',
+          data_importacao: '2026-04-22T10:00:00.000Z',
+          status_importacao: 'Importado',
+          total_linhas: 1,
+          total_importadas: 1,
+          relatorio_json: JSON.stringify({
+            arquivo: { nome: 'legado.csv' },
+            linhas: [{
+              linhaNumero: 2,
+              status: 'APTO',
+              original: { nome: 'Militar Legado', matricula: '111.222-333', cpf: '529.982.247-25', telefone: '67999999999', rg: '123456' },
+              transformado: { nome_completo: 'Militar Legado', matricula: '111.222-333', cpf: '52998224725', telefone: '67999999999', banco: '001' },
+              importada: true,
+            }],
+          }),
+        }],
+      },
+      ImportacaoAlteracoesLegado: { list: async () => [] },
+    },
+  });
+
+  const [lote] = await listarHistoricoImportacoesMilitares();
+  const linha = lote.linhas[0];
+
+  assert.equal(linha.nome, 'Militar Legado');
+  assert.equal(linha.matricula_atual, '111.222-333');
+  assert.equal(Object.hasOwn(linha, 'cpf'), false);
+  assert.equal(Object.hasOwn(linha, 'telefone'), false);
+  assert.equal(Object.hasOwn(linha, 'dadosOriginais'), false);
+  assert.equal(Object.hasOwn(linha, 'dadosTransformados'), false);
+  assert.deepEqual(Object.keys(lote.relatorioRaw).sort(), ['origem_historico', 'permite_retomada', 'tipo_relatorio', 'versao_relatorio'].sort());
+
+  __setHistoricoImportacoesClientForTests(null);
+});
+
 test('montarResumoHistorico contabiliza cards com base em registros persistidos', () => {
   const lotes = [
     {
