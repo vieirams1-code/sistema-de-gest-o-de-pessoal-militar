@@ -415,6 +415,9 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
   const exigeTodas = acao === 'PLANO_INSTITUCIONAL_EXCLUIR';
+  const autorizadoPorPermissao = necessarias.length > 0 && (exigeTodas
+    ? necessarias.every((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)
+    : necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true));
   // O acesso operacional é exclusivamente por permissões do módulo.
   // PermissaoPlanoFerias não é mais consultada nem concede acesso delegado.
   return autorizadoPorPermissao;
