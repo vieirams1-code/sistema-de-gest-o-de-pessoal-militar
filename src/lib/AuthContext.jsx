@@ -93,12 +93,6 @@ export const AuthProvider = ({ children }) => {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
-      console.info('[SGP_NATIVE_TRACE]', {
-        stage: 'auth.me',
-        functionsVersion: appParams.functionsVersion || 'default',
-        role: currentUser?.role || null,
-        emailFingerprint: String(currentUser?.email || '').trim().toLowerCase().split('').reduce((a, c) => ((a * 31) + c.charCodeAt(0)) >>> 0, 0).toString(16),
-      });
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
