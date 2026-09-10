@@ -11,6 +11,11 @@ import {
   normalizarNomeCanonico,
   validarMatriculaDisponivel,
 } from './militarIdentidadeService.js';
+import {
+  atualizarHistoricoImportacaoMilitaresGateway,
+  criarHistoricoImportacaoMilitaresGateway,
+  obterAnaliseImportacaoMilitaresGateway,
+} from './importacaoMilitaresHistoricoGatewayClient.js';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -1196,11 +1201,22 @@ function relatorioAuditoriaMinimaFromAnalise(analise, {
 }
 
 function getHistoricoImportacaoEntity() {
-  const entity = getMigracaoClient()?.entities?.[HISTORICO_ENTITY_NAME];
-  if (!entity?.create || !entity?.update) {
-    return null;
+  if (migracaoClientOverride) {
+    const entity = getMigracaoClient()?.entities?.[HISTORICO_ENTITY_NAME];
+    if (!entity?.create || !entity?.update) return null;
+    return entity;
   }
-  return entity;
+
+  return {
+    create: (data) => criarHistoricoImportacaoMilitaresGateway(data),
+    update: (id, data) => atualizarHistoricoImportacaoMilitaresGateway(id, data),
+    filter: async (criteria = {}) => {
+      const id = limparTexto(criteria?.id);
+      if (!id) return [];
+      const row = await obterAnaliseImportacaoMilitaresGateway(id);
+      return row ? [row] : [];
+    },
+  };
 }
 
 function assertHistoricoEntity() {
