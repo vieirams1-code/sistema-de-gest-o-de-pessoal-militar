@@ -43,6 +43,19 @@ function extrairMatrizPermissoes(descricao) {
   }
 }
 
+function obterMatrizPerfil(perfil) {
+  const estruturada = perfil?.matriz_permissoes;
+  if (estruturada && typeof estruturada === 'object' && !Array.isArray(estruturada)) {
+    const possuiChavePermissao = Object.keys(estruturada).some((key) => key.startsWith('acesso_') || key.startsWith('perm_'));
+    if (possuiChavePermissao) return estruturada;
+  }
+
+  const legadoDescricao = extrairMatrizPermissoes(perfil?.descricao);
+  if (Object.keys(legadoDescricao).length > 0) return legadoDescricao;
+
+  return perfil || {};
+}
+
 function consolidarPermissoesFerias(perfis = []) {
   const modules = {};
   const actions = {};
@@ -55,8 +68,7 @@ function consolidarPermissoesFerias(perfis = []) {
     }
   };
   for (const perfil of perfis || []) {
-    aplicar(perfil);
-    aplicar(extrairMatrizPermissoes(perfil?.descricao));
+    aplicar(obterMatrizPerfil(perfil));
   }
   return { modules, actions };
 }
