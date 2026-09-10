@@ -301,7 +301,7 @@ export default function PlanosFerias() {
       setFeedback({ tipo: 'erro', texto: 'A exclusão exige a permissão de excluir campanhas de férias e o Modo Admin de férias ativo.' });
       return;
     }
-    if (!window.confirm(`Excluir a campanha "${campanha.titulo}"? As respostas enviadas nela também serão excluídas. O militar continuará podendo responder em outra campanha ativa do mesmo plano.`)) return;
+    if (!window.confirm(`Excluir a campanha "${campanha.titulo}"? A exclusão só será permitida se não houver respostas. Campanhas com respostas serão preservadas e deverão ser arquivadas.`)) return;
     setSalvando(true);
     try {
       const resposta = await base44.functions.invoke('portal_servicos', {
