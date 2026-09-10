@@ -15,6 +15,8 @@ const ativarReversao = read('../../../../base44/functions/ativarReversaoDesconto
 const jisoWhatsApp = read('../../../../base44/functions/notificarJisoWhatsAppTemplate/entry.ts');
 const signedUrl = read('../../../../base44/functions/getAtestadoAnexoSignedUrl/entry.ts');
 const zipAtestados = read('../../../../base44/functions/gerarZipAnexosAtestados/entry.ts');
+const atestadoActionsMenu = read('../../atestado/AtestadoActionsMenu.jsx');
+const extratoAtestados = read('../../../pages/ExtratoAtestadosMedicos.jsx');
 const acervo = read('../../../../base44/functions/gerirAcervoHistorico/entry.ts');
 const lotacao = read('../../../../base44/functions/moverMilitaresLotacao/entry.ts');
 const antiguidade = read('../../../../base44/functions/getPreviaAntiguidadeMilitares/entry.ts');
@@ -60,11 +62,20 @@ test('notificação JISO via WhatsApp exige gerir_jiso e escopo do militar', () 
   assert.match(jisoWhatsApp, /jiso_whatsapp_enviado_por: effectiveEmail/);
 });
 
-test('anexos médicos exigem visualização, download e dados sensíveis no servidor', () => {
-  assert.match(signedUrl, /\['visualizar_atestados', 'baixar_anexos_atestados', 'ver_dados_sensiveis_atestado'\]/);
-  assert.match(zipAtestados, /\['visualizar_atestados', 'baixar_zip_atestados', 'ver_dados_sensiveis_atestado'\]/);
+test('downloads de anexos médicos usam capacidades próprias sem dependência oculta de dados sensíveis', () => {
+  assert.match(signedUrl, /\['visualizar_atestados', 'baixar_anexos_atestados'\]/);
+  assert.match(zipAtestados, /\['visualizar_atestados', 'baixar_zip_atestados'\]/);
+  assert.doesNotMatch(signedUrl, /\['visualizar_atestados', 'baixar_anexos_atestados', 'ver_dados_sensiveis_atestado'\]/);
+  assert.doesNotMatch(zipAtestados, /\['visualizar_atestados', 'baixar_zip_atestados', 'ver_dados_sensiveis_atestado'\]/);
   assert.match(signedUrl, /getScopedAtestadosBundle/);
   assert.match(zipAtestados, /getScopedAtestadosBundle/);
+
+  assert.match(atestadoActionsMenu, /canDownloadAttachments = canAccessAction\('baixar_anexos_atestados'\)/);
+  assert.doesNotMatch(atestadoActionsMenu, /canDownloadAttachments && canViewSensitive/);
+  assert.match(extratoAtestados, /if \(!canDownloadZip\)/);
+  assert.match(extratoAtestados, /if \(!canDownloadAttachments\)/);
+  assert.doesNotMatch(extratoAtestados, /canDownloadZip && canViewSensitive/);
+  assert.doesNotMatch(extratoAtestados, /canDownloadAttachments && canViewSensitive/);
 });
 
 test('acervo histórico exige gestão explícita e escopo antes da escrita', () => {
