@@ -6,6 +6,7 @@ const perfisPage = await readFile(new URL('../../../pages/PerfisPermissao.jsx', 
 const usuariosPage = await readFile(new URL('../../../pages/PermissoesUsuarios.jsx', import.meta.url), 'utf8');
 const gatewayClient = await readFile(new URL('../../../services/permissoesAdminGatewayClient.js', import.meta.url), 'utf8');
 const gatewayBackend = await readFile(new URL('../../../../base44/functions/permissoesAdminGateway/entry.ts', import.meta.url), 'utf8');
+const gatewayManifest = await readFile(new URL('../../../../base44/functions/permissoesAdminGateway/permissionManifest.ts', import.meta.url), 'utf8');
 const permissionsBackend = await readFile(new URL('../../../../base44/functions/getUserPermissions/entry.ts', import.meta.url), 'utf8');
 const cadastroMedalha = await readFile(new URL('../../../pages/CadastrarMedalha.jsx', import.meta.url), 'utf8');
 const importacaoMedalha = await readFile(new URL('../../../services/importacaoMedalhaService.js', import.meta.url), 'utf8');
@@ -109,6 +110,20 @@ test('L09 hotfix: uso de perfil expõe vínculo mínimo e frontend não acessa e
 test('L09: getUserPermissions continua resolvendo a fonte de autorização via service role', () => {
   assert.match(permissionsBackend, /asServiceRole\.entities\.UsuarioAcesso/);
   assert.match(permissionsBackend, /asServiceRole\.entities\.PerfilPermissao/);
+});
+
+test('ARCH-002: matriz estruturada é fonte primária e descricao fica somente como fallback legado', () => {
+  assert.match(permissionsBackend, /const estruturada = perfil\?\.matriz_permissoes/);
+  assert.match(permissionsBackend, /if \(hasCanonicalKey\) return estruturada/);
+  assert.match(cudBackend, /const estruturada = perfil\?\.matriz_permissoes/);
+  assert.match(cudBackend, /if \(hasPermissionKey\) return estruturada/);
+  assert.match(gatewayBackend, /matrizEstruturadaValida/);
+  assert.match(gatewayBackend, /backfillPerfisAtivos/);
+  assert.match(gatewayBackend, /asServiceRole\.entities\.PerfilPermissao\.update/);
+  assert.match(gatewayBackend, /versao_matriz_permissoes: PROFILE_MATRIX_VERSION/);
+  assert.match(gatewayBackend, /from '\.\/permissionManifest\.ts'/);
+  assert.match(gatewayManifest, /export const PROFILE_MATRIX_VERSION/);
+  assert.match(gatewayManifest, /export const CANONICAL_PERMISSION_KEYS/);
 });
 
 test('L09: Medalha não possui leitura ou escrita direta no frontend', () => {
