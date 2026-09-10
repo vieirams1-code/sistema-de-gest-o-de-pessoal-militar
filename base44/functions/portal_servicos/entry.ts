@@ -647,6 +647,12 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      if (['PERMISSOES_LISTAR_USUARIOS', 'PLANO_PERMISSOES_LISTAR', 'PLANO_PERMISSAO_SALVAR', 'PLANO_PERMISSAO_EXCLUIR'].includes(acao)) {
+        return new Response(JSON.stringify({ error: 'As permissões específicas por campanha foram descontinuadas. Use as permissões do módulo de férias.' }), {
+          status: 410,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
       let autorizado = false;
       try {
         // Compatibilidade de auditoria: autorizado = await autorizarAcaoAdminPortal(base44, user, acao)
