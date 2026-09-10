@@ -55,29 +55,67 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
     : necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true));
 }
 
-function militarNoEscopo(militar: any, campanha: any): boolean {
+async function carregarMembrosPorGrupo(base44: any, campanhas: any[]): Promise<Map<string, Set<string>>> {
+  const ids = new Set<string>();
+  for (const campanha of campanhas || []) {
+    for (const id of [
+      ...(campanha?.escopo_grupos_ids || []),
+      ...(campanha?.escopo_grupos_excluidos_ids || []),
+    ]) {
+      if (id) ids.add(String(id));
+    }
+  }
+  const resultado = new Map<string, Set<string>>();
+  if (ids.size === 0) return resultado;
+  let vinculos: any[] = [];
+  try {
+    vinculos = await base44.asServiceRole.entities.MembroGrupoEfetivo.list();
+  } catch {
+    vinculos = [];
+  }
+  for (const vinculo of vinculos || []) {
+    if (vinculo.ativo === false || !ids.has(String(vinculo.grupo_id)) || !vinculo.militar_id) continue;
+    const grupoId = String(vinculo.grupo_id);
+    if (!resultado.has(grupoId)) resultado.set(grupoId, new Set<string>());
+    resultado.get(grupoId)!.add(String(vinculo.militar_id));
+  }
+  return resultado;
+}
+
+function militarNoEscopo(militar: any, campanha: any, membrosPorGrupo = new Map<string, Set<string>>()): boolean {
   if (!militar || militar.status === 'Inativo' || militar.status === 'Falecido') return false;
-  if (!campanha?.tipo_escopo || campanha.tipo_escopo === 'TODOS' || campanha.tipo_escopo === 'SEM_ESCOPO') return true;
-  if (campanha.tipo_escopo === 'SELECAO_MILITARES') {
-    return (campanha.escopo_militares_ids || []).includes(militar.id);
-  }
-  if (campanha.tipo_escopo === 'QUADROS') {
-    return (campanha.escopo_quadros || []).includes(militar.quadro);
-  }
-  if (campanha.tipo_escopo !== 'UNIDADES') return false;
 
-  const alvos = (campanha.escopo_unidades_ids || []).map((id: unknown) => normalizar(id)).filter(Boolean);
-  const valores = [
-    militar.lotacao_id,
-    militar.grupamento_id,
-    militar.estrutura_id,
-    militar.lotacao,
-    militar.estrutura_nome,
-  ].map((item) => normalizar(item)).filter(Boolean);
+  const tipoEscopo = campanha?.tipo_escopo || 'TODOS';
+  let baseEscopo = tipoEscopo === 'TODOS' || tipoEscopo === 'SEM_ESCOPO';
 
-  return alvos.some((alvo: string) =>
-    valores.some((valor: string) => valor === alvo || valor.includes(alvo) || alvo.includes(valor))
-  );
+  if (tipoEscopo === 'SELECAO_MILITARES') {
+    baseEscopo = (campanha.escopo_militares_ids || []).includes(militar.id);
+  } else if (tipoEscopo === 'QUADROS') {
+    baseEscopo = (campanha.escopo_quadros || []).includes(militar.quadro);
+  } else if (tipoEscopo === 'UNIDADES') {
+    const alvos = (campanha.escopo_unidades_ids || []).map((id: unknown) => normalizar(id)).filter(Boolean);
+    const valores = [
+      militar.lotacao_id,
+      militar.grupamento_id,
+      militar.estrutura_id,
+      militar.lotacao,
+      militar.estrutura_nome,
+    ].map((item) => normalizar(item)).filter(Boolean);
+    baseEscopo = alvos.some((alvo: string) =>
+      valores.some((valor: string) => valor === alvo || valor.includes(alvo) || alvo.includes(valor))
+    );
+  } else if (!['TODOS', 'SEM_ESCOPO'].includes(tipoEscopo)) {
+    baseEscopo = false;
+  }
+
+  const grupos = (campanha?.escopo_grupos_ids || [])
+    .map((id: unknown) => membrosPorGrupo.get(String(id)))
+    .filter(Boolean);
+  const pertenceGrupo = grupos.length === 0 || grupos.some((membros) => membros!.has(String(militar.id)));
+  const excluidoPorGrupo = (campanha?.escopo_grupos_excluidos_ids || [])
+    .some((id: unknown) => membrosPorGrupo.get(String(id))?.has(String(militar.id)));
+
+  return baseEscopo && pertenceGrupo && !excluidoPorGrupo;
 }
 
 Deno.serve(async (req: Request) => {
@@ -203,11 +241,12 @@ Deno.serve(async (req: Request) => {
           plano_ferias_institucional_id: planoId,
         }),
       ]);
+      const membrosPorGrupo = await carregarMembrosPorGrupo(base44, campanhas);
 
       const publicoIds = new Set<string>();
       for (const campanha of campanhas) {
         for (const militar of militares || []) {
-          if (militarNoEscopo(militar, campanha) && militar.id) publicoIds.add(militar.id);
+          if (militarNoEscopo(militar, campanha, membrosPorGrupo) && militar.id) publicoIds.add(militar.id);
         }
       }
       const respondidos = new Set(
