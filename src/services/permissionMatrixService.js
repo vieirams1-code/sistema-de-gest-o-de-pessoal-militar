@@ -367,6 +367,7 @@ export const buildPermissionPayload = (source = {}, { includeLegacy = true } = {
   const normalized = buildPermissionsFromSource(source);
   const payload = {
     matriz_permissoes: { ...normalized },
+    versao_matriz_permissoes: PROFILE_MATRIX_VERSION,
   };
 
   if (!includeLegacy) return payload;
@@ -389,6 +390,14 @@ export const getPermissionMismatches = (expectedPermissions = {}, persistedSourc
 
 export const resolveProfilePermissions = ({ profileSource = {}, fallbackSource = {} }) => ({
   permissions: (() => {
+    const structuredMatrix = isObjectRecord(profileSource?.matriz_permissoes)
+      && canonicalPermissionKeys.some((key) => hasOwn(profileSource.matriz_permissoes, key))
+      ? profileSource.matriz_permissoes
+      : null;
+    if (structuredMatrix) return buildPermissionsFromSource(structuredMatrix);
+
+    // Compatibilidade transitória: perfis ainda não migrados podem manter a matriz
+    // serializada em descricao até o backfill controlado concluir a transição.
     const parsedProfileDescription = extractProfileMatrixFromDescription(profileSource?.descricao);
     if (parsedProfileDescription.matrix) return buildPermissionsFromSource(parsedProfileDescription.matrix);
     const flattenedCollectionMatrix = flattenPermissionsFromCollections(profileSource);
