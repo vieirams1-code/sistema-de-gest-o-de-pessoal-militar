@@ -28,7 +28,7 @@ const FILTROS_INICIAIS = {
 const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de importação?\nEsta ação remove apenas o registro do histórico e não apaga os militares já importados.`;
 
 export default function HistoricoImportacoesMilitares() {
-  const { isAdmin, isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
   const podeExcluirHistorico = canAccessAction('importar_militares');
   const { toast } = useToast();
 
