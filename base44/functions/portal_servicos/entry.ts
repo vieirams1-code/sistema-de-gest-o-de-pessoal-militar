@@ -1921,15 +1921,9 @@ Deno.serve(async (req: Request) => {
               opcoes = consolidarOpcoesPlano(opcoes);
             }
 
-            // 3. Purga opções órfãs de campanhas que foram excluídas
-            try {
-              const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-              for (const op of (allOpcoes || [])) {
-                if (!op.campanha_id || !campanhasIdsValidos.has(op.campanha_id)) {
-                  await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
-                }
-              }
-            } catch (_ePurge) {}
+            // 3. A consulta não remove opções órfãs.
+            // Registros históricos devem ser preservados para análise e eventual restauração.
+            // A limpeza de órfãos, se necessária, será uma operação administrativa explícita.
 
             // Rotina de reparo/sincronização automática para férias já geradas
             try {
