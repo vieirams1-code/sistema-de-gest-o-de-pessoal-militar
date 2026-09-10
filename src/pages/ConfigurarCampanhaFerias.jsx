@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const vazio = { usuario_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false };
 const erroTexto = (erro, fallback) => erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
 export default function ConfigurarCampanhaFerias() {
@@ -18,9 +17,6 @@ export default function ConfigurarCampanhaFerias() {
   const planoId = params.get('planoId') || '';
   const [campanha, setCampanha] = useState(null);
   const [plano, setPlano] = useState(null);
-  const [usuarios, setUsuarios] = useState([]);
-  const [permissoes, setPermissoes] = useState([]);
-  const [form, setForm] = useState(vazio);
   const [dadosCampanhaForm, setDadosCampanhaForm] = useState({ titulo: '', data_inicio: '', data_fim_militar: '' });
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
