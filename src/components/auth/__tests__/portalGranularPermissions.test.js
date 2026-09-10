@@ -100,7 +100,7 @@ test('PlanosFerias aplica permissões próprias e não depende de leitura direta
   for (const action of [
     'visualizar_planos_ferias', 'criar_planos_ferias', 'editar_planos_ferias', 'excluir_planos_ferias',
     'criar_campanhas_ferias', 'excluir_campanhas_ferias', 'visualizar_respostas_ferias',
-    'gerar_ferias_campanhas', 'atribuir_permissoes_ferias', 'admin_campanhas_ferias',
+    'gerar_ferias_campanhas', 'admin_campanhas_ferias',
   ]) assert.match(paginaPlanos, new RegExp(action));
   assert.doesNotMatch(paginaPlanos, /base44\.entities\.(Militar|GrupoEfetivo)/);
   assert.match(paginaPlanos, /PLANO_CAMPANHA_CRIAR/);
@@ -118,8 +118,8 @@ test('Painel de Férias não herda admin_mode e exige aprovação para Não Cont
 test('menu e rota de Campanhas usam somente permissões canônicas após L08', () => {
   assert.match(layout, /GerirCampanhasPortal[\s\S]*perm_visualizar_campanhas_gerais/);
   assert.match(app, /GerirCampanhasPortal:[\s\S]*'visualizar_campanhas_gerais'/);
-  assert.match(layout, /PainelPlanoFerias[\s\S]*perm_atribuir_permissoes_ferias/);
-  assert.match(app, /PainelPlanoFerias:[\s\S]*'atribuir_permissoes_ferias'/);
+  assert.doesNotMatch(layout, /perm_atribuir_permissoes_ferias/);
+  assert.doesNotMatch(app, /PainelPlanoFerias:[\s\S]*'atribuir_permissoes_ferias'/);
   assert.doesNotMatch(layout, /perm_gerir_campanhas|perm_gerir_respostas/);
   assert.doesNotMatch(app, /'gerir_campanhas'|'gerir_respostas'/);
 });
