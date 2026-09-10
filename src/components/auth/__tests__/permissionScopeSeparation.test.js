@@ -6,6 +6,7 @@ import { buildAccessScopeKey } from '../../../lib/accessScopeKey.js';
 const backendSource = readFileSync(new URL('../../../../base44/functions/getUserPermissions/entry.ts', import.meta.url), 'utf8');
 const backendCudSource = readFileSync(new URL('../../../../base44/functions/cudEscopado/entry.ts', import.meta.url), 'utf8');
 const frontendSource = readFileSync(new URL('../useCurrentUser.jsx', import.meta.url), 'utf8');
+const authContextSource = readFileSync(new URL('../../../lib/AuthContext.jsx', import.meta.url), 'utf8');
 const layoutSource = readFileSync(new URL('../../../Layout.jsx', import.meta.url), 'utf8');
 const publicacoesSource = readFileSync(new URL('../../../pages/Publicacoes.jsx', import.meta.url), 'utf8');
 const rpSource = readFileSync(new URL('../../../pages/RP.jsx', import.meta.url), 'utf8');
@@ -32,6 +33,16 @@ test('frontend mantém bypass funcional somente para role administrativa real', 
   assert.match(frontendSource, /const hasAbsoluteAccess = isAdmin;/);
   assert.doesNotMatch(frontendSource, /const isAdmin = Boolean\(data\?\.isAdmin\);/);
   assert.match(frontendSource, /if \(hasAbsoluteAccess\) return true;/);
+});
+
+test('cache de permissões é isolado por identidade autenticada e revalidado periodicamente', () => {
+  assert.match(frontendSource, /const authIdentityKey = toLowerSafe\(authenticatedUser\?\.email\) \|\| 'sem-identidade'/);
+  assert.match(frontendSource, /queryKey: \['current-user-permissions', permissionIdentityKey\]/);
+  assert.match(frontendSource, /refetchOnWindowFocus: true/);
+  assert.match(frontendSource, /refetchOnMount: 'always'/);
+  assert.match(frontendSource, /refetchInterval: ACCESS_QUERY_REFETCH_INTERVAL/);
+  assert.doesNotMatch(frontendSource, /queryKey: \['current-user-permissions', effectiveEmailFromStorage \|\| 'self'\]/);
+  assert.match(authContextSource, /queryClientInstance\.clear\(\)/);
 });
 
 test('escopo Administrador Global continua abrangendo todos os registros sem liberar módulos', () => {
