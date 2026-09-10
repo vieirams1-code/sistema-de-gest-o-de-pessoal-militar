@@ -8,7 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
+import {
+  permissionStructure,
+  modulosList,
+  acoesSensiveis,
+  isModuleVisibleInAdminMatrix,
+  isPermissionVisibleInAdminMatrix,
+} from '@/config/permissionStructure';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import {
   buildFullAccessPermissions,
@@ -1225,7 +1231,7 @@ export default function PermissoesUsuarios() {
                               className={`w-full text-left px-2.5 py-2 rounded-lg text-sm transition mb-1 last:mb-0 ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'}`}
                             >
                               <div className="font-semibold">{categoryGroup.category}</div>
-                              <div className={`text-[11px] ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>{categoryGroup.modules.length} módulos</div>
+                              <div className={`text-[11px] ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>{categoryGroup.modules.filter(isModuleVisibleInAdminMatrix).length} módulos</div>
                             </button>
                           );
                         })}
@@ -1236,9 +1242,10 @@ export default function PermissoesUsuarios() {
                           <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Categoria selecionada</h4>
                           <p className="text-sm sm:text-base font-semibold text-slate-900">{activeCategoryGroup?.category}</p>
                         </div>
-                        {activeCategoryGroup?.modules.map((mod) => {
+                        {activeCategoryGroup?.modules.filter(isModuleVisibleInAdminMatrix).map((mod) => {
                               const isModuleEnabled = userPermissions[mod.key] === true;
                               const moduleOverride = loadedProfilePermissions && (loadedProfilePermissions[mod.key] === true) !== isModuleEnabled;
+                              const visibleActions = (mod.actions || []).filter(isPermissionVisibleInAdminMatrix);
                               return (
                                 <div key={mod.key} className={`rounded-xl border shadow-sm ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
                                   <div
@@ -1275,10 +1282,10 @@ export default function PermissoesUsuarios() {
                                     </div>
                                   </div>
 
-                                  {mod.actions.length > 0 && isModuleEnabled && (
+                                  {visibleActions.length > 0 && isModuleEnabled && (
                                     <div className="px-3 pb-3">
                                       <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-2 border-t border-blue-100 pt-3">
-                                        {mod.actions.map((act) => {
+                                        {visibleActions.map((act) => {
                                           const isActionEnabled = userPermissions[act.key] === true;
                                           const actionOverride = loadedProfilePermissions && (loadedProfilePermissions[act.key] === true) !== isActionEnabled;
                                           return (
