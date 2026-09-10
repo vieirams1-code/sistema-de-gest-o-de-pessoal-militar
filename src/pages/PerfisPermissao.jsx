@@ -10,7 +10,7 @@ import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permi
 import {
   buildPermissionPayload,
   extractProfileMatrixFromDescription,
-  mergeProfileDescriptionWithMatrix,
+  cleanProfileDescriptionForStructuredPersistence,
   buildPermissionsFromSource,
   isLegacyCustomProfile,
   resolveProfilePermissions,
@@ -198,11 +198,11 @@ export default function PerfisPermissao() {
       return;
     }
     const normalizedPermissions = buildPermissionsFromSource(formData);
-    const descricaoComMatriz = mergeProfileDescriptionWithMatrix(formData.descricao, normalizedPermissions);
+    const descricaoLimpa = cleanProfileDescriptionForStructuredPersistence(formData.descricao);
     const payload = {
       ...formData,
-      descricao: descricaoComMatriz,
-      ...buildPermissionPayload(normalizedPermissions),
+      descricao: descricaoLimpa,
+      ...buildPermissionPayload(normalizedPermissions, { includeLegacy: false }),
     };
 
     if (editingId) {
