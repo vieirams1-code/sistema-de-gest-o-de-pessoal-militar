@@ -1,6 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ENTITY = 'ImportacaoMilitares';
+const STATUS_TERMINAIS_IMPORTACAO = new Set([
+  'Importado', 'Importado Parcial', 'Falhou', 'Concluído', 'Concluido', 'Cancelado', 'Cancelada',
+]);
 
 const WRITE_FIELDS = new Set([
   'nome_arquivo', 'tipo_arquivo', 'hash_arquivo', 'data_importacao',
@@ -45,6 +48,10 @@ function exigirExclusao(authz: any) {
 
 function limparTexto(value: unknown) {
   return String(value ?? '').trim();
+}
+
+function isStatusTerminalImportacao(status: unknown) {
+  return STATUS_TERMINAIS_IMPORTACAO.has(limparTexto(status));
 }
 
 function listaSegura(value: unknown) {
@@ -252,6 +259,10 @@ Deno.serve(async (req) => {
       exigir(authz, 'importar_militares');
       const id = limparTexto(payload?.id);
       if (!id) return erro(400, 'ID do histórico é obrigatório.');
+      const current = await base44.asServiceRole.entities[ENTITY].get(id);
+      if (isStatusTerminalImportacao(current?.status_importacao)) {
+        return erro(409, 'Este lote já foi finalizado e não aceita alteração do snapshot de trabalho.');
+      }
       const updated = await base44.asServiceRole.entities[ENTITY].update(id, sanitizeWrite(payload?.data));
       return Response.json({ result: updated });
     }
@@ -268,10 +279,9 @@ Deno.serve(async (req) => {
       if (authz?.isAdmin !== true) {
         throw Object.assign(new Error('A migração de snapshots históricos é restrita a administrador.'), { status: 403 });
       }
-      const finalStatuses = new Set(['Importado', 'Importado Parcial', 'Falhou', 'Concluído', 'Concluido', 'Cancelado', 'Cancelada']);
       const executar = payload?.executar === true;
       const rows = await base44.asServiceRole.entities[ENTITY].list('-created_date', 1000);
-      const terminalRows = (rows || []).filter((row: any) => finalStatuses.has(limparTexto(row?.status_importacao)));
+      const terminalRows = (rows || []).filter((row: any) => isStatusTerminalImportacao(row?.status_importacao));
       const candidates = terminalRows
         .map((row: any) => ({ row, minimal: relatorioAuditoriaMinimaPersistente(row) }))
         .filter((item: any) => Boolean(item.minimal));
