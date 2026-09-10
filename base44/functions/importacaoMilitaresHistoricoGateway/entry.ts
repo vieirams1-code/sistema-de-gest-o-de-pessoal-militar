@@ -65,11 +65,18 @@ function listaAuditoria(value: unknown) {
   return listaSegura(value).map(sanitizarMensagem);
 }
 
-function linhaHistoricoSegura(raw: any = {}, index = 0) {
+function linhaHistoricoSegura(raw: any = {}, index = 0, options: any = {}) {
   const original = raw?.original || raw?.dados_originais || {};
   const transformado = raw?.transformado || raw?.dados_transformados || raw?.militar_transformado || {};
+  const linhaNumero = Number(raw?.linhaNumero || raw?.linha_numero || index + 1);
+  const motivoNaoImportada = limparTexto(options?.naoImportadasPorLinha?.get?.(linhaNumero) || raw?.motivo_nao_importada);
+  const incluirAlertas = options?.incluirAlertas === true;
+  const elegivel = raw?.status === 'APTO' || (incluirAlertas && raw?.status === 'APTO_COM_ALERTA');
+  const correcao = raw?.correcao_pre_importacao;
   return {
-    linhaNumero: Number(raw?.linhaNumero || raw?.linha_numero || index + 1),
+    formato_linha: 'AUDITORIA_MINIMA_V1',
+    minimizado: true,
+    linhaNumero,
     status: limparTexto(raw?.status),
     nome: limparTexto(raw?.nome || transformado?.nome_completo || original?.nome_completo || original?.nome),
     matricula_atual: limparTexto(raw?.matricula_atual || transformado?.matricula_atual || transformado?.matricula),
@@ -79,23 +86,87 @@ function linhaHistoricoSegura(raw: any = {}, index = 0) {
     erros: listaAuditoria(raw?.erros || raw?.falhas),
     observacoes: listaAuditoria(raw?.observacoes || raw?.observacao || raw?.observacoes_importacao),
     pendencias_revisao: listaAuditoria(raw?.pendencias_revisao || raw?.revisar || raw?.pendencias),
-    importada: Boolean(raw?.importada || raw?.foi_importada || raw?.importado || raw?.militar_id || raw?.id_criado),
-    motivo_nao_importada: sanitizarMensagem(raw?.motivo_nao_importada),
+    correcao_pre_importacao: correcao ? {
+      campos_alterados: Array.isArray(correcao?.campos_alterados)
+        ? correcao.campos_alterados.map(limparTexto).filter(Boolean)
+        : [],
+      corrigido_por: limparTexto(correcao?.corrigido_por),
+      corrigido_em: limparTexto(correcao?.corrigido_em),
+    } : null,
+    importada: motivoNaoImportada
+      ? false
+      : (elegivel || Boolean(raw?.importada || raw?.foi_importada || raw?.importado || raw?.militar_id || raw?.id_criado)),
+    motivo_nao_importada: sanitizarMensagem(motivoNaoImportada),
   };
 }
 
-function relatorioHistoricoSeguro(rawJson: unknown) {
-  let report: any = {};
+function parseRelatorio(rawJson: unknown) {
   try {
-    report = typeof rawJson === 'string' && rawJson.trim() ? JSON.parse(rawJson) : {};
+    return typeof rawJson === 'string' && rawJson.trim() ? JSON.parse(rawJson) : {};
   } catch {
-    report = {};
+    return {};
   }
-  const rawLines = Array.isArray(report?.linhas)
+}
+
+function linhasRelatorio(report: any) {
+  return Array.isArray(report?.linhas)
     ? report.linhas
     : Array.isArray(report?.analise?.linhas) ? report.analise.linhas
       : Array.isArray(report?.importacao?.linhas) ? report.importacao.linhas
         : [];
+}
+
+function relatorioAuditoriaMinimaPersistente(row: any) {
+  const report = parseRelatorio(row?.relatorio_json);
+  if (report?.tipo_relatorio === 'AUDITORIA_MINIMA_V1' || report?.permite_retomada === false) return null;
+
+  const naoImportadas = Array.isArray(report?.importacao?.nao_importadas) ? report.importacao.nao_importadas : [];
+  const naoImportadasPorLinha = new Map(
+    naoImportadas.map((item: any) => [Number(item?.linhaNumero || 0), sanitizarMensagem(item?.motivo)]),
+  );
+  const incluirAlertas = report?.importacao?.incluirAlertas === true || row?.importar_linhas_com_alerta === true;
+  const rawLines = linhasRelatorio(report);
+
+  return JSON.stringify({
+    tipo_relatorio: 'AUDITORIA_MINIMA_V1',
+    versao_relatorio: '2026.09.09-v1',
+    permite_retomada: false,
+    minimizado_em: new Date().toISOString(),
+    arquivo: {
+      nome: limparTexto(report?.arquivo?.nome || row?.nome_arquivo),
+      tipo: limparTexto(report?.arquivo?.tipo || row?.tipo_arquivo),
+      hash: limparTexto(report?.arquivo?.hash || row?.hash_arquivo),
+      data_importacao: limparTexto(report?.arquivo?.data_importacao || row?.data_importacao),
+    },
+    resumo: report?.resumo && typeof report.resumo === 'object' ? report.resumo : {
+      total_linhas: Number(row?.total_linhas || rawLines.length || 0),
+      total_aptas: Number(row?.total_aptas || 0),
+      total_aptas_com_alerta: Number(row?.total_aptas_com_alerta || 0),
+      total_duplicadas: Number(row?.total_duplicadas || 0),
+      total_erros: Number(row?.total_erros || 0),
+    },
+    linhas: rawLines.map((line: any, index: number) => linhaHistoricoSegura(line, index, {
+      incluirAlertas,
+      naoImportadasPorLinha,
+    })),
+    importacao: {
+      incluirAlertas,
+      total_importadas: Number(report?.importacao?.total_importadas ?? row?.total_importadas ?? 0),
+      total_nao_importadas: Number(report?.importacao?.total_nao_importadas ?? row?.total_nao_importadas ?? 0),
+      nao_importadas: naoImportadas.map((item: any) => ({
+        linhaNumero: Number(item?.linhaNumero || 0),
+        motivo: sanitizarMensagem(item?.motivo),
+      })),
+      ids_criados: (Array.isArray(report?.importacao?.ids_criados) ? report.importacao.ids_criados : [])
+        .map(limparTexto)
+        .filter(Boolean),
+    },
+  });
+}
+
+function relatorioHistoricoSeguro(rawJson: unknown) {
+  const report: any = parseRelatorio(rawJson);
+  const rawLines = linhasRelatorio(report);
   return JSON.stringify({
     tipo_relatorio: limparTexto(report?.tipo_relatorio),
     versao_relatorio: limparTexto(report?.versao_relatorio),
@@ -180,6 +251,42 @@ Deno.serve(async (req) => {
       if (!id) return erro(400, 'ID do histórico é obrigatório.');
       const result = await base44.asServiceRole.entities[ENTITY].delete(id);
       return Response.json({ result: result ?? { id } });
+    }
+
+    if (action === 'MIGRATE_FINALIZED_SNAPSHOTS') {
+      if (authz?.isAdmin !== true) {
+        throw Object.assign(new Error('A migração de snapshots históricos é restrita a administrador.'), { status: 403 });
+      }
+      const finalStatuses = new Set(['Importado', 'Importado Parcial', 'Falhou']);
+      const rows = await base44.asServiceRole.entities[ENTITY].list('-created_date', 1000);
+      const candidates = (rows || []).filter((row: any) => finalStatuses.has(limparTexto(row?.status_importacao)));
+      let migrated = 0;
+      let alreadyMinimal = 0;
+      let failed = 0;
+
+      for (const row of candidates) {
+        try {
+          const minimal = relatorioAuditoriaMinimaPersistente(row);
+          if (!minimal) {
+            alreadyMinimal += 1;
+            continue;
+          }
+          await base44.asServiceRole.entities[ENTITY].update(row.id, { relatorio_json: minimal });
+          migrated += 1;
+        } catch (migrationError) {
+          failed += 1;
+          console.error('[importacaoMilitaresHistoricoGateway] falha ao minimizar lote', row?.id, migrationError?.message || migrationError);
+        }
+      }
+
+      return Response.json({
+        result: {
+          examined: candidates.length,
+          migrated,
+          alreadyMinimal,
+          failed,
+        },
+      });
     }
 
     return erro(400, 'Ação inválida para o histórico de importação.');
