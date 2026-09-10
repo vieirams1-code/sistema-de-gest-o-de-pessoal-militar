@@ -137,29 +137,6 @@ export default function ConfigurarCampanhaFerias() {
             </form>
           </section>
         )}
-        <section className="rounded-2xl border border-rose-200 bg-white p-5">
-          <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-rose-700" /><div><h2 className="font-bold text-slate-900">Usuários autorizados nesta campanha</h2><p className="text-xs text-slate-500">Atribua vários responsáveis, cada um com permissões independentes.</p></div></div>
-          <form onSubmit={salvar} className="mt-5 grid gap-4 rounded-xl bg-rose-50/40 p-4">
-            <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_repeat(4,auto)_auto] lg:items-end">
-              <label className="text-xs font-bold text-slate-700">Usuário
-                <select value={form.usuario_id} onChange={(e) => setForm({ ...form, usuario_id: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm">
-                  <option value="">Selecione um usuário</option>
-                  {usuariosDisponiveis.map((usuario) => <option key={usuario.id} value={usuario.id}>{usuario.nome}{usuario.email ? ` · ${usuario.email}` : ''}</option>)}
-                </select>
-              </label>
-              {[
-                ['pode_visualizar', 'Visualizar'],
-                ['pode_editar_escala', 'Editar escala'],
-                ['pode_autorizar', 'Autorizar'],
-                ['pode_gerar_ferias', 'Gerar férias'],
-              ].map(([campo, rotulo]) => <label key={campo} className="flex items-center gap-2 pb-2 text-xs whitespace-nowrap"><input type="checkbox" checked={form[campo]} onChange={(e) => setForm({ ...form, [campo]: e.target.checked })} />{rotulo}</label>)}
-              <Button type="submit" disabled={salvando || !form.usuario_id} className="bg-rose-700 hover:bg-rose-800">{salvando ? 'Salvando...' : 'Atribuir'}</Button>
-            </div>
-          </form>
-          <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200">
-            {permissoes.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">Nenhum responsável atribuído a esta campanha.</div> : <table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="p-3">Responsável</th><th className="p-3">Permissões</th><th className="p-3 text-right">Ação</th></tr></thead><tbody className="divide-y divide-slate-100">{permissoes.map((item) => <tr key={item.id}><td className="p-3"><p className="font-bold text-slate-800">{nomeUsuario(item)}</p><p className="text-xs text-slate-500">{item.usuario_email || ''}</p></td><td className="p-3 text-xs text-slate-600">{[['pode_visualizar','Visualizar'],['pode_editar_escala','Editar escala'],['pode_autorizar','Autorizar'],['pode_gerar_ferias','Gerar férias']].filter(([campo]) => item[campo]).map(([,rotulo]) => rotulo).join(' · ') || 'Sem permissões selecionadas'}</td><td className="p-3 text-right"><Button type="button" variant="outline" onClick={() => remover(item)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="mr-1 h-4 w-4" />Remover</Button></td></tr>)}</tbody></table>}
-          </div>
-        </section>
         <div className="flex justify-end"><Button type="button" variant="outline" onClick={carregar}><RefreshCw className="mr-1.5 h-4 w-4" />Atualizar</Button></div>
       </div>
     </div>
