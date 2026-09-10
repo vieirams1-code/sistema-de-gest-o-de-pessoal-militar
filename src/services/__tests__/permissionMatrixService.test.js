@@ -12,6 +12,8 @@ import {
   isValidPermissionSnapshot,
   mergeProfileAndUserPermissions,
   nestedMatrixKeys,
+  PROFILE_MATRIX_VERSION,
+  resolveProfilePermissions,
   resolveProfilePermissionsWithSnapshot,
   resolveUserPermissionsWithSnapshots,
   upsertProfileSnapshot,
@@ -46,7 +48,7 @@ test('normaliza chaves de acesso_* usando alias sem prefixo', () => {
   assert.equal(normalized.acesso_militares, true);
 });
 
-test('payload de persistência inclui aliases legados para manter compatibilidade', () => {
+test('payload de persistência inclui matriz estruturada versionada e aliases legados para compatibilidade', () => {
   const payload = buildPermissionPayload({
     perm_indicar_medalhas: true,
     perm_gerir_dom_pedro_ii: true,
@@ -61,11 +63,38 @@ test('payload de persistência inclui aliases legados para manter compatibilidad
   assert.equal(payload.gerir_fluxo_dom_pedro_ii, true);
   assert.equal(payload.acesso_folha_alteracoes, true);
   assert.equal(payload.folha_alteracoes, true);
+  assert.equal(payload.matriz_permissoes.perm_indicar_medalhas, true);
+  assert.equal(payload.versao_matriz_permissoes, PROFILE_MATRIX_VERSION);
 
   nestedMatrixKeys.forEach((matrixKey) => {
     assert.equal(payload[matrixKey].perm_indicar_medalhas, true);
     assert.equal(payload[matrixKey].acesso_folha_alteracoes, true);
   });
+});
+
+test('perfil estruturado prevalece sobre matriz divergente serializada em descricao', () => {
+  const profileSource = {
+    matriz_permissoes: {
+      acesso_militares: true,
+      perm_visualizar_militares: false,
+    },
+    versao_matriz_permissoes: PROFILE_MATRIX_VERSION,
+    descricao: '[SGP_PERMISSIONS_MATRIX]{"acesso_militares":false,"perm_visualizar_militares":true}[/SGP_PERMISSIONS_MATRIX]',
+  };
+
+  const resolved = resolveProfilePermissions({ profileSource }).permissions;
+  assert.equal(resolved.acesso_militares, true);
+  assert.equal(resolved.perm_visualizar_militares, false);
+});
+
+test('perfil legado sem campo estruturado continua lendo matriz serializada em descricao', () => {
+  const profileSource = {
+    descricao: '[SGP_PERMISSIONS_MATRIX]{"acesso_militares":true,"perm_visualizar_militares":true}[/SGP_PERMISSIONS_MATRIX]',
+  };
+
+  const resolved = resolveProfilePermissions({ profileSource }).permissions;
+  assert.equal(resolved.acesso_militares, true);
+  assert.equal(resolved.perm_visualizar_militares, true);
 });
 
 test('merge aplica perfil base e sobrescreve com override explícito do usuário', () => {
