@@ -55,41 +55,7 @@ export default function ConfigurarCampanhaFerias() {
 
   useEffect(() => { carregar(); }, [campanhaId, planoId]);
 
-  const usuariosDisponiveis = useMemo(() => {
-    const usados = new Set(permissoes.map((item) => String(item.usuario_id)));
-    return usuarios.filter((item) => !usados.has(String(item.id)));
-  }, [usuarios, permissoes]);
 
-  const salvar = async (evento) => {
-    evento.preventDefault();
-    if (!form.usuario_id || !campanha?.id) return;
-    setSalvando(true);
-    try {
-      const planoAtualId = planoId || campanha.plano_ferias_institucional_id;
-      const registro = {
-        plano_ferias_institucional_id: planoAtualId,
-        campanha_id: campanha.id,
-        usuario_id: form.usuario_id,
-        pode_visualizar: Boolean(form.pode_visualizar),
-        pode_editar_escala: Boolean(form.pode_editar_escala),
-        pode_autorizar: Boolean(form.pode_autorizar),
-        pode_gerar_ferias: Boolean(form.pode_gerar_ferias),
-        ativo: true,
-      };
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_PERMISSAO_SALVAR',
-        plano_id: planoAtualId,
-        permissao: registro,
-      });
-      setForm(vazio);
-      setFeedback({ tipo: 'sucesso', texto: 'Responsável atribuído com sucesso.' });
-      await carregar();
-    } catch (erro) {
-      setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível atribuir este responsável.') });
-    } finally {
-      setSalvando(false);
-    }
-  };
 
   const salvarDadosCampanha = async (evento) => {
     evento.preventDefault();
