@@ -108,11 +108,13 @@ function extrairVersaoMatrizPermissoes(descricao) {
 }
 
 function diagnosticarMatrizPerfil(perfil) {
-    const matriz = extrairMatrizPermissoes(perfil?.descricao);
+    const matriz = obterMatrizPerfil(perfil);
     const keys = Object.keys(matriz || {}).filter((key) => key.startsWith('acesso_') || key.startsWith('perm_'));
     const unknownKeys = keys.filter((key) => !CANONICAL_PERMISSION_KEY_SET.has(key) && !KNOWN_LEGACY_PERMISSION_KEYS.has(key));
     const legacyKeys = keys.filter((key) => KNOWN_LEGACY_PERMISSION_KEYS.has(key));
-    const version = extrairVersaoMatrizPermissoes(perfil?.descricao) || 'LEGADO_SEM_VERSAO';
+    const version = String(perfil?.versao_matriz_permissoes || '').trim()
+        || extrairVersaoMatrizPermissoes(perfil?.descricao)
+        || 'LEGADO_SEM_VERSAO';
     return {
         perfilId: perfil?.id || '',
         perfilNome: perfil?.nome_perfil || '',
@@ -139,6 +141,15 @@ function extrairMatrizPermissoes(descricao) {
     }
 }
 
+function obterMatrizPerfil(perfil) {
+    const estruturada = perfil?.matriz_permissoes;
+    if (estruturada && typeof estruturada === 'object' && !Array.isArray(estruturada)) {
+        const hasCanonicalKey = Object.keys(estruturada).some((key) => CANONICAL_PERMISSION_KEY_SET.has(key));
+        if (hasCanonicalKey) return estruturada;
+    }
+    return extrairMatrizPermissoes(perfil?.descricao);
+}
+
 // Consolida modules e actions EXCLUSIVAMENTE a partir dos perfis ativos.
 // Estratégia: prefixos "acesso_" => modules, "perm_" => actions.
 //
@@ -150,8 +161,9 @@ function extrairMatrizPermissoes(descricao) {
 //   - Se houver necessidade de exceção individual, ela deve ser representada
 //     por um perfil personalizado explicitamente vinculado ao usuário.
 //
-// Para PerfilPermissao, lemos tanto os campos booleanos da raiz quanto a matriz
-// completa serializada em `descricao` ([SGP_PERMISSIONS_MATRIX]{...}[/...]).
+// Para PerfilPermissao, a fonte primária é `matriz_permissoes` estruturada.
+// O bloco serializado em `descricao` permanece somente como fallback legado
+// durante a migração controlada.
 const LEGACY_EXPANSIONS = Object.freeze({
     acesso_campanhas: ['acesso_campanhas_ferias', 'acesso_campanhas_gerais'],
     perm_visualizar_campanhas: ['perm_visualizar_campanhas_ferias', 'perm_visualizar_campanhas_gerais'],
@@ -178,7 +190,7 @@ const PARENT_BY_ACTION = new Map(
 );
 
 function canonicalizarFontePerfil(perfil) {
-    const matriz = extrairMatrizPermissoes(perfil?.descricao);
+    const matriz = obterMatrizPerfil(perfil);
     const fonte = Object.keys(matriz).length > 0 ? matriz : (perfil || {});
     const canonical = {};
 
