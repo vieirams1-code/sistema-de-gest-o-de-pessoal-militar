@@ -28,6 +28,18 @@ function extrairMatrizPermissoes(descricao: unknown): Record<string, boolean> {
   }
 }
 
+function limparDescricaoTecnica(descricao: unknown): string {
+  return String(descricao || '')
+    .replace(/\[SGP_PERMISSIONS_MATRIX\][\s\S]*?\[\/SGP_PERMISSIONS_MATRIX\]/g, '')
+    .replace(/\[SGP_PERMISSIONS_VERSION\][\s\S]*?\[\/SGP_PERMISSIONS_VERSION\]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function matrizesCanonicasIguais(a: Record<string, unknown> = {}, b: Record<string, unknown> = {}): boolean {
+  return CANONICAL_PERMISSION_KEYS.every((key: string) => (a?.[key] === true) === (b?.[key] === true));
+}
+
 const CANONICAL_KEY_SET = new Set(CANONICAL_PERMISSION_KEYS as readonly string[]);
 const PARENT_BY_ACTION = new Map(
   (PERMISSION_MODULES || []).flatMap((module: any) => (module.actions || []).map((action: string) => [action, module.key])),
@@ -96,23 +108,32 @@ async function backfillPerfis(base44: any, perfis: any[]) {
     }
 
     const estruturada = matrizEstruturadaValida(perfil);
-    if (estruturada && String(perfil?.versao_matriz_permissoes || '') === PROFILE_MATRIX_VERSION) {
+    const legadoDescricao = extrairMatrizPermissoes(perfil?.descricao);
+    const fonte = estruturada || legadoDescricao;
+    const descricaoLimpa = limparDescricaoTecnica(perfil?.descricao);
+    const patch: Record<string, unknown> = {};
+
+    if (Object.keys(fonte).length > 0) {
+      const matriz_permissoes = canonicalizarMatriz(fonte);
+      if (!estruturada || !matrizesCanonicasIguais(estruturada, matriz_permissoes)) {
+        patch.matriz_permissoes = matriz_permissoes;
+      }
+      if (String(perfil?.versao_matriz_permissoes || '') !== PROFILE_MATRIX_VERSION) {
+        patch.versao_matriz_permissoes = PROFILE_MATRIX_VERSION;
+      }
+    }
+
+    if (descricaoLimpa !== String(perfil?.descricao || '')) {
+      patch.descricao = descricaoLimpa;
+    }
+
+    if (Object.keys(patch).length === 0) {
       saida.push(perfil);
       continue;
     }
 
-    const fonte = estruturada || extrairMatrizPermissoes(perfil?.descricao);
-    if (Object.keys(fonte).length === 0) {
-      saida.push(perfil);
-      continue;
-    }
-
-    const matriz_permissoes = canonicalizarMatriz(fonte);
-    const atualizado = await base44.asServiceRole.entities.PerfilPermissao.update(perfil.id, {
-      matriz_permissoes,
-      versao_matriz_permissoes: PROFILE_MATRIX_VERSION,
-    });
-    saida.push({ ...perfil, ...(atualizado || {}), matriz_permissoes, versao_matriz_permissoes: PROFILE_MATRIX_VERSION });
+    const atualizado = await base44.asServiceRole.entities.PerfilPermissao.update(perfil.id, patch);
+    saida.push({ ...perfil, ...(atualizado || {}), ...patch });
   }
   return saida;
 }
@@ -187,7 +208,8 @@ Deno.serve(async (req: Request) => {
       if (!profileId) return json({ error: 'profileId é obrigatório.' }, 400);
       const perfil = await base44.asServiceRole.entities.PerfilPermissao.get(profileId).catch(() => null);
       if (!perfil) return json({ error: 'Perfil de permissão não encontrado.' }, 404);
-      return json({ ok: true, perfil });
+      const [perfilMigrado] = await backfillPerfis(base44, [perfil]);
+      return json({ ok: true, perfil: perfilMigrado || perfil });
     }
 
     if (action === 'LIST_ACCESS') {
