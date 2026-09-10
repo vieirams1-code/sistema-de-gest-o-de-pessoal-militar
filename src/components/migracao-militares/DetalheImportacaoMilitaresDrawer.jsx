@@ -31,27 +31,6 @@ function Bloco({ titulo, itens, vazio = 'Sem informações.' }) {
   );
 }
 
-function ObjetoAmigavel({ titulo, dados }) {
-  const entries = Object.entries(dados || {}).filter(([, valor]) => String(valor ?? '').trim() !== '');
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <h4 className="text-sm font-semibold text-slate-700 mb-2">{titulo}</h4>
-      {entries.length === 0 ? (
-        <p className="text-sm text-slate-500">Sem dados disponíveis.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {entries.map(([chave, valor]) => (
-            <div key={chave} className="rounded bg-slate-50 border border-slate-200 px-2 py-1.5">
-              <p className="text-[11px] text-slate-500">{chave.replaceAll('_', ' ')}</p>
-              <p className="text-sm text-slate-700 break-words">{String(valor)}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function DetalheImportacaoMilitaresDrawer({ open, onOpenChange, lote }) {
   const [linhaSelecionada, setLinhaSelecionada] = useState(null);
   const { toast } = useToast();
@@ -152,9 +131,14 @@ export default function DetalheImportacaoMilitaresDrawer({ open, onOpenChange, l
                   Linha {linhaSelecionada.linhaNumero} • {linhaSelecionada.nome || 'Sem nome'}
                 </div>
 
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                  <p><span className="font-semibold">Nome:</span> {linhaSelecionada.nome || '—'}</p>
+                  <p><span className="font-semibold">Matrícula atual:</span> {linhaSelecionada.matricula_atual || linhaSelecionada.matricula || '—'}</p>
+                  <p><span className="font-semibold">Matrícula histórica:</span> {linhaSelecionada.matricula_historica || '—'}</p>
+                  <p><span className="font-semibold">Posto/Graduação:</span> {linhaSelecionada.posto || '—'}</p>
+                </div>
+
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  <ObjetoAmigavel titulo="Dados originais" dados={linhaSelecionada.dadosOriginais} />
-                  <ObjetoAmigavel titulo="Dados transformados" dados={linhaSelecionada.dadosTransformados} />
                   <Bloco titulo="Alertas" itens={linhaSelecionada.alertas} vazio="Sem alertas." />
                   <Bloco titulo="Erros" itens={linhaSelecionada.erros} vazio="Sem erros." />
                   <Bloco titulo="Observações da importação" itens={linhaSelecionada.observacoes} vazio="Sem observações." />
