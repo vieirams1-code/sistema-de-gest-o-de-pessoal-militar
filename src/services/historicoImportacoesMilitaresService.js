@@ -124,7 +124,7 @@ function obterPrincipalMotivo(linha) {
   return 'Sem pendências';
 }
 
-function normalizarLinha(raw, index) {
+function normalizarLinha(raw, index, snapshotMinimizado = false) {
   const transformado = raw?.transformado || raw?.dados_transformados || raw?.militar_transformado || {};
   const original = raw?.original || raw?.dados_originais || {};
   const alertas = toArray(raw?.alertas || raw?.avisos);
@@ -142,6 +142,7 @@ function normalizarLinha(raw, index) {
   );
 
   const status = normalizarStatusLinha(raw?.status, erros, alertas);
+  const motivoNaoImportada = pickFirstString(raw?.motivo_nao_importacao, raw?.motivo_nao_importada);
   const matriculaHistorica = pickFirstString(
     raw?.matricula_historica,
     original?.matricula,
@@ -162,19 +163,35 @@ function normalizarLinha(raw, index) {
     matricula: matriculaAtual || matriculaHistorica,
     matricula_atual: matriculaAtual,
     matricula_historica: matriculaHistorica,
-    posto: pickFirstString(raw?.posto, transformado?.posto_graduacao, original?.posto_graduacao, original?.posto, original?.['posto/graduação']),
+    posto: pickFirstString(raw?.posto_graduacao, raw?.posto, transformado?.posto_graduacao, original?.posto_graduacao, original?.posto, original?.['posto/graduação']),
     observacoes,
     importada,
+    militar_id: pickFirstString(raw?.militar_id, raw?.id_criado),
+    cpf: '',
+    telefone: '',
+    dadosOriginais: {},
+    dadosTransformados: {},
     alertas,
     erros,
     pendencias_revisao: pendenciasRevisao,
-    motivo_nao_importada: pickFirstString(raw?.motivo_nao_importada),
-    ajustesAutomaticos: detectarAjustesAutomaticos({ alertas, observacoes, observacoes_importacao: raw?.observacoes_importacao }),
-    principalMotivo: pickFirstString(raw?.motivo_nao_importada) || obterPrincipalMotivo({ erros, pendencias_revisao: pendenciasRevisao, alertas }),
+    motivo_nao_importada: motivoNaoImportada,
+    ajustesAutomaticos: [
+      ...toArray(raw?.ajustes_automaticos || raw?.ajustesAutomaticos),
+      ...detectarAjustesAutomaticos({ alertas, observacoes, observacoes_importacao: raw?.observacoes_importacao }),
+    ].filter((valor, idx, lista) => lista.indexOf(valor) === idx),
+    correcoesManuais: raw?.correcoes_manuais || null,
+    snapshotMinimizado,
+    principalMotivo: motivoNaoImportada || obterPrincipalMotivo({ erros, pendencias_revisao: pendenciasRevisao, alertas }),
   };
 }
 
-function obterLinhasDoRelatorio(relatorio) {
+function isRelatorioHistoricoMinimo(relatorio) {
+  return relatorio?.tipo_snapshot === 'HISTORICO_MINIMO'
+    || relatorio?.tipo_relatorio === 'AUDITORIA_MINIMA_V1'
+    || relatorio?.permite_retomada === false;
+}
+
+function obterLinhasDoRelatorio(relatorio, snapshotMinimizado = false) {
   const candidatas = [
     relatorio?.linhas,
     relatorio?.analise?.linhas,
@@ -184,7 +201,7 @@ function obterLinhasDoRelatorio(relatorio) {
   ];
 
   const linhas = candidatas.find((item) => Array.isArray(item)) || [];
-  return linhas.map(normalizarLinha);
+  return linhas.map((linha, index) => normalizarLinha(linha, index, snapshotMinimizado));
 }
 
 function calcularResumoDasLinhas(linhas) {
@@ -238,7 +255,8 @@ function normalizarDataLote(item) {
 
 function normalizarLote(item) {
   const relatorio = safeJsonParse(item?.relatorio_json, {});
-  const linhas = obterLinhasDoRelatorio(relatorio);
+  const snapshotMinimizado = isRelatorioHistoricoMinimo(relatorio);
+  const linhas = obterLinhasDoRelatorio(relatorio, snapshotMinimizado);
   const resumoLinhas = calcularResumoDasLinhas(linhas);
 
   const totalLinhas = toNumber(item?.total_linhas, item?.totalLinhas, resumoLinhas.total_linhas);
@@ -287,8 +305,10 @@ function normalizarLote(item) {
     },
     linhas,
     observacoes: pickFirstString(item?.observacoes),
-    relatorioMinimizado: relatorio?.tipo_relatorio === 'AUDITORIA_MINIMA_V1' || relatorio?.permite_retomada === false,
+    relatorioMinimizado: snapshotMinimizado,
     relatorioRaw: {
+      tipo_snapshot: relatorio?.tipo_snapshot || '',
+      versao_snapshot: relatorio?.versao_snapshot || '',
       tipo_relatorio: relatorio?.tipo_relatorio || '',
       versao_relatorio: relatorio?.versao_relatorio || '',
       permite_retomada: relatorio?.permite_retomada !== false,
