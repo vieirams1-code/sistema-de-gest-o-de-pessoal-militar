@@ -39,9 +39,60 @@ function setupClients() {
   const MatriculaMilitar = createEntity([]);
   const ImportacaoMilitares = createEntity([]);
   const PossivelDuplicidadeMilitar = createEntity([]);
+  const digits = (value = '') => String(value || '').replace(/\D/g, '');
+  const canonicalName = (value = '') => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
 
   __setMigracaoMilitaresClientForTests({ entities: { Militar, MatriculaMilitar, ImportacaoMilitares } });
-  __setMilitarIdentidadeClientForTests({ entities: { Militar, MatriculaMilitar, PossivelDuplicidadeMilitar } });
+  __setMilitarIdentidadeClientForTests({
+    functions: {
+      async invoke(name, body) {
+        assert.equal(name, 'militarIdentidadeGateway');
+        const { action, payload = {} } = body || {};
+
+        if (action === 'VALIDATE_MATRICULA') {
+          const matriculaNormalizada = digits(payload.matricula);
+          const militarExistente = Militar._rows.find((item) => digits(item.matricula) === matriculaNormalizada);
+          const matriculaExistente = MatriculaMilitar._rows.find((item) => digits(item.matricula_normalizada || item.matricula) === matriculaNormalizada);
+          if (militarExistente || matriculaExistente) return { data: { error: 'Matrícula já cadastrada.' } };
+          return { data: { result: matriculaNormalizada } };
+        }
+
+        if (action === 'FIND_DUPLICATE') {
+          const cpf = digits(payload.cpf);
+          const nome = canonicalName(payload.nomeCanonico);
+          const dataNascimento = String(payload.dataNascimento || '');
+          const duplicado = Militar._rows.find((item) => {
+            if (cpf && digits(item.cpf) === cpf) return true;
+            return nome
+              && canonicalName(item.nome_canonico || item.nome_completo) === nome
+              && dataNascimento
+              && String(item.data_nascimento || '') === dataNascimento;
+          }) || null;
+          return { data: { result: duplicado } };
+        }
+
+        if (action === 'CREATE_MILITAR') {
+          const created = await Militar.create({ ...(payload.data || {}) });
+          if (payload.data?.matricula) {
+            await MatriculaMilitar.create({
+              militar_id: created.id,
+              matricula: payload.data.matricula,
+              matricula_normalizada: digits(payload.data.matricula),
+              is_atual: true,
+            });
+          }
+          return { data: { result: created } };
+        }
+
+        return { data: { error: `Ação de teste não suportada: ${action}` } };
+      },
+    },
+  });
 
   return { Militar, MatriculaMilitar, ImportacaoMilitares, PossivelDuplicidadeMilitar };
 }
