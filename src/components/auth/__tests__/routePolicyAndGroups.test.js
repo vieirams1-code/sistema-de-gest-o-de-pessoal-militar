@@ -88,11 +88,14 @@ test('Antiguidade prévia mantém natureza administrativa refletida no menu', ()
   assert.match(layout, /name: 'Antiguidade',[\s\S]*?page: 'AntiguidadePrevia',[\s\S]*?adminOnly: true/);
 });
 
-test('novas permissões persistem pela matriz serializada do perfil e são lidas no backend', () => {
+test('novas permissões persistem na matriz estruturada; descrição serializada fica somente como fallback legado', () => {
   assert.match(perfisPage, /permissionStructure, modulosList, acoesSensiveis/);
-  assert.match(perfisPage, /mergeProfileDescriptionWithMatrix\(formData\.descricao, normalizedPermissions\)/);
+  assert.match(perfisPage, /cleanProfileDescriptionForStructuredPersistence\(formData\.descricao\)/);
+  assert.match(perfisPage, /buildPermissionPayload\(normalizedPermissions, \{ includeLegacy: false \}\)/);
+  assert.doesNotMatch(perfisPage, /mergeProfileDescriptionWithMatrix/);
   assert.match(permissionMatrixService, /canonicalPermissionKeys = \[\.\.\.modulePermissionKeys, \.\.\.actionPermissionKeys\]/);
   assert.match(permissionMatrixService, /PROFILE_MATRIX_START_MARKER = '\[SGP_PERMISSIONS_MATRIX\]'/);
+  assert.match(getUserPermissions, /const estruturada = perfil\?\.matriz_permissoes/);
   assert.match(getUserPermissions, /\[SGP_PERMISSIONS_MATRIX\]/);
   assert.match(getUserPermissions, /function consolidarModulesActions\(perfis\)/);
 });
