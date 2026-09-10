@@ -90,7 +90,6 @@ export default function PainelPlanoFerias() {
   const podeAdminFerias = isAdmin || canAccessAction('perm_admin_campanhas_ferias');
   const podeAprovarFerias = isAdmin || canAccessAction('perm_aprovar_ferias');
   const podeGerarFerias = isAdmin || canAccessAction('perm_gerar_ferias_campanhas');
-  const podeAtribuirPermissoesFerias = isAdmin || canAccessAction('perm_atribuir_permissoes_ferias');
   const podeEditarCampanhasFerias = isAdmin || canAccessAction('perm_editar_campanhas_ferias');
   const podeExcluirCampanhasFerias = isAdmin || canAccessAction('perm_excluir_campanhas_ferias');
 
@@ -110,9 +109,6 @@ export default function PainelPlanoFerias() {
 
   // Modo Admin para proteção de campanhas
   const [modoAdmin, setModoAdmin] = useState(false);
-  const [usuariosPermitidos, setUsuariosPermitidos] = useState([]);
-  const [permissoesCampanha, setPermissoesCampanha] = useState([]);
-  const [permissaoCampanhaForm, setPermissaoCampanhaForm] = useState({ usuario_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
 
   // Estados de Edição e Seleção por Militar
   const [selecoesMilitares, setSelecoesMilitares] = useState({});
