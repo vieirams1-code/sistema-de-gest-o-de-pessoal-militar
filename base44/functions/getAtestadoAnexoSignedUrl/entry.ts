@@ -92,7 +92,12 @@ Deno.serve(async (req) => {
     const perms = permsResponse?.data ?? permsResponse ?? {};
     const permActions = perms?.actions || {};
     const isPlatformAdmin = perms?.isAdmin === true;
-    const permissoesNecessarias = ['visualizar_atestados', 'baixar_anexos_atestados', 'ver_dados_sensiveis_atestado'];
+    // A permissão de download é uma capacidade sensível própria. Exigir também
+    // `ver_dados_sensiveis_atestado` criava dependência oculta entre duas ações
+    // concedíveis separadamente na matriz. A visualização clínica continua
+    // protegida por `ver_dados_sensiveis_atestado`; o anexo exige a capacidade
+    // explícita de download + visualização do módulo + escopo do atestado.
+    const permissoesNecessarias = ['visualizar_atestados', 'baixar_anexos_atestados'];
     const faltantes = isPlatformAdmin
       ? []
       : permissoesNecessarias.filter((action) => permActions?.[action] !== true);
