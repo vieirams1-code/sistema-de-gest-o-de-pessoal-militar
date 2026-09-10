@@ -154,7 +154,10 @@ export function useCurrentUser() {
 
   // Modo de acesso para guards/escopo. Usa scope.tipo do backend quando possível,
   // com fallback para o tipo_acesso do primeiro registro.
-  const resolvedTipoAcesso = isAdmin
+  // hasGlobalScope (tipo_acesso='admin' sem role admin da plataforma) também
+  // deve resultar em modoAcesso='admin' para que hasAccess/getMilitarScopeFilters
+  // concedam bypass de escopo corretamente.
+  const resolvedTipoAcesso = (isAdmin || hasGlobalScope)
     ? 'admin'
     : (normalizeAccessMode(scope?.tipo) || normalizeAccessMode(acesso?.tipo_acesso) || 'proprio');
 

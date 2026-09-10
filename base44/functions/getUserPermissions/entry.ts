@@ -242,6 +242,15 @@ function descreverScope(acessos, isAdmin) {
         return { tipo: 'vazio', estruturaIds: [], militarId: null, reason: 'SEM_ACESSO_CONFIGURADO' };
     }
 
+    // Usuário com tipo_acesso='admin' possui escopo organizacional global,
+    // mesmo sem ser admin da plataforma (role !== 'admin'). Sem este tratamento,
+    // o escopo caía em 'TIPO_ACESSO_DESCONHECIDO' e o frontend interpretava
+    // modoAcesso='vazio', negando acesso a todos os registros.
+    const admins = acessos.filter((a) => normalizeTipo(a.tipo_acesso) === 'admin');
+    if (admins.length > 0) {
+        return { tipo: 'admin', estruturaIds: [], militarId: null, reason: null };
+    }
+
     const setores = acessos.filter((a) => normalizeTipo(a.tipo_acesso) === 'setor' && a.grupamento_id);
     const subsetores = acessos.filter((a) => normalizeTipo(a.tipo_acesso) === 'subsetor' && a.subgrupamento_id);
     const unidades = acessos.filter((a) => normalizeTipo(a.tipo_acesso) === 'unidade' && a.subgrupamento_id);
