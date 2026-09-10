@@ -1591,6 +1591,8 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
   });
 
   const idsCriados = [];
+  const idsCriadosPorLinha = new Map();
+  const linhasImportadas = new Set();
   const naoImportadas = [];
 
   try {
@@ -1602,6 +1604,8 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       const resultado = await processarLinhaMilitarImportacao(linha, usuario);
       if (resultado.exito) {
         idsCriados.push(resultado.id);
+        linhasImportadas.add(Number(linha.linhaNumero));
+        if (resultado.id) idsCriadosPorLinha.set(Number(linha.linhaNumero), resultado.id);
       } else {
         naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: resultado.motivo });
       }
@@ -1612,6 +1616,8 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       analise,
       incluirAlertas,
       idsCriados,
+      idsCriadosPorLinha,
+      linhasImportadas,
       naoImportadas,
       usuario,
       avisosHistorico,
@@ -1624,7 +1630,10 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       analise,
       incluirAlertas,
       idsCriados,
+      idsCriadosPorLinha,
+      linhasImportadas,
       naoImportadas,
+      usuario,
     });
   }
 }
