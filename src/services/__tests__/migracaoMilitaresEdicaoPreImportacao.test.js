@@ -226,8 +226,8 @@ test('rejeita data de inclusão absurda na correção pré-importação', async 
   assert.equal(linhaAtualizada.transformado.data_inclusao, '');
   assert.ok(linhaAtualizada.erros.some((erro) => erro.includes('Data de inclusão inválida')));
 });
-test('importação final utiliza dados corrigidos', async () => {
-  const { Militar } = setupClients();
+test('importação final utiliza dados corrigidos e minimiza o snapshot permanente', async () => {
+  const { Militar, ImportacaoMilitares } = setupClients();
   const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
 
   const analise = {
@@ -260,6 +260,21 @@ test('importação final utiliza dados corrigidos', async () => {
   assert.equal(Militar._rows[0].nome_completo, 'Militar Corrigido');
   assert.equal(Militar._rows[0].cpf, '52998224725');
   assert.equal(Militar._rows[0].data_inclusao, '2022-05-01');
+
+  const relatorioPersistido = JSON.parse(ImportacaoMilitares._rows[0].relatorio_json);
+  const relatorioSerializado = JSON.stringify(relatorioPersistido);
+  assert.equal(relatorioPersistido.tipo_relatorio, 'AUDITORIA_MINIMA_V1');
+  assert.equal(relatorioPersistido.permite_retomada, false);
+  assert.equal(relatorioPersistido.linhas[0].nome, 'Militar Corrigido');
+  assert.equal(relatorioPersistido.linhas[0].matricula_atual, '999.888-777');
+  assert.equal(relatorioPersistido.linhas[0].importada, true);
+  assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'original'), false);
+  assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'transformado'), false);
+  assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'cpf'), false);
+  assert.equal(Object.hasOwn(relatorioPersistido.linhas[0], 'telefone'), false);
+  assert.equal(relatorioSerializado.includes('529.982.247-25'), false);
+  assert.equal(relatorioSerializado.includes('52998224725'), false);
+  assert.equal(await carregarAnaliseHistorico(historico.id), null);
 });
 
 test('bloqueia duplicidade na importação sem criar pendência persistida', async () => {
