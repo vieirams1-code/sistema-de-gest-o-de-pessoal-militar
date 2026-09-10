@@ -440,6 +440,46 @@ export const permissionStructure = [
   }
 ];
 
+// PERM-CORE-003 — descontinuação suave.
+// Estas chaves permanecem no contrato canônico e nos perfis físicos por
+// compatibilidade/rollback, mas não devem mais ser oferecidas como opções
+// concedíveis no painel administrativo porque não possuem consumidor de
+// produção identificável. A remoção física fica para uma migração versionada
+// posterior, evitando alterar silenciosamente a matriz persistida dos perfis.
+export const deprecatedAdminPermissionKeys = new Set([
+  'perm_adicionar_folha_alteracoes',
+  'perm_editar_folha_alteracoes',
+  'perm_excluir_folha_alteracoes',
+  'perm_adicionar_migracao_legado',
+  'perm_editar_migracao_legado',
+  'perm_excluir_migracao_legado',
+  'perm_adicionar_quadro_operacional',
+  'perm_editar_quadro_operacional',
+  'perm_aplicar_transicao_legado_ativa',
+  'perm_aplicar_transicao_designacao_manual',
+  'perm_excluir_processo_controle',
+  'perm_reset_operacional',
+  'perm_visualizar_central_pendencias',
+]);
+
+// Módulos cujo único propósito era expor uma ação agora descontinuada.
+// Mantidos no contrato canônico para leitura de perfis legados, mas ocultos da
+// matriz administrativa até a migração física definitiva.
+export const deprecatedAdminModuleKeys = new Set([
+  'acesso_operacoes_administrativas',
+  'acesso_central_pendencias',
+]);
+
+export const isPermissionVisibleInAdminMatrix = (actionOrKey) => {
+  const key = typeof actionOrKey === 'string' ? actionOrKey : actionOrKey?.key;
+  return Boolean(key) && !deprecatedAdminPermissionKeys.has(key);
+};
+
+export const isModuleVisibleInAdminMatrix = (moduleOrKey) => {
+  const key = typeof moduleOrKey === 'string' ? moduleOrKey : moduleOrKey?.key;
+  return Boolean(key) && !deprecatedAdminModuleKeys.has(key);
+};
+
 export const modulosList = permissionStructure.flatMap((group) => group.modules.map(({ key, label }) => ({ key, label })));
 
 export const acoesSensiveis = permissionStructure.flatMap((group) =>
