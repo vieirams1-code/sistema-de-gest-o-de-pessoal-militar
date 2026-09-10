@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { clearImpersonation } from '@/utils/impersonation';
+import { useAuth } from '@/lib/AuthContext';
 
 /**
  * useCurrentUser — Lote 1A
@@ -25,8 +26,9 @@ import { clearImpersonation } from '@/utils/impersonation';
  * ----------------------------------------------------------------------------
  */
 
-const ACCESS_QUERY_STALE_TIME = 5 * 60 * 1000;
+const ACCESS_QUERY_STALE_TIME = 30 * 1000;
 const ACCESS_QUERY_GC_TIME = 15 * 60 * 1000;
+const ACCESS_QUERY_REFETCH_INTERVAL = 60 * 1000;
 
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
 
@@ -91,12 +93,15 @@ async function fetchUserPermissions(effectiveEmail) {
 }
 
 export function useCurrentUser() {
+  const { user: authenticatedUser } = useAuth();
   // Lê effectiveEmail apenas uma vez por montagem do hook.
   // Para mudar o usuário efetivo em runtime, basta atualizar o sessionStorage
   // e invalidar a query (`queryClient.invalidateQueries(['current-user-permissions'])`)
   // ou recarregar a página.
   const effectiveEmailFromStorage = readEffectiveEmailFromStorage();
   const queryClient = useQueryClient();
+  const authIdentityKey = toLowerSafe(authenticatedUser?.email) || 'sem-identidade';
+  const permissionIdentityKey = effectiveEmailFromStorage || authIdentityKey;
 
   const {
     data,
@@ -105,13 +110,16 @@ export function useCurrentUser() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['current-user-permissions', effectiveEmailFromStorage || 'self'],
+    queryKey: ['current-user-permissions', permissionIdentityKey],
     queryFn: () => fetchUserPermissions(effectiveEmailFromStorage),
+    enabled: Boolean(authenticatedUser?.email),
     staleTime: ACCESS_QUERY_STALE_TIME,
     gcTime: ACCESS_QUERY_GC_TIME,
     retry: 1,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchInterval: ACCESS_QUERY_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
   });
 
   const user = data?.user || null;
