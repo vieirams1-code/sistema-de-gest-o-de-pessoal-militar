@@ -35,7 +35,11 @@ Deno.serve(async (req) => {
     const permsResponse = await base44.functions.invoke('getUserPermissions', payload);
     const perms = permsResponse?.data ?? permsResponse ?? {};
     const actions = perms?.actions || {};
-    const requiredPermissions = ['visualizar_atestados', 'baixar_zip_atestados', 'ver_dados_sensiveis_atestado'];
+    // `baixar_zip_atestados` é uma capacidade sensível própria. Não deve depender
+    // de `ver_dados_sensiveis_atestado`, que governa a exposição dos campos
+    // clínicos na interface. ZIP exige visualização do módulo, capacidade
+    // explícita de download em lote e escopo sobre os atestados selecionados.
+    const requiredPermissions = ['visualizar_atestados', 'baixar_zip_atestados'];
     const faltantes = perms?.isAdmin === true
       ? []
       : requiredPermissions.filter((action) => actions?.[action] !== true);
