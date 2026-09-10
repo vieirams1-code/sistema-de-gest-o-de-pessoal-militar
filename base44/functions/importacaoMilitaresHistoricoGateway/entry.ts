@@ -116,49 +116,60 @@ function linhasRelatorio(report: any) {
 
 function relatorioAuditoriaMinimaPersistente(row: any) {
   const report = parseRelatorio(row?.relatorio_json);
-  if (report?.tipo_relatorio === 'AUDITORIA_MINIMA_V1' || report?.permite_retomada === false) return null;
+  if (
+    report?.tipo_snapshot === 'HISTORICO_MINIMO'
+    || report?.tipo_relatorio === 'AUDITORIA_MINIMA_V1'
+    || report?.permite_retomada === false
+  ) return null;
 
   const naoImportadas = Array.isArray(report?.importacao?.nao_importadas) ? report.importacao.nao_importadas : [];
   const naoImportadasPorLinha = new Map(
     naoImportadas.map((item: any) => [Number(item?.linhaNumero || 0), sanitizarMensagem(item?.motivo)]),
   );
-  const incluirAlertas = report?.importacao?.incluirAlertas === true || row?.importar_linhas_com_alerta === true;
+  const incluirAlertas = report?.incluirAlertas === true
+    || report?.importacao?.incluirAlertas === true
+    || row?.importar_linhas_com_alerta === true;
   const rawLines = linhasRelatorio(report);
+  const idsCriados = (
+    Array.isArray(report?.ids_militares_criados) ? report.ids_militares_criados
+      : Array.isArray(report?.importacao?.ids_criados) ? report.importacao.ids_criados
+        : []
+  ).map(limparTexto).filter(Boolean);
 
   return JSON.stringify({
+    tipo_snapshot: 'HISTORICO_MINIMO',
+    versao_snapshot: 1,
     tipo_relatorio: 'AUDITORIA_MINIMA_V1',
-    versao_relatorio: '2026.09.09-v1',
     permite_retomada: false,
-    minimizado_em: new Date().toISOString(),
     arquivo: {
       nome: limparTexto(report?.arquivo?.nome || row?.nome_arquivo),
       tipo: limparTexto(report?.arquivo?.tipo || row?.tipo_arquivo),
       hash: limparTexto(report?.arquivo?.hash || row?.hash_arquivo),
-      data_importacao: limparTexto(report?.arquivo?.data_importacao || row?.data_importacao),
     },
-    resumo: report?.resumo && typeof report.resumo === 'object' ? report.resumo : {
-      total_linhas: Number(row?.total_linhas || rawLines.length || 0),
-      total_aptas: Number(row?.total_aptas || 0),
-      total_aptas_com_alerta: Number(row?.total_aptas_com_alerta || 0),
-      total_duplicadas: Number(row?.total_duplicadas || 0),
-      total_erros: Number(row?.total_erros || 0),
+    data_importacao: limparTexto(report?.data_importacao || report?.arquivo?.data_importacao || row?.data_importacao),
+    versao_regra_migracao: limparTexto(report?.versao_regra_migracao || row?.versao_regra_migracao),
+    resumo: {
+      total_linhas: Number(report?.resumo?.total_linhas ?? row?.total_linhas ?? rawLines.length ?? 0),
+      total_aptas: Number(report?.resumo?.total_aptas ?? row?.total_aptas ?? 0),
+      total_aptas_com_alerta: Number(report?.resumo?.total_aptas_com_alerta ?? row?.total_aptas_com_alerta ?? 0),
+      total_revisar: Number(report?.resumo?.total_revisar ?? row?.total_revisar ?? 0),
+      total_ignoradas: Number(report?.resumo?.total_ignoradas ?? report?.resumo?.total_duplicadas ?? row?.total_ignoradas ?? row?.total_duplicadas ?? 0),
+      total_erros: Number(report?.resumo?.total_erros ?? row?.total_erros ?? 0),
     },
+    status_final: limparTexto(row?.status_importacao),
+    total_linhas: Number(row?.total_linhas ?? report?.resumo?.total_linhas ?? rawLines.length ?? 0),
+    total_importadas: Number(row?.total_importadas ?? report?.importacao?.total_importadas ?? 0),
+    total_nao_importadas: Number(row?.total_nao_importadas ?? report?.importacao?.total_nao_importadas ?? 0),
+    incluirAlertas,
+    ids_militares_criados: idsCriados,
+    data_finalizacao: limparTexto(row?.updated_date || row?.data_importacao),
+    usuario_executor: limparTexto(row?.importado_por || row?.importado_por_nome),
+    avisos_operacionais: listaAuditoria(report?.avisos_operacionais),
+    erros_operacionais: listaAuditoria(report?.erros_operacionais || report?.falha_importacao),
     linhas: rawLines.map((line: any, index: number) => linhaHistoricoSegura(line, index, {
       incluirAlertas,
       naoImportadasPorLinha,
     })),
-    importacao: {
-      incluirAlertas,
-      total_importadas: Number(report?.importacao?.total_importadas ?? row?.total_importadas ?? 0),
-      total_nao_importadas: Number(report?.importacao?.total_nao_importadas ?? row?.total_nao_importadas ?? 0),
-      nao_importadas: naoImportadas.map((item: any) => ({
-        linhaNumero: Number(item?.linhaNumero || 0),
-        motivo: sanitizarMensagem(item?.motivo),
-      })),
-      ids_criados: (Array.isArray(report?.importacao?.ids_criados) ? report.importacao.ids_criados : [])
-        .map(limparTexto)
-        .filter(Boolean),
-    },
   });
 }
 
