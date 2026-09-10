@@ -69,10 +69,10 @@ function linhaHistoricoSegura(raw: any = {}, index = 0, options: any = {}) {
   const original = raw?.original || raw?.dados_originais || {};
   const transformado = raw?.transformado || raw?.dados_transformados || raw?.militar_transformado || {};
   const linhaNumero = Number(raw?.linhaNumero || raw?.linha_numero || index + 1);
-  const motivoNaoImportada = limparTexto(options?.naoImportadasPorLinha?.get?.(linhaNumero) || raw?.motivo_nao_importada);
+  const motivoNaoImportada = limparTexto(options?.naoImportadasPorLinha?.get?.(linhaNumero) || raw?.motivo_nao_importacao || raw?.motivo_nao_importada);
   const incluirAlertas = options?.incluirAlertas === true;
   const elegivel = raw?.status === 'APTO' || (incluirAlertas && raw?.status === 'APTO_COM_ALERTA');
-  const correcao = raw?.correcao_pre_importacao;
+  const correcao = raw?.correcoes_manuais || raw?.correcao_pre_importacao;
   return {
     linhaNumero,
     status: limparTexto(raw?.status),
@@ -92,7 +92,7 @@ function linhaHistoricoSegura(raw: any = {}, index = 0, options: any = {}) {
       campos_alterados: Array.isArray(correcao?.campos_alterados)
         ? correcao.campos_alterados.map(limparTexto).filter(Boolean)
         : [],
-      data: limparTexto(correcao?.corrigido_em),
+      data: limparTexto(correcao?.data || correcao?.corrigido_em),
     } : null,
     motivo_nao_importacao: sanitizarMensagem(motivoNaoImportada),
   };
@@ -177,6 +177,8 @@ function relatorioHistoricoSeguro(rawJson: unknown) {
   const report: any = parseRelatorio(rawJson);
   const rawLines = linhasRelatorio(report);
   return JSON.stringify({
+    tipo_snapshot: limparTexto(report?.tipo_snapshot),
+    versao_snapshot: Number(report?.versao_snapshot || 0) || undefined,
     tipo_relatorio: limparTexto(report?.tipo_relatorio),
     versao_relatorio: limparTexto(report?.versao_relatorio),
     permite_retomada: report?.permite_retomada !== false,
@@ -229,27 +231,7 @@ Deno.serve(async (req) => {
     if (action === 'LIST_HISTORY') {
       exigir(authz, 'ver_historico_importacoes');
       const rows = await base44.asServiceRole.entities[ENTITY].list('-created_date', 1000);
-      const finalStatuses = new Set(['Importado', 'Importado Parcial', 'Falhou']);
-      const rowsSeguros = [];
-      let snapshotsMigrados = 0;
-
-      for (const row of rows || []) {
-        let rowEfetivo = row;
-        if (authz?.isAdmin === true && finalStatuses.has(limparTexto(row?.status_importacao))) {
-          const minimal = relatorioAuditoriaMinimaPersistente(row);
-          if (minimal) {
-            await base44.asServiceRole.entities[ENTITY].update(row.id, { relatorio_json: minimal });
-            rowEfetivo = { ...row, relatorio_json: minimal };
-            snapshotsMigrados += 1;
-          }
-        }
-        rowsSeguros.push(projetarHistorico(rowEfetivo));
-      }
-
-      return Response.json({
-        result: rowsSeguros,
-        meta: { snapshotsMigrados },
-      });
+      return Response.json({ result: (rows || []).map(projetarHistorico) });
     }
 
     if (action === 'GET_ANALYSIS') {
