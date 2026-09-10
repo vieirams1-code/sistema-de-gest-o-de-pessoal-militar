@@ -13,6 +13,7 @@ const creditos = read('../../../../base44/functions/getScopedCreditosExtraFerias
 const gratificacoes = read('../../../../base44/functions/getScopedPainelGratificacoesFuncao/entry.ts');
 const cotasGratificacoes = read('../../../../base44/functions/getScopedCotasGratificacaoFuncao/entry.ts');
 const periodos = read('../../../../base44/functions/getScopedPeriodosAquisitivosBundle/entry.ts');
+const militares = read('../../../../base44/functions/getScopedMilitares/entry.ts');
 const ferias = read('../../../../base44/functions/getScopedFeriasBundle/entry.ts');
 const familiaFerias = read('../../ferias/FamiliaFeriasPanel.jsx');
 
@@ -32,6 +33,18 @@ test('bundles escopados exigem capacidade funcional explícita antes do service 
   assert.match(creditos, /modules\?\.ferias === true && acoesCredito\.some/);
   assert.match(gratificacoes, /modules\?\.gratificacoes_funcao === true && authz\?\.actions\?\.visualizar_gratificacoes_funcao === true/);
   assert.match(cotasGratificacoes, /modules\?\.gratificacoes_funcao === true && authz\?\.actions\?\.visualizar_gratificacoes_funcao === true/);
+});
+
+test('Militares e Férias priorizam a matriz estruturada e só usam descrição/campos raiz como fallback', () => {
+  for (const source of [militares, ferias]) {
+    assert.match(source, /const estruturada = perfil\?\.matriz_permissoes/);
+    assert.match(source, /if \(possuiChavePermissao\) return estruturada/);
+    assert.match(source, /const legadoDescricao = extrairMatrizPermissoes\(perfil\?\.descricao\)/);
+    assert.match(source, /if \(Object\.keys\(legadoDescricao\)\.length > 0\) return legadoDescricao/);
+    assert.match(source, /return perfil \|\| \{\}/);
+    assert.match(source, /aplicar\(obterMatrizPerfil\(perfil\)\)/);
+    assert.doesNotMatch(source, /aplicar\(perfil\);\s*aplicar\(extrairMatrizPermissoes\(perfil\?\.descricao\)\)/);
+  }
 });
 
 test('créditos separam leitura funcional própria de DTO mínimo usado pela tela de Férias', () => {
