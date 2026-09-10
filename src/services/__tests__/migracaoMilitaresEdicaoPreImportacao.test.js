@@ -77,7 +77,9 @@ function setupClients() {
         }
 
         if (action === 'CREATE_MILITAR') {
-          const created = await Militar.create({ ...(payload.data || {}) });
+          const data = { ...(payload.data || {}) };
+          if (data.cpf) data.cpf = digits(data.cpf);
+          const created = await Militar.create(data);
           if (payload.data?.matricula) {
             await MatriculaMilitar.create({
               militar_id: created.id,
