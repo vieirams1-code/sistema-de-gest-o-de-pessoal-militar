@@ -20,7 +20,7 @@ import {
   isLegacyCustomProfile,
   isBasePermissionProfile,
   extractProfileOriginIdFromDescription,
-  mergeProfileDescriptionWithMatrix,
+  cleanProfileDescriptionForStructuredPersistence,
   mergeProfileOriginIntoDescription,
   resolveProfilePermissions,
   resolveUserPermissions,
@@ -539,9 +539,9 @@ export default function PermissoesUsuarios() {
         );
         const payloadPerfilPersonalizado = {
           nome_perfil: `Personalizado - ${userNomeUsuario || reloadedAccess?.nome_usuario || reloadedAccess?.user_email || 'Usuário'}`,
-          descricao: mergeProfileDescriptionWithMatrix(descricaoComOrigem, normalizedPermissions),
+          descricao: cleanProfileDescriptionForStructuredPersistence(descricaoComOrigem),
           ativo: true,
-          ...buildPermissionPayload(normalizedPermissions),
+          ...buildPermissionPayload(normalizedPermissions, { includeLegacy: false }),
         };
 
         if (perfilPersonalizadoSelecionado?.id) {
