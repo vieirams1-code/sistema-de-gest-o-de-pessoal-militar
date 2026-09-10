@@ -38,6 +38,7 @@ const historicoImportacoesPage = await readFile(new URL('../../../pages/Historic
 const historicoImportacoesLista = await readFile(new URL('../../../components/migracao-militares/HistoricoImportacoesMilitaresLista.jsx', import.meta.url), 'utf8');
 const importacaoHistoricoGateway = await readFile(new URL('../../../../base44/functions/importacaoMilitaresHistoricoGateway/entry.ts', import.meta.url), 'utf8');
 const importacaoHistoricoClient = await readFile(new URL('../../../services/importacaoMilitaresHistoricoGatewayClient.js', import.meta.url), 'utf8');
+const importacaoMilitaresSchema = await readFile(new URL('../../../../base44/entities/ImportacaoMilitares.jsonc', import.meta.url), 'utf8');
 async function listarFontesRecursivamente(dirUrl) {
   const entries = await readdir(dirUrl, { withFileTypes: true });
   const fontes = [];
@@ -333,6 +334,13 @@ test('L09E: finalização troca análise ativa por auditoria mínima sem retomad
   assert.match(migracaoMilitaresService, /tipo_relatorio === RELATORIO_IMPORTACAO_TIPO_AUDITORIA_MINIMA/);
   assert.doesNotMatch(historicoImportacoesService, /\bcpf:/);
   assert.doesNotMatch(historicoImportacoesService, /\btelefone:/);
+});
+
+test('L09E: ImportacaoMilitares permanece service-only', () => {
+  assert.match(importacaoMilitaresSchema, /"create"\s*:\s*false/);
+  assert.match(importacaoMilitaresSchema, /"read"\s*:\s*false/);
+  assert.match(importacaoMilitaresSchema, /"update"\s*:\s*false/);
+  assert.match(importacaoMilitaresSchema, /"delete"\s*:\s*false/);
 });
 
 test('L09D: entidades fechadas dos blocos 1, 2 e 3 permanecem service-only', async () => {
