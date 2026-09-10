@@ -73,8 +73,23 @@ const ALL_PERMISSIONS_SENTINEL = 'ALL';
 async function fetchUserPermissions(effectiveEmail) {
   const requestPayload = effectiveEmail ? { effectiveEmail } : {};
   const response = await base44.functions.invoke('getUserPermissions', requestPayload);
+  // Trace temporário: não registra e-mail, token ou dados pessoais.
+  const rawPayload = response?.data ?? response;
+  console.info('[SGP_AUTH_TRACE]', {
+    source: 'getUserPermissions',
+    requestHasEffectiveEmail: Boolean(effectiveEmail),
+    status: response?.status || null,
+    authUserEmailLength: typeof rawPayload?.authUserEmail === 'string' ? rawPayload.authUserEmail.length : 0,
+    effectiveUserEmailLength: typeof rawPayload?.effectiveUserEmail === 'string' ? rawPayload.effectiveUserEmail.length : 0,
+    isImpersonating: Boolean(rawPayload?.isImpersonating),
+    modulesTrue: rawPayload?.modules && typeof rawPayload.modules === 'object' ? Object.values(rawPayload.modules).filter(Boolean).length : 0,
+    actionsTrue: rawPayload?.actions && typeof rawPayload.actions === 'object' ? Object.values(rawPayload.actions).filter(Boolean).length : 0,
+    militares: rawPayload?.modules?.militares === true,
+    visualizarMilitares: rawPayload?.actions?.visualizar_militares === true,
+    hasGlobalScope: Boolean(rawPayload?.hasGlobalScope),
+  });
   // base44.functions.invoke retorna axios-like: { data, status, headers }
-  const payload = response?.data ?? response;
+  const payload = rawPayload;
 
   if (!payload) {
     throw new Error('Resposta vazia da função getUserPermissions');
