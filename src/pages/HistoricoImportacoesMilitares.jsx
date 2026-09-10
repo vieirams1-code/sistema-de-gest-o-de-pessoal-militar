@@ -29,6 +29,7 @@ const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de im
 
 export default function HistoricoImportacoesMilitares() {
   const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+  const podeExcluirHistorico = canAccessAction('importar_militares');
   const { toast } = useToast();
 
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
@@ -133,6 +134,7 @@ export default function HistoricoImportacoesMilitares() {
             lotesExcluindo={lotesExcluindo}
             onAbrirDetalhe={setLoteSelecionado}
             onExcluirLote={excluirLote}
+            podeExcluirHistorico={podeExcluirHistorico}
             semResultadosPorFiltro={lotes.length > 0}
           />
         )}
