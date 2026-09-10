@@ -311,40 +311,7 @@ export default function PainelPlanoFerias() {
 
 
 
-  const salvarPermissaoCampanha = async (evento) => {
-    evento.preventDefault();
-    if (!podeAtribuirPermissoesFerias || !planoSelecionadoId || !campanhaSelecionada?.id || !permissaoCampanhaForm.usuario_id) return;
-    setActionLoading(true);
-    try {
-      await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_PERMISSAO_SALVAR',
-        plano_id: planoSelecionadoId,
-        permissao: { ...permissaoCampanhaForm, campanha_id: campanhaSelecionada.id },
-      });
-      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSOES_LISTAR', plano_id: planoSelecionadoId, campanha_id: campanhaSelecionada.id });
-      setPermissoesCampanha(resposta.data?.permissoes || []);
-      setPermissaoCampanhaForm({ usuario_id: '', pode_visualizar: true, pode_editar_escala: false, pode_autorizar: false, pode_gerar_ferias: false });
-      setFeedback({ type: 'success', msg: 'Usuário autorizado nesta campanha.' });
-    } catch (erro) {
-      setFeedback({ type: 'error', msg: erro.response?.data?.error || erro.message || 'Não foi possível salvar a autorização.' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
-  const removerPermissaoCampanha = async (permissao) => {
-    if (!podeAtribuirPermissoesFerias) return;
-    if (!window.confirm('Remover o acesso deste usuário à campanha?')) return;
-    setActionLoading(true);
-    try {
-      await base44.functions.invoke('portal_servicos', { acao: 'PLANO_PERMISSAO_EXCLUIR', permissao_id: permissao.id });
-      setPermissoesCampanha((atual) => atual.filter((item) => item.id !== permissao.id));
-    } catch (erro) {
-      setFeedback({ type: 'error', msg: erro.response?.data?.error || erro.message || 'Não foi possível remover o acesso.' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleSelecionarCampanha = (camp) => {
     setCampanhaSelecionada(camp);
