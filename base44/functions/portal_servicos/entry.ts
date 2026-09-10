@@ -1667,10 +1667,26 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
           if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+
+          const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id }).catch(() => []);
+          const respostas = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ campanha_id }).catch(() => []);
+          const opcoesGeradas = (opcoes || []).filter((opcao: any) => opcao.gerado_ferias_efetivas).length;
+
+          if ((opcoes || []).length > 0 || (respostas || []).length > 0) {
+            return new Response(JSON.stringify({
+              error: opcoesGeradas > 0
+                ? 'Esta campanha possui férias já geradas e não pode ser excluída. Arquive-a para preservar o histórico.'
+                : 'Esta campanha possui respostas e não pode ser excluída. Arquive-a para preservar o histórico.',
+              requires_archive: true,
+              campanha_id,
+              total_opcoes: (opcoes || []).length,
+              total_respostas: (respostas || []).length,
+              total_opcoes_geradas: opcoesGeradas,
+            }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+
           await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
-          for (const op of (await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id }).catch(() => [])) || []) await base44.asServiceRole.entities.OpcaoFeriasMilitar.delete(op.id);
-          for (const r of (await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ campanha_id }).catch(() => [])) || []) await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.delete(r.id);
-          return new Response(JSON.stringify({ ok: true, message: 'Campanha de férias e respostas associadas excluídas com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, message: 'Campanha de férias excluída; não havia respostas registradas.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         case 'PLANO_CAMPANHA_ARQUIVAR':
