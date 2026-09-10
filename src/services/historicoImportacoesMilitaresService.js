@@ -494,7 +494,7 @@ function escapeCsv(valor) {
   return texto;
 }
 
-export function exportarCsvHistoricoHumano(lote) {
+export function gerarCsvHistoricoHumano(lote) {
   const headers = [
     'status',
     'nome',
@@ -521,8 +521,11 @@ export function exportarCsvHistoricoHumano(lote) {
     linha.importada ? 'Sim' : 'Não',
   ]);
 
-  const csv = [headers, ...linhas].map((colunas) => colunas.map(escapeCsv).join(',')).join('\n');
+  return [headers, ...linhas].map((colunas) => colunas.map(escapeCsv).join(',')).join('\n');
+}
 
+export function exportarCsvHistoricoHumano(lote) {
+  const csv = gerarCsvHistoricoHumano(lote);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
