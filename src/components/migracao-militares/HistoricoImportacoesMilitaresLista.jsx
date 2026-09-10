@@ -25,6 +25,7 @@ export default function HistoricoImportacoesMilitaresLista({
   lotesExcluindo = {},
   onAbrirDetalhe,
   onExcluirLote,
+  podeExcluirHistorico = false,
   semResultadosPorFiltro = false,
 }) {
   const [loteExpandido, setLoteExpandido] = useState(null);
@@ -60,9 +61,11 @@ export default function HistoricoImportacoesMilitaresLista({
               </div>
               <div className="flex items-center gap-2">
                 <Badge className={STATUS_LOTE_BADGE_CLASS[lote.statusGeral] || 'bg-slate-100 text-slate-700 border-slate-200'}>{lote.statusGeral}</Badge>
-                <Button variant="destructive" size="sm" onClick={() => onExcluirLote?.(lote)} disabled={excluindo}>
-                  <Trash2 className="w-4 h-4 mr-1" /> {excluindo ? 'Excluindo...' : 'Excluir'}
-                </Button>
+                {podeExcluirHistorico && (
+                  <Button variant="destructive" size="sm" onClick={() => onExcluirLote?.(lote)} disabled={excluindo}>
+                    <Trash2 className="w-4 h-4 mr-1" /> {excluindo ? 'Excluindo...' : 'Excluir'}
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => onAbrirDetalhe(lote)}>
                   <Eye className="w-4 h-4 mr-1" /> Ver detalhe
                 </Button>
