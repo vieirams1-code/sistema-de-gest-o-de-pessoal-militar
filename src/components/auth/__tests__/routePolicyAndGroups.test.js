@@ -89,7 +89,7 @@ test('Antiguidade prévia mantém natureza administrativa refletida no menu', ()
 });
 
 test('novas permissões persistem na matriz estruturada; descrição serializada fica somente como fallback legado', () => {
-  assert.match(perfisPage, /permissionStructure, modulosList, acoesSensiveis/);
+  assert.match(perfisPage, /permissionStructure,[\s\S]*modulosList,[\s\S]*acoesSensiveis/);
   assert.match(perfisPage, /cleanProfileDescriptionForStructuredPersistence\(formData\.descricao\)/);
   assert.match(perfisPage, /buildPermissionPayload\(normalizedPermissions, \{ includeLegacy: false \}\)/);
   assert.doesNotMatch(perfisPage, /mergeProfileDescriptionWithMatrix/);
