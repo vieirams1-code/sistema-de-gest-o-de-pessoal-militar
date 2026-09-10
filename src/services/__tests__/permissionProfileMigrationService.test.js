@@ -49,15 +49,18 @@ test('perfil legado sem campo estruturado continua compatível via descricao', (
   assert.equal(resolved.perm_visualizar_militares, true);
 });
 
-test('perfil canônico recebe versão formal sem alterar intenção', () => {
+test('perfil canônico migra matriz para campo estruturado e limpa a descrição técnica', () => {
   const preview = previewProfilePermissionMigration({
     id: 'p1',
     nome_perfil: 'Teste',
-    descricao: wrap({ acesso_militares: true, perm_visualizar_militares: true }),
+    descricao: wrap({ acesso_militares: true, perm_visualizar_militares: true }, 'Descrição humana'),
   });
   assert.equal(preview.finalMatrix.acesso_militares, true);
   assert.equal(preview.finalMatrix.perm_visualizar_militares, true);
-  assert.equal(extractProfileMatrixVersion(preview.finalDescricao), CURRENT_PROFILE_MATRIX_VERSION);
+  assert.equal(preview.afterVersion, CURRENT_PROFILE_MATRIX_VERSION);
+  assert.equal(preview.finalDescricao, 'Descrição humana');
+  assert.equal(extractProfileMatrixVersion(preview.finalDescricao), '');
+  assert.doesNotMatch(preview.finalDescricao, /SGP_PERMISSIONS_MATRIX/);
 });
 
 test('ação filha verdadeira repara módulo pai sem conceder outras ações', () => {
@@ -108,16 +111,18 @@ test('chaves desconhecidas e depreciadas são reportadas, não copiadas silencio
   assert.equal(Object.prototype.hasOwnProperty.call(preview.finalMatrix, 'perm_chave_inexistente'), false);
 });
 
-test('migração é idempotente', () => {
+test('migração é idempotente após persistência estruturada', () => {
   const first = previewProfilePermissionMigration({
     id: 'p1',
     nome_perfil: 'Teste',
-    descricao: wrap({ acesso_militares: false, perm_visualizar_militares: true }),
+    descricao: wrap({ acesso_militares: false, perm_visualizar_militares: true }, 'Descrição humana'),
   });
   const second = previewProfilePermissionMigration({
     id: 'p1',
     nome_perfil: 'Teste',
     descricao: first.finalDescricao,
+    matriz_permissoes: first.finalMatrix,
+    versao_matriz_permissoes: CURRENT_PROFILE_MATRIX_VERSION,
   });
   assert.equal(second.finalDescricao, first.finalDescricao);
   assert.equal(second.changed, false);
