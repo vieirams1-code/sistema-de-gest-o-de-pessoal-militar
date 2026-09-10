@@ -200,8 +200,9 @@ export default function PerfisPermissao() {
     const normalizedPermissions = buildPermissionsFromSource(formData);
     const descricaoLimpa = cleanProfileDescriptionForStructuredPersistence(formData.descricao);
     const payload = {
-      ...formData,
+      nome_perfil: formData.nome_perfil.trim(),
       descricao: descricaoLimpa,
+      ativo: formData.ativo !== false,
       ...buildPermissionPayload(normalizedPermissions, { includeLegacy: false }),
     };
 
