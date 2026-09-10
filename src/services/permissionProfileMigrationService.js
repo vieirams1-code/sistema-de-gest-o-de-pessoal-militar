@@ -3,7 +3,7 @@ import {
   PROFILE_MATRIX_START_MARKER,
   PROFILE_MATRIX_END_MARKER,
   extractProfileMatrixFromDescription,
-  mergeProfileDescriptionWithMatrix,
+  cleanProfileDescriptionForStructuredPersistence,
 } from './permissionMatrixService.js';
 
 export const CURRENT_PROFILE_MATRIX_VERSION = '2026.09.08-v3';
@@ -150,16 +150,16 @@ export function previewProfilePermissionMigration(profile = {}) {
   }
 
   const parsed = extractProfileMatrixFromDescription(profile.descricao);
-  const cleanDescricao = parsed.cleanDescricao
-    .replace(/\[SGP_PERMISSIONS_VERSION\][\s\S]*?\[\/SGP_PERMISSIONS_VERSION\]/g, '')
-    .trim();
-  const withMatrix = mergeProfileDescriptionWithMatrix(cleanDescricao, finalMatrix);
-  const finalDescricao = mergeProfileMatrixVersion(withMatrix, CURRENT_PROFILE_MATRIX_VERSION);
+  const finalDescricao = cleanProfileDescriptionForStructuredPersistence(profile.descricao);
 
   const beforeCanonical = profile?.matriz_permissoes && typeof profile.matriz_permissoes === 'object' && !Array.isArray(profile.matriz_permissoes)
     ? profile.matriz_permissoes
     : (parsed.matrix || {});
   const changedKeys = canonicalProfilePermissionKeys.filter((key) => Boolean(beforeCanonical[key]) !== finalMatrix[key]);
+  const structuredVersionCurrent = String(profile?.versao_matriz_permissoes || '').trim() === CURRENT_PROFILE_MATRIX_VERSION;
+  const structuredMatrixCurrent = profile?.matriz_permissoes && typeof profile.matriz_permissoes === 'object' && !Array.isArray(profile.matriz_permissoes)
+    ? changedKeys.length === 0
+    : false;
 
   return {
     profileId: profile.id || '',
@@ -173,7 +173,7 @@ export function previewProfilePermissionMigration(profile = {}) {
     changedKeys,
     finalMatrix,
     finalDescricao,
-    changed: finalDescricao !== String(profile.descricao || ''),
+    changed: finalDescricao !== String(profile.descricao || '') || !structuredVersionCurrent || !structuredMatrixCurrent,
   };
 }
 
