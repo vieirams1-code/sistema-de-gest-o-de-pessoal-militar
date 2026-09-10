@@ -12,8 +12,6 @@ import {
   isValidPermissionSnapshot,
   mergeProfileAndUserPermissions,
   nestedMatrixKeys,
-  PROFILE_MATRIX_VERSION,
-  resolveProfilePermissions,
   resolveProfilePermissionsWithSnapshot,
   resolveUserPermissionsWithSnapshots,
   upsertProfileSnapshot,
@@ -48,7 +46,7 @@ test('normaliza chaves de acesso_* usando alias sem prefixo', () => {
   assert.equal(normalized.acesso_militares, true);
 });
 
-test('payload de persistência inclui matriz estruturada versionada e aliases legados para compatibilidade', () => {
+test('payload de persistência inclui aliases legados para manter compatibilidade', () => {
   const payload = buildPermissionPayload({
     perm_indicar_medalhas: true,
     perm_gerir_dom_pedro_ii: true,
@@ -63,8 +61,6 @@ test('payload de persistência inclui matriz estruturada versionada e aliases le
   assert.equal(payload.gerir_fluxo_dom_pedro_ii, true);
   assert.equal(payload.acesso_folha_alteracoes, true);
   assert.equal(payload.folha_alteracoes, true);
-  assert.equal(payload.matriz_permissoes.perm_indicar_medalhas, true);
-  assert.equal(payload.versao_matriz_permissoes, PROFILE_MATRIX_VERSION);
 
   nestedMatrixKeys.forEach((matrixKey) => {
     assert.equal(payload[matrixKey].perm_indicar_medalhas, true);
