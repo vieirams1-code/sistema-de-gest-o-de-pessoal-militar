@@ -87,6 +87,12 @@ export default function DetalheImportacaoMilitaresDrawer({ open, onOpenChange, l
               <p><span className="font-semibold">Observações:</span> {lote.observacoes || 'Sem observações.'}</p>
             </div>
 
+            {lote?.relatorioRaw?.tipo_snapshot === 'HISTORICO_MINIMO' ? (
+              <p className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                Dados pessoais detalhados foram descartados após a conclusão da importação, conforme política de minimização.
+              </p>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => exportarCsvHistoricoHumano(lote)}>
                 <Download className="w-4 h-4 mr-2" /> Exportar CSV legível
