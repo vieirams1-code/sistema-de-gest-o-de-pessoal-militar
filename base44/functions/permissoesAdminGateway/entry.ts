@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
+import { CANONICAL_PERMISSION_KEYS, PERMISSION_MODULES, PROFILE_MATRIX_VERSION } from '../getUserPermissions/permissionManifest.ts';
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -27,10 +28,93 @@ function extrairMatrizPermissoes(descricao: unknown): Record<string, boolean> {
   }
 }
 
+const CANONICAL_KEY_SET = new Set(CANONICAL_PERMISSION_KEYS as readonly string[]);
+const PARENT_BY_ACTION = new Map(
+  (PERMISSION_MODULES || []).flatMap((module: any) => (module.actions || []).map((action: string) => [action, module.key])),
+);
+const LEGACY_EXPANSIONS = Object.freeze({
+  acesso_campanhas: ['acesso_campanhas_ferias', 'acesso_campanhas_gerais'],
+  perm_visualizar_campanhas: ['perm_visualizar_campanhas_ferias', 'perm_visualizar_campanhas_gerais'],
+  perm_gerir_campanhas: [
+    'perm_visualizar_campanhas_ferias', 'perm_criar_campanhas_ferias', 'perm_admin_campanhas_ferias',
+    'perm_editar_campanhas_ferias', 'perm_excluir_campanhas_ferias', 'perm_visualizar_planos_ferias',
+    'perm_criar_planos_ferias', 'perm_editar_planos_ferias', 'perm_excluir_planos_ferias',
+    'perm_visualizar_campanhas_gerais', 'perm_criar_campanhas', 'perm_admin_campanhas',
+    'perm_editar_campanhas', 'perm_excluir_campanhas', 'perm_enviar_lembretes_campanhas',
+  ],
+  perm_gerir_respostas: [
+    'perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas',
+    'perm_atribuir_permissoes_ferias', 'perm_visualizar_respostas_campanhas',
+    'perm_exportar_respostas_campanhas', 'perm_baixar_anexos_respostas_campanhas',
+    'perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais',
+    'perm_aprovar_respostas_campanhas', 'perm_atribuir_permissoes_campanhas',
+  ],
+  perm_excluir_atestados: ['perm_excluir_atestado'],
+  perm_gerir_fluxo_dom_pedro_ii: ['perm_gerir_dom_pedro_ii'],
+});
+
+function matrizEstruturadaValida(perfil: any): Record<string, boolean> | null {
+  const matriz = perfil?.matriz_permissoes;
+  if (!matriz || typeof matriz !== 'object' || Array.isArray(matriz)) return null;
+  return Object.keys(matriz).some((key) => CANONICAL_KEY_SET.has(key)) ? matriz : null;
+}
+
+function canonicalizarMatriz(raw: Record<string, unknown> = {}): Record<string, boolean> {
+  const canonical = Object.fromEntries(
+    CANONICAL_PERMISSION_KEYS.map((key: string) => [key, raw?.[key] === true]),
+  ) as Record<string, boolean>;
+
+  for (const [legacyKey, targets] of Object.entries(LEGACY_EXPANSIONS)) {
+    if (raw?.[legacyKey] !== true) continue;
+    for (const target of targets) {
+      if (CANONICAL_KEY_SET.has(target)) canonical[target] = true;
+    }
+  }
+
+  for (const [actionKey, moduleKey] of PARENT_BY_ACTION.entries()) {
+    if (canonical[actionKey] === true) canonical[moduleKey] = true;
+  }
+  return canonical;
+}
+
+function matrizFontePerfil(perfil: any): Record<string, boolean> {
+  return matrizEstruturadaValida(perfil) || extrairMatrizPermissoes(perfil?.descricao);
+}
+
 function perfilTemPermissao(perfil: any, key: string): boolean {
-  if (perfil?.[key] === true) return true;
-  const matriz = extrairMatrizPermissoes(perfil?.descricao);
-  return matriz?.[key] === true;
+  const matriz = matrizFontePerfil(perfil);
+  if (Object.keys(matriz).length > 0) return canonicalizarMatriz(matriz)?.[key] === true;
+  return perfil?.[key] === true;
+}
+
+async function backfillPerfisAtivos(base44: any, perfis: any[]) {
+  const saida = [];
+  for (const perfil of (perfis || [])) {
+    if (!perfil || perfil?.ativo === false) {
+      saida.push(perfil);
+      continue;
+    }
+
+    const estruturada = matrizEstruturadaValida(perfil);
+    if (estruturada && String(perfil?.versao_matriz_permissoes || '') === PROFILE_MATRIX_VERSION) {
+      saida.push(perfil);
+      continue;
+    }
+
+    const fonte = estruturada || extrairMatrizPermissoes(perfil?.descricao);
+    if (Object.keys(fonte).length === 0) {
+      saida.push(perfil);
+      continue;
+    }
+
+    const matriz_permissoes = canonicalizarMatriz(fonte);
+    const atualizado = await base44.asServiceRole.entities.PerfilPermissao.update(perfil.id, {
+      matriz_permissoes,
+      versao_matriz_permissoes: PROFILE_MATRIX_VERSION,
+    });
+    saida.push({ ...perfil, ...(atualizado || {}), matriz_permissoes, versao_matriz_permissoes: PROFILE_MATRIX_VERSION });
+  }
+  return saida;
 }
 
 async function resolverCapacidadesAdministrativas(base44: any, user: any) {
@@ -91,7 +175,8 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Usuário sem permissão para consultar perfis de permissão.' }, 403);
       }
       const perfis = await base44.asServiceRole.entities.PerfilPermissao.list('nome_perfil', 1000, 0);
-      return json({ ok: true, perfis: Array.isArray(perfis) ? perfis : [] });
+      const perfisMigrados = await backfillPerfisAtivos(base44, Array.isArray(perfis) ? perfis : []);
+      return json({ ok: true, perfis: perfisMigrados });
     }
 
     if (action === 'GET_PROFILE') {
