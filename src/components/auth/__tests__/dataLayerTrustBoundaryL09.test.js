@@ -88,6 +88,16 @@ test('L09 hotfix: PerfisPermissao importa o resolvedor usado durante a renderiza
   assert.match(perfisPage, /resolveProfilePermissions\(\{ profileSource: p \}\)\.permissions/);
 });
 
+test('L09 arquitetura: novos salvamentos de perfil usam matriz estruturada e não reembutem permissões na descricao', () => {
+  assert.doesNotMatch(perfisPage, /mergeProfileDescriptionWithMatrix/);
+  assert.doesNotMatch(usuariosPage, /mergeProfileDescriptionWithMatrix/);
+  assert.match(perfisPage, /buildPermissionPayload\(normalizedPermissions, \{ includeLegacy: false \}\)/);
+  assert.match(usuariosPage, /buildPermissionPayload\(normalizedPermissions, \{ includeLegacy: false \}\)/);
+  assert.match(gatewayBackend, /function limparDescricaoTecnica/);
+  assert.match(gatewayBackend, /patch\.descricao = descricaoLimpa/);
+  assert.match(gatewayBackend, /const \[perfilMigrado\] = await backfillPerfis\(base44, \[perfil\]\)/);
+});
+
 test('L09 hotfix: gateway administrativo é autossuficiente e usa entidades explícitas service-role', () => {
   assert.match(gatewayClient, /functions\.invoke\('permissoesAdminGateway'/);
   assert.match(gatewayBackend, /resolverCapacidadesAdministrativas/);
