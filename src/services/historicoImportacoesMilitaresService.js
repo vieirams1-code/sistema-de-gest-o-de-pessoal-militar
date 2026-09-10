@@ -139,36 +139,34 @@ function normalizarLinha(raw, index) {
 
   const status = normalizarStatusLinha(raw?.status, erros, alertas);
   const matriculaHistorica = pickFirstString(
+    raw?.matricula_historica,
     original?.matricula,
     original?.['matrícula'],
     raw?.matricula,
   );
   const matriculaAtual = pickMatriculaAtual(
+    raw?.matricula_atual,
     transformado?.matricula_atual,
     transformado?.matricula,
-    raw?.matricula_atual,
   );
 
   return {
     id: raw?.id || `linha-${index + 1}`,
     linhaNumero: toNumber(raw?.linhaNumero, raw?.linha_numero, index + 1),
     status,
-    nome: pickFirstString(transformado?.nome_completo, original?.nome_completo, original?.nome, raw?.nome),
+    nome: pickFirstString(raw?.nome, transformado?.nome_completo, original?.nome_completo, original?.nome),
     matricula: matriculaAtual || matriculaHistorica,
     matricula_atual: matriculaAtual,
     matricula_historica: matriculaHistorica,
-    posto: pickFirstString(transformado?.posto_graduacao, original?.posto_graduacao, original?.posto, original?.['posto/graduação']),
-    cpf: pickFirstString(transformado?.cpf, original?.cpf),
-    telefone: pickFirstString(transformado?.telefone, original?.telefone, original?.celular),
+    posto: pickFirstString(raw?.posto, transformado?.posto_graduacao, original?.posto_graduacao, original?.posto, original?.['posto/graduação']),
     observacoes,
     importada,
     alertas,
     erros,
     pendencias_revisao: pendenciasRevisao,
-    dadosOriginais: original,
-    dadosTransformados: transformado,
+    motivo_nao_importada: pickFirstString(raw?.motivo_nao_importada),
     ajustesAutomaticos: detectarAjustesAutomaticos({ alertas, observacoes, observacoes_importacao: raw?.observacoes_importacao }),
-    principalMotivo: obterPrincipalMotivo({ erros, pendencias_revisao: pendenciasRevisao, alertas }),
+    principalMotivo: pickFirstString(raw?.motivo_nao_importada) || obterPrincipalMotivo({ erros, pendencias_revisao: pendenciasRevisao, alertas }),
   };
 }
 
@@ -285,7 +283,13 @@ function normalizarLote(item) {
     },
     linhas,
     observacoes: pickFirstString(item?.observacoes),
-    relatorioRaw: { ...relatorio, origem_historico: item?.origem_historico || ENTITY_NAME },
+    relatorioMinimizado: relatorio?.tipo_relatorio === 'AUDITORIA_MINIMA_V1' || relatorio?.permite_retomada === false,
+    relatorioRaw: {
+      tipo_relatorio: relatorio?.tipo_relatorio || '',
+      versao_relatorio: relatorio?.versao_relatorio || '',
+      permite_retomada: relatorio?.permite_retomada !== false,
+      origem_historico: item?.origem_historico || ENTITY_NAME,
+    },
   };
 }
 
@@ -469,8 +473,6 @@ export function exportarCsvHistoricoHumano(lote) {
     'matricula_atual',
     'matricula_historica',
     'posto',
-    'cpf',
-    'telefone',
     'principal_motivo',
     'alertas',
     'erros',
@@ -484,8 +486,6 @@ export function exportarCsvHistoricoHumano(lote) {
     linha.matricula_atual || linha.matricula || '',
     linha.matricula_historica || '',
     linha.posto,
-    linha.cpf,
-    linha.telefone,
     linha.principalMotivo,
     linha.alertas.join(' | '),
     linha.erros.join(' | '),
