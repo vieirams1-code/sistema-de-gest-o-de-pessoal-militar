@@ -1,4 +1,8 @@
 import { base44 } from '../api/base44Client.js';
+import {
+  excluirHistoricoImportacaoMilitaresGateway,
+  listarHistoricoImportacaoMilitaresGateway,
+} from './importacaoMilitaresHistoricoGatewayClient.js';
 
 const ENTITY_NAME = 'ImportacaoMilitares';
 const ENTITY_NAME_ALTERACOES = 'ImportacaoAlteracoesLegado';
@@ -317,11 +321,13 @@ function isDateInRange(dateText, inicio, fim) {
 
 export async function listarHistoricoImportacoesMilitares() {
   const client = historicoClientOverride || base44;
-  const entityMilitares = client?.entities?.[ENTITY_NAME];
+  const entityMilitares = historicoClientOverride ? client?.entities?.[ENTITY_NAME] : null;
   const entityAlteracoes = client?.entities?.[ENTITY_NAME_ALTERACOES];
 
   const [resMilitares, resAlteracoes] = await Promise.allSettled([
-    entityMilitares?.list ? entityMilitares.list('-created_date', 1000) : Promise.reject(new Error(ERROR_MILITARES)),
+    historicoClientOverride
+      ? (entityMilitares?.list ? entityMilitares.list('-created_date', 1000) : Promise.reject(new Error(ERROR_MILITARES)))
+      : listarHistoricoImportacaoMilitaresGateway(),
     entityAlteracoes?.list ? entityAlteracoes.list('-created_date', 1000) : Promise.reject(new Error(ERROR_ALTERACOES)),
   ]);
 
@@ -348,18 +354,20 @@ export async function listarHistoricoImportacoesMilitares() {
 }
 
 export async function excluirHistoricoImportacaoMilitares(loteId) {
-  const client = historicoClientOverride || base44;
-  const entity = client?.entities?.[ENTITY_NAME];
-  if (!entity?.delete) {
-    throw new Error(ERROR_MILITARES);
+  if (!historicoClientOverride) {
+    return excluirHistoricoImportacaoMilitaresGateway(loteId);
   }
-
+  const entity = historicoClientOverride?.entities?.[ENTITY_NAME];
+  if (!entity?.delete) throw new Error(ERROR_MILITARES);
   return entity.delete(loteId);
 }
 
 export async function excluirHistoricoImportacao(lote) {
   const client = historicoClientOverride || base44;
   const entityName = lote?.relatorioRaw?.origem_historico || lote?.origem_historico || ENTITY_NAME;
+  if (entityName === ENTITY_NAME && !historicoClientOverride) {
+    return excluirHistoricoImportacaoMilitaresGateway(lote.id);
+  }
   const entity = client?.entities?.[entityName];
   if (!entity?.delete) {
     throw new Error(entityName === ENTITY_NAME_ALTERACOES ? ERROR_ALTERACOES : ERROR_MILITARES);
