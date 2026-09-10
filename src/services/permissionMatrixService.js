@@ -186,6 +186,13 @@ export const extractProfileMatrixFromDescription = (rawDescricao = '') => {
   }
 };
 
+export const cleanProfileDescriptionForStructuredPersistence = (rawDescricao = '') => {
+  const { cleanDescricao } = extractProfileMatrixFromDescription(rawDescricao);
+  return stripProfileVersionMarker(cleanDescricao).trim();
+};
+
+// Compatibilidade legada: mantido apenas para leitura/testes de registros antigos.
+// Persistências novas devem usar cleanProfileDescriptionForStructuredPersistence + matriz_permissoes.
 export const mergeProfileDescriptionWithMatrix = (cleanDescricao = '', matrix = {}) => {
   const sanitizedDescricao = stripProfileVersionMarker(typeof cleanDescricao === 'string' ? cleanDescricao.trim() : '');
   const sanitizedMatrix = sanitizePermissionsMatrix(matrix);
