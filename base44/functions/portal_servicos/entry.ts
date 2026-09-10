@@ -351,15 +351,12 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   // F8-L08: somente capacidades canônicas. Aliases legados são convertidos
   // exclusivamente pelo getUserPermissions antes de chegar a este serviço.
 
-  if (acao === 'PERMISSOES_LISTAR_USUARIOS') {
-    return ['perm_atribuir_permissoes_ferias', 'perm_atribuir_permissoes_campanhas'];
+  // Autorizações por campanha foram descontinuadas. Os registros antigos permanecem
+  // preservados para histórico, mas não concedem mais acesso operacional.
+  if (acao === 'PERMISSOES_LISTAR_USUARIOS' || acao === 'PLANO_PERMISSOES_LISTAR' || acao === 'PLANO_PERMISSAO_SALVAR' || acao === 'PLANO_PERMISSAO_EXCLUIR') {
+    return [];
   }
-  if (acao === 'PLANO_PERMISSOES_LISTAR' || acao === 'PLANO_AUDITORIA_LISTAR') {
-    return ['perm_atribuir_permissoes_ferias'];
-  }
-  if (acao === 'PLANO_PERMISSAO_SALVAR' || acao === 'PLANO_PERMISSAO_EXCLUIR') {
-    return ['perm_atribuir_permissoes_ferias'];
-  }
+  if (acao === 'PLANO_AUDITORIA_LISTAR') return ['perm_admin_campanhas_ferias'];
   if (acao === 'PLANO_INSTITUCIONAL_LISTAR' || acao === 'PLANO_INSTITUCIONAL_DETALHES') {
     return ['perm_visualizar_planos_ferias'];
   }
@@ -368,7 +365,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     return ['perm_editar_planos_ferias'];
   }
   if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias'];
-  if (acao === 'PLANO_ESCALA_LISTAR') return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas', 'perm_atribuir_permissoes_ferias'];
+  if (acao === 'PLANO_ESCALA_LISTAR') return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas'];
   if (acao === 'PLANO_DECISAO_CAMADA_1' || acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
     return ['perm_aprovar_ferias'];
   }
@@ -418,53 +415,9 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
   const exigeTodas = acao === 'PLANO_INSTITUCIONAL_EXCLUIR';
-  const autorizadoPorPermissao = necessarias.length > 0 && (exigeTodas
-    ? necessarias.every((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)
-    : necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true));
-  if (autorizadoPorPermissao) return true;
-
-  // Delegação por plano/campanha: um usuário pode atuar nas férias apenas
-  // quando recebeu uma autorização ativa e explícita naquele plano.
-  const acoesDelegaveis = new Set([
-    'PLANO_ESCALA_LISTAR',
-    'PLANO_DECISAO_CAMADA_1',
-    'PLANO_HOMOLOGACAO_CAMADA_2',
-    'PLANO_GERAR_LOTE_FERIAS',
-    'PLANO_INSTITUCIONAL_GERAR_FERIAS',
-  ]);
-  if (!acoesDelegaveis.has(acao)) return false;
-
-  let planoId = textoId(payload?.plano_id);
-  const campanhaId = textoId(payload?.campanha_id);
-  if (!planoId && campanhaId) {
-    try {
-      const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanhaId);
-      planoId = textoId(campanha?.plano_ferias_institucional_id);
-    } catch (_eCampanha) {}
-  }
-  if (!planoId) return false;
-
-  let delegacoes: any[] = [];
-  try {
-    delegacoes = await base44.asServiceRole.entities.PermissaoPlanoFerias.filter({
-      plano_ferias_institucional_id: planoId,
-      usuario_id: user.id,
-      ativo: true,
-    });
-  } catch (_eDelegacao) {
-    delegacoes = [];
-  }
-  const delegacao = (delegacoes || []).find((item: any) => {
-    const campanhaDelegada = textoId(item?.campanha_id);
-    return !campanhaDelegada || !campanhaId || campanhaDelegada === campanhaId;
-  });
-  if (!delegacao) return false;
-
-  if (acao === 'PLANO_ESCALA_LISTAR') return Boolean(delegacao.pode_visualizar);
-  if (acao === 'PLANO_DECISAO_CAMADA_1' || acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
-    return Boolean(delegacao.pode_autorizar || delegacao.pode_editar_escala);
-  }
-  return Boolean(delegacao.pode_gerar_ferias);
+  // O acesso operacional é exclusivamente por permissões do módulo.
+  // PermissaoPlanoFerias não é mais consultada nem concede acesso delegado.
+  return autorizadoPorPermissao;
 }
 
 async function usuarioPodeAgirSobreMilitarPortal(base44: any, user: any, militarId: string): Promise<boolean> {
