@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { clearImpersonation } from '@/utils/impersonation';
 import { useAuth } from '@/lib/AuthContext';
+import { appParams } from '@/lib/app-params';
 
 /**
  * useCurrentUser — Lote 1A
@@ -75,7 +76,7 @@ async function fetchUserPermissions(effectiveEmail) {
   const response = await base44.functions.invoke('getUserPermissions', requestPayload);
   // base44.functions.invoke retorna axios-like: { data, status, headers }
   const payload = response?.data ?? response;
-  console.info('[SGP_NATIVE_TRACE]', {
+  const nativeTrace = {
     stage: 'getUserPermissions',
     functionsVersion: base44?.functionsVersion || 'unknown',
     status: response?.status || null,
@@ -85,7 +86,10 @@ async function fetchUserPermissions(effectiveEmail) {
     militares: payload?.modules?.militares === true,
     visualizarMilitares: payload?.actions?.visualizar_militares === true,
     hasGlobalScope: Boolean(payload?.hasGlobalScope),
-  });
+    appFunctionsVersion: appParams.functionsVersion || 'default',
+  };
+  window.__SGP_NATIVE_TRACE = nativeTrace;
+  console.info('[SGP_NATIVE_TRACE]', nativeTrace);
 
   if (!payload) {
     throw new Error('Resposta vazia da função getUserPermissions');
