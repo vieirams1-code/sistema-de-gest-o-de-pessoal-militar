@@ -352,6 +352,19 @@ test('L09E: finalização troca análise ativa por auditoria mínima sem retomad
   assert.doesNotMatch(historicoImportacoesService, /\btelefone:/);
 });
 
+test('L09E: migração retroativa de snapshots é admin-only, idempotente e limitada a lotes finalizados', () => {
+  assert.match(importacaoHistoricoGateway, /MIGRATE_FINALIZED_SNAPSHOTS/);
+  assert.match(importacaoHistoricoGateway, /authz\?\.isAdmin !== true/);
+  assert.match(importacaoHistoricoGateway, /new Set\(\['Importado', 'Importado Parcial', 'Falhou'\]\)/);
+  assert.match(importacaoHistoricoGateway, /relatorioAuditoriaMinimaPersistente/);
+  assert.match(importacaoHistoricoGateway, /tipo_relatorio === 'AUDITORIA_MINIMA_V1'/);
+  assert.match(importacaoHistoricoGateway, /permite_retomada === false/);
+  assert.match(importacaoHistoricoGateway, /asServiceRole\.entities\[ENTITY\]\.update/);
+  assert.match(importacaoHistoricoClient, /migrarSnapshotsFinalizadosImportacaoMilitaresGateway/);
+  assert.match(historicoImportacoesPage, /isAdmin && !migracaoSnapshotsExecutadaRef\.current/);
+  assert.doesNotMatch(importacaoHistoricoGateway, /finalStatuses = new Set\(\[[^\]]*Analisado/);
+});
+
 test('L09E: ImportacaoMilitares permanece service-only', () => {
   assert.match(importacaoMilitaresSchema, /"create"\s*:\s*false/);
   assert.match(importacaoMilitaresSchema, /"read"\s*:\s*false/);
