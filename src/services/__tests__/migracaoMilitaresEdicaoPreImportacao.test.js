@@ -369,6 +369,68 @@ test('importação final utiliza dados corrigidos e minimiza o snapshot permanen
   assert.equal(await carregarAnaliseHistorico(historico.id), null);
 });
 
+test('falha inesperada finaliza histórico minimizado sem preservar PII do snapshot', async () => {
+  const createMilitarError = new Error('Falha técnica. CPF: 529.982.247-25 telefone: (67) 99999-0000');
+  const { ImportacaoMilitares } = setupClients({ createMilitarError });
+  const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
+
+  const analise = {
+    arquivo: { nome: 'falha.csv', tipo: 'text/csv', hash: 'hash-falha' },
+    resumo: { total_linhas: 1, total_aptas: 1, total_aptas_com_alerta: 0, total_duplicadas: 0, total_erros: 0 },
+    linhas: [
+      {
+        linhaNumero: 2,
+        status: 'APTO',
+        alertas: [],
+        erros: [],
+        original: {
+          nome_completo: 'Militar Falha',
+          matricula: '777666555',
+          cpf: '52998224725',
+          telefone: '67999990000',
+          rg: '998877 SSP/MS',
+        },
+        transformado: {
+          nome_completo: 'Militar Falha',
+          nome_guerra: 'Falha',
+          matricula: '777.666-555',
+          cpf: '529.982.247-25',
+          telefone: '(67) 99999-0000',
+          rg: '998877 SSP/MS',
+          data_inclusao: '2022-05-01',
+          posto_graduacao: 'Soldado',
+          data_nascimento: '1990-01-02',
+        },
+      },
+    ],
+    versao_regra_migracao: 'v1.1.0',
+  };
+
+  const historico = await salvarAnaliseHistorico(analise, usuario);
+  await assert.rejects(
+    importarAnalise({ analise, incluirAlertas: false, historicoId: historico.id, usuario }),
+    /Falha técnica/,
+  );
+
+  const persistido = ImportacaoMilitares._rows[0];
+  const relatorio = JSON.parse(persistido.relatorio_json);
+  const serializado = JSON.stringify(relatorio);
+  assert.equal(persistido.status_importacao, 'Falhou');
+  assert.equal(relatorio.tipo_relatorio, 'AUDITORIA_MINIMA_V1');
+  assert.equal(relatorio.permite_retomada, false);
+  assert.equal(relatorio.linhas[0].nome, 'Militar Falha');
+  assert.equal(Object.hasOwn(relatorio.linhas[0], 'original'), false);
+  assert.equal(Object.hasOwn(relatorio.linhas[0], 'transformado'), false);
+  assert.equal(serializado.includes('529.982.247-25'), false);
+  assert.equal(serializado.includes('52998224725'), false);
+  assert.equal(serializado.includes('(67) 99999-0000'), false);
+  assert.equal(serializado.includes('67999990000'), false);
+  assert.equal(serializado.includes('998877 SSP/MS'), false);
+  assert.match(relatorio.falha_importacao, /CPF \[suprimido\]/);
+  assert.match(relatorio.falha_importacao, /telefone \[suprimido\]/i);
+  assert.equal(await carregarAnaliseHistorico(historico.id), null);
+});
+
 test('bloqueia duplicidade na importação sem criar pendência persistida', async () => {
   const { Militar, PossivelDuplicidadeMilitar } = setupClients();
   const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
