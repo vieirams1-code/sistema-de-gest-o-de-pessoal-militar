@@ -22,7 +22,9 @@ export default function ConfigurarCampanhaFerias() {
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
   const statusCampanha = String(campanha?.status || '').trim().toLowerCase();
   const campanhaEmEdicaoPermitida = !['arquivada', 'desativada', 'encerrada'].includes(statusCampanha);
-  const podeEditarCampanha = (isAdmin || canAccessAction('editar_campanhas_ferias'))
+  // Campanhas seguem o acesso ao módulo de Planos de Férias;
+  // as antigas permissões individuais de campanha não são mais necessárias.
+  const podeEditarCampanha = (isAdmin || canAccessAction('visualizar_planos_ferias'))
     && campanhaEmEdicaoPermitida
     && String(plano?.status || 'ATIVO').toUpperCase() !== 'ARQUIVADO';
 
