@@ -1896,6 +1896,27 @@ Deno.serve(async (req: Request) => {
               });
             }
 
+            let opcoesExistentesCampanha: any[] = [];
+            try {
+              opcoesExistentesCampanha = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id: campanha.id });
+            } catch (_errOpcoesCampanha) {}
+            const datasRespostas = (opcoesExistentesCampanha || [])
+              .map((opcao: any) => String(opcao.data_envio_militar || opcao.data_envio || opcao.created_date || '').slice(0, 10))
+              .filter((data: string) => formatoDataValido.test(data))
+              .sort();
+            if (datasRespostas.length > 0) {
+              const primeiraResposta = datasRespostas[0];
+              const ultimaResposta = datasRespostas[datasRespostas.length - 1];
+              if (dataInicio > primeiraResposta || dataFimMilitar < ultimaResposta) {
+                return new Response(JSON.stringify({
+                  error: `O novo período precisa abranger as respostas já recebidas (${primeiraResposta} a ${ultimaResposta}).`,
+                }), {
+                  status: 409,
+                  headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+                });
+              }
+            }
+
             const campanhaAtualizada = await base44.asServiceRole.entities.CampanhaPortal.update(campanha.id, {
               titulo,
               data_inicio: dataInicio,
