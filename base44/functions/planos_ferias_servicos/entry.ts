@@ -236,6 +236,9 @@ Deno.serve(async (req: Request) => {
       if (payload?.confirmacao_dupla !== true) {
         return json({ error: 'A exclusão do plano exige confirmação dupla.' }, 400);
       }
+      if (String(planoAtual.status || '').toUpperCase() !== 'ARQUIVADO') {
+        return json({ error: 'O plano precisa estar arquivado antes de ser excluído.' }, 409);
+      }
       const campanhas = await base44.asServiceRole.entities.CampanhaPortal.filter({
         plano_ferias_institucional_id: planoId,
       });
