@@ -1962,6 +1962,12 @@ Deno.serve(async (req: Request) => {
             
             if (decisao_camada_1?.opcao_escolhida === 'NAO_CONTEMPLADO') {
               const opcaoNaoContemplada = await base44.asServiceRole.entities.OpcaoFeriasMilitar.get(opcao_id);
+              if (!opcaoNaoContemplada?.militar_id || !(await usuarioPodeAgirSobreMilitarPortal(base44, user, opcaoNaoContemplada.militar_id))) {
+                return new Response(JSON.stringify({ error: 'Você não possui escopo para atuar sobre este militar.' }), {
+                  status: 403,
+                  headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+                });
+              }
               const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
                 status_camada_1: 'Nao_Contemplado',
                 decisao_camada_1_opcao: 'NAO_CONTEMPLADO',
@@ -1989,6 +1995,12 @@ Deno.serve(async (req: Request) => {
             }
 
             const opcaoGestao = await base44.asServiceRole.entities.OpcaoFeriasMilitar.get(opcao_id);
+            if (!opcaoGestao?.militar_id || !(await usuarioPodeAgirSobreMilitarPortal(base44, user, opcaoGestao.militar_id))) {
+              return new Response(JSON.stringify({ error: 'Você não possui escopo para atuar sobre este militar.' }), {
+                status: 403,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
             if (!opcaoGestao?.periodo_aquisitivo_id) {
               return new Response(JSON.stringify({ error: 'Opção de férias sem período aquisitivo válido.' }), {
                 status: 400,
@@ -2080,6 +2092,12 @@ Deno.serve(async (req: Request) => {
           if (acao === 'PLANO_HOMOLOGACAO_CAMADA_2') {
             const { opcao_id, homologacao_camada_2 } = payload;
             const opcaoHomologacao = await base44.asServiceRole.entities.OpcaoFeriasMilitar.get(opcao_id);
+            if (!opcaoHomologacao?.militar_id || !(await usuarioPodeAgirSobreMilitarPortal(base44, user, opcaoHomologacao.militar_id))) {
+              return new Response(JSON.stringify({ error: 'Você não possui escopo para atuar sobre este militar.' }), {
+                status: 403,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
             const updated = await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcao_id, {
               status_camada_2: homologacao_camada_2?.status === 'Homologado_Superior' ? 'Homologado_Superior' : 'Rejeitado_Para_Revisao',
               superior_homologador_id: user.id,
