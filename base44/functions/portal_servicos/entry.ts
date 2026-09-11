@@ -1851,6 +1851,11 @@ Deno.serve(async (req: Request) => {
           }
 
           if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR') {
+            return new Response(JSON.stringify({ error: 'A rota legada de criação por ano foi descontinuada. Crie a campanha dentro de um Plano de Férias.' }), {
+              status: 410,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+            /* Compatibilidade histórica mantida apenas para leitura do código; não cria campanhas soltas.
             let campanhas = await base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS', ano_referencia: ano });
             let campanha = campanhas?.[0];
             if (!campanha) {
@@ -1871,6 +1876,7 @@ Deno.serve(async (req: Request) => {
               });
             }
             return new Response(JSON.stringify({ ok: true, campanha }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            */
           }
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
