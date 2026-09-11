@@ -2980,10 +2980,21 @@ Deno.serve(async (req: Request) => {
 
       case 'FERIAS_SUBMETER_OPCAO': {
         const { periodo_aquisitivo_id, modalidade, opcao_1, opcao_2, opcao_3 } = payload;
+        const campanhasFeriasElegiveisSubmissao = campanhasAtivasMilitar.filter((c) => c.tipo === 'PLANO_FERIAS');
         const campanhaSolicitada = payload.campanha_id
-          ? campanhasAtivasMilitar.find((c) => c.id === payload.campanha_id && c.tipo === 'PLANO_FERIAS')
+          ? campanhasFeriasElegiveisSubmissao.find((c) => c.id === payload.campanha_id)
           : null;
-        const campanhaFeriasAtiva = campanhaSolicitada || campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
+        if (payload.campanha_id && !campanhaSolicitada) {
+          return new Response(JSON.stringify({ error: 'A campanha de férias selecionada não está mais disponível para receber respostas.' }), {
+            status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+        if (!payload.campanha_id && campanhasFeriasElegiveisSubmissao.length > 1) {
+          return new Response(JSON.stringify({ error: 'Selecione explicitamente a campanha de férias antes de enviar suas opções.' }), {
+            status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+        const campanhaFeriasAtiva = campanhaSolicitada || campanhasFeriasElegiveisSubmissao[0] || null;
         if (!campanhaFeriasAtiva?.id) {
           return new Response(JSON.stringify({ error: 'Não há campanha de férias aberta para receber esta resposta.' }), {
             status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
