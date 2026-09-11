@@ -24,9 +24,11 @@ export default function PlanosFerias() {
   const podeCriarPlanos = isAdmin || canAccessAction('criar_planos_ferias');
   const podeEditarPlanos = isAdmin || canAccessAction('editar_planos_ferias');
   const podeExcluirPlanos = isAdmin || canAccessAction('excluir_planos_ferias');
-  const podeCriarCampanhas = isAdmin || canAccessAction('criar_campanhas_ferias');
-  const podeEditarCampanhas = isAdmin || canAccessAction('editar_campanhas_ferias');
-  const podeExcluirCampanhas = isAdmin || canAccessAction('excluir_campanhas_ferias');
+  // O acesso às campanhas é herdado do módulo de Planos de Férias.
+  // Permissões específicas por campanha permanecem apenas como legado compatível.
+  const podeCriarCampanhas = isAdmin || podeVisualizarPlanos;
+  const podeEditarCampanhas = isAdmin || podeVisualizarPlanos;
+  const podeExcluirCampanhas = isAdmin || podeVisualizarPlanos;
   const podeVisualizarRespostas = isAdmin || canAccessAction('visualizar_respostas_ferias');
   const podeGerarFerias = isAdmin || canAccessAction('gerar_ferias_campanhas');
   const podeAdminFerias = isAdmin || canAccessAction('admin_campanhas_ferias');
