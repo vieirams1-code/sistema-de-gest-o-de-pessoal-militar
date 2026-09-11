@@ -241,11 +241,25 @@ export default function PlanosFerias() {
   const salvarCampanha = async (evento) => {
     evento.preventDefault();
     if (!podeCriarCampanhas || !selecionado || !campanhaForm?.titulo.trim()) return;
-    if (campanhaForm.tipo_escopo === 'UNIDADES' && campanhaForm.escopo_unidades_ids.length === 0) {
+    const unidadesSelecionadas = campanhaForm.escopo_unidades_ids || [];
+    const gruposSelecionados = campanhaForm.escopo_grupos_ids || [];
+    if (gruposSelecionados.length > 0 && campanhaForm.tipo_escopo !== 'SEM_ESCOPO') {
+      setFeedback({ tipo: 'erro', texto: 'Ao selecionar grupos, o escopo deve ser Somente grupos de militares.' });
+      return;
+    }
+    if (unidadesSelecionadas.length > 0 && campanhaForm.tipo_escopo !== 'UNIDADES') {
+      setFeedback({ tipo: 'erro', texto: 'Ao selecionar unidades, o escopo deve ser Unidades selecionadas.' });
+      return;
+    }
+    if (gruposSelecionados.length > 0 && unidadesSelecionadas.length > 0) {
+      setFeedback({ tipo: 'erro', texto: 'Selecione grupos ou unidades, não os dois ao mesmo tempo.' });
+      return;
+    }
+    if (campanhaForm.tipo_escopo === 'UNIDADES' && unidadesSelecionadas.length === 0) {
       setFeedback({ tipo: 'erro', texto: 'Selecione ao menos uma unidade para o escopo da campanha.' });
       return;
     }
-    if (campanhaForm.tipo_escopo === 'SEM_ESCOPO' && (campanhaForm.escopo_grupos_ids || []).length === 0) {
+    if (campanhaForm.tipo_escopo === 'SEM_ESCOPO' && gruposSelecionados.length === 0) {
       setFeedback({ tipo: 'erro', texto: 'Selecione ao menos um grupo quando o escopo de lotação estiver vazio.' });
       return;
     }
@@ -382,15 +396,15 @@ export default function PlanosFerias() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Nova campanha de férias</h2><p className="text-xs text-slate-500">Plano: {selecionado?.titulo}</p></div><button type="button" onClick={() => setModalCampanha(false)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>
             <div><label className="text-xs font-bold text-slate-700">Nome da campanha *</label><Input required value={campanhaForm.titulo} onChange={(e) => setCampanhaForm({ ...campanhaForm, titulo: e.target.value })} /></div>
             <div className="grid sm:grid-cols-3 gap-3"><div><label className="text-xs font-bold text-slate-700">Início *</label><Input required type="date" value={campanhaForm.data_inicio} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_inicio: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo militar *</label><Input required type="date" value={campanhaForm.data_fim_militar} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo unidade</label><Input type="date" value={campanhaForm.data_fim_unidade} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_unidade: e.target.value })} /></div></div>
-            <div><label className="text-xs font-bold text-slate-700">Escopo de lotação</label><select value={campanhaForm.tipo_escopo} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.value, escopo_unidades_ids: [] })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Unidades selecionadas</option><option value="SEM_ESCOPO">Somente grupos de militares (sem lotação)</option></select>{campanhaForm.tipo_escopo === 'SEM_ESCOPO' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida exclusivamente pelos grupos selecionados abaixo.</p>}</div>
-            {campanhaForm.tipo_escopo === 'UNIDADES' && <div className="grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{unidades.length === 0 ? <p className="text-xs text-slate-500">Nenhuma unidade disponível para seleção.</p> : unidades.map((unidade) => <label key={unidade.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={campanhaForm.escopo_unidades_ids.includes(unidade.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_unidades_ids: e.target.checked ? [...campanhaForm.escopo_unidades_ids, unidade.id] : campanhaForm.escopo_unidades_ids.filter((id) => id !== unidade.id) })} />{unidade.nome}</label>)}</div>}
+            <div><label className="text-xs font-bold text-slate-700">Escopo de lotação</label><select value={campanhaForm.tipo_escopo} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.value, escopo_unidades_ids: [], escopo_grupos_ids: e.target.value === 'SEM_ESCOPO' ? (campanhaForm.escopo_grupos_ids || []) : [] })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Unidades selecionadas</option><option value="SEM_ESCOPO">Somente grupos de militares (sem lotação)</option></select>{campanhaForm.tipo_escopo === 'SEM_ESCOPO' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida exclusivamente pelos grupos selecionados abaixo.</p>}</div>
+            {campanhaForm.tipo_escopo === 'UNIDADES' && <div className="grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{unidades.length === 0 ? <p className="text-xs text-slate-500">Nenhuma unidade disponível para seleção.</p> : unidades.map((unidade) => <label key={unidade.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={campanhaForm.escopo_unidades_ids.includes(unidade.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: 'UNIDADES', escopo_grupos_ids: [], escopo_unidades_ids: e.target.checked ? [...(campanhaForm.escopo_unidades_ids || []), unidade.id] : (campanhaForm.escopo_unidades_ids || []).filter((id) => id !== unidade.id) })} />{unidade.nome}</label>)}</div>}
             <div>
               <label className="text-xs font-bold text-slate-700">Grupos de militares</label>
-              <p className="mt-1 text-[11px] text-slate-500">Opcional quando houver lotação; selecione um ou mais grupos para restringir o público. Com “Somente grupos”, eles definem o público sem lotação.</p>
+              <p className="mt-1 text-[11px] text-slate-500">Selecione um ou mais grupos para definir exclusivamente o público da campanha. Ao selecionar um grupo, o escopo muda para Somente grupos e as unidades são limpas.</p>
               <div className="mt-2 grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 {grupos.length === 0 ? <p className="text-xs text-slate-500">Nenhum grupo ativo disponível. Cadastre grupos em Grupos do Efetivo.</p> : grupos.map((grupo) => (
                   <label key={grupo.id} className="flex items-center gap-2 text-xs">
-                    <input type="checkbox" checked={(campanhaForm.escopo_grupos_ids || []).includes(grupo.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_grupos_ids: e.target.checked ? [...(campanhaForm.escopo_grupos_ids || []), grupo.id] : (campanhaForm.escopo_grupos_ids || []).filter((id) => id !== grupo.id) })} />
+                    <input type="checkbox" checked={(campanhaForm.escopo_grupos_ids || []).includes(grupo.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, tipo_escopo: e.target.checked ? 'SEM_ESCOPO' : (campanhaForm.escopo_grupos_ids || []).length > 1 ? 'SEM_ESCOPO' : campanhaForm.tipo_escopo, escopo_unidades_ids: [], escopo_grupos_ids: e.target.checked ? [...(campanhaForm.escopo_grupos_ids || []), grupo.id] : (campanhaForm.escopo_grupos_ids || []).filter((id) => id !== grupo.id) })} />
                     <span>{grupo.nome}{grupo.sigla ? ` (${grupo.sigla})` : ''}</span>
                   </label>
                 ))}
