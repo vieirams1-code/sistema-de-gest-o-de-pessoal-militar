@@ -84,7 +84,8 @@ export default function BackupSistema() {
       setRelatorioRestore({ arquivoUrl, simulacao });
       toast({ title: 'Simulação concluída', description: 'Confira os conflitos antes de confirmar.' });
     } catch (error) {
-      toast({ title: 'Falha ao validar backup', description: error?.message || 'Arquivo inválido.', variant: 'destructive' });
+      const detalhe = error?.response?.data?.error || error?.data?.error || error?.message || 'Arquivo inválido.';
+      toast({ title: 'Falha ao validar backup', description: detalhe, variant: 'destructive' });
     } finally {
       setRestaurando(false);
     }
@@ -102,7 +103,8 @@ export default function BackupSistema() {
       setRelatorioRestore((atual) => ({ ...atual, resultado: response?.data?.restauracao || response?.data }));
       toast({ title: 'Restauração concluída', description: 'Os registros existentes foram preservados.' });
     } catch (error) {
-      toast({ title: 'Falha na restauração', description: error?.message || 'Nenhum registro foi confirmado.', variant: 'destructive' });
+      const detalhe = error?.response?.data?.error || error?.data?.error || error?.message || 'Nenhum registro foi confirmado.';
+      toast({ title: 'Falha na restauração', description: detalhe, variant: 'destructive' });
     } finally {
       setRestaurando(false);
     }
