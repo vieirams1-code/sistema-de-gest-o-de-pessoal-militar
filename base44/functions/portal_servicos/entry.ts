@@ -1098,8 +1098,26 @@ Deno.serve(async (req: Request) => {
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
+            if (gruposIds.length > 0 && tipoEscopo !== 'SEM_ESCOPO') {
+              return new Response(JSON.stringify({ error: 'Ao selecionar grupos, o escopo deve ser Somente grupos de militares.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (unidadesIds.length > 0 && tipoEscopo !== 'UNIDADES') {
+              return new Response(JSON.stringify({ error: 'Ao selecionar unidades, o escopo deve ser Unidades selecionadas.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
             if (tipoEscopo === 'SEM_ESCOPO' && unidadesIds.length > 0) {
               return new Response(JSON.stringify({ error: 'O modo somente grupos não pode conter unidades no escopo de lotação.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (tipoEscopo === 'UNIDADES' && gruposIds.length > 0) {
+              return new Response(JSON.stringify({ error: 'O modo por unidades não pode conter grupos de militares.' }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
