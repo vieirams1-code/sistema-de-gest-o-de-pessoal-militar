@@ -1846,6 +1846,13 @@ Deno.serve(async (req: Request) => {
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
+            const statusCampanha = String(campanha.status || '').trim().toLowerCase();
+            if (['arquivada', 'desativada', 'encerrada'].includes(statusCampanha)) {
+              return new Response(JSON.stringify({ error: 'Campanhas encerradas, desativadas ou arquivadas não podem ser alteradas.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
 
             const titulo = String(dados.titulo || '').trim();
             const dataInicio = String(dados.data_inicio || '').slice(0, 10);
