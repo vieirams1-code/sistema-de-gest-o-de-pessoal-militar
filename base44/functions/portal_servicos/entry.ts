@@ -175,6 +175,13 @@ function ultimoDiaMes(ano: number, mes: number): string {
   return new Date(Date.UTC(ano, mes, 0)).toISOString().slice(0, 10);
 }
 
+function feriasVinculadasAoPlano(ferias: any[] = [], planoId: unknown): any[] {
+  const id = textoId(planoId);
+  // Férias sem vínculo explícito pertencem ao módulo geral e não podem
+  // reduzir o saldo de um Plano/Campanha de Férias.
+  return id ? ferias.filter((f: any) => textoId(f?.plano_ferias_id) === id) : ferias;
+}
+
 function feriasPertencePeriodoPlano(ferias: any, periodo: any): boolean {
   const feriasPeriodoId = textoId(ferias?.periodo_aquisitivo_id);
   const periodoId = textoId(periodo?.id);
@@ -2103,7 +2110,8 @@ Deno.serve(async (req: Request) => {
               base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: opcaoGestao.militar_id }),
             ]);
             const anoPlanoGestao = Number(opcaoGestao.ano_referencia || new Date().getFullYear() + 1);
-            const resumoGestao = calcularResumoPeriodoPlano(periodoGestao, feriasGestao, ajustesGestao, anoPlanoGestao);
+            const feriasDoPlanoGestao = feriasVinculadasAoPlano(feriasGestao, opcaoGestao.plano_ferias_institucional_id);
+            const resumoGestao = calcularResumoPeriodoPlano(periodoGestao, feriasDoPlanoGestao, ajustesGestao, anoPlanoGestao);
             const diasEsperados = Math.max(0, numeroSeguro(opcaoGestao.dias_direito, resumoGestao.dias_sem_previsao));
             const parcelasNormalizadas = parcelas.map((p: any, idx: number) => {
               const mes = textoId(p?.mes || p?.data_inicio?.slice?.(5, 7));
@@ -2291,7 +2299,8 @@ Deno.serve(async (req: Request) => {
                 base44.asServiceRole.entities.Ferias.filter({ militar_id: op.militar_id }),
                 base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: op.militar_id }),
               ]);
-              const resumoGeracao = calcularResumoPeriodoPlano(pa, feriasAtuaisGeracao, ajustesAtuaisGeracao, Number(op.ano_referencia || ano));
+              const feriasDoPlanoGeracao = feriasVinculadasAoPlano(feriasAtuaisGeracao, op.plano_ferias_institucional_id);
+              const resumoGeracao = calcularResumoPeriodoPlano(pa, feriasDoPlanoGeracao, ajustesAtuaisGeracao, Number(op.ano_referencia || ano));
               const totalSolicitadoGeracao = parcelas.reduce((acc: number, p: any) => acc + Math.max(0, numeroSeguro(p?.dias, 0)), 0);
               const diasEsperadosGeracao = Math.max(0, numeroSeguro(op.dias_direito, resumoGeracao.dias_sem_previsao));
               if (totalSolicitadoGeracao !== diasEsperadosGeracao || totalSolicitadoGeracao > resumoGeracao.dias_sem_previsao) {
@@ -2901,9 +2910,10 @@ Deno.serve(async (req: Request) => {
           return dtA - dtB;
         });
 
+        const feriasDoPlanoPortal = feriasVinculadasAoPlano(feriasMilitarPlano, campanhaFeriasAtiva?.plano_ferias_institucional_id);
         const periodosComResumo = periodosOrdenados.map((p: any) => ({
           ...p,
-          ...calcularResumoPeriodoPlano(p, feriasMilitarPlano, ajustesMilitarPlano, Number(anoCampanha)),
+          ...calcularResumoPeriodoPlano(p, feriasDoPlanoPortal, ajustesMilitarPlano, Number(anoCampanha)),
         }));
         const periodoMaisAntigoElegivel = periodosComResumo.find((p: any) => p.elegivel_plano && p.dias_sem_previsao > 0) || null;
         const maisAntigoId: string | null = periodoMaisAntigoElegivel?.id || null;
@@ -3127,9 +3137,10 @@ Deno.serve(async (req: Request) => {
         const ordenadosSubmissao = (todosPeriodosSubmissao || []).sort((a: any, b: any) =>
           String(a.inicio_aquisitivo || '').localeCompare(String(b.inicio_aquisitivo || ''))
         );
+        const feriasDoPlanoSubmissao = feriasVinculadasAoPlano(feriasMilitarSubmissao, planoIdAtivo);
         const resumosSubmissao = ordenadosSubmissao.map((p: any) => ({
           periodo: p,
-          resumo: calcularResumoPeriodoPlano(p, feriasMilitarSubmissao, ajustesMilitarSubmissao, Number(anoCampanha)),
+          resumo: calcularResumoPeriodoPlano(p, feriasDoPlanoSubmissao, ajustesMilitarSubmissao, Number(anoCampanha)),
         }));
         const maisAntigoElegivelSubmissao = resumosSubmissao.find((item: any) => item.resumo.elegivel_plano && item.resumo.dias_sem_previsao > 0);
         if (!maisAntigoElegivelSubmissao || maisAntigoElegivelSubmissao.periodo.id !== periodo.id) {
