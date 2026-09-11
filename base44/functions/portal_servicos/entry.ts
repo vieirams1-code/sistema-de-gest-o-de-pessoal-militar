@@ -86,6 +86,16 @@ function matchMilitarCampanha(campanha: any, militar: any, membrosPorGrupo: Map<
   return baseEscopo && pertenceGrupo && !excluido;
 }
 
+function campanhaPodeReceberResposta(campanha: any, militar: any, membrosPorGrupo: Map<string, Set<string>>): boolean {
+  const status = String(campanha?.status || '').trim().toLowerCase();
+  const statusAberto = new Set(['aberta_coleta', 'aberta', 'ativa', 'em_andamento']);
+  if (!statusAberto.has(status)) return false;
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (campanha?.data_inicio && String(campanha.data_inicio).slice(0, 10) > hoje) return false;
+  if (campanha?.data_fim_militar && String(campanha.data_fim_militar).slice(0, 10) < hoje) return false;
+  return matchMilitarCampanha(campanha, militar, membrosPorGrupo);
+}
+
 interface ParcelaItem {
   etapa: number;
   dias: number;
@@ -3169,6 +3179,13 @@ Deno.serve(async (req: Request) => {
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
+        const membrosCampanha = await carregarMembrosPorGrupo(base44, [campanha]);
+        if (!campanhaPodeReceberResposta(campanha, militar, membrosCampanha)) {
+          return new Response(JSON.stringify({ error: 'Esta campanha não está disponível para o militar neste momento.' }), {
+            status: 403,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
 
         let respostaExistente: any = null;
         try {
@@ -3259,6 +3276,13 @@ Deno.serve(async (req: Request) => {
         if (!campanha) {
           return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), {
             status: 404,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+        const membrosCampanha = await carregarMembrosPorGrupo(base44, [campanha]);
+        if (!campanhaPodeReceberResposta(campanha, militar, membrosCampanha)) {
+          return new Response(JSON.stringify({ error: 'Esta campanha não está disponível para receber respostas.' }), {
+            status: 403,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
         }
