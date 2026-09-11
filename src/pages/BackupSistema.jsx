@@ -11,6 +11,9 @@ export default function BackupSistema() {
   const { toast } = useToast();
   const [modo, setModo] = useState('somente_dados');
   const [gerando, setGerando] = useState(false);
+  const [arquivoRestore, setArquivoRestore] = useState(null);
+  const [restaurando, setRestaurando] = useState(false);
+  const [relatorioRestore, setRelatorioRestore] = useState(null);
 
   const handleGerarBackup = async () => {
     setGerando(true);
@@ -62,6 +65,46 @@ export default function BackupSistema() {
       });
     } finally {
       setGerando(false);
+    }
+  };
+
+  const simularRestauracao = async () => {
+    if (!arquivoRestore) return;
+    setRestaurando(true);
+    setRelatorioRestore(null);
+    try {
+      toast({ title: 'Validando backup...', description: 'Nenhum registro será alterado nesta etapa.' });
+      const upload = await base44.integrations.Core.UploadFile({ file: arquivoRestore });
+      const uploadData = upload && typeof upload === 'object' ? upload : {};
+      const arquivoUrl = uploadData.file_url || uploadData.url || uploadData.file?.url || '';
+      if (!arquivoUrl) throw new Error('Não foi possível obter o endereço do arquivo enviado.');
+      const response = await base44.functions.invoke('restaurarBackupPlanosFerias', { arquivo_url: arquivoUrl, modo: 'SIMULAR' });
+      const simulacao = response?.data?.simulacao;
+      if (!simulacao) throw new Error(response?.data?.error || 'A simulação não retornou um relatório.');
+      setRelatorioRestore({ arquivoUrl, simulacao });
+      toast({ title: 'Simulação concluída', description: 'Confira os conflitos antes de confirmar.' });
+    } catch (error) {
+      toast({ title: 'Falha ao validar backup', description: error?.message || 'Arquivo inválido.', variant: 'destructive' });
+    } finally {
+      setRestaurando(false);
+    }
+  };
+
+  const confirmarRestauracao = async () => {
+    if (!relatorioRestore?.arquivoUrl) return;
+    if (!window.confirm('Segunda confirmação: inserir somente os registros ausentes deste backup? Registros existentes serão preservados e nada será excluído.')) return;
+    setRestaurando(true);
+    try {
+      const response = await base44.functions.invoke('restaurarBackupPlanosFerias', {
+        arquivo_url: relatorioRestore.arquivoUrl,
+        modo: 'CONFIRMAR',
+      });
+      setRelatorioRestore((atual) => ({ ...atual, resultado: response?.data?.restauracao || response?.data }));
+      toast({ title: 'Restauração concluída', description: 'Os registros existentes foram preservados.' });
+    } catch (error) {
+      toast({ title: 'Falha na restauração', description: error?.message || 'Nenhum registro foi confirmado.', variant: 'destructive' });
+    } finally {
+      setRestaurando(false);
     }
   };
 
@@ -181,6 +224,44 @@ export default function BackupSistema() {
               )}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Restaurar backup de Planos de Férias</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Selecione um ZIP de Planos de Férias. A primeira etapa apenas valida o manifesto,
+            os checksums e os conflitos; ela não altera nenhum dado.
+          </p>
+          <input
+            type="file"
+            accept=".zip,application/zip"
+            onChange={(event) => {
+              setArquivoRestore(event.target.files?.[0] || null);
+              setRelatorioRestore(null);
+            }}
+            className="block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm"
+          />
+          <Button type="button" onClick={simularRestauracao} disabled={!arquivoRestore || restaurando} className="bg-amber-700 hover:bg-amber-800">
+            {restaurando ? 'Validando...' : 'Simular restauração'}
+          </Button>
+          {relatorioRestore?.simulacao && (
+            <Alert className="border-amber-300 bg-amber-50">
+              <AlertTriangle className="h-4 w-4 text-amber-700" />
+              <AlertTitle className="text-amber-900">Simulação pronta para revisão</AlertTitle>
+              <AlertDescription className="space-y-2 text-amber-900">
+                <p>{relatorioRestore.simulacao.registros_a_inserir} registro(s) ausente(s) seriam inserido(s).</p>
+                <p>{relatorioRestore.simulacao.conflitos} registro(s) já existem e serão preservados.</p>
+                <Button type="button" onClick={confirmarRestauracao} disabled={restaurando || relatorioRestore.resultado} className="bg-rose-700 hover:bg-rose-800">
+                  Confirmar restauração aditiva
+                </Button>
+                {relatorioRestore.resultado && <p className="font-semibold">Processamento concluído. Verifique eventuais erros no relatório antes de utilizar os dados.</p>}
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
