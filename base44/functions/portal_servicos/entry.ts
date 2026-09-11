@@ -2776,7 +2776,63 @@ Deno.serve(async (req: Request) => {
 
       // 1.3B: Férias no Portal com 3 Opções de Meses
       case 'FERIAS_GET': {
-        const campanhaFeriasAtiva = campanhasAtivasMilitar.find((c) => c.tipo === 'PLANO_FERIAS');
+        const campanhasFeriasElegiveis = campanhasAtivasMilitar.filter((c) => c.tipo === 'PLANO_FERIAS');
+        const campanhaSolicitada = payload?.campanha_id
+          ? campanhasFeriasElegiveis.find((c) => c.id === payload.campanha_id) || null
+          : null;
+        if (payload?.campanha_id && !campanhaSolicitada) {
+          return new Response(JSON.stringify({ error: 'A campanha de férias selecionada não está disponível para este militar.' }), {
+            status: 404,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        let campanhaComResposta: any = null;
+        if (!campanhaSolicitada && campanhasFeriasElegiveis.length > 1) {
+          try {
+            const opcoesExistentes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId });
+            const idsElegiveis = new Set(campanhasFeriasElegiveis.map((c) => c.id));
+            campanhaComResposta = campanhasFeriasElegiveis.find((c) =>
+              (opcoesExistentes || []).some((opcao: any) => idsElegiveis.has(opcao.campanha_id) && opcao.campanha_id === c.id)
+            ) || null;
+          } catch (_eOpcoesExistentes) {}
+        }
+
+        const campanhaFeriasAtiva = campanhaSolicitada
+          || campanhaComResposta
+          || (campanhasFeriasElegiveis.length === 1 ? campanhasFeriasElegiveis[0] : null);
+
+        if (!campanhaFeriasAtiva && campanhasFeriasElegiveis.length > 1) {
+          return new Response(JSON.stringify({
+            ok: true,
+            ano_referencia: null,
+            campanha: null,
+            campanhas_ferias_elegiveis: campanhasFeriasElegiveis,
+            campanhas_ativas: campanhasAtivasMilitar,
+            periodos: [],
+            periodo_mais_antigo_id: null,
+            opcao_militar_enviada: null,
+            bloqueado_por_dependencia: false,
+            motivo_bloqueio: '',
+            dependencia_tipo: 'ATUALIZACAO_CADASTRAL',
+            campanha_cadastral_pendente: null,
+            config: {
+              ativo: portalConfig?.ferias_ativo !== false,
+              modo_selecao: portalConfig?.ferias_modo_selecao_periodo || 'mais_antigo',
+              permitir_1_etapa: portalConfig?.ferias_permitir_1_etapa_30d !== false,
+              permitir_2_etapas: portalConfig?.ferias_permitir_2_etapas_15d !== false,
+              permitir_3_etapas: portalConfig?.ferias_permitir_3_etapas_10d !== false,
+              permitir_custom: Boolean(portalConfig?.ferias_permitir_custom),
+              exigir_atualizacao_cadastral: false,
+              prazo_limite: '',
+              instrucoes: '',
+            },
+          }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
         const anoCampanha = campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
 
         // O plano usa a mesma ideia do saldo operacional: direito líquido menos férias
