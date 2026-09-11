@@ -989,8 +989,17 @@ Deno.serve(async (req: Request) => {
           const campanhasIds = new Set(campanhas.map((campanha: any) => campanha.id));
           const opcoes = (await base44.asServiceRole.entities.OpcaoFeriasMilitar.list())
             .filter((opcao: any) => campanhasIds.has(opcao.campanha_id));
-          const respondidosIds = new Set(opcoes.map((opcao: any) => textoId(opcao.militar_id)).filter(Boolean));
-          const geradosIds = new Set(opcoes.filter((opcao: any) => opcao.gerado_ferias_efetivas).map((opcao: any) => textoId(opcao.militar_id)).filter(Boolean));
+          const respondidosIds = new Set(
+            opcoes
+              .map((opcao: any) => textoId(opcao.militar_id))
+              .filter((id: string) => id && publicoIds.has(id))
+          );
+          const geradosIds = new Set(
+            opcoes
+              .filter((opcao: any) => opcao.gerado_ferias_efetivas)
+              .map((opcao: any) => textoId(opcao.militar_id))
+              .filter((id: string) => id && publicoIds.has(id))
+          );
           return new Response(JSON.stringify({
             ok: true,
             plano,
