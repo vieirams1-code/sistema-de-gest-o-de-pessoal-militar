@@ -551,7 +551,7 @@ export default function PainelPlanoFerias() {
 
   // Geração de férias no nível do Plano; mantém geração legada somente para campanhas sem plano.
   const handleGerarLoteFerias = async () => {
-    if (!podeGerarFerias) return;
+    if (!podeGerarFerias || !modoAdmin) return;
     const usaPlanoConsolidado = painelConsolidado && Boolean(planoSelecionadoId);
     if (!campanhaSelecionada && !usaPlanoConsolidado) return;
 
@@ -848,7 +848,7 @@ export default function PainelPlanoFerias() {
             <span>{modoAdmin ? 'Admin ON' : 'Admin'}</span>
           </button>}
 
-          {podeGerarFerias && !isCampanhaEncerradaOuDesativada && (
+          {podeGerarFerias && modoAdmin && !isCampanhaEncerradaOuDesativada && (
             <button
               type="button"
               onClick={handleGerarLoteFerias}
