@@ -11,7 +11,11 @@ const erroTexto = (erro, fallback) => erro?.response?.data?.error || erro?.data?
 export default function ConfigurarCampanhaFerias() {
   const navigate = useNavigate();
   const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
-  const podeEditarCampanha = isAdmin || canAccessAction('editar_campanhas_ferias');
+  const statusCampanha = String(campanha?.status || '').trim().toLowerCase();
+  const campanhaEmEdicaoPermitida = !['arquivada', 'desativada', 'encerrada'].includes(statusCampanha);
+  const podeEditarCampanha = (isAdmin || canAccessAction('editar_campanhas_ferias'))
+    && campanhaEmEdicaoPermitida
+    && String(plano?.status || 'ATIVO').toUpperCase() !== 'ARQUIVADO';
   const [params] = useSearchParams();
   const campanhaId = params.get('campanhaId') || '';
   const planoId = params.get('planoId') || '';
@@ -108,7 +112,7 @@ export default function ConfigurarCampanhaFerias() {
           </div>
         </div>
         {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{feedback.texto}</div>}
-        {podeEditarCampanha && (
+        {podeEditarCampanha ? (
           <section className="rounded-2xl border border-blue-200 bg-white p-5">
             <div>
               <h2 className="font-bold text-slate-900">Dados e disponibilidade da campanha</h2>
@@ -135,6 +139,11 @@ export default function ConfigurarCampanhaFerias() {
                 </Button>
               </div>
             </form>
+          </section>
+        ) : (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 className="font-bold text-slate-900">Campanha em modo de consulta</h2>
+            <p className="mt-1 text-sm text-slate-600">O nome e o prazo só podem ser alterados enquanto o plano estiver ativo e a campanha estiver em coleta.</p>
           </section>
         )}
         <div className="flex justify-end"><Button type="button" variant="outline" onClick={carregar}><RefreshCw className="mr-1.5 h-4 w-4" />Atualizar</Button></div>
