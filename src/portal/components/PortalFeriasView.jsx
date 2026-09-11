@@ -53,12 +53,13 @@ export default function PortalFeriasView({ onBack }) {
   const [mesOpcao3, setMesOpcao3] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const [campanhaIdSelecionada, setCampanhaIdSelecionada] = useState('');
 
-  const loadData = async () => {
+  const loadData = async (campanhaIdOverride = campanhaIdSelecionada) => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await getFerias();
+      const res = await getFerias(campanhaIdOverride);
       setData(res);
 
       if (res?.periodo_mais_antigo_id) {
@@ -313,6 +314,30 @@ export default function PortalFeriasView({ onBack }) {
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      ) : data?.campanhas_ferias_elegiveis?.length > 1 ? (
+        <Card className="border-blue-200 bg-blue-50/40 shadow-sm">
+          <CardContent className="p-6 sm:p-8 space-y-4">
+            <div>
+              <h3 className="font-extrabold text-slate-800 text-base">Selecione o Plano de Férias</h3>
+              <p className="mt-1 text-xs text-slate-600">Você possui mais de uma campanha de férias disponível. Selecione qual deseja preencher.</p>
+            </div>
+            <select
+              value={campanhaIdSelecionada}
+              onChange={(e) => {
+                setCampanhaIdSelecionada(e.target.value);
+                loadData(e.target.value);
+              }}
+              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800"
+            >
+              <option value="">Selecione uma campanha</option>
+              {data.campanhas_ferias_elegiveis.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.titulo || ('Plano de Férias ' + (item.ano_referencia || ''))} — {item.data_fim_militar || 'prazo não informado'}
+                </option>
+              ))}
+            </select>
           </CardContent>
         </Card>
       ) : !campanha ? (
