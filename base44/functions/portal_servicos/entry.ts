@@ -2196,6 +2196,11 @@ Deno.serve(async (req: Request) => {
                   status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
                 });
               }
+              if (String(planoInstitucional.status || 'ATIVO').toUpperCase() !== 'ATIVO') {
+                return new Response(JSON.stringify({ error: 'Planos arquivados não podem gerar novas férias. Desarquive o plano antes de gerar.' }), {
+                  status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+                });
+              }
               const campanhasDoPlano = await base44.asServiceRole.entities.CampanhaPortal.filter({
                 plano_ferias_institucional_id: planoId,
               });
