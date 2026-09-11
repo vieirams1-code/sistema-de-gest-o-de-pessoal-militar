@@ -396,11 +396,24 @@ export default function PortalFeriasView({ onBack }) {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => {
+                    // Ao reabrir a resposta, restaura explicitamente modalidade e meses
+                    // para que o militar possa alterar qualquer uma das duas partes.
+                    if (opcaoEnviada.modalidade) setModalidade(opcaoEnviada.modalidade);
+                    try {
+                      const p1 = JSON.parse(opcaoEnviada.opcao_1_detalhes || '[]');
+                      const p2 = JSON.parse(opcaoEnviada.opcao_2_detalhes || '[]');
+                      const p3 = JSON.parse(opcaoEnviada.opcao_3_detalhes || '[]');
+                      setMesOpcao1(p1[0]?.mes || '');
+                      setMesOpcao2(p2[0]?.mes || '');
+                      setMesOpcao3(p3[0]?.mes || '');
+                    } catch (_err) {}
+                    setIsEditing(true);
+                  }}
                   className="border-emerald-300 text-emerald-900 hover:bg-emerald-100 rounded-xl text-xs h-9 font-semibold"
                 >
                   <Edit3 className="w-3.5 h-3.5 mr-1.5" />
-                  Alterar Minhas Opções
+                  Alterar Modalidade e Meses
                 </Button>
               </CardHeader>
 
