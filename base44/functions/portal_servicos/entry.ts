@@ -1907,47 +1907,6 @@ Deno.serve(async (req: Request) => {
             // Registros históricos devem ser preservados para análise e eventual restauração.
             // A limpeza de órfãos, se necessária, será uma operação administrativa explícita.
 
-            // Rotina de reparo/sincronização automática para férias já geradas
-            try {
-              const allFerias2 = await base44.asServiceRole.entities.Ferias.list();
-              const feriasDoAno = (allFerias2 || []).filter((f: any) => f.data_inicio && f.data_inicio.startsWith(String(ano)));
-
-              for (const f of feriasDoAno) {
-                let needsUpdate = false;
-                const updatePayload: any = {};
-
-                if (f.status === 'Previsto') {
-                  updatePayload.status = 'Prevista';
-                  needsUpdate = true;
-                }
-
-                if (!f.periodo_aquisitivo_ref && f.periodo_aquisitivo_id) {
-                  const pa = await base44.asServiceRole.entities.PeriodoAquisitivo.get(f.periodo_aquisitivo_id);
-                  if (pa) {
-                    const ref = pa.ano_referencia || pa.referencia || (pa.inicio_aquisitivo && pa.fim_aquisitivo ? `${new Date(pa.inicio_aquisitivo).getFullYear()}/${new Date(pa.fim_aquisitivo).getFullYear()}` : '');
-                    if (ref) {
-                      updatePayload.periodo_aquisitivo_ref = ref;
-                      needsUpdate = true;
-                    }
-                  }
-                }
-
-                if (!f.dias_base && f.dias) {
-                  updatePayload.dias_base = f.dias;
-                  needsUpdate = true;
-                }
-
-                if (!f.fracionamento) {
-                  updatePayload.fracionamento = f.dias === 30 ? 'Integral' : '1ª Fração';
-                  needsUpdate = true;
-                }
-
-                if (needsUpdate) {
-                  await base44.asServiceRole.entities.Ferias.update(f.id, updatePayload);
-                }
-              }
-            } catch (_errRepair) {}
-
             return new Response(JSON.stringify({
               ok: true,
               campanhas: campanhasFerias || [],
