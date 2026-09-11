@@ -27,17 +27,30 @@ export default function BackupSistema() {
           : 'Coletando todos os dados do sistema.',
       });
 
-      const response = await base44.functions.invoke(
-        backupPlanosFerias ? 'gerarBackupPlanosFerias' : 'gerarBackupSistema',
-        backupPlanosFerias ? {} : { incluir_arquivos: incluirArquivos },
+      // ZIP precisa ser lido pela resposta HTTP nativa. O invoke usa Axios e pode
+      // transformar o corpo binário em JSON/string, corrompendo o arquivo baixado.
+      const response = await base44.functions.fetch(
+        `/apps/${base44.appId}/functions/${backupPlanosFerias ? 'gerarBackupPlanosFerias' : 'gerarBackupSistema'}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupPlanosFerias ? {} : { incluir_arquivos: incluirArquivos }),
+        },
       );
 
-      // A resposta vem como Blob/ArrayBuffer. O SDK retorna {data, status, headers}.
-      const data = response?.data;
-      if (!data) throw new Error('Resposta vazia do servidor.');
+      if (!response.ok) {
+        let detalhe = `Falha ao gerar backup (HTTP ${response.status}).`;
+        try {
+          const payload = await response.json();
+          detalhe = payload?.error || detalhe;
+        } catch (_erroResposta) {
+          // Mantém a mensagem HTTP quando a resposta não for JSON.
+        }
+        throw new Error(detalhe);
+      }
 
-      // Converte em Blob para download
-      const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/zip' });
+      const blob = await response.blob();
+      if (!blob.size) throw new Error('O servidor retornou um arquivo vazio.');
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = backupPlanosFerias
         ? `sgp-planos-ferias-backup-${stamp}.zip`
