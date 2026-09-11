@@ -2227,6 +2227,8 @@ Deno.serve(async (req: Request) => {
 
                 const fCreated = await base44.asServiceRole.entities.Ferias.create({
                   militar_id: op.militar_id,
+                  plano_ferias_id: textoId(op.plano_ferias_institucional_id || planoId) || undefined,
+                  campanha_id: textoId(op.campanha_id || campanha_id) || undefined,
                   militar_nome: op.militar_nome,
                   militar_posto: op.militar_posto,
                   militar_matricula: op.militar_matricula,
