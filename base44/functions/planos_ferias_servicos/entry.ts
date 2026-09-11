@@ -191,6 +191,9 @@ Deno.serve(async (req: Request) => {
     if (!planoAtual) return json({ error: 'Plano de Férias não encontrado.' }, 404);
 
     if (acao === 'ATUALIZAR') {
+      if (String(planoAtual.status || '').toUpperCase() === 'ARQUIVADO') {
+        return json({ error: 'Planos arquivados não podem ser alterados. Desarquive o plano antes de editá-lo.' }, 409);
+      }
       const dados = payload?.plano || {};
       const titulo = texto(dados.titulo);
       const ano = Number(dados.ano_referencia);
