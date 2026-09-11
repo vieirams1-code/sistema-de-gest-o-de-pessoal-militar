@@ -55,6 +55,16 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
     : necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true));
 }
 
+function vinculoGrupoValidoHoje(vinculo: any): boolean {
+  if (vinculo?.ativo === false) return false;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const inicio = texto(vinculo?.data_inicio).slice(0, 10);
+  const fim = texto(vinculo?.data_fim).slice(0, 10);
+  if (inicio && inicio > hoje) return false;
+  if (fim && fim < hoje) return false;
+  return true;
+}
+
 async function carregarMembrosPorGrupo(base44: any, campanhas: any[]): Promise<Map<string, Set<string>>> {
   const ids = new Set<string>();
   for (const campanha of campanhas || []) {
@@ -74,7 +84,7 @@ async function carregarMembrosPorGrupo(base44: any, campanhas: any[]): Promise<M
     vinculos = [];
   }
   for (const vinculo of vinculos || []) {
-    if (vinculo.ativo === false || !ids.has(String(vinculo.grupo_id)) || !vinculo.militar_id) continue;
+    if (!vinculoGrupoValidoHoje(vinculo) || !ids.has(String(vinculo.grupo_id)) || !vinculo.militar_id) continue;
     const grupoId = String(vinculo.grupo_id);
     if (!resultado.has(grupoId)) resultado.set(grupoId, new Set<string>());
     resultado.get(grupoId)!.add(String(vinculo.militar_id));
