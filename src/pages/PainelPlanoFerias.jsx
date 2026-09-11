@@ -602,7 +602,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" desativada.` });
-      await carregarPainel();
+      await recarregarPainelAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao desativar campanha.' });
     } finally {
@@ -620,7 +620,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" arquivada.` });
-      await carregarPainel();
+      await recarregarPainelAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao arquivar campanha.' });
     } finally {
@@ -638,7 +638,7 @@ export default function PainelPlanoFerias() {
         campanha_id: camp.id,
       });
       setFeedback({ type: 'success', msg: `Campanha "${camp.titulo}" excluída com sucesso.` });
-      await carregarPainel();
+      await recarregarPainelAtual();
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao excluir campanha.' });
     } finally {
