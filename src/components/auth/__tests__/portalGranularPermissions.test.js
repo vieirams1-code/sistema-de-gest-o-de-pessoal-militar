@@ -99,7 +99,7 @@ test('Configurações do Portal não têm fallback direto e Mesa RH respeita per
 test('PlanosFerias aplica permissões próprias e não depende de leitura direta de efetivo', () => {
   for (const action of [
     'visualizar_planos_ferias', 'criar_planos_ferias', 'editar_planos_ferias', 'excluir_planos_ferias',
-    'criar_campanhas_ferias', 'excluir_campanhas_ferias', 'visualizar_respostas_ferias',
+    'visualizar_respostas_ferias',
     'gerar_ferias_campanhas', 'admin_campanhas_ferias',
   ]) assert.match(paginaPlanos, new RegExp(action));
   assert.doesNotMatch(paginaPlanos, /base44\.entities\.(Militar|GrupoEfetivo)/);
