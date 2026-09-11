@@ -223,8 +223,11 @@ export async function solicitarAlteracaoCadastral({ campo_chave, campo_label, va
 /**
  * Consulta os períodos aquisitivos e histórico de férias (Fase 1.3B).
  */
-export async function getFerias() {
-  return portalFetch('portal_servicos', { acao: 'FERIAS_GET' });
+export async function getFerias(campanha_id = '') {
+  return portalFetch('portal_servicos', {
+    acao: 'FERIAS_GET',
+    ...(campanha_id ? { campanha_id } : {}),
+  });
 }
 
 /**
