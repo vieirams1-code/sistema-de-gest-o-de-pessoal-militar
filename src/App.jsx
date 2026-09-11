@@ -142,7 +142,7 @@ const actionGuardByPage = {
   },
   ConfigurarCampanhaFerias: {
     moduleKey: 'campanhas_ferias',
-    actionKeys: ['editar_campanhas_ferias', 'admin_campanhas_ferias'],
+    actionKey: 'visualizar_planos_ferias',
     moduleName: 'Configuração de Campanha de Férias',
   },
   PainelPlanoFerias: {
