@@ -394,8 +394,13 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   }
   if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias'];
   if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas_ferias', 'perm_editar_campanhas_ferias'];
-  if (acao === 'PLANO_CAMPANHA_SALVAR' || acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') return ['perm_editar_campanhas_ferias'];
-  if (acao === 'PLANO_CAMPANHA_EXCLUIR') return ['perm_excluir_campanhas_ferias'];
+  if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_editar_campanhas_ferias'];
+  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') {
+    return ['perm_editar_campanhas_ferias', 'perm_admin_campanhas_ferias'];
+  }
+  if (acao === 'PLANO_CAMPANHA_EXCLUIR') {
+    return ['perm_excluir_campanhas_ferias', 'perm_admin_campanhas_ferias'];
+  }
 
   if (acao === 'PORTAL_CONFIG_GET' || acao === 'PORTAL_CONFIG_SAVE') return ['perm_configurar_portal'];
   if (acao === 'CADASTRO_SOLICITACOES_LISTAR') return ['perm_visualizar_solicitacoes_cadastrais', 'perm_decidir_solicitacoes_cadastrais'];
@@ -436,6 +441,9 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
   const exigeTodas = [
     'PLANO_INSTITUCIONAL_EXCLUIR',
+    'PLANO_CAMPANHA_ARQUIVAR',
+    'PLANO_CAMPANHA_DESATIVAR',
+    'PLANO_CAMPANHA_EXCLUIR',
     'PLANO_GERAR_LOTE_FERIAS',
     'PLANO_INSTITUCIONAL_GERAR_FERIAS',
   ].includes(acao);
