@@ -845,6 +845,12 @@ Deno.serve(async (req: Request) => {
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
           }
+          if (String(existente.status || '').toUpperCase() === 'ARQUIVADO') {
+            return new Response(JSON.stringify({ error: 'Planos arquivados não podem ser alterados. Desarquive o plano antes de editá-lo.' }), {
+              status: 409,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           const campanhasVinculadas = await base44.asServiceRole.entities.CampanhaPortal.filter({ plano_ferias_institucional_id: planoId });
           if (campanhasVinculadas.length > 0 && Number(existente.ano_referencia) !== ano) {
             return new Response(JSON.stringify({ error: 'O ano não pode ser alterado depois que o plano possui campanhas.' }), {
