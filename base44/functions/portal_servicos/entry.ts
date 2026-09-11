@@ -381,8 +381,11 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     return ['perm_visualizar_planos_ferias'];
   }
   if (acao === 'PLANO_INSTITUCIONAL_CRIAR') return ['perm_criar_planos_ferias'];
-  if (['PLANO_INSTITUCIONAL_ATUALIZAR', 'PLANO_INSTITUCIONAL_ARQUIVAR'].includes(acao)) {
+  if (acao === 'PLANO_INSTITUCIONAL_ATUALIZAR') {
     return ['perm_editar_planos_ferias'];
+  }
+  if (acao === 'PLANO_INSTITUCIONAL_ARQUIVAR') {
+    return ['perm_editar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias'];
   if (acao === 'PLANO_ESCALA_LISTAR') return ['perm_visualizar_respostas_ferias', 'perm_aprovar_ferias', 'perm_gerar_ferias_campanhas'];
@@ -441,6 +444,7 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
   const exigeTodas = [
     'PLANO_INSTITUCIONAL_EXCLUIR',
+    'PLANO_INSTITUCIONAL_ARQUIVAR',
     'PLANO_CAMPANHA_ARQUIVAR',
     'PLANO_CAMPANHA_DESATIVAR',
     'PLANO_CAMPANHA_EXCLUIR',
