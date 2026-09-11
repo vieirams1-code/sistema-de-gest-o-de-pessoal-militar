@@ -40,9 +40,14 @@ Deno.serve(async (req: Request) => {
     if (!arquivoUrl) return jsonResponse({ error: 'Arquivo de backup não informado.' }, 400);
 
     const resposta = await fetch(arquivoUrl);
-    if (!resposta.ok) return jsonResponse({ error: 'Não foi possível ler o arquivo de backup enviado.' }, 400);
+    if (!resposta.ok) return jsonResponse({ error: `Não foi possível ler o arquivo de backup enviado (HTTP ${resposta.status}). Verifique se o arquivo ainda está disponível.` }, 400);
     const bytes = new Uint8Array(await resposta.arrayBuffer());
-    const entries = unzipSync(bytes);
+    let entries: Record<string, Uint8Array>;
+    try {
+      entries = unzipSync(bytes);
+    } catch (_erroZip) {
+      return jsonResponse({ error: 'O arquivo enviado não é um ZIP válido ou foi corrompido durante o upload.' }, 400);
+    }
     const manifestoBytes = entries['manifesto.json'];
     if (!manifestoBytes) return jsonResponse({ error: 'ZIP inválido: manifesto.json não encontrado.' }, 400);
 
