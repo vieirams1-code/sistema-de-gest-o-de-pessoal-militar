@@ -395,14 +395,17 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao === 'PLANO_GERAR_LOTE_FERIAS' || acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
     return ['perm_gerar_ferias_campanhas', 'perm_admin_campanhas_ferias'];
   }
-  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias'];
-  if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas_ferias', 'perm_editar_campanhas_ferias'];
-  if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_editar_campanhas_ferias'];
+  // Campanhas de férias pertencem ao módulo de Planos de Férias.
+  // As permissões específicas por campanha foram descontinuadas; registros
+  // antigos são preservados, mas não concedem nem bloqueiam o acesso.
+  if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_visualizar_planos_ferias'];
+  if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_visualizar_planos_ferias'];
+  if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') {
-    return ['perm_editar_campanhas_ferias', 'perm_admin_campanhas_ferias'];
+    return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_CAMPANHA_EXCLUIR') {
-    return ['perm_excluir_campanhas_ferias', 'perm_admin_campanhas_ferias'];
+    return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
 
   if (acao === 'PORTAL_CONFIG_GET' || acao === 'PORTAL_CONFIG_SAVE') return ['perm_configurar_portal'];
