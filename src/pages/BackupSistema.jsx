@@ -5,6 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Archive, Download, AlertTriangle, Database, FileArchive, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { appParams } from '@/lib/app-params';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function BackupSistema() {
@@ -30,10 +31,14 @@ export default function BackupSistema() {
       // ZIP precisa ser lido pela resposta HTTP nativa. O invoke usa Axios e pode
       // transformar o corpo binário em JSON/string, corrompendo o arquivo baixado.
       const response = await base44.functions.fetch(
-        `/apps/${base44.appId}/functions/${backupPlanosFerias ? 'gerarBackupPlanosFerias' : 'gerarBackupSistema'}`,
+        backupPlanosFerias ? 'gerarBackupPlanosFerias' : 'gerarBackupSistema',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(appParams.appId ? { 'X-App-Id': appParams.appId } : {}),
+            ...(appParams.functionsVersion ? { 'Base44-Functions-Version': appParams.functionsVersion } : {}),
+          },
           body: JSON.stringify(backupPlanosFerias ? {} : { incluir_arquivos: incluirArquivos }),
         },
       );
