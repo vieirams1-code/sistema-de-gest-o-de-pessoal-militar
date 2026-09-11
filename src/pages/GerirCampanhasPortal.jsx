@@ -55,6 +55,7 @@ export default function GerirCampanhasPortal() {
   const [campanhas, setCampanhas] = useState([]);
   const [unidadesList, setUnidadesList] = useState([]);
   const [gruposList, setGruposList] = useState([]);
+  const [portalConfig, setPortalConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
@@ -104,12 +105,17 @@ export default function GerirCampanhasPortal() {
       }
 
       if (canCreateCampaigns || canEditCampaigns) {
-        const scopeRes = await base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_SCOPE_OPTIONS' });
+        const [scopeRes, configRes] = await Promise.all([
+          base44.functions.invoke('portal_servicos', { acao: 'CAMPANHA_SCOPE_OPTIONS' }),
+          base44.functions.invoke('portal_servicos', { acao: 'PORTAL_CONFIG_GET' }),
+        ]);
         setUnidadesList(scopeRes.data?.unidades || []);
         setGruposList(scopeRes.data?.grupos || []);
+        setPortalConfig(configRes.data?.config || null);
       } else {
         setUnidadesList([]);
         setGruposList([]);
+        setPortalConfig(null);
       }
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar dados do painel.' });
@@ -168,11 +174,11 @@ export default function GerirCampanhasPortal() {
         instrucoes: `Prezados militares, registrem suas 3 opções de preferências de meses para o Plano de Férias de ${ano}.`,
         plano_ferias_institucional_id: planoId,
         config_regras: {
-          permitir_1_etapa_30d: true,
-          permitir_2_etapas_15d: true,
-          permitir_3_etapas_10d: true,
-          modo_selecao_periodo: 'mais_antigo',
-          exigir_atualizacao_cadastral: true,
+          permitir_1_etapa_30d: portalConfig?.ferias_permitir_1_etapa_30d !== false,
+          permitir_2_etapas_15d: portalConfig?.ferias_permitir_2_etapas_15d !== false,
+          permitir_3_etapas_10d: portalConfig?.ferias_permitir_3_etapas_10d !== false,
+          modo_selecao_periodo: portalConfig?.ferias_modo_selecao_periodo || 'mais_antigo',
+          exigir_atualizacao_cadastral: portalConfig?.ferias_exigir_atualizacao_cadastral === true,
         },
         arquivo_modelo_url: '',
         arquivo_modelo_nome: '',
