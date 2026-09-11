@@ -30,6 +30,10 @@
       "type": "string",
       "description": "ID do plano de f\u00e9rias vinculado"
     },
+    "campanha_id": {
+      "type": "string",
+      "description": "ID da campanha de f\u00e9rias que originou o registro"
+    },
     "tipo": {
       "type": "string",
       "enum": [
