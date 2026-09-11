@@ -76,11 +76,11 @@ export default function BackupSistema() {
       toast({ title: 'Validando backup...', description: 'Nenhum registro será alterado nesta etapa.' });
       const upload = await base44.integrations.Core.UploadFile({ file: arquivoRestore });
       const uploadData = upload && typeof upload === 'object' ? upload : {};
-      const arquivoUrl = uploadData.file_url || uploadData.url || uploadData.file?.url || '';
+      const arquivoUrl = uploadData.file_url || uploadData.url || uploadData.signedUrl || uploadData.file?.url || uploadData.data?.file_url || uploadData.data?.url || '';
       if (!arquivoUrl) throw new Error('Não foi possível obter o endereço do arquivo enviado.');
       const response = await base44.functions.invoke('restaurarBackupPlanosFerias', { arquivo_url: arquivoUrl, modo: 'SIMULAR' });
       const simulacao = response?.data?.simulacao;
-      if (!simulacao) throw new Error(response?.data?.error || 'A simulação não retornou um relatório.');
+      if (!simulacao) throw new Error(response?.data?.error || `A simulação não retornou um relatório (HTTP ${response?.status || 'desconhecido'}).`);
       setRelatorioRestore({ arquivoUrl, simulacao });
       toast({ title: 'Simulação concluída', description: 'Confira os conflitos antes de confirmar.' });
     } catch (error) {
