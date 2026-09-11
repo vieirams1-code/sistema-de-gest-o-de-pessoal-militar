@@ -370,7 +370,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     return ['perm_aprovar_ferias'];
   }
   if (acao === 'PLANO_GERAR_LOTE_FERIAS' || acao === 'PLANO_INSTITUCIONAL_GERAR_FERIAS') {
-    return ['perm_gerar_ferias_campanhas'];
+    return ['perm_gerar_ferias_campanhas', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_criar_campanhas_ferias'];
   if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas_ferias', 'perm_editar_campanhas_ferias'];
@@ -414,7 +414,11 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const authzResponse = await base44.functions.invoke('getUserPermissions', {});
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
-  const exigeTodas = acao === 'PLANO_INSTITUCIONAL_EXCLUIR';
+  const exigeTodas = [
+    'PLANO_INSTITUCIONAL_EXCLUIR',
+    'PLANO_GERAR_LOTE_FERIAS',
+    'PLANO_INSTITUCIONAL_GERAR_FERIAS',
+  ].includes(acao);
   const autorizadoPorPermissao = necessarias.length > 0 && (exigeTodas
     ? necessarias.every((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)
     : necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true));
