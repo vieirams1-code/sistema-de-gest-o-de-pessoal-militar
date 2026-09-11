@@ -11,11 +11,6 @@ const erroTexto = (erro, fallback) => erro?.response?.data?.error || erro?.data?
 export default function ConfigurarCampanhaFerias() {
   const navigate = useNavigate();
   const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
-  const statusCampanha = String(campanha?.status || '').trim().toLowerCase();
-  const campanhaEmEdicaoPermitida = !['arquivada', 'desativada', 'encerrada'].includes(statusCampanha);
-  const podeEditarCampanha = (isAdmin || canAccessAction('editar_campanhas_ferias'))
-    && campanhaEmEdicaoPermitida
-    && String(plano?.status || 'ATIVO').toUpperCase() !== 'ARQUIVADO';
   const [params] = useSearchParams();
   const campanhaId = params.get('campanhaId') || '';
   const planoId = params.get('planoId') || '';
@@ -25,6 +20,11 @@ export default function ConfigurarCampanhaFerias() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
+  const statusCampanha = String(campanha?.status || '').trim().toLowerCase();
+  const campanhaEmEdicaoPermitida = !['arquivada', 'desativada', 'encerrada'].includes(statusCampanha);
+  const podeEditarCampanha = (isAdmin || canAccessAction('editar_campanhas_ferias'))
+    && campanhaEmEdicaoPermitida
+    && String(plano?.status || 'ATIVO').toUpperCase() !== 'ARQUIVADO';
 
   const carregar = async () => {
     if (!campanhaId) {
