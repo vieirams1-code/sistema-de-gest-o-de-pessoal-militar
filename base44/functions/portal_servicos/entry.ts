@@ -2376,11 +2376,9 @@ Deno.serve(async (req: Request) => {
     try {
       const allCamp = await base44.asServiceRole.entities.CampanhaPortal.list();
       const membrosPorGrupoPortal = await carregarMembrosPorGrupo(base44, allCamp || []);
-      campanhasAtivasMilitar = (allCamp || []).filter((cp: any) => {
-        const st = String(cp.status || '').toLowerCase();
-        const isAtiva = st === 'aberta_coleta' || st === 'ativa' || st === 'aberta' || st === 'em_andamento' || !cp.status;
-        return isAtiva && matchMilitarCampanha(cp, militar, membrosPorGrupoPortal);
-      });
+      campanhasAtivasMilitar = (allCamp || []).filter((cp: any) =>
+        campanhaPodeReceberResposta(cp, militar, membrosPorGrupoPortal)
+      );
     } catch (_e) {
       campanhasAtivasMilitar = [];
     }
