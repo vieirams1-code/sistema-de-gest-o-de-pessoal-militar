@@ -57,6 +57,16 @@ function matchMilitarEscopoUnidade(m: any, escopoUnidadesIds: string[]): boolean
   });
 }
 
+function vinculoGrupoValidoHoje(vinculo: any): boolean {
+  if (vinculo?.ativo === false) return false;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const inicio = textoId(vinculo?.data_inicio).slice(0, 10);
+  const fim = textoId(vinculo?.data_fim).slice(0, 10);
+  if (inicio && inicio > hoje) return false;
+  if (fim && fim < hoje) return false;
+  return true;
+}
+
 async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Promise<Map<string, Set<string>>> {
   const ids = new Set<string>();
   (campanhas || []).forEach((campanha) => {
@@ -67,7 +77,7 @@ async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Prom
   let vinculos: any[] = [];
   try { vinculos = await base44.asServiceRole.entities.MembroGrupoEfetivo.list(); } catch (_e) { vinculos = []; }
   (vinculos || []).forEach((v: any) => {
-    if (v.ativo === false || !ids.has(String(v.grupo_id)) || !v.militar_id) return;
+    if (!vinculoGrupoValidoHoje(v) || !ids.has(String(v.grupo_id)) || !v.militar_id) return;
     if (!resultado.has(String(v.grupo_id))) resultado.set(String(v.grupo_id), new Set<string>());
     resultado.get(String(v.grupo_id))!.add(String(v.militar_id));
   });
