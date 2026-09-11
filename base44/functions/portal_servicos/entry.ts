@@ -1831,6 +1831,21 @@ Deno.serve(async (req: Request) => {
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
+            const planoCampanha = campanha.plano_ferias_institucional_id
+              ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(campanha.plano_ferias_institucional_id).catch(() => null)
+              : null;
+            if (!planoCampanha) {
+              return new Response(JSON.stringify({ error: 'O plano vinculado à campanha não foi encontrado.' }), {
+                status: 404,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (String(planoCampanha.status || 'ATIVO') !== 'ATIVO') {
+              return new Response(JSON.stringify({ error: 'Campanhas de um plano arquivado não podem ser alteradas.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
 
             const titulo = String(dados.titulo || '').trim();
             const dataInicio = String(dados.data_inicio || '').slice(0, 10);
