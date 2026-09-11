@@ -233,6 +233,7 @@ export async function getFerias() {
 export async function submeterOpcaoFerias({
   periodo_aquisitivo_id,
   ano_referencia,
+  campanha_id,
   modalidade,
   opcao_1,
   opcao_2,
@@ -243,6 +244,7 @@ export async function submeterOpcaoFerias({
     acao: 'FERIAS_SUBMETER_OPCAO',
     periodo_aquisitivo_id,
     ano_referencia,
+    campanha_id,
     modalidade,
     opcao_1,
     opcao_2,
