@@ -902,7 +902,6 @@ Deno.serve(async (req: Request) => {
 
         case 'PLANO_INSTITUCIONAL_EXCLUIR': {
           const planoId = String(payload.plano_id || '').trim();
-          const confirmarPerdaVinculo = Boolean(payload.confirmar_perda_vinculo);
           if (payload.confirmacao_dupla !== true) {
             return new Response(JSON.stringify({ error: 'A exclusão do plano exige confirmação dupla.' }), {
               status: 400,
