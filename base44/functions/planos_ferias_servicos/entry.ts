@@ -246,6 +246,9 @@ Deno.serve(async (req: Request) => {
     }
 
     if (acao === 'ARQUIVAR') {
+      if (String(planoAtual.status || '').toUpperCase() === 'ARQUIVADO') {
+        return json({ error: 'O plano já está arquivado.' }, 409);
+      }
       const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
         status: 'ARQUIVADO',
         data_encerramento: planoAtual.data_encerramento || new Date().toISOString().slice(0, 10),
@@ -254,6 +257,9 @@ Deno.serve(async (req: Request) => {
     }
 
     if (acao === 'DESARQUIVAR') {
+      if (String(planoAtual.status || '').toUpperCase() !== 'ARQUIVADO') {
+        return json({ error: 'O plano não está arquivado.' }, 409);
+      }
       const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
         status: 'ATIVO',
         data_encerramento: '',
@@ -272,7 +278,7 @@ Deno.serve(async (req: Request) => {
         plano_ferias_institucional_id: planoId,
       });
       if ((campanhas || []).length > 0) {
-        return json({ error: 'O plano possui campanhas. Arquive-o para preservar o histórico.' }, 409);
+        return json({ error: 'O plano possui campanhas vinculadas e não pode ser excluído. O histórico será preservado.' }, 409);
       }
       await base44.asServiceRole.entities.PlanoFeriasInstitucional.delete(planoId);
       return json({ ok: true });
