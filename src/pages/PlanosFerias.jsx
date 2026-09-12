@@ -328,6 +328,28 @@ export default function PlanosFerias() {
 
 
 
+  const alterarStatusCampanha = async (campanha, acao, statusAlvo) => {
+    if (!modoAdmin || !podeAdminFerias) {
+      setFeedback({ tipo: 'erro', texto: 'Esta ação exige o Modo Admin de férias ativo.' });
+      return;
+    }
+    const verbo = acao === 'PLANO_CAMPANHA_REABRIR' ? 'reabrir' : 'arquivar';
+    if (!window.confirm(`${verbo.charAt(0).toUpperCase() + verbo.slice(1)} a campanha "${campanha.titulo}"? As respostas e opções serão preservadas.`)) return;
+    setSalvando(true);
+    try {
+      const resposta = await base44.functions.invoke('portal_servicos', {
+        acao,
+        campanha_id: campanha.id,
+      });
+      setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || `Campanha ${statusAlvo.toLowerCase()} com sucesso.` });
+      await carregar();
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, `Não foi possível ${verbo} a campanha.`) });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const abrirRespostas = async (campanha) => {
     if (!podeVisualizarRespostas) return;
     setModalRespostas(campanha);
@@ -462,6 +484,8 @@ export default function PlanosFerias() {
                     <div className="flex gap-2 flex-wrap">
                       {(podeEditarCampanhas || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
                       {podeVisualizarRespostas && <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>}
+                      {modoAdmin && podeAdminFerias && campanha.status !== 'Arquivada' && <Button type="button" variant="outline" onClick={() => alterarStatusCampanha(campanha, 'PLANO_CAMPANHA_ARQUIVAR', 'arquivada')} disabled={salvando} className="border-amber-200 text-amber-700 hover:bg-amber-50"><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
+                      {modoAdmin && podeAdminFerias && campanha.status === 'Arquivada' && <Button type="button" variant="outline" onClick={() => alterarStatusCampanha(campanha, 'PLANO_CAMPANHA_REABRIR', 'aberta para coleta')} disabled={salvando} className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"><RefreshCw className="w-4 h-4 mr-1.5" />Reabrir</Button>}
                       {modoAdmin && podeAdminFerias && podeExcluirCampanhas && campanha.status === 'Arquivada' && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
                     </div>
                   </div>
