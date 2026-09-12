@@ -942,9 +942,20 @@ Deno.serve(async (req: Request) => {
             });
           }
 
+          let opcoesExistentesPlano: any[] = [];
+          let respostasExistentesPlano: any[] = [];
+          try {
+            opcoesExistentesPlano = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+            opcoesExistentesPlano = (opcoesExistentesPlano || []).filter((opcao: any) => campanhasIds.has(opcao.campanha_id) || textoId(opcao.plano_ferias_institucional_id) === planoId);
+          } catch (_errOpcoesExistentes) {}
+          try {
+            respostasExistentesPlano = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.list();
+            respostasExistentesPlano = (respostasExistentesPlano || []).filter((resposta: any) => campanhasIds.has(resposta.campanha_id));
+          } catch (_errRespostasExistentes) {}
+
           // O plano nunca é apagado junto com campanhas, opções ou respostas.
           // Isso protege capturas já iniciadas e mantém o histórico recuperável.
-          if (campanhasVinculadas.length > 0) {
+          if (campanhasVinculadas.length > 0 || opcoesExistentesPlano.length > 0 || respostasExistentesPlano.length > 0) {
             return new Response(JSON.stringify({
               error: 'Este plano possui campanhas vinculadas e não pode ser excluído. Arquive-o para preservar o histórico das campanhas e respostas.',
               requires_archive: true,
