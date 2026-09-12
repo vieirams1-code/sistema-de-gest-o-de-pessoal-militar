@@ -86,7 +86,7 @@ async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Prom
 
 function matchMilitarCampanha(campanha: any, militar: any, membrosPorGrupo: Map<string, Set<string>> = new Map()): boolean {
   const baseEscopo = campanha.tipo_escopo === 'TODOS' || campanha.tipo_escopo === 'SEM_ESCOPO' || !campanha.tipo_escopo ||
-    (campanha.tipo_escopo === 'UNIDADES' && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
+    ((campanha.tipo_escopo === 'UNIDADES' || campanha.tipo_escopo === 'UNIDADES_E_GRUPOS') && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
     (campanha.tipo_escopo === 'QUADROS' && (campanha.escopo_quadros || []).includes(militar.quadro)) ||
     (campanha.tipo_escopo === 'SELECAO_MILITARES' && (campanha.escopo_militares_ids || []).includes(militar.id));
   const grupos = (campanha.escopo_grupos_ids || []).map((id: any) => membrosPorGrupo.get(String(id))).filter(Boolean) as Set<string>[];
@@ -932,10 +932,10 @@ Deno.serve(async (req: Request) => {
             feriasVinculadas = [];
           }
 
-          if (feriasVinculadas.length > 0 && !confirmarPerdaVinculo) {
+          if (feriasVinculadas.length > 0) {
             return new Response(JSON.stringify({
-              error: 'Este plano possui férias já geradas. A exclusão removerá o vínculo dessas férias com o plano e impedirá o rastreamento pelo plano.',
-              requires_confirmation: true,
+              error: 'Este plano possui férias geradas e não pode ser excluído. O histórico e o vínculo das férias devem ser preservados; mantenha o plano arquivado.',
+              requires_archive: true,
               ferias_vinculadas: feriasVinculadas.length,
             }), {
               status: 409,
@@ -943,7 +943,20 @@ Deno.serve(async (req: Request) => {
             });
           }
 
-          // Exclui respostas e campanhas do plano, sem tocar nos militares nem nas férias geradas.
+          // O plano nunca é apagado junto com campanhas, opções ou respostas.
+          // Isso protege capturas já iniciadas e mantém o histórico recuperável.
+          if (campanhasVinculadas.length > 0) {
+            return new Response(JSON.stringify({
+              error: 'Este plano possui campanhas vinculadas e não pode ser excluído. Arquive-o para preservar o histórico das campanhas e respostas.',
+              requires_archive: true,
+              campanhas_vinculadas: campanhasVinculadas.length,
+            }), {
+              status: 409,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+
+          // Exclui somente um plano arquivado sem campanhas, respostas ou férias vinculadas.
           try {
             const opcoesDoPlano = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
             for (const opcao of (opcoesDoPlano || [])) {
@@ -1099,20 +1112,33 @@ Deno.serve(async (req: Request) => {
             const tipoEscopo = String(cp.tipo_escopo || 'TODOS');
             const gruposIds = Array.isArray(cp.escopo_grupos_ids) ? cp.escopo_grupos_ids.filter(Boolean) : [];
             const unidadesIds = Array.isArray(cp.escopo_unidades_ids) ? cp.escopo_unidades_ids.filter(Boolean) : [];
+            const tiposEscopoValidos = new Set(['TODOS', 'UNIDADES', 'SEM_ESCOPO', 'UNIDADES_E_GRUPOS']);
+            if (!tiposEscopoValidos.has(tipoEscopo)) {
+              return new Response(JSON.stringify({ error: 'Modo de escopo inválido para a campanha.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (tipoEscopo === 'TODOS' && (gruposIds.length > 0 || unidadesIds.length > 0)) {
+              return new Response(JSON.stringify({ error: 'O modo Toda a Corporação não pode conter unidades ou grupos selecionados.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
             if (tipoEscopo === 'SEM_ESCOPO' && gruposIds.length === 0) {
               return new Response(JSON.stringify({ error: 'Selecione ao menos um grupo de militares quando o escopo de lotação estiver vazio.' }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
-            if (gruposIds.length > 0 && tipoEscopo !== 'SEM_ESCOPO') {
-              return new Response(JSON.stringify({ error: 'Ao selecionar grupos, o escopo deve ser Somente grupos de militares.' }), {
+            if (gruposIds.length > 0 && !['SEM_ESCOPO', 'UNIDADES_E_GRUPOS'].includes(tipoEscopo)) {
+              return new Response(JSON.stringify({ error: 'Ao selecionar grupos, escolha Somente Grupo de Militares ou Unidades + Grupos.' }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
             }
-            if (unidadesIds.length > 0 && tipoEscopo !== 'UNIDADES') {
-              return new Response(JSON.stringify({ error: 'Ao selecionar unidades, o escopo deve ser Unidades selecionadas.' }), {
+            if (unidadesIds.length > 0 && !['UNIDADES', 'UNIDADES_E_GRUPOS'].includes(tipoEscopo)) {
+              return new Response(JSON.stringify({ error: 'Ao selecionar unidades, escolha Somente Unidades ou Unidades + Grupos.' }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
@@ -1124,7 +1150,13 @@ Deno.serve(async (req: Request) => {
               });
             }
             if (tipoEscopo === 'UNIDADES' && gruposIds.length > 0) {
-              return new Response(JSON.stringify({ error: 'O modo por unidades não pode conter grupos de militares.' }), {
+              return new Response(JSON.stringify({ error: 'O modo Somente Unidades não pode conter grupos de militares.' }), {
+                status: 400,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
+            if (tipoEscopo === 'UNIDADES_E_GRUPOS' && (unidadesIds.length === 0 || gruposIds.length === 0)) {
+              return new Response(JSON.stringify({ error: 'No modo Unidades + Grupos, selecione ao menos uma unidade e um grupo.' }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
@@ -1722,6 +1754,9 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
           if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          if (String(campanha.status || '').toLowerCase() !== 'arquivada') {
+            return new Response(JSON.stringify({ error: 'A campanha precisa estar arquivada antes de ser excluída.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
 
           const opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id }).catch(() => []);
           const respostas = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ campanha_id }).catch(() => []);
