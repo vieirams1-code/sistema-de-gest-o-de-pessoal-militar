@@ -39,6 +39,12 @@ export default function ConfigurarCampanhaFerias() {
     try {
       const encontrada = await base44.entities.CampanhaPortal.get(campanhaId);
       if (!encontrada) throw new Error('Campanha não encontrada ou sem acesso.');
+      if (encontrada.tipo !== 'PLANO_FERIAS' || !encontrada.plano_ferias_institucional_id) {
+        throw new Error('Esta campanha não pertence a um Plano de Férias. Abra-a pelo módulo correspondente.');
+      }
+      if (planoId && encontrada.plano_ferias_institucional_id !== planoId) {
+        throw new Error('A campanha não pertence ao plano informado.');
+      }
       setCampanha(encontrada);
       setDadosCampanhaForm({
         titulo: encontrada.titulo || '',
@@ -108,7 +114,7 @@ export default function ConfigurarCampanhaFerias() {
               <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Campanha de Férias</p>
               <h1 className="mt-1 text-2xl font-black text-slate-900">{campanha?.titulo || 'Campanha'}</h1>
               <p className="mt-2 text-sm text-slate-500">Plano: {plano?.titulo || 'Plano de Férias'} · Status: {campanha?.status || '-'}</p>
-              <p className="mt-1 text-xs text-slate-500">Escopo: {campanha?.tipo_escopo === 'SEM_ESCOPO' ? 'Somente grupos' : (campanha?.escopo_unidades_nomes || 'Toda a corporação')}{campanha?.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''}</p>
+              <p className="mt-1 text-xs text-slate-500">Escopo: {campanha?.tipo_escopo === 'SEM_ESCOPO' ? 'Somente Grupo de Militares' : campanha?.tipo_escopo === 'UNIDADES_E_GRUPOS' ? 'Unidades + Grupos (combinados)' : (campanha?.escopo_unidades_nomes || 'Toda a corporação')}{campanha?.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''}</p>
             </div>
             <Button type="button" variant="outline" onClick={() => navigate('/PainelPlanoFerias?planoId=' + (planoId || campanha?.plano_ferias_institucional_id || '') + '&campanhaId=' + campanhaId)}><ExternalLink className="mr-1.5 h-4 w-4" />Abrir respostas e escalação</Button>
           </div>
