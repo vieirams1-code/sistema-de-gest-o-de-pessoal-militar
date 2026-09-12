@@ -368,7 +368,7 @@ export default function PlanosFerias() {
     const impactoFerias = geradas > 0
       ? ` O plano possui ${geradas} registro(s) de férias já gerado(s), que serão mantidos no SGP, mas perderão o vínculo com o plano.`
       : '';
-    if (!window.confirm(`Primeira confirmação: excluir o plano "${plano.titulo}" também excluirá suas campanhas e respostas.${impactoFerias}`)) return;
+    if (!window.confirm(`Primeira confirmação: excluir o plano "${plano.titulo}" só pode ser excluído quando não houver campanhas, respostas ou férias vinculadas.${impactoFerias}`)) return;
     if (!window.confirm(`Segunda confirmação: deseja excluir definitivamente o plano "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
     try {
