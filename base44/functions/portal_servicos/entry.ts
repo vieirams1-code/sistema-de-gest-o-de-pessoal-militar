@@ -408,7 +408,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
   if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_visualizar_planos_ferias'];
-  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR') {
+  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR' || acao === 'PLANO_CAMPANHA_REABRIR') {
     return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_CAMPANHA_EXCLUIR') {
@@ -457,6 +457,7 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
     'PLANO_INSTITUCIONAL_ARQUIVAR',
     'PLANO_CAMPANHA_ARQUIVAR',
     'PLANO_CAMPANHA_DESATIVAR',
+    'PLANO_CAMPANHA_REABRIR',
     'PLANO_CAMPANHA_EXCLUIR',
     'PLANO_GERAR_LOTE_FERIAS',
     'PLANO_INSTITUCIONAL_GERAR_FERIAS',
@@ -1796,12 +1797,21 @@ Deno.serve(async (req: Request) => {
         }
 
         case 'PLANO_CAMPANHA_ARQUIVAR':
-        case 'PLANO_CAMPANHA_DESATIVAR': {
+        case 'PLANO_CAMPANHA_DESATIVAR':
+        case 'PLANO_CAMPANHA_REABRIR': {
           const { campanha_id } = payload;
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
           if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-          const status = acao === 'PLANO_CAMPANHA_ARQUIVAR' ? 'Arquivada' : 'Desativada';
+          if (acao === 'PLANO_CAMPANHA_REABRIR' && String(campanha.status || '').toLowerCase() !== 'arquivada') {
+            return new Response(JSON.stringify({ error: 'A campanha precisa estar arquivada antes de ser reaberta.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+          if (acao === 'PLANO_CAMPANHA_ARQUIVAR' && String(campanha.status || '').toLowerCase() === 'arquivada') {
+            return new Response(JSON.stringify({ error: 'A campanha já está arquivada.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+          const status = acao === 'PLANO_CAMPANHA_REABRIR'
+            ? 'Aberta_Coleta'
+            : acao === 'PLANO_CAMPANHA_ARQUIVAR' ? 'Arquivada' : 'Desativada';
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: `Campanha ${status.toLowerCase()} com sucesso.` }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
