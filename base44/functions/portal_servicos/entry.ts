@@ -1813,7 +1813,13 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
 
-          await obterCampanhaGeralOuErro(base44, campanha_id);
+          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          if (campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id) {
+            return new Response(JSON.stringify({ error: 'Campanhas de Planos de Férias devem ser excluídas pelo módulo de Planos de Férias.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           // 1. Exclui a campanha
           await base44.asServiceRole.entities.CampanhaPortal.delete(campanha_id);
 
@@ -1852,7 +1858,13 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
-          await obterCampanhaGeralOuErro(base44, campanha_id);
+          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          if (campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id) {
+            return new Response(JSON.stringify({ error: 'Campanhas de Planos de Férias devem ser arquivadas pelo módulo de Planos de Férias.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Arquivada' });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha arquivada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
@@ -1863,7 +1875,13 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
-          await obterCampanhaGeralOuErro(base44, campanha_id);
+          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          if (campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id) {
+            return new Response(JSON.stringify({ error: 'Campanhas de Planos de Férias devem ser desativadas pelo módulo de Planos de Férias.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status: 'Desativada' });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Campanha desativada com sucesso.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
@@ -1871,7 +1889,13 @@ Deno.serve(async (req: Request) => {
         // Encerrar Campanha
         case 'CAMPANHA_ENCERRAR': {
           const { campanha_id } = payload;
-          await obterCampanhaGeralOuErro(base44, campanha_id);
+          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          if (campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id) {
+            return new Response(JSON.stringify({ error: 'Campanhas de Planos de Férias devem ser encerradas pelo módulo de Planos de Férias.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             status: 'Encerrada',
           });
@@ -1888,7 +1912,13 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
-          await obterCampanhaGeralOuErro(base44, campanha_id);
+          const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
+          if (campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id) {
+            return new Response(JSON.stringify({ error: 'Campanhas de Planos de Férias devem ser reabertas pelo módulo de Planos de Férias.' }), {
+              status: 403,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             status: 'Aberta_Coleta',
           });
