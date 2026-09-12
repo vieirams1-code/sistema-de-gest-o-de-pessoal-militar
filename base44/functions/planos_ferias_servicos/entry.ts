@@ -102,7 +102,7 @@ function militarNoEscopo(militar: any, campanha: any, membrosPorGrupo = new Map<
     baseEscopo = (campanha.escopo_militares_ids || []).includes(militar.id);
   } else if (tipoEscopo === 'QUADROS') {
     baseEscopo = (campanha.escopo_quadros || []).includes(militar.quadro);
-  } else if (tipoEscopo === 'UNIDADES') {
+  } else if (tipoEscopo === 'UNIDADES' || tipoEscopo === 'UNIDADES_E_GRUPOS') {
     const alvos = (campanha.escopo_unidades_ids || []).map((id: unknown) => normalizar(id)).filter(Boolean);
     const valores = [
       militar.lotacao_id,
@@ -114,7 +114,7 @@ function militarNoEscopo(militar: any, campanha: any, membrosPorGrupo = new Map<
     baseEscopo = alvos.some((alvo: string) =>
       valores.some((valor: string) => valor === alvo || valor.includes(alvo) || alvo.includes(valor))
     );
-  } else if (!['TODOS', 'SEM_ESCOPO'].includes(tipoEscopo)) {
+  } else if (!['TODOS', 'SEM_ESCOPO', 'UNIDADES_E_GRUPOS'].includes(tipoEscopo)) {
     baseEscopo = false;
   }
 
