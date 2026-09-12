@@ -92,6 +92,34 @@ async function carregarMembrosPorGrupo(base44: any, campanhas: any[]): Promise<M
   return resultado;
 }
 
+async function enriquecerContadoresCampanhas(base44: any, campanhas: any[] = []): Promise<any[]> {
+  if (!campanhas.length) return campanhas;
+  let opcoes: any[] = [];
+  try {
+    opcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+  } catch {
+    opcoes = [];
+  }
+  const idsCampanhas = new Set(campanhas.map((campanha: any) => String(campanha.id)));
+  const porCampanha = new Map<string, Set<string>>();
+  for (const opcao of opcoes || []) {
+    const campanhaId = String(opcao?.campanha_id || '');
+    const militarId = texto(opcao?.militar_id);
+    if (!idsCampanhas.has(campanhaId) || !militarId) continue;
+    if (!porCampanha.has(campanhaId)) porCampanha.set(campanhaId, new Set<string>());
+    porCampanha.get(campanhaId)!.add(militarId);
+  }
+  return campanhas.map((campanha: any) => {
+    const respondidos = porCampanha.get(String(campanha.id))?.size || 0;
+    const alvo = Number(campanha.total_publico_alvo || 0);
+    return {
+      ...campanha,
+      total_respondidos: respondidos,
+      total_pendentes: Math.max(0, alvo - respondidos),
+    };
+  });
+}
+
 function militarNoEscopo(militar: any, campanha: any, membrosPorGrupo = new Map<string, Set<string>>()): boolean {
   if (!militar || militar.status === 'Inativo' || militar.status === 'Falecido') return false;
 
@@ -161,7 +189,8 @@ Deno.serve(async (req: Request) => {
         base44.asServiceRole.entities.PlanoFeriasInstitucional.list(),
         base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS' }),
       ]);
-      return json({ ok: true, planos: planos || [], campanhas: campanhas || [] });
+      const campanhasComContadores = await enriquecerContadoresCampanhas(base44, campanhas || []);
+      return json({ ok: true, planos: planos || [], campanhas: campanhasComContadores });
     }
 
     if (acao === 'CRIAR') {
