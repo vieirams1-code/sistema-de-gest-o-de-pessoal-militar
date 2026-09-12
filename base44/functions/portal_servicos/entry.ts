@@ -1803,6 +1803,12 @@ Deno.serve(async (req: Request) => {
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
           if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return new Response(JSON.stringify({ error: 'Campanha de férias não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const planoCampanha = campanha.plano_ferias_institucional_id
+            ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(campanha.plano_ferias_institucional_id).catch(() => null)
+            : null;
+          if (!planoCampanha || String(planoCampanha.status || '').toUpperCase() !== 'ATIVO') {
+            return new Response(JSON.stringify({ error: 'O plano precisa estar ativo para alterar o status da campanha.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
           if (acao === 'PLANO_CAMPANHA_REABRIR' && String(campanha.status || '').toLowerCase() !== 'arquivada') {
             return new Response(JSON.stringify({ error: 'A campanha precisa estar arquivada antes de ser reaberta.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
