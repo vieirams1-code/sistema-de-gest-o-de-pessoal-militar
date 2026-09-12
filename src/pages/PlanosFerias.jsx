@@ -372,8 +372,8 @@ export default function PlanosFerias() {
     if (!window.confirm(`Segunda confirmação: deseja excluir definitivamente o plano "${plano.titulo}"? Esta ação não pode ser desfeita.`)) return;
     setSalvando(true);
     try {
-      const resposta = await base44.functions.invoke('portal_servicos', {
-        acao: 'PLANO_INSTITUCIONAL_EXCLUIR',
+      const resposta = await base44.functions.invoke('planos_ferias_servicos', {
+        acao: 'EXCLUIR',
         plano_id: plano.id,
         confirmacao_dupla: true,
       });
