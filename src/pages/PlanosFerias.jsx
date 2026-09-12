@@ -309,7 +309,7 @@ export default function PlanosFerias() {
       setFeedback({ tipo: 'erro', texto: 'A exclusão exige a permissão de excluir campanhas de férias e o Modo Admin de férias ativo.' });
       return;
     }
-    if (!window.confirm(`Excluir a campanha "${campanha.titulo}"? A exclusão só será permitida se não houver respostas. Campanhas com respostas serão preservadas e deverão ser arquivadas.`)) return;
+    if (!window.confirm(`Excluir a campanha "${campanha.titulo}"? A exclusão só será permitida se não houver respostas, opções ou férias geradas vinculadas.`)) return;
     setSalvando(true);
     try {
       const resposta = await base44.functions.invoke('portal_servicos', {
@@ -492,7 +492,7 @@ export default function PlanosFerias() {
                 ['Férias geradas', metricas?.ferias_geradas_unicas ?? '-'],
               ].map(([rotulo, valor]) => <div key={rotulo} className="rounded-xl bg-slate-50 border border-slate-200 p-3"><p className="text-xs text-slate-500">{rotulo}</p><p className="text-xl font-black text-slate-900 mt-1">{valor}</p></div>)}
             </div>
-            {modoAdmin && podeAdminFerias && <p className="mt-4 text-xs text-rose-700">Modo Admin ativo: a exclusão remove campanhas e respostas vinculadas; férias geradas só perdem o vínculo com o plano após confirmação.</p>}
+            {modoAdmin && podeAdminFerias && <p className="mt-4 text-xs text-rose-700">Modo Admin ativo: a exclusão de plano ou campanha só é permitida sem respostas, opções ou férias geradas vinculadas.</p>}
             {modoAdmin && podeGerarFerias && <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100 pt-4">
               <p className="text-xs text-slate-500">A geração inclui somente respostas novas, com escala salva, e preserva tudo o que já foi gerado.</p>
               {modoAdmin && podeGerarFerias && <Button type="button" onClick={gerarFeriasDoPlano} disabled={salvando || selecionado.status === 'ARQUIVADO'} className="bg-emerald-700 hover:bg-emerald-800"><CalendarDays className="w-4 h-4 mr-1.5" />{salvando ? 'Gerando...' : 'Gerar férias do plano'}</Button>}
