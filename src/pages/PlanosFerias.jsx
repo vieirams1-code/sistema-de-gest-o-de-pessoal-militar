@@ -507,8 +507,15 @@ export default function PlanosFerias() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {campanhasDoPlano.map((campanha) => (
-                  <div key={campanha.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div><p className="font-bold text-slate-800">{campanha.titulo}</p><p className="text-xs text-slate-500 mt-1">Escopo: {campanha.tipo_escopo === 'SEM_ESCOPO' ? 'Somente Grupo de Militares' : campanha.tipo_escopo === 'UNIDADES_E_GRUPOS' ? 'Unidades + Grupos' : (campanha.escopo_unidades_nomes || 'Toda a Corporação')}{campanha.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''} · Prazo: {campanha.data_fim_militar || '-'}</p></div>
+                  <div key={campanha.id} className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${campanha.status === 'Arquivada' ? 'bg-slate-50 border-l-4 border-slate-400' : campanha.status === 'Desativada' ? 'bg-amber-50/40 border-l-4 border-amber-300' : 'bg-white'}`}>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-slate-800">{campanha.titulo}</p>
+                        {campanha.status === 'Arquivada' && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">Arquivada</span>}
+                        {campanha.status === 'Desativada' && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">Desativada</span>}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Escopo: {campanha.tipo_escopo === 'SEM_ESCOPO' ? 'Somente Grupo de Militares' : campanha.tipo_escopo === 'UNIDADES_E_GRUPOS' ? 'Unidades + Grupos' : (campanha.escopo_unidades_nomes || 'Toda a Corporação')}{campanha.escopo_grupos_nomes ? ` · Grupos: ${campanha.escopo_grupos_nomes}` : ''} · Prazo: {campanha.data_fim_militar || '-'}</p>
+                    </div>
                     <div className="flex gap-2 flex-wrap">
                       {(podeEditarCampanhas || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
                       {podeVisualizarRespostas && <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>}
