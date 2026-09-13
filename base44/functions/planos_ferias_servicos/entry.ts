@@ -243,7 +243,8 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
 
   try {
-    const payload = await req.json();
+    const requisicao = await req.json();
+    const payload = dadosDaRequisicaoPlano(requisicao);
     const acao = normalizarAcaoPlano(payload);
     const base44 = createClientFromRequest(req);
 
