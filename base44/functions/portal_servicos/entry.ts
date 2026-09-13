@@ -454,7 +454,7 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
 
   const authzResponse = await base44.functions.invoke('getUserPermissions', {});
   const authz = authzResponse?.data ?? authzResponse ?? {};
-  const necessarias = permissoesNecessariasAcaoAdminPortal(acao);
+  const necessarias = permissoesNecessariasAcaoAdminPortal(acao, payload);
   const exigeTodas = [
     'PLANO_INSTITUCIONAL_EXCLUIR',
     'PLANO_INSTITUCIONAL_ARQUIVAR',
