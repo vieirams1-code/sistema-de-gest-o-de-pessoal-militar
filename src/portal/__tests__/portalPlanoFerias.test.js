@@ -253,4 +253,10 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha/);
     assert.match(paginaPlanosSource, /origem_plano_ferias: true/);
   });
+
+  it('diferencia visualmente campanhas arquivadas e desativadas', () => {
+    assert.match(paginaPlanosSource, /campanha\.status === 'Arquivada' \? 'bg-slate-50 border-l-4 border-slate-400'/);
+    assert.match(paginaPlanosSource, /campanha\.status === 'Arquivada' && <span[^>]*>Arquivada<\/span>/);
+    assert.match(paginaPlanosSource, /campanha\.status === 'Desativada' && <span[^>]*>Desativada<\/span>/);
+  });
 });
