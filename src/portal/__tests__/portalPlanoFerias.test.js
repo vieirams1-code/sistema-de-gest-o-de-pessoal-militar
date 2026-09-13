@@ -244,4 +244,13 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(portalServicosSource, /payload\.confirmacao_dupla !== true/);
     assert.match(portalServicosSource, /perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias/);
   });
+
+  it('mantém um contrato compatível e auditável para a reabertura de campanhas', () => {
+    assert.match(planosFeriasServicosSource, /function normalizarAcaoPlano/);
+    assert.match(planosFeriasServicosSource, /origemPlano.*CAMPANHA_REABRIR/);
+    assert.match(planosFeriasServicosSource, /registrarAuditoriaStatusCampanha/);
+    assert.match(planosFeriasServicosSource, /respostas_preservadas: true/);
+    assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha/);
+    assert.match(paginaPlanosSource, /origem_plano_ferias: true/);
+  });
 });
