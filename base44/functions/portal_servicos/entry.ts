@@ -1935,11 +1935,23 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
           const campanhaAtual = await obterCampanhaGeralOuErro(base44, campanha_id);
-          if (campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id) {
+          const campanhaDePlano = campanhaAtual.tipo === 'PLANO_FERIAS' || campanhaAtual.plano_ferias_institucional_id;
+          if (campanhaDePlano && payload.origem_plano_ferias !== true) {
             return new Response(JSON.stringify({ error: 'Campanhas de Planos de Férias devem ser reabertas pelo módulo de Planos de Férias.' }), {
               status: 403,
               headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
             });
+          }
+          if (campanhaDePlano) {
+            const planoDaCampanha = campanhaAtual.plano_ferias_institucional_id
+              ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(campanhaAtual.plano_ferias_institucional_id).catch(() => null)
+              : null;
+            if (!planoDaCampanha || String(planoDaCampanha.status || '').toUpperCase() !== 'ATIVO' || String(campanhaAtual.status || '').toLowerCase() !== 'arquivada') {
+              return new Response(JSON.stringify({ error: 'A campanha precisa pertencer a um plano ativo e estar arquivada antes de ser reaberta.' }), {
+                status: 409,
+                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+              });
+            }
           }
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
             status: 'Aberta_Coleta',
