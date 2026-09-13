@@ -338,9 +338,11 @@ export default function PlanosFerias() {
     setSalvando(true);
     try {
       const resposta = await base44.functions.invoke('portal_servicos', {
-        acao,
+        // A prévia ainda mantém a rota administrativa legada; o marcador
+        // preserva as validações específicas de campanhas de Planos de Férias.
+        acao: acao === 'PLANO_CAMPANHA_REABRIR' ? 'CAMPANHA_REABRIR' : acao,
         campanha_id: campanha.id,
-        plano_id: selecionado?.id,
+        ...(acao === 'PLANO_CAMPANHA_REABRIR' ? { origem_plano_ferias: true, plano_id: selecionado?.id } : {}),
       });
       setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || `Campanha ${statusAlvo.toLowerCase()} com sucesso.` });
       await carregar();
