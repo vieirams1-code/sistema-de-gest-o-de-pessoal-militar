@@ -25,7 +25,7 @@ const invocarAcaoStatusCampanha = async (payload) => {
   // transições de campanha e mantém as respostas intactas. Usá-lo diretamente
   // evita que a prévia encaminhe a ação para uma versão incompatível do
   // serviço novo e transforme uma transição válida em “ação não reconhecida”.
-  return base44.functions.invoke('portal_servicos', payload);
+  return base44.functions.invoke('portal_servicos', { ...payload, origem_plano_ferias: true });
 };
 
 const invocarAcaoStatusPlano = async (payload) => {
