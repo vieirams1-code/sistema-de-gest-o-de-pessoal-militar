@@ -38,6 +38,7 @@ function permissoesNecessariasPlano(acao: string): string[] {
   if (acao === 'CRIAR') return ['perm_criar_planos_ferias'];
   if (acao === 'ATUALIZAR') return ['perm_editar_planos_ferias'];
   if (acao === 'ARQUIVAR' || acao === 'DESARQUIVAR') return ['perm_editar_planos_ferias', 'perm_admin_campanhas_ferias'];
+  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR' || acao === 'PLANO_CAMPANHA_REABRIR') return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   if (acao === 'EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias'];
   return [];
 }
@@ -49,7 +50,7 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
   const authzResponse = await base44.functions.invoke('getUserPermissions', {});
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasPlano(acao);
-  const exigeTodas = ['ARQUIVAR', 'DESARQUIVAR', 'EXCLUIR'].includes(acao);
+  const exigeTodas = ['ARQUIVAR', 'DESARQUIVAR', 'EXCLUIR', 'PLANO_CAMPANHA_ARQUIVAR', 'PLANO_CAMPANHA_DESATIVAR', 'PLANO_CAMPANHA_REABRIR'].includes(acao);
   return necessarias.length > 0 && (exigeTodas
     ? necessarias.every((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true)
     : necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true));
@@ -218,6 +219,31 @@ Deno.serve(async (req: Request) => {
 
     const planoAtual = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
     if (!planoAtual) return json({ error: 'Plano de Férias não encontrado.' }, 404);
+
+    if (['PLANO_CAMPANHA_ARQUIVAR', 'PLANO_CAMPANHA_DESATIVAR', 'PLANO_CAMPANHA_REABRIR'].includes(acao)) {
+      const campanhaId = texto(payload?.campanha_id);
+      if (!campanhaId) return json({ error: 'ID da campanha não informado.' }, 400);
+      const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanhaId);
+      if (!campanha || campanha.tipo !== 'PLANO_FERIAS') return json({ error: 'Campanha de férias não encontrada.' }, 404);
+      if (texto(campanha.plano_ferias_institucional_id) !== planoId) {
+        return json({ error: 'A campanha não pertence ao plano informado.' }, 409);
+      }
+      if (String(planoAtual.status || '').toUpperCase() !== 'ATIVO') {
+        return json({ error: 'O plano precisa estar ativo para alterar o status da campanha.' }, 409);
+      }
+      const statusAtual = normalizar(campanha.status);
+      if (acao === 'PLANO_CAMPANHA_REABRIR' && statusAtual !== 'arquivada') {
+        return json({ error: 'A campanha precisa estar arquivada antes de ser reaberta.' }, 409);
+      }
+      if (acao === 'PLANO_CAMPANHA_ARQUIVAR' && statusAtual === 'arquivada') {
+        return json({ error: 'A campanha já está arquivada.' }, 409);
+      }
+      const status = acao === 'PLANO_CAMPANHA_REABRIR'
+        ? 'Aberta_Coleta'
+        : acao === 'PLANO_CAMPANHA_ARQUIVAR' ? 'Arquivada' : 'Desativada';
+      const campanhaAtualizada = await base44.asServiceRole.entities.CampanhaPortal.update(campanhaId, { status });
+      return json({ ok: true, campanha: campanhaAtualizada, message: `Campanha ${status.toLowerCase()} com sucesso.` });
+    }
 
     if (acao === 'ATUALIZAR') {
       if (String(planoAtual.status || '').toUpperCase() === 'ARQUIVADO') {
