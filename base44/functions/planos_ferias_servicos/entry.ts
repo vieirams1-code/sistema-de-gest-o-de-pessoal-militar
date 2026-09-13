@@ -134,6 +134,23 @@ async function registrarAuditoriaStatusCampanha(base44: any, user: any, contexto
   }
 }
 
+async function registrarAuditoriaPlano(base44: any, user: any, acao: string, planoId: string, detalhes: any = {}) {
+  try {
+    await base44.asServiceRole.entities.AuditoriaFerias.create({
+      acao,
+      resultado: 'SUCESSO',
+      usuario_id: String(user?.id || ''),
+      usuario_email: user?.email || '',
+      usuario_nome: user?.full_name || user?.name || user?.email || 'Usuário',
+      plano_id: String(planoId || ''),
+      detalhes: JSON.stringify(detalhes || {}),
+      data_hora: new Date().toISOString(),
+    });
+  } catch {
+    // Auditoria não pode impedir a transição principal.
+  }
+}
+
 function vinculoGrupoValidoHoje(vinculo: any): boolean {
   if (vinculo?.ativo === false) return false;
   const hoje = new Date().toISOString().slice(0, 10);
@@ -368,6 +385,11 @@ Deno.serve(async (req: Request) => {
         status: 'ARQUIVADO',
         data_encerramento: planoAtual.data_encerramento || new Date().toISOString().slice(0, 10),
       });
+      await registrarAuditoriaPlano(base44, user, 'PLANO_INSTITUCIONAL_ARQUIVAR', planoId, {
+        plano_titulo: planoAtual.titulo || '',
+        status_anterior: planoAtual.status || '',
+        status_novo: 'ARQUIVADO',
+      });
       return json({ ok: true, plano });
     }
 
@@ -378,6 +400,11 @@ Deno.serve(async (req: Request) => {
       const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
         status: 'ATIVO',
         data_encerramento: '',
+      });
+      await registrarAuditoriaPlano(base44, user, 'PLANO_INSTITUCIONAL_DESARQUIVAR', planoId, {
+        plano_titulo: planoAtual.titulo || '',
+        status_anterior: planoAtual.status || '',
+        status_novo: 'ATIVO',
       });
       return json({ ok: true, plano });
     }
@@ -395,7 +422,18 @@ Deno.serve(async (req: Request) => {
       if ((campanhas || []).length > 0) {
         return json({ error: 'O plano possui campanhas vinculadas e não pode ser excluído. O histórico será preservado.' }, 409);
       }
+      const [opcoes, ferias] = await Promise.all([
+        base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ plano_ferias_institucional_id: planoId }).catch(() => []),
+        base44.asServiceRole.entities.Ferias.filter({ plano_ferias_id: planoId }).catch(() => []),
+      ]);
+      if ((opcoes || []).length > 0 || (ferias || []).length > 0) {
+        return json({ error: 'O plano possui respostas ou férias vinculadas e não pode ser excluído. O histórico será preservado.' }, 409);
+      }
       await base44.asServiceRole.entities.PlanoFeriasInstitucional.delete(planoId);
+      await registrarAuditoriaPlano(base44, user, 'PLANO_INSTITUCIONAL_EXCLUIR', planoId, {
+        plano_titulo: planoAtual.titulo || '',
+        status_anterior: planoAtual.status || '',
+      });
       return json({ ok: true });
     }
 
