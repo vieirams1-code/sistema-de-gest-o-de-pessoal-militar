@@ -258,7 +258,7 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(planosFeriasServicosSource, /registrarAuditoriaStatusCampanha/);
     assert.match(planosFeriasServicosSource, /respostas_preservadas: true/);
     assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha = async \(payload\) =>/);
-    assert.match(paginaPlanosSource, /const invocarAcaoStatusPlano = \(payload\) =>/);
+    assert.match(paginaPlanosSource, /const invocarAcaoStatusPlano = async \(payload\) =>/);
     assert.match(paginaPlanosSource, /base44\.functions\.invoke\('planos_ferias_servicos', payload\)/);
   });
 
