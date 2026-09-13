@@ -34,7 +34,9 @@
         "Aberta_Coleta",
         "Em_Homologacao",
         "Homologada",
-        "Encerrada"
+        "Encerrada",
+        "Arquivada",
+        "Desativada"
       ],
       "default": "Aberta_Coleta"
     },
@@ -62,7 +64,8 @@
         "UNIDADES",
         "SEM_ESCOPO",
         "SELECAO_MILITARES",
-        "QUADROS"
+        "QUADROS",
+        "UNIDADES_E_GRUPOS"
       ],
       "default": "TODOS"
     },
