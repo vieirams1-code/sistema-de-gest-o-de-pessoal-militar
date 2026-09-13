@@ -1851,6 +1851,15 @@ Deno.serve(async (req: Request) => {
             ? 'Aberta_Coleta'
             : acao === 'PLANO_CAMPANHA_ARQUIVAR' ? 'Arquivada' : 'Desativada';
           const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { status });
+          await registrarAuditoriaFerias(base44, user, acao, {
+            plano_id: planoCampanha.id,
+            campanha_id,
+          }, {
+            campanha_titulo: campanha.titulo || '',
+            status_anterior: campanha.status || '',
+            status_novo: status,
+            respostas_preservadas: true,
+          });
           return new Response(JSON.stringify({ ok: true, campanha: updated, message: `Campanha ${status.toLowerCase()} com sucesso.` }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
