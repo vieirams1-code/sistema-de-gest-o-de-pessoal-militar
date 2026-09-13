@@ -9,54 +9,11 @@ import { Input } from '@/components/ui/input';
 const mensagemErro = (erro, fallback) =>
   erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
-const normalizarTexto = (valor) => String(valor || '')
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase();
+const invocarAcaoStatusCampanha = (payload) =>
+  base44.functions.invoke('planos_ferias_servicos', payload);
 
-const acaoNaoReconhecida = (erro) => {
-  const mensagem = normalizarTexto(mensagemErro(erro, ''));
-  return mensagem.includes('acao de plano de ferias nao reconhecida')
-    || mensagem.includes('acao administrativa nao reconhecida');
-};
-
-const erroServicoInterno = (erro) =>
-  normalizarTexto(mensagemErro(erro, '')).includes('erro interno ao processar servico do portal');
-
-// Somente a ausência da ação canônica justifica compatibilidade; falhas internas não devem ser reenviadas para o serviço geral.
-const precisaFallbackServico = (erro) => acaoNaoReconhecida(erro) && !erroServicoInterno(erro);
-
-const invocarAcaoStatusCampanha = async (payload) => {
-  try {
-    const resposta = await base44.functions.invoke('planos_ferias_servicos', payload);
-    if (!precisaFallbackServico(resposta)) return resposta;
-  } catch (erro) {
-    if (!precisaFallbackServico(erro)) throw erro;
-  }
-
-  // Fallback removível após a propagação integral do serviço canônico.
-  return base44.functions.invoke('portal_servicos', {
-    ...payload,
-    acao: payload.acao === 'PLANO_CAMPANHA_REABRIR' ? 'CAMPANHA_REABRIR' : payload.acao,
-    origem_plano_ferias: true,
-  });
-};
-
-const invocarAcaoStatusPlano = async (payload) => {
-  try {
-    const resposta = await base44.functions.invoke('planos_ferias_servicos', payload);
-    if (!precisaFallbackServico(resposta)) return resposta;
-  } catch (erro) {
-    if (!precisaFallbackServico(erro)) throw erro;
-  }
-
-  return base44.functions.invoke('portal_servicos', {
-    plano_id: payload.plano_id,
-    acao: payload.acao === 'ARQUIVAR'
-      ? 'PLANO_INSTITUCIONAL_ARQUIVAR'
-      : 'PLANO_INSTITUCIONAL_DESARQUIVAR',
-  });
-};
+const invocarAcaoStatusPlano = (payload) =>
+  base44.functions.invoke('planos_ferias_servicos', payload);
 
 const novoPlano = () => ({
   titulo: '',
