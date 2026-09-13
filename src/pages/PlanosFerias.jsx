@@ -20,12 +20,17 @@ const acaoNaoReconhecida = (erro) => {
     || mensagem.includes('acao administrativa nao reconhecida');
 };
 
+const erroServicoInterno = (erro) =>
+  normalizarTexto(mensagemErro(erro, '')).includes('erro interno ao processar servico do portal');
+
+const precisaFallbackServico = (erro) => acaoNaoReconhecida(erro) || erroServicoInterno(erro);
+
 const invocarAcaoStatusCampanha = async (payload) => {
   try {
     const resposta = await base44.functions.invoke('planos_ferias_servicos', payload);
-    if (!acaoNaoReconhecida(resposta)) return resposta;
+    if (!precisaFallbackServico(resposta)) return resposta;
   } catch (erro) {
-    if (!acaoNaoReconhecida(erro)) throw erro;
+    if (!precisaFallbackServico(erro)) throw erro;
   }
 
   // Fallback removível após a propagação integral do serviço canônico.
@@ -33,6 +38,22 @@ const invocarAcaoStatusCampanha = async (payload) => {
     ...payload,
     acao: payload.acao === 'PLANO_CAMPANHA_REABRIR' ? 'CAMPANHA_REABRIR' : payload.acao,
     origem_plano_ferias: true,
+  });
+};
+
+const invocarAcaoStatusPlano = async (payload) => {
+  try {
+    const resposta = await base44.functions.invoke('planos_ferias_servicos', payload);
+    if (!precisaFallbackServico(resposta)) return resposta;
+  } catch (erro) {
+    if (!precisaFallbackServico(erro)) throw erro;
+  }
+
+  return base44.functions.invoke('portal_servicos', {
+    plano_id: payload.plano_id,
+    acao: payload.acao === 'ARQUIVAR'
+      ? 'PLANO_INSTITUCIONAL_ARQUIVAR'
+      : 'PLANO_INSTITUCIONAL_DESARQUIVAR',
   });
 };
 
@@ -200,7 +221,7 @@ export default function PlanosFerias() {
     if (!window.confirm(`Arquivar o plano "${plano.titulo}"? O histórico será preservado e novas campanhas não poderão ser incluídas.`)) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('planos_ferias_servicos', { acao: 'ARQUIVAR', plano_id: plano.id });
+      await invocarAcaoStatusPlano({ acao: 'ARQUIVAR', plano_id: plano.id });
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: 'Plano arquivado. O histórico foi preservado.' });
     } catch (erro) {
@@ -218,7 +239,7 @@ export default function PlanosFerias() {
     if (!window.confirm(`Desarquivar o plano "${plano.titulo}" e permitir novamente sua gestão?`)) return;
     setSalvando(true);
     try {
-      await base44.functions.invoke('planos_ferias_servicos', { acao: 'DESARQUIVAR', plano_id: plano.id });
+      await invocarAcaoStatusPlano({ acao: 'DESARQUIVAR', plano_id: plano.id });
       await carregar();
       setFeedback({ tipo: 'sucesso', texto: 'Plano desarquivado com sucesso.' });
     } catch (erro) {
