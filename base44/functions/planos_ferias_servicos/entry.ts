@@ -12,15 +12,26 @@ const json = (body: unknown, status = 200) =>
 
 const texto = (value: unknown) => String(value ?? '').trim();
 
+const ALIASES_ACAO_PLANO: Record<string, string> = {
+  // Ações legadas da tela de campanhas, quando encaminhadas ao serviço
+  // exclusivo de Planos de Férias.
+  CAMPANHA_REABRIR: 'PLANO_CAMPANHA_REABRIR',
+  CAMPANHA_ATIVAR: 'PLANO_CAMPANHA_REABRIR',
+  PLANO_CAMPANHA_ATIVAR: 'PLANO_CAMPANHA_REABRIR',
+  PLANO_INSTITUCIONAL_LISTAR: 'LISTAR',
+  PLANO_INSTITUCIONAL_DETALHES: 'DETALHES',
+  PLANO_INSTITUCIONAL_CRIAR: 'CRIAR',
+  PLANO_INSTITUCIONAL_ATUALIZAR: 'ATUALIZAR',
+  PLANO_INSTITUCIONAL_ARQUIVAR: 'ARQUIVAR',
+  PLANO_INSTITUCIONAL_DESARQUIVAR: 'DESARQUIVAR',
+  PLANO_INSTITUCIONAL_EXCLUIR: 'EXCLUIR',
+};
+
 function normalizarAcaoPlano(payload: any): string {
-  const acao = texto(payload?.acao);
-  const origemPlano = payload?.origem_plano_ferias === true;
-  // Compatibilidade transitória: versões antigas da tela usavam a ação
-  // genérica, mas somente com a marca explícita de origem no módulo.
-  if (origemPlano && (acao === 'CAMPANHA_REABRIR' || acao === 'CAMPANHA_ATIVAR')) {
-    return 'PLANO_CAMPANHA_REABRIR';
-  }
-  return acao;
+  // O SDK normalmente entrega o payload diretamente; os envelopes abaixo
+  // mantêm compatibilidade com versões intermediárias da tela.
+  const acao = texto(payload?.acao ?? payload?.data?.acao ?? payload?.body?.acao);
+  return ALIASES_ACAO_PLANO[acao] || acao;
 }
 
 function normalizar(value: unknown): string {

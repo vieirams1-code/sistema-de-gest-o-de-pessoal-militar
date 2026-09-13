@@ -1,0 +1,45 @@
+{
+  "name": "PreferenciaUsuario",
+  "type": "object",
+  "title": "Prefer\u00eancia de Usu\u00e1rio",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "default": ""
+    },
+    "contexto": {
+      "type": "string",
+      "default": "quick_access_widget"
+    },
+    "valor_json": {
+      "type": "object",
+      "default": {
+        "itens_fixados": []
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "default": ""
+    }
+  },
+  "required": [
+    "user_email",
+    "contexto",
+    "valor_json"
+  ],
+  "rls": {
+    "read": {
+      "data.user_email": "{{user.email}}"
+    },
+    "create": {
+      "data.user_email": "{{user.email}}"
+    },
+    "update": {
+      "data.user_email": "{{user.email}}"
+    },
+    "delete": {
+      "data.user_email": "{{user.email}}"
+    }
+  }
+}
