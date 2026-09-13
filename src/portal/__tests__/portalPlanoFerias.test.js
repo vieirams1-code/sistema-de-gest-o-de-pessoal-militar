@@ -233,7 +233,7 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(paginaPlanosSource, /acao: 'DESARQUIVAR'/);
     assert.match(paginaPlanosSource, /selecionado\.status === 'ARQUIVADO'.*>Desarquivar</s);
     assert.match(paginaPlanosSource, /const invocarAcaoStatusPlano/);
-    assert.match(paginaPlanosSource, /erroServicoInterno/);
+    assert.doesNotMatch(paginaPlanosSource, /origem_plano_ferias/);
     assert.match(planosFeriasServicosSource, /acao === 'ARQUIVAR' \|\| acao === 'DESARQUIVAR'.*perm_admin_campanhas_ferias/);
     assert.match(planosFeriasServicosSource, /status: 'ATIVO',[\s\S]*data_encerramento: ''/);
     assert.match(planosFeriasServicosSource, /exigeTodas[\s\S]*necessarias\.every/);
