@@ -252,7 +252,9 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(planosFeriasServicosSource, /function normalizarAcaoPlano/);
     assert.match(planosFeriasServicosSource, /CAMPANHA_REABRIR: 'PLANO_CAMPANHA_REABRIR'/);
     assert.match(planosFeriasServicosSource, /PLANO_INSTITUCIONAL_DESARQUIVAR: 'DESARQUIVAR'/);
-    assert.match(planosFeriasServicosSource, /payload\?\.data\?\.acao/);
+    assert.match(planosFeriasServicosSource, /CAMPOS_ENVELOPE_REQUISICAO/);
+    assert.match(planosFeriasServicosSource, /dadosDaRequisicaoPlano/);
+    assert.match(planosFeriasServicosSource, /Object\.prototype\.hasOwnProperty\.call\(ALIASES_ACAO_PLANO, acao\)/);
     assert.match(planosFeriasServicosSource, /registrarAuditoriaStatusCampanha/);
     assert.match(planosFeriasServicosSource, /respostas_preservadas: true/);
     assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha = \(payload\) =>/);
