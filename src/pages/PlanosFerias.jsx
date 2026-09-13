@@ -9,6 +9,33 @@ import { Input } from '@/components/ui/input';
 const mensagemErro = (erro, fallback) =>
   erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
+const normalizarTexto = (valor) => String(valor || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase();
+
+const acaoNaoReconhecida = (erro) => {
+  const mensagem = normalizarTexto(mensagemErro(erro, ''));
+  return mensagem.includes('acao de plano de ferias nao reconhecida')
+    || mensagem.includes('acao administrativa nao reconhecida');
+};
+
+const invocarAcaoStatusCampanha = async (payload) => {
+  try {
+    const resposta = await base44.functions.invoke('planos_ferias_servicos', payload);
+    if (!acaoNaoReconhecida(resposta)) return resposta;
+  } catch (erro) {
+    if (!acaoNaoReconhecida(erro)) throw erro;
+  }
+
+  // Fallback removível após a propagação integral do serviço canônico.
+  return base44.functions.invoke('portal_servicos', {
+    ...payload,
+    acao: payload.acao === 'PLANO_CAMPANHA_REABRIR' ? 'CAMPANHA_REABRIR' : payload.acao,
+    origem_plano_ferias: true,
+  });
+};
+
 const novoPlano = () => ({
   titulo: '',
   ano_referencia: new Date().getFullYear() + 1,
@@ -337,7 +364,7 @@ export default function PlanosFerias() {
     if (!window.confirm(`${verbo.charAt(0).toUpperCase() + verbo.slice(1)} a campanha "${campanha.titulo}"? As respostas e opções serão preservadas.`)) return;
     setSalvando(true);
     try {
-      const resposta = await base44.functions.invoke('planos_ferias_servicos', {
+      const resposta = await invocarAcaoStatusCampanha({
         acao,
         plano_id: selecionado?.id,
         campanha_id: campanha.id,
