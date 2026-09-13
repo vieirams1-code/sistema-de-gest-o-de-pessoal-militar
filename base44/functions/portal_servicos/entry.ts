@@ -391,7 +391,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string, payload: any = {}): 
   if (acao === 'PLANO_INSTITUCIONAL_ATUALIZAR') {
     return ['perm_editar_planos_ferias'];
   }
-  if (acao === 'PLANO_INSTITUCIONAL_ARQUIVAR') {
+  if (acao === 'PLANO_INSTITUCIONAL_ARQUIVAR' || acao === 'PLANO_INSTITUCIONAL_DESARQUIVAR') {
     return ['perm_editar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_INSTITUCIONAL_EXCLUIR') return ['perm_excluir_planos_ferias', 'perm_admin_campanhas_ferias'];
@@ -458,6 +458,7 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const exigeTodas = [
     'PLANO_INSTITUCIONAL_EXCLUIR',
     'PLANO_INSTITUCIONAL_ARQUIVAR',
+    'PLANO_INSTITUCIONAL_DESARQUIVAR',
     'PLANO_CAMPANHA_ARQUIVAR',
     'PLANO_CAMPANHA_DESATIVAR',
     'PLANO_CAMPANHA_REABRIR',
@@ -902,6 +903,31 @@ Deno.serve(async (req: Request) => {
             data_encerramento: existente.data_encerramento || new Date().toISOString().slice(0, 10),
           });
           return new Response(JSON.stringify({ ok: true, plano: atualizado }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          });
+        }
+
+        case 'PLANO_INSTITUCIONAL_DESARQUIVAR': {
+          const planoId = String(payload.plano_id || '').trim();
+          const existente = planoId ? await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId) : null;
+          if (!existente) {
+            return new Response(JSON.stringify({ error: 'Plano de Férias não encontrado.' }), {
+              status: 404,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          if (String(existente.status || '').toUpperCase() !== 'ARQUIVADO') {
+            return new Response(JSON.stringify({ error: 'O plano não está arquivado.' }), {
+              status: 409,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+          const atualizado = await base44.asServiceRole.entities.PlanoFeriasInstitucional.update(planoId, {
+            status: 'ATIVO',
+            data_encerramento: '',
+          });
+          return new Response(JSON.stringify({ ok: true, plano: atualizado, message: 'Plano desarquivado com sucesso.' }), {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
