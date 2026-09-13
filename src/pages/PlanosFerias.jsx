@@ -11,7 +11,7 @@ const mensagemErro = (erro, fallback) =>
 
 const normalizarTexto = (valor) => String(valor || '')
   .normalize('NFD')
-  .replace(/[\\u0300-\\u036f]/g, '')
+  .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase();
 
 const acaoNaoReconhecida = (valor) => {
