@@ -23,7 +23,8 @@ const acaoNaoReconhecida = (erro) => {
 const erroServicoInterno = (erro) =>
   normalizarTexto(mensagemErro(erro, '')).includes('erro interno ao processar servico do portal');
 
-// Somente a ausência da ação canônica justifica compatibilidade; falhas internas não devem ser reenviadas para o serviço geral.\nconst precisaFallbackServico = (erro) => acaoNaoReconhecida(erro) && !erroServicoInterno(erro);
+// Somente a ausência da ação canônica justifica compatibilidade; falhas internas não devem ser reenviadas para o serviço geral.
+const precisaFallbackServico = (erro) => acaoNaoReconhecida(erro) && !erroServicoInterno(erro);
 
 const invocarAcaoStatusCampanha = async (payload) => {
   try {
