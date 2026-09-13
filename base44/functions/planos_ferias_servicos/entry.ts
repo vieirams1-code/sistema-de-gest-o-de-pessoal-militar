@@ -27,11 +27,49 @@ const ALIASES_ACAO_PLANO: Record<string, string> = {
   PLANO_INSTITUCIONAL_EXCLUIR: 'EXCLUIR',
 };
 
-function normalizarAcaoPlano(payload: any): string {
-  // O SDK normalmente entrega o payload diretamente; os envelopes abaixo
-  // mantêm compatibilidade com versões intermediárias da tela.
-  const acao = texto(payload?.acao ?? payload?.data?.acao ?? payload?.body?.acao);
-  return ALIASES_ACAO_PLANO[acao] || acao;
+const CAMPOS_ENVELOPE_REQUISICAO = ['data', 'body', 'payload', 'args', 'input', 'params'] as const;
+
+function comoObjeto(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === 'string' && value.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * A função aceita o corpo direto do SDK e envelopes conhecidos de versões
+ * intermediárias. Os campos do corpo direto têm prioridade sobre o envelope,
+ * evitando que metadados de transporte alterem a intenção da tela.
+ */
+function dadosDaRequisicaoPlano(value: unknown): Record<string, unknown> {
+  const raiz = comoObjeto(value);
+  if (!raiz) return {};
+
+  const partes: Record<string, unknown>[] = [raiz];
+  for (const campo of CAMPOS_ENVELOPE_REQUISICAO) {
+    const envelope = comoObjeto(raiz[campo]);
+    if (envelope) partes.push(envelope);
+  }
+
+  return Object.assign({}, ...partes.reverse());
+}
+
+function normalizarAcaoPlano(payload: unknown): string {
+  const dados = dadosDaRequisicaoPlano(payload);
+  const acao = texto(dados.acao).toUpperCase();
+  return Object.prototype.hasOwnProperty.call(ALIASES_ACAO_PLANO, acao)
+    ? ALIASES_ACAO_PLANO[acao]
+    : acao;
 }
 
 function normalizar(value: unknown): string {
