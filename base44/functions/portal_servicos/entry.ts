@@ -374,7 +374,7 @@ async function registrarAuditoriaFerias(base44: any, user: any, acao: string, co
   }
 }
 
-function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
+function permissoesNecessariasAcaoAdminPortal(acao: string, payload: any = {}): string[] {
   // F8-L08: somente capacidades canônicas. Aliases legados são convertidos
   // exclusivamente pelo getUserPermissions antes de chegar a este serviço.
 
@@ -421,6 +421,9 @@ function permissoesNecessariasAcaoAdminPortal(acao: string): string[] {
     return ['perm_decidir_solicitacoes_cadastrais'];
   }
 
+  if ((acao === 'CAMPANHA_REABRIR' || acao === 'CAMPANHA_ATIVAR') && payload?.origem_plano_ferias === true) {
+    return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
+  }
   if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais'];
   if (acao === 'CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas', 'perm_editar_campanhas'];
   if (acao === 'CAMPANHA_CONTEXTO_RETORNO') {
@@ -461,7 +464,10 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
     'PLANO_CAMPANHA_EXCLUIR',
     'PLANO_GERAR_LOTE_FERIAS',
     'PLANO_INSTITUCIONAL_GERAR_FERIAS',
-  ].includes(acao);
+  ].includes(acao) || Boolean(
+    payload?.origem_plano_ferias === true
+      && (acao === 'CAMPANHA_REABRIR' || acao === 'CAMPANHA_ATIVAR')
+  );
   const autorizadoPorPermissao = necessarias.length > 0 && (exigeTodas
     ? necessarias.every((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true)
     : necessarias.some((key) => authz?.actions?.[key.replace(/^perm_/, '')] === true));
