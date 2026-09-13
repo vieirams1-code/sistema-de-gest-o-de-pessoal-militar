@@ -250,7 +250,9 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
 
   it('mantém um contrato compatível e auditável para a reabertura de campanhas', () => {
     assert.match(planosFeriasServicosSource, /function normalizarAcaoPlano/);
-    assert.match(planosFeriasServicosSource, /origemPlano.*CAMPANHA_REABRIR/);
+    assert.match(planosFeriasServicosSource, /CAMPANHA_REABRIR: 'PLANO_CAMPANHA_REABRIR'/);
+    assert.match(planosFeriasServicosSource, /PLANO_INSTITUCIONAL_DESARQUIVAR: 'DESARQUIVAR'/);
+    assert.match(planosFeriasServicosSource, /payload\?\.data\?\.acao/);
     assert.match(planosFeriasServicosSource, /registrarAuditoriaStatusCampanha/);
     assert.match(planosFeriasServicosSource, /respostas_preservadas: true/);
     assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha = \(payload\) =>/);
