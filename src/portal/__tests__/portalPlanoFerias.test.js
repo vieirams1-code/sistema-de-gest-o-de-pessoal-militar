@@ -253,8 +253,9 @@ describe('Plano de Férias Institucional — integração da tela e vínculos', 
     assert.match(planosFeriasServicosSource, /origemPlano.*CAMPANHA_REABRIR/);
     assert.match(planosFeriasServicosSource, /registrarAuditoriaStatusCampanha/);
     assert.match(planosFeriasServicosSource, /respostas_preservadas: true/);
-    assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha = \(payload\) =>[\\s\\S]*planos_ferias_servicos', payload\)/);
-    assert.match(paginaPlanosSource, /const invocarAcaoStatusPlano = \(payload\) =>[\\s\\S]*planos_ferias_servicos', payload\)/);
+    assert.match(paginaPlanosSource, /const invocarAcaoStatusCampanha = \(payload\) =>/);
+    assert.match(paginaPlanosSource, /const invocarAcaoStatusPlano = \(payload\) =>/);
+    assert.match(paginaPlanosSource, /base44\.functions\.invoke\('planos_ferias_servicos', payload\)/);
   });
 
   it('diferencia visualmente campanhas arquivadas e desativadas', () => {
