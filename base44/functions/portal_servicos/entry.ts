@@ -3420,6 +3420,19 @@ Deno.serve(async (req: Request) => {
           salvoRecord = await base44.asServiceRole.entities.OpcaoFeriasMilitar.create(opcaoPayload);
         }
 
+        // Mantém os contadores denormalizados da campanha coerentes com as respostas
+        // reais, sem alterar nenhuma opção já registrada.
+        try {
+          const opcoesCampanhaAtualizadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id: campanhaId });
+          const totalRespondidosCampanha = new Set((opcoesCampanhaAtualizadas || []).map((item: any) => textoId(item.militar_id)).filter(Boolean)).size;
+          await base44.asServiceRole.entities.CampanhaPortal.update(campanhaId, {
+            total_respondidos: totalRespondidosCampanha,
+            total_pendentes: Math.max(0, Number(campanhaFeriasAtiva.total_publico_alvo || 0) - totalRespondidosCampanha),
+          });
+        } catch (_erroContadores) {
+          // A resposta já foi salva; falha de contador não desfaz a operação principal.
+        }
+
         await registrarAuditoriaPortal(base44, {
           sessao_id: sessionAuth.context.sessao_id,
           militar_id: militarId,
