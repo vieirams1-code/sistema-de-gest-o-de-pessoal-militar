@@ -337,12 +337,10 @@ export default function PlanosFerias() {
     if (!window.confirm(`${verbo.charAt(0).toUpperCase() + verbo.slice(1)} a campanha "${campanha.titulo}"? As respostas e opções serão preservadas.`)) return;
     setSalvando(true);
     try {
-      const resposta = await base44.functions.invoke('portal_servicos', {
-        // A prévia ainda mantém a rota administrativa legada; o marcador
-        // preserva as validações específicas de campanhas de Planos de Férias.
-        acao: acao === 'PLANO_CAMPANHA_REABRIR' ? 'CAMPANHA_REABRIR' : acao,
+      const resposta = await base44.functions.invoke('planos_ferias_servicos', {
+        acao,
+        plano_id: selecionado?.id,
         campanha_id: campanha.id,
-        ...(acao === 'PLANO_CAMPANHA_REABRIR' ? { origem_plano_ferias: true, plano_id: selecionado?.id } : {}),
       });
       setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || `Campanha ${statusAlvo.toLowerCase()} com sucesso.` });
       await carregar();
