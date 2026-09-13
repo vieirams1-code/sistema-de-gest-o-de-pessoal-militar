@@ -12,6 +12,17 @@ const json = (body: unknown, status = 200) =>
 
 const texto = (value: unknown) => String(value ?? '').trim();
 
+function normalizarAcaoPlano(payload: any): string {
+  const acao = texto(payload?.acao);
+  const origemPlano = payload?.origem_plano_ferias === true;
+  // Compatibilidade transitória: versões antigas da tela usavam a ação
+  // genérica, mas somente com a marca explícita de origem no módulo.
+  if (origemPlano && (acao === 'CAMPANHA_REABRIR' || acao === 'CAMPANHA_ATIVAR')) {
+    return 'PLANO_CAMPANHA_REABRIR';
+  }
+  return acao;
+}
+
 function normalizar(value: unknown): string {
   return texto(value)
     .normalize('NFD')
@@ -54,6 +65,24 @@ async function usuarioPodeGerirPlanos(base44: any, user: any, acao: string): Pro
   return necessarias.length > 0 && (exigeTodas
     ? necessarias.every((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true)
     : necessarias.some((permissao) => authz?.actions?.[permissao.replace(/^perm_/, '')] === true));
+}
+
+async function registrarAuditoriaStatusCampanha(base44: any, user: any, contexto: any, detalhes: any) {
+  try {
+    await base44.asServiceRole.entities.AuditoriaFerias.create({
+      acao: contexto.acao,
+      resultado: 'SUCESSO',
+      usuario_id: String(user?.id || ''),
+      usuario_email: user?.email || '',
+      usuario_nome: user?.full_name || user?.name || user?.email || 'Usuário',
+      plano_id: String(contexto.plano_id || ''),
+      campanha_id: String(contexto.campanha_id || ''),
+      detalhes: JSON.stringify(detalhes || {}),
+      data_hora: new Date().toISOString(),
+    });
+  } catch {
+    // O registro de auditoria não pode impedir a alteração de status.
+  }
 }
 
 function vinculoGrupoValidoHoje(vinculo: any): boolean {
@@ -166,7 +195,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const payload = await req.json();
-    const acao = texto(payload?.acao);
+    const acao = normalizarAcaoPlano(payload);
     const base44 = createClientFromRequest(req);
 
     let user: any = null;
@@ -242,7 +271,17 @@ Deno.serve(async (req: Request) => {
         ? 'Aberta_Coleta'
         : acao === 'PLANO_CAMPANHA_ARQUIVAR' ? 'Arquivada' : 'Desativada';
       const campanhaAtualizada = await base44.asServiceRole.entities.CampanhaPortal.update(campanhaId, { status });
-      return json({ ok: true, campanha: campanhaAtualizada, message: `Campanha ${status.toLowerCase()} com sucesso.` });
+      await registrarAuditoriaStatusCampanha(base44, user, {
+        acao,
+        plano_id: planoId,
+        campanha_id: campanhaId,
+      }, {
+        campanha_titulo: campanha.titulo || '',
+        status_anterior: campanha.status || '',
+        status_novo: status,
+        respostas_preservadas: true,
+      });
+      return json({ ok: true, campanha: campanhaAtualizada, message: 'Campanha ' + status.toLowerCase() + ' com sucesso.' });
     }
 
     if (acao === 'ATUALIZAR') {
