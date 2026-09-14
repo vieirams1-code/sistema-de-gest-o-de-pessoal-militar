@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -71,6 +71,8 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
   const [detalhes, setDetalhes] = useState(null);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+  const [mensagemModelo, setMensagemModelo] = useState('');
+  const modeloCampanhaRef = useRef('');
 
   const portalLink = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -83,6 +85,8 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
     && campanhaAberta
     && Boolean(preview?.whatsapp_configurado)
     && Number(preview?.publico?.com_telefone || 0) > 0
+    && Boolean(mensagemModelo.trim())
+    && mensagemModelo.length <= 5000
     && !processando;
 
   const carregarPreview = async ({ silencioso = false } = {}) => {
@@ -97,6 +101,10 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
       const dados = unwrap(resposta);
       setPreview(dados);
       setHistorico(dados.historico || []);
+      if (modeloCampanhaRef.current !== String(campanha.id)) {
+        setMensagemModelo(dados.mensagem_modelo || '');
+        modeloCampanhaRef.current = String(campanha.id);
+      }
     } catch (erro) {
       setFeedback({ tipo: 'erro', texto: erroTexto(erro, 'Não foi possível preparar a comunicação por WhatsApp.') });
     } finally {
@@ -109,6 +117,8 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
     setHistorico([]);
     setDetalhes(null);
     setMostrarDetalhes(false);
+    setMensagemModelo('');
+    modeloCampanhaRef.current = '';
     setFeedback({ tipo: '', texto: '' });
     carregarPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,6 +165,7 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
         acao: 'CRIAR_ENVIO',
         campanha_id: campanha.id,
         link_portal: portalLink,
+        mensagem_modelo: mensagemModelo,
       });
       const dados = unwrap(resposta);
       const envio = dados.envio;
@@ -275,8 +286,41 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Mensagem que será enviada</div>
-            <pre className="mt-3 whitespace-pre-wrap font-sans text-sm leading-6 text-slate-700">{preview.mensagem_exemplo}</pre>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="mensagem-whatsapp-campanha" className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Mensagem a ser enviada
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setMensagemModelo(preview.mensagem_modelo || '')}
+                disabled={processando}
+              >
+                Restaurar padrão
+              </Button>
+            </div>
+            <textarea
+              id="mensagem-whatsapp-campanha"
+              value={mensagemModelo}
+              onChange={(event) => {
+                setMensagemModelo(event.target.value);
+                setConfirmando(false);
+              }}
+              disabled={processando}
+              maxLength={5000}
+              rows={12}
+              className="mt-3 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 font-sans text-sm leading-6 text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
+            />
+            <div className="mt-2 flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Variáveis disponíveis: <code>{'{posto_graduacao}'}</code>, <code>{'{nome_guerra}'}</code>, <code>{'{nome_campanha}'}</code>, <code>{'{data_limite}'}</code> e <code>{'{link_portal}'}</code>.
+              </span>
+              <span>{mensagemModelo.length}/5000</span>
+            </div>
+            {!mensagemModelo.trim() && (
+              <div className="mt-2 text-xs font-semibold text-red-600">Digite uma mensagem antes de iniciar o disparo.</div>
+            )}
             <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
               Link automático: <span className="break-all font-medium text-slate-700">{preview.link_portal}</span>
             </div>
