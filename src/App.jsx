@@ -150,6 +150,11 @@ const actionGuardByPage = {
     actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas'],
     moduleName: 'Respostas e Escalação de Férias',
   },
+  PainelPlanoFeriasV2: {
+    moduleKey: 'campanhas_ferias',
+    actionKeys: ['visualizar_respostas_ferias', 'aprovar_ferias', 'gerar_ferias_campanhas'],
+    moduleName: 'Painel Plano de Férias',
+  },
   CentralRespostasCampanhas: {
     moduleKey: 'campanhas_gerais',
     actionKeys: ['visualizar_respostas_campanhas', 'exportar_respostas_campanhas', 'baixar_anexos_respostas_campanhas', 'aprovar_respostas_campanhas'],
