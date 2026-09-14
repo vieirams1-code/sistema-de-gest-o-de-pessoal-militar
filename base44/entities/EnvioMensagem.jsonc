@@ -1,0 +1,92 @@
+{
+  "name": "EnvioMensagem",
+  "type": "object",
+  "title": "Envio de Mensagem",
+  "properties": {
+    "canal": {
+      "type": "string",
+      "enum": ["WHATSAPP"]
+    },
+    "contexto_tipo": {
+      "type": "string"
+    },
+    "contexto_id": {
+      "type": "string"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "mensagem_modelo": {
+      "type": "string"
+    },
+    "link_destino": {
+      "type": "string"
+    },
+    "prazo": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "EM_PREPARACAO",
+        "EM_PROCESSAMENTO",
+        "CONCLUIDO",
+        "CONCLUIDO_COM_FALHAS",
+        "FALHOU"
+      ]
+    },
+    "total_destinatarios": {
+      "type": "number"
+    },
+    "total_enviaveis": {
+      "type": "number"
+    },
+    "total_enviados": {
+      "type": "number"
+    },
+    "total_falhas": {
+      "type": "number"
+    },
+    "total_sem_contato": {
+      "type": "number"
+    },
+    "solicitado_por_id": {
+      "type": "string"
+    },
+    "solicitado_por_email": {
+      "type": "string"
+    },
+    "solicitado_por_nome": {
+      "type": "string"
+    },
+    "inicio_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "concluido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ultimo_erro": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "canal",
+    "contexto_tipo",
+    "contexto_id",
+    "titulo",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
