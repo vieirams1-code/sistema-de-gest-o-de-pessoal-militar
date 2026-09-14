@@ -568,6 +568,35 @@ export default function PainelPlanoFeriasV2() {
           </div>
 
           <div className="px-5 py-5">
+            {selecionado.sem_resposta ? (
+              <div>
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <Clock3 className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                    <div>
+                      <h3 className="font-black text-sm text-red-800">Este militar ainda não respondeu</h3>
+                      <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                        O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções. Por isso não há meses ou período aquisitivo disponíveis para definição pelo gestor.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {Array.isArray(selecionado.campanhas_alvo) && selecionado.campanhas_alvo.length > 0 && (
+                  <div className="mt-5">
+                    <SectionLabel>Campanha(s) em que está incluído</SectionLabel>
+                    <div className="space-y-2">
+                      {selecionado.campanhas_alvo.map((campanha) => (
+                        <div key={campanha.campanha_id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                          {campanha.titulo || 'Campanha de férias'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
             <SectionLabel>Período aquisitivo</SectionLabel>
             <p className="text-sm font-semibold text-slate-700 mb-6">{formatarDataBR(selecionado.periodo_inicio)} a {formatarDataBR(selecionado.periodo_fim)}</p>
 
@@ -642,6 +671,8 @@ export default function PainelPlanoFeriasV2() {
                 <p className="mt-3 text-xs text-center text-slate-500">As férias deste militar já foram geradas e a definição está bloqueada para edição.</p>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
       )}
