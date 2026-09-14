@@ -114,6 +114,7 @@ function decisaoAtual(op) {
 }
 
 function statusOpcao(op) {
+  if (op?.sem_resposta) return { label: 'Não respondeu', cls: 'bg-red-50 text-red-700 border-red-200' };
   if (op?.gerado_ferias_efetivas) return { label: 'Gerado', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
   if (op?.status_camada_1 === 'Nao_Contemplado' || op?.decisao_camada_1_opcao === 'NAO_CONTEMPLADO') {
     return { label: 'Não contemplado', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
@@ -137,6 +138,7 @@ export default function PainelPlanoFeriasV2() {
   const [planoId, setPlanoId] = useState(searchParams.get('planoId') || '');
   const [campanhaAtual, setCampanhaAtual] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
+  const [publicoAlvo, setPublicoAlvo] = useState([]);
 
   const [visao, setVisao] = useState('lista');
   const [busca, setBusca] = useState('');
@@ -163,6 +165,7 @@ export default function PainelPlanoFeriasV2() {
 
       const listaCampanhas = escalaRes.data?.campanhas || [];
       const opcoesRecebidas = escalaRes.data?.opcoes || [];
+      const publicoAlvoRecebido = escalaRes.data?.publico_alvo || [];
       const campanhasPlano = planoAlvo
         ? listaCampanhas.filter((c) => c.plano_ferias_institucional_id === planoAlvo)
         : listaCampanhas;
@@ -172,6 +175,7 @@ export default function PainelPlanoFeriasV2() {
       setCampanhas(listaCampanhas);
       setCampanhaAtual(ativa);
       setOpcoes(opcoesRecebidas);
+      setPublicoAlvo(publicoAlvoRecebido);
 
       if (planoAlvo && searchParams.get('planoId') !== planoAlvo) {
         const next = new URLSearchParams(searchParams);
@@ -196,21 +200,58 @@ export default function PainelPlanoFeriasV2() {
     [campanhas, planoId],
   );
 
+  const linhasPainel = useMemo(() => {
+    const idsComResposta = new Set(opcoes.map((op) => String(op.militar_id || '')).filter(Boolean));
+    const semResposta = publicoAlvo
+      .filter((militar) => !idsComResposta.has(String(militar.militar_id || '')))
+      .map((militar) => ({
+        ...militar,
+        id: `publico:${militar.militar_id}`,
+        sem_resposta: true,
+        periodo_inicio: '',
+        periodo_fim: '',
+        modalidade: '',
+        status_camada_1: '',
+      }));
+
+    return [...opcoes, ...semResposta].sort((a, b) => (
+      String(a.militar_nome || '').localeCompare(String(b.militar_nome || ''), 'pt-BR')
+    ));
+  }, [opcoes, publicoAlvo]);
+
   const totalPublico = useMemo(() => {
-    const totais = campanhasDoPlano.map((c) => Number(c?.total_publico_alvo || 0));
-    return Math.max(opcoes.length, ...totais, Number(campanhaAtual?.total_publico_alvo || 0), 0);
-  }, [campanhasDoPlano, campanhaAtual, opcoes.length]);
+    const ids = new Set([
+      ...publicoAlvo.map((m) => String(m.militar_id || '')).filter(Boolean),
+      ...opcoes.map((o) => String(o.militar_id || '')).filter(Boolean),
+    ]);
+    return ids.size;
+  }, [publicoAlvo, opcoes]);
 
-  const totalRespondidos = opcoes.length;
-  const totalSemResposta = Math.max(0, totalPublico - totalRespondidos);
-  const totalDefinidos = opcoes.filter((o) => statusOpcao(o).label === 'Definido' || statusOpcao(o).label === 'Gerado').length;
-  const totalPendentes = opcoes.filter((o) => statusOpcao(o).label === 'Pendente').length;
+  const totalRespondidos = useMemo(() => (
+    new Set(opcoes.map((o) => String(o.militar_id || '')).filter(Boolean)).size
+  ), [opcoes]);
+  const totalSemResposta = useMemo(() => {
+    const respondidos = new Set(opcoes.map((o) => String(o.militar_id || '')).filter(Boolean));
+    return publicoAlvo.filter((m) => !respondidos.has(String(m.militar_id || ''))).length;
+  }, [publicoAlvo, opcoes]);
+  const totalDefinidos = useMemo(() => new Set(
+    opcoes
+      .filter((o) => statusOpcao(o).label === 'Definido' || statusOpcao(o).label === 'Gerado')
+      .map((o) => String(o.militar_id || ''))
+      .filter(Boolean),
+  ).size, [opcoes]);
+  const totalPendentes = useMemo(() => new Set(
+    opcoes
+      .filter((o) => statusOpcao(o).label === 'Pendente')
+      .map((o) => String(o.militar_id || ''))
+      .filter(Boolean),
+  ).size, [opcoes]);
 
-  const unidades = useMemo(() => [...new Set(opcoes.map((o) => o.lotacao_nome).filter(Boolean))].sort(), [opcoes]);
+  const unidades = useMemo(() => [...new Set(linhasPainel.map((o) => o.lotacao_nome).filter(Boolean))].sort(), [linhasPainel]);
 
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return opcoes.filter((op) => {
+    return linhasPainel.filter((op) => {
       if (termo) {
         const texto = `${op.militar_nome || ''} ${op.militar_posto || ''} ${op.militar_matricula || ''} ${op.lotacao_nome || ''}`.toLowerCase();
         if (!texto.includes(termo)) return false;
@@ -223,7 +264,7 @@ export default function PainelPlanoFeriasV2() {
       }
       return true;
     });
-  }, [opcoes, busca, filtroUnidade, filtroStatus, filtroMes]);
+  }, [linhasPainel, busca, filtroUnidade, filtroStatus, filtroMes]);
 
   const abrirMilitar = (op) => {
     setSelecionado(op);
