@@ -126,6 +126,7 @@ import ConferenciasMilitares from './pages/ConferenciasMilitares';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
 import ConfigurarCampanhaFerias from './pages/ConfigurarCampanhaFerias';
 import PainelPlanoFerias from './pages/PainelPlanoFerias';
+import PainelPlanoFeriasV2 from './pages/PainelPlanoFeriasV2';
 import PlanosFerias from './pages/PlanosFerias';
 import GerirCampanhasPortal from './pages/GerirCampanhasPortal';
 import CentralRespostasCampanhas from './pages/CentralRespostasCampanhas';
@@ -144,6 +145,7 @@ export const PAGES = {
     "PortalCadastro": PortalCadastro,
     "GruposEfetivo": GruposEfetivo,
     "PainelPlanoFerias": PainelPlanoFerias,
+    "PainelPlanoFeriasV2": PainelPlanoFeriasV2,
     "PlanosFerias": PlanosFerias,
     "ConfiguracoesPortal": ConfiguracoesPortal,
     "ConfigurarCampanhaFerias": ConfigurarCampanhaFerias,
