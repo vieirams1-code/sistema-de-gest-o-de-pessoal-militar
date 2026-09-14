@@ -27,7 +27,7 @@ Acesse o Portal do Militar:
 
 Prazo para preenchimento: *{data_limite}*.
 
-Esta é uma mensagem automática do SGP Militar.`;
+Esta é uma mensagem automática.`;
 
 function payloadDaRequisicao(body: any) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
@@ -56,13 +56,20 @@ function validarLinkPortal(value: unknown) {
   }
 }
 
-function renderizarMensagem(militar: any, campanha: any, linkPortal: string) {
-  const saudacao = [
-    texto(militar?.posto_graduacao),
-    texto(militar?.nome_guerra) || texto(militar?.nome_completo) || 'Militar',
-  ].filter(Boolean).join(' ');
-  return MODELO_MENSAGEM
-    .replace('{posto_graduacao} {nome_guerra}', saudacao)
+function validarModeloMensagem(value: unknown) {
+  const modelo = texto(value) || MODELO_MENSAGEM;
+  if (modelo.length > 5000) {
+    throw Object.assign(new Error('A mensagem não pode ultrapassar 5.000 caracteres.'), { status: 400 });
+  }
+  return modelo;
+}
+
+function renderizarMensagem(militar: any, campanha: any, linkPortal: string, modelo = MODELO_MENSAGEM) {
+  const postoGraduacao = texto(militar?.posto_graduacao);
+  const nomeGuerra = texto(militar?.nome_guerra) || texto(militar?.nome_completo) || 'Militar';
+  return modelo
+    .replaceAll('{posto_graduacao}', postoGraduacao)
+    .replaceAll('{nome_guerra}', nomeGuerra)
     .replaceAll('{nome_campanha}', texto(campanha?.titulo) || 'Campanha de Férias')
     .replaceAll('{data_limite}', formatarDataBR(campanha?.data_fim_militar))
     .replaceAll('{link_portal}', linkPortal);
@@ -275,6 +282,7 @@ Deno.serve(async (req: Request) => {
         campanha: { id: campanha.id, titulo: campanha.titulo, status: campanha.status, data_fim_militar: campanha.data_fim_militar },
         publico: resumo,
         mensagem_exemplo: exemplo,
+        mensagem_modelo: MODELO_MENSAGEM,
         link_portal: linkPortal,
         whatsapp_configurado: isEvolutionWhatsAppConfigured(),
         historico: hist.envios,
@@ -299,6 +307,7 @@ Deno.serve(async (req: Request) => {
       if (emAndamento) return json({ error: 'Já existe um envio em processamento para esta campanha.', envio_id: emAndamento.id }, 409);
 
       const linkPortal = validarLinkPortal(payload?.link_portal);
+      const modeloMensagem = validarModeloMensagem(payload?.mensagem_modelo);
       const publico = await carregarPublico(base44, campanha);
       const resumo = resumoPublico(publico);
       if (!resumo.total) return json({ error: 'A campanha não possui militares no público-alvo atual.' }, 409);
@@ -308,7 +317,7 @@ Deno.serve(async (req: Request) => {
         contexto_tipo: 'CAMPANHA_FERIAS',
         contexto_id: campanhaId,
         titulo: `Campanha de Férias - ${texto(campanha.titulo)}`,
-        mensagem_modelo: MODELO_MENSAGEM,
+        mensagem_modelo: modeloMensagem,
         link_destino: linkPortal,
         prazo: texto(campanha.data_fim_militar).slice(0, 10),
         status: 'EM_PREPARACAO',
@@ -334,7 +343,7 @@ Deno.serve(async (req: Request) => {
             nome_guerra: texto(militar.nome_guerra),
             telefone: texto(militar.telefone),
             telefone_normalizado: telefoneNormalizado || '',
-            mensagem_renderizada: renderizarMensagem(militar, campanha, linkPortal),
+            mensagem_renderizada: renderizarMensagem(militar, campanha, linkPortal, modeloMensagem),
             status: telefoneNormalizado ? 'PENDENTE' : 'SEM_CONTATO',
             tentativas: 0,
             ultimo_erro: telefoneNormalizado ? '' : 'Telefone ausente ou inválido no cadastro do militar.',
