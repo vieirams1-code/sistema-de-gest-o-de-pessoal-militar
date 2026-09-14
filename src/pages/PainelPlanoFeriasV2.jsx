@@ -457,6 +457,7 @@ export default function PainelPlanoFeriasV2() {
 
                 <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
                   <option value="TODOS">Todas as situações</option>
+                  <option value="Não respondeu">Não respondeu</option>
                   <option value="Pendente">Pendente</option>
                   <option value="Definido">Definido</option>
                   <option value="Gerado">Gerado</option>
@@ -469,7 +470,7 @@ export default function PainelPlanoFeriasV2() {
                 </select>
               </div>
 
-              <div className="mt-4 text-xs font-medium text-slate-500">{filtradas.length} resposta(s) encontrada(s)</div>
+              <div className="mt-4 text-xs font-medium text-slate-500">{filtradas.length} registro(s) de militar encontrado(s)</div>
 
               <div className="mt-3 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
@@ -499,11 +500,11 @@ export default function PainelPlanoFeriasV2() {
                               <div className="text-xs text-slate-500 mt-0.5">{op.militar_posto || '-'} · {op.militar_matricula || 'sem matrícula'}</div>
                             </td>
                             <td className="px-4 py-3 text-slate-600">{op.lotacao_nome || '-'}</td>
-                            <td className="px-4 py-3 text-slate-600 text-xs">{formatarDataBR(op.periodo_inicio)} a {formatarDataBR(op.periodo_fim)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-700">{descricaoOpcao(op, 1)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-700">{descricaoOpcao(op, 2)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-700">{descricaoOpcao(op, 3)}</td>
-                            <td className="px-4 py-3 text-slate-600 text-xs">{nomeModalidade(op)}</td>
+                            <td className="px-4 py-3 text-slate-600 text-xs">{op.sem_resposta ? '-' : `${formatarDataBR(op.periodo_inicio)} a ${formatarDataBR(op.periodo_fim)}`}</td>
+                            <td className="px-4 py-3 font-medium text-slate-700">{op.sem_resposta ? '-' : descricaoOpcao(op, 1)}</td>
+                            <td className="px-4 py-3 font-medium text-slate-700">{op.sem_resposta ? '-' : descricaoOpcao(op, 2)}</td>
+                            <td className="px-4 py-3 font-medium text-slate-700">{op.sem_resposta ? '-' : descricaoOpcao(op, 3)}</td>
+                            <td className="px-4 py-3 text-slate-600 text-xs">{op.sem_resposta ? '-' : nomeModalidade(op)}</td>
                             <td className="px-4 py-3 text-slate-700 font-semibold text-xs">{atual.length ? atual.map((p) => `${curtoMes(p.mes)} ${p.dias || ''}d`).join(' + ') : '-'}</td>
                             <td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${st.cls}`}>{st.label}</span></td>
                             <td className="px-2 py-3"><ChevronRight className="w-4 h-4 text-slate-400" /></td>
@@ -515,7 +516,7 @@ export default function PainelPlanoFeriasV2() {
                 </div>
 
                 {filtradas.length === 0 && (
-                  <div className="py-12 text-center text-sm text-slate-500">Nenhuma resposta encontrada com os filtros selecionados.</div>
+                  <div className="py-12 text-center text-sm text-slate-500">Nenhum militar encontrado com os filtros selecionados.</div>
                 )}
               </div>
             </>
