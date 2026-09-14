@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import CampanhaFeriasWhatsAppCard from '@/components/ferias/CampanhaFeriasWhatsAppCard';
 
 const erroTexto = (erro, fallback) => erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
@@ -27,6 +28,8 @@ export default function ConfigurarCampanhaFerias() {
   const podeEditarCampanha = (isAdmin || canAccessAction('visualizar_planos_ferias'))
     && campanhaEmEdicaoPermitida
     && String(plano?.status || 'ATIVO').toUpperCase() !== 'ARQUIVADO';
+  // O disparo em massa é uma ação administrativa separada da edição da campanha.
+  const podeEnviarWhatsApp = isAdmin || canAccessAction('admin_campanhas_ferias');
 
   const carregar = async () => {
     if (!campanhaId) {
@@ -67,8 +70,6 @@ export default function ConfigurarCampanhaFerias() {
 
   useEffect(() => { carregar(); }, [campanhaId, planoId]);
 
-
-
   const salvarDadosCampanha = async (evento) => {
     evento.preventDefault();
     const titulo = dadosCampanhaForm.titulo.trim();
@@ -99,8 +100,6 @@ export default function ConfigurarCampanhaFerias() {
       setSalvando(false);
     }
   };
-
-
 
   if (loading) return <div className="min-h-screen bg-slate-50 p-8 text-center text-sm text-slate-500">Carregando campanha...</div>;
 
@@ -154,6 +153,11 @@ export default function ConfigurarCampanhaFerias() {
             <p className="mt-1 text-sm text-slate-600">O nome e o prazo só podem ser alterados enquanto o plano estiver ativo e a campanha estiver em coleta.</p>
           </section>
         )}
+
+        {campanha?.id && (
+          <CampanhaFeriasWhatsAppCard campanha={campanha} canSend={podeEnviarWhatsApp} />
+        )}
+
         <div className="flex justify-end"><Button type="button" variant="outline" onClick={carregar}><RefreshCw className="mr-1.5 h-4 w-4" />Atualizar</Button></div>
       </div>
     </div>
