@@ -2197,7 +2197,48 @@ Deno.serve(async (req: Request) => {
               opcoes = consolidarOpcoesPlano(opcoes);
             }
 
-            // 3. A consulta não remove opções órfãs.
+            // 3. Relação nominal atual do público-alvo.
+            // O painel V2 precisa exibir também quem ainda não respondeu. A relação é
+            // recalculada a partir do escopo atual das campanhas (inclusive grupos),
+            // deduplicando o militar quando ele participa de mais de uma campanha do plano.
+            let todosMilitaresEscala: any[] = [];
+            try {
+              todosMilitaresEscala = await base44.asServiceRole.entities.Militar.list();
+            } catch (_e) {
+              todosMilitaresEscala = [];
+            }
+            const membrosPorGrupoEscala = await carregarMembrosPorGrupo(base44, campanhasConsulta);
+            const publicoAlvoMap = new Map<string, any>();
+
+            for (const militar of todosMilitaresEscala || []) {
+              const statusCadastro = String(militar?.status_cadastro || militar?.status || '').trim().toLowerCase();
+              if (statusCadastro === 'inativo' || statusCadastro === 'falecido') continue;
+
+              const campanhasAlvo = campanhasConsulta.filter((campanha: any) => (
+                matchMilitarCampanha(campanha, militar, membrosPorGrupoEscala)
+              ));
+              if (campanhasAlvo.length === 0) continue;
+
+              const militarId = textoId(militar?.id);
+              if (!militarId) continue;
+              publicoAlvoMap.set(militarId, {
+                militar_id: militarId,
+                militar_nome: militar?.nome_completo || militar?.nome_guerra || '',
+                militar_nome_guerra: militar?.nome_guerra || '',
+                militar_posto: militar?.posto_graduacao || '',
+                militar_matricula: militar?.matricula || '',
+                militar_quadro: militar?.quadro || '',
+                lotacao_id: militar?.estrutura_id || militar?.subgrupamento_id || militar?.lotacao_id || '',
+                lotacao_nome: militar?.lotacao || militar?.estrutura_nome || 'Não informada',
+                campanhas_alvo: campanhasAlvo.map((campanha: any) => ({
+                  campanha_id: campanha.id,
+                  titulo: campanha.titulo || '',
+                })),
+              });
+            }
+            const publicoAlvo = Array.from(publicoAlvoMap.values());
+
+            // 4. A consulta não remove opções órfãs.
             // Registros históricos devem ser preservados para análise e eventual restauração.
             // A limpeza de órfãos, se necessária, será uma operação administrativa explícita.
 
@@ -2205,6 +2246,8 @@ Deno.serve(async (req: Request) => {
               ok: true,
               campanhas: campanhasFerias || [],
               opcoes: opcoes || [],
+              publico_alvo: publicoAlvo,
+              total_publico_alvo_atual: publicoAlvo.length,
               plano_id: planoIdConsulta || null,
               modo_consolidado: modoConsolidado,
             }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
