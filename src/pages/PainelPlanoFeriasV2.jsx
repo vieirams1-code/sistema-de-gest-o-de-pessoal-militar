@@ -480,9 +480,9 @@ export default function PainelPlanoFeriasV2() {
                   />
                 </div>
 
-                <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
-                  <option value="TODAS">Todas as unidades</option>
-                  {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
+                <select value={filtroCampanha} onChange={(e) => setFiltroCampanha(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+                  <option value="TODAS">Todos os grupos / campanhas</option>
+                  {campanhasFiltro.map((campanha) => <option key={campanha.id} value={campanha.id}>{campanha.nome}</option>)}
                 </select>
 
                 <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
