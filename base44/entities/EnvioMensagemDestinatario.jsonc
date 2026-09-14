@@ -1,0 +1,81 @@
+{
+  "name": "EnvioMensagemDestinatario",
+  "type": "object",
+  "title": "Destinatário de Envio de Mensagem",
+  "properties": {
+    "envio_id": {
+      "type": "string"
+    },
+    "contexto_id": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "posto_graduacao": {
+      "type": "string"
+    },
+    "nome_guerra": {
+      "type": "string"
+    },
+    "telefone": {
+      "type": "string"
+    },
+    "telefone_normalizado": {
+      "type": "string"
+    },
+    "mensagem_renderizada": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PENDENTE",
+        "ENVIANDO",
+        "ENVIADO",
+        "FALHA",
+        "SEM_CONTATO"
+      ]
+    },
+    "tentativas": {
+      "type": "number"
+    },
+    "ultimo_erro": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "provider_message_id": {
+      "type": "string"
+    },
+    "ultima_tentativa_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "enviado_em": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "envio_id",
+    "contexto_id",
+    "militar_id",
+    "militar_nome",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
