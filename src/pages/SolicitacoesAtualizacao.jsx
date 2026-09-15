@@ -44,25 +44,16 @@ export default function SolicitacoesAtualizacao() {
   const { data: solicitacoes = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['solicitacoes-atualizacao', filtroStatus],
     queryFn: async () => {
-      let authProbeOk = false;
       try {
-        const authProbe = await base44.functions.invoke('getUserPermissions', {});
-        authProbeOk = Boolean(authProbe?.data?.user || authProbe?.user);
-      } catch (_authProbeError) {
-        authProbeOk = false;
-      }
-
-      try {
-        const res = await base44.functions.invoke('portal_servicos', {
-          acao: 'CADASTRO_SOLICITACOES_LISTAR',
+        const res = await base44.functions.invoke('solicitacoesCadastraisGateway', {
+          action: 'LISTAR',
           status: filtroStatus,
         });
         return res.data?.solicitacoes || [];
       } catch (err) {
         const status = err?.response?.status || err?.status || 'sem status';
         const backendMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha desconhecida';
-        const authProbeLabel = authProbeOk ? 'sessão SGP confirmada' : 'sessão SGP não confirmada';
-        throw new Error(`Falha ${status} em portal_servicos: ${backendMessage} (${authProbeLabel}).`);
+        throw new Error(`Falha ${status} ao carregar solicitações: ${backendMessage}`);
       }
     },
     enabled: canViewSolicitacoes,
@@ -101,8 +92,8 @@ export default function SolicitacoesAtualizacao() {
     setFeedback(null);
     try {
       const valorCorrigido = valoresEditados[sol.id];
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CADASTRO_DECIDIR_SOLICITACAO',
+      const res = await base44.functions.invoke('solicitacoesCadastraisGateway', {
+        action: 'DECIDIR',
         solicitacao_id: sol.id,
         decisao: novoStatus,
         valor_corrigido: valorCorrigido,
@@ -132,8 +123,8 @@ export default function SolicitacoesAtualizacao() {
         valor_corrigido: valoresEditados[item.id] !== undefined ? valoresEditados[item.id] : item.valor_proposto,
       }));
 
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CADASTRO_DECIDIR_LOTE_MILITAR',
+      const res = await base44.functions.invoke('solicitacoesCadastraisGateway', {
+        action: 'DECIDIR_LOTE',
         militar_id: militarId,
         decisao: novoStatus,
         itens_decisao: itensDecisao,
