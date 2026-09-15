@@ -44,11 +44,26 @@ export default function SolicitacoesAtualizacao() {
   const { data: solicitacoes = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['solicitacoes-atualizacao', filtroStatus],
     queryFn: async () => {
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CADASTRO_SOLICITACOES_LISTAR',
-        status: filtroStatus,
-      });
-      return res.data?.solicitacoes || [];
+      let authProbeOk = false;
+      try {
+        const authProbe = await base44.functions.invoke('getUserPermissions', {});
+        authProbeOk = Boolean(authProbe?.data?.user || authProbe?.user);
+      } catch (_authProbeError) {
+        authProbeOk = false;
+      }
+
+      try {
+        const res = await base44.functions.invoke('portal_servicos', {
+          acao: 'CADASTRO_SOLICITACOES_LISTAR',
+          status: filtroStatus,
+        });
+        return res.data?.solicitacoes || [];
+      } catch (err) {
+        const status = err?.response?.status || err?.status || 'sem status';
+        const backendMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Falha desconhecida';
+        const authProbeLabel = authProbeOk ? 'sessão SGP confirmada' : 'sessão SGP não confirmada';
+        throw new Error(`Falha ${status} em portal_servicos: ${backendMessage} (${authProbeLabel}).`);
+      }
     },
     enabled: canViewSolicitacoes,
   });
