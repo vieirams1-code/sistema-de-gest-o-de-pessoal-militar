@@ -87,6 +87,12 @@ test('Solicitações cadastrais não são mais admin-only e usam gateway própri
   assert.match(solicitacoes, /canDecidirSolicitacoes/);
 });
 
+test('listagem de solicitações cadastrais é rota administrativa e não exige sessão do Portal Militar', () => {
+  assert.match(portalServicos, /const isCadastroGestaoAction = Boolean\([\s\S]*CADASTRO_SOLICITACOES_LISTAR/);
+  assert.match(portalServicos, /acao\?\.startsWith\('CADASTRO_'\) && !isCadastroGestaoAction/);
+  assert.match(portalServicos, /const isAdminAction = !isMilitarPortalAction && Boolean\([\s\S]*isCadastroGestaoAction/);
+});
+
 test('Configurações do Portal não têm fallback direto e Mesa RH respeita permissões', () => {
   assert.doesNotMatch(configuracoes, /base44\.entities\.PortalAuthConfig/);
   assert.doesNotMatch(configuracoes, /base44\.entities\.SolicitacaoAtualizacao/);
