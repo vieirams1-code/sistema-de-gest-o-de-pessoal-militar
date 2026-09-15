@@ -6,6 +6,7 @@ const read = (relative) => readFileSync(new URL(relative, import.meta.url), 'utf
 
 const permissionStructure = read('../../../config/permissionStructure.js');
 const portalServicos = read('../../../../base44/functions/portal_servicos/entry.ts');
+const solicitacoesGateway = read('../../../../base44/functions/solicitacoesCadastraisGateway/entry.ts');
 const planosFerias = read('../../../../base44/functions/planos_ferias_servicos/entry.ts');
 const centralRespostas = read('../../../pages/CentralRespostasCampanhas.jsx');
 const gerirCampanhas = read('../../../pages/GerirCampanhasPortal.jsx');
@@ -83,21 +84,29 @@ test('Solicitações cadastrais não são mais admin-only e usam gateway própri
   assert.match(app, /SolicitacoesAtualizacao:[\s\S]*visualizar_solicitacoes_cadastrais[\s\S]*decidir_solicitacoes_cadastrais/);
   assert.doesNotMatch(solicitacoes, /RequireAdmin/);
   assert.doesNotMatch(solicitacoes, /base44\.entities\.SolicitacaoAtualizacao/);
-  assert.match(solicitacoes, /CADASTRO_SOLICITACOES_LISTAR/);
+  assert.match(solicitacoes, /solicitacoesCadastraisGateway/);
+  assert.match(solicitacoes, /action: 'LISTAR'/);
+  assert.match(solicitacoes, /action: 'DECIDIR'/);
+  assert.match(solicitacoes, /action: 'DECIDIR_LOTE'/);
   assert.match(solicitacoes, /canDecidirSolicitacoes/);
 });
 
-test('listagem de solicitações cadastrais é rota administrativa e não exige sessão do Portal Militar', () => {
-  assert.match(portalServicos, /const isCadastroGestaoAction = Boolean\([\s\S]*CADASTRO_SOLICITACOES_LISTAR/);
-  assert.match(portalServicos, /acao\?\.startsWith\('CADASTRO_'\) && !isCadastroGestaoAction/);
-  assert.match(portalServicos, /const isAdminAction = !isMilitarPortalAction && Boolean\([\s\S]*isCadastroGestaoAction/);
+test('gestão de solicitações cadastrais usa gateway administrativo isolado', () => {
+  assert.match(solicitacoesGateway, /const user = await base44\.auth\.me\(\)\.catch/);
+  assert.match(solicitacoesGateway, /functions\.invoke\('getUserPermissions'/);
+  assert.match(solicitacoesGateway, /visualizar_solicitacoes_cadastrais/);
+  assert.match(solicitacoesGateway, /decidir_solicitacoes_cadastrais/);
+  assert.match(solicitacoesGateway, /scopeCheck\?\.allowedIds/);
+  assert.match(solicitacoesGateway, /SolicitacaoAtualizacao/);
+  assert.doesNotMatch(solicitacoesGateway, /requirePortalSession|X-Portal-Token/);
 });
 
 test('Configurações do Portal não têm fallback direto e Mesa RH respeita permissões', () => {
   assert.doesNotMatch(configuracoes, /base44\.entities\.PortalAuthConfig/);
   assert.doesNotMatch(configuracoes, /base44\.entities\.SolicitacaoAtualizacao/);
   assert.match(configuracoes, /PORTAL_CONFIG_GET/);
-  assert.match(configuracoes, /CADASTRO_SOLICITACOES_LISTAR/);
+  assert.match(configuracoes, /solicitacoesCadastraisGateway/);
+  assert.match(configuracoes, /action: 'LISTAR'/);
   assert.match(configuracoes, /canViewSolicitacoes/);
   assert.match(configuracoes, /canDecidirSolicitacoes/);
 });
