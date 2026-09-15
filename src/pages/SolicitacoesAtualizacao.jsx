@@ -41,7 +41,7 @@ export default function SolicitacoesAtualizacao() {
   const [processing, setProcessing] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const { data: solicitacoes = [], isLoading, refetch } = useQuery({
+  const { data: solicitacoes = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['solicitacoes-atualizacao', filtroStatus],
     queryFn: async () => {
       const res = await base44.functions.invoke('portal_servicos', {
@@ -289,6 +289,18 @@ export default function SolicitacoesAtualizacao() {
               <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin"></div>
               <p className="text-sm text-slate-500 font-medium">Carregando solicitações...</p>
             </div>
+          ) : isError ? (
+            <Card className="border-red-200 shadow-sm rounded-2xl bg-red-50">
+              <CardContent className="p-8 text-center text-xs text-red-800 space-y-3">
+                <AlertCircle className="w-8 h-8 mx-auto text-red-500" />
+                <p className="font-bold">Não foi possível carregar as solicitações cadastrais.</p>
+                <p className="text-red-700">{error?.message || 'Falha ao consultar as solicitações no servidor.'}</p>
+                <Button type="button" variant="outline" size="sm" onClick={() => refetch()} className="rounded-xl bg-white">
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Tentar novamente
+                </Button>
+              </CardContent>
+            </Card>
           ) : gruposMilitares.length === 0 ? (
             <Card className="border-slate-200 shadow-sm rounded-2xl bg-white">
               <CardContent className="p-12 text-center text-xs text-slate-500 space-y-2">
