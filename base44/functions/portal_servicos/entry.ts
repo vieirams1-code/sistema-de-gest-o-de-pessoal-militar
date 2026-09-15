@@ -672,11 +672,16 @@ Deno.serve(async (req: Request) => {
     // ========================================================================
     // ROTAS ADMINISTRATIVAS DO SGP (Gestão de Campanhas, Configurações e RH)
     // ========================================================================
+    const isCadastroGestaoAction = Boolean(
+      acao === 'CADASTRO_SOLICITACOES_LISTAR' ||
+      acao?.startsWith('CADASTRO_DECIDIR_')
+    );
+
     const isMilitarPortalAction = Boolean(
       acao === 'CAMPANHA_FORMULARIO_OBTER' ||
       acao === 'CAMPANHA_FORMULARIO_SUBMETER' ||
       acao === 'CAMPANHAS_ATIVAS_MILITAR_GET' ||
-      (acao?.startsWith('CADASTRO_') && !acao?.startsWith('CADASTRO_DECIDIR_')) ||
+      (acao?.startsWith('CADASTRO_') && !isCadastroGestaoAction) ||
       acao?.startsWith('FERIAS_')
     );
 
@@ -685,7 +690,7 @@ Deno.serve(async (req: Request) => {
       acao?.startsWith('PLANO_') ||
       acao?.startsWith('PORTAL_CONFIG_') ||
       acao?.startsWith('PERMISSOES_') ||
-      acao?.startsWith('CADASTRO_DECIDIR_')
+      isCadastroGestaoAction
     );
 
     if (isAdminAction) {
