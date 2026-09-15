@@ -109,7 +109,7 @@ export default function ConfiguracoesPortal() {
     }
     setLoadingSolicitacoes(true);
     try {
-      const res = await base44.functions.invoke('portal_servicos', { acao: 'CADASTRO_SOLICITACOES_LISTAR', status: 'todos' });
+      const res = await base44.functions.invoke('solicitacoesCadastraisGateway', { action: 'LISTAR', status: 'todos' });
       setSolicitacoes(res.data?.solicitacoes || []);
     } catch (err) {
       console.error('Falha ao carregar solicitações:', err);
@@ -201,8 +201,8 @@ export default function ConfiguracoesPortal() {
     if (!canDecidirSolicitacoes) return;
     try {
       const valorCorrigido = valoresEditados[solId];
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CADASTRO_DECIDIR_SOLICITACAO',
+      const res = await base44.functions.invoke('solicitacoesCadastraisGateway', {
+        action: 'DECIDIR',
         solicitacao_id: solId,
         decisao: novoStatus,
         valor_corrigido: valorCorrigido,
@@ -227,8 +227,8 @@ export default function ConfiguracoesPortal() {
         valor_corrigido: valoresEditados[item.id] !== undefined ? valoresEditados[item.id] : item.valor_proposto,
       }));
 
-      const res = await base44.functions.invoke('portal_servicos', {
-        acao: 'CADASTRO_DECIDIR_LOTE_MILITAR',
+      const res = await base44.functions.invoke('solicitacoesCadastraisGateway', {
+        action: 'DECIDIR_LOTE',
         militar_id: militarId,
         decisao: novoStatus,
         itens_decisao: itensDecisao,
