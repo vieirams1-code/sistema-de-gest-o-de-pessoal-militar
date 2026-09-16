@@ -92,25 +92,39 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
   }
   const publico = Array.from(publicoMap.values());
   let cobertura: any[] | null = null;
+  let cobertura_erro: string | null = null;
   if (payload.incluir_cobertura === true && planoId) {
-    const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
-    if (!plano) return Response.json({ error: 'Plano não encontrado.' }, { status: 404, headers: corsHeaders });
-    const ano = Number(plano.ano_referencia);
-    const consultaMilitares = { militar_id: { $in: militares.filter((m: any) => !publicoMap.has(textoId(m.id))).map((m: any) => m.id) } };
-    const [periodos, ferias, ajustes] = await Promise.all([
-      listarTodos(base44.asServiceRole.entities.PeriodoAquisitivo, consultaMilitares),
-      listarTodos(base44.asServiceRole.entities.Ferias, { ...consultaMilitares, plano_ferias_id: planoId }),
-      listarTodos(base44.asServiceRole.entities.AjusteSaldoFerias, { ...consultaMilitares, status: 'ativo' }),
-    ]);
-    cobertura = militares.flatMap((m: any) => {
-      const id = textoId(m?.id);
-      if (!id || publicoMap.has(id)) return [];
-      const feriasMilitar = feriasVinculadasAoPlano(ferias.filter((f: any) => textoId(f?.militar_id) === id), planoId);
-      const ajustesMilitar = ajustes.filter((a: any) => textoId(a?.militar_id) === id);
-      const elegiveis = periodos.filter((p: any) => textoId(p?.militar_id) === id).map((p: any) => ({ id: p.id, ano_referencia: p.ano_referencia || '', inicio_aquisitivo: p.inicio_aquisitivo || '', fim_aquisitivo: p.fim_aquisitivo || '', ...calcularResumoPeriodoPlano(p, feriasMilitar, ajustesMilitar, ano) })).filter((p: any) => p.elegivel_plano === true);
-      return elegiveis.length ? [{ militar_id: id, militar_nome: m?.nome_completo || m?.nome_guerra || '', militar_posto: m?.posto_graduacao || '', militar_matricula: m?.matricula || '', lotacao_nome: m?.lotacao || m?.estrutura_nome || 'Não informada', periodos_elegiveis: elegiveis }] : [];
-    }).sort((a: any, b: any) => a.militar_nome.localeCompare(b.militar_nome, 'pt-BR'));
+    try {
+      const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
+      if (!plano) return Response.json({ error: 'Plano não encontrado.' }, { status: 404, headers: corsHeaders });
+      const ano = Number(plano.ano_referencia);
+      // Militares visíveis que ainda não estão cobertos por nenhuma campanha do plano.
+      const idsNaoCobertos = militares.filter((m: any) => !publicoMap.has(textoId(m.id))).map((m: any) => m.id).filter(Boolean);
+      if (!idsNaoCobertos.length) {
+        cobertura = [];
+      } else {
+        const consultaMilitares = { militar_id: { $in: idsNaoCobertos } };
+        const [periodos, ferias, ajustes] = await Promise.all([
+          listarTodos(base44.asServiceRole.entities.PeriodoAquisitivo, consultaMilitares),
+          listarTodos(base44.asServiceRole.entities.Ferias, { ...consultaMilitares, plano_ferias_id: planoId }),
+          listarTodos(base44.asServiceRole.entities.AjusteSaldoFerias, { ...consultaMilitares, status: 'ativo' }),
+        ]);
+        cobertura = militares.flatMap((m: any) => {
+          const id = textoId(m?.id);
+          if (!id || publicoMap.has(id)) return [];
+          const feriasMilitar = feriasVinculadasAoPlano(ferias.filter((f: any) => textoId(f?.militar_id) === id), planoId);
+          const ajustesMilitar = ajustes.filter((a: any) => textoId(a?.militar_id) === id);
+          const elegiveis = periodos.filter((p: any) => textoId(p?.militar_id) === id).map((p: any) => ({ id: p.id, ano_referencia: p.ano_referencia || '', inicio_aquisitivo: p.inicio_aquisitivo || '', fim_aquisitivo: p.fim_aquisitivo || '', ...calcularResumoPeriodoPlano(p, feriasMilitar, ajustesMilitar, ano) })).filter((p: any) => p.elegivel_plano === true);
+          return elegiveis.length ? [{ militar_id: id, militar_nome: m?.nome_completo || m?.nome_guerra || '', militar_posto: m?.posto_graduacao || '', militar_matricula: m?.matricula || '', lotacao_nome: m?.lotacao || m?.estrutura_nome || 'Não informada', periodos_elegiveis: elegiveis }] : [];
+        }).sort((a: any, b: any) => a.militar_nome.localeCompare(b.militar_nome, 'pt-BR'));
+      }
+    } catch (erroCobertura: any) {
+      // A falha na cobertura nunca pode derrubar a listagem principal do painel.
+      console.error('[listarEscalaPlano] Falha ao calcular cobertura:', erroCobertura?.message || erroCobertura);
+      cobertura = null;
+      cobertura_erro = 'Não foi possível consultar a cobertura deste plano agora. Tente novamente.';
+    }
   }
   const campanhasSeguras = campanhas.map((c: any) => ({ id: c.id, titulo: c.titulo, status: c.status, ano_referencia: c.ano_referencia, plano_ferias_institucional_id: c.plano_ferias_institucional_id, data_inicio: c.data_inicio, data_fim_militar: c.data_fim_militar }));
-  return new Response(JSON.stringify({ ok: true, campanhas: campanhasSeguras, opcoes, publico_alvo: publico, cobertura, total_elegiveis_nao_cobertos: cobertura?.length ?? null, total_publico_alvo_atual: publico.length, plano_id: planoId || null, modo_consolidado: consolidado }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify({ ok: true, campanhas: campanhasSeguras, opcoes, publico_alvo: publico, cobertura, cobertura_erro, total_elegiveis_nao_cobertos: cobertura?.length ?? null, total_publico_alvo_atual: publico.length, plano_id: planoId || null, modo_consolidado: consolidado }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
