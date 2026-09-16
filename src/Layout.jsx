@@ -279,7 +279,7 @@ const menuGroups = [
           },
           {
             name: '3. Respostas e Escalação',
-            page: 'PainelPlanoFerias',
+            page: 'PainelPlanoFeriasV2',
             icon: CalendarDays,
             anyOf: [
               { type: 'action', key: 'perm_visualizar_respostas_ferias' },
@@ -427,6 +427,7 @@ export default function Layout({ children, currentPageName }) {
       .filter((item) => !item.children || item.children.length > 0);
   };
 
+  const menuGroupOrder = ['GERAL', 'GESTÃO MILITAR', 'CAMPANHAS', 'SISTEMA'];
   const visibleMenuGroups = menuGroups
     .map((group) => ({
       ...group,
@@ -437,7 +438,8 @@ export default function Layout({ children, currentPageName }) {
         }))
         .filter((section) => section.items.length > 0),
     }))
-    .filter((group) => group.sections.length > 0);
+    .filter((group) => group.sections.length > 0)
+    .sort((a, b) => menuGroupOrder.indexOf(a.title) - menuGroupOrder.indexOf(b.title));
 
 
   const allVisibleItems = useMemo(() => visibleMenuGroups.flatMap((group) =>
@@ -484,7 +486,7 @@ export default function Layout({ children, currentPageName }) {
 
   const renderMenuItems = (items, { nested = false } = {}) => (
     groupItemsByMenuGroup(items).map((group, groupIndex) => (
-      <React.Fragment key={`${nested ? 'nested' : 'root'}-${group.label || 'ungrouped'}-${groupIndex}`}>
+      <div className="contents" key={`${nested ? 'nested' : 'root'}-${group.label || 'ungrouped'}-${groupIndex}`}>
         {group.label && renderMenuSectionLabel(group.label, nested)}
         {group.items.map((item) => {
           const active = isItemActive(item);
@@ -546,7 +548,7 @@ export default function Layout({ children, currentPageName }) {
             </div>
           );
         })}
-      </React.Fragment>
+      </div>
     ))
   );
 
