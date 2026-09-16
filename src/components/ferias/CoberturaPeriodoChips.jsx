@@ -11,7 +11,7 @@ export default function CoberturaPeriodoChips({ periodos = [] }) {
       {periodos.map((periodo) => (
         <div key={periodo.id} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs text-blue-900">
           <div className="font-bold">{periodo.ano_referencia || 'Período'} · {periodo.saldo_disponivel} dia(s)</div>
-          <div className="mt-0.5 text-blue-700">{periodo.situacao_aquisitiva} · gozo a partir de {formatarData(periodo.primeira_data_legal_gozo)}</div>
+          <div className="mt-0.5 text-blue-700">{periodo.situacao_aquisitiva === 'Aberto' ? 'A adquirir' : periodo.situacao_aquisitiva} · gozo a partir de {formatarData(periodo.primeira_data_legal_gozo)}</div>
         </div>
       ))}
     </div>

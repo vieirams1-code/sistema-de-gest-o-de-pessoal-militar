@@ -1,32 +1,41 @@
 function textoId(value: unknown): string { return String(value ?? '').trim(); }
 function tipoAcesso(value: unknown): string { return textoId(value).toLowerCase(); }
 
-async function filtrarEscopo(base44: any, user: any, militares: any[]): Promise<any[]> {
-  if (tipoAcesso(user?.role) === 'admin') return militares;
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user?.email, ativo: true }).catch(() => []);
+export async function listarTodos(entity: any, query: any = {}): Promise<any[]> {
+  const registros: any[] = [];
+  for (let skip = 0; ; skip += 500) {
+    const pagina = await entity.filter(query, 'id', 500, skip);
+    registros.push(...pagina);
+    if (pagina.length < 500) return registros;
+  }
+}
+
+export async function filtrarEscopo(base44: any, user: any, militares: any[]): Promise<any[]> {
+  if (!user?.email) return [];
+  if (tipoAcesso(user.role) === 'admin') return militares;
+  const acessos = await listarTodos(base44.asServiceRole.entities.UsuarioAcesso, { user_email: user.email, ativo: true });
   if (acessos.some((a: any) => tipoAcesso(a?.tipo_acesso) === 'admin')) return militares;
   const pais = new Set(acessos.filter((a: any) => tipoAcesso(a?.tipo_acesso) === 'subsetor').map((a: any) => textoId(a?.subgrupamento_id)).filter(Boolean));
-  const estruturas = pais.size ? await base44.asServiceRole.entities.Subgrupamento.list().catch(() => []) : [];
-  const filhos = new Map<string, Set<string>>();
-  for (const item of estruturas) {
-    const pai = textoId(item?.parent_id);
-    if (!pais.has(pai)) continue;
-    if (!filhos.has(pai)) filhos.set(pai, new Set());
-    filhos.get(pai)!.add(textoId(item?.id));
-  }
+  const estruturas = pais.size ? await listarTodos(base44.asServiceRole.entities.Subgrupamento, { parent_id: { $in: [...pais] } }) : [];
   return militares.filter((m: any) => acessos.some((a: any) => {
     const tipo = tipoAcesso(a?.tipo_acesso);
-    const estrutura = textoId(m?.estrutura_id);
-    const sub = textoId(m?.subgrupamento_id);
-    if (tipo === 'proprio') return textoId(a?.militar_id) === textoId(m?.id);
-    if (tipo === 'setor') return [estrutura, textoId(m?.grupamento_id), textoId(m?.grupamento_raiz_id)].includes(textoId(a?.grupamento_id));
-    if (tipo === 'unidade') return [estrutura, sub].includes(textoId(a?.subgrupamento_id));
-    if (tipo === 'subsetor') {
-      const id = textoId(a?.subgrupamento_id);
-      return [estrutura, sub].includes(id) || Boolean(filhos.get(id)?.has(estrutura) || filhos.get(id)?.has(sub));
-    }
+    const estrutura = textoId(m?.estrutura_id), sub = textoId(m?.subgrupamento_id);
+    const setor = textoId(a?.grupamento_id), unidade = textoId(a?.subgrupamento_id);
+    if (tipo === 'proprio') return Boolean(a?.militar_id && textoId(a.militar_id) === textoId(m?.id));
+    if (tipo === 'setor') return Boolean(setor && [estrutura, textoId(m?.grupamento_id), textoId(m?.grupamento_raiz_id)].includes(setor));
+    if (tipo === 'unidade') return Boolean(unidade && [estrutura, sub].includes(unidade));
+    if (tipo === 'subsetor') return Boolean(unidade && ([estrutura, sub].includes(unidade) || estruturas.some((e: any) => textoId(e.parent_id) === unidade && [estrutura, sub].includes(textoId(e.id)))));
     return false;
   }));
+}
+
+export async function validarSelecaoNominal(base44: any, user: any, cp: any) {
+  const ids = [...new Set(cp.escopo_militares_ids.map(textoId).filter(Boolean))];
+  const militares = await listarTodos(base44.asServiceRole.entities.Militar, { id: { $in: ids } });
+  const permitidos = await filtrarEscopo(base44, user, militares.filter((m: any) => !['inativo', 'falecido'].includes(tipoAcesso(m.status_cadastro || m.status))));
+  if (permitidos.length !== ids.length) return 'Há militar inexistente, inativo ou fora do seu escopo. Atualize a seleção.';
+  cp.escopo_militares_ids = ids;
+  return '';
 }
 
 export function validarEscopoCampanhaFerias(cp: any): string {
@@ -48,17 +57,21 @@ export function validarEscopoCampanhaFerias(cp: any): string {
 
 export async function listarEscalaPlano(args: any): Promise<Response> {
   const { base44, user, payload, calcularResumoPeriodoPlano, feriasVinculadasAoPlano, consolidarOpcoesPlano, carregarMembrosPorGrupo, matchMilitarCampanha, corsHeaders } = args;
-  const todasCampanhas = await base44.asServiceRole.entities.CampanhaPortal.list().catch(() => []);
+  if (payload.incluir_cobertura === true && tipoAcesso(user.role) !== 'admin') {
+    const authz = (await base44.functions.invoke('getUserPermissions', {})).data;
+    if (!authz?.actions?.visualizar_respostas_ferias && !authz?.actions?.aprovar_ferias) return Response.json({ error: 'Sem permissão para consultar cobertura.' }, { status: 403, headers: corsHeaders });
+  }
+  const todasCampanhas = await listarTodos(base44.asServiceRole.entities.CampanhaPortal, { tipo: 'PLANO_FERIAS' });
   const campanhas = todasCampanhas.filter((c: any) => c.tipo === 'PLANO_FERIAS');
   const primeira = campanhas.find((c: any) => ['Aberta_Coleta', 'Ativa'].includes(c.status)) || campanhas[0] || null;
   const planoId = !payload.campanha_id ? (textoId(payload.plano_id) || textoId(primeira?.plano_ferias_institucional_id)) : '';
   const campanhasConsulta = payload.campanha_id ? campanhas.filter((c: any) => c.id === payload.campanha_id) : planoId ? campanhas.filter((c: any) => textoId(c.plano_ferias_institucional_id) === planoId) : primeira ? [primeira] : [];
   const idsCampanhas = new Set(campanhasConsulta.map((c: any) => c.id));
-  const todosMilitares = await base44.asServiceRole.entities.Militar.list().catch(() => []);
-  const ativos = todosMilitares.filter((m: any) => !['inativo', 'falecido'].includes(tipoAcesso(m?.status_cadastro || m?.status)));
-  const militares = await filtrarEscopo(base44, user, ativos);
-  const idsEscopo = new Set(militares.map((m: any) => textoId(m?.id)).filter(Boolean));
-  const todasOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
+  const todosMilitares = await listarTodos(base44.asServiceRole.entities.Militar);
+  const militaresVisiveis = await filtrarEscopo(base44, user, todosMilitares);
+  const militares = militaresVisiveis.filter((m: any) => !['inativo', 'falecido'].includes(tipoAcesso(m?.status_cadastro || m?.status)));
+  const idsEscopo = new Set(militaresVisiveis.map((m: any) => textoId(m?.id)).filter(Boolean));
+  const todasOpcoes = await listarTodos(base44.asServiceRole.entities.OpcaoFeriasMilitar, { $or: [{ campanha_id: { $in: [...idsCampanhas] } }, { plano_ferias_institucional_id: planoId || '__nenhum__' }] });
   let opcoes = todasOpcoes.filter((op: any) => idsEscopo.has(textoId(op?.militar_id)) && (idsCampanhas.has(op.campanha_id) || (!payload.campanha_id && planoId && textoId(op.plano_ferias_institucional_id) === planoId))).map((op: any) => ({ ...op, campanha_titulo: campanhas.find((c: any) => c.id === op.campanha_id)?.titulo || '' }));
   const consolidado = Boolean(planoId && !payload.campanha_id);
   if (consolidado) opcoes = consolidarOpcoesPlano(opcoes);
@@ -73,9 +86,15 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
   const publico = Array.from(publicoMap.values());
   let cobertura: any[] | null = null;
   if (payload.incluir_cobertura === true && planoId) {
-    const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId).catch(() => null);
-    const ano = Number(plano?.ano_referencia || payload.ano_referencia || new Date().getFullYear() + 1);
-    const [periodos, ferias, ajustes] = await Promise.all([base44.asServiceRole.entities.PeriodoAquisitivo.list().catch(() => []), base44.asServiceRole.entities.Ferias.list().catch(() => []), base44.asServiceRole.entities.AjusteSaldoFerias.list().catch(() => [])]);
+    const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
+    if (!plano) return Response.json({ error: 'Plano não encontrado.' }, { status: 404, headers: corsHeaders });
+    const ano = Number(plano.ano_referencia);
+    const consultaMilitares = { militar_id: { $in: militares.filter((m: any) => !publicoMap.has(textoId(m.id))).map((m: any) => m.id) } };
+    const [periodos, ferias, ajustes] = await Promise.all([
+      listarTodos(base44.asServiceRole.entities.PeriodoAquisitivo, consultaMilitares),
+      listarTodos(base44.asServiceRole.entities.Ferias, { ...consultaMilitares, plano_ferias_id: planoId }),
+      listarTodos(base44.asServiceRole.entities.AjusteSaldoFerias, { ...consultaMilitares, status: 'ativo' }),
+    ]);
     cobertura = militares.flatMap((m: any) => {
       const id = textoId(m?.id);
       if (!id || publicoMap.has(id)) return [];
@@ -85,5 +104,6 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
       return elegiveis.length ? [{ militar_id: id, militar_nome: m?.nome_completo || m?.nome_guerra || '', militar_posto: m?.posto_graduacao || '', militar_matricula: m?.matricula || '', lotacao_nome: m?.lotacao || m?.estrutura_nome || 'Não informada', periodos_elegiveis: elegiveis }] : [];
     }).sort((a: any, b: any) => a.militar_nome.localeCompare(b.militar_nome, 'pt-BR'));
   }
-  return new Response(JSON.stringify({ ok: true, campanhas, opcoes, publico_alvo: publico, cobertura, total_elegiveis_nao_cobertos: cobertura?.length ?? null, total_publico_alvo_atual: publico.length, plano_id: planoId || null, modo_consolidado: consolidado }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const campanhasSeguras = campanhas.map((c: any) => ({ id: c.id, titulo: c.titulo, status: c.status, ano_referencia: c.ano_referencia, plano_ferias_institucional_id: c.plano_ferias_institucional_id, data_inicio: c.data_inicio, data_fim_militar: c.data_fim_militar }));
+  return new Response(JSON.stringify({ ok: true, campanhas: campanhasSeguras, opcoes, publico_alvo: publico, cobertura, total_elegiveis_nao_cobertos: cobertura?.length ?? null, total_publico_alvo_atual: publico.length, plano_id: planoId || null, modo_consolidado: consolidado }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }

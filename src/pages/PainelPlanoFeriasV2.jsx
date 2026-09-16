@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import useCoberturaPlano from '@/components/ferias/useCoberturaPlano';
 
 const MESES = [
   { val: '01', nome: 'Janeiro', curto: 'Jan' },
@@ -133,7 +134,7 @@ function statusOpcao(op) {
 }
 
 export default function PainelPlanoFeriasV2() {
-  const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
+  const { isAdmin = false, canAccessAction = () => false, userEmail } = useCurrentUser();
   const podeAprovar = isAdmin || canAccessAction('perm_aprovar_ferias');
   const podeVerCobertura = isAdmin || canAccessAction('perm_visualizar_respostas_ferias') || canAccessAction('perm_aprovar_ferias');
   const navigate = useNavigate();
@@ -148,12 +149,13 @@ export default function PainelPlanoFeriasV2() {
   const [campanhaAtual, setCampanhaAtual] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
   const [publicoAlvo, setPublicoAlvo] = useState([]);
-  const [cobertura, setCobertura] = useState([]);
-  const [coberturaCarregada, setCoberturaCarregada] = useState(false);
-  const [carregandoCobertura, setCarregandoCobertura] = useState(false);
   const [militaresSelecionados, setMilitaresSelecionados] = useState([]);
-
   const [visao, setVisao] = useState('lista');
+  const coberturaQuery = useCoberturaPlano(planoId, podeVerCobertura && visao === 'cobertura' && !loading, userEmail);
+  const cobertura = coberturaQuery.data || [];
+  const coberturaCarregada = coberturaQuery.isSuccess;
+  const carregandoCobertura = coberturaQuery.isFetching;
+  const podeCriarCampanha = (isAdmin || canAccessAction('visualizar_planos_ferias')) && planos.some((p) => p.id === planoId && p.status === 'ATIVO');
   const [busca, setBusca] = useState('');
   const [filtroCampanha, setFiltroCampanha] = useState('TODAS');
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
@@ -189,9 +191,10 @@ export default function PainelPlanoFeriasV2() {
       setCampanhaAtual(ativa);
       setOpcoes(opcoesRecebidas);
       setPublicoAlvo(publicoAlvoRecebido);
-      setCobertura([]);
-      setCoberturaCarregada(false);
       setMilitaresSelecionados([]);
+      setVisao('lista');
+      setSelecionado(null);
+      setFiltroCampanha('TODAS');
 
       if (planoAlvo && searchParams.get('planoId') !== planoAlvo) {
         const next = new URLSearchParams(searchParams);
@@ -397,20 +400,7 @@ export default function PainelPlanoFeriasV2() {
     return mapa;
   }, [opcoes]);
 
-  const abrirCobertura = async () => {
-    setVisao('cobertura');
-    if (coberturaCarregada || carregandoCobertura || !planoId) return;
-    setCarregandoCobertura(true);
-    try {
-      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_ESCALA_LISTAR', plano_id: planoId, incluir_cobertura: true });
-      setCobertura(resposta.data?.cobertura || []);
-      setCoberturaCarregada(true);
-    } catch (err) {
-      setFeedback({ type: 'error', message: err?.message || 'Não foi possível calcular a cobertura do plano.' });
-    } finally {
-      setCarregandoCobertura(false);
-    }
-  };
+  const abrirCobertura = () => { setSelecionado(null); setVisao('cobertura'); };
 
   const alternarCobertura = (militarId) => setMilitaresSelecionados((atuais) => atuais.includes(militarId) ? atuais.filter((id) => id !== militarId) : [...atuais, militarId]);
   const alternarTodosCobertura = () => setMilitaresSelecionados((atuais) => atuais.length === cobertura.length ? [] : cobertura.map((m) => m.militar_id));
@@ -488,7 +478,7 @@ export default function PainelPlanoFeriasV2() {
             <Kpi icon={Users} value={coberturaCarregada ? cobertura.length : '—'} label="Elegíveis não cobertos" tone={coberturaCarregada && cobertura.length ? 'amber' : 'slate'} sub={!coberturaCarregada ? 'Consulte na aba Cobertura' : ''} />
           </div>
 
-          <div className="mt-6 border-b border-slate-200 flex gap-6">
+          <div className="mt-6 border-b border-slate-200 flex flex-wrap gap-x-6">
             <button onClick={() => setVisao('lista')} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'lista' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
               <LayoutList className="w-4 h-4" /> Lista de militares
             </button>
@@ -585,7 +575,10 @@ export default function PainelPlanoFeriasV2() {
             </>
           ) : visao === 'cobertura' ? (
             <CoberturaPlanoFerias
-              loading={carregandoCobertura}
+              loading={carregandoCobertura || (!coberturaCarregada && !coberturaQuery.isError)}
+              error={coberturaQuery.error?.message}
+              onRetry={coberturaQuery.refetch}
+              podeCriar={podeCriarCampanha}
               militares={cobertura}
               selecionados={militaresSelecionados}
               onToggle={alternarCobertura}

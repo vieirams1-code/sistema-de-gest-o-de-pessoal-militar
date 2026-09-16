@@ -480,36 +480,10 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
 async function usuarioPodeAgirSobreMilitarPortal(base44: any, user: any, militarId: string): Promise<boolean> {
   if (!user?.email || !militarId) return false;
   if (String(user.role || '').trim().toLowerCase() === 'admin') return true;
-
-  const acessos = await base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true });
-  if ((acessos || []).some((a: any) => normalizarTipoAcesso(a?.tipo_acesso) === 'admin')) return true;
-
-  const militar = await base44.asServiceRole.entities.Militar.get(militarId).catch(() => null);
+  const militar = await base44.asServiceRole.entities.Militar.get(militarId);
   if (!militar) return false;
-
-  for (const acesso of acessos || []) {
-    const tipo = normalizarTipoAcesso(acesso?.tipo_acesso);
-    if (tipo === 'proprio' && String(acesso?.militar_id || '') === String(militarId)) return true;
-
-    const grupamentoId = String(acesso?.grupamento_id || '').trim();
-    const subgrupamentoId = String(acesso?.subgrupamento_id || '').trim();
-    const estruturaId = String(militar?.estrutura_id || '').trim();
-    const militarSubgrupamentoId = String(militar?.subgrupamento_id || '').trim();
-    const militarGrupamentoId = String(militar?.grupamento_id || '').trim();
-    const militarRaizId = String(militar?.grupamento_raiz_id || '').trim();
-
-    if (tipo === 'setor' && grupamentoId && [estruturaId, militarGrupamentoId, militarRaizId].includes(grupamentoId)) return true;
-    if (tipo === 'unidade' && subgrupamentoId && [estruturaId, militarSubgrupamentoId].includes(subgrupamentoId)) return true;
-
-    if (tipo === 'subsetor' && subgrupamentoId) {
-      if ([estruturaId, militarSubgrupamentoId].includes(subgrupamentoId)) return true;
-      const filhos = await base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }).catch(() => []);
-      const idsFilhos = new Set((filhos || []).map((f: any) => String(f?.id || '')).filter(Boolean));
-      if (idsFilhos.has(estruturaId) || idsFilhos.has(militarSubgrupamentoId)) return true;
-    }
-  }
-
-  return false;
+  const { filtrarEscopo } = await import('../../shared/ferias/listarEscalaPlano.ts');
+  return (await filtrarEscopo(base44, user, [militar])).length === 1;
 }
 
 function sanitizarItemAnexoCampanha(item: any, incluirUrl = false): any {
@@ -1157,8 +1131,8 @@ Deno.serve(async (req: Request) => {
               });
             }
 
-            const { validarEscopoCampanhaFerias } = await import('../../shared/ferias/listarEscalaPlano.ts');
-            const erroEscopo = validarEscopoCampanhaFerias(cp);
+            const { validarEscopoCampanhaFerias, validarSelecaoNominal } = await import('../../shared/ferias/listarEscalaPlano.ts');
+            const erroEscopo = validarEscopoCampanhaFerias(cp) || (cp.tipo_escopo === 'SELECAO_MILITARES' ? await validarSelecaoNominal(base44, user, cp) : '');
             if (erroEscopo) {
               return new Response(JSON.stringify({ error: erroEscopo }), {
                 status: 400,
@@ -1190,7 +1164,7 @@ Deno.serve(async (req: Request) => {
             status: cp.status || 'Aberta_Coleta',
             tipo_escopo: cp.tipo_escopo || 'TODOS',
             escopo_unidades_ids: cp.escopo_unidades_ids || [],
-            escopo_unidades_nomes: cp.tipo_escopo === 'SEM_ESCOPO' ? '' : (cp.escopo_unidades_nomes || 'Toda a Corporação'),
+            escopo_unidades_nomes: cp.tipo_escopo === 'SELECAO_MILITARES' ? `Seleção de ${cp.escopo_militares_ids.length} militar(es)` : cp.tipo_escopo === 'SEM_ESCOPO' ? '' : (cp.escopo_unidades_nomes || 'Toda a Corporação'),
             escopo_militares_ids: cp.escopo_militares_ids || [],
             escopo_militares_excluidos_ids: cp.escopo_militares_excluidos_ids || [],
             escopo_grupos_ids: cp.escopo_grupos_ids || [],
