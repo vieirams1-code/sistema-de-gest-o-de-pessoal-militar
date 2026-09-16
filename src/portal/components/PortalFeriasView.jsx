@@ -53,53 +53,60 @@ export default function PortalFeriasView({ onBack }) {
   const [mesOpcao3, setMesOpcao3] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const [infoMsg, setInfoMsg] = useState(null);
   const [campanhaIdSelecionada, setCampanhaIdSelecionada] = useState('');
+
+  const applyFeriasResponse = (res) => {
+    setData(res);
+    if (res?.periodo_mais_antigo_id) {
+      setSelectedPeriodoId(res.periodo_mais_antigo_id);
+      const periodoPlano = (res?.periodos || []).find((p) => p.id === res.periodo_mais_antigo_id);
+      if (periodoPlano && Number(periodoPlano.dias_sem_previsao || 0) !== 30) {
+        setModalidade('CUSTOM');
+      } else {
+        const modalidadePadrao = [
+          [res?.config?.permitir_1_etapa, '1_ETAPA_30'],
+          [res?.config?.permitir_2_etapas, '2_ETAPAS_15'],
+          [res?.config?.permitir_3_etapas, '3_ETAPAS_10'],
+        ].find(([permitida]) => permitida === true)?.[1];
+        if (modalidadePadrao) setModalidade(modalidadePadrao);
+      }
+    } else {
+      setSelectedPeriodoId('');
+    }
+    if (res?.opcao_militar_enviada) {
+      const opEnviada = res.opcao_militar_enviada;
+      if (opEnviada.modalidade) setModalidade(opEnviada.modalidade);
+      setIsEditing(false);
+      try {
+        const p1 = JSON.parse(opEnviada.opcao_1_detalhes || '[]');
+        if (p1[0]?.mes) setMesOpcao1(p1[0].mes);
+        const p2 = JSON.parse(opEnviada.opcao_2_detalhes || '[]');
+        if (p2[0]?.mes) setMesOpcao2(p2[0].mes);
+        const p3 = JSON.parse(opEnviada.opcao_3_detalhes || '[]');
+        if (p3[0]?.mes) setMesOpcao3(p3[0].mes);
+      } catch (_err) {}
+    } else {
+      setIsEditing(true);
+      setMesOpcao1('');
+      setMesOpcao2('');
+      setMesOpcao3('');
+    }
+  };
 
   const loadData = async (campanhaIdOverride = campanhaIdSelecionada) => {
     setLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
     try {
       const res = await getFerias(campanhaIdOverride);
-      setData(res);
-
-      if (res?.periodo_mais_antigo_id) {
-        setSelectedPeriodoId(res.periodo_mais_antigo_id);
-        const periodoPlano = (res?.periodos || []).find((p) => p.id === res.periodo_mais_antigo_id);
-        if (periodoPlano && Number(periodoPlano.dias_sem_previsao || 0) !== 30) {
-          setModalidade('CUSTOM');
-        } else {
-          const modalidadePadrao = [
-            [res?.config?.permitir_1_etapa, '1_ETAPA_30'],
-            [res?.config?.permitir_2_etapas, '2_ETAPAS_15'],
-            [res?.config?.permitir_3_etapas, '3_ETAPAS_10'],
-          ].find(([permitida]) => permitida === true)?.[1];
-          if (modalidadePadrao) setModalidade(modalidadePadrao);
-        }
+      if (res?.redirecionar_campanha_id && res.redirecionar_campanha_id !== campanhaIdOverride) {
+        setCampanhaIdSelecionada(res.redirecionar_campanha_id);
+        setInfoMsg(res.mensagem_redirecionamento || 'Você já respondeu a este plano por outra campanha.');
+        const resOrig = await getFerias(res.redirecionar_campanha_id);
+        applyFeriasResponse(resOrig);
       } else {
-        setSelectedPeriodoId('');
-      }
-
-      // Se o militar já havia enviado opções
-      if (res?.opcao_militar_enviada) {
-        const opEnviada = res.opcao_militar_enviada;
-        if (opEnviada.modalidade) setModalidade(opEnviada.modalidade);
-        setIsEditing(false);
-
-        try {
-          const p1 = JSON.parse(opEnviada.opcao_1_detalhes || '[]');
-          if (p1[0]?.mes) setMesOpcao1(p1[0].mes);
-
-          const p2 = JSON.parse(opEnviada.opcao_2_detalhes || '[]');
-          if (p2[0]?.mes) setMesOpcao2(p2[0].mes);
-
-          const p3 = JSON.parse(opEnviada.opcao_3_detalhes || '[]');
-          if (p3[0]?.mes) setMesOpcao3(p3[0].mes);
-        } catch (_err) {}
-      } else {
-        setIsEditing(true);
-        setMesOpcao1('');
-        setMesOpcao2('');
-        setMesOpcao3('');
+        applyFeriasResponse(res);
       }
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao carregar informações de férias.');
@@ -184,7 +191,13 @@ export default function PortalFeriasView({ onBack }) {
       setIsEditing(false);
       await loadData();
     } catch (err) {
-      setErrorMsg(err.message || 'Falha ao salvar opção de férias.');
+      if (err?.data?.redirecionar_campanha_id) {
+        setCampanhaIdSelecionada(err.data.redirecionar_campanha_id);
+        setInfoMsg(err.message || 'Você já respondeu a este plano por outra campanha.');
+        await loadData(err.data.redirecionar_campanha_id);
+      } else {
+        setErrorMsg(err.message || 'Falha ao salvar opção de férias.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -239,6 +252,13 @@ export default function PortalFeriasView({ onBack }) {
         <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
           <span>{successMsg}</span>
+        </div>
+      )}
+
+      {infoMsg && (
+        <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center space-x-2 animate-in fade-in">
+          <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
+          <span>{infoMsg}</span>
         </div>
       )}
 

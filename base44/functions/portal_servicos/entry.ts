@@ -3093,10 +3093,10 @@ Deno.serve(async (req: Request) => {
           });
         }
 
+        const planoIdAtivoFerias = textoId(campanhaFeriasAtiva?.plano_ferias_institucional_id);
+        let opcaoPlanoExistente: any = null;
+        if (planoIdAtivoFerias) { try { const ops = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId }); opcaoPlanoExistente = (ops || []).find((op: any) => textoId(op?.plano_ferias_institucional_id) === planoIdAtivoFerias) || null; } catch (_e) {} if (campanhaSolicitada && opcaoPlanoExistente && textoId(opcaoPlanoExistente.campanha_id) !== textoId(campanhaSolicitada.id) && campanhasFeriasElegiveis.some((c) => c.id === opcaoPlanoExistente.campanha_id)) return new Response(JSON.stringify({ ok: true, redirecionar_campanha_id: opcaoPlanoExistente.campanha_id, mensagem_redirecionamento: 'Você já respondeu a este plano por outra campanha. Redirecionando para a campanha original.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }); }
         const anoCampanha = campanhaFeriasAtiva?.ano_referencia || (new Date().getFullYear() + 1);
-
-        // O plano usa a mesma ideia do saldo operacional: direito líquido menos férias
-        // já gozadas/previstas. Não basta olhar apenas dias_gozados persistidos no período.
         let rawPeriodos: any[] = [];
         let feriasMilitarPlano: any[] = [];
         let ajustesMilitarPlano: any[] = [];
@@ -3128,16 +3128,8 @@ Deno.serve(async (req: Request) => {
           is_periodo_plano_selecionavel: p.id === maisAntigoId,
         }));
 
-        // Busca opção de férias já enviada pelo militar para esta campanha específica
-        let opcoesEnviadas: any[] = [];
-        try {
-          if (campanhaFeriasAtiva?.id) {
-            opcoesEnviadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
-              militar_id: militarId,
-              campanha_id: campanhaFeriasAtiva.id,
-            });
-          }
-        } catch (_e) {}
+        let opcoesEnviadas: any[] = opcaoPlanoExistente ? [opcaoPlanoExistente] : [];
+        if (!opcaoPlanoExistente && campanhaFeriasAtiva?.id && !planoIdAtivoFerias) { try { opcoesEnviadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ militar_id: militarId, campanha_id: campanhaFeriasAtiva.id }); } catch (_e) {} }
 
         let regrasCampanha: any = {};
         if (campanhaFeriasAtiva?.config_regras) {
@@ -3426,12 +3418,8 @@ Deno.serve(async (req: Request) => {
           return Boolean(mesmoPlano || mesmaCampanhaLegada);
         });
 
-        if (existentes?.[0]?.gerado_ferias_efetivas === true) {
-          return new Response(JSON.stringify({ error: 'As férias deste período já foram geradas e a resposta não pode mais ser substituída.' }), {
-            status: 409,
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          });
-        }
+        if (existentes?.[0]?.gerado_ferias_efetivas === true) return new Response(JSON.stringify({ error: 'As férias deste período já foram geradas e a resposta não pode mais ser substituída.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        if (planoIdAtivo && existentes?.[0]?.id && textoId(existentes[0].campanha_id) !== textoId(campanhaId)) return new Response(JSON.stringify({ error: 'Você já respondeu a este plano de férias por outra campanha.', redirecionar_campanha_id: existentes[0].campanha_id }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
 
         const opcaoPayload = {
           campanha_id: campanhaId,
@@ -3468,18 +3456,18 @@ Deno.serve(async (req: Request) => {
           salvoRecord = await base44.asServiceRole.entities.OpcaoFeriasMilitar.create(opcaoPayload);
         }
 
-        // Mantém os contadores denormalizados da campanha coerentes com as respostas
-        // reais, sem alterar nenhuma opção já registrada.
         try {
-          const opcoesCampanhaAtualizadas = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id: campanhaId });
-          const totalRespondidosCampanha = new Set((opcoesCampanhaAtualizadas || []).map((item: any) => textoId(item.militar_id)).filter(Boolean)).size;
-          await base44.asServiceRole.entities.CampanhaPortal.update(campanhaId, {
-            total_respondidos: totalRespondidosCampanha,
-            total_pendentes: Math.max(0, Number(campanhaFeriasAtiva.total_publico_alvo || 0) - totalRespondidosCampanha),
-          });
-        } catch (_erroContadores) {
-          // A resposta já foi salva; falha de contador não desfaz a operação principal.
-        }
+          const cpsSync = planoIdAtivo ? campanhasFeriasElegiveisSubmissao.filter((c) => textoId(c.plano_ferias_institucional_id) === planoIdAtivo) : [campanhaFeriasAtiva];
+          const opcsSync = planoIdAtivo ? await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ plano_ferias_institucional_id: planoIdAtivo }) : await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({ campanha_id: campanhaId });
+          const respPlano = new Set((opcsSync || []).map((i: any) => textoId(i.militar_id)).filter(Boolean));
+          const todosMSync = await base44.asServiceRole.entities.Militar.list();
+          const mbgSync = await carregarMembrosPorGrupo(base44, cpsSync);
+          for (const cp of cpsSync) {
+            const membrosCp = (todosMSync || []).filter((m: any) => { const st = String(m?.status_cadastro || m?.status || '').trim().toLowerCase(); return st !== 'inativo' && st !== 'falecido' && matchMilitarCampanha(cp, m, mbgSync); });
+            const r = membrosCp.filter((m: any) => respPlano.has(textoId(m.id))).length;
+            await base44.asServiceRole.entities.CampanhaPortal.update(cp.id, { total_respondidos: r, total_pendentes: Math.max(0, membrosCp.length - r), total_publico_alvo: membrosCp.length || Number(cp.total_publico_alvo || 0) });
+          }
+        } catch (_erroContadores) {}
 
         await registrarAuditoriaPortal(base44, {
           sessao_id: sessionAuth.context.sessao_id,
@@ -3519,17 +3507,10 @@ Deno.serve(async (req: Request) => {
           let dataResposta = null;
           let respostaId = null;
 
+          let campanhaRespostaId = null;
           if (cp.tipo === 'PLANO_FERIAS') {
-            const op = opcoesFerias.find((o: any) =>
-              cp.plano_ferias_institucional_id
-                ? textoId(o.plano_ferias_institucional_id) === textoId(cp.plano_ferias_institucional_id)
-                : o.campanha_id === cp.id
-            );
-            if (op) {
-              statusResposta = 'Respondido';
-              dataResposta = op.data_envio_militar || op.created_date;
-              respostaId = op.id;
-            }
+            const op = opcoesFerias.find((o: any) => cp.plano_ferias_institucional_id ? textoId(o.plano_ferias_institucional_id) === textoId(cp.plano_ferias_institucional_id) : o.campanha_id === cp.id);
+            if (op) { statusResposta = 'Respondido'; dataResposta = op.data_envio_militar || op.created_date; respostaId = op.id; campanhaRespostaId = op.campanha_id; }
           } else if (cp.tipo === 'ATUALIZACAO_CADASTRAL' || cp.tipo === 'CONFERENCIA_GERAL') {
             const conferiu = militar.data_ultima_conferencia && cp.data_inicio && militar.data_ultima_conferencia >= cp.data_inicio;
             if (conferiu) {
@@ -3553,32 +3534,20 @@ Deno.serve(async (req: Request) => {
           }
 
           return {
-            id: cp.id,
-            tipo: cp.tipo,
-            titulo: cp.titulo,
-            ano_referencia: cp.ano_referencia,
-            data_inicio: cp.data_inicio,
-            data_fim_militar: cp.data_fim_militar,
-            instrucoes: cp.instrucoes,
-            status_resposta: statusResposta,
-            data_resposta: dataResposta,
-            resposta_id: respostaId,
-            arquivo_modelo_url: cp.arquivo_modelo_url,
-            arquivo_modelo_nome: cp.arquivo_modelo_nome,
-            exigir_devolucao_arquivo: Boolean(cp.exigir_devolucao_arquivo),
-            texto_termo_aceite: cp.texto_termo_aceite,
+            id: cp.id, tipo: cp.tipo, titulo: cp.titulo, ano_referencia: cp.ano_referencia,
+            data_inicio: cp.data_inicio, data_fim_militar: cp.data_fim_militar, instrucoes: cp.instrucoes,
+            status_resposta: statusResposta, data_resposta: dataResposta, resposta_id: respostaId,
+            plano_ferias_institucional_id: cp.plano_ferias_institucional_id || '',
+            campanha_resposta_id: campanhaRespostaId,
+            arquivo_modelo_url: cp.arquivo_modelo_url, arquivo_modelo_nome: cp.arquivo_modelo_nome,
+            exigir_devolucao_arquivo: Boolean(cp.exigir_devolucao_arquivo), texto_termo_aceite: cp.texto_termo_aceite,
             total_perguntas: formConfig?.campos?.length || 0,
           };
         });
 
-        return new Response(JSON.stringify({
-          ok: true,
-          campanhas: campanhasEnriquecidas,
-          total_pendentes: campanhasEnriquecidas.filter((c) => c.status_resposta === 'Pendente' || c.status_resposta === 'Pendente_Correcao').length,
-        }), {
-          status: 200,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        });
+        const campanhasDedup = []; const seenPlano = new Map();
+        for (const c of campanhasEnriquecidas) { const pid = c.tipo === 'PLANO_FERIAS' ? textoId(c.plano_ferias_institucional_id) : ''; const key = pid || c.id; const prev = seenPlano.get(key); if (!prev) { seenPlano.set(key, c); campanhasDedup.push(c); } else if (prev.status_resposta !== 'Respondido' && c.status_resposta === 'Respondido') { seenPlano.set(key, c); const idx = campanhasDedup.indexOf(prev); if (idx >= 0) campanhasDedup[idx] = c; } }
+        return new Response(JSON.stringify({ ok: true, campanhas: campanhasDedup, total_pendentes: campanhasDedup.filter((c) => c.status_resposta === 'Pendente' || c.status_resposta === 'Pendente_Correcao').length }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
       }
 
       // Obter Detalhes de Campanha Dinâmica / Documento para o Militar
