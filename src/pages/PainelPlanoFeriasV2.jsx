@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import CoberturaPlanoFerias from '@/components/ferias/CoberturaPlanoFerias';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
@@ -134,6 +135,8 @@ function statusOpcao(op) {
 export default function PainelPlanoFeriasV2() {
   const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
   const podeAprovar = isAdmin || canAccessAction('perm_aprovar_ferias');
+  const podeVerCobertura = isAdmin || canAccessAction('perm_visualizar_respostas_ferias') || canAccessAction('perm_aprovar_ferias');
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
@@ -145,6 +148,10 @@ export default function PainelPlanoFeriasV2() {
   const [campanhaAtual, setCampanhaAtual] = useState(null);
   const [opcoes, setOpcoes] = useState([]);
   const [publicoAlvo, setPublicoAlvo] = useState([]);
+  const [cobertura, setCobertura] = useState([]);
+  const [coberturaCarregada, setCoberturaCarregada] = useState(false);
+  const [carregandoCobertura, setCarregandoCobertura] = useState(false);
+  const [militaresSelecionados, setMilitaresSelecionados] = useState([]);
 
   const [visao, setVisao] = useState('lista');
   const [busca, setBusca] = useState('');
@@ -182,6 +189,9 @@ export default function PainelPlanoFeriasV2() {
       setCampanhaAtual(ativa);
       setOpcoes(opcoesRecebidas);
       setPublicoAlvo(publicoAlvoRecebido);
+      setCobertura([]);
+      setCoberturaCarregada(false);
+      setMilitaresSelecionados([]);
 
       if (planoAlvo && searchParams.get('planoId') !== planoAlvo) {
         const next = new URLSearchParams(searchParams);
@@ -387,6 +397,25 @@ export default function PainelPlanoFeriasV2() {
     return mapa;
   }, [opcoes]);
 
+  const abrirCobertura = async () => {
+    setVisao('cobertura');
+    if (coberturaCarregada || carregandoCobertura || !planoId) return;
+    setCarregandoCobertura(true);
+    try {
+      const resposta = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_ESCALA_LISTAR', plano_id: planoId, incluir_cobertura: true });
+      setCobertura(resposta.data?.cobertura || []);
+      setCoberturaCarregada(true);
+    } catch (err) {
+      setFeedback({ type: 'error', message: err?.message || 'Não foi possível calcular a cobertura do plano.' });
+    } finally {
+      setCarregandoCobertura(false);
+    }
+  };
+
+  const alternarCobertura = (militarId) => setMilitaresSelecionados((atuais) => atuais.includes(militarId) ? atuais.filter((id) => id !== militarId) : [...atuais, militarId]);
+  const alternarTodosCobertura = () => setMilitaresSelecionados((atuais) => atuais.length === cobertura.length ? [] : cobertura.map((m) => m.militar_id));
+  const criarCampanhaSelecionados = () => navigate(`/PlanosFerias?planoId=${encodeURIComponent(planoId)}&novaCampanha=1&militares=${encodeURIComponent(militaresSelecionados.join(','))}`);
+
   if (loading) {
     return (
       <div className="min-h-[65vh] flex flex-col items-center justify-center gap-3">
@@ -450,12 +479,13 @@ export default function PainelPlanoFeriasV2() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-6">
             <Kpi icon={Users} value={totalPublico} label="Militares no plano" tone="blue" />
             <Kpi icon={CheckCircle2} value={totalRespondidos} label="Responderam" tone="green" sub={totalPublico ? `${Math.round((totalRespondidos / totalPublico) * 100)}% do escopo` : ''} />
             <Kpi icon={Clock3} value={totalSemResposta} label="Não responderam" tone="slate" />
             <Kpi icon={CalendarDays} value={totalDefinidos} label="Férias definidas" tone="green" />
             <Kpi icon={AlertTriangle} value={totalPendentes} label="Pendentes de definição" tone="amber" />
+            <Kpi icon={Users} value={coberturaCarregada ? cobertura.length : '—'} label="Elegíveis não cobertos" tone={coberturaCarregada && cobertura.length ? 'amber' : 'slate'} sub={!coberturaCarregada ? 'Consulte na aba Cobertura' : ''} />
           </div>
 
           <div className="mt-6 border-b border-slate-200 flex gap-6">
@@ -465,6 +495,9 @@ export default function PainelPlanoFeriasV2() {
             <button onClick={() => setVisao('meses')} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'meses' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
               <BarChart3 className="w-4 h-4" /> Distribuição por mês
             </button>
+            {podeVerCobertura && <button onClick={abrirCobertura} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'cobertura' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
+              <Users className="w-4 h-4" /> Cobertura
+            </button>}
           </div>
 
           {visao === 'lista' ? (
@@ -550,6 +583,15 @@ export default function PainelPlanoFeriasV2() {
                 )}
               </div>
             </>
+          ) : visao === 'cobertura' ? (
+            <CoberturaPlanoFerias
+              loading={carregandoCobertura}
+              militares={cobertura}
+              selecionados={militaresSelecionados}
+              onToggle={alternarCobertura}
+              onToggleTodos={alternarTodosCobertura}
+              onCriar={criarCampanhaSelecionados}
+            />
           ) : (
             <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-5">
               {MESES.map((mes) => {

@@ -1157,60 +1157,10 @@ Deno.serve(async (req: Request) => {
               });
             }
 
-            const tipoEscopo = String(cp.tipo_escopo || 'TODOS');
-            const gruposIds = Array.isArray(cp.escopo_grupos_ids) ? cp.escopo_grupos_ids.filter(Boolean) : [];
-            const unidadesIds = Array.isArray(cp.escopo_unidades_ids) ? cp.escopo_unidades_ids.filter(Boolean) : [];
-            const tiposEscopoValidos = new Set(['TODOS', 'UNIDADES', 'SEM_ESCOPO', 'UNIDADES_E_GRUPOS']);
-            if (!tiposEscopoValidos.has(tipoEscopo)) {
-              return new Response(JSON.stringify({ error: 'Modo de escopo inválido para a campanha.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (tipoEscopo === 'TODOS' && (gruposIds.length > 0 || unidadesIds.length > 0)) {
-              return new Response(JSON.stringify({ error: 'O modo Toda a Corporação não pode conter unidades ou grupos selecionados.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (tipoEscopo === 'SEM_ESCOPO' && gruposIds.length === 0) {
-              return new Response(JSON.stringify({ error: 'Selecione ao menos um grupo de militares quando o escopo de lotação estiver vazio.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (gruposIds.length > 0 && !['SEM_ESCOPO', 'UNIDADES_E_GRUPOS'].includes(tipoEscopo)) {
-              return new Response(JSON.stringify({ error: 'Ao selecionar grupos, escolha Somente Grupo de Militares ou Unidades + Grupos.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (unidadesIds.length > 0 && !['UNIDADES', 'UNIDADES_E_GRUPOS'].includes(tipoEscopo)) {
-              return new Response(JSON.stringify({ error: 'Ao selecionar unidades, escolha Somente Unidades ou Unidades + Grupos.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (tipoEscopo === 'SEM_ESCOPO' && unidadesIds.length > 0) {
-              return new Response(JSON.stringify({ error: 'O modo somente grupos não pode conter unidades no escopo de lotação.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (tipoEscopo === 'UNIDADES' && gruposIds.length > 0) {
-              return new Response(JSON.stringify({ error: 'O modo Somente Unidades não pode conter grupos de militares.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (tipoEscopo === 'UNIDADES_E_GRUPOS' && (unidadesIds.length === 0 || gruposIds.length === 0)) {
-              return new Response(JSON.stringify({ error: 'No modo Unidades + Grupos, selecione ao menos uma unidade e um grupo.' }), {
-                status: 400,
-                headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-              });
-            }
-            if (tipoEscopo === 'UNIDADES' && unidadesIds.length === 0) {
-              return new Response(JSON.stringify({ error: 'Selecione ao menos uma unidade para o escopo da campanha.' }), {
+            const { validarEscopoCampanhaFerias } = await import('../../shared/ferias/listarEscalaPlano.ts');
+            const erroEscopo = validarEscopoCampanhaFerias(cp);
+            if (erroEscopo) {
+              return new Response(JSON.stringify({ error: erroEscopo }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
               });
@@ -2163,99 +2113,18 @@ Deno.serve(async (req: Request) => {
           }
 
           if (acao === 'PLANO_ESCALA_LISTAR') {
-            // 1. Carrega todas as campanhas de férias cadastradas
-            let todasCampanhasPortal: any[] = [];
-            try {
-              todasCampanhasPortal = await base44.asServiceRole.entities.CampanhaPortal.list();
-            } catch (_e) {
-              todasCampanhasPortal = [];
-            }
-            const campanhasFerias = (todasCampanhasPortal || []).filter((cp: any) => cp.tipo === 'PLANO_FERIAS');
-            const campanhasIdsValidos = new Set(campanhasFerias.map((c: any) => c.id));
-
-            // 2. Consulta opções por campanha ou consolida todas as campanhas do mesmo plano.
-            // Sem parâmetros, mantém compatibilidade e abre o primeiro plano ativo de forma consolidada.
-            const primeiraCampanha = campanhasFerias.find((c: any) => c.status === 'Aberta_Coleta' || c.status === 'Ativa') || campanhasFerias[0] || null;
-            const planoIdConsulta = !payload.campanha_id
-              ? (textoId(payload.plano_id) || textoId(primeiraCampanha?.plano_ferias_institucional_id))
-              : '';
-            const campanhasConsulta = payload.campanha_id
-              ? campanhasFerias.filter((campanha: any) => campanha.id === payload.campanha_id)
-              : planoIdConsulta
-                ? campanhasFerias.filter((campanha: any) => textoId(campanha.plano_ferias_institucional_id) === planoIdConsulta)
-                : primeiraCampanha
-                  ? [primeiraCampanha]
-                  : [];
-            const idsCampanhasConsulta = new Set(campanhasConsulta.map((campanha: any) => campanha.id));
-
-            const allOpcoes = await base44.asServiceRole.entities.OpcaoFeriasMilitar.list();
-            let opcoes = (allOpcoes || [])
-              .filter((op: any) => idsCampanhasConsulta.has(op.campanha_id)
-                || (!payload.campanha_id && planoIdConsulta && textoId(op.plano_ferias_institucional_id) === planoIdConsulta))
-              .map((op: any) => ({
-                ...op,
-                campanha_titulo: campanhasFerias.find((campanha: any) => campanha.id === op.campanha_id)?.titulo || '',
-              }));
-
-            const modoConsolidado = Boolean(planoIdConsulta && !payload.campanha_id);
-            if (modoConsolidado) {
-              opcoes = consolidarOpcoesPlano(opcoes);
-            }
-
-            // 3. Relação nominal atual do público-alvo.
-            // O painel V2 precisa exibir também quem ainda não respondeu. A relação é
-            // recalculada a partir do escopo atual das campanhas (inclusive grupos),
-            // deduplicando o militar quando ele participa de mais de uma campanha do plano.
-            let todosMilitaresEscala: any[] = [];
-            try {
-              todosMilitaresEscala = await base44.asServiceRole.entities.Militar.list();
-            } catch (_e) {
-              todosMilitaresEscala = [];
-            }
-            const membrosPorGrupoEscala = await carregarMembrosPorGrupo(base44, campanhasConsulta);
-            const publicoAlvoMap = new Map<string, any>();
-
-            for (const militar of todosMilitaresEscala || []) {
-              const statusCadastro = String(militar?.status_cadastro || militar?.status || '').trim().toLowerCase();
-              if (statusCadastro === 'inativo' || statusCadastro === 'falecido') continue;
-
-              const campanhasAlvo = campanhasConsulta.filter((campanha: any) => (
-                matchMilitarCampanha(campanha, militar, membrosPorGrupoEscala)
-              ));
-              if (campanhasAlvo.length === 0) continue;
-
-              const militarId = textoId(militar?.id);
-              if (!militarId) continue;
-              publicoAlvoMap.set(militarId, {
-                militar_id: militarId,
-                militar_nome: militar?.nome_completo || militar?.nome_guerra || '',
-                militar_nome_guerra: militar?.nome_guerra || '',
-                militar_posto: militar?.posto_graduacao || '',
-                militar_matricula: militar?.matricula || '',
-                militar_quadro: militar?.quadro || '',
-                lotacao_id: militar?.estrutura_id || militar?.subgrupamento_id || militar?.lotacao_id || '',
-                lotacao_nome: militar?.lotacao || militar?.estrutura_nome || 'Não informada',
-                campanhas_alvo: campanhasAlvo.map((campanha: any) => ({
-                  campanha_id: campanha.id,
-                  titulo: campanha.titulo || '',
-                })),
-              });
-            }
-            const publicoAlvo = Array.from(publicoAlvoMap.values());
-
-            // 4. A consulta não remove opções órfãs.
-            // Registros históricos devem ser preservados para análise e eventual restauração.
-            // A limpeza de órfãos, se necessária, será uma operação administrativa explícita.
-
-            return new Response(JSON.stringify({
-              ok: true,
-              campanhas: campanhasFerias || [],
-              opcoes: opcoes || [],
-              publico_alvo: publicoAlvo,
-              total_publico_alvo_atual: publicoAlvo.length,
-              plano_id: planoIdConsulta || null,
-              modo_consolidado: modoConsolidado,
-            }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            const { listarEscalaPlano } = await import('../../shared/ferias/listarEscalaPlano.ts');
+            return await listarEscalaPlano({
+              base44,
+              user,
+              payload,
+              calcularResumoPeriodoPlano,
+              feriasVinculadasAoPlano,
+              consolidarOpcoesPlano,
+              carregarMembrosPorGrupo,
+              matchMilitarCampanha,
+              corsHeaders: CORS_HEADERS,
+            });
           }
 
           if (acao === 'PLANO_DECISAO_CAMADA_1') {

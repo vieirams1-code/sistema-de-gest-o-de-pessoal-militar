@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users, X, Eye, ShieldCheck, Trash2 } from 'lucide-react';
@@ -54,6 +54,8 @@ const novoPlano = () => ({
 
 export default function PlanosFerias() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [prefillCampanhaAplicado, setPrefillCampanhaAplicado] = useState(false);
   const { isAdmin = false, canAccessAction = () => false } = useCurrentUser();
   const podeVisualizarPlanos = isAdmin || canAccessAction('visualizar_planos_ferias');
   const podeCriarPlanos = isAdmin || canAccessAction('criar_planos_ferias');
@@ -97,7 +99,11 @@ export default function PlanosFerias() {
         listaPlanos = resposta.data?.planos || [];
         setPlanos(listaPlanos);
         setCampanhas(resposta.data?.campanhas || []);
-        setSelecionado((atual) => atual ? listaPlanos.find((p) => p.id === atual.id) || null : null);
+        setSelecionado((atual) => {
+          const planoUrl = searchParams.get('planoId');
+          if (planoUrl) return listaPlanos.find((p) => p.id === planoUrl) || null;
+          return atual ? listaPlanos.find((p) => p.id === atual.id) || null : null;
+        });
       } else {
         setPlanos([]);
         setCampanhas([]);
@@ -255,15 +261,16 @@ export default function PlanosFerias() {
     }
   };
 
-  const abrirNovaCampanha = () => {
+  const abrirNovaCampanha = (militaresIds = []) => {
     if (!podeCriarCampanhas || !selecionado || selecionado.status === 'ARQUIVADO') return;
     const ano = Number(selecionado.ano_referencia);
     setCampanhaForm({
       titulo: `Campanha de Férias — ${selecionado.titulo}`,
       ano_referencia: ano,
-      tipo_escopo: 'TODOS',
+      tipo_escopo: militaresIds.length ? 'SELECAO_MILITARES' : 'TODOS',
       escopo_unidades_ids: [],
       escopo_grupos_ids: [],
+      escopo_militares_ids: militaresIds,
       data_inicio: new Date().toISOString().slice(0, 10),
       data_fim_militar: `${ano}-10-31`,
       data_fim_unidade: `${ano}-11-30`,
@@ -273,11 +280,28 @@ export default function PlanosFerias() {
     setFeedback({ tipo: '', texto: '' });
   };
 
+  useEffect(() => {
+    if (loading || prefillCampanhaAplicado || searchParams.get('novaCampanha') !== '1' || !selecionado?.id) return;
+    const militaresIds = (searchParams.get('militares') || '').split(',').map((id) => id.trim()).filter(Boolean);
+    if (!militaresIds.length) return;
+    abrirNovaCampanha(militaresIds);
+    setPrefillCampanhaAplicado(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('novaCampanha');
+    next.delete('militares');
+    setSearchParams(next, { replace: true });
+  }, [loading, selecionado?.id, prefillCampanhaAplicado]);
+
   const salvarCampanha = async (evento) => {
     evento.preventDefault();
     if (!podeCriarCampanhas || !selecionado || !campanhaForm?.titulo.trim()) return;
     const unidadesSelecionadas = campanhaForm.escopo_unidades_ids || [];
     const gruposSelecionados = campanhaForm.escopo_grupos_ids || [];
+    const militaresSelecionados = campanhaForm.escopo_militares_ids || [];
+    if (campanhaForm.tipo_escopo === 'SELECAO_MILITARES' && militaresSelecionados.length === 0) {
+      setFeedback({ tipo: 'erro', texto: 'Selecione ao menos um militar para a campanha.' });
+      return;
+    }
     if (gruposSelecionados.length > 0 && !['SEM_ESCOPO', 'UNIDADES_E_GRUPOS'].includes(campanhaForm.tipo_escopo)) {
       setFeedback({ tipo: 'erro', texto: 'Ao selecionar grupos, escolha Somente Grupo de Militares ou Unidades + Grupos.' });
       return;
@@ -314,6 +338,7 @@ export default function PlanosFerias() {
           tipo_escopo: campanhaForm.tipo_escopo,
           escopo_unidades_ids: campanhaForm.escopo_unidades_ids,
           escopo_unidades_nomes: nomesUnidades,
+          escopo_militares_ids: campanhaForm.escopo_militares_ids || [],
           escopo_grupos_ids: campanhaForm.escopo_grupos_ids || [],
           escopo_grupos_nomes: (campanhaForm.escopo_grupos_ids || [])
             .map((id) => grupos.find((grupo) => grupo.id === id)?.nome || id)
@@ -453,7 +478,7 @@ export default function PlanosFerias() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Nova campanha de férias</h2><p className="text-xs text-slate-500">Plano: {selecionado?.titulo}</p></div><button type="button" onClick={() => setModalCampanha(false)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>
             <div><label className="text-xs font-bold text-slate-700">Nome da campanha *</label><Input required value={campanhaForm.titulo} onChange={(e) => setCampanhaForm({ ...campanhaForm, titulo: e.target.value })} /></div>
             <div className="grid sm:grid-cols-3 gap-3"><div><label className="text-xs font-bold text-slate-700">Início *</label><Input required type="date" value={campanhaForm.data_inicio} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_inicio: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo militar *</label><Input required type="date" value={campanhaForm.data_fim_militar} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Prazo unidade</label><Input type="date" value={campanhaForm.data_fim_unidade} onChange={(e) => setCampanhaForm({ ...campanhaForm, data_fim_unidade: e.target.value })} /></div></div>
-            <div><label className="text-xs font-bold text-slate-700">Escopo da campanha</label><select value={campanhaForm.tipo_escopo} onChange={(e) => { const tipo = e.target.value; setCampanhaForm({ ...campanhaForm, tipo_escopo: tipo, escopo_unidades_ids: tipo === 'UNIDADES' || tipo === 'UNIDADES_E_GRUPOS' ? (campanhaForm.escopo_unidades_ids || []) : [], escopo_grupos_ids: tipo === 'SEM_ESCOPO' || tipo === 'UNIDADES_E_GRUPOS' ? (campanhaForm.escopo_grupos_ids || []) : [] }); }} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="UNIDADES">Somente unidades selecionadas</option><option value="SEM_ESCOPO">Somente Grupo de Militares (sem lotação)</option><option value="UNIDADES_E_GRUPOS">Unidades + Grupos (combinados)</option></select>{campanhaForm.tipo_escopo === 'SEM_ESCOPO' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida somente pelos grupos selecionados.</p>}{campanhaForm.tipo_escopo === 'UNIDADES_E_GRUPOS' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida pela combinação das unidades e dos grupos selecionados.</p>}</div>
+            <div><label className="text-xs font-bold text-slate-700">Escopo da campanha</label><select value={campanhaForm.tipo_escopo} onChange={(e) => { const tipo = e.target.value; setCampanhaForm({ ...campanhaForm, tipo_escopo: tipo, escopo_unidades_ids: tipo === 'UNIDADES' || tipo === 'UNIDADES_E_GRUPOS' ? (campanhaForm.escopo_unidades_ids || []) : [], escopo_grupos_ids: tipo === 'SEM_ESCOPO' || tipo === 'UNIDADES_E_GRUPOS' ? (campanhaForm.escopo_grupos_ids || []) : [], escopo_militares_ids: tipo === 'SELECAO_MILITARES' ? (campanhaForm.escopo_militares_ids || []) : [] }); }} className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm"><option value="TODOS">Toda a corporação</option><option value="SELECAO_MILITARES">Seleção de militares</option><option value="UNIDADES">Somente unidades selecionadas</option><option value="SEM_ESCOPO">Somente Grupo de Militares (sem lotação)</option><option value="UNIDADES_E_GRUPOS">Unidades + Grupos (combinados)</option></select>{campanhaForm.tipo_escopo === 'SELECAO_MILITARES' && <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">{(campanhaForm.escopo_militares_ids || []).length} militar(es) selecionado(s) a partir da cobertura do plano.</p>}{campanhaForm.tipo_escopo === 'SEM_ESCOPO' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida somente pelos grupos selecionados.</p>}{campanhaForm.tipo_escopo === 'UNIDADES_E_GRUPOS' && <p className="mt-1 text-[11px] text-slate-500">A elegibilidade será definida pela combinação das unidades e dos grupos selecionados.</p>}</div>
             {(campanhaForm.tipo_escopo === 'UNIDADES' || campanhaForm.tipo_escopo === 'UNIDADES_E_GRUPOS') && <div className="grid sm:grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{unidades.length === 0 ? <p className="text-xs text-slate-500">Nenhuma unidade disponível para seleção.</p> : unidades.map((unidade) => <label key={unidade.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={campanhaForm.escopo_unidades_ids.includes(unidade.id)} onChange={(e) => setCampanhaForm({ ...campanhaForm, escopo_unidades_ids: e.target.checked ? [...(campanhaForm.escopo_unidades_ids || []), unidade.id] : (campanhaForm.escopo_unidades_ids || []).filter((id) => id !== unidade.id) })} />{unidade.nome}</label>)}</div>}
             <div>
               <label className="text-xs font-bold text-slate-700">Grupos de militares</label>
@@ -508,7 +533,7 @@ export default function PlanosFerias() {
                 <h2 className="font-bold text-slate-900">Campanhas deste plano</h2>
                 <p className="text-xs text-slate-500 mt-1">Cada campanha possui prazo e escopo próprios; todas fazem parte deste mesmo plano.</p>
               </div>
-              {podeCriarCampanhas && selecionado.status !== 'ARQUIVADO' && <Button type="button" onClick={abrirNovaCampanha} className="bg-[#1e3a5f] hover:bg-[#2a4d7d]"><Plus className="w-4 h-4 mr-1.5" />Nova campanha de férias</Button>}
+              {podeCriarCampanhas && selecionado.status !== 'ARQUIVADO' && <Button type="button" onClick={() => abrirNovaCampanha()} className="bg-[#1e3a5f] hover:bg-[#2a4d7d]"><Plus className="w-4 h-4 mr-1.5" />Nova campanha de férias</Button>}
             </div>
             {campanhasDoPlano.length === 0 ? (
               <div className="p-10 text-center text-sm text-slate-500">Ainda não há campanhas neste plano.</div>
