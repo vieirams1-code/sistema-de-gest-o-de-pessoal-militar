@@ -59,7 +59,11 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
   const { base44, user, payload, calcularResumoPeriodoPlano, feriasVinculadasAoPlano, consolidarOpcoesPlano, carregarMembrosPorGrupo, matchMilitarCampanha, corsHeaders } = args;
   if (payload.incluir_cobertura === true && tipoAcesso(user.role) !== 'admin') {
     const authz = (await base44.functions.invoke('getUserPermissions', {})).data;
-    if (!authz?.actions?.visualizar_respostas_ferias && !authz?.actions?.aprovar_ferias) return Response.json({ error: 'Sem permissão para consultar cobertura.' }, { status: 403, headers: corsHeaders });
+    const acoes = authz?.actions || {};
+    const autorizado = authz?.isAdmin === true
+      || acoes.visualizar_respostas_ferias || acoes.perm_visualizar_respostas_ferias
+      || acoes.aprovar_ferias || acoes.perm_aprovar_ferias;
+    if (!autorizado) return Response.json({ error: 'Sem permissão para consultar cobertura.' }, { status: 403, headers: corsHeaders });
   }
   const todasCampanhas = await listarTodos(base44.asServiceRole.entities.CampanhaPortal, { tipo: 'PLANO_FERIAS' });
   const campanhas = todasCampanhas.filter((c: any) => c.tipo === 'PLANO_FERIAS');
