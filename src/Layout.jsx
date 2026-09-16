@@ -38,6 +38,7 @@ import {
   GraduationCap,
   SlidersHorizontal,
   Megaphone,
+  MinusCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -104,6 +105,7 @@ const menuGroups = [
         items: [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
           { name: 'Ajustes de Saldo', page: 'AjustesSaldoFerias', icon: SlidersHorizontal, moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
+          { name: 'Descontos em Férias', page: 'DescontosFerias', icon: MinusCircle, adminOnly: true },
         ],
       },
       {
