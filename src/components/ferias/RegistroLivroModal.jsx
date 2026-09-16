@@ -30,6 +30,7 @@ import {
   validarInicioFracaoNoLivro,
   validarInicioNoPeriodoConcessivo,
 } from '@/components/ferias/feriasRules';
+import AjusteDescontoFeriasAlert from '@/components/ferias/AjusteDescontoFeriasAlert';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
@@ -501,6 +502,7 @@ export default function RegistroLivroModal({
       periodo: periodoSaldo,
       ajustes: ajustesSaldoFerias,
       ferias: todasFeriasDoMilitar.filter((item) => String(item?.id || '') !== String(ferias?.id || '')),
+      incluirPendentes: true,
     });
     const baseDiasOperacional = saldoOperacional.direito_liquido ?? obterDiasBase(periodoSaldo);
     const saldoUtilizavelPeriodo = saldoOperacional.saldo_restante ?? 0;
@@ -513,19 +515,37 @@ export default function RegistroLivroModal({
     const dataRef = parseDate(dataRegistro);
 
     if (tipoRegistro === 'Saída Férias') {
-      const novoFim = toDateOnlyString(addDays(dataRef, Math.max(totaisGozo.dias_totais_gozo - 1, 0)));
-      const novoRetorno = toDateOnlyString(addDays(dataRef, totaisGozo.dias_totais_gozo));
+      const diasFeriasPrevistos = Number(ferias?.dias) > 0 ? Number(ferias.dias) : 0;
+      const precisaAjusteDesconto = diasFeriasPrevistos > 0
+        && diasFeriasPrevistos > saldoUtilizavelPeriodo
+        && saldoUtilizavelPeriodo > 0;
+      const diasEfetivos = precisaAjusteDesconto
+        ? saldoUtilizavelPeriodo
+        : totaisGozo.dias_totais_gozo;
+
+      const novoFim = toDateOnlyString(addDays(dataRef, Math.max(diasEfetivos - 1, 0)));
+      const novoRetorno = toDateOnlyString(addDays(dataRef, diasEfetivos));
 
       return {
         titulo: 'Resumo do Início',
         inicio: dataRegistro,
-        dias: totaisGozo.dias_totais_gozo,
+        dias: diasEfetivos,
         diasBase: baseDiasOperacional,
         saldoUtilizavel: saldoUtilizavelPeriodo,
         diasExtras: totaisGozo.dias_extras_creditos,
         creditosSelecionados,
         fim: novoFim,
         retorno: novoRetorno,
+        ajusteDesconto: precisaAjusteDesconto
+          ? {
+              diasOriginais: diasFeriasPrevistos,
+              diasAjustados: saldoUtilizavelPeriodo,
+              direito: saldoOperacional.dias_base ?? baseDiasOperacional,
+              descontosAtivos: saldoOperacional.debitos_ativos ?? 0,
+              descontosPendentes: saldoOperacional.debitos_pendentes_dias ?? 0,
+              saldoLiquido: saldoUtilizavelPeriodo,
+            }
+          : null,
       };
     }
 
@@ -741,7 +761,12 @@ export default function RegistroLivroModal({
         // O campo `dias` do evento deve refletir a fração INICIADA (ferias.dias),
         // nunca o direito operacional total do período (direito_liquido / diasOperacionais).
         // Para a 1ª fração da Gleiciane: 15d, jamais 30d.
-        const diasFracaoInicio = Number(ferias.dias) > 0 ? Number(ferias.dias) : diasOperacionais;
+        // Exceção: quando há desconto que reduz o saldo abaixo dos dias previstos,
+        // usa o saldo líquido ajustado automaticamente (preservando dias_base).
+        const diasAjustadosDesconto = resumo.ajusteDesconto?.diasAjustados;
+        const diasFracaoInicio = diasAjustadosDesconto
+          ? diasAjustadosDesconto
+          : (Number(ferias.dias) > 0 ? Number(ferias.dias) : diasOperacionais);
 
         registroPayload.dias = diasFracaoInicio;
         registroPayload.dias_base_gozo = diasBaseGozo;
@@ -761,11 +786,19 @@ export default function RegistroLivroModal({
           await liberarCreditosDoGozo({ gozoFeriasId: ferias.id });
         }
 
-        await atualizarEscopado('Ferias', ferias.id, {
+        const feriasUpdatePayload = {
           dias_base_gozo: registroPayload.dias_base_gozo,
           dias_extras_creditos: totaisGozo.dias_extras_creditos,
           dias_totais_gozo: registroPayload.dias_totais_gozo,
-        });
+        };
+
+        if (resumo.ajusteDesconto) {
+          feriasUpdatePayload.dias = resumo.ajusteDesconto.diasAjustados;
+          feriasUpdatePayload.data_fim = resumo.fim;
+          feriasUpdatePayload.data_retorno = resumo.retorno;
+        }
+
+        await atualizarEscopado('Ferias', ferias.id, feriasUpdatePayload);
       }
 
       await criarEscopado('RegistroLivro', registroPayload);
@@ -886,6 +919,12 @@ export default function RegistroLivroModal({
           {resumo && !erroCronologia && (
             <div className="rounded-lg border p-4 bg-cyan-50 border-cyan-200">
               <div className="font-semibold text-cyan-800 mb-3">{resumo.titulo}</div>
+
+              {resumo.ajusteDesconto && (
+                <div className="mb-3">
+                  <AjusteDescontoFeriasAlert detalhe={resumo.ajusteDesconto} />
+                </div>
+              )}
 
               {tipoRegistro === 'Saída Férias' && (
                 <div className="grid grid-cols-3 gap-4 text-sm">

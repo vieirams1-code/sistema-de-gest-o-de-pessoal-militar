@@ -127,25 +127,38 @@ export function calcularDireitoLiquidoPeriodo({ periodo = {}, ajustes = [] } = {
   };
 }
 
-export function calcularSaldoLiquidoPeriodo({ periodo = {}, ajustes = [], ferias = [] } = {}) {
+function isAjusteDescontoPendente(ajuste = {}) {
+  return normalizarStatusAjuste(ajuste?.status) === STATUS_AJUSTE_SALDO_FERIAS.PENDENTE_PUBLICACAO
+    && normalizarTexto(ajuste?.origem) === 'desconto_ferias';
+}
+
+export function calcularSaldoLiquidoPeriodo({ periodo = {}, ajustes = [], ferias = [], incluirPendentes = false } = {}) {
   const dias_base = obterDiasBase(periodo);
   const ajustesAtivos = (ajustes || []).filter(isAjusteAtivo);
+  const ajustesPendentesDesconto = incluirPendentes
+    ? (ajustes || []).filter((ajuste) => isAjusteDescontoPendente(ajuste) && normalizarTipoAjuste(ajuste?.tipo) === TIPOS_AJUSTE_SALDO_FERIAS.DEBITO)
+    : [];
   const detalhes_creditos = ajustesAtivos.filter((ajuste) => normalizarTipoAjuste(ajuste?.tipo) === TIPOS_AJUSTE_SALDO_FERIAS.CREDITO);
   const detalhes_debitos = ajustesAtivos.filter((ajuste) => normalizarTipoAjuste(ajuste?.tipo) === TIPOS_AJUSTE_SALDO_FERIAS.DEBITO);
+  const detalhes_debitos_pendentes = ajustesPendentesDesconto;
   const creditos_ativos = detalhes_creditos.reduce((acc, ajuste) => acc + obterDiasAjuste(ajuste), 0);
   const debitos_ativos = detalhes_debitos.reduce((acc, ajuste) => acc + obterDiasAjuste(ajuste), 0);
+  const debitos_pendentes_dias = detalhes_debitos_pendentes.reduce((acc, ajuste) => acc + obterDiasAjuste(ajuste), 0);
   const dias_gozados_previstos = (ferias || [])
     .filter((item) => item && isFeriasDoPeriodo(item, periodo) && isFeriasComImpactoNoSaldo(item))
     .reduce((acc, item) => acc + obterDiasFerias(item), 0);
-  const saldo_liquido = dias_base + creditos_ativos - debitos_ativos - dias_gozados_previstos;
+  const saldo_liquido = dias_base + creditos_ativos - debitos_ativos - debitos_pendentes_dias - dias_gozados_previstos;
 
   return {
     dias_base,
     creditos_ativos,
     debitos_ativos,
+    debitos_pendentes: detalhes_debitos_pendentes,
+    debitos_pendentes_dias,
     dias_gozados_previstos,
     saldo_liquido,
     detalhes_creditos,
     detalhes_debitos,
+    detalhes_debitos_pendentes,
   };
 }

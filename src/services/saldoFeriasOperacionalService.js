@@ -62,11 +62,12 @@ function calcularDiasPorStatus(periodo = {}, ferias = [], statuses = new Set()) 
   }, 0);
 }
 
-export function calcularSaldoOperacionalPeriodo({ periodo = {}, ajustes = [], ferias = [] } = {}) {
-  const saldo = calcularSaldoLiquidoPeriodo({ periodo, ajustes, ferias });
+export function calcularSaldoOperacionalPeriodo({ periodo = {}, ajustes = [], ferias = [], incluirPendentes = false } = {}) {
+  const saldo = calcularSaldoLiquidoPeriodo({ periodo, ajustes, ferias, incluirPendentes });
   const base = saldo.dias_base;
   const feriasPrevistasGozadas = saldo.dias_gozados_previstos;
-  const direitoLiquido = base + saldo.creditos_ativos - saldo.debitos_ativos;
+  const debitosPendentesDias = saldo.debitos_pendentes_dias || 0;
+  const direitoLiquido = base + saldo.creditos_ativos - saldo.debitos_ativos - debitosPendentesDias;
   const saldoRestante = direitoLiquido - feriasPrevistasGozadas;
 
   return {
@@ -74,6 +75,8 @@ export function calcularSaldoOperacionalPeriodo({ periodo = {}, ajustes = [], fe
     dias_base: base,
     creditos_ativos: saldo.creditos_ativos,
     debitos_ativos: saldo.debitos_ativos,
+    debitos_pendentes: saldo.debitos_pendentes,
+    debitos_pendentes_dias: debitosPendentesDias,
     direito_liquido: direitoLiquido,
     ferias_previstas_gozadas: feriasPrevistasGozadas,
     dias_gozados: calcularDiasPorStatus(periodo, ferias, STATUS_GOZADA),
@@ -84,6 +87,7 @@ export function calcularSaldoOperacionalPeriodo({ periodo = {}, ajustes = [], fe
     saldo_restante: saldoRestante,
     detalhes_creditos: saldo.detalhes_creditos,
     detalhes_debitos: saldo.detalhes_debitos,
+    detalhes_debitos_pendentes: saldo.detalhes_debitos_pendentes,
   };
 }
 
@@ -102,12 +106,13 @@ export function filtrarAjustesDoPeriodo(ajustes = [], periodo = {}) {
   });
 }
 
-export function calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo = {}, ajustes = [], ferias = [] } = {}) {
+export function calcularSaldoOperacionalPeriodoComTodosAjustes({ periodo = {}, ajustes = [], ferias = [], incluirPendentes = false } = {}) {
   const periodoOperacional = periodo?.raw ? { ...periodo.raw, ...periodo } : periodo;
 
   return calcularSaldoOperacionalPeriodo({
     periodo: periodoOperacional,
     ajustes: filtrarAjustesDoPeriodo(ajustes, periodoOperacional),
     ferias,
+    incluirPendentes,
   });
 }
