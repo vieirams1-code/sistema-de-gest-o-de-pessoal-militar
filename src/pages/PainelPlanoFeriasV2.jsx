@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import useCoberturaPlano from '@/components/ferias/useCoberturaPlano';
 import GeracaoFeriasPlanoV2 from '@/components/ferias/GeracaoFeriasPlanoV2';
+import RegistrarPendenciaNaoRespondente from '@/components/ferias/RegistrarPendenciaNaoRespondente';
 
 const MESES = [
   { val: '01', nome: 'Janeiro', curto: 'Jan' },
@@ -125,6 +126,9 @@ function decisaoAtual(op) {
 function statusOpcao(op) {
   if (op?.sem_resposta) return { label: 'Não respondeu', cls: 'bg-red-50 text-red-700 border-red-200' };
   if (op?.gerado_ferias_efetivas) return { label: 'Gerado', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+  if (op?.nao_respondeu_no_prazo && !(op?.status_camada_1 && op.status_camada_1 !== 'Pendente')) {
+    return { label: 'Não respondeu no prazo', cls: 'bg-red-50 text-red-700 border-red-200' };
+  }
   if (op?.status_camada_1 === 'Nao_Contemplado' || op?.decisao_camada_1_opcao === 'NAO_CONTEMPLADO') {
     return { label: 'Não contemplado', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
   }
@@ -266,11 +270,12 @@ export default function PainelPlanoFeriasV2() {
   }, [publicoAlvo, opcoes]);
 
   const totalRespondidos = useMemo(() => (
-    new Set(opcoes.map((o) => String(o.militar_id || '')).filter(Boolean)).size
+    new Set(opcoes.filter((o) => !o.nao_respondeu_no_prazo).map((o) => String(o.militar_id || '')).filter(Boolean)).size
   ), [opcoes]);
   const totalSemResposta = useMemo(() => {
-    const respondidos = new Set(opcoes.map((o) => String(o.militar_id || '')).filter(Boolean));
-    return publicoAlvo.filter((m) => !respondidos.has(String(m.militar_id || ''))).length;
+    const comRegistro = new Set(opcoes.map((o) => String(o.militar_id || '')).filter(Boolean));
+    const pendenciasRegistradas = opcoes.filter((o) => o.nao_respondeu_no_prazo).length;
+    return publicoAlvo.filter((m) => !comRegistro.has(String(m.militar_id || ''))).length + pendenciasRegistradas;
   }, [publicoAlvo, opcoes]);
   const totalDefinidos = useMemo(() => new Set(
     opcoes
@@ -386,6 +391,32 @@ export default function PainelPlanoFeriasV2() {
       setSelecionado((prev) => prev ? { ...prev, status_camada_1: 'Ajustado_Pelo_Gestor', decisao_camada_1_detalhes: JSON.stringify(parcelasPayload) } : prev);
     } catch (err) {
       setFeedback({ type: 'error', message: err?.message || 'Falha ao salvar a definição.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const registrarPendencia = async (justificativa) => {
+    if (!selecionado?.sem_resposta || !podeAprovar || saving) return;
+    const campanhaAlvo = (selecionado.campanhas_alvo || [])[0];
+    if (!campanhaAlvo?.campanha_id) {
+      setFeedback({ type: 'error', message: 'Não foi possível identificar a campanha deste militar.' });
+      return;
+    }
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const res = await base44.functions.invoke('registrarNaoRespondenteFerias', {
+        plano_id: planoId,
+        campanha_id: campanhaAlvo.campanha_id,
+        militar_alvo_id: selecionado.militar_id,
+        justificativa,
+      });
+      setFeedback({ type: 'success', message: res.data?.message || 'Pendência registrada.' });
+      setSelecionado(null);
+      await carregar(planoId);
+    } catch (err) {
+      setFeedback({ type: 'error', message: err?.response?.data?.error || err?.message || 'Falha ao registrar a pendência.' });
     } finally {
       setSaving(false);
     }
@@ -518,6 +549,7 @@ export default function PainelPlanoFeriasV2() {
                 <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
                   <option value="TODOS">Todas as situações</option>
                   <option value="Não respondeu">Não respondeu</option>
+                  <option value="Não respondeu no prazo">Não respondeu no prazo</option>
                   <option value="Pendente">Pendente</option>
                   <option value="Definido">Definido</option>
                   <option value="Gerado">Gerado</option>
@@ -666,9 +698,27 @@ export default function PainelPlanoFeriasV2() {
                     </div>
                   </div>
                 )}
+
+                <RegistrarPendenciaNaoRespondente
+                  podeRegistrar={podeAprovar}
+                  salvando={saving}
+                  onRegistrar={registrarPendencia}
+                />
               </div>
             ) : (
               <>
+            {selecionado.nao_respondeu_no_prazo && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 mb-6">
+                <h3 className="font-black text-sm text-red-800">Não respondeu no prazo</h3>
+                <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                  Pendência registrada por {selecionado.registrado_por_email || 'gestor'}. A definição abaixo é administrativa.
+                </p>
+                {selecionado.justificativa_administrativa && (
+                  <p className="text-xs text-red-700 mt-2 italic">“{selecionado.justificativa_administrativa}”</p>
+                )}
+              </div>
+            )}
+
             <SectionLabel>Período aquisitivo</SectionLabel>
             <p className="text-sm font-semibold text-slate-700 mb-6">{formatarDataBR(selecionado.periodo_inicio)} a {formatarDataBR(selecionado.periodo_fim)}</p>
 

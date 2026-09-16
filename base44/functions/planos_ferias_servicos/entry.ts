@@ -286,6 +286,8 @@ Deno.serve(async (req: Request) => {
         base44.asServiceRole.entities.PlanoFeriasInstitucional.list(),
         base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS' }),
       ]);
+      const { encerrarCampanhasFeriasVencidas } = await import('../../shared/ferias/encerrarCampanhasVencidas.ts');
+      await encerrarCampanhasFeriasVencidas(base44, campanhas || []);
       const campanhasComContadores = await enriquecerContadoresCampanhas(base44, campanhas || []);
       return json({ ok: true, planos: planos || [], campanhas: campanhasComContadores });
     }

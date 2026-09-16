@@ -63,6 +63,9 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
   }
   const todasCampanhas = await listarTodos(base44.asServiceRole.entities.CampanhaPortal, { tipo: 'PLANO_FERIAS' });
   const campanhas = todasCampanhas.filter((c: any) => c.tipo === 'PLANO_FERIAS');
+  // Campanhas cujo prazo terminou são encerradas automaticamente ao abrir o painel.
+  const { encerrarCampanhasFeriasVencidas } = await import('./encerrarCampanhasVencidas.ts');
+  await encerrarCampanhasFeriasVencidas(base44, campanhas);
   const primeira = campanhas.find((c: any) => ['Aberta_Coleta', 'Ativa'].includes(c.status)) || campanhas[0] || null;
   const planoId = !payload.campanha_id ? (textoId(payload.plano_id) || textoId(primeira?.plano_ferias_institucional_id)) : '';
   const campanhasConsulta = payload.campanha_id ? campanhas.filter((c: any) => c.id === payload.campanha_id) : planoId ? campanhas.filter((c: any) => textoId(c.plano_ferias_institucional_id) === planoId) : primeira ? [primeira] : [];

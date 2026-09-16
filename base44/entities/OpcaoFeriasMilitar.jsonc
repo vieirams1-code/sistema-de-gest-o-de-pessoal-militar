@@ -80,6 +80,33 @@
       "type": "string",
       "format": "date-time"
     },
+    "origem_resposta": {
+      "type": "string",
+      "enum": [
+        "MILITAR",
+        "ADMINISTRATIVA"
+      ],
+      "default": "MILITAR",
+      "description": "MILITAR: enviada pelo pr\u00f3prio militar no portal. ADMINISTRATIVA: registrada pelo gestor para militar que n\u00e3o respondeu no prazo."
+    },
+    "nao_respondeu_no_prazo": {
+      "type": "boolean",
+      "default": false,
+      "description": "Registro formal de que o militar n\u00e3o respondeu dentro do prazo da campanha. Permite a defini\u00e7\u00e3o administrativa das f\u00e9rias."
+    },
+    "justificativa_administrativa": {
+      "type": "string",
+      "description": "Justificativa do gestor ao registrar a pend\u00eancia de resposta."
+    },
+    "registrado_por_email": {
+      "type": "string",
+      "description": "Auditoria \u2014 e-mail do gestor que registrou a pend\u00eancia."
+    },
+    "data_registro_administrativo": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Auditoria \u2014 data/hora do registro da pend\u00eancia."
+    },
     "status_camada_1": {
       "type": "string",
       "enum": [
