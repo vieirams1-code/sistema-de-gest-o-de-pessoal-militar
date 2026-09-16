@@ -7,7 +7,7 @@ const formatarData = (data) => {
 
 export default function CoberturaPeriodoChips({ periodos = [] }) {
   return (
-    <div className="flex min-w-[280px] flex-wrap gap-2">
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {periodos.map((periodo) => (
         <div key={periodo.id} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs text-blue-900">
           <div className="font-bold">{periodo.ano_referencia || 'Período'} · {periodo.saldo_disponivel} dia(s)</div>
