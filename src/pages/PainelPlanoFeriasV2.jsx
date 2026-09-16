@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useCoberturaPlano from '@/components/ferias/useCoberturaPlano';
+import GeracaoFeriasPlanoV2 from '@/components/ferias/GeracaoFeriasPlanoV2';
 
 const MESES = [
   { val: '01', nome: 'Janeiro', curto: 'Jan' },
@@ -462,6 +463,12 @@ export default function PainelPlanoFeriasV2() {
               </div>
             )}
           </div>
+
+          <GeracaoFeriasPlanoV2 key={planoId} plano={planoAtual}
+            podeAdmin={isAdmin || canAccessAction('admin_campanhas_ferias')}
+            podeGerar={isAdmin || canAccessAction('gerar_ferias_campanhas')}
+            onGerado={async (message) => { await carregar(planoId); setFeedback({ type: 'success', message }); }}
+          />
 
           {feedback && (
             <div className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${feedback.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
