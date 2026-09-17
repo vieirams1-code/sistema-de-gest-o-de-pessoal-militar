@@ -39,7 +39,7 @@ async function sendTwilio(to: string, text: string): Promise<OtpDeliveryResult> 
   else body.set('From', from);
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
     method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${sid}:${token}`)}, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { Authorization: `Basic ${btoa(`${sid}:${token}`)}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
   if (!response.ok) return { success: false, provider: 'twilio', error: `Falha no envio via Twilio (HTTP ${response.status}).` };
