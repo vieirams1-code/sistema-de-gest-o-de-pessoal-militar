@@ -20,6 +20,7 @@ import {
   resolveMilitarEmail,
   resolveEmailProvider,
   resolveMilitarTelefone,
+  resolveSmsProvider,
   resolveWhatsAppProvider,
   generateRequestId,
 } from '../../shared/portal/otp/otpService.ts';
@@ -248,6 +249,65 @@ Deno.serve(async (req: Request) => {
               );
             } catch (errDispatch) {
               console.error('[portal_auth] Erro no envio de e-mail:', errDispatch);
+            }
+          }
+
+          try {
+            await registrarAuditoriaPortal(base44, {
+              sessao_id: sessao.id,
+              militar_id: sessao.militar_id,
+              acao: 'LOGIN_SOLICITADO',
+              resultado: Boolean(dispatchRes?.success),
+              motivo_falha_sanitizado: dispatchRes?.success ? null : dispatchRes?.error,
+              ip_origem,
+              user_agent,
+              correlation_id,
+            });
+          } catch (_eAud) {}
+
+          return jsonResponse(respostaGenerica);
+        }
+
+        // Disparo: SMS — reutiliza o mesmo otp_hash/otp_expires_at e a mesma validação.
+        if (canalSolicitado === 'SMS') {
+          const telefoneDestino = resolveMilitarTelefone(militar);
+          const smsProvider = resolveSmsProvider(config);
+          let dispatchRes: any = { success: false, error: 'Provedor de SMS indisponível.' };
+
+          if (telefoneDestino?.formatted && smsProvider) {
+            try {
+              dispatchRes = await smsProvider.sendOtp(
+                {
+                  to: telefoneDestino.formatted,
+                  code: otpCode,
+                  provider: config.sms_provider,
+                  militarNome: militar.nome_guerra || militar.nome_completo,
+                  correlationId: correlation_id,
+                },
+                base44
+              );
+            } catch (errDispatch) {
+              console.error('[portal_auth] Erro no envio de SMS:', errDispatch);
+            }
+          }
+
+          // Fallback secundário: SMS falhou e o WhatsApp continua disponível.
+          if (!dispatchRes.success) {
+            const telefoneFallback = resolveMilitarTelefone(militar);
+            const whatsappProvider = resolveWhatsAppProvider(config);
+            if (telefoneFallback?.formatted && whatsappProvider) {
+              try {
+                const whatsappRes = await whatsappProvider.sendOtp(
+                  {
+                    to: telefoneFallback.formatted,
+                    code: otpCode,
+                    militarNome: militar.nome_guerra || militar.nome_completo,
+                    correlationId: correlation_id,
+                  },
+                  base44
+                );
+                if (whatsappRes.success) dispatchRes = whatsappRes;
+              } catch (_e) {}
             }
           }
 
