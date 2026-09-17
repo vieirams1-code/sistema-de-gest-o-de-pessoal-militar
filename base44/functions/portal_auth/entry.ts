@@ -156,7 +156,8 @@ Deno.serve(async (req: Request) => {
         }
 
         const requestId = String(payload?.request_id || '').trim();
-        const matriculaInput = String(payload?.matricula || '').trim().toUpperCase();
+        const normalizeMatricula = (value: unknown) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const matriculaInput = normalizeMatricula(payload?.matricula);
         if (!requestId || requestId.length < 16 || !matriculaInput || matriculaInput.length > 40) {
           return jsonResponse({ error: 'CPF ou matrícula inválidos.' }, 401);
         }
@@ -186,7 +187,7 @@ Deno.serve(async (req: Request) => {
           militar = Militar ? await Militar.get(sessao.militar_id) : null;
         } catch (_e) {}
 
-        const matriculaCadastrada = String(militar?.matricula || '').trim().toUpperCase();
+        const matriculaCadastrada = normalizeMatricula(militar?.matricula);
         const militarAtivo = militar && militar.status !== 'Inativo' && militar.status_cadastro !== 'Inativo' && militar.status !== 'Falecido';
         const matriculaValida = militarAtivo && matriculaCadastrada && matriculaInput === matriculaCadastrada;
 
