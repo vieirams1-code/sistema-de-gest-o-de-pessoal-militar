@@ -67,7 +67,7 @@ export default function Sargenteacao() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['sargenteacao-dados'] });
   const iniciarNovo = (tipo = tab) => { setTab(tipo); setEditing(null); setForm({ ...EMPTY[tipo] }); };
-  const iniciarEdicao = (tipo, item) => { setTab(tipo); setEditing(item.id); setForm({ ...EMPTY[tipo], ...item }); };
+  const iniciarEdicao = (tipo, item) => {\n    setTab(tipo);\n    setEditing(item.id);\n    if (tipo === 'modelo') {\n      const vagas = (data.vagas || []).filter((vaga) => vaga.modelo_guarnicao_id === item.id);\n      setForm({ ...EMPTY[tipo], ...item, possui_motorista: vagas.some((vaga) => vaga.funcao_operacional === 'MOTORISTA'), auxiliares: vagas.filter((vaga) => vaga.funcao_operacional === 'AUXILIAR').length });\n      return;\n    }\n    setForm({ ...EMPTY[tipo], ...item });\n  };
 
   const salvar = useMutation({
     mutationFn: async ({ tipo, values }) => {
