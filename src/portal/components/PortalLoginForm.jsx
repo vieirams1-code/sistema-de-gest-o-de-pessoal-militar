@@ -306,16 +306,20 @@ export default function PortalLoginForm() {
                       <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
                         m.canal === 'WHATSAPP' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {m.canal === 'WHATSAPP' ? (
-                          <Smartphone className="w-5 h-5" />
-                        ) : (
+                        {m.canal === 'EMAIL' ? (
                           <Mail className="w-5 h-5" />
+                        ) : (
+                          <Smartphone className="w-5 h-5" />
                         )}
                       </div>
                       <div>
                         <div className="text-sm font-medium">{m.label}</div>
                         <div className="text-[11px] text-slate-500">
-                          {m.canal === 'WHATSAPP' ? 'Envio instantâneo via WhatsApp' : 'Envio para sua caixa de e-mail'}
+                          {m.canal === 'WHATSAPP'
+                            ? 'Envio instantâneo via WhatsApp'
+                            : m.canal === 'SMS'
+                              ? 'Envio para o celular cadastrado'
+                              : 'Envio para sua caixa de e-mail'}
                         </div>
                       </div>
                     </div>
@@ -359,7 +363,7 @@ export default function PortalLoginForm() {
                 </div>
                 <h3 className="text-sm font-semibold text-slate-800">Digite o código de 6 dígitos</h3>
                 <p className="text-xs text-slate-500">
-                  Enviado via {selectedChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail'} para o seu cadastro.
+                  Enviado via {selectedChannel === 'WHATSAPP' ? 'WhatsApp' : selectedChannel === 'SMS' ? 'SMS' : 'E-mail'} para o seu cadastro.
                 </p>
               </div>
 
