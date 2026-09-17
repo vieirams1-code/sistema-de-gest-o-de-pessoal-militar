@@ -174,6 +174,9 @@ export async function autenticarProvisorio(requestId, matricula) {
   return result;
 }
 
+/**
+ * Solicita o envio do código OTP pelo canal escolhido.
+ */
 export async function enviarOtp(requestId, canal = 'EMAIL') {
   return portalFetch('portal_auth', {
     acao: 'ENVIAR',
