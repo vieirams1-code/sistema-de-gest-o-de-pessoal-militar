@@ -12,6 +12,8 @@ const HEADERS = {
   'Content-Type': 'application/json',
 };
 const LIMITE_CORPORACAO = 5000;
+// Hotfix operacional: campanhas em massa ficam bloqueadas acima deste teto até o provedor ser estabilizado.
+const LIMITE_DISPARO_WHATSAPP = 25;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: HEADERS });
 const texto = (value: unknown) => String(value ?? '').trim();
 const normalizar = (value: unknown) => texto(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -311,6 +313,13 @@ Deno.serve(async (req: Request) => {
       const publico = await carregarPublico(base44, campanha);
       const resumo = resumoPublico(publico);
       if (!resumo.total) return json({ error: 'A campanha não possui militares no público-alvo atual.' }, 409);
+      if (resumo.com_telefone > LIMITE_DISPARO_WHATSAPP) {
+        return json({
+          error: `Disparo em massa bloqueado temporariamente. Limite operacional: ${LIMITE_DISPARO_WHATSAPP} destinatários por envio.`,
+          limite_destinatarios: LIMITE_DISPARO_WHATSAPP,
+          total_enviaveis: resumo.com_telefone,
+        }, 429);
+      }
 
       const envio = await base44.asServiceRole.entities.EnvioMensagem.create({
         canal: 'WHATSAPP',
@@ -392,7 +401,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const solicitado = Number(payload?.tamanho_lote || 8);
-      const tamanhoLote = Math.max(1, Math.min(10, Number.isFinite(solicitado) ? solicitado : 8));
+      const tamanhoLote = Math.max(1, Math.min(3, Number.isFinite(solicitado) ? solicitado : 3));
       const lote = destinatarios.filter((item) => item.status === 'PENDENTE').slice(0, tamanhoLote);
       if (!lote.length) {
         const finalizado = await recalcularEnvio(base44, envio);
@@ -454,6 +463,13 @@ Deno.serve(async (req: Request) => {
       }
       const falhas = (await listarDestinatarios(base44, envioId)).filter((item) => item.status === 'FALHA');
       if (!falhas.length) return json({ ok: true, envio, reenfileirados: 0 });
+      if (falhas.length > LIMITE_DISPARO_WHATSAPP) {
+        return json({
+          error: `Reenvio em massa bloqueado temporariamente. Limite operacional: ${LIMITE_DISPARO_WHATSAPP} destinatários por ação.`,
+          limite_destinatarios: LIMITE_DISPARO_WHATSAPP,
+          total_falhas: falhas.length,
+        }, 429);
+      }
       await executarEmLotes(falhas, (item) => base44.asServiceRole.entities.EnvioMensagemDestinatario.update(item.id, {
         status: 'PENDENTE',
         ultimo_erro: '',
