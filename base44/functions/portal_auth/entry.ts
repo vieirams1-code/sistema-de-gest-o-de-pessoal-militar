@@ -142,7 +142,106 @@ Deno.serve(async (req: Request) => {
           ok: true,
           request_id: requestId,
           metodos: metodosPublicos,
+          modo_provisorio: config.provisional_cpf_matricula_enabled === true,
         });
+      }
+
+      // ----------------------------------------------------------------------
+      // MODO PROVISÓRIO: conferência de matrícula e emissão da sessão normal.
+      // A configuração é desligada por padrão e este caminho não altera o OTP.
+      // ----------------------------------------------------------------------
+      case 'AUTENTICAR_PROVISORIO': {
+        if (config.provisional_cpf_matricula_enabled !== true) {
+          return jsonResponse({ error: 'Modo provisório de autenticação desabilitado.' }, 403);
+        }
+
+        const requestId = String(payload?.request_id || '').trim();
+        const matriculaInput = String(payload?.matricula || '').trim().toUpperCase();
+        if (!requestId || requestId.length < 16 || !matriculaInput || matriculaInput.length > 40) {
+          return jsonResponse({ error: 'CPF ou matrícula inválidos.' }, 401);
+        }
+
+        const now = new Date();
+        const nowIso = now.toISOString();
+        const PortalSessao = base44.asServiceRole?.entities?.PortalSessao || base44.entities?.PortalSessao;
+        if (!PortalSessao) return jsonResponse({ error: 'Não foi possível validar o acesso. Tente novamente.' }, 401);
+
+        let sessoes: any[] = [];
+        try { sessoes = await PortalSessao.filter({ request_id: requestId }, undefined, 2, 0); } catch (_e) {}
+        const sessao = Array.isArray(sessoes) && sessoes.length > 0 ? sessoes[0] : null;
+        if (!sessao || sessao.status !== 'CRIADA_AGUARDANDO_OTP' || !sessao.militar_id) {
+          return jsonResponse({ error: 'CPF ou matrícula inválidos.' }, 401);
+        }
+
+        if (
+          (sessao.otp_attempts && sessao.otp_attempts >= config.otp_max_attempts) ||
+          (sessao.otp_blocked_until && new Date(sessao.otp_blocked_until).getTime() > now.getTime())
+        ) {
+          return jsonResponse({ error: 'Acesso temporariamente bloqueado. Tente novamente mais tarde.' }, 429);
+        }
+
+        let militar: any = null;
+        try {
+          const Militar = base44.asServiceRole?.entities?.Militar || base44.entities?.Militar;
+          militar = Militar ? await Militar.get(sessao.militar_id) : null;
+        } catch (_e) {}
+
+        const matriculaCadastrada = String(militar?.matricula || '').trim().toUpperCase();
+        const militarAtivo = militar && militar.status !== 'Inativo' && militar.status_cadastro !== 'Inativo' && militar.status !== 'Falecido';
+        const matriculaValida = militarAtivo && matriculaCadastrada && matriculaInput === matriculaCadastrada;
+
+        if (!matriculaValida) {
+          const novasTentativas = (sessao.otp_attempts || 0) + 1;
+          const atingiuLimite = novasTentativas >= config.otp_max_attempts;
+          try {
+            await PortalSessao.update(sessao.id, {
+              otp_attempts: novasTentativas,
+              status: atingiuLimite ? 'EXPIRADA' : 'CRIADA_AGUARDANDO_OTP',
+              otp_blocked_until: atingiuLimite ? new Date(now.getTime() + 15 * 60 * 1000).toISOString() : undefined,
+            });
+          } catch (_e) {}
+          try {
+            await registrarAuditoriaPortal(base44, {
+              sessao_id: sessao.id,
+              militar_id: sessao.militar_id,
+              acao: 'LOGIN_FALHA_OTP',
+              resultado: false,
+              motivo_falha_sanitizado: 'Falha na conferência da matrícula provisória',
+              ip_origem,
+              user_agent,
+              correlation_id,
+            });
+          } catch (_e) {}
+          return jsonResponse({ error: 'CPF ou matrícula inválidos.' }, 401);
+        }
+
+        const rawToken = generatePortalToken();
+        const tokenHash = await hashPortalToken(rawToken);
+        const absoluteExpiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
+        try {
+          await PortalSessao.update(sessao.id, {
+            status: 'ATIVA',
+            token_hash: tokenHash,
+            validated_at: nowIso,
+            last_activity_at: nowIso,
+            expires_at: absoluteExpiresAt,
+          });
+        } catch (_e) {}
+
+        try {
+          await registrarAuditoriaPortal(base44, {
+            sessao_id: sessao.id,
+            militar_id: sessao.militar_id,
+            acao: 'LOGIN_SUCESSO',
+            resultado: true,
+            motivo_falha_sanitizado: null,
+            ip_origem,
+            user_agent,
+            correlation_id,
+          });
+        } catch (_e) {}
+
+        return jsonResponse({ ok: true, token: rawToken, expires_in: 14400 });
       }
 
       // ----------------------------------------------------------------------
