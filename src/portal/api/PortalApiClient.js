@@ -160,9 +160,6 @@ export async function iniciarAuth(cpf) {
 }
 
 /**
- * Solicita o envio do código OTP pelo canal escolhido.
- */
-/**
  * Autenticação emergencial provisória por CPF e matrícula.
  */
 export async function autenticarProvisorio(requestId, matricula) {
