@@ -1,0 +1,63 @@
+{
+  "name": "EmpenhoOperacional",
+  "type": "object",
+  "title": "Empenho operacional",
+  "description": "Miss\u00e3o que afeta a disponibilidade para a escala, incluindo TIF/Pantanal e deslocamentos.",
+  "properties": {
+    "nome": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "TIF_PANTANAL",
+        "MISSAO_DESLOCAMENTO",
+        "OUTRA"
+      ],
+      "default": "OUTRA"
+    },
+    "ciclo": {
+      "type": "string"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date"
+    },
+    "destino": {
+      "type": "string"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PLANEJADO",
+        "ATIVO",
+        "ENCERRADO",
+        "CANCELADO"
+      ],
+      "default": "PLANEJADO"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome",
+    "tipo",
+    "data_inicio",
+    "data_fim",
+    "status"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

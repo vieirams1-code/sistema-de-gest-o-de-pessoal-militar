@@ -1,0 +1,41 @@
+{
+  "name": "ModeloGuarnicao",
+  "type": "object",
+  "title": "Modelo de guarni\u00e7\u00e3o",
+  "description": "Modelo reutiliz\u00e1vel de composi\u00e7\u00e3o operacional, sem transformar comandante em vaga.",
+  "properties": {
+    "nome": {
+      "type": "string"
+    },
+    "descricao": {
+      "type": "string"
+    },
+    "quantitativo": {
+      "type": "integer"
+    },
+    "grupo_id": {
+      "type": "string"
+    },
+    "grupo_nome": {
+      "type": "string"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome",
+    "quantitativo",
+    "ativo"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

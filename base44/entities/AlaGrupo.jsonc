@@ -1,0 +1,54 @@
+{
+  "name": "AlaGrupo",
+  "type": "object",
+  "title": "Ala ou grupo de servi\u00e7o",
+  "description": "Agrupamento de servi\u00e7o em regime 24x72.",
+  "properties": {
+    "nome": {
+      "type": "string"
+    },
+    "sigla": {
+      "type": "string"
+    },
+    "quartel_posto_id": {
+      "type": "string"
+    },
+    "quartel_posto_nome": {
+      "type": "string"
+    },
+    "ciclo": {
+      "type": "string",
+      "enum": [
+        "24X72"
+      ],
+      "default": "24X72"
+    },
+    "hora_inicio": {
+      "type": "string",
+      "format": "time"
+    },
+    "hora_fim": {
+      "type": "string",
+      "format": "time"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome",
+    "quartel_posto_id",
+    "ciclo",
+    "ativo"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

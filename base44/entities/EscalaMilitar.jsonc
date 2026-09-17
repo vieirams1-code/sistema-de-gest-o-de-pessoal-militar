@@ -1,0 +1,70 @@
+{
+  "name": "EscalaMilitar",
+  "type": "object",
+  "title": "Militar na escala",
+  "description": "Participa\u00e7\u00e3o individual do militar. O comandante \u00e9 um atributo desta participa\u00e7\u00e3o e pode acumular com motorista.",
+  "properties": {
+    "escala_servico_id": {
+      "type": "string"
+    },
+    "escala_guarnicao_id": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "funcao_operacional": {
+      "type": "string",
+      "enum": [
+        "MOTORISTA",
+        "AUXILIAR"
+      ]
+    },
+    "eh_comandante": {
+      "type": "boolean",
+      "default": false
+    },
+    "ordem_antiguidade": {
+      "type": "integer"
+    },
+    "origem_comandante": {
+      "type": "string",
+      "enum": [
+        "AUTOMATICA",
+        "MANUAL"
+      ],
+      "default": "AUTOMATICA"
+    },
+    "motivo_override": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ESCALADO",
+        "SUBSTITUIDO",
+        "CANCELADO"
+      ],
+      "default": "ESCALADO"
+    }
+  },
+  "required": [
+    "escala_servico_id",
+    "escala_guarnicao_id",
+    "militar_id",
+    "funcao_operacional",
+    "eh_comandante"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

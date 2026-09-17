@@ -1,0 +1,57 @@
+{
+  "name": "DisponibilidadeEscala",
+  "type": "object",
+  "title": "Disponibilidade para escala",
+  "description": "Registro de disponibilidade ou indisponibilidade com origem rastre\u00e1vel.",
+  "properties": {
+    "militar_id": {
+      "type": "string"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "FERIAS",
+        "ATESTADO",
+        "JISO",
+        "EMPENHO",
+        "OUTRO"
+      ]
+    },
+    "origem_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DISPONIVEL",
+        "INDISPONIVEL",
+        "RESTRITO"
+      ],
+      "default": "INDISPONIVEL"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "militar_id",
+    "data_inicio",
+    "data_fim",
+    "tipo",
+    "status"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

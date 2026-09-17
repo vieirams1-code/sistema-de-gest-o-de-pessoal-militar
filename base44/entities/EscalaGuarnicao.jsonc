@@ -1,0 +1,44 @@
+{
+  "name": "EscalaGuarnicao",
+  "type": "object",
+  "title": "Guarni\u00e7\u00e3o na escala",
+  "description": "Inst\u00e2ncia de um modelo de guarni\u00e7\u00e3o dentro de uma escala.",
+  "properties": {
+    "escala_servico_id": {
+      "type": "string"
+    },
+    "modelo_guarnicao_id": {
+      "type": "string"
+    },
+    "nome": {
+      "type": "string"
+    },
+    "quantidade_prevista": {
+      "type": "integer"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "RASCUNHO",
+        "COMPLETA",
+        "INCOMPLETA",
+        "PUBLICADA"
+      ],
+      "default": "RASCUNHO"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "escala_servico_id",
+    "modelo_guarnicao_id",
+    "quantidade_prevista"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
