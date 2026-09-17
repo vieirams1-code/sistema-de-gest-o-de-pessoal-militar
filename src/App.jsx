@@ -90,6 +90,7 @@ const moduleGuardByPage = {
   Configuracoes: { moduleKeys: ['configuracoes', 'adicoes_personalizacoes'], actionKeys: ['gerir_configuracoes', 'gerir_adicoes_personalizacoes'], moduleName: 'Configurações' },
   Tags: { moduleKey: 'tags', actionKey: 'visualizar_tags', moduleName: 'Tags' },
   GruposEfetivo: { moduleKey: 'grupos_efetivo', actionKey: 'visualizar_grupos_efetivo', moduleName: 'Grupos do Efetivo' },
+  Sargenteacao: { moduleKey: 'sargenteacao', actionKey: 'visualizar_sargenteacao', moduleName: 'Sargenteação' },
   PermissoesUsuarios: { moduleKeys: ['permissoes_usuarios'], actionKeys: ['gerir_permissoes_usuarios'], moduleName: 'Permissões de Usuários' },
   PerfisPermissao: { moduleKeys: ['perfis_permissao'], actionKeys: ['gerir_perfis_permissao'], moduleName: 'Perfis de Permissão' },
   Publicacoes: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },
