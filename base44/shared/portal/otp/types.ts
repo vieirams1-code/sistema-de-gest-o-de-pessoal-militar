@@ -38,6 +38,7 @@ export interface OtpDeliveryParams {
   code: string;
   militarNome?: string;
   correlationId?: string;
+  provider?: string;
 }
 
 export interface OtpDeliveryResult {
