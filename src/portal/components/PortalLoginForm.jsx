@@ -316,7 +316,7 @@ export default function PortalLoginForm() {
             </form>
           )}
 
-          {/* PASSO 2: MATRÍCULA */
+          {/* PASSO 2: MATRÍCULA */}
           {step === 'MATRICULA' && (
             <form onSubmit={handleProvisorioSubmit} className="space-y-4">
               <div className="space-y-1.5">
