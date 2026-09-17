@@ -134,6 +134,7 @@ import Portal from './pages/Portal';
 import PortalFerias from './pages/PortalFerias';
 import PortalCadastro from './pages/PortalCadastro';
 import GruposEfetivo from './pages/GruposEfetivo';
+import Sargenteacao from './pages/Sargenteacao';
 import __Layout from './Layout.jsx';
 
 
@@ -144,6 +145,7 @@ export const PAGES = {
     "PortalFerias": PortalFerias,
     "PortalCadastro": PortalCadastro,
     "GruposEfetivo": GruposEfetivo,
+    "Sargenteacao": Sargenteacao,
     "PainelPlanoFerias": PainelPlanoFerias,
     "PainelPlanoFeriasV2": PainelPlanoFeriasV2,
     "PlanosFerias": PlanosFerias,
