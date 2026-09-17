@@ -5,12 +5,14 @@ import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   AlertTriangle,
+  AlertCircle,
   BarChart3,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
   LayoutList,
+  RefreshCw,
   Search,
   Users,
   X,
@@ -125,6 +127,9 @@ function decisaoAtual(op) {
 
 function statusOpcao(op) {
   if (op?.sem_resposta) return { label: 'Não respondeu', cls: 'bg-red-50 text-red-700 border-red-200' };
+  if (op?.status_camada_1 === 'Pendente_Reanalise') {
+    return { label: 'Reanálise', cls: 'bg-orange-50 text-orange-700 border-orange-300' };
+  }
   if (op?.gerado_ferias_efetivas) return { label: 'Gerado', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
   if (op?.nao_respondeu_no_prazo && !(op?.status_camada_1 && op.status_camada_1 !== 'Pendente')) {
     return { label: 'Não respondeu no prazo', cls: 'bg-red-50 text-red-700 border-red-200' };
@@ -168,6 +173,8 @@ export default function PainelPlanoFeriasV2() {
 
   const [selecionado, setSelecionado] = useState(null);
   const [mesesGestor, setMesesGestor] = useState([]);
+  const [saneando, setSaneando] = useState(false);
+  const [reatribuindo, setReatribuindo] = useState(false);
 
   const carregar = async (idPlano = '') => {
     setLoading(true);
@@ -396,6 +403,46 @@ export default function PainelPlanoFeriasV2() {
     }
   };
 
+  const executarSaneamento = async () => {
+    if (!podeAprovar || saneando) return;
+    setSaneando(true);
+    setFeedback(null);
+    try {
+      const res = await base44.functions.invoke('saneamentoRespostasFerias', {
+        plano_id: planoId || undefined,
+      });
+      const data = res.data || {};
+      setFeedback({
+        type: 'success',
+        message: data.message || `${data.total_marcadas || 0} resposta(s) marcada(s) para reanálise.`,
+      });
+      await carregar(planoId);
+    } catch (err) {
+      setFeedback({ type: 'error', message: err?.response?.data?.error || err?.message || 'Falha ao executar o saneamento.' });
+    } finally {
+      setSaneando(false);
+    }
+  };
+
+  const reatribuirPeriodo = async () => {
+    if (!selecionado?.id || !podeAprovar || reatribuindo) return;
+    setReatribuindo(true);
+    setFeedback(null);
+    try {
+      const res = await base44.functions.invoke('reatribuirPeriodoFerias', {
+        opcao_id: selecionado.id,
+      });
+      const data = res.data || {};
+      setFeedback({ type: 'success', message: data.message || 'Período reatribuído com sucesso.' });
+      setSelecionado(null);
+      await carregar(planoId);
+    } catch (err) {
+      setFeedback({ type: 'error', message: err?.response?.data?.error || err?.message || 'Falha ao reatribuir o período.' });
+    } finally {
+      setReatribuindo(false);
+    }
+  };
+
   const registrarPendencia = async (justificativa) => {
     if (!selecionado?.sem_resposta || !podeAprovar || saving) return;
     const campanhaAlvo = (selecionado.campanhas_alvo || [])[0];
@@ -495,11 +542,25 @@ export default function PainelPlanoFeriasV2() {
             )}
           </div>
 
-          <GeracaoFeriasPlanoV2 key={planoId} plano={planoAtual}
-            podeAdmin={isAdmin || canAccessAction('admin_campanhas_ferias')}
-            podeGerar={isAdmin || canAccessAction('gerar_ferias_campanhas')}
-            onGerado={async (message) => { await carregar(planoId); setFeedback({ type: 'success', message }); }}
-          />
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <GeracaoFeriasPlanoV2 key={planoId} plano={planoAtual}
+              podeAdmin={isAdmin || canAccessAction('admin_campanhas_ferias')}
+              podeGerar={isAdmin || canAccessAction('gerar_ferias_campanhas')}
+              onGerado={async (message) => { await carregar(planoId); setFeedback({ type: 'success', message }); }}
+            />
+            {podeAprovar && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={executarSaneamento}
+                disabled={saneando}
+                className="h-10 border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800 font-semibold"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${saneando ? 'animate-spin' : ''}`} />
+                {saneando ? 'Saneando...' : 'Saneamento de respostas'}
+              </Button>
+            )}
+          </div>
 
           {feedback && (
             <div className={`mt-5 rounded-xl border px-4 py-3 text-sm font-medium ${feedback.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
@@ -548,6 +609,7 @@ export default function PainelPlanoFeriasV2() {
 
                 <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
                   <option value="TODOS">Todas as situações</option>
+                  <option value="Reanálise">Reanálise necessária</option>
                   <option value="Não respondeu">Não respondeu</option>
                   <option value="Não respondeu no prazo">Não respondeu no prazo</option>
                   <option value="Pendente">Pendente</option>
@@ -716,6 +778,32 @@ export default function PainelPlanoFeriasV2() {
                 {selecionado.justificativa_administrativa && (
                   <p className="text-xs text-red-700 mt-2 italic">“{selecionado.justificativa_administrativa}”</p>
                 )}
+              </div>
+            )}
+
+            {selecionado.status_camada_1 === 'Pendente_Reanalise' && (
+              <div className="rounded-xl border border-orange-300 bg-orange-50 p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="font-black text-sm text-orange-800">Reanálise necessária</h3>
+                    <p className="text-xs text-orange-700 mt-1 leading-relaxed">
+                      O período aquisitivo informado pelo militar já está integralmente comprometido por férias existentes. O sistema pode reatribuir automaticamente esta resposta para o próximo período elegível.
+                    </p>
+                    {selecionado.justificativa_ajuste_gestor && (
+                      <p className="text-xs text-orange-700 mt-2 italic">“{selecionado.justificativa_ajuste_gestor}”</p>
+                    )}
+                    <Button
+                      type="button"
+                      onClick={reatribuirPeriodo}
+                      disabled={!podeAprovar || reatribuindo}
+                      className="mt-3 h-9 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${reatribuindo ? 'animate-spin' : ''}`} />
+                      {reatribuindo ? 'Reatribuindo...' : 'Reatribuir ao período correto'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
 

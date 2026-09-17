@@ -27,9 +27,15 @@ export function ultimoDiaMes(ano: number, mes: number): string {
 }
 
 export function feriasVinculadasAoPlano(ferias: any[] = [], planoId: unknown): any[] {
+  // AVISO: Esta função filtra férias por vínculo de plano (plano_ferias_id).
+  // NÃO deve ser usada para pré-filtrar férias antes de calcular saldo de
+  // período aquisitivo — TODAS as férias com status de impacto que pertencem
+  // ao período abatem o saldo, independentemente de vínculo com plano.
+  // Passe o array completo de férias do militar diretamente para
+  // calcularResumoPeriodoPlano; ela filtra por período internamente.
+  // Esta função permanece apenas para listagens/exibições que precisam
+  // mostrar férias geradas por um plano específico.
   const id = textoId(planoId);
-  // Férias sem vínculo explícito pertencem ao módulo geral e não podem
-  // reduzir o saldo de um Plano/Campanha de Férias.
   return id ? ferias.filter((f: any) => textoId(f?.plano_ferias_id) === id) : ferias;
 }
 

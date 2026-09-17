@@ -106,13 +106,13 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
         const consultaMilitares = { militar_id: { $in: idsNaoCobertos } };
         const [periodos, ferias, ajustes] = await Promise.all([
           listarTodos(base44.asServiceRole.entities.PeriodoAquisitivo, consultaMilitares),
-          listarTodos(base44.asServiceRole.entities.Ferias, { ...consultaMilitares, plano_ferias_id: planoId }),
+          listarTodos(base44.asServiceRole.entities.Ferias, consultaMilitares),
           listarTodos(base44.asServiceRole.entities.AjusteSaldoFerias, { ...consultaMilitares, status: 'ativo' }),
         ]);
         cobertura = militares.flatMap((m: any) => {
           const id = textoId(m?.id);
           if (!id || publicoMap.has(id)) return [];
-          const feriasMilitar = feriasVinculadasAoPlano(ferias.filter((f: any) => textoId(f?.militar_id) === id), planoId);
+          const feriasMilitar = ferias.filter((f: any) => textoId(f?.militar_id) === id);
           const ajustesMilitar = ajustes.filter((a: any) => textoId(a?.militar_id) === id);
           const elegiveis = periodos.filter((p: any) => textoId(p?.militar_id) === id).map((p: any) => ({ id: p.id, ano_referencia: p.ano_referencia || '', inicio_aquisitivo: p.inicio_aquisitivo || '', fim_aquisitivo: p.fim_aquisitivo || '', ...calcularResumoPeriodoPlano(p, feriasMilitar, ajustesMilitar, ano) })).filter((p: any) => p.elegivel_plano === true);
           return elegiveis.length ? [{ militar_id: id, militar_nome: m?.nome_completo || m?.nome_guerra || '', militar_posto: m?.posto_graduacao || '', militar_matricula: m?.matricula || '', lotacao_nome: m?.lotacao || m?.estrutura_nome || 'Não informada', periodos_elegiveis: elegiveis }] : [];

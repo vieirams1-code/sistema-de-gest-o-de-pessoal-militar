@@ -2027,7 +2027,7 @@ Deno.serve(async (req: Request) => {
               base44.asServiceRole.entities.AjusteSaldoFerias.filter({ militar_id: opcaoGestao.militar_id }),
             ]);
             const anoPlanoGestao = Number(opcaoGestao.ano_referencia || new Date().getFullYear() + 1);
-            const feriasDoPlanoGestao = feriasVinculadasAoPlano(feriasGestao, opcaoGestao.plano_ferias_institucional_id);
+            const feriasDoPlanoGestao = feriasGestao;
             const resumoGestao = calcularResumoPeriodoPlano(periodoGestao, feriasDoPlanoGestao, ajustesGestao, anoPlanoGestao);
             const diasEsperados = Math.max(0, numeroSeguro(opcaoGestao.dias_direito, resumoGestao.dias_sem_previsao));
             const parcelasNormalizadas = parcelas.map((p: any, idx: number) => {
@@ -2597,7 +2597,7 @@ Deno.serve(async (req: Request) => {
           return dtA - dtB;
         });
 
-        const feriasDoPlanoPortal = feriasVinculadasAoPlano(feriasMilitarPlano, campanhaFeriasAtiva?.plano_ferias_institucional_id);
+        const feriasDoPlanoPortal = feriasMilitarPlano;
         const periodosComResumo = periodosOrdenados.map((p: any) => ({
           ...p,
           ...calcularResumoPeriodoPlano(p, feriasDoPlanoPortal, ajustesMilitarPlano, Number(anoCampanha)),
@@ -2816,7 +2816,7 @@ Deno.serve(async (req: Request) => {
         const ordenadosSubmissao = (todosPeriodosSubmissao || []).sort((a: any, b: any) =>
           String(a.inicio_aquisitivo || '').localeCompare(String(b.inicio_aquisitivo || ''))
         );
-        const feriasDoPlanoSubmissao = feriasVinculadasAoPlano(feriasMilitarSubmissao, planoIdAtivo);
+        const feriasDoPlanoSubmissao = feriasMilitarSubmissao;
         const resumosSubmissao = ordenadosSubmissao.map((p: any) => ({
           periodo: p,
           resumo: calcularResumoPeriodoPlano(p, feriasDoPlanoSubmissao, ajustesMilitarSubmissao, Number(anoCampanha)),
