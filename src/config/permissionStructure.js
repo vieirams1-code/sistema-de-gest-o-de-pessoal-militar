@@ -42,6 +42,14 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_sargenteacao',
+        label: 'Sargenteação',
+        actions: [
+          { key: 'perm_visualizar_sargenteacao', label: 'Visualizar Sargenteação' },
+          { key: 'perm_gerir_sargenteacao', label: 'Gerir cadastros da Sargenteação', sensitive: true }
+        ]
+      },
+      {
         key: 'acesso_extracao_efetivo',
         label: 'Extração do Efetivo',
         actions: [
