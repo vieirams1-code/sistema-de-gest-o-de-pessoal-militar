@@ -54,6 +54,7 @@ export default function ConfiguracoesPortal() {
   // Estados de Canais & OTP
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
+  const [provisionalCpfMatriculaEnabled, setProvisionalCpfMatriculaEnabled] = useState(false);
   const [otpTtlSeconds, setOtpTtlSeconds] = useState(300);
   const [otpResendSeconds, setOtpResendSeconds] = useState(60);
 
@@ -92,6 +93,7 @@ export default function ConfiguracoesPortal() {
 
         setWhatsappEnabled(c.whatsapp_enabled !== false);
         setEmailEnabled(c.email_enabled === true); // desativado por padrão a menos que explicitamente true
+        setProvisionalCpfMatriculaEnabled(c.provisional_cpf_matricula_enabled === true);
         setOtpTtlSeconds(c.otp_ttl_seconds || 300);
         setOtpResendSeconds(c.otp_resend_seconds || 60);
       }
@@ -147,6 +149,7 @@ export default function ConfiguracoesPortal() {
       whatsapp_provider: whatsappEnabled ? 'evolution_api' : 'disabled',
       email_enabled: emailEnabled,
       email_provider: emailEnabled ? 'base44_core' : 'disabled',
+      provisional_cpf_matricula_enabled: provisionalCpfMatriculaEnabled,
       allow_channel_choice: Boolean(whatsappEnabled && emailEnabled),
       default_channel: whatsappEnabled ? 'WHATSAPP' : 'EMAIL',
       otp_ttl_seconds: Number(otpTtlSeconds) || 300,
@@ -637,6 +640,26 @@ export default function ConfiguracoesPortal() {
                     onChange={(e) => setEmailEnabled(e.target.checked)}
                     className="w-4 h-4 accent-[#1e3a5f] rounded"
                   />
+                </div>
+
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-300 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="font-bold text-amber-950 block">Modo provisório: CPF + matrícula</span>
+                      <span className="text-amber-800 text-[11px]">Acesso emergencial sem OTP. Deixe desligado após normalizar os canais.</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={provisionalCpfMatriculaEnabled}
+                      onChange={(e) => setProvisionalCpfMatriculaEnabled(e.target.checked)}
+                      className="w-4 h-4 accent-amber-700 rounded shrink-0"
+                    />
+                  </div>
+                  {provisionalCpfMatriculaEnabled && (
+                    <p className="text-[11px] text-amber-900">
+                      Atenção: CPF e matrícula são dados de conhecimento. Use somente durante a contingência e desative ao final.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-2">
