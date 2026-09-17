@@ -101,7 +101,7 @@ export default function PortalLoginForm() {
     }
   };
 
-  // ETAPA 2 (modo provisório): conferir matrícula sem alterar o fluxo OTP.
+  // ETAPA 2: conferir matrícula sem alterar o fluxo OTP.
   const handleProvisorioSubmit = async (e) => {
     e.preventDefault();
     const matriculaNormalizada = matricula.trim();
