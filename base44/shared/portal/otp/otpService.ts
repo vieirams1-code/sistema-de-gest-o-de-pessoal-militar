@@ -1,6 +1,7 @@
 import { base44EmailProvider } from './providers/base44EmailProvider.ts';
 import { resendEmailProvider } from './providers/resendEmailProvider.ts';
 import { evolutionWhatsAppProvider, normalizeWhatsAppNumber } from './providers/evolutionWhatsAppProvider.ts';
+import { smsProvider } from './providers/smsProvider.ts';
 import { generatePortalToken } from '../portalCrypto.ts';
 
 /**
@@ -53,6 +54,13 @@ export function resolveWhatsAppProvider(config: PortalAuthConfigData) {
     return evolutionWhatsAppProvider;
   }
   return null;
+}
+
+/**
+ * Retorna o provedor de SMS somente quando existe configuração e credencial operacional.
+ */
+export function resolveSmsProvider(config: PortalAuthConfigData) {
+  return smsProvider.isOperational(config) ? smsProvider : null;
 }
 
 /**
@@ -121,7 +129,8 @@ export function getAvailablePublicMethods(config: PortalAuthConfigData): PublicM
     metodos.push({ canal: 'WHATSAPP', label: 'WhatsApp cadastrado' });
   }
 
-  if (config.sms_enabled && config.sms_provider !== 'disabled') {
+  const smsProv = resolveSmsProvider(config);
+  if (smsProv) {
     metodos.push({ canal: 'SMS', label: 'SMS cadastrado' });
   }
 
