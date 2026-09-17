@@ -37,6 +37,11 @@ export const PAGE_ACCESS_POLICY = {
     actionKey: 'visualizar_grupos_efetivo',
     moduleName: 'Grupos do Efetivo',
   },
+  Sargenteacao: {
+    moduleKey: 'sargenteacao',
+    actionKey: 'visualizar_sargenteacao',
+    moduleName: 'Sargenteação',
+  },
 };
 
 const NORMALIZED = Object.fromEntries(
