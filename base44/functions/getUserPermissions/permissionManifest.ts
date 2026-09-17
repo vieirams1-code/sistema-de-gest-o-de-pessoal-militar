@@ -37,6 +37,13 @@ export const PERMISSION_MODULES = [
     ]
   },
   {
+    "key": "acesso_sargenteacao",
+    "actions": [
+      "perm_visualizar_sargenteacao",
+      "perm_gerir_sargenteacao"
+    ]
+  },
+  {
     "key": "acesso_extracao_efetivo",
     "actions": [
       "perm_visualizar_extracao_efetivo",
