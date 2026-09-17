@@ -316,24 +316,22 @@ export default function PortalLoginForm() {
             </form>
           )}
 
-          {/* PASSO 2: MATRÍCULA NO MODO PROVISÓRIO */}
+          {/* PASSO 2: MATRÍCULA */
           {step === 'MATRICULA' && (
             <form onSubmit={handleProvisorioSubmit} className="space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs">
-                <strong>Modo provisório ativo.</strong> Informe a matrícula funcional cadastrada para concluir o acesso.
-              </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 block">Matrícula do Militar</label>
                 <Input
                   type="text"
                   value={matricula}
-                  onChange={(e) => setMatricula(e.target.value.slice(0, 40))}
+                  onChange={(e) => setMatricula(e.target.value.replace(/\D/g, '').slice(0, 20))}
                   autoFocus
-                  maxLength={40}
-                  placeholder="Digite sua matrícula"
+                  inputMode="numeric"
+                  maxLength={20}
+                  placeholder="Ex.: 108747021"
                   className="h-12 text-base text-center tracking-wider font-semibold border-slate-300 rounded-xl focus:border-[#1e3a5f] focus:ring-[#1e3a5f]"
                 />
-                <p className="text-[11px] text-slate-500 text-center">Essa modalidade é temporária e deve ser desativada quando o OTP voltar a funcionar.</p>
+                <p className="text-[11px] text-slate-500 text-center">Digite apenas os números da sua matrícula funcional.</p>
               </div>
               <div className="flex space-x-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setStep('CPF')} className="h-11 rounded-xl text-slate-600 border-slate-300">
