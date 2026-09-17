@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { listarSargenteacao, salvarSargenteacao, alternarSargenteacao } from '@/services/sargenteacaoService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
@@ -24,23 +24,7 @@ const EMPTY = {
   empenho: { nome: '', tipo: 'TIF_PANTANAL', ciclo: '', data_inicio: '', data_fim: '', destino: '', descricao: '', status: 'PLANEJADO', observacoes: '' },
 };
 
-const ENTITY = {
-  quartel: 'QuartelPosto',
-  ala: 'AlaGrupo',
-  modelo: 'ModeloGuarnicao',
-  empenho: 'EmpenhoOperacional',
-};
 
-async function carregarDados() {
-  const [quartel, alas, modelos, vagas, empenhos] = await Promise.all([
-    base44.entities.QuartelPosto.list('-created_date', 200),
-    base44.entities.AlaGrupo.list('-created_date', 200),
-    base44.entities.ModeloGuarnicao.list('-created_date', 200),
-    base44.entities.ModeloGuarnicaoVaga.list('ordem', 500),
-    base44.entities.EmpenhoOperacional.list('-data_inicio', 200),
-  ]);
-  return { quartel, alas, modelos, vagas, empenhos };
-}
 
 function Campo({ label, children, className = '' }) {
   return <label className={`block ${className}`}><span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>{children}</label>;
@@ -61,7 +45,7 @@ export default function Sargenteacao() {
   const podeGerir = isAdmin || canAccessAction('gerir_sargenteacao');
   const { data = {}, isLoading: carregando, error } = useQuery({
     queryKey: ['sargenteacao-dados'],
-    queryFn: carregarDados,
+    queryFn: listarSargenteacao,
     enabled: isAccessResolved && podeVisualizar,
   });
 
@@ -79,29 +63,14 @@ export default function Sargenteacao() {
   };
 
   const salvar = useMutation({
-    mutationFn: async ({ tipo, values }) => {
-      const entity = base44.entities[ENTITY[tipo]];
-      const saved = editing ? await entity.update(editing, values) : await entity.create(values);
-      if (tipo === 'modelo') {
-        const modeloId = editing || saved?.id;
-        const existentes = await base44.entities.ModeloGuarnicaoVaga.filter({ modelo_guarnicao_id: modeloId });
-        await Promise.all((existentes || []).map((vaga) => base44.entities.ModeloGuarnicaoVaga.delete(vaga.id)));
-        const vagas = [];
-        if (values.possui_motorista) vagas.push({ modelo_guarnicao_id: modeloId, funcao_operacional: 'MOTORISTA', ordem: 1, obrigatoria: true });
-        for (let i = 0; i < Number(values.auxiliares || 0); i += 1) {
-          vagas.push({ modelo_guarnicao_id: modeloId, funcao_operacional: 'AUXILIAR', ordem: vagas.length + 1, obrigatoria: true });
-        }
-        if (vagas.length) await Promise.all(vagas.map((vaga) => base44.entities.ModeloGuarnicaoVaga.create(vaga)));
-      }
-      return saved;
-    },
+    mutationFn: ({ tipo, id, values }) => salvarSargenteacao(tipo, id, values),
     onSuccess: () => { refresh(); setEditing(null); setForm({ ...EMPTY[tab] }); toast({ title: 'Registro salvo com sucesso.' }); },
     onError: (e) => toast({ title: 'Não foi possível salvar.', description: e?.message, variant: 'destructive' }),
   });
 
   const alternar = useMutation({
-    mutationFn: ({ tipo, item }) => base44.entities[ENTITY[tipo]].update(item.id, { ativo: item.ativo === false }),
-    onSuccess: refresh,
+    mutationFn: ({ tipo, item }) => alternarSargenteacao(tipo, item.id),
+    onSuccess: () => { refresh(); toast({ title: 'Status atualizado.' }); },
     onError: (e) => toast({ title: 'Não foi possível alterar o status.', description: e?.message, variant: 'destructive' }),
   });
 
@@ -110,11 +79,19 @@ export default function Sargenteacao() {
     if (!podeGerir) return;
     const values = { ...form };
     if (tab === 'modelo') {
-      values.quantitativo = Number(values.quantitativo || 0);
-      delete values.auxiliares;
-      delete values.possui_motorista;
+      const auxiliares = Number(values.auxiliares);
+      const vagas = auxiliares + Number(Boolean(values.possui_motorista));
+      if (!Number.isInteger(auxiliares) || auxiliares < 0 || vagas < 1) {
+        toast({ title: 'Informe ao menos uma vaga operacional.', variant: 'destructive' });
+        return;
+      }
+      values.quantitativo = vagas;
     }
-    salvar.mutate({ tipo: tab, values: tab === 'modelo' ? { ...values, quantitativo: Number(form.quantitativo || 0) } : values });
+    if (tab === 'empenho' && values.data_fim < values.data_inicio) {
+      toast({ title: 'A data final deve ser igual ou posterior à inicial.', variant: 'destructive' });
+      return;
+    }
+    salvar.mutate({ tipo: tab, id: editing, values });
   };
 
   const counts = useMemo(() => ({
@@ -146,7 +123,7 @@ export default function Sargenteacao() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        {TABS.map(([key, label, Icon]) => <button type="button" key={key} onClick={() => { setTab(key); setEditing(null); }} className={`rounded-xl border p-4 text-left transition ${tab === key ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-200'}`}>
+        {TABS.map(([key, label, Icon]) => <button type="button" key={key} onClick={() => iniciarNovo(key)} className={`rounded-xl border p-4 text-left transition ${tab === key ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-200'}`}>
           <div className="flex items-center justify-between"><Icon className="h-5 w-5 text-indigo-600" /><span className="text-xl font-bold text-slate-900">{carregando ? '—' : counts[key]}</span></div><p className="mt-2 text-sm font-semibold text-slate-800">{label}</p>
         </button>)}
       </div>
@@ -175,7 +152,7 @@ export default function Sargenteacao() {
           <form onSubmit={salvarFormulario} className="space-y-4">
             {tab === 'quartel' && <><Campo label="Nome"><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo><div className="grid grid-cols-2 gap-3"><Campo label="Sigla"><Input value={form.sigla} onChange={(e) => setForm({ ...form, sigla: e.target.value.toUpperCase() })} /></Campo><Campo label="Tipo"><select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option value="QUARTEL">Quartel</option><option value="POSTO">Posto</option></select></Campo></div><Campo label="ID da estrutura existente"><Input value={form.estrutura_id} onChange={(e) => setForm({ ...form, estrutura_id: e.target.value })} placeholder="Referência opcional" /></Campo><Campo label="Nome da estrutura"><Input value={form.estrutura_nome} onChange={(e) => setForm({ ...form, estrutura_nome: e.target.value })} /></Campo></>}
             {tab === 'ala' && <><Campo label="Nome"><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo><div className="grid grid-cols-2 gap-3"><Campo label="Sigla"><Input value={form.sigla} onChange={(e) => setForm({ ...form, sigla: e.target.value.toUpperCase() })} /></Campo><Campo label="Quartel/posto"><select required className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.quartel_posto_id} onChange={(e) => { const q = data.quartel?.find((item) => item.id === e.target.value); setForm({ ...form, quartel_posto_id: e.target.value, quartel_posto_nome: q?.nome || '' }); }}><option value="">Selecione</option>{data.quartel?.filter((q) => q.ativo !== false).map((q) => <option key={q.id} value={q.id}>{q.nome}</option>)}</select></Campo></div><div className="grid grid-cols-2 gap-3"><Campo label="Início"><Input type="time" value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} /></Campo><Campo label="Fim"><Input type="time" value={form.hora_fim} onChange={(e) => setForm({ ...form, hora_fim: e.target.value })} /></Campo></div><p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Regime fixo desta primeira etapa: 24x72.</p></>}
-            {tab === 'modelo' && <><Campo label="Nome"><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo><Campo label="Descrição"><Input value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></Campo><div className="grid grid-cols-2 gap-3"><Campo label="Quantitativo"><Input required type="number" min="1" value={form.quantitativo} onChange={(e) => setForm({ ...form, quantitativo: e.target.value })} /></Campo><Campo label="Auxiliares"><Input required type="number" min="0" value={form.auxiliares} onChange={(e) => setForm({ ...form, auxiliares: e.target.value })} /></Campo></div><label className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm"><input type="checkbox" checked={Boolean(form.possui_motorista)} onChange={(e) => setForm({ ...form, possui_motorista: e.target.checked })} /> Possui vaga operacional de motorista</label><p className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900">O comandante será escolhido depois entre os militares escalados, pela antiguidade. Não é contado no quantitativo.</p></>}
+            {tab === 'modelo' && <><Campo label="Nome"><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo><Campo label="Descrição"><Input value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></Campo><div className="grid grid-cols-2 gap-3"><Campo label="Quantitativo"><Input readOnly type="number" value={Number(form.auxiliares || 0) + Number(Boolean(form.possui_motorista))} /></Campo><Campo label="Auxiliares"><Input required type="number" min="0" value={form.auxiliares} onChange={(e) => setForm({ ...form, auxiliares: e.target.value })} /></Campo></div><label className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm"><input type="checkbox" checked={Boolean(form.possui_motorista)} onChange={(e) => setForm({ ...form, possui_motorista: e.target.checked })} /> Possui vaga operacional de motorista</label><p className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900">O comandante será escolhido depois entre os militares escalados, pela antiguidade. Não é contado no quantitativo.</p></>}
             {tab === 'empenho' && <><Campo label="Nome da missão"><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo><div className="grid grid-cols-2 gap-3"><Campo label="Tipo"><select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option value="TIF_PANTANAL">TIF / Pantanal</option><option value="MISSAO_DESLOCAMENTO">Missão / deslocamento</option><option value="OUTRA">Outra</option></select></Campo><Campo label="Ciclo"><Input value={form.ciclo} onChange={(e) => setForm({ ...form, ciclo: e.target.value })} placeholder="Ex.: ciclo 1" /></Campo></div><div className="grid grid-cols-2 gap-3"><Campo label="Data inicial"><Input required type="date" value={form.data_inicio} onChange={(e) => setForm({ ...form, data_inicio: e.target.value })} /></Campo><Campo label="Data final"><Input required type="date" value={form.data_fim} onChange={(e) => setForm({ ...form, data_fim: e.target.value })} /></Campo></div><Campo label="Destino"><Input value={form.destino} onChange={(e) => setForm({ ...form, destino: e.target.value })} /></Campo><Campo label="Descrição"><Input value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></Campo><Campo label="Status"><select className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="PLANEJADO">Planejado</option><option value="ATIVO">Ativo</option><option value="ENCERRADO">Encerrado</option><option value="CANCELADO">Cancelado</option></select></Campo></>}
 
             {podeGerir && <div className="flex justify-end gap-2 pt-3"><Button type="button" variant="outline" onClick={() => { setEditing(null); setForm({ ...EMPTY[tab] }); }}>Limpar</Button><Button type="submit" disabled={salvar.isPending}><Save className="mr-2 h-4 w-4" />{salvar.isPending ? 'Salvando...' : 'Salvar'}</Button></div>}
