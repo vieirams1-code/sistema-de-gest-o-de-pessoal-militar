@@ -1,10 +1,14 @@
 import { base44 } from '@/api/base44Client';
 
 async function invoke(action, payload = {}) {
-  const response = await base44.functions.invoke('sargenteacaoGateway', { action, ...payload });
-  const data = response?.data ?? response ?? {};
-  if (data?.error) throw new Error(data.error);
-  return data;
+  try {
+    const response = await base44.functions.invoke('sargenteacaoGateway', { action, ...payload });
+    const data = response?.data ?? response ?? {};
+    if (data?.error) throw new Error(data.error);
+    return data;
+  } catch (error) {
+    throw new Error(error?.response?.data?.error || error?.message || 'Falha ao acessar a Sargenteação.');
+  }
 }
 
 export const listarSargenteacao = () => invoke('LIST');
