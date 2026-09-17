@@ -90,14 +90,13 @@ export class SmsProvider implements OtpDeliveryProvider {
 
   async sendOtp(params: OtpDeliveryParams, _base44Client?: any): Promise<OtpDeliveryResult> {
     const to = normalizeSmsNumber(params.to);
-    if (!to) return { success: false, provider: providerName({ sms_provider: 'http' } as PortalAuthConfigData), error: 'Número de telefone do militar inválido.' };
+    const provider = String(params.provider || env('SMS_PROVIDER') || '').trim().toLowerCase();
+    if (!to) return { success: false, provider: provider || 'sms', error: 'Número de telefone do militar inválido.' };
     const text = `VIVICAS - SGP Militar: seu código de acesso é ${params.code}. Válido por 5 minutos. Não compartilhe este código.`;
-    const provider = env('SMS_PROVIDER').toLowerCase() || 'config';
     try {
-      const configuredProvider = providerName({ sms_provider: provider } as PortalAuthConfigData);
-      if (configuredProvider === 'twilio') return await sendTwilio(to, text);
-      if (configuredProvider === 'zenvia') return await sendZenvia(to, text);
-      if (configuredProvider === 'infobip') return await sendInfobip(to, text);
+      if (provider === 'twilio') return await sendTwilio(to, text);
+      if (provider === 'zenvia') return await sendZenvia(to, text);
+      if (provider === 'infobip') return await sendInfobip(to, text);
       return await sendGeneric(to, text);
     } catch (error: any) {
       console.error('[SmsProvider] Falha no envio:', error?.message || error);
