@@ -5,6 +5,7 @@ export interface PortalAuthConfigData {
   email_enabled: boolean;
   sms_enabled: boolean;
   whatsapp_enabled: boolean;
+  provisional_cpf_matricula_enabled: boolean;
   email_provider: string;
   sms_provider: string;
   whatsapp_provider: string;
@@ -21,6 +22,7 @@ export const DEFAULT_AUTH_CONFIG: PortalAuthConfigData = {
   email_enabled: false,
   sms_enabled: false,
   whatsapp_enabled: true,
+  provisional_cpf_matricula_enabled: false,
   email_provider: 'disabled',
   sms_provider: 'disabled',
   whatsapp_provider: 'evolution_api',
