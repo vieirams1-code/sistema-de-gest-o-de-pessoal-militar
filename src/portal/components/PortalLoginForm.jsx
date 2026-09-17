@@ -328,7 +328,7 @@ export default function PortalLoginForm() {
                   autoFocus
                   inputMode="numeric"
                   maxLength={20}
-                  placeholder="Ex.: 108747021"
+                  placeholder="Ex.: 000123456"
                   className="h-12 text-base text-center tracking-wider font-semibold border-slate-300 rounded-xl focus:border-[#1e3a5f] focus:ring-[#1e3a5f]"
                 />
                 <p className="text-[11px] text-slate-500 text-center">Digite apenas os números da sua matrícula funcional.</p>
