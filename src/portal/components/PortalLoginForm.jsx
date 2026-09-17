@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePortalAuth } from '../context/PortalAuthContext';
-import { iniciarAuth, enviarOtp, validarOtp } from '../api/PortalApiClient';
+import { iniciarAuth, autenticarProvisorio, enviarOtp, validarOtp } from '../api/PortalApiClient';
 import { Shield, Smartphone, Mail, ArrowRight, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,9 @@ export default function PortalLoginForm() {
   const { loginWithToken } = usePortalAuth();
 
   // Estados do Fluxo
-  const [step, setStep] = useState('CPF'); // 'CPF' | 'CHANNEL' | 'OTP'
+  const [step, setStep] = useState('CPF'); // 'CPF' | 'MATRICULA' | 'CHANNEL' | 'OTP'
   const [cpf, setCpf] = useState('');
+  const [matricula, setMatricula] = useState('');
   const [requestId, setRequestId] = useState(null);
   const [metodos, setMetodos] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState('WHATSAPP');
@@ -66,6 +67,12 @@ export default function PortalLoginForm() {
       const response = await iniciarAuth(cleanCpf);
       setRequestId(response.request_id);
 
+      if (response?.modo_provisorio === true) {
+        setMatricula('');
+        setStep('MATRICULA');
+        return;
+      }
+
       const availableMethods = Array.isArray(response.metodos) && response.metodos.length > 0
         ? response.metodos
         : [{ canal: 'WHATSAPP', label: 'WhatsApp cadastrado' }];
@@ -89,6 +96,32 @@ export default function PortalLoginForm() {
       }
     } catch (err) {
       setErrorMsg(err.message || 'Falha ao iniciar autenticação.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ETAPA 2 (modo provisório): conferir matrícula sem alterar o fluxo OTP.
+  const handleProvisorioSubmit = async (e) => {
+    e.preventDefault();
+    const matriculaNormalizada = matricula.trim();
+    if (!requestId || !matriculaNormalizada) {
+      setErrorMsg('Informe a matrícula cadastrada.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const response = await autenticarProvisorio(requestId, matriculaNormalizada);
+      if (response?.token) {
+        await loginWithToken(response.token);
+      } else {
+        throw new Error('CPF ou matrícula inválidos.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'CPF ou matrícula inválidos.');
+      setMatricula('');
     } finally {
       setLoading(false);
     }
@@ -283,7 +316,38 @@ export default function PortalLoginForm() {
             </form>
           )}
 
-          {/* PASSO 2: ESCOLHA DE CANAL (SE MULTICANAL DISPONÍVEL) */}
+          {/* PASSO 2: MATRÍCULA NO MODO PROVISÓRIO */}
+          {step === 'MATRICULA' && (
+            <form onSubmit={handleProvisorioSubmit} className="space-y-4">
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs">
+                <strong>Modo provisório ativo.</strong> Informe a matrícula funcional cadastrada para concluir o acesso.
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 block">Matrícula do Militar</label>
+                <Input
+                  type="text"
+                  value={matricula}
+                  onChange={(e) => setMatricula(e.target.value.slice(0, 40))}
+                  autoFocus
+                  maxLength={40}
+                  placeholder="Digite sua matrícula"
+                  className="h-12 text-base text-center tracking-wider font-semibold border-slate-300 rounded-xl focus:border-[#1e3a5f] focus:ring-[#1e3a5f]"
+                />
+                <p className="text-[11px] text-slate-500 text-center">Essa modalidade é temporária e deve ser desativada quando o OTP voltar a funcionar.</p>
+              </div>
+              <div className="flex space-x-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setStep('CPF')} className="h-11 rounded-xl text-slate-600 border-slate-300">
+                  <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
+                </Button>
+                <Button type="submit" disabled={loading || !matricula.trim()} className="flex-1 h-11 bg-[#1e3a5f] hover:bg-[#2a4d7d] text-white rounded-xl font-semibold shadow-md">
+                  {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Entrar no Portal
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* PASSO 3: ESCOLHA DE CANAL (SE MULTICANAL DISPONÍVEL) */}
           {step === 'CHANNEL' && (
             <form onSubmit={handleChannelSubmit} className="space-y-4">
               <p className="text-xs text-slate-600 text-center font-medium">
