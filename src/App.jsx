@@ -14,6 +14,7 @@ import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 import DescontosFerias from '@/pages/DescontosFerias';
+import InativacaoPeriodoLote from '@/pages/InativacaoPeriodoLote';
 import PortalApp from '@/portal/PortalApp';
 import { getPageAccessPolicy } from '@/config/pageAccessPolicy';
 
@@ -319,6 +320,17 @@ function App() {
                 <AuthenticatedAppWrapper currentPageName="DescontosFerias">
                   <RequireAdmin>
                     <DescontosFerias />
+                  </RequireAdmin>
+                </AuthenticatedAppWrapper>
+              }
+            />
+            {/* Inativação em lote do período 24/25 (Nova Alvorada do Sul e Sidrolândia). Admin-only. */}
+            <Route
+              path="/InativacaoPeriodoLote"
+              element={
+                <AuthenticatedAppWrapper currentPageName="InativacaoPeriodoLote">
+                  <RequireAdmin>
+                    <InativacaoPeriodoLote />
                   </RequireAdmin>
                 </AuthenticatedAppWrapper>
               }

@@ -4,19 +4,13 @@ import {
   normalizeWhatsAppNumber,
   sendEvolutionWhatsAppText,
 } from '../../shared/messaging/evolutionWhatsAppProvider.ts';
+import { CORS_HEADERS, json } from '../../shared/utils/httpJson.ts';
+import { normalizar, texto } from '../../shared/utils/texto.ts';
 
-const HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Id',
-  'Content-Type': 'application/json',
-};
+const HEADERS = { ...CORS_HEADERS, 'Content-Type': 'application/json' };
 const LIMITE_CORPORACAO = 5000;
 // Hotfix operacional: campanhas em massa ficam bloqueadas acima deste teto até o provedor ser estabilizado.
 const LIMITE_DISPARO_WHATSAPP = 25;
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: HEADERS });
-const texto = (value: unknown) => String(value ?? '').trim();
-const normalizar = (value: unknown) => texto(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 const MODELO_MENSAGEM = `Olá, {posto_graduacao} {nome_guerra}.
 
