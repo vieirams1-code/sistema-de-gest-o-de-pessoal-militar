@@ -16,6 +16,14 @@ const LOTACOES_ALVO = ['nova alvorada do sul', 'sidrolandia'];
 const ACAO_INATIVACAO = 'PERIODO_INATIVADO_LOTE_2425';
 const ACAO_REATIVACAO = 'PERIODO_REATIVADO_LOTE_2425';
 
+// Períodos aquisitivos que esta ferramenta pode tratar.
+const PERIODOS_DISPONIVEIS = ['2024/2025', '2023/2024'];
+
+function normalizarPeriodoRef(valor: any): string {
+  const ref = texto(valor);
+  return PERIODOS_DISPONIVEIS.includes(ref) ? ref : PERIODOS_DISPONIVEIS[0];
+}
+
 function militarEstaAtivo(militar: any): boolean {
   return normalizar(militar?.status_cadastro || militar?.status) === 'ativo';
 }
@@ -24,21 +32,22 @@ function pertenceAoEscopo(militar: any): boolean {
   return LOTACOES_ALVO.includes(normalizar(militar?.lotacao || militar?.estrutura_nome));
 }
 
-function ehPeriodo2425(periodo: any): boolean {
-  if (texto(periodo?.ano_referencia || periodo?.periodo_aquisitivo_ref) === '2024/2025') return true;
+function ehPeriodo(periodo: any, ref: string): boolean {
+  if (texto(periodo?.ano_referencia || periodo?.periodo_aquisitivo_ref) === ref) return true;
+  const [anoInicio, anoFim] = ref.split('/');
   const inicio = texto(periodo?.inicio_aquisitivo).slice(0, 4);
   const fim = texto(periodo?.fim_aquisitivo).slice(0, 4);
-  return inicio === '2024' && fim === '2025';
+  return inicio === anoInicio && fim === anoFim;
 }
 
-function montarAlvo(militar: any, periodo: any) {
+function montarAlvo(militar: any, periodo: any, ref: string) {
   return {
     militar_id: militar.id,
     militar_nome: militar.nome_completo || militar.nome_guerra || '',
     militar_matricula: militar.matricula || '',
     militar_lotacao: militar.lotacao || militar.estrutura_nome || '',
     periodo_id: periodo.id,
-    periodo_ref: periodo.ano_referencia || periodo.periodo_aquisitivo_ref || '2024/2025',
+    periodo_ref: periodo.ano_referencia || periodo.periodo_aquisitivo_ref || ref,
     periodo_inicio: periodo.inicio_aquisitivo || '',
     periodo_fim: periodo.fim_aquisitivo || '',
   };
@@ -47,7 +56,7 @@ function montarAlvo(militar: any, periodo: any) {
 // Calcula o público-alvo: militares ativos das unidades do escopo com o
 // período 2024/2025 ainda em aberto. É idempotente — quem já está inativo
 // simplesmente não entra na lista.
-async function calcularAlvos(base44: any) {
+async function calcularAlvos(base44: any, ref: string) {
   const [militares, periodos] = await Promise.all([
     listarTodos(base44.asServiceRole.entities.Militar),
     listarTodos(base44.asServiceRole.entities.PeriodoAquisitivo),
@@ -61,7 +70,7 @@ async function calcularAlvos(base44: any) {
     const militarId = texto(periodo?.militar_id);
     if (!idsAlvo.has(militarId)) continue;
     if (periodo?.inativo === true || periodo?.status === 'Inativo') continue;
-    if (!ehPeriodo2425(periodo)) continue;
+    if (!ehPeriodo(periodo, ref)) continue;
     if (!periodosPorMilitar.has(militarId)) periodosPorMilitar.set(militarId, []);
     periodosPorMilitar.get(militarId)!.push(periodo);
   }
@@ -69,7 +78,7 @@ async function calcularAlvos(base44: any) {
   const alvos: any[] = [];
   for (const militar of militaresAlvo) {
     for (const periodo of periodosPorMilitar.get(texto(militar.id)) || []) {
-      alvos.push(montarAlvo(militar, periodo));
+      alvos.push(montarAlvo(militar, periodo, ref));
     }
   }
 
@@ -123,22 +132,24 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const acao = texto(body?.acao).toUpperCase();
+    const periodoRef = normalizarPeriodoRef(body?.periodo_ref);
 
     if (acao === 'PREVIA') {
-      const { totalMilitaresEscopo, alvos } = await calcularAlvos(base44);
+      const { totalMilitaresEscopo, alvos } = await calcularAlvos(base44, periodoRef);
       return json({
         ok: true,
+        periodo_ref: periodoRef,
         total_militares_escopo: totalMilitaresEscopo,
         total_alvos: alvos.length,
         alvos,
         message: alvos.length
-          ? `${alvos.length} período(s) 24/25 elegível(is) para inativação.`
-          : 'Nenhum militar ativo das unidades do escopo possui o período 24/25 em aberto.',
+          ? `${alvos.length} período(s) ${periodoRef} elegível(is) para inativação.`
+          : `Nenhum militar ativo das unidades do escopo possui o período ${periodoRef} em aberto.`,
       });
     }
 
     if (acao === 'EXECUTAR') {
-      const { totalMilitaresEscopo, alvos } = await calcularAlvos(base44);
+      const { totalMilitaresEscopo, alvos } = await calcularAlvos(base44, periodoRef);
       const inativados: any[] = [];
       const falhas: any[] = [];
 
@@ -160,6 +171,7 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         total_militares_escopo: totalMilitaresEscopo,
+        periodo_ref: periodoRef,
         total_alvos: alvos.length,
         total_inativados: inativados.length,
         total_ignorados: falhas.length,
@@ -175,20 +187,30 @@ Deno.serve(async (req: Request) => {
         listarTodos(base44.asServiceRole.entities.AuditoriaFerias, { acao: ACAO_REATIVACAO }),
       ]);
 
-      const jaReativados = new Set<string>();
-      for (const registro of reativacoes || []) {
+      // Considera o ÚLTIMO evento de cada período: se o mais recente é uma
+      // inativação, ele está pendente de reversão. Assim, períodos que já
+      // passaram por um ciclo inativa → reativa → inativa continuam
+      // elegíveis para nova reversão.
+      const eventos = new Map<string, { acao: string; registro: any; quando: string }>();
+      for (const registro of [...(inativacoes || []), ...(reativacoes || [])]) {
         const detalhes = lerDetalhes(registro);
-        if (detalhes?.periodo_id) jaReativados.add(texto(detalhes.periodo_id));
+        const periodoId = texto(detalhes?.periodo_id);
+        if (!periodoId) continue;
+        const quando = texto(registro?.data_hora || registro?.created_date);
+        const atual = eventos.get(periodoId);
+        if (!atual || quando >= atual.quando) {
+          eventos.set(periodoId, { acao: texto(registro?.acao), registro, quando });
+        }
       }
 
       const pendentes = new Map<string, any>();
-      for (const registro of inativacoes || []) {
+      for (const [periodoId, evento] of eventos) {
+        if (evento.acao !== ACAO_INATIVACAO) continue;
+        const registro = evento.registro;
         const detalhes = lerDetalhes(registro);
-        const periodoId = texto(detalhes?.periodo_id);
-        if (!periodoId || jaReativados.has(periodoId) || pendentes.has(periodoId)) continue;
         pendentes.set(periodoId, {
           periodo_id: periodoId,
-          periodo_ref: detalhes?.periodo_ref || '2024/2025',
+          periodo_ref: detalhes?.periodo_ref || '',
           periodo_inicio: detalhes?.periodo_inicio || '',
           periodo_fim: detalhes?.periodo_fim || '',
           militar_id: registro?.militar_id || '',

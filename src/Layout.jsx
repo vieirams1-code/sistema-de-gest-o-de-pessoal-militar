@@ -107,7 +107,7 @@ const menuGroups = [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
           { name: 'Ajustes de Saldo', page: 'AjustesSaldoFerias', icon: SlidersHorizontal, moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
           { name: 'Descontos em Férias', page: 'DescontosFerias', icon: MinusCircle, adminOnly: true },
-          { name: 'Inativação 24/25 em Lote', page: 'InativacaoPeriodoLote', icon: CalendarX, adminOnly: true },
+          { name: 'Inativação de Período em Lote', page: 'InativacaoPeriodoLote', icon: CalendarX, adminOnly: true },
         ],
       },
       {
