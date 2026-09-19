@@ -46,6 +46,75 @@ export function prepararLinhasTexto(texto = '') {
   return String(texto).split(/\r?\n/).map((linha) => linha.trim()).filter(Boolean).map((linha) => linha.replace(/^\s*\d+[\s.)-]+/, '').trim()).filter(Boolean);
 }
 
+function pareceCabecalhoNome(value = '') {
+  const v = normalizarTextoConferencia(value);
+  return ['NOME', 'NOME COMPLETO', 'MILITAR', 'NOME DO MILITAR', 'SERVIDOR', 'NOME SERVIDOR'].includes(v);
+}
+
+function pareceNomePessoa(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw || raw.includes('@')) return false;
+  const norm = normalizarTextoConferencia(raw);
+  if (!norm || /^\d+$/.test(norm)) return false;
+  if (norm.length < 5 || norm.length > 120) return false;
+  if (/^(MS|MT|SP|PR|SC|RS|RJ|MG|ES|GO|DF|BA|PE|CE|PA|AM|RO|AC|RR|AP|TO|MA|PI|RN|PB|AL|SE)$/.test(norm)) return false;
+  if (/^(CBMMS|SEJUSP|PMMS|PCMS|BOMBEIRO MILITAR|MILITAR ESTADUAL)$/.test(norm)) return false;
+  const tokens = norm.split(' ').filter(Boolean);
+  return tokens.length >= 2 && tokens.every((t) => /[A-Z]/.test(t));
+}
+
+export function extrairNomesPlanilha(rows = []) {
+  const matriz = (rows || []).map((row) => Array.isArray(row) ? row : [row]);
+  if (!matriz.length) return { linhas: [], colunaNome: -1, cabecalhoDetectado: false };
+
+  const limiteCabecalho = Math.min(10, matriz.length);
+  let headerRowIndex = -1;
+  let colunaNome = -1;
+
+  for (let r = 0; r < limiteCabecalho; r += 1) {
+    for (let c = 0; c < matriz[r].length; c += 1) {
+      if (pareceCabecalhoNome(matriz[r][c])) {
+        headerRowIndex = r;
+        colunaNome = c;
+        break;
+      }
+    }
+    if (colunaNome >= 0) break;
+  }
+
+  if (colunaNome < 0) {
+    const maxCols = Math.max(...matriz.map((row) => row.length), 0);
+    let melhorColuna = -1;
+    let melhorScore = -1;
+    for (let c = 0; c < maxCols; c += 1) {
+      const valores = matriz.slice(0, 80).map((row) => row[c]).filter((v) => String(v || '').trim());
+      if (!valores.length) continue;
+      const nomes = valores.filter((v) => pareceNomePessoa(v)).length;
+      const emails = valores.filter((v) => String(v || '').includes('@')).length;
+      const numericos = valores.filter((v) => /^\s*\d+(?:[.,]\d+)?\s*$/.test(String(v || ''))).length;
+      const score = (nomes / valores.length) - (emails / valores.length) - (numericos / valores.length);
+      if (score > melhorScore && nomes >= Math.min(3, valores.length)) {
+        melhorScore = score;
+        melhorColuna = c;
+      }
+    }
+    colunaNome = melhorColuna;
+  }
+
+  if (colunaNome >= 0) {
+    const inicio = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
+    const linhas = matriz.slice(inicio)
+      .map((row) => String(row[colunaNome] || '').trim())
+      .filter((v) => pareceNomePessoa(v));
+    return { linhas, colunaNome, cabecalhoDetectado: headerRowIndex >= 0 };
+  }
+
+  const linhasFallback = matriz
+    .map((row) => row.map((v) => String(v || '').trim()).find((v) => pareceNomePessoa(v)) || '')
+    .filter(Boolean);
+  return { linhas: linhasFallback, colunaNome: -1, cabecalhoDetectado: false };
+}
+
 function nomesMilitar(m) { return [m?.nome_completo, m?.nome, m?.nome_guerra].filter(Boolean); }
 
 export function cruzarListagem({ linhas = [], militares = [], limiarAutomatico = 0.94, limiarDuvidoso = 0.78 } = {}) {
