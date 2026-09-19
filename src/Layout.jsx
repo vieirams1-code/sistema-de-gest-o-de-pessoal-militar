@@ -96,6 +96,7 @@ const menuGroups = [
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes', actionKey: 'perm_visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, moduleKey: 'registros_militar', actionKey: 'perm_visualizar_registros_militar' },
           { name: 'Conferência Cadastral', page: 'ConferenciasMilitares', icon: ShieldCheck, moduleKey: 'acesso_conferencias_militares', actionKey: 'perm_visualizar_conferencias_militares' },
+          { name: 'Central de Conferências', page: 'CentralConferencias', icon: ClipboardCheck, moduleKey: 'central_conferencias', actionKey: 'visualizar_central_conferencias' },
           { name: 'Armamentos', page: 'Armamentos', icon: Sword, moduleKey: 'armamentos', actionKey: 'perm_visualizar_armamentos' },
         ],
       },
