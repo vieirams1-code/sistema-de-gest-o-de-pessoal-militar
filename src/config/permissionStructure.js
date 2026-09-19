@@ -231,6 +231,14 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_central_conferencias',
+        label: 'Central de Conferências',
+        actions: [
+          { key: 'perm_visualizar_central_conferencias', label: 'Visualizar Central de Conferências' },
+          { key: 'perm_gerir_central_conferencias', label: 'Criar e revisar conferências', sensitive: true }
+        ]
+      },
+      {
         key: 'acesso_controle_processos',
         label: 'Controle de Processos e Procedimentos',
         actions: [
