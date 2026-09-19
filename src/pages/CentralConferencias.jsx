@@ -402,8 +402,13 @@ export default function CentralConferencias() {
               <p className="text-xs text-slate-500 mt-1">{detalhe.conferencia?.universo_ref_nome || 'Todo o efetivo visível'} · {detalhe.conferencia?.fonte_nome || 'Entrada manual'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => exportarConferencia(detalhe.itens, detalhe.conferencia?.titulo, 'csv')}><Download className="w-4 h-4 mr-2" />CSV</Button>
-              <Button variant="outline" onClick={() => exportarConferencia(detalhe.itens, detalhe.conferencia?.titulo, 'xlsx')}><Download className="w-4 h-4 mr-2" />Excel</Button>
+              <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" value={escopoExportacao} onChange={(e) => setEscopoExportacao(e.target.value)}>
+                <option value="TODOS">Exportar: todos</option>
+                <option value="FILTRADOS">Exportar: filtrados ({detalheItensVisiveis.length})</option>
+                <option value="SELECIONADOS">Exportar: selecionados ({selecionadosExportacao.size})</option>
+              </select>
+              <Button variant="outline" onClick={() => exportarEscopo(detalhe.itens || [], detalheItensVisiveis, detalhe.conferencia?.titulo, 'csv')}><Download className="w-4 h-4 mr-2" />CSV</Button>
+              <Button variant="outline" onClick={() => exportarEscopo(detalhe.itens || [], detalheItensVisiveis, detalhe.conferencia?.titulo, 'xlsx')}><Download className="w-4 h-4 mr-2" />Excel</Button>
               {podeGerir && <Button variant="outline" onClick={() => editarConferencia(detalhe)}><Pencil className="w-4 h-4 mr-2" />Editar</Button>}
               {podeGerir && <Button variant="outline" className="text-rose-700 hover:text-rose-800" onClick={() => confirmarExclusao(detalhe.conferencia)}><Trash2 className="w-4 h-4 mr-2" />Excluir</Button>}
             </div>
@@ -421,7 +426,18 @@ export default function CentralConferencias() {
             <div className="relative flex-1"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" value={buscaItens} onChange={(e) => setBuscaItens(e.target.value)} placeholder="Buscar por nome, matrícula, posto ou status..." /></div>
             <div className="flex gap-2 flex-wrap">{['TODOS','ENCONTRADO','DUVIDOSO','NAO_LOCALIZADO','AUSENTE_NA_LISTA'].map((s) => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'TODOS' ? 'Todos' : STATUS[s]?.label}</Button>)}</div>
           </div>
-          <div className="border rounded-xl overflow-hidden bg-white"><div className="max-h-[650px] overflow-auto divide-y">{detalheItensVisiveis.map((item, idx) => <div key={item.id || idx} className="p-4 grid grid-cols-1 lg:grid-cols-[1.2fr_1.2fr_auto] gap-4 items-center">
+          <div className="flex items-center justify-between gap-3 rounded-lg border bg-slate-50 px-3 py-2">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input type="checkbox" checked={detalheItensVisiveis.length > 0 && detalheItensVisiveis.every((item, idx) => selecionadosExportacao.has(chaveItem(item, idx)))} onChange={() => alternarTodosFiltrados(detalheItensVisiveis)} />
+              Selecionar todos os filtrados ({detalheItensVisiveis.length})
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-600">{selecionadosExportacao.size} selecionado(s)</span>
+              {selecionadosExportacao.size > 0 && <Button variant="ghost" size="sm" onClick={() => setSelecionadosExportacao(new Set())}>Limpar seleção</Button>}
+            </div>
+          </div>
+          <div className="border rounded-xl overflow-hidden bg-white"><div className="max-h-[650px] overflow-auto divide-y">{detalheItensVisiveis.map((item, idx) => <div key={item.id || idx} className="p-4 grid grid-cols-1 lg:grid-cols-[32px_1.2fr_1.2fr_auto] gap-4 items-center">
+            <input type="checkbox" className="w-4 h-4" checked={selecionadosExportacao.has(chaveItem(item, idx))} onChange={() => alternarSelecionadoExportacao(item, idx)} />
             <div><p className="text-xs font-bold uppercase text-slate-400">{item.tipo_linha === 'ENTRADA' ? 'Recebido na lista' : 'Militar do universo'}</p><p className="font-medium text-slate-900 mt-1">{item.tipo_linha === 'ENTRADA' ? item.entrada_original : item.militar_nome}</p>{item.tipo_linha === 'AUSENTE_UNIVERSO' && <p className="text-xs text-slate-500">{item.militar_posto_graduacao} · {item.militar_matricula || 'sem matrícula'}</p>}</div>
             <div>{item.tipo_linha === 'ENTRADA' && item.militar_nome ? <><p className="text-xs font-bold uppercase text-slate-400">Correspondência</p><p className="font-medium text-slate-900 mt-1">{item.militar_nome}</p><p className="text-xs text-slate-500">{item.militar_posto_graduacao} · {item.militar_matricula || 'sem matrícula'} · {Math.round((item.score || 0) * 100)}%</p></> : item.tipo_linha === 'ENTRADA' ? <p className="text-sm text-slate-400">Nenhuma correspondência confiável.</p> : null}</div>
             <Badge variant="outline" className={STATUS[item.status]?.cls}>{STATUS[item.status]?.label || item.status}</Badge>
