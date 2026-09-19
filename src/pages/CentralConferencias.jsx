@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { centralConferenciasService } from '@/services/centralConferenciasService';
-import { cruzarListagem, prepararLinhasTexto } from '@/utils/centralConferencias';
+import { cruzarListagem, extrairNomesPlanilha, prepararLinhasTexto } from '@/utils/centralConferencias';
 
 const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
 const PDFJS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
@@ -58,8 +58,13 @@ async function lerArquivo(file) {
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const linhas = rows.map((row) => (Array.isArray(row) ? row : [row]).map((v) => String(v || '').trim()).filter(Boolean).join(' ')).filter(Boolean);
-    return { linhas, tipo: ext === 'csv' ? 'CSV' : 'XLSX' };
+    const extraido = extrairNomesPlanilha(rows);
+    return {
+      linhas: extraido.linhas,
+      tipo: ext === 'csv' ? 'CSV' : 'XLSX',
+      colunaNome: extraido.colunaNome,
+      cabecalhoDetectado: extraido.cabecalhoDetectado,
+    };
   }
   return { linhas: prepararLinhasTexto(await file.text()), tipo: 'TXT' };
 }
@@ -188,7 +193,10 @@ export default function CentralConferencias() {
       setFonteNome(file.name);
       setFonteTipo(parsed.tipo);
       setTexto('');
-      toast({ title: 'Arquivo lido', description: `${parsed.linhas.length} linha(s) identificada(s).` });
+      const detalheColuna = Number.isInteger(parsed.colunaNome) && parsed.colunaNome >= 0
+        ? ` Coluna de nome identificada: ${XLSX.utils.encode_col(parsed.colunaNome)}.`
+        : '';
+      toast({ title: 'Arquivo lido', description: `${parsed.linhas.length} nome(s) identificado(s).${detalheColuna}` });
     } catch (err) {
       toast({ title: 'Não foi possível ler o arquivo', description: err.message, variant: 'destructive' });
     } finally { setLendoArquivo(false); }
