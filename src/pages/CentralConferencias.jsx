@@ -230,6 +230,7 @@ export default function CentralConferencias() {
     try {
       const data = await centralConferenciasService.detalhar(id);
       setDetalhe(data);
+      setFiltroStatus('TODOS');
     } catch (err) {
       toast({ title: 'Erro ao abrir conferência', description: err.message, variant: 'destructive' });
     }
@@ -318,6 +319,13 @@ export default function CentralConferencias() {
   if (!podeVer) return <AccessDenied modulo="Central de Conferências" />;
 
   const itensVisiveis = (resultado?.itens || []).filter((i) => filtroStatus === 'TODOS' || i.status === filtroStatus);
+  const historicoFiltrado = (historico.data?.conferencias || []).filter((c) => {
+    const q = buscaHistorico.trim().toLowerCase();
+    const bateBusca = !q || [c.titulo, c.universo_ref_nome, c.fonte_nome, c.criado_por_nome].some((v) => String(v || '').toLowerCase().includes(q));
+    const bateStatus = statusHistorico === 'TODOS' || c.status === statusHistorico;
+    return bateBusca && bateStatus;
+  });
+  const detalheItensVisiveis = (detalhe?.itens || []).filter((i) => filtroStatus === 'TODOS' || i.status === filtroStatus);
 
   return <div className="min-h-screen bg-slate-50 p-6">
     <div className="max-w-[1500px] mx-auto space-y-6">
