@@ -1,0 +1,83 @@
+{
+  "name": "CentralConferenciaItem",
+  "type": "object",
+  "title": "Item da Central de Confer\u00eancias",
+  "description": "Linha audit\u00e1vel do resultado de uma confer\u00eancia de listagem.",
+  "properties": {
+    "conferencia_id": {
+      "type": "string"
+    },
+    "tipo_linha": {
+      "type": "string",
+      "enum": [
+        "ENTRADA",
+        "AUSENTE_UNIVERSO"
+      ],
+      "default": "ENTRADA"
+    },
+    "ordem": {
+      "type": "number",
+      "default": 0
+    },
+    "entrada_original": {
+      "type": "string"
+    },
+    "nome_normalizado": {
+      "type": "string"
+    },
+    "matricula_informada": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "militar_posto_graduacao": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ENCONTRADO",
+        "DUVIDOSO",
+        "NAO_LOCALIZADO",
+        "AUSENTE_NA_LISTA",
+        "CONFIRMADO",
+        "IGNORADO"
+      ]
+    },
+    "score": {
+      "type": "number",
+      "default": 0
+    },
+    "criterio": {
+      "type": "string"
+    },
+    "observacao": {
+      "type": "string"
+    },
+    "ajustado_por_email": {
+      "type": "string"
+    },
+    "ajustado_em": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "conferencia_id",
+    "tipo_linha",
+    "status"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
