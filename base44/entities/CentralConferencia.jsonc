@@ -1,0 +1,100 @@
+{
+  "name": "CentralConferencia",
+  "type": "object",
+  "title": "Central de Confer\u00eancias",
+  "description": "Cabe\u00e7alho e resumo audit\u00e1vel de cruzamentos de listagens externas com o efetivo.",
+  "properties": {
+    "titulo": {
+      "type": "string"
+    },
+    "fonte_nome": {
+      "type": "string"
+    },
+    "fonte_tipo": {
+      "type": "string",
+      "enum": [
+        "TEXTO",
+        "TXT",
+        "CSV",
+        "XLSX",
+        "PDF"
+      ],
+      "default": "TEXTO"
+    },
+    "universo_tipo": {
+      "type": "string",
+      "enum": [
+        "TODO_ESCOPO",
+        "LOTACAO",
+        "GRUPO",
+        "SELECAO_MANUAL"
+      ],
+      "default": "TODO_ESCOPO"
+    },
+    "universo_ref_id": {
+      "type": "string"
+    },
+    "universo_ref_nome": {
+      "type": "string"
+    },
+    "universo_ids_json": {
+      "type": "string"
+    },
+    "total_universo": {
+      "type": "number",
+      "default": 0
+    },
+    "total_entrada": {
+      "type": "number",
+      "default": 0
+    },
+    "total_encontrados": {
+      "type": "number",
+      "default": 0
+    },
+    "total_duvidosos": {
+      "type": "number",
+      "default": 0
+    },
+    "total_nao_localizados": {
+      "type": "number",
+      "default": 0
+    },
+    "total_ausentes_universo": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "EM_REVISAO",
+        "CONCLUIDA"
+      ],
+      "default": "EM_REVISAO"
+    },
+    "parametros_json": {
+      "type": "string"
+    },
+    "criado_por_email": {
+      "type": "string"
+    },
+    "criado_por_nome": {
+      "type": "string"
+    },
+    "concluido_em": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "titulo",
+    "universo_tipo",
+    "status"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
