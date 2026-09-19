@@ -489,7 +489,15 @@ export default function CentralConferencias() {
         </Card>
 
         {resultado && <Card>
-          <CardHeader><div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><CardTitle className="text-base">2. Resultado da conferência</CardTitle><p className="text-xs text-slate-500 mt-1">Correspondências duvidosas exigem revisão humana antes do fechamento.</p></div><div className="flex gap-2 flex-wrap"><Button variant="outline" onClick={() => exportarConferencia(resultado.itens, titulo, 'csv')}><Download className="w-4 h-4 mr-2" />CSV</Button><Button variant="outline" onClick={() => exportarConferencia(resultado.itens, titulo, 'xlsx')}><Download className="w-4 h-4 mr-2" />Excel</Button><Button variant="outline" onClick={executar}><RotateCcw className="w-4 h-4 mr-2" />Recalcular</Button><Button disabled={salvar.isPending} onClick={() => salvar.mutate()}><Save className="w-4 h-4 mr-2" />{editandoId ? 'Atualizar conferência' : 'Salvar no histórico'}</Button></div></div></CardHeader>
+          <CardHeader><div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div><CardTitle className="text-base">2. Resultado da conferência</CardTitle><p className="text-xs text-slate-500 mt-1">Correspondências duvidosas exigem revisão humana antes do fechamento.</p></div><div className="flex gap-2 flex-wrap">
+            <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" value={escopoExportacao} onChange={(e) => setEscopoExportacao(e.target.value)}>
+              <option value="TODOS">Exportar: todos</option>
+              <option value="FILTRADOS">Exportar: filtrados ({itensVisiveis.length})</option>
+              <option value="SELECIONADOS">Exportar: selecionados ({selecionadosExportacao.size})</option>
+            </select>
+            <Button variant="outline" onClick={() => exportarEscopo(resultado.itens || [], itensVisiveis, titulo, 'csv')}><Download className="w-4 h-4 mr-2" />CSV</Button>
+            <Button variant="outline" onClick={() => exportarEscopo(resultado.itens || [], itensVisiveis, titulo, 'xlsx')}><Download className="w-4 h-4 mr-2" />Excel</Button>
+            <Button variant="outline" onClick={executar}><RotateCcw className="w-4 h-4 mr-2" />Recalcular</Button><Button disabled={salvar.isPending} onClick={() => salvar.mutate()}><Save className="w-4 h-4 mr-2" />{editandoId ? 'Atualizar conferência' : 'Salvar no histórico'}</Button></div></div></CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <Resumo icon={Users} label="Universo" value={resultado.resumo.totalUniverso} />
@@ -502,9 +510,20 @@ export default function CentralConferencias() {
               <div className="relative flex-1"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" value={buscaItens} onChange={(e) => setBuscaItens(e.target.value)} placeholder="Buscar no resultado por nome, matrícula, posto ou status..." /></div>
               <div className="flex gap-2 flex-wrap">{['TODOS','ENCONTRADO','DUVIDOSO','NAO_LOCALIZADO','AUSENTE_NA_LISTA'].map((s) => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'TODOS' ? 'Todos' : STATUS[s]?.label}</Button>)}</div>
             </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-slate-50 px-3 py-2">
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={itensVisiveis.length > 0 && itensVisiveis.every((item, idx) => selecionadosExportacao.has(chaveItem(item, idx)))} onChange={() => alternarTodosFiltrados(itensVisiveis)} />
+                Selecionar todos os filtrados ({itensVisiveis.length})
+              </label>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-slate-600">{selecionadosExportacao.size} selecionado(s)</span>
+                {selecionadosExportacao.size > 0 && <Button variant="ghost" size="sm" onClick={() => setSelecionadosExportacao(new Set())}>Limpar seleção</Button>}
+              </div>
+            </div>
             <div className="border rounded-xl overflow-hidden bg-white"><div className="max-h-[580px] overflow-auto divide-y">{itensVisiveis.map((item) => {
               const idx = resultado.itens.indexOf(item);
-              return <div key={`${item.tipo_linha}-${item.ordem}-${idx}`} className="p-4 grid grid-cols-1 lg:grid-cols-[1.2fr_1.2fr_auto] gap-4 items-center">
+              return <div key={`${item.tipo_linha}-${item.ordem}-${idx}`} className="p-4 grid grid-cols-1 lg:grid-cols-[32px_1.2fr_1.2fr_auto] gap-4 items-center">
+                <input type="checkbox" className="w-4 h-4" checked={selecionadosExportacao.has(chaveItem(item, idx))} onChange={() => alternarSelecionadoExportacao(item, idx)} />
                 <div><p className="text-xs font-bold uppercase text-slate-400">{item.tipo_linha === 'ENTRADA' ? 'Recebido na lista' : 'Militar do universo'}</p><p className="font-medium text-slate-900 mt-1">{item.tipo_linha === 'ENTRADA' ? item.entrada_original : item.militar_nome}</p>{item.tipo_linha === 'AUSENTE_UNIVERSO' && <p className="text-xs text-slate-500">{item.militar_posto_graduacao} · {item.militar_matricula || 'sem matrícula'}</p>}</div>
                 <div>{item.tipo_linha === 'ENTRADA' && item.militar_nome ? <><p className="text-xs font-bold uppercase text-slate-400">Correspondência sugerida</p><p className="font-medium text-slate-900 mt-1">{item.militar_nome}</p><p className="text-xs text-slate-500">{item.militar_posto_graduacao} · {item.militar_matricula || 'sem matrícula'} · {Math.round((item.score || 0) * 100)}%</p></> : item.tipo_linha === 'ENTRADA' ? <p className="text-sm text-slate-400">Nenhuma correspondência confiável.</p> : null}</div>
                 <div className="flex items-center gap-2 justify-start lg:justify-end"><Badge variant="outline" className={STATUS[item.status]?.cls}>{STATUS[item.status]?.label || item.status}</Badge>{item.status === 'DUVIDOSO' && <><Button size="sm" variant="outline" onClick={() => confirmarSugestao(idx)}>Aceitar</Button><Button size="sm" variant="ghost" onClick={() => ignorarSugestao(idx)}>Rejeitar</Button></>}</div>
