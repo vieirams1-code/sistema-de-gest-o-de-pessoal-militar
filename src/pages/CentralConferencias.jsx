@@ -135,7 +135,6 @@ export default function CentralConferencias() {
   const [buscaItens, setBuscaItens] = useState('');
   const [selecionadosExportacao, setSelecionadosExportacao] = useState(new Set());
   const [escopoExportacao, setEscopoExportacao] = useState('TODOS');
-  const [selecionadosExportacao, setSelecionadosExportacao] = useState(new Set());
 
   const bootstrap = useQuery({
     queryKey: ['central-conferencias-bootstrap'],
