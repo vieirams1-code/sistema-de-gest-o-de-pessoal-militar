@@ -85,6 +85,10 @@ function linhasExportacao(itens = []) {
   }));
 }
 
+function chaveItem(item, index = 0) {
+  return String(item?.id || `${item?.tipo_linha || 'ITEM'}:${item?.ordem ?? index}:${item?.militar_id || ''}:${item?.entrada_original || ''}`);
+}
+
 function exportarConferencia(itens, titulo, formato = 'xlsx') {
   const dados = linhasExportacao(itens);
   const nomeSeguro = String(titulo || 'conferencia').replace(/[^a-zA-Z0-9-_]+/g, '_').replace(/^_+|_+$/g, '') || 'conferencia';
@@ -129,6 +133,8 @@ export default function CentralConferencias() {
   const [buscaHistorico, setBuscaHistorico] = useState('');
   const [statusHistorico, setStatusHistorico] = useState('TODOS');
   const [buscaItens, setBuscaItens] = useState('');
+  const [selecionadosExportacao, setSelecionadosExportacao] = useState(new Set());
+  const [escopoExportacao, setEscopoExportacao] = useState('TODOS');
   const [selecionadosExportacao, setSelecionadosExportacao] = useState(new Set());
 
   const bootstrap = useQuery({
@@ -226,6 +232,9 @@ export default function CentralConferencias() {
     setTitulo(''); setTexto(''); setFonteNome(''); setFonteTipo('TEXTO'); setLinhasArquivo([]);
     setUniversoTipo('TODO_ESCOPO'); setUniversoRefId(''); setSelecionados(new Set()); setResultado(null); setBuscaManual('');
     setEditandoId('');
+    setBuscaItens('');
+    setSelecionadosExportacao(new Set());
+    setEscopoExportacao('TODOS');
   };
 
   const abrirDetalhe = async (id) => {
@@ -233,6 +242,9 @@ export default function CentralConferencias() {
       const data = await centralConferenciasService.detalhar(id);
       setDetalhe(data);
       setFiltroStatus('TODOS');
+      setBuscaItens('');
+      setSelecionadosExportacao(new Set());
+      setEscopoExportacao('TODOS');
     } catch (err) {
       toast({ title: 'Erro ao abrir conferência', description: err.message, variant: 'destructive' });
     }
@@ -266,6 +278,9 @@ export default function CentralConferencias() {
       },
     });
     setFiltroStatus('TODOS');
+    setBuscaItens('');
+    setSelecionadosExportacao(new Set());
+    setEscopoExportacao('TODOS');
     setDetalhe(null);
     setNova(true);
   };
