@@ -3,7 +3,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const ACTIONS = {
   BOOTSTRAP: 'visualizar_central_conferencias',
   LIST: 'visualizar_central_conferencias',
+  GET_DETAIL: 'visualizar_central_conferencias',
   SAVE: 'gerir_central_conferencias',
+  UPDATE: 'gerir_central_conferencias',
+  DELETE: 'gerir_central_conferencias',
   UPDATE_ITEM: 'gerir_central_conferencias',
   CONCLUDE: 'gerir_central_conferencias',
 };
@@ -114,6 +117,18 @@ Deno.serve(async (req) => {
       return Response.json({ conferencias: visiveis });
     }
 
+    if (action === 'GET_DETAIL') {
+      const id = String(payload?.conferenciaId || '');
+      const conf = await base44.asServiceRole.entities.CentralConferencia.get(id);
+      if (!conf) return Response.json({ error: 'Conferência não encontrada.' }, { status: 404 });
+      const ids = parseIds(conf?.universo_ids_json);
+      if (!(authz?.isAdmin === true || authz?.hasGlobalScope === true) && ids.some((militarId) => !allowedIds.has(String(militarId)))) {
+        return Response.json({ error: 'Conferência fora do escopo autorizado.' }, { status: 403 });
+      }
+      const itens = await base44.asServiceRole.entities.CentralConferenciaItem.filter({ conferencia_id: id }, 'ordem', 5000, 0);
+      return Response.json({ conferencia: conf, itens: itens || [] });
+    }
+
     if (action === 'SAVE') {
       const cab = payload?.conferencia || {};
       const itens = Array.isArray(payload?.itens) ? payload.itens : [];
@@ -149,6 +164,64 @@ Deno.serve(async (req) => {
       }));
       await bulkCreate(base44.asServiceRole.entities.CentralConferenciaItem, safeItens);
       return Response.json({ conferencia: created });
+    }
+
+    if (action === 'UPDATE') {
+      const id = String(payload?.conferenciaId || '');
+      const atual = await base44.asServiceRole.entities.CentralConferencia.get(id);
+      if (!atual) return Response.json({ error: 'Conferência não encontrada.' }, { status: 404 });
+      const cab = payload?.conferencia || {};
+      const itens = Array.isArray(payload?.itens) ? payload.itens : [];
+      const ids = [...new Set([
+        ...parseIds(cab?.universo_ids_json || atual?.universo_ids_json),
+        ...itens.map((i: any) => String(i?.militar_id || '')).filter(Boolean),
+      ])];
+      if (ids.length) {
+        authz = await getAuthz(base44, ids);
+        requireCapability(authz, ACTIONS[action]);
+        requireScope(authz);
+      }
+      const updated = await base44.asServiceRole.entities.CentralConferencia.update(id, {
+        ...cab,
+        criado_por_email: atual?.criado_por_email || String(user?.email || ''),
+        criado_por_nome: atual?.criado_por_nome || String(user?.full_name || user?.name || ''),
+      });
+      const existentes = await base44.asServiceRole.entities.CentralConferenciaItem.filter({ conferencia_id: id }, undefined, 5000, 0);
+      for (const item of existentes || []) await base44.asServiceRole.entities.CentralConferenciaItem.delete(item.id);
+      const safeItens = itens.map((i: any) => ({
+        conferencia_id: id,
+        tipo_linha: String(i?.tipo_linha || 'ENTRADA'),
+        ordem: Number(i?.ordem || 0),
+        entrada_original: String(i?.entrada_original || '').slice(0, 1000),
+        nome_normalizado: String(i?.nome_normalizado || '').slice(0, 300),
+        matricula_informada: String(i?.matricula_informada || '').slice(0, 50),
+        militar_id: String(i?.militar_id || ''),
+        militar_nome: String(i?.militar_nome || '').slice(0, 300),
+        militar_matricula: String(i?.militar_matricula || '').slice(0, 50),
+        militar_posto_graduacao: String(i?.militar_posto_graduacao || '').slice(0, 100),
+        status: String(i?.status || 'NAO_LOCALIZADO'),
+        score: Number(i?.score || 0),
+        criterio: String(i?.criterio || '').slice(0, 100),
+        observacao: String(i?.observacao || '').slice(0, 1000),
+      }));
+      await bulkCreate(base44.asServiceRole.entities.CentralConferenciaItem, safeItens);
+      return Response.json({ conferencia: updated });
+    }
+
+    if (action === 'DELETE') {
+      const id = String(payload?.conferenciaId || '');
+      const conf = await base44.asServiceRole.entities.CentralConferencia.get(id);
+      if (!conf) return Response.json({ error: 'Conferência não encontrada.' }, { status: 404 });
+      const ids = parseIds(conf?.universo_ids_json);
+      if (ids.length) {
+        authz = await getAuthz(base44, ids);
+        requireCapability(authz, ACTIONS[action]);
+        requireScope(authz);
+      }
+      const itens = await base44.asServiceRole.entities.CentralConferenciaItem.filter({ conferencia_id: id }, undefined, 5000, 0);
+      for (const item of itens || []) await base44.asServiceRole.entities.CentralConferenciaItem.delete(item.id);
+      await base44.asServiceRole.entities.CentralConferencia.delete(id);
+      return Response.json({ ok: true });
     }
 
     if (action === 'UPDATE_ITEM') {
