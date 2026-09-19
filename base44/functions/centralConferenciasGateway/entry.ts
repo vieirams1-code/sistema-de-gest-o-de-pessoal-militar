@@ -94,6 +94,8 @@ Deno.serve(async (req) => {
 
     const militares = await listarMilitaresEscopados(base44, authz);
     const allowedIds = new Set((militares || []).map((m: any) => String(m.id)));
+    const militaresAtivos = (militares || []).filter((m: any) => String(m?.status_cadastro || 'Ativo').trim().toLowerCase() !== 'inativo');
+    const activeIds = new Set(militaresAtivos.map((m: any) => String(m.id)));
 
     if (action === 'BOOTSTRAP') {
       const [grupos, membros] = await Promise.all([
@@ -101,9 +103,9 @@ Deno.serve(async (req) => {
         base44.asServiceRole.entities.MembroGrupoEfetivo.filter({ ativo: true }, '-created_date', 3000, 0),
       ]);
       return Response.json({
-        militares: militares || [],
+        militares: militaresAtivos,
         grupos: grupos || [],
-        membros: (membros || []).filter((m: any) => allowedIds.has(String(m?.militar_id || ''))),
+        membros: (membros || []).filter((m: any) => activeIds.has(String(m?.militar_id || ''))),
       });
     }
 
