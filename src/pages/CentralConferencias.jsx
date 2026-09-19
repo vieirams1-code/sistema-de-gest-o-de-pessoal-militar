@@ -189,7 +189,7 @@ export default function CentralConferencias() {
           ? lotacoes.find((l) => l.id === universoRefId)?.nome || ''
           : universoTipo === 'SELECAO_MANUAL' ? 'Seleção manual' : 'Todo o efetivo visível';
       const r = resultado.resumo;
-      return centralConferenciasService.salvar({
+      const cabecalho = {
         titulo: titulo.trim(),
         fonte_nome: fonteNome,
         fonte_tipo: fonteTipo,
@@ -205,12 +205,17 @@ export default function CentralConferencias() {
         total_ausentes_universo: resultado.itens.filter((i) => i.status === 'AUSENTE_NA_LISTA').length,
         status: resultado.itens.some((i) => i.status === 'DUVIDOSO') ? 'EM_REVISAO' : 'CONCLUIDA',
         parametros_json: JSON.stringify({ limiarAutomatico: 0.94, limiarDuvidoso: 0.78 }),
-      }, resultado.itens);
+      };
+      return editandoId
+        ? centralConferenciasService.atualizar(editandoId, cabecalho, resultado.itens)
+        : centralConferenciasService.salvar(cabecalho, resultado.itens);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['central-conferencias-historico'] });
-      toast({ title: 'Conferência salva', description: 'O resultado foi registrado no histórico.' });
+      toast({ title: editandoId ? 'Conferência atualizada' : 'Conferência salva', description: editandoId ? 'As alterações foram gravadas no histórico.' : 'O resultado foi registrado no histórico.' });
       setNova(false);
+      setEditandoId('');
+      setDetalhe(null);
     },
     onError: (err) => toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' }),
   });
@@ -218,6 +223,64 @@ export default function CentralConferencias() {
   const reset = () => {
     setTitulo(''); setTexto(''); setFonteNome(''); setFonteTipo('TEXTO'); setLinhasArquivo([]);
     setUniversoTipo('TODO_ESCOPO'); setUniversoRefId(''); setSelecionados(new Set()); setResultado(null); setBuscaManual('');
+    setEditandoId('');
+  };
+
+  const abrirDetalhe = async (id) => {
+    try {
+      const data = await centralConferenciasService.detalhar(id);
+      setDetalhe(data);
+    } catch (err) {
+      toast({ title: 'Erro ao abrir conferência', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const editarConferencia = (data) => {
+    const conf = data?.conferencia;
+    const itens = data?.itens || [];
+    if (!conf) return;
+    setEditandoId(String(conf.id));
+    setTitulo(conf.titulo || '');
+    setFonteNome(conf.fonte_nome || '');
+    setFonteTipo(conf.fonte_tipo || 'TEXTO');
+    setUniversoTipo(conf.universo_tipo || 'TODO_ESCOPO');
+    setUniversoRefId(conf.universo_ref_id || '');
+    let ids = [];
+    try { ids = JSON.parse(conf.universo_ids_json || '[]'); } catch { ids = []; }
+    setSelecionados(new Set((ids || []).map(String)));
+    const entradas = itens.filter((i) => i.tipo_linha === 'ENTRADA').map((i) => i.entrada_original).filter(Boolean);
+    setLinhasArquivo(entradas);
+    setTexto('');
+    setResultado({
+      itens,
+      resumo: {
+        totalEntrada: conf.total_entrada || entradas.length,
+        totalUniverso: conf.total_universo || ids.length,
+        encontrados: conf.total_encontrados || 0,
+        duvidosos: conf.total_duvidosos || 0,
+        naoLocalizados: conf.total_nao_localizados || 0,
+        ausentesUniverso: conf.total_ausentes_universo || 0,
+      },
+    });
+    setFiltroStatus('TODOS');
+    setDetalhe(null);
+    setNova(true);
+  };
+
+  const excluir = useMutation({
+    mutationFn: (id) => centralConferenciasService.excluir(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['central-conferencias-historico'] });
+      setDetalhe(null);
+      toast({ title: 'Conferência excluída' });
+    },
+    onError: (err) => toast({ title: 'Erro ao excluir', description: err.message, variant: 'destructive' }),
+  });
+
+  const confirmarExclusao = (conf) => {
+    if (window.confirm(`Excluir definitivamente a conferência "${conf?.titulo || ''}"? Esta ação também remove os itens do histórico.`)) {
+      excluir.mutate(conf.id);
+    }
   };
 
   const onFile = async (file) => {
