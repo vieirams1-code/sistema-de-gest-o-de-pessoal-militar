@@ -147,7 +147,7 @@ export default function CentralConferencias() {
     enabled: podeVer && isAccessResolved,
   });
 
-  const militares = bootstrap.data?.militares || [];
+  const militares = (bootstrap.data?.militares || []).filter((m) => String(m?.status_cadastro || 'Ativo').trim().toLowerCase() !== 'inativo');
   const grupos = bootstrap.data?.grupos || [];
   const membros = bootstrap.data?.membros || [];
 
