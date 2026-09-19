@@ -56,6 +56,10 @@ export default function PortalFeriasView({ onBack }) {
   const [infoMsg, setInfoMsg] = useState(null);
   const [campanhaIdSelecionada, setCampanhaIdSelecionada] = useState('');
 
+  // Opção de não gozo no plano
+  const [naoGozo, setNaoGozo] = useState(false);
+  const [justificativaNaoGozo, setJustificativaNaoGozo] = useState('');
+
   const applyFeriasResponse = (res) => {
     setData(res);
     if (res?.periodo_mais_antigo_id) {
@@ -77,6 +81,8 @@ export default function PortalFeriasView({ onBack }) {
     if (res?.opcao_militar_enviada) {
       const opEnviada = res.opcao_militar_enviada;
       if (opEnviada.modalidade) setModalidade(opEnviada.modalidade);
+      setNaoGozo(Boolean(opEnviada.nao_gozo_no_plano) && res?.nao_gozo_permitido !== false);
+      setJustificativaNaoGozo(opEnviada.justificativa_nao_gozo || '');
       setIsEditing(false);
       try {
         const p1 = JSON.parse(opEnviada.opcao_1_detalhes || '[]');
@@ -91,6 +97,8 @@ export default function PortalFeriasView({ onBack }) {
       setMesOpcao1('');
       setMesOpcao2('');
       setMesOpcao3('');
+      setNaoGozo(false);
+      setJustificativaNaoGozo('');
     }
   };
 
@@ -144,45 +152,61 @@ export default function PortalFeriasView({ onBack }) {
       return;
     }
 
-    if (!mesOpcao1 || !mesOpcao2 || !mesOpcao3) {
-      setErrorMsg('É obrigatório escolher as 3 opções de meses.');
-      return;
-    }
-
-    const periodoPlano = (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
-    const mesesPermitidos = new Set((periodoPlano?.meses_elegiveis || []).filter((m) => m.permitido).map((m) => m.mes));
-    if (![mesOpcao1, mesOpcao2, mesOpcao3].every((mes) => mesesPermitidos.has(mes))) {
-      setErrorMsg('Uma das opções escolhidas não está disponível para este plano.');
-      return;
-    }
-
-    // Validação: os 3 meses de preferência devem ser diferentes
-    if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
-      setErrorMsg('As 3 opções de preferência de meses devem ser diferentes entre si (1ª, 2ª e 3ª opção).');
-      return;
-    }
-
     const campanha = data?.campanha;
     const anoCampanha = campanha?.ano_referencia || (new Date().getFullYear() + 1);
 
-    const payload = {
-      periodo_aquisitivo_id: selectedPeriodoId,
-      ano_referencia: anoCampanha,
-      campanha_id: campanha?.id,
-      modalidade,
-      opcao_1: {
-        meses_resumo: `${getNomeMes(mesOpcao1)}`,
-        parcelas: buildParcelasForMes(mesOpcao1, anoCampanha),
-      },
-      opcao_2: {
-        meses_resumo: `${getNomeMes(mesOpcao2)}`,
-        parcelas: buildParcelasForMes(mesOpcao2, anoCampanha),
-      },
-      opcao_3: {
-        meses_resumo: `${getNomeMes(mesOpcao3)}`,
-        parcelas: buildParcelasForMes(mesOpcao3, anoCampanha),
-      },
-    };
+    let payload;
+
+    if (naoGozo) {
+      if (!justificativaNaoGozo.trim()) {
+        setErrorMsg('Informe a justificativa para não tirar férias neste plano.');
+        return;
+      }
+      payload = {
+        periodo_aquisitivo_id: selectedPeriodoId,
+        ano_referencia: anoCampanha,
+        campanha_id: campanha?.id,
+        nao_gozo: true,
+        justificativa_nao_gozo: justificativaNaoGozo.trim(),
+      };
+    } else {
+      if (!mesOpcao1 || !mesOpcao2 || !mesOpcao3) {
+        setErrorMsg('É obrigatório escolher as 3 opções de meses.');
+        return;
+      }
+
+      const periodoPlano = (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
+      const mesesPermitidos = new Set((periodoPlano?.meses_elegiveis || []).filter((m) => m.permitido).map((m) => m.mes));
+      if (![mesOpcao1, mesOpcao2, mesOpcao3].every((mes) => mesesPermitidos.has(mes))) {
+        setErrorMsg('Uma das opções escolhidas não está disponível para este plano.');
+        return;
+      }
+
+      // Validação: os 3 meses de preferência devem ser diferentes
+      if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
+        setErrorMsg('As 3 opções de preferência de meses devem ser diferentes entre si (1ª, 2ª e 3ª opção).');
+        return;
+      }
+
+      payload = {
+        periodo_aquisitivo_id: selectedPeriodoId,
+        ano_referencia: anoCampanha,
+        campanha_id: campanha?.id,
+        modalidade,
+        opcao_1: {
+          meses_resumo: `${getNomeMes(mesOpcao1)}`,
+          parcelas: buildParcelasForMes(mesOpcao1, anoCampanha),
+        },
+        opcao_2: {
+          meses_resumo: `${getNomeMes(mesOpcao2)}`,
+          parcelas: buildParcelasForMes(mesOpcao2, anoCampanha),
+        },
+        opcao_3: {
+          meses_resumo: `${getNomeMes(mesOpcao3)}`,
+          parcelas: buildParcelasForMes(mesOpcao3, anoCampanha),
+        },
+      };
+    }
 
     setSubmitting(true);
     try {
@@ -217,6 +241,7 @@ export default function PortalFeriasView({ onBack }) {
   const opcaoEnviada = data?.opcao_militar_enviada;
   const anoCampanha = campanha?.ano_referencia || (new Date().getFullYear() + 1);
   const isBloqueadoPorDependencia = Boolean(data?.bloqueado_por_dependencia);
+  const naoGozoPermitido = data?.nao_gozo_permitido !== false;
   const diasPlanejar = Number(periodoMaisAntigo?.dias_sem_previsao || 0);
   const saldoParcial = diasPlanejar > 0 && diasPlanejar !== 30;
   const regraMes = (mes) => (periodoMaisAntigo?.meses_elegiveis || []).find((item) => item.mes === mes);
@@ -420,6 +445,8 @@ export default function PortalFeriasView({ onBack }) {
                     // Ao reabrir a resposta, restaura explicitamente modalidade e meses
                     // para que o militar possa alterar qualquer uma das duas partes.
                     if (opcaoEnviada.modalidade) setModalidade(opcaoEnviada.modalidade);
+                    setNaoGozo(Boolean(opcaoEnviada.nao_gozo_no_plano) && naoGozoPermitido);
+                    setJustificativaNaoGozo(opcaoEnviada.justificativa_nao_gozo || '');
                     try {
                       const p1 = JSON.parse(opcaoEnviada.opcao_1_detalhes || '[]');
                       const p2 = JSON.parse(opcaoEnviada.opcao_2_detalhes || '[]');
@@ -438,6 +465,18 @@ export default function PortalFeriasView({ onBack }) {
               </CardHeader>
 
               <CardContent className="p-4 sm:p-5 text-xs space-y-3">
+                {opcaoEnviada.nao_gozo_no_plano ? (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-1.5">
+                    <strong className="block text-sm text-violet-900">Optou por não gozar férias neste plano</strong>
+                    {opcaoEnviada.justificativa_nao_gozo && (
+                      <p className="text-[11px] text-violet-800 italic">“{opcaoEnviada.justificativa_nao_gozo}”</p>
+                    )}
+                    <p className="text-[11px] text-violet-700">
+                      Seu período aquisitivo permanece aguardando definição da sua unidade.
+                    </p>
+                  </div>
+                ) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-2xs space-y-1">
                     <span className="font-bold text-emerald-800 flex items-center text-[11px]">
@@ -481,6 +520,8 @@ export default function PortalFeriasView({ onBack }) {
                     </strong>. As frações serão escaladas pelo gestor da unidade dentro dos 3 meses escolhidos acima.
                   </span>
                 </div>
+                </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -576,6 +617,57 @@ export default function PortalFeriasView({ onBack }) {
                 </div>
               </div>
 
+              {/* OPÇÃO DE NÃO GOZO */}
+              <div className={`rounded-xl border p-5 shadow-sm transition-colors ${naoGozo ? 'border-violet-400 bg-violet-50' : 'border-slate-200 bg-white'}`}>
+                <label className={`flex items-start gap-3 ${naoGozoPermitido ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}>
+                  <input
+                    type="checkbox"
+                    checked={naoGozo}
+                    disabled={!naoGozoPermitido}
+                    onChange={(e) => setNaoGozo(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold text-slate-900">Não vou tirar férias neste plano</span>
+                    <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
+                      Registre formalmente que você optou por não gozar férias neste plano. O período aquisitivo continua aguardando definição da sua unidade.
+                    </span>
+                  </span>
+                </label>
+
+                {!naoGozoPermitido && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>{data?.motivo_bloqueio_nao_gozo || 'Você possui período aquisitivo vencendo no plano. É obrigatório escolher as opções de meses.'}</span>
+                  </div>
+                )}
+
+                {naoGozo && naoGozoPermitido && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Justificativa</label>
+                    <textarea
+                      value={justificativaNaoGozo}
+                      onChange={(e) => setJustificativaNaoGozo(e.target.value)}
+                      rows={3}
+                      placeholder="Ex.: não pretendo gozar férias neste plano."
+                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none font-medium bg-white"
+                    />
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-bold shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        <i className="ph ph-paper-plane-tilt text-lg"></i>
+                        {opcaoEnviada ? 'Salvar Alterações' : 'Registrar Não Gozo'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {!naoGozo && (
+              <>
               {/* PASSO 2: PREFERÊNCIA DE MESES */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h4 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-5 flex items-center gap-2">
@@ -673,6 +765,8 @@ export default function PortalFeriasView({ onBack }) {
                   </button>
                 </div>
               </div>
+              </>
+              )}
             </form>
           )}
         </div>

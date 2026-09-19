@@ -92,6 +92,11 @@ export function calcularResumoPeriodoPlano(periodo: any, feriasMilitar: any[] = 
   const elegivelPlano = Boolean(!periodoInativo && diasSemPrevisao > 0 && primeiraDataLegal &&
     primeiraDataLegal <= ultimoDiaAno && (!limiteGozo || primeiraDataLegal <= limiteGozo));
 
+  // O período vence dentro do plano quando ainda há dias sem previsão e o prazo
+  // limite de fruição cai dentro do ano do plano. Nesses casos o militar não
+  // pode optar por não gozar férias.
+  const venceNoPlano = Boolean(!periodoInativo && diasSemPrevisao > 0 && limiteGozo && limiteGozo <= ultimoDiaAno);
+
   const mesesElegiveis = Array.from({ length: 12 }, (_, idx) => {
     const mesNumero = idx + 1;
     const mes = String(mesNumero).padStart(2, '0');
@@ -122,6 +127,7 @@ export function calcularResumoPeriodoPlano(periodo: any, feriasMilitar: any[] = 
     primeira_data_legal_gozo: primeiraDataLegal,
     limite_fruicao: limiteGozo,
     elegivel_plano: elegivelPlano,
+    vence_no_plano: venceNoPlano,
     meses_elegiveis: mesesElegiveis,
   };
 }

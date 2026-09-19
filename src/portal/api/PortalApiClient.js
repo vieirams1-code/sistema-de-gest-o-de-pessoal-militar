@@ -257,6 +257,8 @@ export async function submeterOpcaoFerias({
   opcao_2,
   opcao_3,
   parcelas,
+  nao_gozo,
+  justificativa_nao_gozo,
 }) {
   return portalFetch('portal_servicos', {
     acao: 'FERIAS_SUBMETER_OPCAO',
@@ -268,6 +270,7 @@ export async function submeterOpcaoFerias({
     opcao_2,
     opcao_3,
     parcelas,
+    ...(nao_gozo ? { nao_gozo: true, justificativa_nao_gozo } : {}),
   });
 }
 
@@ -297,6 +300,3 @@ export async function submeterRespostaCampanha(payload) {
     ...payload,
   });
 }
-
-
-

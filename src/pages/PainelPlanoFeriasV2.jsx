@@ -127,6 +127,7 @@ function decisaoAtual(op) {
 
 function statusOpcao(op) {
   if (op?.sem_resposta) return { label: 'Não respondeu', cls: 'bg-red-50 text-red-700 border-red-200' };
+  if (op?.nao_gozo_no_plano) return { label: 'Optou por não gozar', cls: 'bg-violet-50 text-violet-700 border-violet-200' };
   if (op?.status_camada_1 === 'Pendente_Reanalise') {
     return { label: 'Reanálise', cls: 'bg-orange-50 text-orange-700 border-orange-300' };
   }
@@ -293,6 +294,12 @@ export default function PainelPlanoFeriasV2() {
   const totalPendentes = useMemo(() => new Set(
     opcoes
       .filter((o) => statusOpcao(o).label === 'Pendente')
+      .map((o) => String(o.militar_id || ''))
+      .filter(Boolean),
+  ).size, [opcoes]);
+  const totalNaoGozo = useMemo(() => new Set(
+    opcoes
+      .filter((o) => o.nao_gozo_no_plano === true)
       .map((o) => String(o.militar_id || ''))
       .filter(Boolean),
   ).size, [opcoes]);
@@ -568,12 +575,13 @@ export default function PainelPlanoFeriasV2() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mt-6">
             <Kpi icon={Users} value={totalPublico} label="Militares no plano" tone="blue" />
             <Kpi icon={CheckCircle2} value={totalRespondidos} label="Responderam" tone="green" sub={totalPublico ? `${Math.round((totalRespondidos / totalPublico) * 100)}% do escopo` : ''} />
             <Kpi icon={Clock3} value={totalSemResposta} label="Não responderam" tone="slate" />
             <Kpi icon={CalendarDays} value={totalDefinidos} label="Férias definidas" tone="green" />
             <Kpi icon={AlertTriangle} value={totalPendentes} label="Pendentes de definição" tone="amber" />
+            <Kpi icon={Clock3} value={totalNaoGozo} label="Optaram por não gozar" tone="violet" />
             <Kpi icon={Users} value={coberturaCarregada ? cobertura.length : '—'} label="Elegíveis não cobertos" tone={coberturaCarregada && cobertura.length ? 'amber' : 'slate'} sub={!coberturaCarregada ? 'Consulte na aba Cobertura' : ''} />
           </div>
 
@@ -612,6 +620,7 @@ export default function PainelPlanoFeriasV2() {
                   <option value="Reanálise">Reanálise necessária</option>
                   <option value="Não respondeu">Não respondeu</option>
                   <option value="Não respondeu no prazo">Não respondeu no prazo</option>
+                  <option value="Optou por não gozar">Optou por não gozar</option>
                   <option value="Pendente">Pendente</option>
                   <option value="Definido">Definido</option>
                   <option value="Gerado">Gerado</option>
@@ -769,6 +778,18 @@ export default function PainelPlanoFeriasV2() {
               </div>
             ) : (
               <>
+            {selecionado.nao_gozo_no_plano && (
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 mb-6">
+                <h3 className="font-black text-sm text-violet-800">Optou por não gozar férias neste plano</h3>
+                <p className="text-xs text-violet-700 mt-1 leading-relaxed">
+                  Registrado pelo próprio militar no portal. O período aquisitivo permanece pendente para definição administrativa da unidade.
+                </p>
+                {selecionado.justificativa_nao_gozo && (
+                  <p className="text-xs text-violet-700 mt-2 italic">“{selecionado.justificativa_nao_gozo}”</p>
+                )}
+              </div>
+            )}
+
             {selecionado.nao_respondeu_no_prazo && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 mb-6">
                 <h3 className="font-black text-sm text-red-800">Não respondeu no prazo</h3>
@@ -810,6 +831,8 @@ export default function PainelPlanoFeriasV2() {
             <SectionLabel>Período aquisitivo</SectionLabel>
             <p className="text-sm font-semibold text-slate-700 mb-6">{formatarDataBR(selecionado.periodo_inicio)} a {formatarDataBR(selecionado.periodo_fim)}</p>
 
+            {!selecionado.nao_gozo_no_plano && (
+            <>
             <SectionLabel>Solicitação do militar</SectionLabel>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3 mb-4">
@@ -823,6 +846,8 @@ export default function PainelPlanoFeriasV2() {
                 </div>
               ))}
             </div>
+            </>
+            )}
 
             <div className="mt-7 pt-6 border-t border-slate-200">
               <h3 className="font-black text-base text-slate-900">Definição do gestor</h3>
@@ -895,6 +920,7 @@ function Kpi({ icon: Icon, value, label, sub, tone = 'blue' }) {
     blue: 'bg-blue-50 text-blue-700',
     green: 'bg-emerald-50 text-emerald-700',
     amber: 'bg-amber-50 text-amber-700',
+    violet: 'bg-violet-50 text-violet-700',
     slate: 'bg-slate-100 text-slate-600',
   };
   return (
