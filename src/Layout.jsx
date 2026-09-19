@@ -15,6 +15,7 @@ import {
   HeartPulse,
   CalendarDays,
   ClipboardList,
+  ClipboardCheck,
   ScrollText,
   Medal,
   Sword,
