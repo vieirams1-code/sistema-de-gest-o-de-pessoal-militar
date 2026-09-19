@@ -10,7 +10,10 @@ async function invoke(action, payload = {}) {
 export const centralConferenciasService = {
   bootstrap: () => invoke('BOOTSTRAP'),
   listar: () => invoke('LIST'),
+  detalhar: (conferenciaId) => invoke('GET_DETAIL', { conferenciaId }),
   salvar: (conferencia, itens) => invoke('SAVE', { conferencia, itens }),
+  atualizar: (conferenciaId, conferencia, itens) => invoke('UPDATE', { conferenciaId, conferencia, itens }),
+  excluir: (conferenciaId) => invoke('DELETE', { conferenciaId }),
   atualizarItem: (itemId, data) => invoke('UPDATE_ITEM', { itemId, data }),
   concluir: (conferenciaId) => invoke('CONCLUDE', { conferenciaId }),
 };
