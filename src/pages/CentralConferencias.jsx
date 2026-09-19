@@ -344,15 +344,61 @@ export default function CentralConferencias() {
         {podeGerir && <Button onClick={() => { reset(); setNova(true); }}><Plus className="w-4 h-4 mr-2" />Nova conferência</Button>}
       </header>
 
-      {!nova && <Card>
-        <CardHeader><CardTitle className="text-base">Conferências recentes</CardTitle></CardHeader>
-        <CardContent>
+      {!nova && detalhe && <Card>
+        <CardHeader>
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+            <div>
+              <Button variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => { setDetalhe(null); setBuscaItens(''); setFiltroStatus('TODOS'); }}><ArrowLeft className="w-4 h-4 mr-1" />Voltar ao histórico</Button>
+              <CardTitle className="text-lg">{detalhe.conferencia?.titulo}</CardTitle>
+              <p className="text-xs text-slate-500 mt-1">{detalhe.conferencia?.universo_ref_nome || 'Todo o efetivo visível'} · {detalhe.conferencia?.fonte_nome || 'Entrada manual'}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => exportarConferencia(detalhe.itens, detalhe.conferencia?.titulo, 'csv')}><Download className="w-4 h-4 mr-2" />CSV</Button>
+              <Button variant="outline" onClick={() => exportarConferencia(detalhe.itens, detalhe.conferencia?.titulo, 'xlsx')}><Download className="w-4 h-4 mr-2" />Excel</Button>
+              {podeGerir && <Button variant="outline" onClick={() => editarConferencia(detalhe)}><Pencil className="w-4 h-4 mr-2" />Editar</Button>}
+              {podeGerir && <Button variant="outline" className="text-rose-700 hover:text-rose-800" onClick={() => confirmarExclusao(detalhe.conferencia)}><Trash2 className="w-4 h-4 mr-2" />Excluir</Button>}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <Resumo icon={Users} label="Universo" value={detalhe.conferencia?.total_universo || 0} />
+            <Resumo icon={CheckCircle2} label="Encontrados" value={detalhe.conferencia?.total_encontrados || 0} />
+            <Resumo icon={AlertTriangle} label="Duvidosos" value={detalhe.conferencia?.total_duvidosos || 0} />
+            <Resumo icon={XCircle} label="Não localizados" value={detalhe.conferencia?.total_nao_localizados || 0} />
+            <Resumo icon={UserMinus} label="Ausentes na lista" value={detalhe.conferencia?.total_ausentes_universo || 0} />
+          </div>
+          <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
+            <div className="relative flex-1"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" value={buscaItens} onChange={(e) => setBuscaItens(e.target.value)} placeholder="Buscar por nome, matrícula, posto ou status..." /></div>
+            <div className="flex gap-2 flex-wrap">{['TODOS','ENCONTRADO','DUVIDOSO','NAO_LOCALIZADO','AUSENTE_NA_LISTA'].map((s) => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'TODOS' ? 'Todos' : STATUS[s]?.label}</Button>)}</div>
+          </div>
+          <div className="border rounded-xl overflow-hidden bg-white"><div className="max-h-[650px] overflow-auto divide-y">{detalheItensVisiveis.map((item, idx) => <div key={item.id || idx} className="p-4 grid grid-cols-1 lg:grid-cols-[1.2fr_1.2fr_auto] gap-4 items-center">
+            <div><p className="text-xs font-bold uppercase text-slate-400">{item.tipo_linha === 'ENTRADA' ? 'Recebido na lista' : 'Militar do universo'}</p><p className="font-medium text-slate-900 mt-1">{item.tipo_linha === 'ENTRADA' ? item.entrada_original : item.militar_nome}</p>{item.tipo_linha === 'AUSENTE_UNIVERSO' && <p className="text-xs text-slate-500">{item.militar_posto_graduacao} · {item.militar_matricula || 'sem matrícula'}</p>}</div>
+            <div>{item.tipo_linha === 'ENTRADA' && item.militar_nome ? <><p className="text-xs font-bold uppercase text-slate-400">Correspondência</p><p className="font-medium text-slate-900 mt-1">{item.militar_nome}</p><p className="text-xs text-slate-500">{item.militar_posto_graduacao} · {item.militar_matricula || 'sem matrícula'} · {Math.round((item.score || 0) * 100)}%</p></> : item.tipo_linha === 'ENTRADA' ? <p className="text-sm text-slate-400">Nenhuma correspondência confiável.</p> : null}</div>
+            <Badge variant="outline" className={STATUS[item.status]?.cls}>{STATUS[item.status]?.label || item.status}</Badge>
+          </div>)}{!detalheItensVisiveis.length && <p className="p-8 text-center text-sm text-slate-500">Nenhum item encontrado com estes filtros.</p>}</div></div>
+        </CardContent>
+      </Card>}
+
+      {!nova && !detalhe && <Card>
+        <CardHeader><CardTitle className="text-base">Histórico de conferências</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3">
+            <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" /><Input className="pl-9" value={buscaHistorico} onChange={(e) => setBuscaHistorico(e.target.value)} placeholder="Buscar por título, universo, arquivo ou responsável..." /></div>
+            <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" value={statusHistorico} onChange={(e) => setStatusHistorico(e.target.value)}><option value="TODOS">Todos os status</option><option value="CONCLUIDA">Concluídas</option><option value="EM_REVISAO">Em revisão</option></select>
+          </div>
           {historico.isLoading && <p className="text-sm text-slate-500">Carregando histórico...</p>}
           {!historico.isLoading && !(historico.data?.conferencias || []).length && <div className="py-10 text-center text-slate-500"><ClipboardCheck className="w-10 h-10 mx-auto mb-3 text-slate-300" /><p>Nenhuma conferência registrada.</p></div>}
+          {!historico.isLoading && (historico.data?.conferencias || []).length > 0 && historicoFiltrado.length === 0 && <p className="py-8 text-center text-sm text-slate-500">Nenhuma conferência encontrada com os filtros atuais.</p>}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {(historico.data?.conferencias || []).map((c) => <div key={c.id} className="rounded-xl border bg-white p-4">
+            {historicoFiltrado.map((c) => <div key={c.id} className="rounded-xl border bg-white p-4">
               <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-slate-900">{c.titulo}</p><p className="text-xs text-slate-500 mt-1">{c.universo_ref_nome || 'Todo o efetivo visível'} · {c.total_entrada || 0} linha(s) recebida(s)</p></div><Badge variant="outline">{c.status === 'CONCLUIDA' ? 'Concluída' : 'Em revisão'}</Badge></div>
               <div className="grid grid-cols-4 gap-2 mt-4 text-center text-xs"><div><b className="block text-emerald-700 text-lg">{c.total_encontrados || 0}</b>encontrados</div><div><b className="block text-amber-700 text-lg">{c.total_duvidosos || 0}</b>duvidosos</div><div><b className="block text-rose-700 text-lg">{c.total_nao_localizados || 0}</b>não localizados</div><div><b className="block text-slate-700 text-lg">{c.total_ausentes_universo || 0}</b>ausentes</div></div>
+              <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
+                <Button size="sm" variant="outline" onClick={() => abrirDetalhe(c.id)}><Eye className="w-4 h-4 mr-2" />Abrir</Button>
+                {podeGerir && <Button size="sm" variant="outline" onClick={async () => editarConferencia(await centralConferenciasService.detalhar(c.id))}><Pencil className="w-4 h-4 mr-2" />Editar</Button>}
+                {podeGerir && <Button size="sm" variant="ghost" className="text-rose-700" onClick={() => confirmarExclusao(c)}><Trash2 className="w-4 h-4 mr-2" />Excluir</Button>}
+              </div>
             </div>)}
           </div>
         </CardContent>
