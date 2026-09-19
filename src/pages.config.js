@@ -123,6 +123,7 @@ import Tags from './pages/Tags';
 import BackupSistema from './pages/BackupSistema';
 import CursosFormacao from './pages/CursosFormacao';
 import ConferenciasMilitares from './pages/ConferenciasMilitares';
+import CentralConferencias from './pages/CentralConferencias';
 import ConfiguracoesPortal from './pages/ConfiguracoesPortal';
 import ConfigurarCampanhaFerias from './pages/ConfigurarCampanhaFerias';
 import PainelPlanoFerias from './pages/PainelPlanoFerias';
@@ -227,6 +228,7 @@ export const PAGES = {
     "BackupSistema": BackupSistema,
     "CursosFormacao": CursosFormacao,
     "ConferenciasMilitares": ConferenciasMilitares,
+    "CentralConferencias": CentralConferencias,
 }
 
 export const pagesConfig = {
