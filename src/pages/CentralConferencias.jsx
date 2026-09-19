@@ -349,6 +349,40 @@ export default function CentralConferencias() {
   });
   const detalheItensVisiveis = (detalhe?.itens || []).filter((i) => (filtroStatus === 'TODOS' || i.status === filtroStatus) && itemBateBusca(i));
 
+  const alternarSelecionadoExportacao = (item, index = 0) => {
+    const key = chaveItem(item, index);
+    setSelecionadosExportacao((old) => {
+      const next = new Set(old);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const alternarTodosFiltrados = (itens) => {
+    const chaves = itens.map((item, index) => chaveItem(item, index));
+    const todosMarcados = chaves.length > 0 && chaves.every((key) => selecionadosExportacao.has(key));
+    setSelecionadosExportacao((old) => {
+      const next = new Set(old);
+      chaves.forEach((key) => todosMarcados ? next.delete(key) : next.add(key));
+      return next;
+    });
+  };
+
+  const obterItensExportacao = (todos, filtrados) => {
+    if (escopoExportacao === 'FILTRADOS') return filtrados;
+    if (escopoExportacao === 'SELECIONADOS') return todos.filter((item, index) => selecionadosExportacao.has(chaveItem(item, index)));
+    return todos;
+  };
+
+  const exportarEscopo = (todos, filtrados, tituloExportacao, formato) => {
+    const itens = obterItensExportacao(todos, filtrados);
+    if (!itens.length) {
+      toast({ title: 'Nada para exportar', description: escopoExportacao === 'SELECIONADOS' ? 'Selecione ao menos um registro.' : 'O filtro atual não possui registros.', variant: 'destructive' });
+      return;
+    }
+    exportarConferencia(itens, tituloExportacao, formato);
+  };
+
   return <div className="min-h-screen bg-slate-50 p-6">
     <div className="max-w-[1500px] mx-auto space-y-6">
       <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
