@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-import { ClipboardCheck, FileUp, Plus, Search, Users, CheckCircle2, AlertTriangle, XCircle, UserMinus, Save, RotateCcw } from 'lucide-react';
+import { ClipboardCheck, FileUp, Plus, Search, Users, CheckCircle2, AlertTriangle, XCircle, UserMinus, Save, RotateCcw, Eye, Pencil, Trash2, Download, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -71,6 +71,38 @@ async function lerArquivo(file) {
 
 function nomeMilitar(m) { return m?.nome_completo || m?.nome || m?.nome_guerra || 'Militar sem nome'; }
 
+function linhasExportacao(itens = []) {
+  return itens.map((i) => ({
+    Tipo: i.tipo_linha === 'ENTRADA' ? 'Recebido na lista' : 'Militar do universo',
+    Recebido: i.entrada_original || '',
+    Militar: i.militar_nome || '',
+    Matricula: i.militar_matricula || '',
+    'Posto/Graduação': i.militar_posto_graduacao || '',
+    Status: STATUS[i.status]?.label || i.status || '',
+    'Confiança (%)': Math.round((i.score || 0) * 100),
+    Critério: i.criterio || '',
+    Observação: i.observacao || '',
+  }));
+}
+
+function exportarConferencia(itens, titulo, formato = 'xlsx') {
+  const dados = linhasExportacao(itens);
+  const nomeSeguro = String(titulo || 'conferencia').replace(/[^a-zA-Z0-9-_]+/g, '_').replace(/^_+|_+$/g, '') || 'conferencia';
+  const ws = XLSX.utils.json_to_sheet(dados);
+  if (formato === 'csv') {
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${nomeSeguro}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Conferência');
+  XLSX.writeFile(wb, `${nomeSeguro}.xlsx`);
+}
+
 export default function CentralConferencias() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -92,6 +124,10 @@ export default function CentralConferencias() {
   const [resultado, setResultado] = useState(null);
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
   const [lendoArquivo, setLendoArquivo] = useState(false);
+  const [editandoId, setEditandoId] = useState('');
+  const [detalhe, setDetalhe] = useState(null);
+  const [buscaHistorico, setBuscaHistorico] = useState('');
+  const [statusHistorico, setStatusHistorico] = useState('TODOS');
 
   const bootstrap = useQuery({
     queryKey: ['central-conferencias-bootstrap'],
