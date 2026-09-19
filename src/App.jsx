@@ -42,6 +42,7 @@ const moduleGuardByPage = {
   EditarJiso: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
   ConferenciasMilitares: { moduleKey: 'acesso_conferencias_militares', actionKey: 'perm_visualizar_conferencias_militares', moduleName: 'Conferência Cadastral' },
+  CentralConferencias: { moduleKey: 'central_conferencias', actionKey: 'visualizar_central_conferencias', moduleName: 'Central de Conferências' },
   CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   Medicos: { moduleKey: 'atestados', moduleName: 'Atestados' },
