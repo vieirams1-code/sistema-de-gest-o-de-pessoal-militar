@@ -142,6 +142,26 @@ export default function PortalFeriasView({ onBack }) {
     return [{ etapa: 1, dias: diasPlanejar, mes: mesVal, data_inicio: dataInicio }];
   };
 
+  const getPeriodoSelecionado = () => (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
+  const getMesesDisponiveis = (periodo) => (periodo?.meses_elegiveis || [])
+    .filter((item) => item.permitido)
+    .map((item) => item.mes);
+  // A quantidade de opções acompanha os meses realmente elegíveis do período
+  // (mínimo 1, máximo 3): sem 3 meses disponíveis, o militar não fica impedido
+  // de concluir o registro por falta de opções inexistentes.
+  const getQtdOpcoesNecessarias = (periodo) => Math.max(1, Math.min(3, getMesesDisponiveis(periodo).length));
+  const getValorMesOpcao = (numero) => ({ 1: mesOpcao1, 2: mesOpcao2, 3: mesOpcao3 }[numero] || '');
+
+  const alterarMesOpcao = (numero, valor) => {
+    const setters = { 1: setMesOpcao1, 2: setMesOpcao2, 3: setMesOpcao3 };
+    Object.keys(setters).forEach((chave) => {
+      const idx = Number(chave);
+      if (idx === numero || !valor || getValorMesOpcao(idx) !== valor) return;
+      setters[idx](getValorMesOpcao(numero));
+    });
+    setters[numero](valor);
+  };
+
   const handleSubmeter = async (e, naoGozoForcado = null) => {
     if (e) e.preventDefault();
     const opcaoNaoGozo = naoGozoForcado === true || (naoGozoForcado === null && naoGozo);
@@ -171,41 +191,43 @@ export default function PortalFeriasView({ onBack }) {
         justificativa_nao_gozo: justificativaNaoGozo.trim(),
       };
     } else {
-      if (!mesOpcao1 || !mesOpcao2 || !mesOpcao3) {
-        setErrorMsg('É obrigatório escolher as 3 opções de meses.');
+      const periodoPlano = getPeriodoSelecionado();
+      const qtdOpcoesNecessarias = getQtdOpcoesNecessarias(periodoPlano);
+      const mesesEscolhidos = [mesOpcao1, mesOpcao2, mesOpcao3].slice(0, qtdOpcoesNecessarias);
+
+      if (mesesEscolhidos.some((mes) => !mes)) {
+        setErrorMsg(qtdOpcoesNecessarias === 1
+          ? 'É obrigatório escolher a opção de mês disponível para este plano.'
+          : `É obrigatório escolher as ${qtdOpcoesNecessarias} opções de meses disponíveis para este plano.`);
         return;
       }
 
-      const periodoPlano = (data?.periodos || []).find((p) => p.id === selectedPeriodoId);
-      const mesesPermitidos = new Set((periodoPlano?.meses_elegiveis || []).filter((m) => m.permitido).map((m) => m.mes));
-      if (![mesOpcao1, mesOpcao2, mesOpcao3].every((mes) => mesesPermitidos.has(mes))) {
+      const mesesPermitidos = new Set(getMesesDisponiveis(periodoPlano));
+      if (!mesesEscolhidos.every((mes) => mesesPermitidos.has(mes))) {
         setErrorMsg('Uma das opções escolhidas não está disponível para este plano.');
         return;
       }
 
-      // Validação: os 3 meses de preferência devem ser diferentes
-      if (mesOpcao1 === mesOpcao2 || mesOpcao1 === mesOpcao3 || mesOpcao2 === mesOpcao3) {
-        setErrorMsg('As 3 opções de preferência de meses devem ser diferentes entre si (1ª, 2ª e 3ª opção).');
+      // Validação: as opções de preferência devem ser meses diferentes entre si
+      if (new Set(mesesEscolhidos).size !== mesesEscolhidos.length) {
+        setErrorMsg('As opções de preferência de meses devem ser diferentes entre si.');
         return;
       }
+
+      const opcoesPayload = {};
+      mesesEscolhidos.forEach((mes, idx) => {
+        opcoesPayload[`opcao_${idx + 1}`] = {
+          meses_resumo: `${getNomeMes(mes)}`,
+          parcelas: buildParcelasForMes(mes, anoCampanha),
+        };
+      });
 
       payload = {
         periodo_aquisitivo_id: selectedPeriodoId,
         ano_referencia: anoCampanha,
         campanha_id: campanha?.id,
         modalidade,
-        opcao_1: {
-          meses_resumo: `${getNomeMes(mesOpcao1)}`,
-          parcelas: buildParcelasForMes(mesOpcao1, anoCampanha),
-        },
-        opcao_2: {
-          meses_resumo: `${getNomeMes(mesOpcao2)}`,
-          parcelas: buildParcelasForMes(mesOpcao2, anoCampanha),
-        },
-        opcao_3: {
-          meses_resumo: `${getNomeMes(mesOpcao3)}`,
-          parcelas: buildParcelasForMes(mesOpcao3, anoCampanha),
-        },
+        ...opcoesPayload,
       };
     }
 
@@ -247,6 +269,12 @@ export default function PortalFeriasView({ onBack }) {
   const saldoParcial = diasPlanejar > 0 && diasPlanejar !== 30;
   const regraMes = (mes) => (periodoMaisAntigo?.meses_elegiveis || []).find((item) => item.mes === mes);
   const mesPermitido = (mes) => Boolean(regraMes(mes)?.permitido);
+  const qtdOpcoesNecessarias = getQtdOpcoesNecessarias(periodoMaisAntigo);
+  const opcoesFormulario = [
+    { numero: 1, label: '1ª Opção (Preferencial)' },
+    { numero: 2, label: '2ª Opção (Alternativa A)' },
+    { numero: 3, label: '3ª Opção (Alternativa B)' },
+  ].slice(0, qtdOpcoesNecessarias);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -479,33 +507,27 @@ export default function PortalFeriasView({ onBack }) {
                 ) : (
                 <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-2xs space-y-1">
-                    <span className="font-bold text-emerald-800 flex items-center text-[11px]">
-                      <Star className="w-3 h-3 mr-1 text-emerald-600 fill-emerald-600" />
-                      1ª Opção (Preferencial)
-                    </span>
-                    <strong className="text-sm text-slate-800 block">
-                      {opcaoEnviada.opcao_1_meses || 'Não informada'}
-                    </strong>
-                  </div>
-
-                  <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                    <span className="font-semibold text-slate-600 text-[11px] block">
-                      2ª Opção (Alternativa A)
-                    </span>
-                    <strong className="text-sm text-slate-800 block">
-                      {opcaoEnviada.opcao_2_meses || 'Não informada'}
-                    </strong>
-                  </div>
-
-                  <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                    <span className="font-semibold text-slate-600 text-[11px] block">
-                      3ª Opção (Alternativa B)
-                    </span>
-                    <strong className="text-sm text-slate-800 block">
-                      {opcaoEnviada.opcao_3_meses || 'Não informada'}
-                    </strong>
-                  </div>
+                  {[
+                    { numero: 1, label: '1ª Opção (Preferencial)' },
+                    { numero: 2, label: '2ª Opção (Alternativa A)' },
+                    { numero: 3, label: '3ª Opção (Alternativa B)' },
+                  ].map((opcao) => {
+                    const meses = opcaoEnviada[`opcao_${opcao.numero}_meses`];
+                    if (!meses) return null;
+                    const preferencial = opcao.numero === 1;
+                    return (
+                      <div
+                        key={opcao.numero}
+                        className={`p-3 bg-white rounded-xl shadow-2xs space-y-1 ${preferencial ? 'border border-emerald-100' : 'border border-slate-200'}`}
+                      >
+                        <span className={`text-[11px] ${preferencial ? 'font-bold text-emerald-800 flex items-center' : 'font-semibold text-slate-600 block'}`}>
+                          {preferencial && <Star className="w-3 h-3 mr-1 text-emerald-600 fill-emerald-600" />}
+                          {opcao.label}
+                        </span>
+                        <strong className="text-sm text-slate-800 block">{meses}</strong>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="p-3 bg-emerald-50/60 rounded-xl text-[11px] text-emerald-900 border border-emerald-100">
@@ -676,84 +698,39 @@ export default function PortalFeriasView({ onBack }) {
                   <i className="ph ph-calendar-star text-green-600 text-xl"></i> Passo 2: Preferência de Meses no Ano de {anoCampanha}
                 </h4>
 
+                {qtdOpcoesNecessarias < 3 && (
+                  <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-medium text-blue-800 flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <span>
+                      {qtdOpcoesNecessarias === 1
+                        ? 'Há apenas 1 mês disponível para este período — selecione 1 opção.'
+                        : `Há apenas ${qtdOpcoesNecessarias} meses disponíveis para este período — selecione ${qtdOpcoesNecessarias} opções.`}
+                    </span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">1ª Opção (Preferencial)</label>
-                    <select
-                      value={mesOpcao1}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v && v === mesOpcao2) setMesOpcao2(mesOpcao1);
-                        if (v && v === mesOpcao3) setMesOpcao3(mesOpcao1);
-                        setMesOpcao1(v);
-                      }}
-                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
-                    >
-                      <option value="">Selecione o mês...</option>
-                      {MESES_ANO.map((m) => (
-                        <option
-                          key={m.valor}
-                          value={m.valor}
-                          disabled={!mesPermitido(m.valor) || m.valor === mesOpcao2 || m.valor === mesOpcao3}
-                        >
-                          {m.nome}
-                          {m.valor === mesOpcao2 ? ' (Em uso na 2ª Opção)' : m.valor === mesOpcao3 ? ' (Em uso na 3ª Opção)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">2ª Opção (Alternativa A)</label>
-                    <select
-                      value={mesOpcao2}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v && v === mesOpcao1) setMesOpcao1(mesOpcao2);
-                        if (v && v === mesOpcao3) setMesOpcao3(mesOpcao2);
-                        setMesOpcao2(v);
-                      }}
-                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
-                    >
-                      <option value="">Selecione o mês...</option>
-                      {MESES_ANO.map((m) => (
-                        <option
-                          key={m.valor}
-                          value={m.valor}
-                          disabled={!mesPermitido(m.valor) || m.valor === mesOpcao1 || m.valor === mesOpcao3}
-                        >
-                          {m.nome}
-                          {m.valor === mesOpcao1 ? ' (Em uso na 1ª Opção)' : m.valor === mesOpcao3 ? ' (Em uso na 3ª Opção)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">3ª Opção (Alternativa B)</label>
-                    <select
-                      value={mesOpcao3}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v && v === mesOpcao1) setMesOpcao1(mesOpcao3);
-                        if (v && v === mesOpcao2) setMesOpcao2(mesOpcao3);
-                        setMesOpcao3(v);
-                      }}
-                      className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
-                    >
-                      <option value="">Selecione o mês...</option>
-                      {MESES_ANO.map((m) => (
-                        <option
-                          key={m.valor}
-                          value={m.valor}
-                          disabled={!mesPermitido(m.valor) || m.valor === mesOpcao1 || m.valor === mesOpcao2}
-                        >
-                          {m.nome}
-                          {m.valor === mesOpcao1 ? ' (Em uso na 1ª Opção)' : m.valor === mesOpcao2 ? ' (Em uso na 2ª Opção)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {opcoesFormulario.map((opcao) => (
+                    <div key={opcao.numero}>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">{opcao.label}</label>
+                      <select
+                        value={getValorMesOpcao(opcao.numero)}
+                        onChange={(e) => alterarMesOpcao(opcao.numero, e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-green-500 outline-none font-medium bg-white"
+                      >
+                        <option value="">Selecione o mês...</option>
+                        {MESES_ANO.map((m) => {
+                          const emUsoEm = [1, 2, 3].find((n) => n !== opcao.numero && getValorMesOpcao(n) === m.valor);
+                          return (
+                            <option key={m.valor} value={m.valor} disabled={!mesPermitido(m.valor) || Boolean(emUsoEm)}>
+                              {m.nome}
+                              {emUsoEm ? ` (Em uso na ${emUsoEm}ª Opção)` : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="mt-8 flex justify-end pt-4 border-t border-slate-100">

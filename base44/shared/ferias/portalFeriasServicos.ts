@@ -277,7 +277,7 @@ export async function feriasGet(ctx: FeriasCtx): Promise<Response> {
       permitir_custom: Boolean(portalConfig?.ferias_permitir_custom),
       exigir_atualizacao_cadastral: exigirAtualizacao,
       prazo_limite: campanhaFeriasAtiva?.data_fim_militar || portalConfig?.ferias_prazo_limite || '',
-      instrucoes: campanhaFeriasAtiva?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas 3 opções de meses para a escala de férias.',
+      instrucoes: campanhaFeriasAtiva?.instrucoes || portalConfig?.ferias_instrucoes || 'Informe suas opções de meses para a escala de férias.',
     },
   }, 200, corsHeaders);
 }
@@ -358,10 +358,6 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
 
   if (!periodo_aquisitivo_id && !naoGozoSolicitado) {
     return json({ error: 'Não foi possível validar as opções de férias. Atualize a página e tente novamente.' }, 400, corsHeaders);
-  }
-
-  if (!naoGozoSolicitado && (!opcao_1?.parcelas?.length || !opcao_2?.parcelas?.length || !opcao_3?.parcelas?.length)) {
-    return json({ error: 'É obrigatório preencher as 3 opções de preferências de meses.' }, 400, corsHeaders);
   }
 
   const periodo = periodo_aquisitivo_id
@@ -518,17 +514,28 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
     }
   }
 
-  const preferenciasNormalizadas = [
-    normalizarPreferenciaMes(opcao_1, resumoPeriodoSubmissao, diasPlanejar),
-    normalizarPreferenciaMes(opcao_2, resumoPeriodoSubmissao, diasPlanejar),
-    normalizarPreferenciaMes(opcao_3, resumoPeriodoSubmissao, diasPlanejar),
-  ];
+  // A quantidade de opções acompanha os meses realmente elegíveis do período
+  // (mínimo 1, máximo 3). Quando existem menos de 3 meses disponíveis, o militar
+  // registra apenas as opções possíveis, sem exigir meses inexistentes.
+  const mesesDisponiveis = (resumoPeriodoSubmissao.meses_elegiveis || [])
+    .filter((m: any) => m.permitido)
+    .map((m: any) => m.mes);
+  const qtdOpcoesNecessarias = Math.max(1, Math.min(3, mesesDisponiveis.length));
+
+  const opcoesRecebidas = [opcao_1, opcao_2, opcao_3].slice(0, qtdOpcoesNecessarias);
+  if (opcoesRecebidas.some((op: any) => !op?.parcelas?.length)) {
+    return json({ error: `É obrigatório preencher ${qtdOpcoesNecessarias} opção(ões) de preferência de meses para este plano.` }, 400, corsHeaders);
+  }
+
+  const preferenciasNormalizadas = opcoesRecebidas.map((op: any) =>
+    normalizarPreferenciaMes(op, resumoPeriodoSubmissao, diasPlanejar)
+  );
   if (preferenciasNormalizadas.some((op: any) => !op)) {
     return json({ error: 'Uma ou mais opções de mês não estão disponíveis para este plano.' }, 400, corsHeaders);
   }
   const mesesPreferidos = preferenciasNormalizadas.map((op: any) => op.parcelas[0].mes);
-  if (new Set(mesesPreferidos).size !== 3) {
-    return json({ error: 'As 3 opções de meses devem ser diferentes entre si.' }, 400, corsHeaders);
+  if (new Set(mesesPreferidos).size !== preferenciasNormalizadas.length) {
+    return json({ error: 'As opções de meses devem ser diferentes entre si.' }, 400, corsHeaders);
   }
 
   const modalidadeEfetiva = diasPlanejar === 30 ? (modalidade || '2_ETAPAS_15') : 'CUSTOM';
@@ -569,12 +576,12 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
     periodo_fim: periodo.fim_aquisitivo || '',
     dias_direito: diasPlanejar,
     modalidade: modalidadeEfetiva,
-    opcao_1_meses: preferenciasNormalizadas[0].meses_resumo || '',
-    opcao_1_detalhes: JSON.stringify(preferenciasNormalizadas[0].parcelas),
-    opcao_2_meses: preferenciasNormalizadas[1].meses_resumo || '',
-    opcao_2_detalhes: JSON.stringify(preferenciasNormalizadas[1].parcelas),
-    opcao_3_meses: preferenciasNormalizadas[2].meses_resumo || '',
-    opcao_3_detalhes: JSON.stringify(preferenciasNormalizadas[2].parcelas),
+    opcao_1_meses: preferenciasNormalizadas[0]?.meses_resumo || '',
+    opcao_1_detalhes: JSON.stringify(preferenciasNormalizadas[0]?.parcelas || []),
+    opcao_2_meses: preferenciasNormalizadas[1]?.meses_resumo || '',
+    opcao_2_detalhes: JSON.stringify(preferenciasNormalizadas[1]?.parcelas || []),
+    opcao_3_meses: preferenciasNormalizadas[2]?.meses_resumo || '',
+    opcao_3_detalhes: JSON.stringify(preferenciasNormalizadas[2]?.parcelas || []),
     nao_gozo_no_plano: false,
     justificativa_nao_gozo: '',
     data_nao_gozo: '',
@@ -606,7 +613,7 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
 
   return json({
     ok: true,
-    message: `Suas 3 opções de férias para o plano de ${anoCampanha} foram registradas com sucesso!`,
+    message: `Suas ${preferenciasNormalizadas.length} opções de férias para o plano de ${anoCampanha} foram registradas com sucesso!`,
     opcao: salvoRecord,
   }, 201, corsHeaders);
 }
