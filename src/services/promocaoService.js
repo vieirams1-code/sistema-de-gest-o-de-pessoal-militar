@@ -14,7 +14,7 @@ const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'cancelada', 'retifi
 
 const STATUS_PROMOCAO_RASCUNHO = new Set(['rascunho']);
 
-const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
 const STATUS_ITEM_BLOQUEADO_PUBLICACAO = new Set(['bloqueado', 'bloqueada', 'cancelado', 'cancelada', 'retificado', 'retificada']);
 
 function dataSomente(valor) {
@@ -304,38 +304,36 @@ function montarPatchSincronizacaoHistoricoPromocao(promocao = {}) {
 export async function sincronizarHistoricoPromocaoPublicada({
   promocaoAntes = null,
   promocaoDepois = null,
-  entities = null,
 } = {}) {
-  if (!promocaoDepois?.id || !ehStatusPublicado(promocaoDepois?.status)) return { atualizados: 0, ignorado: true };
-  diagLog('salvar-promocao-publicada:inicio', { promocaoId: promocaoDepois?.id, status: promocaoDepois?.status });
-  const Historico = entities?.HistoricoPromocaoMilitarV2;
-  if (!Historico || typeof Historico.list !== 'function' || typeof Historico.update !== 'function') {
-    throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para sincronização da promoção publicada.');
+  if (!promocaoDepois?.id || !ehStatusPublicado(promocaoDepois?.status)) {
+    return { atualizados: 0, ignorado: true };
   }
 
-  const houveMudancaEstrutural = (
-    dataSomente(promocaoAntes?.data_promocao) !== dataSomente(promocaoDepois?.data_promocao)
-    || dataSomente(promocaoAntes?.data_publicacao) !== dataSomente(promocaoDepois?.data_publicacao)
-    || texto(promocaoAntes?.boletim_referencia) !== texto(promocaoDepois?.boletim_referencia)
-    || texto(promocaoAntes?.ato_referencia) !== texto(promocaoDepois?.ato_referencia)
-    || texto(promocaoAntes?.quadro) !== texto(promocaoDepois?.quadro)
-  );
-  if (!houveMudancaEstrutural) return { atualizados: 0, ignorado: true };
-
-  const historicos = await Historico.list();
-  const ativosDaPromocao = (historicos || []).filter((registro) => (
-    statusNormalizado(registro?.status_registro) === 'ativo'
-    && texto(registro?.promocao_id) === texto(promocaoDepois.id)
+  const camposMantidos = [
+    'posto_graduacao',
+    'quadro',
+    'data_promocao',
+    'data_publicacao',
+    'boletim_referencia',
+    'ato_referencia',
+    'observacoes',
+  ];
+  const houveMudanca = camposMantidos.some((campo) => (
+    campo.startsWith('data_')
+      ? dataSomente(promocaoAntes?.[campo]) !== dataSomente(promocaoDepois?.[campo])
+      : texto(promocaoAntes?.[campo]) !== texto(promocaoDepois?.[campo])
   ));
+  if (!houveMudanca) return { atualizados: 0, ignorado: true };
 
-  const patch = montarPatchSincronizacaoHistoricoPromocao(promocaoDepois);
-  diagLog('sincronizacao-historico:busca-vinculados', { totalHistoricos: (historicos || []).length, encontrados: ativosDaPromocao.length, idsHistoricos: ativosDaPromocao.map((r) => r?.id), patch });
-  await sincronizarHistoricoPromocaoPublicadaTx({
+  diagLog('salvar-promocao-publicada:sincronizacao-servidor', {
     promocaoId: promocaoDepois.id,
-    idsHistoricos: ativosDaPromocao.map((registro) => registro?.id).filter(Boolean),
-    patch,
+    camposAlterados: camposMantidos.filter((campo) => texto(promocaoAntes?.[campo]) !== texto(promocaoDepois?.[campo])),
   });
-  return { atualizados: ativosDaPromocao.length, ignorado: false };
+
+  return sincronizarHistoricoPromocaoPublicadaTx({
+    promocaoId: promocaoDepois.id,
+    patch: promocaoDepois,
+  });
 }
 
 export async function sincronizarHistoricoPromocaoPublicadaTx({
@@ -344,23 +342,23 @@ export async function sincronizarHistoricoPromocaoPublicadaTx({
   patch = {},
 } = {}) {
   const idsUnicos = [...new Set((idsHistoricos || []).map((id) => texto(id)).filter(Boolean))];
-  if (idsUnicos.length === 0) return { atualizados: 0, ignorado: true };
-
   const payload = {
     promocao_id: texto(promocaoId),
     historico_ids: idsUnicos,
-    patch: {
+    patch_promocao: {
+      posto_graduacao: texto(patch?.posto_graduacao),
+      quadro: texto(patch?.quadro),
       data_promocao: dataSomente(patch?.data_promocao),
+      data_publicacao: dataSomente(patch?.data_publicacao),
       boletim_referencia: texto(patch?.boletim_referencia),
       ato_referencia: texto(patch?.ato_referencia),
-      quadro_novo: texto(patch?.quadro_novo),
-      data_publicacao: dataSomente(patch?.data_publicacao),
+      observacoes: texto(patch?.observacoes),
     },
   };
 
   try {
     const response = await base44.functions.invoke('sincronizarHistoricoPromocaoPublicadaTx', { body: payload });
-    return response?.data || { atualizados: idsUnicos.length, ignorado: false };
+    return response?.data || { atualizados: 0, ignorado: false };
   } catch (error) {
     diagLog('sincronizacao-historico:tx:erro', {
       promocaoId: payload.promocao_id,
