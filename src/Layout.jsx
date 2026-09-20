@@ -184,19 +184,6 @@ const menuGroups = [
     ],
   },
   {
-    title: 'SARGENTEAÇÃO',
-    sections: [
-      {
-        title: 'Escalas e empenhos',
-        icon: CalendarClock,
-        description: 'Planejamento operacional em regime 24x72',
-        items: [
-          { name: 'Painel de Sargenteação', page: 'Sargenteacao', icon: CalendarClock, moduleKey: 'sargenteacao', actionKey: 'visualizar_sargenteacao' },
-        ],
-      },
-    ],
-  },
-  {
     title: 'FERRAMENTAS',
     sections: [
       {
@@ -271,6 +258,19 @@ const menuGroups = [
             anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }],
           },
           { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'SARGENTEAÇÃO',
+    sections: [
+      {
+        title: 'Escalas e empenhos',
+        icon: CalendarClock,
+        description: 'Planejamento operacional em regime 24x72',
+        items: [
+          { name: 'Painel de Sargenteação', page: 'Sargenteacao', icon: CalendarClock, moduleKey: 'sargenteacao', actionKey: 'visualizar_sargenteacao' },
         ],
       },
     ],
