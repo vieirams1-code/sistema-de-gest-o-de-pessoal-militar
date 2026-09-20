@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle, ChevronDown, ChevronRight, MessageCircle, Shield } from 'lucide-react';
+import { CalendarDays, CheckCircle, ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AtestadoCard from './AtestadoCard';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
-import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { createPageUrl } from '@/utils';
 
 const statusClasses = {
@@ -22,13 +21,10 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
-function getStatusOperacional(atestado, isFluxoJiso) {
+function getStatusOperacional(atestado) {
   if (atestado?.status === 'Cancelado') return { label: 'Cancelado', variant: 'cancelado' };
   if (atestado?.status === 'Encerrado') return { label: 'Encerrado', variant: 'encerrado' };
-  if (atestado?.status_jiso === 'Homologado pela JISO') return { label: 'Homologado JISO', variant: 'success' };
-  if (atestado?.homologado_comandante || atestado?.status_jiso === 'Homologado pelo Comandante') return { label: 'Homologado Cmt', variant: 'success' };
-  if (isFluxoJiso && atestado?.data_jiso_agendada) return { label: 'JISO agendada', variant: 'purple' };
-  if (isFluxoJiso) return { label: 'Aguardando Agendamento', variant: 'warning' };
+  if (atestado?.homologado_comandante) return { label: 'Homologado Cmt', variant: 'success' };
   return { label: atestado?.status || 'Ativo', variant: 'default' };
 }
 
@@ -41,43 +37,13 @@ export default function AtestadoCompactItem({
   canDelete,
 }) {
   const navigate = useNavigate();
-  const { canAccessAction } = useCurrentUser();
   const [expanded, setExpanded] = useState(false);
   const matricula = montarLabelMilitarAtestado(atestado, { contexto: 'operacional' });
-  const isFluxoJiso = Boolean(
-    atestado?.necessita_jiso
-    || atestado?.fluxo_homologacao === 'jiso'
-    || Number(atestado?.dias || 0) > 15
-  );
   const periodoFinal = atestado?.data_retorno || atestado?.data_termino;
-  const statusOperacional = useMemo(() => getStatusOperacional(atestado, isFluxoJiso), [atestado, isFluxoJiso]);
-  const whatsappJisoEnviado = Boolean(atestado?.jiso_whatsapp_enviado_em);
-  const whatsappJisoPrecisaReenvio = whatsappJisoEnviado && Boolean(
-    atestado?.jiso_whatsapp_data_agendada_snapshot !== atestado?.data_jiso_agendada
-    || atestado?.jiso_whatsapp_hora_agendada_snapshot !== atestado?.hora_jiso_agendada
-  );
-
-  const quickAction = useMemo(() => {
-    if (isFluxoJiso && !atestado?.data_jiso_agendada && canAccessAction('gerir_jiso')) {
-      return { label: 'Agendar JISO', tone: 'warning', action: 'expand' };
-    }
-    if (
-      isFluxoJiso
-      && atestado?.data_jiso_agendada
-      && atestado?.status_jiso !== 'Homologado pela JISO'
-      && canAccessAction('registrar_decisao_jiso')
-    ) {
-      return { label: 'Registrar decisão', tone: 'primary', action: 'decision' };
-    }
-    if (
-      atestado?.fluxo_homologacao === 'comandante'
-      && !atestado?.homologado_comandante
-      && canAccessAction('publicar_homologacao')
-    ) {
-      return { label: 'Homologar', tone: 'primary', action: 'expand' };
-    }
-    return { label: 'Gerenciar', tone: 'neutral', action: 'expand' };
-  }, [atestado, canAccessAction, isFluxoJiso]);
+  const statusOperacional = useMemo(() => getStatusOperacional(atestado), [atestado]);
+  const quickAction = atestado?.jiso_vinculo_ativo
+    ? { label: 'Abrir JISO', tone: 'primary', action: 'jiso' }
+    : { label: 'Gerenciar', tone: 'neutral', action: 'expand' };
 
   const statusClass = statusOperacional.variant === 'success'
     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -89,8 +55,8 @@ export default function AtestadoCompactItem({
 
   const handleQuickAction = (event) => {
     event.stopPropagation();
-    if (quickAction.action === 'decision') {
-      navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`);
+    if (quickAction.action === 'jiso' && atestado?.jiso_id_derivado) {
+      navigate(createPageUrl('EditarJISO') + `?jiso_id=${atestado.jiso_id_derivado}`);
       return;
     }
     setExpanded(true);
@@ -135,16 +101,11 @@ export default function AtestadoCompactItem({
           <Badge className={`${statusClass} border text-[10px] px-1.5 py-0.5`}>
             {statusOperacional.label}
           </Badge>
-          {isFluxoJiso && atestado?.data_jiso_agendada && (
+          {atestado?.jiso_vinculo_ativo && (
             <span className="text-[10px] text-purple-600 inline-flex items-center gap-1 truncate">
               <Shield className="w-3 h-3 shrink-0" />
-              {formatDate(atestado.data_jiso_agendada)}{atestado?.hora_jiso_agendada ? ` · ${atestado.hora_jiso_agendada}` : ''}
-            </span>
-          )}
-          {whatsappJisoEnviado && (
-            <span className={`text-[10px] inline-flex items-center gap-1 truncate ${whatsappJisoPrecisaReenvio ? 'text-orange-600' : 'text-emerald-600'}`}>
-              <MessageCircle className="w-3 h-3 shrink-0" />
-              {whatsappJisoPrecisaReenvio ? 'Reenviar WhatsApp' : 'WhatsApp enviado'}
+              {atestado.jiso_codigo || 'JISO'} · {atestado.jiso_status || 'Em andamento'}
+              {atestado?.jiso_data ? ` · ${formatDate(atestado.jiso_data)}` : ''}
             </span>
           )}
         </div>
@@ -157,7 +118,6 @@ export default function AtestadoCompactItem({
             className={`h-7 px-2.5 text-[11px] ${quickAction.tone === 'primary' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}`}
             onClick={handleQuickAction}
           >
-            {quickAction.tone === 'warning' && <AlertCircle className="w-3.5 h-3.5 mr-1 text-amber-600" />}
             {quickAction.label}
           </Button>
           <Button
