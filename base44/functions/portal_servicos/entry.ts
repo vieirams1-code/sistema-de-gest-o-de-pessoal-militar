@@ -516,7 +516,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload = (rawBody || {}) as PortalServicosPayload;
-    const acao = payload.acao;
+    // Normaliza a ação recebida para evitar que espaços/valores não-string
+    // desviem uma ação administrativa válida para o fallback de “não reconhecida”.
+    const acao = String(payload.acao || '').trim();
     const base44 = createClientFromRequest(req);
 
     // ========================================================================
