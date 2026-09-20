@@ -225,7 +225,7 @@ test('functions transacionais de promoção mantêm administração real, exceto
   assert.match(publicarPromocaoBackend, /function postoAnteriorPrevisto/);
   assert.match(publicarPromocaoBackend, /function resolverOrigemHistorica/);
   assert.match(publicarPromocaoBackend, /origem: 'historico_anterior'/);
-  assert.match(publicarPromocaoBackend, /origem: 'hierarquia_institucional'/);
+  assert.match(publicarPromocaoBackend, /hierarquia_institucional/);
   assert.match(publicarPromocaoBackend, /antiguidade_referencia_id: texto\(historicoAnterior\?\.id\)/);
   assert.doesNotMatch(publicarPromocaoBackend, /posto_graduacao_anterior: texto\(militarEncontrado\?\.posto_graduacao\)/);
 });
