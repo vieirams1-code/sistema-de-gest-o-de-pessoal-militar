@@ -76,6 +76,7 @@ export default function AgendarJISO() {
   const selectableAtestados = useMemo(() => {
     const term = atestadoSearch.trim().toLowerCase();
     return atestados
+      .filter((item) => !item.jiso_vinculo_ativo)
       .filter((item) => !selectedMilitarId || item.militar_id === selectedMilitarId)
       .filter((item) => {
         if (!term) return true;
