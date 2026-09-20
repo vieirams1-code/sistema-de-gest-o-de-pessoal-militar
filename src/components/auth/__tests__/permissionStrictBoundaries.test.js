@@ -223,6 +223,8 @@ test('functions transacionais de promoção mantêm administração real, exceto
   assert.match(publicarPromocaoBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
   assert.match(sincronizarGraduacoesBackend, /import \{ atualizarCadastroMilitar \} from '\.\/utils\.ts';/);
   assert.match(publicarPromocaoBackend, /function postoAnteriorPrevisto/);
+  assert.match(publicarPromocaoBackend, /if \(indiceNovo <= 0\) return '';/);
+  assert.match(publicarPromocaoBackend, /chavePosto\(quadroNovo\) === chavePosto\('QAOBM'\)[\s\S]*return 'Subtenente';/);
   assert.match(publicarPromocaoBackend, /function resolverOrigemHistorica/);
   assert.match(publicarPromocaoBackend, /origem: 'historico_anterior'/);
   assert.match(publicarPromocaoBackend, /hierarquia_institucional/);
