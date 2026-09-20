@@ -1,0 +1,101 @@
+{
+  "gerado_em": "2026-09-20",
+  "finalidade": "Backup lógico antes de corrigir erro de digitação da data de publicação.",
+  "evidencia": {
+    "ato": "PORTARIA “P” CBMMS/DP-2 Nº 149, DE 28 DE NOVEMBRO DE 2016",
+    "boletim": "Diário Oficial n. 9.295, de 29 de novembro de 2016",
+    "conclusao": "A data 2026-11-29 é incompatível com o ato de 2016 e com a edição 9.295. Correção determinística para 2016-11-29."
+  },
+  "promocao": {
+    "id": "6a0e646929aefd84bb54b72f",
+    "antes": {
+      "data_publicacao": "2026-11-29"
+    },
+    "depois": {
+      "data_publicacao": "2016-11-29"
+    }
+  },
+  "historicos": [
+    {
+      "id": "6a0e728dc1a8a089970b5f78",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e728ca3c67076fcaa5b55",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e728cb3afe3bdb972b948",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e728bd8fedb64d7f37353",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e728a0cd4d550dbf29154",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e728a7813449dd51fe082",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e7289d29dfffdb33936a0",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e72882769896182aae243",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    },
+    {
+      "id": "6a0e7288ba7436067df310d1",
+      "antes": {
+        "data_publicacao": "2026-11-29"
+      },
+      "depois": {
+        "data_publicacao": "2016-11-29"
+      }
+    }
+  ]
+}
