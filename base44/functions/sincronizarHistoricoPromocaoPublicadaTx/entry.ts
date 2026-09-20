@@ -13,6 +13,7 @@ const STATUS_OFICIAL = new Set([
 ]);
 
 const CAMPOS_PROMOCAO_EDITAVEIS = [
+  'status',
   'posto_graduacao',
   'quadro',
   'data_promocao',
@@ -106,6 +107,9 @@ Deno.serve(async (req) => {
     );
 
     const promocaoDepois = { ...promocaoAntes, ...patchPromocao };
+    if (!STATUS_OFICIAL.has(normalizar(promocaoDepois?.status))) {
+      return Response.json({ success: false, etapa: 'validacao', motivo: 'status_oficial_nao_pode_ser_rebaixado' }, { status: 409 });
+    }
     if (!dataSomente(promocaoDepois?.data_promocao) || !texto(promocaoDepois?.posto_graduacao) || !texto(promocaoDepois?.quadro)) {
       return Response.json({ success: false, etapa: 'validacao', motivo: 'campos_obrigatorios_ausentes' }, { status: 400 });
     }
