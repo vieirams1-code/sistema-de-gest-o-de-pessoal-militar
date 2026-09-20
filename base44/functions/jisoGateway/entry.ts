@@ -198,6 +198,78 @@ async function createLinks(base44: any, jiso: any, atestados: any[], authUser: a
   return created;
 }
 
+async function syncJisoBoard(base44: any, jiso: any, totalAtestados = 0) {
+  try {
+    const quadros = await base44.asServiceRole.entities.QuadroOperacional.filter({ ativo: true }, 'ordem', 1, 0);
+    const quadro = Array.isArray(quadros) ? quadros[0] : null;
+    if (!quadro?.id) return;
+
+    const colunas = await base44.asServiceRole.entities.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem', 100, 0);
+    const coluna = (colunas || []).find((item: any) => asText(item?.nome, 100).toUpperCase() === 'JISO');
+    if (!coluna?.id) return;
+
+    const vinculos = await base44.asServiceRole.entities.CardVinculo.filter({
+      tipo_vinculo: 'Processo',
+      registro_id: jiso.id,
+    }, '-created_date', 10, 0);
+    let card = null;
+    if (vinculos?.[0]?.card_id) card = await findOne(base44, 'CardOperacional', { id: vinculos[0].card_id });
+
+    const payload = {
+      coluna_id: coluna.id,
+      titulo: `${jiso.codigo || 'JISO'} - ${jiso.militar_nome || 'Militar'}`,
+      descricao: `Processo JISO independente com ${totalAtestados} atestado(s) vinculado(s). Status: ${jiso.status || 'Rascunho'}.`,
+      status: ['Concluída', 'Cancelada'].includes(jiso.status) ? 'Concluído' : 'Ativo',
+      prazo: jiso.data_jiso || '',
+      militar_id: jiso.militar_id || '',
+      militar_nome_snapshot: jiso.militar_nome || '',
+      origem_tipo: 'Processo',
+      origem_modulo: 'Processos',
+      origem_registro_id: jiso.id,
+      protocolo: jiso.codigo || `JISO:${jiso.id}`,
+      etiqueta_texto: 'JISO',
+      etiqueta_cor: '#7c3aed',
+      criado_automaticamente: true,
+      tipo_automacao: 'JISO_INDEPENDENTE',
+      arquivado: false,
+    };
+
+    if (card?.id) {
+      await base44.asServiceRole.entities.CardOperacional.update(card.id, payload);
+      return;
+    }
+
+    const cardsColuna = await base44.asServiceRole.entities.CardOperacional.filter({ coluna_id: coluna.id, arquivado: false }, '-created_date', 500, 0);
+    card = await base44.asServiceRole.entities.CardOperacional.create({ ...payload, ordem: (cardsColuna || []).length + 1, comentarios_count: 1 });
+    await base44.asServiceRole.entities.CardVinculo.create({
+      card_id: card.id,
+      tipo_vinculo: 'Processo',
+      registro_id: jiso.id,
+      titulo_vinculo: jiso.codigo || 'Processo JISO',
+    });
+    await base44.asServiceRole.entities.CardComentario.create({
+      card_id: card.id,
+      mensagem: 'Card criado automaticamente para o processo JISO independente.',
+      tipo_registro: 'Sistema',
+      data_hora: new Date().toISOString(),
+      origem_automatica: true,
+      autor_nome: 'Sistema',
+    });
+    const checklist = ['Conferir atestados vinculados', 'Agendar JISO', 'Notificar militar', 'Registrar resultado', 'Publicar Ata JISO'];
+    for (let index = 0; index < checklist.length; index += 1) {
+      await base44.asServiceRole.entities.CardChecklistItem.create({
+        card_id: card.id,
+        titulo: checklist[index],
+        concluido: false,
+        ordem: index + 1,
+      });
+    }
+    await base44.asServiceRole.entities.CardOperacional.update(card.id, { checklist_resumo: `0/${checklist.length}` });
+  } catch (boardError) {
+    console.warn('[jisoGateway] sincronização do quadro não concluída', boardError);
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -253,6 +325,7 @@ Deno.serve(async (req) => {
       const codigo = `JISO-${new Date().getFullYear()}-${String(jiso.id || '').slice(-6).toUpperCase()}`;
       const updated = await base44.asServiceRole.entities.JISO.update(jiso.id, { codigo });
       await createLinks(base44, { ...jiso, ...updated }, atestados, authUser);
+      await syncJisoBoard(base44, { ...jiso, ...updated, codigo }, ids.length);
       await audit(base44, authUser, 'CRIAR', jiso.id, { atestado_ids: ids });
       return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, codigo }, perm.canSensitive) });
     }
@@ -301,6 +374,7 @@ Deno.serve(async (req) => {
       if (scheduleChanged) patch.whatsapp_status = 'pendente';
       patch.versao = Number(jiso.versao || 0) + 1;
       const updated = await base44.asServiceRole.entities.JISO.update(jisoId, patch);
+      await syncJisoBoard(base44, { ...jiso, ...updated, ...patch }, (await activeLinksForJiso(base44, jisoId)).length);
       await audit(base44, authUser, 'ATUALIZAR', jisoId, { campos: Object.keys(patch) });
       return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, ...patch }, perm.canSensitive) });
     }
@@ -311,6 +385,7 @@ Deno.serve(async (req) => {
       if (!motivo) return error(400, 'MOTIVO_REQUIRED', 'Informe o motivo do cancelamento.');
       const patch = { status: 'Cancelada', cancelada_em: new Date().toISOString(), motivo_cancelamento: motivo, versao: Number(jiso.versao || 0) + 1 };
       const updated = await base44.asServiceRole.entities.JISO.update(jisoId, patch);
+      await syncJisoBoard(base44, { ...jiso, ...updated, ...patch }, (await activeLinksForJiso(base44, jisoId)).length);
       await audit(base44, authUser, 'CANCELAR', jisoId, { motivo });
       return Response.json({ success: true, jiso: { ...jiso, ...updated, ...patch } });
     }
@@ -347,6 +422,7 @@ Deno.serve(async (req) => {
       });
       const patch = { publicacao_id: publicacao.id, status_publicacao: publicacao.status, status: 'Concluída', concluida_em: new Date().toISOString(), versao: Number(jiso.versao || 0) + 1 };
       await base44.asServiceRole.entities.JISO.update(jisoId, patch);
+      await syncJisoBoard(base44, { ...jiso, ...patch }, atestadoIds.length);
       await audit(base44, authUser, 'PUBLICAR_ATA', jisoId, { publicacao_id: publicacao.id, atestado_ids: atestadoIds });
       return Response.json({ success: true, publicacao, jiso: { ...jiso, ...patch } });
     }
