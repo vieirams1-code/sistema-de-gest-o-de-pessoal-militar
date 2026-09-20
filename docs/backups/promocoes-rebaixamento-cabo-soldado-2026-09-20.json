@@ -1,0 +1,677 @@
+{
+  "gerado_em": "2026-09-20",
+  "escopo": "Correção do incidente Cabo para Soldado",
+  "observacao": "Backup lógico anterior à restauração. Históricos oficiais são preservados como evidência do incidente.",
+  "militares_restaurados": [
+    {
+      "id": "69eb8d14c784f768b36c2eb0",
+      "antes": {
+        "posto_graduacao": "Soldado",
+        "quadro": "QBMP-1.a",
+        "status_cadastro": "Inativo"
+      },
+      "depois": {
+        "posto_graduacao": "Cabo",
+        "quadro": "QBMP-1.a"
+      }
+    },
+    {
+      "id": "69eb849ba2be7a2748351649",
+      "antes": {
+        "posto_graduacao": "Soldado",
+        "quadro": "QBMP-1.a",
+        "status_cadastro": "Inativo"
+      },
+      "depois": {
+        "posto_graduacao": "Cabo",
+        "quadro": "QBMP-1.a"
+      }
+    }
+  ],
+  "itens_corrigidos": [
+    {
+      "id": "6a2978ba988387248b0344ba",
+      "militar_id": "6a1ef3b280d8695210c4b4aa",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29787076298bd2523c53e7",
+      "militar_id": "69eb84980eac6eab9609628a",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29781e083a1e6d88b144c0",
+      "militar_id": "69eb81db977cf40700ad1120",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2977ff398c796de4264cff",
+      "militar_id": "69ef593dab99be4b5f722273",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2977dce41950bc03a30782",
+      "militar_id": "69eba201a1b98c259b10503a",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2977d042c78cde445efc1d",
+      "militar_id": "69eb81e3c52ba7943ff69d1a",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2977be77ce99369fa6e6d5",
+      "militar_id": "69ef59426290f15bbbe5dda2",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a297784158815e4e4f87783",
+      "militar_id": "69eb840895902f712e50c8f2",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29777a31e072bfc54af833",
+      "militar_id": "69eb81d82c00b13adb8bf6d3",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2961e42723ee02ba477f82",
+      "militar_id": "69eba21037e783e6f7cb3802",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2961d24fa05e1196feb28b",
+      "militar_id": "69ef59462c982752c36f9be3",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2961c4709b289d1dce8ff9",
+      "militar_id": "69eb7b9469762d853c9dc634",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2961b1c69d3ef1de45d6a8",
+      "militar_id": "69eba1f986c590fcd08cb3fd",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2961988e6e0498f729a916",
+      "militar_id": "69eb8d14c784f768b36c2eb0",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29618581adc67908c085d1",
+      "militar_id": "69eb83fcb6e67be4e0bde701",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29616aedddf64ea65b3224",
+      "militar_id": "69eb8d2843b99045923b18e3",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295f5fb8373c2ecb3d8513",
+      "militar_id": "69eb83ff05e89a8e8f959e8c",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295f0d1d1fecbf85cf0b4a",
+      "militar_id": "69eba1f15b1edf53ac41681b",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2957cd6825d3e160c214ad",
+      "militar_id": "69eba01a18ed86c9f7904970",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "atual",
+        "motivo_atualizacao_cadastro": "Cadastro já compatível com a promoção histórica. Nenhuma alteração cadastral necessária."
+      }
+    },
+    {
+      "id": "6a29579d5fe890449f5a402b",
+      "militar_id": "69eb840b7e271890fb600c7b",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295791def882de4fac983c",
+      "militar_id": "69eb81df25862e6bbf125aec",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29577a886d6a4ea14b179f",
+      "militar_id": "69eb82cf69bc68dbdb9e2509",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29576720df57b29a3f75e5",
+      "militar_id": "69eb7ba0cc99a8a0094e431d",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29574dd88dff58b012446b",
+      "militar_id": "69eb83f8977cf40700ad1293",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295735c7726be5bcb7363e",
+      "militar_id": "69eba21792048467799aad29",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295710ab52b3a559d9dbf9",
+      "militar_id": "69eb81eb3ac62d3ab5e715ee",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2957043377b01882ef7937",
+      "militar_id": "69eba1ea17385f5eaabbde72",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2956f9e6129b76ce12c645",
+      "militar_id": "69eb840fa5c67224ff3c8a7c",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2956d6a49ed2d06e6e857a",
+      "militar_id": "69eba1fdbd020579eba69449",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29569d5f9df1ecda6c316e",
+      "militar_id": "69eba20cedfa2ff14959bc35",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29569196fd750fb10c1b25",
+      "militar_id": "69ef5966956d86d227f6f019",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29568386e8c905eac4d9fb",
+      "militar_id": "69eb8d1ba830a170c30ae027",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2956695b0dd1c3d8db2242",
+      "militar_id": "69eb7ba3e1051a7daa81e2d8",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29564b2e28e177b2b9124b",
+      "militar_id": "69eb849ba2be7a2748351649",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295623277c1e656a45037e",
+      "militar_id": "69eb81b40b05c59b1aaf9196",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2955c3f35aa9db2b96f58a",
+      "militar_id": "69eba1f503bce7ecfcc850f3",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2955984fda902dbf525ad9",
+      "militar_id": "69eba1e6edfa2ff14959bc0e",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a295560f9a09422d70659c7",
+      "militar_id": "69eb7b9c644dc9c69d791de3",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29554e93029eae81faf750",
+      "militar_id": "69eb84938c7191d75478ad75",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "atual",
+        "motivo_atualizacao_cadastro": "Cadastro já compatível com a promoção histórica. Nenhuma alteração cadastral necessária."
+      }
+    },
+    {
+      "id": "6a295518098027653a3e21e0",
+      "militar_id": "69eb8d1115f9ab411c07067c",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2954d59888335270fdb454",
+      "militar_id": "69eb8d1edb261d158e1ab711",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a2954a3d8c36d544b97358a",
+      "militar_id": "69ef596d16cf11ee36f2e708",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29547eb2cc7cf125dbfd59",
+      "militar_id": "69eb8d21873e9930fca97c19",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29546f781a503b82fac24b",
+      "militar_id": "69eb8404c45b988032f76687",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29545318053561aeeccf1a",
+      "militar_id": "69eb8d1862e1a9569fd4cb22",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    },
+    {
+      "id": "6a29541794217e2265ece6f0",
+      "militar_id": "69ef767d5a42118ee0d828ca",
+      "antes": {
+        "atualizar_cadastro_militar": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role."
+      },
+      "depois": {
+        "atualizar_cadastro_militar": false,
+        "resultado_aplicacao_cadastro": "cadastro_preservado",
+        "motivo_atualizacao_cadastro": "Cadastro superior ao evento histórico de Soldado. Rebaixamento automático bloqueado pelo saneamento."
+      }
+    }
+  ]
+}
