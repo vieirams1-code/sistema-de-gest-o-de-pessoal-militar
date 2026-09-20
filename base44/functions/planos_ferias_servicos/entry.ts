@@ -288,7 +288,10 @@ Deno.serve(async (req: Request) => {
       ]);
       const { encerrarCampanhasFeriasVencidas } = await import('../../shared/ferias/encerrarCampanhasVencidas.ts');
       await encerrarCampanhasFeriasVencidas(base44, campanhas || []);
-      const campanhasComContadores = await enriquecerContadoresCampanhas(base44, campanhas || []);
+      // Recarrega após o saneamento: a resposta já precisa refletir campanhas
+      // encerradas nesta própria consulta, sem exigir um segundo refresh da tela.
+      const campanhasAtualizadas = await base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS' });
+      const campanhasComContadores = await enriquecerContadoresCampanhas(base44, campanhasAtualizadas || []);
       return json({ ok: true, planos: planos || [], campanhas: campanhasComContadores });
     }
 
