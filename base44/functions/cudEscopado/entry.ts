@@ -1587,6 +1587,19 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
+        if (
+          ['update', 'delete'].includes(operation)
+          && String(registroExistente?.promocao_id || '').trim()
+        ) {
+          return Response.json(
+            {
+              error: 'Registro vinculado a promoção oficial. Faça a manutenção pela tela da promoção para preservar a cadeia documental.',
+              motivo: 'historico_vinculado_promocao_bloqueado',
+              promocao_id: String(registroExistente.promocao_id),
+            },
+            { status: 409 },
+          );
+        }
       } else if (entityName === 'Militar' && operation === 'update') {
         const chaves = Object.keys(data || {});
         const camposAntiguidadeAdmin = new Set(['posto_graduacao', 'quadro']);
