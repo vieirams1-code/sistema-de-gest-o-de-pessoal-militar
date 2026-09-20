@@ -1642,6 +1642,54 @@ Deno.serve(async (req: Request) => {
           if (!planoCampanha || String(planoCampanha.status || '').toUpperCase() !== 'ATIVO') {
             return new Response(JSON.stringify({ error: 'O plano precisa estar ativo para alterar o status da campanha.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          if (acao === 'PLANO_CAMPANHA_PRORROGAR') {
+            const novaDataFim = String(payload.nova_data_fim_militar || '').slice(0, 10);
+            const novaHoraFim = String(payload.nova_hora_fim_militar || '').slice(0, 5);
+            const justificativa = String(payload.justificativa || '').trim();
+            const formatoData = /^\d{4}-\d{2}-\d{2}$/;
+            const formatoHora = /^\d{2}:\d{2}$/;
+            const agoraCampoGrande = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString().slice(0, 16);
+            if (String(campanha.status || '').toLowerCase() !== 'encerrada') {
+              return new Response(JSON.stringify({ error: 'Somente campanhas encerradas por prazo podem ser prorrogadas.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+            if (!formatoData.test(novaDataFim) || !formatoHora.test(novaHoraFim)) {
+              return new Response(JSON.stringify({ error: 'Informe a nova data e hora limite da campanha.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+            if (`${novaDataFim}T${novaHoraFim}` <= agoraCampoGrande) {
+              return new Response(JSON.stringify({ error: 'O novo prazo precisa estar no futuro (horário de Campo Grande).' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+            if (justificativa.length < 5) {
+              return new Response(JSON.stringify({ error: 'Informe uma justificativa para a prorrogação.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+            }
+            const prazoAnterior = String(campanha.data_fim_militar || '').slice(0, 10);
+            const horaAnterior = String(campanha.hora_fim_militar || '').slice(0, 5);
+            const campanhaProrrogada = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
+              status: 'Aberta_Coleta',
+              data_fim_militar: novaDataFim,
+              hora_fim_militar: novaHoraFim,
+              data_fim_militar_original: campanha.data_fim_militar_original || prazoAnterior,
+              hora_fim_militar_original: campanha.hora_fim_militar_original || horaAnterior,
+              encerrada_em: '',
+              quantidade_prorrogacoes: Number(campanha.quantidade_prorrogacoes || 0) + 1,
+            });
+            await registrarAuditoriaFerias(base44, user, 'CAMPANHA_FERIAS_PRORROGADA', {
+              plano_id: planoCampanha.id,
+              campanha_id,
+            }, {
+              campanha_titulo: campanha.titulo || '',
+              status_anterior: campanha.status || '',
+              status_novo: 'Aberta_Coleta',
+              prazo_anterior: prazoAnterior,
+              hora_anterior: horaAnterior || 'não registrada',
+              encerrada_em_anterior: campanha.encerrada_em || 'não registrada',
+              novo_prazo: novaDataFim,
+              nova_hora: novaHoraFim,
+              justificativa,
+              respostas_preservadas: true,
+              somente_novas_respostas_recomendado: true,
+            });
+            return new Response(JSON.stringify({ ok: true, campanha: campanhaProrrogada, message: 'Campanha prorrogada e reaberta para coleta. As respostas já registradas foram preservadas.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
           if (acao === 'PLANO_CAMPANHA_REABRIR' && String(campanha.status || '').toLowerCase() !== 'arquivada') {
             return new Response(JSON.stringify({ error: 'A campanha precisa estar arquivada antes de ser reaberta.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
