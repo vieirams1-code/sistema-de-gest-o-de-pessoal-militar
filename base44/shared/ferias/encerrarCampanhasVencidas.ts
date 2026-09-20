@@ -20,7 +20,11 @@ export async function encerrarCampanhasFeriasVencidas(base44: any, campanhas: an
   const vencidas = (campanhas || []).filter((c: any) => c?.tipo === 'PLANO_FERIAS' && campanhaComPrazoVencido(c, hoje));
   for (const campanha of vencidas) {
     try {
-      await base44.asServiceRole.entities.CampanhaPortal.update(campanha.id, { status: 'Encerrada' });
+      const encerradaEm = new Date().toISOString();
+      await base44.asServiceRole.entities.CampanhaPortal.update(campanha.id, {
+        status: 'Encerrada',
+        encerrada_em: encerradaEm,
+      });
       const statusAnterior = campanha.status;
       campanha.status = 'Encerrada';
       await base44.asServiceRole.entities.AuditoriaFerias.create({
@@ -35,6 +39,8 @@ export async function encerrarCampanhasFeriasVencidas(base44: any, campanhas: an
           status_anterior: statusAnterior || '',
           status_novo: 'Encerrada',
           prazo_militar: String(campanha.data_fim_militar || '').slice(0, 10),
+          hora_limite: String(campanha.hora_fim_militar || ''),
+          encerrada_em: encerradaEm,
           data_referencia: hoje,
           respostas_preservadas: true,
         }),
