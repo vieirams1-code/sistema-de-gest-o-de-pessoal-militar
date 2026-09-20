@@ -374,6 +374,9 @@ Deno.serve(async (req) => {
         (patch.hora_jiso !== undefined && patch.hora_jiso !== jiso.hora_jiso)
       );
       if (scheduleChanged) patch.whatsapp_status = 'pendente';
+      if (patch.status === 'Agendada' && jiso.status !== 'Agendada') patch.agendada_em = new Date().toISOString();
+      if (patch.status === 'Realizada' && jiso.status !== 'Realizada') patch.realizada_em = patch.realizada_em || new Date().toISOString();
+      if (patch.status === 'Resultado Registrado' && jiso.status !== 'Resultado Registrado') patch.resultado_registrado_em = new Date().toISOString();
       patch.versao = Number(jiso.versao || 0) + 1;
       const updated = await base44.asServiceRole.entities.JISO.update(jisoId, patch);
       await syncJisoBoard(base44, { ...jiso, ...updated, ...patch }, (await activeLinksForJiso(base44, jisoId)).length);
