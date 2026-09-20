@@ -1,0 +1,80 @@
+{
+  "name": "JISOAtestado",
+  "type": "object",
+  "title": "Atestado vinculado \u00e0 JISO",
+  "description": "V\u00ednculo audit\u00e1vel entre um processo JISO e um atestado m\u00e9dico.",
+  "properties": {
+    "jiso_id": {
+      "type": "string"
+    },
+    "atestado_id": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "tipo_vinculo": {
+      "type": "string",
+      "enum": [
+        "Principal",
+        "Complementar",
+        "Hist\u00f3rico"
+      ],
+      "default": "Principal"
+    },
+    "ordem": {
+      "type": "number",
+      "default": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Ativo",
+        "Removido"
+      ],
+      "default": "Ativo"
+    },
+    "incluido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "incluido_por": {
+      "type": "string"
+    },
+    "removido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "removido_por": {
+      "type": "string"
+    },
+    "motivo_remocao": {
+      "type": "string"
+    },
+    "atestado_data_inicio_snapshot": {
+      "type": "string",
+      "format": "date"
+    },
+    "atestado_dias_snapshot": {
+      "type": "number"
+    },
+    "atestado_data_termino_snapshot": {
+      "type": "string",
+      "format": "date"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "jiso_id",
+    "atestado_id",
+    "militar_id"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
