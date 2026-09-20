@@ -340,6 +340,7 @@ Deno.serve(async (req) => {
       const ids = unique((Array.isArray(payload.atestado_ids) ? payload.atestado_ids : []).map(asId));
       const atestados = await validateSelectedAtestados(base44, ids, allowedAtestadoIds, perm.isAdmin, asId(jiso.militar_id));
       await createLinks(base44, jiso, atestados, authUser);
+      await syncJisoBoard(base44, jiso, (await activeLinksForJiso(base44, jisoId)).length);
       await audit(base44, authUser, 'VINCULAR_ATESTADOS', jisoId, { atestado_ids: ids });
       return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive) });
     }
@@ -357,6 +358,7 @@ Deno.serve(async (req) => {
         removido_por: authUser.email || '',
         motivo_remocao: asText(payload.motivo, 500),
       });
+      await syncJisoBoard(base44, jiso, Math.max(0, linksAtivos.length - 1));
       await audit(base44, authUser, 'REMOVER_VINCULO', jisoId, { atestado_id: atestadoId });
       return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive) });
     }
@@ -476,6 +478,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.JISO.update(parent.id, { ...proposed, atestado_id: parent.atestado_id || atestado.id });
         }
         await createLinks(base44, parent, [atestado], authUser);
+        await syncJisoBoard(base44, parent, (await activeLinksForJiso(base44, parent.id)).length);
         if (atestado.jiso_whatsapp_enviado_em || atestado.jiso_whatsapp_status === 'legado') {
           await base44.asServiceRole.entities.JISONotificacao.create({
             jiso_id: parent.id,
