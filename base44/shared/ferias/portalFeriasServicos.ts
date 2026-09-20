@@ -356,7 +356,7 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
     }
   }
 
-  if (!periodo_aquisitivo_id) {
+  if (!periodo_aquisitivo_id && !naoGozoSolicitado) {
     return json({ error: 'Não foi possível validar as opções de férias. Atualize a página e tente novamente.' }, 400, corsHeaders);
   }
 
@@ -364,8 +364,10 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
     return json({ error: 'É obrigatório preencher as 3 opções de preferências de meses.' }, 400, corsHeaders);
   }
 
-  const periodo = await base44.asServiceRole.entities.PeriodoAquisitivo.get(periodo_aquisitivo_id);
-  if (!periodo || periodo.militar_id !== militarId) {
+  const periodo = periodo_aquisitivo_id
+    ? await base44.asServiceRole.entities.PeriodoAquisitivo.get(periodo_aquisitivo_id)
+    : null;
+  if (periodo_aquisitivo_id && (!periodo || periodo.militar_id !== militarId)) {
     return json({ error: 'Não foi possível validar as opções de férias. Atualize a página e tente novamente.' }, 403, corsHeaders);
   }
 
@@ -385,7 +387,7 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
     resumo: calcularResumoPeriodoPlano(p, feriasDoPlanoSubmissao, ajustesMilitarSubmissao, Number(anoCampanha)),
   }));
   const maisAntigoElegivelSubmissao = resumosSubmissao.find((item: any) => item.resumo.elegivel_plano && item.resumo.dias_sem_previsao > 0);
-  if (!maisAntigoElegivelSubmissao || maisAntigoElegivelSubmissao.periodo.id !== periodo.id) {
+  if (!naoGozoSolicitado && (!maisAntigoElegivelSubmissao || !periodo || maisAntigoElegivelSubmissao.periodo.id !== periodo.id)) {
     return json({
       error: 'Não foi possível validar as opções de férias. Atualize a página e tente novamente.',
       periodo_correto_id: maisAntigoElegivelSubmissao?.periodo?.id || null,
@@ -412,9 +414,9 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
       }, 409, corsHeaders);
     }
 
+    const periodoNaoGozo = periodo || maisAntigoElegivelSubmissao?.periodo || null;
     const opcoesNaoGozoPeriodo = await base44.asServiceRole.entities.OpcaoFeriasMilitar.filter({
       militar_id: militarId,
-      periodo_aquisitivo_id: periodo.id,
     });
     const existentesNaoGozo = (opcoesNaoGozoPeriodo || []).filter((opcao: any) => {
       const mesmoPlano = planoIdAtivo && textoId(opcao?.plano_ferias_institucional_id) === planoIdAtivo;
@@ -442,10 +444,10 @@ export async function feriasSubmeterOpcao(ctx: FeriasCtx): Promise<Response> {
       militar_quadro: militar.quadro || '',
       lotacao_id: militar.lotacao_id || militar.grupamento_id || '',
       lotacao_nome: militar.lotacao || militar.estrutura_nome || '',
-      periodo_aquisitivo_id: periodo.id,
-      periodo_inicio: periodo.inicio_aquisitivo || '',
-      periodo_fim: periodo.fim_aquisitivo || '',
-      dias_direito: Number(maisAntigoElegivelSubmissao.resumo.dias_sem_previsao || 0),
+      periodo_aquisitivo_id: periodoNaoGozo?.id || '',
+      periodo_inicio: periodoNaoGozo?.inicio_aquisitivo || '',
+      periodo_fim: periodoNaoGozo?.fim_aquisitivo || '',
+      dias_direito: Number(maisAntigoElegivelSubmissao?.resumo?.dias_sem_previsao || 0),
       modalidade: '',
       opcao_1_meses: '',
       opcao_1_detalhes: '[]',
