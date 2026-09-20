@@ -288,10 +288,10 @@ Deno.serve(async (req: Request) => {
       ]);
       const { encerrarCampanhasFeriasVencidas } = await import('../../shared/ferias/encerrarCampanhasVencidas.ts');
       await encerrarCampanhasFeriasVencidas(base44, campanhas || []);
-      // Recarrega após o saneamento: a resposta já precisa refletir campanhas
-      // encerradas nesta própria consulta, sem exigir um segundo refresh da tela.
-      const campanhasAtualizadas = await base44.asServiceRole.entities.CampanhaPortal.filter({ tipo: 'PLANO_FERIAS' });
-      const campanhasComContadores = await enriquecerContadoresCampanhas(base44, campanhasAtualizadas || []);
+      // Mantém a lista originalmente carregada. O fechamento automático é
+      // idempotente e não pode tornar a consulta do plano dependente de uma
+      // segunda leitura da entidade.
+      const campanhasComContadores = await enriquecerContadoresCampanhas(base44, campanhas || []);
       return json({ ok: true, planos: planos || [], campanhas: campanhasComContadores });
     }
 
