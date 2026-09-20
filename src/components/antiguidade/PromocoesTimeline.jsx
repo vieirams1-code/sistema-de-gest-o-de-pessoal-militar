@@ -6,11 +6,8 @@ import RankIcon from './RankIcon';
 
 const STATUS_PREVISTO = 'previsto';
 
-const STATUS_ATIVO = 'ativo';
-
-const isRegistroBloqueadoParaCorrecaoDireta = (registro) => Boolean(registro?.promocao_id) && statusRegistro(registro) === STATUS_ATIVO;
+const isRegistroBloqueadoParaCorrecaoDireta = (registro) => Boolean(registro?.promocao_id);
 const valorTexto = (v) => String(v || '').trim();
-const statusRegistro = (registro) => valorTexto(registro?.status_registro || 'ativo').toLowerCase();
 const documentoPromocao = (registro) => registro?.boletim_referencia || registro?.ato_referencia || '—';
 
 function Info({ label, value }) {
@@ -40,7 +37,7 @@ function AcoesRegistro({ canManage, registro, onCorrigir, onRetificar, onExcluir
     </div> : <Button size="sm" variant="outline" className="gap-2 border-slate-300 text-slate-700" onClick={() => onCorrigir?.(registro)}>
       <Pencil className="h-4 w-4" />Corrigir cadastro
     </Button>}
-    <DropdownMenu>
+    {!bloqueadoParaCorrecaoDireta && <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="sm" variant="ghost" className="gap-2 text-slate-600">
           <MoreHorizontal className="h-4 w-4" />Mais ações
@@ -60,7 +57,7 @@ function AcoesRegistro({ canManage, registro, onCorrigir, onRetificar, onExcluir
           <Trash2 className="h-4 w-4" />Excluir registro
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
+    </DropdownMenu>}
   </div>;
 }
 
