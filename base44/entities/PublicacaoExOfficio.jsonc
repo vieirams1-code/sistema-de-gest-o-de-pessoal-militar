@@ -120,6 +120,10 @@
     "parecer_jiso": {
       "type": "string"
     },
+    "jiso_id": {
+      "type": "string",
+      "description": "ID do processo JISO independente que originou a Ata JISO."
+    },
     "atestados_jiso_ids": {
       "type": "array",
       "items": {
