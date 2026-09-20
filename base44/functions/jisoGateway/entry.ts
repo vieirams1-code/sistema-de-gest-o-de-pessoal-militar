@@ -5,7 +5,8 @@ const JISO_FIELDS = new Set([
   'data_jiso', 'hora_jiso', 'local_jiso', 'secao_jiso', 'finalidade_jiso', 'nup',
   'numero_ata', 'resultado_jiso', 'dias_jiso', 'data_inicio_efeito',
   'data_termino_efeito', 'data_retorno_efeito', 'parecer_jiso', 'status',
-  'observacoes', 'arquivo_ata_jiso', 'texto_publicacao'
+  'observacoes', 'arquivo_ata_jiso', 'texto_publicacao',
+  'agendada_em', 'realizada_em', 'resultado_registrado_em', 'concluida_em'
 ]);
 
 const asId = (value: unknown) => String(value || '').trim();
@@ -256,9 +257,10 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, codigo }, perm.canSensitive) });
     }
 
+    const isMigrationAction = action === 'MIGRACAO_DRY_RUN' || action === 'MIGRACAO_APLICAR';
     const jisoId = asId(payload.jiso_id);
-    const jiso = await findOne(base44, 'JISO', { id: jisoId });
-    await assertJisoScope(base44, jiso, allowedMilitarIds, perm.isAdmin);
+    const jiso = isMigrationAction ? null : await findOne(base44, 'JISO', { id: jisoId });
+    if (!isMigrationAction) await assertJisoScope(base44, jiso, allowedMilitarIds, perm.isAdmin);
 
     if (action === 'VINCULAR_ATESTADOS') {
       if (!perm.canManage) return error(403, 'FORBIDDEN_MANAGE', 'Permissão gerir_jiso é obrigatória.');
