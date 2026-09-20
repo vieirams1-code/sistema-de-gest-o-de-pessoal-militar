@@ -67,6 +67,7 @@ const CAMPOS_ATESTADO_OPERACIONAL = [
   'data_jiso_agendada', 'hora_jiso_agendada', 'jiso_id', 'status_jiso', 'status_publicacao',
   'numero_bg', 'data_bg', 'apostilada_por_id', 'tornada_sem_efeito_por_id',
   'medico_nome_snapshot', 'medico_crm_snapshot', 'medico', 'crm_medico',
+  'jiso_vinculo_ativo', 'jiso_id_derivado', 'jiso_codigo', 'jiso_status', 'jiso_data', 'jiso_hora',
   'created_date', 'updated_date',
 ];
 const CAMPOS_ATESTADO_SENSIVEIS = [
@@ -75,8 +76,9 @@ const CAMPOS_ATESTADO_SENSIVEIS = [
   'arquivo_url', 'anexo_url', 'arquivo_path', 'storage_path', 'anexos', 'documentos',
 ];
 const CAMPOS_JISO_OPERACIONAL = [
-  'id', 'atestado_id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula',
-  'data_jiso', 'status', 'finalidade_jiso', 'created_date', 'updated_date',
+  'id', 'codigo', 'atestado_id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula',
+  'data_jiso', 'hora_jiso', 'local_jiso', 'status', 'finalidade_jiso', 'secao_jiso',
+  'whatsapp_status', 'publicacao_id', 'created_date', 'updated_date',
 ];
 const CAMPOS_JISO_SENSIVEIS = ['resultado_jiso', 'dias_jiso', 'parecer', 'parecer_jiso', 'observacoes', 'cid_10', 'diagnostico'];
 
@@ -94,6 +96,38 @@ function sanitizarAtestados(registros, podeVerSensiveis) {
 function sanitizarJisos(registros, podeVerSensiveis) {
   const campos = podeVerSensiveis ? [...CAMPOS_JISO_OPERACIONAL, ...CAMPOS_JISO_SENSIVEIS] : CAMPOS_JISO_OPERACIONAL;
   return (registros || []).map((registro) => projetarRegistro(registro, campos));
+}
+
+async function enriquecerAtestadosComJiso(base44, atestados, jisos) {
+  const ids = (atestados || []).map((item) => item?.id).filter(Boolean);
+  if (!ids.length) return atestados || [];
+
+  const links = await fetchWithRetry(() => base44.asServiceRole.entities.JISOAtestado.filter({
+    atestado_id: { $in: ids },
+    status: 'Ativo',
+  }, '-created_date', 1000, 0));
+
+  const jisoPorId = new Map((jisos || []).map((item) => [item.id, item]));
+  const vinculoPorAtestado = new Map();
+  for (const link of links || []) {
+    const parent = jisoPorId.get(link.jiso_id);
+    if (!parent || parent.status === 'Cancelada') continue;
+    if (!vinculoPorAtestado.has(link.atestado_id)) vinculoPorAtestado.set(link.atestado_id, { link, parent });
+  }
+
+  return (atestados || []).map((atestado) => {
+    const vinculo = vinculoPorAtestado.get(atestado.id);
+    if (!vinculo) return { ...atestado, jiso_vinculo_ativo: false };
+    return {
+      ...atestado,
+      jiso_vinculo_ativo: true,
+      jiso_id_derivado: vinculo.parent.id,
+      jiso_codigo: vinculo.parent.codigo || '',
+      jiso_status: vinculo.parent.status || '',
+      jiso_data: vinculo.parent.data_jiso || '',
+      jiso_hora: vinculo.parent.hora_jiso || '',
+    };
+  });
 }
 
 Deno.serve(async (req) => {
@@ -133,7 +167,8 @@ Deno.serve(async (req) => {
         fetchWithRetry(() => base44.asServiceRole.entities.Atestado.list('-created_date')),
         fetchWithRetry(() => base44.asServiceRole.entities.JISO.list('-created_date')),
       ]);
-      const atestadosSanitizados = sanitizarAtestados(atestados, podeVerDadosSensiveis);
+      const atestadosComJiso = await enriquecerAtestadosComJiso(base44, atestados, jisos);
+      const atestadosSanitizados = sanitizarAtestados(atestadosComJiso, podeVerDadosSensiveis);
       const jisosSanitizados = sanitizarJisos(jisos, podeVerDadosSensiveis);
       return Response.json({ atestados: atestadosSanitizados, jisos: jisosSanitizados, meta: { totalMilitaresEscopo: null, totalAtestados: atestadosSanitizados.length, totalJiso: jisosSanitizados.length, partialFailures: 0, warnings: [], sensitiveFieldsIncluded: podeVerDadosSensiveis } });
     }
@@ -143,7 +178,8 @@ Deno.serve(async (req) => {
 
     const [atestadosResult, jisoResult] = await Promise.all([listarPorEscopoIds(base44, 'Atestado', militarIds, '-created_date'), listarPorEscopoIds(base44, 'JISO', militarIds, '-created_date')]);
     const partialFailures = atestadosResult.partialFailures + jisoResult.partialFailures;
-    const atestadosSanitizados = sanitizarAtestados(atestadosResult.rows, podeVerDadosSensiveis);
+    const atestadosComJiso = await enriquecerAtestadosComJiso(base44, atestadosResult.rows, jisoResult.rows);
+    const atestadosSanitizados = sanitizarAtestados(atestadosComJiso, podeVerDadosSensiveis);
     const jisosSanitizados = sanitizarJisos(jisoResult.rows, podeVerDadosSensiveis);
     return Response.json({ atestados: atestadosSanitizados, jisos: jisosSanitizados, meta: { totalMilitaresEscopo: militarIds.length, totalAtestados: atestadosSanitizados.length, totalJiso: jisosSanitizados.length, partialFailures, warnings: partialFailures > 0 ? ['PARTIAL_FAILURES'] : [], sensitiveFieldsIncluded: podeVerDadosSensiveis } });
   } catch (error) {
