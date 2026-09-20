@@ -1,0 +1,91 @@
+{
+  "name": "JISONotificacao",
+  "type": "object",
+  "title": "Hist\u00f3rico de notifica\u00e7\u00f5es da JISO",
+  "description": "Registro imut\u00e1vel de comunica\u00e7\u00f5es relacionadas a uma JISO.",
+  "properties": {
+    "jiso_id": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "Agendamento",
+        "Reagendamento",
+        "Lembrete",
+        "Cancelamento",
+        "Outra"
+      ],
+      "default": "Agendamento"
+    },
+    "canal": {
+      "type": "string",
+      "enum": [
+        "WhatsApp",
+        "Telefone",
+        "E-mail",
+        "Presencial",
+        "Outro"
+      ],
+      "default": "WhatsApp"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Preparada",
+        "Enviada",
+        "Falhou",
+        "Legado"
+      ],
+      "default": "Preparada"
+    },
+    "destinatario": {
+      "type": "string"
+    },
+    "mensagem": {
+      "type": "string"
+    },
+    "data_jiso_snapshot": {
+      "type": "string",
+      "format": "date"
+    },
+    "hora_jiso_snapshot": {
+      "type": "string"
+    },
+    "template_id": {
+      "type": "string"
+    },
+    "template_nome": {
+      "type": "string"
+    },
+    "template_hash": {
+      "type": "string"
+    },
+    "enviado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "enviado_por": {
+      "type": "string"
+    },
+    "provedor_retorno": {
+      "type": "object"
+    },
+    "erro": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "jiso_id",
+    "militar_id"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
