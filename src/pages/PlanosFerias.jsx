@@ -85,6 +85,7 @@ export default function PlanosFerias() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [campanhaForm, setCampanhaForm] = useState(null);
   const [modalRespostas, setModalRespostas] = useState(null);
+  const [modalProrrogacao, setModalProrrogacao] = useState(null);
   const [respostasCampanha, setRespostasCampanha] = useState(null);
   const [carregandoRespostas, setCarregandoRespostas] = useState(false);
   const [auditoria, setAuditoria] = useState([]);
@@ -413,6 +414,40 @@ export default function PlanosFerias() {
     }
   };
 
+  const abrirProrrogacao = (campanha) => {
+    if (!modoAdmin || !podeAdminFerias) return;
+    setModalProrrogacao({
+      campanha,
+      nova_data_fim_militar: campanha.data_fim_militar || new Date().toISOString().slice(0, 10),
+      nova_hora_fim_militar: campanha.hora_fim_militar || '23:59',
+      justificativa: '',
+    });
+    setFeedback({ tipo: '', texto: '' });
+  };
+
+  const confirmarProrrogacao = async (evento) => {
+    evento.preventDefault();
+    if (!modalProrrogacao?.campanha || !modoAdmin || !podeAdminFerias) return;
+    setSalvando(true);
+    try {
+      const resposta = await invocarAcaoStatusCampanha({
+        acao: 'PLANO_CAMPANHA_PRORROGAR',
+        plano_id: selecionado?.id,
+        campanha_id: modalProrrogacao.campanha.id,
+        nova_data_fim_militar: modalProrrogacao.nova_data_fim_militar,
+        nova_hora_fim_militar: modalProrrogacao.nova_hora_fim_militar,
+        justificativa: modalProrrogacao.justificativa,
+      });
+      setModalProrrogacao(null);
+      setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Campanha prorrogada com sucesso.' });
+      await carregar();
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível prorrogar a campanha.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const abrirRespostas = async (campanha) => {
     if (!podeVisualizarRespostas) return;
     setModalRespostas(campanha);
@@ -497,6 +532,17 @@ export default function PlanosFerias() {
             <div><label className="text-xs font-bold text-slate-700">Orientações aos militares</label><textarea value={campanhaForm.instrucoes} onChange={(e) => setCampanhaForm({ ...campanhaForm, instrucoes: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" rows={4} /></div>
             {feedback.tipo === 'erro' && <p role="alert" className="text-sm text-destructive">{feedback.texto}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><Button type="button" variant="outline" onClick={() => setModalCampanha(false)}>Cancelar</Button><Button type="submit" disabled={salvandoCampanha} className="bg-emerald-700 hover:bg-emerald-800">{salvandoCampanha ? 'Criando...' : 'Criar campanha'}</Button></div>
+          </form>
+        </div>
+      )}
+      {modalProrrogacao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={confirmarProrrogacao} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Prorrogar campanha</h2><p className="text-xs text-slate-500">{modalProrrogacao.campanha.titulo}</p></div><button type="button" onClick={() => setModalProrrogacao(null)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Prazo anterior: <strong>{modalProrrogacao.campanha.data_fim_militar || 'não registrado'}{modalProrrogacao.campanha.hora_fim_militar ? ` às ${modalProrrogacao.campanha.hora_fim_militar}` : ' (hora não registrada)'}</strong>. As respostas existentes serão preservadas e a prorrogação ficará registrada no histórico.</div>
+            <div className="grid grid-cols-2 gap-3"><div><label className="text-xs font-bold text-slate-700">Nova data limite *</label><Input required type="date" value={modalProrrogacao.nova_data_fim_militar} onChange={(e) => setModalProrrogacao({ ...modalProrrogacao, nova_data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Nova hora limite *</label><Input required type="time" value={modalProrrogacao.nova_hora_fim_militar} onChange={(e) => setModalProrrogacao({ ...modalProrrogacao, nova_hora_fim_militar: e.target.value })} /></div></div>
+            <div><label className="text-xs font-bold text-slate-700">Justificativa *</label><textarea required minLength={5} value={modalProrrogacao.justificativa} onChange={(e) => setModalProrrogacao({ ...modalProrrogacao, justificativa: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" rows={3} placeholder="Ex.: necessidade de conceder prazo complementar aos pendentes." /></div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><Button type="button" variant="outline" onClick={() => setModalProrrogacao(null)}>Cancelar</Button><Button type="submit" disabled={salvando} className="bg-emerald-700 hover:bg-emerald-800">{salvando ? 'Prorrogando...' : 'Confirmar prorrogação'}</Button></div>
           </form>
         </div>
       )}
