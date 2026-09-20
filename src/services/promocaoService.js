@@ -291,16 +291,6 @@ function diagLog(evento, dados = {}) {
   void dados;
 }
 
-function montarPatchSincronizacaoHistoricoPromocao(promocao = {}) {
-  return {
-    data_promocao: dataSomente(promocao?.data_promocao),
-    boletim_referencia: texto(promocao?.boletim_referencia),
-    ato_referencia: texto(promocao?.ato_referencia),
-    quadro_novo: texto(promocao?.quadro),
-    data_publicacao: dataSomente(promocao?.data_publicacao) || dataSomente(promocao?.data_promocao),
-  };
-}
-
 export async function sincronizarHistoricoPromocaoPublicada({
   promocaoAntes = null,
   promocaoDepois = null,
