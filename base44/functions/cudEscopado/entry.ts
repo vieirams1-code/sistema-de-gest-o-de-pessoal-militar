@@ -1911,6 +1911,121 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ---- Barreiras de integridade de Promoções/Antiguidade ----
+    // A validação vive no backend para impedir que chamadas diretas, concorrentes
+    // ou telas antigas criem filhos órfãos ou apaguem parte da cadeia oficial.
+    if (entityName === 'PromocaoMilitar' && ['create', 'update'].includes(operation)) {
+      const promocaoId = String(dataValidada?.promocao_id || registroExistente?.promocao_id || '').trim();
+      const militarId = String(dataValidada?.militar_id || registroExistente?.militar_id || '').trim();
+
+      if (operation === 'update') {
+        if (
+          Object.prototype.hasOwnProperty.call(dataValidada || {}, 'promocao_id')
+          && promocaoId !== String(registroExistente?.promocao_id || '').trim()
+        ) {
+          return Response.json(
+            { error: 'Não é permitido mover um militar entre promoções. Remova-o do rascunho e faça um novo vínculo.' },
+            { status: 409 },
+          );
+        }
+        if (
+          Object.prototype.hasOwnProperty.call(dataValidada || {}, 'militar_id')
+          && militarId !== String(registroExistente?.militar_id || '').trim()
+        ) {
+          return Response.json(
+            { error: 'Não é permitido trocar o militar de um vínculo de promoção existente.' },
+            { status: 409 },
+          );
+        }
+      }
+
+      if (!promocaoId || !await buscarRegistroExistente(base44, 'Promocao', promocaoId)) {
+        return Response.json(
+          { error: 'Promoção pai não encontrada. O vínculo não foi gravado para evitar registro órfão.', motivo: 'promocao_pai_ausente' },
+          { status: 409 },
+        );
+      }
+      if (!militarId || !await buscarRegistroExistente(base44, 'Militar', militarId)) {
+        return Response.json(
+          { error: 'Militar não encontrado. O vínculo não foi gravado para evitar registro órfão.', motivo: 'militar_ausente' },
+          { status: 409 },
+        );
+      }
+    }
+
+    if (
+      entityName === 'HistoricoPromocaoMilitarV2'
+      && operation === 'create'
+      && String(dataValidada?.promocao_id || '').trim()
+    ) {
+      const promocaoId = String(dataValidada.promocao_id).trim();
+      if (!await buscarRegistroExistente(base44, 'Promocao', promocaoId)) {
+        return Response.json(
+          { error: 'Promoção pai não encontrada. O histórico oficial não foi criado.', motivo: 'promocao_pai_ausente' },
+          { status: 409 },
+        );
+      }
+    }
+
+    if (entityName === 'Promocao' && operation === 'delete') {
+      const [itensVinculados, historicosVinculados] = await Promise.all([
+        base44.asServiceRole.entities.PromocaoMilitar.filter(
+          { promocao_id: registroId },
+          undefined,
+          1,
+          0,
+          ['id'],
+        ),
+        base44.asServiceRole.entities.HistoricoPromocaoMilitarV2.filter(
+          { promocao_id: registroId },
+          undefined,
+          1,
+          0,
+          ['id'],
+        ),
+      ]);
+      if ((itensVinculados || []).length > 0 || (historicosVinculados || []).length > 0) {
+        return Response.json(
+          {
+            error: 'Exclusão bloqueada: a promoção possui militares ou históricos vinculados.',
+            motivo: 'promocao_com_dependencias',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    if (entityName === 'PromocaoMilitar' && operation === 'delete') {
+      const promocaoId = String(registroExistente?.promocao_id || '').trim();
+      const militarId = String(registroExistente?.militar_id || '').trim();
+      const possuiVinculoOficial = Boolean(
+        registroExistente?.publicado
+        || String(registroExistente?.historico_promocao_v2_id || '').trim()
+        || ['publicado', 'publicada', 'retificado', 'retificada', 'cancelado', 'cancelada'].includes(
+          String(registroExistente?.status || '').trim().toLowerCase(),
+        )
+      );
+      const historicosRelacionados = promocaoId && militarId
+        ? await base44.asServiceRole.entities.HistoricoPromocaoMilitarV2.filter(
+          { promocao_id: promocaoId, militar_id: militarId },
+          undefined,
+          1,
+          0,
+          ['id'],
+        )
+        : [];
+
+      if (possuiVinculoOficial || (historicosRelacionados || []).length > 0) {
+        return Response.json(
+          {
+            error: 'Exclusão direta bloqueada: use a reversão ou a exclusão administrativa da cadeia da promoção.',
+            motivo: 'item_promocao_com_cadeia_oficial',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     // ---- Execução com service role ----
     const entity = getEntity(base44, entityName);
     let resultado = null;
