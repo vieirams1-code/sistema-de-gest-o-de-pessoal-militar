@@ -420,7 +420,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       publicacao.tipo === 'Homologação de Atestado' &&
       getAtestadoIdsVinculados(publicacao).includes(atestado.id)
   );
-  const podePublicarHomologacao = atestado.fluxo_homologacao === 'comandante' && !hasHomologacaoGerada;
+  const podePublicarHomologacao = !atestado.jiso_vinculo_ativo && !hasHomologacaoGerada;
   const hasPublicacaoVinculada = publicacoesVinculadas.some(isPublicacaoAtestadoAtiva);
   const mensagemBloqueioPublicacao = 'Ação não permitida: este atestado possui publicação/nota vinculada.';
 
@@ -604,7 +604,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   };
 
   const statusInfo = getStatusInfo();
-  const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15;
+  // A gestão de JISO foi movida para o processo independente. O card do atestado não executa ações de JISO.
+  const isFluxoJiso = false;
   const whatsappJisoEnviadoEm = whatsappTrackingLocal?.enviado_em || atestado.jiso_whatsapp_enviado_em;
   const whatsappJisoEnviadoPor = whatsappTrackingLocal?.enviado_por || atestado.jiso_whatsapp_enviado_por;
   const whatsappJisoDataSnapshot = whatsappTrackingLocal?.data_jiso_snapshot || atestado.jiso_whatsapp_data_agendada_snapshot;
