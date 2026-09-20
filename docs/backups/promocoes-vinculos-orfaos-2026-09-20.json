@@ -1,0 +1,90 @@
+{
+  "criado_em": "2026-09-20",
+  "motivo": "Saneamento reversível de vínculos órfãos de promoção e resíduo de curso de teste.",
+  "checkpoint_antes": "6ab050bb66275e707a59a3e3",
+  "registros": [
+    {
+      "entidade": "PromocaoMilitar",
+      "id": "6a0b0031787521e1ab8d7271",
+      "antes": {
+        "data_vinculo": "2026-05-18T12:04:00.979Z",
+        "observacao": "",
+        "promocao_id": "6a0aff6eeb2540d5856b37e2",
+        "origem": "adicao_manual",
+        "usuario_vinculo": "vieirams1@gmail.com",
+        "created_at": "",
+        "militar_id": "69eb81c57b037c09a3a4ade5",
+        "selecionado": false,
+        "created_by": "",
+        "conflito": "",
+        "updated_at": "",
+        "justificativa": "",
+        "ordem": 1,
+        "updated_by": "",
+        "historico_promocao_v2_id": "",
+        "publicado": false,
+        "status": "elegivel",
+        "id": "6a0b0031787521e1ab8d7271",
+        "created_date": "2026-05-18T12:04:01.199000",
+        "updated_date": "2026-05-18T12:04:01.199000",
+        "created_by_id": "694014f8539e0b317aa75a24",
+        "is_sample": false
+      }
+    },
+    {
+      "entidade": "PromocaoMilitar",
+      "id": "6a2f00696efb0e0a32788e5d",
+      "antes": {
+        "data_vinculo": "2026-06-14T19:26:33.305Z",
+        "observacao": "",
+        "promocao_id": "6a2f0069a6b2e6873e38acd4",
+        "origem": "curso_formacao",
+        "usuario_vinculo": "vieirams1@gmail.com",
+        "created_at": "",
+        "atualizar_cadastro_militar": true,
+        "militar_id": "6a2ef9cc41aa63f58bb88680",
+        "selecionado": true,
+        "created_by": "",
+        "conflito": "",
+        "motivo_atualizacao_cadastro": "Cadastro atualizado por publicação oficial via backend service-role.",
+        "updated_at": "",
+        "justificativa": "",
+        "ordem": 1,
+        "updated_by": "",
+        "historico_promocao_v2_id": "6a2f00a97573b6af53cd8bc3",
+        "publicado": true,
+        "resultado_aplicacao_cadastro": "imediatamente_superior",
+        "status": "publicado",
+        "id": "6a2f00696efb0e0a32788e5d",
+        "created_date": "2026-06-14T19:26:33.971000",
+        "updated_date": "2026-06-14T19:27:38.230000",
+        "created_by_id": "694014f8539e0b317aa75a24",
+        "is_sample": false
+      }
+    },
+    {
+      "entidade": "ParticipanteCursoFormacao",
+      "id": "6a2efffce636487156cc888b",
+      "antes": {
+        "curso_id": "6a2efaa338ccea93c9243fbd",
+        "promocao_id": "6a2f0069a6b2e6873e38acd4",
+        "snapshot_antiguidade": 1,
+        "status_pre_publicacao": "aprovado",
+        "militar_id": "6a2ef9cc41aa63f58bb88680",
+        "data_status_atual": "2026-06-14T20:34:49.353Z",
+        "matricula_snapshot": "108.747-022",
+        "posto_origem": "Soldado",
+        "quadro_origem": "QBMP-1.a",
+        "nome_militar_snapshot": "TESTE",
+        "observacoes": "Aprovado",
+        "ordem_antiguidade_origem": null,
+        "status": "promovido",
+        "id": "6a2efffce636487156cc888b",
+        "created_date": "2026-06-14T19:24:44.027000",
+        "updated_date": "2026-06-14T20:34:50.078000",
+        "created_by_id": "694014f8539e0b317aa75a24",
+        "is_sample": false
+      }
+    }
+  ]
+}
