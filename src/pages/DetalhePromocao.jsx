@@ -125,8 +125,17 @@ function montarRascunhoPromocao(promocao = {}) {
   };
 }
 
-function montarPatchPromocao(rascunho = {}) {
-  return CAMPOS_PROMOCAO.reduce((patch, campo) => ({ ...patch, [campo]: rascunho[campo] || '' }), {});
+function montarPatchPromocao(rascunho = {}, promocaoAtual = null) {
+  const patch = CAMPOS_PROMOCAO.reduce((acc, campo) => ({ ...acc, [campo]: rascunho[campo] || '' }), {});
+  // Promoções publicadas não podem perder a trilha documental por um rascunho
+  // desatualizado/blank. A limpeza deliberada deve ocorrer em fluxo administrativo
+  // próprio, nunca como efeito colateral do salvamento geral da tela.
+  if (ehPromocaoPublicada(promocaoAtual)) {
+    ['boletim_referencia', 'ato_referencia'].forEach((campo) => {
+      if (!texto(patch[campo]) && texto(promocaoAtual?.[campo])) patch[campo] = texto(promocaoAtual[campo]);
+    });
+  }
+  return patch;
 }
 
 function rotuloBoletim(valor) {
@@ -650,7 +659,7 @@ export default function DetalhePromocao() {
   const salvarPromocaoMutation = useMutation({
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
-      const patchPromocao = montarPatchPromocao(rascunhoPromocao);
+      const patchPromocao = montarPatchPromocao(rascunhoPromocao, promocao);
       const promocaoAtualizada = { ...promocao, ...patchPromocao };
       diagLog('salvar-promocao:sincronizacao-oficial:chamada', { promocaoId: promocao.id, status: promocao.status });
       const sincronizacao = await sincronizarHistoricoPromocaoPublicada({
@@ -667,7 +676,7 @@ export default function DetalhePromocao() {
       return { sincronizacao };
     },
     onSuccess: async (resultado, registroPromocao) => {
-      setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao) } : atual));
+      setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao, promocao) } : atual));
       const totalSincronizado = Number(resultado?.sincronizacao?.atualizados) || 0;
       const descricao = totalSincronizado > 0
         ? `Os dados da promoção foram atualizados e ${totalSincronizado} histórico(s) oficial(is) foram sincronizados.`
