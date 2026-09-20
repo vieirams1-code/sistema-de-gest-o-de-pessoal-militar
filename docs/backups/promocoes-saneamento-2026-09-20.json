@@ -1,0 +1,240 @@
+{
+  "gerado_em": "2026-09-20",
+  "escopo": "Saneamento determinístico de Promoções",
+  "app_id": "694014f8539e0b317aa75a23",
+  "observacao": "Backup lógico anterior às escritas produtivas. Não contém dados pessoais de militares.",
+  "totalizadores": [
+    {
+      "id": "6a296fea949732fae0d41a11",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 15
+      }
+    },
+    {
+      "id": "6a296230e0a5806d6424dde6",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 32
+      }
+    },
+    {
+      "id": "6a29604174b22d313fc86a66",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 16
+      }
+    },
+    {
+      "id": "6a295eb28d105fbc0ff47f03",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 2
+      }
+    },
+    {
+      "id": "6a295357db851537ae34f966",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 28
+      }
+    },
+    {
+      "id": "6a0fbdb9c4345799a236f8dd",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 1
+      }
+    },
+    {
+      "id": "6a0eef0a28a3e1413489aaf7",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 1
+      }
+    },
+    {
+      "id": "6a0e7e08195dd3fc0cf8af3e",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 1
+      }
+    },
+    {
+      "id": "6a0e7d8dff07cb4cdd1a0c18",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 1
+      }
+    },
+    {
+      "id": "6a0e7bd7ceaa72091a1fd945",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 2
+      }
+    },
+    {
+      "id": "6a0e7a604934a11a793d7f46",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 5
+      }
+    },
+    {
+      "id": "6a0e798d605cb5b5445bfb91",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 4
+      }
+    },
+    {
+      "id": "6a0e77c3894e01d3817a7c53",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 4
+      }
+    },
+    {
+      "id": "6a0e76e7fe83ecd8ca2b5045",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 4
+      }
+    },
+    {
+      "id": "6a0e751f80eabf959fc1b738",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 1
+      }
+    },
+    {
+      "id": "6a0e740290dab091c3c69e31",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 9
+      }
+    },
+    {
+      "id": "6a0e729720a1b7a21291a1e2",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 9
+      }
+    },
+    {
+      "id": "6a0e646929aefd84bb54b72f",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 9
+      }
+    },
+    {
+      "id": "6a09f827de12f4a6e42af8c9",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 19
+      }
+    },
+    {
+      "id": "6a09f4dea5f6a5dc54b7bc59",
+      "antes": {
+        "total_militares_vinculados": 0
+      },
+      "depois": {
+        "total_militares_vinculados": 40
+      }
+    }
+  ],
+  "promocoes_pai_documentais": [
+    {
+      "id": "6a09f827de12f4a6e42af8c9",
+      "antes": {
+        "data_publicacao": "",
+        "boletim_referencia": "",
+        "ato_referencia": ""
+      },
+      "depois": {
+        "data_publicacao": "2025-11-18",
+        "boletim_referencia": "11999",
+        "ato_referencia": ""
+      },
+      "evidencia": {
+        "historicos_ativos": 19,
+        "valores_data_publicacao": [
+          "2025-11-18"
+        ],
+        "valores_boletim_referencia": [
+          "11999"
+        ]
+      }
+    },
+    {
+      "id": "6a09f4dea5f6a5dc54b7bc59",
+      "antes": {
+        "data_publicacao": "",
+        "boletim_referencia": "",
+        "ato_referencia": ""
+      },
+      "depois": {
+        "data_publicacao": "2024-11-27",
+        "boletim_referencia": "11678",
+        "ato_referencia": ""
+      },
+      "evidencia": {
+        "historicos_ativos": 40,
+        "valores_data_publicacao": [
+          "2024-11-27"
+        ],
+        "valores_boletim_referencia": [
+          "11678"
+        ]
+      }
+    }
+  ],
+  "nao_alterados": {
+    "itens_orfaos": 2,
+    "vinculos_historicos_orfaos": 1,
+    "lancamentos_soldado_em_revisao": 46,
+    "historicos_sem_referencia_antiguidade": 206
+  }
+}
