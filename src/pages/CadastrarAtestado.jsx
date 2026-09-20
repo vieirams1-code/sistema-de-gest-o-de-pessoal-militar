@@ -17,7 +17,6 @@ import MedicoSelector from '@/components/atestado/MedicoSelector';
 import { normalizeCrm } from '@/components/atestado/medicoUtils';
 import { isAtestadoAcompanhamento, normalizeDadosAcompanhamentoAtestado } from '@/components/atestado/atestadoAcompanhamentoForm';
 import DateCalculator from '@/components/atestado/DateCalculator';
-import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
@@ -51,11 +50,6 @@ const initialFormData = {
   data_termino: '',
   data_retorno: '',
   status: 'Ativo',
-  fluxo_homologacao: '', // 'comandante' ou 'jiso' — definido pelo usuário ou forçado quando dias > 15
-  necessita_jiso: false,
-  homologado_comandante: false,
-  encaminhado_jiso: false,
-  data_jiso_agendada: '',
   observacoes: ''
 };
 
@@ -163,17 +157,6 @@ export default function CadastrarAtestado() {
     }));
   };
 
-  // Ao escolher fluxo manualmente, sincronizar campos derivados
-  const handleFluxoChange = (fluxo) => {
-    setFormData(prev => ({
-      ...prev,
-      fluxo_homologacao: fluxo,
-      necessita_jiso: fluxo === 'jiso',
-      homologado_comandante: false,
-      encaminhado_jiso: fluxo === 'jiso',
-    }));
-  };
-
   const handleMilitarSelect = (militarData) => {
     setFormData(prev => ({ ...prev, ...militarData }));
   };
@@ -234,14 +217,6 @@ export default function CadastrarAtestado() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Quando dias muda: forçar JISO se >15, sem sobrescrever decisão manual para <=15
-  useEffect(() => {
-    const dias = parseInt(formData.dias) || 0;
-    if (dias > 15) {
-
-    }
-  }, [formData.dias]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -301,8 +276,6 @@ export default function CadastrarAtestado() {
       alert(err?.message || 'Falha ao salvar atestado.');
       return;
     }
-
-    await sincronizarAtestadoJisoNoQuadro(atestadoSalvo);
 
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['cards'] });
