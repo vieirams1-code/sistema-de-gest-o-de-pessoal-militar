@@ -458,7 +458,7 @@ export default function Layout({ children, currentPageName }) {
       .filter((item) => !item.children || item.children.length > 0);
   };
 
-  const menuGroupOrder = ['GERAL', 'GESTÃO MILITAR', 'CAMPANHAS', 'SISTEMA'];
+  const menuGroupOrder = ['GERAL', 'GESTÃO MILITAR', 'FERRAMENTAS', 'SISTEMA', 'SARGENTEAÇÃO', 'CAMPANHAS'];
   const visibleMenuGroups = menuGroups
     .map((group) => ({
       ...group,
