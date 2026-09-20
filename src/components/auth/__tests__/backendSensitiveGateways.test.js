@@ -120,3 +120,14 @@ test('cudEscopado usa capacidades granulares de férias e protege publicação d
   assert.match(cud, /apenasTornarSemEfeito[\s\S]*'tornar_sem_efeito_publicacao'/s);
   assert.match(cud, /requiredPermissions = \[\.\.\.requiredPermissions, 'publicar_bg'\]/);
 });
+
+test('cudEscopado impede órfãos e exclusão parcial da cadeia de promoções', () => {
+  assert.match(cud, /motivo: 'promocao_pai_ausente'/);
+  assert.match(cud, /motivo: 'militar_ausente'/);
+  assert.match(cud, /motivo: 'promocao_com_dependencias'/);
+  assert.match(cud, /motivo: 'item_promocao_com_cadeia_oficial'/);
+  assert.match(cud, /PromocaoMilitar\.filter\([\s\S]*promocao_id: registroId/s);
+  assert.match(cud, /HistoricoPromocaoMilitarV2\.filter\([\s\S]*promocao_id: registroId/s);
+  assert.match(cud, /Não é permitido mover um militar entre promoções/);
+  assert.match(cud, /Não é permitido trocar o militar de um vínculo de promoção existente/);
+});
