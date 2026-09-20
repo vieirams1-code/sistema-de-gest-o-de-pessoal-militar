@@ -652,15 +652,18 @@ export default function DetalhePromocao() {
       if (!promocao) throw new Error('Promoção não carregada.');
       const patchPromocao = montarPatchPromocao(rascunhoPromocao);
       const promocaoAtualizada = { ...promocao, ...patchPromocao };
-      diagLog('salvar-promocao-publicada:promocao-update:enviando', { promocaoId: promocao.id, status: promocao.status, patchPromocao });
-      const retornoPromocao = await atualizarEscopado('Promocao', promocao.id, patchPromocao);
-      diagLog('salvar-promocao-publicada:promocao-update:retorno', { promocaoId: promocao.id, retornoPromocao });
-      diagLog('salvar-promocao-publicada:sincronizacao:chamada', { chamada: true });
+      diagLog('salvar-promocao:sincronizacao-oficial:chamada', { promocaoId: promocao.id, status: promocao.status });
       const sincronizacao = await sincronizarHistoricoPromocaoPublicada({
         promocaoAntes: promocao,
         promocaoDepois: promocaoAtualizada,
-        entities: base44.entities,
       });
+
+      if (sincronizacao?.ignorado) {
+        diagLog('salvar-promocao:rascunho-update:enviando', { promocaoId: promocao.id, status: promocao.status, patchPromocao });
+        const retornoPromocao = await atualizarEscopado('Promocao', promocao.id, patchPromocao);
+        diagLog('salvar-promocao:rascunho-update:retorno', { promocaoId: promocao.id, retornoPromocao });
+      }
+
       return { sincronizacao };
     },
     onSuccess: async (resultado, registroPromocao) => {
