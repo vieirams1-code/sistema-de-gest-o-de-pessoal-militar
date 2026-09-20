@@ -6,6 +6,7 @@ import { listarMilitarIdsEscopo } from '@/services/publicacoesPainelService';
 import { listarPublicacoesLegadoPendentesClassificacao } from '@/services/migracaoAlteracoesLegadoService';
 import { listarPendenciasPossivelDuplicidade, STATUS_POSSIVEL_DUPLICIDADE } from '@/services/militarIdentidadeService';
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
+import { jisoService } from '@/services/jisoService';
 import { createPageUrl } from '@/utils';
 import { buildAccessScopeKey } from '@/lib/accessScopeKey';
 import {
@@ -66,7 +67,7 @@ function mapPromocoesPrevistasPendentes(promocoes = [], militares = []) {
 }
 
 const STATUS_PUBLICACAO_PENDENTE = ['aguardando publicação', 'aguardando publicacao', 'aguardando nota'];
-const STATUS_ATESTADO_PENDENTE = ['aguardando homologação', 'aguardando homologacao', 'aguardando jiso'];
+const STATUS_ATESTADO_PENDENTE = ['aguardando homologação', 'aguardando homologacao'];
 
 function parseJsonSafe(value) {
   if (!value || typeof value !== 'string') return null;
@@ -169,21 +170,19 @@ function mapAtestadosPendentes(registros = []) {
   const hoje = new Date();
   return registros
     .filter((item) => {
-      const statusJiso = normalizarTexto(item.status_jiso);
       const statusPub = normalizarTexto(item.status_publicacao || item.status);
       const fim = item.data_retorno || item.data_termino;
       const dias = diferencaDias(fim, hoje);
       const vencidoSemEncerrar = dias !== null && dias < 0 && !['encerrado', 'cancelado'].includes(normalizarTexto(item.status));
       const retornoProximo = dias !== null && dias <= 7 && dias >= 0;
-      const aguardandoFluxo = STATUS_ATESTADO_PENDENTE.some((s) => statusJiso.includes(s) || statusPub.includes(s));
+      const aguardandoFluxo = STATUS_ATESTADO_PENDENTE.some((s) => statusPub.includes(s));
       return aguardandoFluxo || retornoProximo || vencidoSemEncerrar;
     })
     .map((item) => {
       const dataFim = item.data_retorno || item.data_termino || item.data_inicio;
       const dias = diferencaDias(dataFim, hoje);
-      const prioridade = calcularPrioridadePorPrazo({ diasParaVencer: dias, vencido: (dias ?? 0) < 0, status: item.status_jiso || item.status || '' });
-      const situacao = item.status_jiso || item.status || 'Aguardando homologação';
-      const necessitaJiso = Boolean(item.necessita_jiso || normalizarTexto(item.fluxo_homologacao).includes('jiso'));
+      const prioridade = calcularPrioridadePorPrazo({ diasParaVencer: dias, vencido: (dias ?? 0) < 0, status: item.status || '' });
+      const situacao = item.status || 'Aguardando homologação';
       const observacoes = item.observacoes || item.observacao || item.justificativa || item.motivo || '';
       return criarPendenciaBase({
         id: `at-${item.id}`,
@@ -196,7 +195,7 @@ function mapAtestadosPendentes(registros = []) {
         setor: item.subgrupamento_nome || item.obm_nome || '—',
         dataReferencia: dataFim,
         origem: 'Atestados',
-        sugestaoAcao: 'Revisar o fluxo de homologação/JISO no módulo de Atestados.',
+        sugestaoAcao: 'Revisar a vigência e a homologação do atestado.',
         origemLink: '/Atestados',
         origemLinkLabel: 'Abrir no módulo completo',
         atestadoId: item.id,
@@ -206,9 +205,43 @@ function mapAtestadosPendentes(registros = []) {
         dataFinal: dataFim || '',
         quantidadeDias: item.quantidade_dias || item.dias || item.duracao_dias || '',
         statusAtestado: situacao,
-        necessitaHomologacaoJiso: necessitaJiso ? 'Sim' : 'Não',
+        necessitaHomologacaoJiso: 'Não se aplica',
         observacoesAtestado: observacoes,
         origemRegistro: item.origem_registro || item.origem || 'Atestado',
+      });
+    });
+}
+
+function mapJisosPendentes(registros = []) {
+  const finais = new Set(['concluída', 'concluida', 'cancelada']);
+  return (registros || [])
+    .filter((item) => !finais.has(normalizarTexto(item.status)))
+    .map((item) => {
+      const dias = diferencaDias(item.data_jiso);
+      const semAgendamento = !item.data_jiso;
+      const prioridade = semAgendamento
+        ? 'alta'
+        : calcularPrioridadePorPrazo({ diasParaVencer: dias, vencido: (dias ?? 0) < 0, status: item.status || '' });
+      const situacao = item.status || 'Aguardando Agendamento';
+      return criarPendenciaBase({
+        id: `jiso-${item.id}`,
+        categoria: 'JISO',
+        prioridade,
+        situacao,
+        titulo: item.codigo || 'Processo JISO',
+        descricao: montarDescricaoCurta({
+          situacao,
+          detalhe: `${item.total_atestados || 0} atestado(s) vinculado(s)`,
+          dataReferencia: item.data_jiso,
+        }),
+        militar: item.militar_nome || '—',
+        setor: item.secao_jiso || '—',
+        dataReferencia: item.data_jiso || item.created_date,
+        origem: 'JISO',
+        sugestaoAcao: semAgendamento ? 'Definir data e horário da JISO.' : 'Dar andamento ao processo JISO.',
+        origemLink: `${createPageUrl('EditarJISO')}?jiso_id=${item.id}`,
+        origemLinkLabel: 'Abrir processo JISO',
+        jisoId: item.id,
       });
     });
 }
@@ -581,6 +614,7 @@ export default function useCentralPendencias() {
       const resultados = await Promise.allSettled([
         listarPublicacoesCentral({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
         listarPorEscopo({ entidade: base44?.entities?.Atestado, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
+        jisoService.listar(),
         listarPorEscopo({ entidade: base44?.entities?.Ferias, isAdmin, hasGlobalScope, getMilitarScopeFilters, ordem: '-data_inicio' }),
         listarPorEscopo({ entidade: base44?.entities?.RegistroLivro, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
         listarPorEscopo({ entidade: base44?.entities?.PendenciaComportamento, isAdmin, hasGlobalScope, getMilitarScopeFilters }),
@@ -590,11 +624,12 @@ export default function useCentralPendencias() {
         podeVerLegadoDuplicidade ? listarPendenciasPossivelDuplicidade({ status: STATUS_POSSIVEL_DUPLICIDADE.PENDENTE }) : Promise.resolve([]),
       ]);
 
-      const [pubR, atR, feR, rlR, coR, prR, miR, leR, duR] = resultados;
+      const [pubR, atR, jiR, feR, rlR, coR, prR, miR, leR, duR] = resultados;
 
       const errosCategorias = [];
       if (pubR.status === 'rejected') errosCategorias.push('Publicações');
       if (atR.status === 'rejected') errosCategorias.push('Atestados');
+      if (jiR.status === 'rejected') errosCategorias.push('JISO');
       if (feR.status === 'rejected') errosCategorias.push('Férias');
       if (coR.status === 'rejected') errosCategorias.push('Comportamento');
       if (prR.status === 'rejected' || miR.status === 'rejected') errosCategorias.push('Antiguidade/Promoções');
@@ -603,6 +638,7 @@ export default function useCentralPendencias() {
       const pendencias = [
         ...mapPublicacoesPendentes(pubR.status === 'fulfilled' ? pubR.value : []),
         ...mapAtestadosPendentes(atR.status === 'fulfilled' ? atR.value : []),
+        ...mapJisosPendentes(jiR.status === 'fulfilled' ? jiR.value?.jisos : []),
         ...mapFeriasPendentes(feR.status === 'fulfilled' ? feR.value : [], rlR.status === 'fulfilled' ? rlR.value : []),
         ...mapComportamentoPendencias(coR.status === 'fulfilled' ? coR.value : []),
         ...mapPromocoesPrevistasPendentes(
