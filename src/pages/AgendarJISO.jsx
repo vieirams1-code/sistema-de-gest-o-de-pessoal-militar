@@ -167,6 +167,7 @@ export default function AgendarJISO() {
               {Object.keys(STATUS_CLASS).map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
             </SelectContent>
           </Select>
+          </div>
         </div>
 
         {error ? (
