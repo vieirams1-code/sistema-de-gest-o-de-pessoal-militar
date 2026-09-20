@@ -28,11 +28,6 @@ import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMi
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 import { fetchScopedPublicacoesBundle } from '@/services/getScopedPublicacoesBundleClient';
 
-const STATUS_FLUXO_FINALIZADO = new Set([
-  'Homologado pela JISO',
-  'Homologado pelo Comandante',
-]);
-
 const parseDateOnly = (dateValue) => {
   if (!dateValue) return null;
   const parsed = new Date(`${dateValue}T00:00:00`);
@@ -46,8 +41,7 @@ const getDataFimAfastamento = (atestado) => atestado.data_retorno || atestado.da
 const isFluxoFinalizado = (atestado) => {
   if (!atestado) return false;
   if (atestado.status === 'Encerrado' || atestado.status === 'Cancelado') return true;
-  if (atestado.homologado_comandante) return true;
-  return STATUS_FLUXO_FINALIZADO.has(atestado.status_jiso);
+  return Boolean(atestado.homologado_comandante);
 };
 
 const isAtestadoVigente = (atestado, hoje) => {
@@ -129,12 +123,12 @@ export default function Atestados() {
       (a.medico_crm_snapshot || a.crm_medico)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.cid_10?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTipoAfastamento = tipoAfastamentoFilter === 'all' || a.tipo_afastamento === tipoAfastamentoFilter;
-    const isFluxoJiso = a.necessita_jiso || a.fluxo_homologacao === 'jiso' || Number(a.dias || 0) > 15;
-    const matchesJiso = jisoFilter === 'all' || 
-      (jisoFilter === 'necessita' && isFluxoJiso) ||
-      (jisoFilter === 'nao_necessita' && !isFluxoJiso) ||
-      (jisoFilter === 'aguardando' && a.status_jiso === 'Aguardando JISO') ||
-      (jisoFilter === 'homologado' && a.status_jiso === 'Homologado pela JISO');
+    const vinculadoJiso = Boolean(a.jiso_vinculo_ativo);
+    const matchesJiso = jisoFilter === 'all' ||
+      (jisoFilter === 'vinculado' && vinculadoJiso) ||
+      (jisoFilter === 'sem_jiso' && !vinculadoJiso) ||
+      (jisoFilter === 'em_andamento' && vinculadoJiso && !['Concluída', 'Cancelada'].includes(a.jiso_status)) ||
+      (jisoFilter === 'concluida' && a.jiso_status === 'Concluída');
     const matchesPublicacao = publicacaoFilter === 'all' ||
       (publicacaoFilter === 'aguardando_nota' && (!a.status_publicacao || a.status_publicacao === 'Aguardando Nota')) ||
       (publicacaoFilter === 'aguardando_pub' && a.status_publicacao === 'Aguardando Publicação') ||
@@ -315,11 +309,11 @@ export default function Atestados() {
                 <SelectValue placeholder="JISO" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas JISO</SelectItem>
-                <SelectItem value="necessita">Necessita JISO</SelectItem>
-                <SelectItem value="nao_necessita">Sem JISO</SelectItem>
-                <SelectItem value="aguardando">Aguardando JISO</SelectItem>
-                <SelectItem value="homologado">Homologado JISO</SelectItem>
+                <SelectItem value="all">Todos os vínculos</SelectItem>
+                <SelectItem value="vinculado">Vinculados à JISO</SelectItem>
+                <SelectItem value="sem_jiso">Sem JISO</SelectItem>
+                <SelectItem value="em_andamento">JISO em andamento</SelectItem>
+                <SelectItem value="concluida">JISO concluída</SelectItem>
               </SelectContent>
             </Select>
             <Select value={publicacaoFilter} onValueChange={setPublicacaoFilter}>
