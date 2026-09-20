@@ -263,7 +263,7 @@ const menuGroups = [
     ],
   },
   {
-    title: 'SARGENTEAÇÃO',
+    title: 'PRODUÇÃO',
     sections: [
       {
         title: 'Escalas e empenhos',
@@ -458,7 +458,7 @@ export default function Layout({ children, currentPageName }) {
       .filter((item) => !item.children || item.children.length > 0);
   };
 
-  const menuGroupOrder = ['GERAL', 'GESTÃO MILITAR', 'FERRAMENTAS', 'SISTEMA', 'SARGENTEAÇÃO', 'CAMPANHAS'];
+  const menuGroupOrder = ['GERAL', 'GESTÃO MILITAR', 'FERRAMENTAS', 'SISTEMA', 'CAMPANHAS', 'PRODUÇÃO'];
   const visibleMenuGroups = menuGroups
     .map((group) => ({
       ...group,
