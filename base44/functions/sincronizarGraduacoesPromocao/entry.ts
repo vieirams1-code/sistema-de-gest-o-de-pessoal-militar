@@ -87,7 +87,7 @@ const toTime = (value: unknown) => {
 };
 
 function compararHistoricosDesc(a: any, b: any) {
-  const camposData = ['data_promocao', 'data_publicacao', 'created_at'];
+  const camposData = ['data_promocao', 'data_publicacao', 'created_date', 'created_at'];
   for (const campo of camposData) {
     const delta = toTime(b?.[campo]) - toTime(a?.[campo]);
     if (delta !== 0) return delta;
@@ -97,8 +97,7 @@ function compararHistoricosDesc(a: any, b: any) {
 
 function obterPostoCanonico(v: string) {
   const t = normalizar(v);
-  // Mapeamento simples para garantir que "Soldado" vs "SD" ou variações batam se necessário.
-  // No Historico V2, geralmente já está o nome por extenso, mas o normalizar garante case/acentos.
+  if (['aspirante', 'asp oficial'].includes(t)) return 'Aspirante a Oficial';
   for (const p of POSTOS_HIERARQUIA) {
     if (normalizar(p) === t) return p;
   }
