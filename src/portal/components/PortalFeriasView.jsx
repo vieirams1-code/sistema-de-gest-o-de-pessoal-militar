@@ -142,12 +142,13 @@ export default function PortalFeriasView({ onBack }) {
     return [{ etapa: 1, dias: diasPlanejar, mes: mesVal, data_inicio: dataInicio }];
   };
 
-  const handleSubmeter = async (e) => {
+  const handleSubmeter = async (e, naoGozoForcado = null) => {
     if (e) e.preventDefault();
+    const opcaoNaoGozo = naoGozoForcado === true || (naoGozoForcado === null && naoGozo);
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!selectedPeriodoId && !naoGozo) {
+    if (!selectedPeriodoId && !opcaoNaoGozo) {
       setErrorMsg('Não foi possível preparar suas opções de férias. Atualize a página e tente novamente.');
       return;
     }
@@ -157,7 +158,7 @@ export default function PortalFeriasView({ onBack }) {
 
     let payload;
 
-    if (naoGozo) {
+    if (opcaoNaoGozo) {
       if (!justificativaNaoGozo.trim()) {
         setErrorMsg('Informe a justificativa para não tirar férias neste plano.');
         return;
@@ -654,8 +655,9 @@ export default function PortalFeriasView({ onBack }) {
                     />
                     <div className="mt-4 flex justify-end">
                       <button
-                        type="submit"
+                        type="button"
                         disabled={submitting}
+                        onClick={() => handleSubmeter(null, true)}
                         className="px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-bold shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
                       >
                         <i className="ph ph-paper-plane-tilt text-lg"></i>
