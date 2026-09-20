@@ -310,6 +310,7 @@ export async function sincronizarHistoricoPromocaoPublicada({
   }
 
   const camposMantidos = [
+    'status',
     'posto_graduacao',
     'quadro',
     'data_promocao',
@@ -346,6 +347,7 @@ export async function sincronizarHistoricoPromocaoPublicadaTx({
     promocao_id: texto(promocaoId),
     historico_ids: idsUnicos,
     patch_promocao: {
+      status: texto(patch?.status),
       posto_graduacao: texto(patch?.posto_graduacao),
       quadro: texto(patch?.quadro),
       data_promocao: dataSomente(patch?.data_promocao),
