@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { atualizarCadastroMilitar } from './utils.ts';
 
-const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
 const STATUS_ITEM_BLOQUEADO_PUBLICACAO = new Set(['bloqueado', 'bloqueada', 'cancelado', 'cancelada', 'retificado', 'retificada']);
 
 const texto = (valor: unknown) => String(valor ?? '').trim();
@@ -20,6 +20,9 @@ const chavePosto = (valor: unknown) => texto(valor)
   .replace(/[°º]/g, 'o').replace(/[-–—.]/g, ' ')
   .replace(/\s+/g, ' ').trim().toLowerCase();
 const INDICE_POR_POSTO = new Map(POSTOS_HIERARQUIA.map((p, i) => [chavePosto(p), i]));
+INDICE_POR_POSTO.set(chavePosto('Aspirante'), POSTOS_HIERARQUIA.indexOf('Aspirante a Oficial'));
+INDICE_POR_POSTO.set(chavePosto('Asp Oficial'), POSTOS_HIERARQUIA.indexOf('Aspirante a Oficial'));
+INDICE_POR_POSTO.set(chavePosto('Tenente Coronel'), POSTOS_HIERARQUIA.indexOf('Tenente-Coronel'));
 const indicePosto = (valor: unknown) => {
   const idx = INDICE_POR_POSTO.get(chavePosto(valor));
   return Number.isInteger(idx) ? (idx as number) : -1;
@@ -140,8 +143,8 @@ Deno.serve(async (req) => {
       payload?.data?.promocaoId ||
       payload?.data?.promocao?.id;
     const promocao_id = promocaoId;
-    const promocao = payload?.promocao || payload?.data?.promocao || {};
-    const itens = Array.isArray(payload?.itens) ? payload.itens : Array.isArray(payload?.data?.itens) ? payload.data.itens : [];
+    let promocao = payload?.promocao || payload?.data?.promocao || {};
+    let itens = Array.isArray(payload?.itens) ? payload.itens : Array.isArray(payload?.data?.itens) ? payload.data.itens : [];
     const temAlteracoesPendentes = Boolean(payload?.temAlteracoesPendentes ?? payload?.data?.temAlteracoesPendentes);
 
     const erroConcorrencia = promocaoId && EXECUCOES_EM_ANDAMENTO.has(texto(promocaoId))
@@ -164,6 +167,27 @@ Deno.serve(async (req) => {
     const PromocaoMilitar = base44.asServiceRole.entities.PromocaoMilitar;
     const Promocao = base44.asServiceRole.entities.Promocao;
 
+    const promocaoPersistida = await Promocao.get(promocaoId).catch(() => null);
+    const itensPersistidos = await PromocaoMilitar.filter({ promocao_id: promocaoId });
+    const idsSolicitados = new Set((itens || []).map((item: any) => texto(item?.id)).filter(Boolean));
+    const itensAutoritativos = (itensPersistidos || []).filter((item: any) => idsSolicitados.has(texto(item?.id)));
+
+    if (!promocaoPersistida?.id || itensAutoritativos.length !== idsSolicitados.size) {
+      const erroAutoridade = montarErro({
+        etapa: 'validacao_servidor',
+        motivo: !promocaoPersistida?.id ? 'promocao_nao_encontrada' : 'item_nao_pertence_promocao',
+        promocao_id: texto(promocaoId),
+      });
+      return Response.json({ ...erroAutoridade, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [erroAutoridade] }, { status: 409 });
+    }
+
+    promocao = promocaoPersistida;
+    itens = itensAutoritativos;
+    const erroValidacaoServidor = validarEntrada(promocaoId, promocao, itens, temAlteracoesPendentes);
+    if (erroValidacaoServidor) {
+      return Response.json({ ...erroValidacaoServidor, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [erroValidacaoServidor] }, { status: 400 });
+    }
+
     const warnings: any[] = [];
     const errors: any[] = [];
     const historicos: any[] = [];
@@ -182,8 +206,8 @@ Deno.serve(async (req) => {
         const payloadHistorico = {
           militar_id: militarId,
           promocao_id: promocaoId,
-          posto_graduacao_anterior: texto(item?.militar?.posto_graduacao || item?.militar?.posto_graduacao_atual),
-          quadro_anterior: texto(item?.militar?.quadro || item?.militar?.quadro_atual),
+          posto_graduacao_anterior: texto(militarEncontrado?.posto_graduacao),
+          quadro_anterior: texto(militarEncontrado?.quadro),
           posto_graduacao_novo: texto(promocao.posto_graduacao),
           quadro_novo: texto(promocao.quadro),
           data_promocao: dataSomente(promocao.data_promocao),
@@ -198,12 +222,27 @@ Deno.serve(async (req) => {
 
         const historicoExistente = (historicosAtivos || []).find((h: any) => normalizar(h?.status_registro) === 'ativo' && texto(h?.militar_id) === militarId && normalizar(h?.posto_graduacao_novo) === normalizar(payloadHistorico.posto_graduacao_novo) && normalizar(h?.quadro_novo) === normalizar(payloadHistorico.quadro_novo) && dataSomente(h?.data_promocao) === dataSomente(payloadHistorico.data_promocao));
 
+        const historicoAnterior = (historicosAtivos || [])
+          .filter((h: any) => texto(h?.militar_id) === militarId && dataSomente(h?.data_promocao) < dataSomente(payloadHistorico.data_promocao))
+          .sort((a: any, b: any) => dataSomente(b?.data_promocao).localeCompare(dataSomente(a?.data_promocao)) || texto(b?.created_date).localeCompare(texto(a?.created_date)))[0] || null;
+        payloadHistorico.antiguidade_referencia_id = texto(historicoAnterior?.id);
+
         let historico = historicoExistente;
         if (!historico) {
           historico = await Historico.create(payloadHistorico).catch(() => null);
           if (!historico?.id) throw montarErro({ etapa: 'criar_historico', motivo: 'historico_criacao_falhou', promocao_id: promocaoId, item_id: itemId });
-        } else if (!texto(historico?.promocao_id)) {
-          historico = await Historico.update(historico.id, { promocao_id: promocaoId });
+        } else {
+          historico = await Historico.update(historico.id, {
+            promocao_id: promocaoId,
+            posto_graduacao_novo: payloadHistorico.posto_graduacao_novo,
+            quadro_novo: payloadHistorico.quadro_novo,
+            data_promocao: payloadHistorico.data_promocao,
+            data_publicacao: payloadHistorico.data_publicacao,
+            boletim_referencia: payloadHistorico.boletim_referencia,
+            ato_referencia: payloadHistorico.ato_referencia,
+            antiguidade_referencia_ordem: payloadHistorico.antiguidade_referencia_ordem,
+            antiguidade_referencia_id: texto(historico?.antiguidade_referencia_id) || payloadHistorico.antiguidade_referencia_id,
+          });
         }
 
         // === Regra do Cadastro Presumidamente Correto ===
@@ -274,7 +313,8 @@ Deno.serve(async (req) => {
 
     if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente'});
     const statusFinal = publicados === 0 ? 'rascunho' : (publicados < itens.length ? 'publicada_parcial' : 'publicada');
-    await Promocao.update(promocaoId, { status: statusFinal });
+    const totalVinculados = (await PromocaoMilitar.filter({ promocao_id: promocaoId })).length;
+    await Promocao.update(promocaoId, { status: statusFinal, total_militares_vinculados: totalVinculados });
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
   } catch (error: any) {
