@@ -97,7 +97,15 @@
       ],
       "default": "Rascunho"
     },
+    "agendada_em": {
+      "type": "string",
+      "format": "date-time"
+    },
     "realizada_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resultado_registrado_em": {
       "type": "string",
       "format": "date-time"
     },
