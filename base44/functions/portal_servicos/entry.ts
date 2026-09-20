@@ -278,7 +278,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string, payload: any = {}): 
   if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_visualizar_planos_ferias'];
-  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR' || acao === 'PLANO_CAMPANHA_REABRIR') {
+  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR' || acao === 'PLANO_CAMPANHA_REABRIR' || acao === 'PLANO_CAMPANHA_PRORROGAR') {
     return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_CAMPANHA_EXCLUIR') {
@@ -332,6 +332,7 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
     'PLANO_CAMPANHA_ARQUIVAR',
     'PLANO_CAMPANHA_DESATIVAR',
     'PLANO_CAMPANHA_REABRIR',
+    'PLANO_CAMPANHA_PRORROGAR',
     'PLANO_CAMPANHA_EXCLUIR',
     'PLANO_GERAR_LOTE_FERIAS',
     'PLANO_INSTITUCIONAL_GERAR_FERIAS',
@@ -1629,7 +1630,8 @@ Deno.serve(async (req: Request) => {
 
         case 'PLANO_CAMPANHA_ARQUIVAR':
         case 'PLANO_CAMPANHA_DESATIVAR':
-        case 'PLANO_CAMPANHA_REABRIR': {
+        case 'PLANO_CAMPANHA_REABRIR':
+        case 'PLANO_CAMPANHA_PRORROGAR': {
           const { campanha_id } = payload;
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
