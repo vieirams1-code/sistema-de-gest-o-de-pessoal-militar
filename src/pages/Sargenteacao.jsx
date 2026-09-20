@@ -1,16 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listarSargenteacao, salvarSargenteacao, alternarSargenteacao } from '@/services/sargenteacaoService';
+import EscalasPanel from '@/components/sargenteacao/EscalasPanel';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  CalendarClock, ClipboardList, Edit3, MapPin, Plus, Power, Save, ShieldCheck, UsersRound, X,
+  CalendarClock, CalendarDays, ClipboardList, Edit3, MapPin, Plus, Power, Save, ShieldCheck, UsersRound, X,
 } from 'lucide-react';
 
 const TABS = [
+  ['escala', 'Escalas de serviço', CalendarDays],
   ['quartel', 'Quartéis e postos', MapPin],
   ['ala', 'Alas e grupos 24x72', UsersRound],
   ['modelo', 'Modelos de guarnição', ShieldCheck],
@@ -18,6 +20,7 @@ const TABS = [
 ];
 
 const EMPTY = {
+  escala: {},
   quartel: { nome: '', sigla: '', tipo: 'QUARTEL', estrutura_id: '', estrutura_nome: '', observacoes: '', ativo: true },
   ala: { nome: '', sigla: '', quartel_posto_id: '', quartel_posto_nome: '', ciclo: '24X72', hora_inicio: '07:00', hora_fim: '07:00', observacoes: '', ativo: true },
   modelo: { nome: '', descricao: '', quantitativo: 4, auxiliares: 3, possui_motorista: true, grupo_id: '', grupo_nome: '', observacoes: '', ativo: true },
@@ -38,7 +41,7 @@ export default function Sargenteacao() {
   const { isAdmin, canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [tab, setTab] = useState('quartel');
+  const [tab, setTab] = useState('escala');
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY.quartel);
   const podeVisualizar = isAdmin || (canAccessModule('sargenteacao') && canAccessAction('visualizar_sargenteacao'));
@@ -95,6 +98,7 @@ export default function Sargenteacao() {
   };
 
   const counts = useMemo(() => ({
+    escala: data.escalas?.length || 0,
     quartel: data.quartel?.length || 0,
     ala: data.alas?.length || 0,
     modelo: data.modelos?.length || 0,
@@ -115,14 +119,14 @@ export default function Sargenteacao() {
           <div className="rounded-2xl bg-indigo-100 p-3 text-indigo-700"><CalendarClock className="h-7 w-7" /></div>
           <div><h1 className="text-2xl font-bold text-slate-900">Sargenteação</h1><p className="mt-1 text-sm text-slate-600">Cadastros operacionais para escalas 24x72, guarnições e empenhos.</p></div>
         </div>
-        {podeGerir && <Button onClick={() => iniciarNovo()}><Plus className="mr-2 h-4 w-4" />Novo registro</Button>}
+        {podeGerir && tab !== 'escala' && <Button onClick={() => iniciarNovo()}><Plus className="mr-2 h-4 w-4" />Novo registro</Button>}
       </header>
 
       <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-950">
         O comandante é uma atribuição do militar na escala, definida inicialmente pela antiguidade. Ele pode acumular com motorista e não ocupa uma vaga adicional.
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {TABS.map(([key, label, Icon]) => <button type="button" key={key} onClick={() => iniciarNovo(key)} className={`rounded-xl border p-4 text-left transition ${tab === key ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-200'}`}>
           <div className="flex items-center justify-between"><Icon className="h-5 w-5 text-indigo-600" /><span className="text-xl font-bold text-slate-900">{carregando ? '—' : counts[key]}</span></div><p className="mt-2 text-sm font-semibold text-slate-800">{label}</p>
         </button>)}
@@ -130,7 +134,7 @@ export default function Sargenteacao() {
 
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">Não foi possível carregar os registros.</div>}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      {tab === 'escala' ? <EscalasPanel data={data} podeGerir={podeGerir} carregando={carregando} refresh={refresh} /> : <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b p-5"><div><h2 className="font-semibold text-slate-900">{TABS.find(([key]) => key === tab)?.[1]}</h2><p className="text-xs text-slate-500">Registros cadastrados no módulo isolado.</p></div>{podeGerir && <Button variant="outline" size="sm" onClick={() => iniciarNovo()}><Plus className="mr-2 h-4 w-4" />Adicionar</Button>}</div>
           <div className="divide-y divide-slate-100">
@@ -160,7 +164,7 @@ export default function Sargenteacao() {
           {tab === 'modelo' && editing && <div className="mt-5 border-t pt-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Funções do modelo</p><p className="mt-2 text-sm text-slate-600">{vagasDoModelo.map((vaga) => vaga.funcao_operacional).join(' + ') || 'Nenhuma função cadastrada'}</p></div>}
           {tab === 'ala' && selectedQuartel && <p className="mt-4 text-xs text-slate-500">Vinculado a: {selectedQuartel.nome}</p>}
         </section>
-      </div>
+      </div>}
     </div>
   </div>;
 }
