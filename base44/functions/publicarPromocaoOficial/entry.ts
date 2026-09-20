@@ -220,7 +220,12 @@ Deno.serve(async (req) => {
           observacoes: `Registro gerado pela publicação da promoção ${promocaoId}.`,
         };
 
-        const historicoExistente = (historicosAtivos || []).find((h: any) => normalizar(h?.status_registro) === 'ativo' && texto(h?.militar_id) === militarId && normalizar(h?.posto_graduacao_novo) === normalizar(payloadHistorico.posto_graduacao_novo) && normalizar(h?.quadro_novo) === normalizar(payloadHistorico.quadro_novo) && dataSomente(h?.data_promocao) === dataSomente(payloadHistorico.data_promocao));
+        const historicosMesmoEvento = (historicosAtivos || []).filter((h: any) => normalizar(h?.status_registro) === 'ativo' && texto(h?.militar_id) === militarId && normalizar(h?.posto_graduacao_novo) === normalizar(payloadHistorico.posto_graduacao_novo) && normalizar(h?.quadro_novo) === normalizar(payloadHistorico.quadro_novo) && dataSomente(h?.data_promocao) === dataSomente(payloadHistorico.data_promocao));
+        const historicoConflitante = historicosMesmoEvento.find((h: any) => texto(h?.promocao_id) && texto(h?.promocao_id) !== texto(promocaoId));
+        if (historicoConflitante) {
+          throw montarErro({ etapa: 'vincular_historico', motivo: 'historico_vinculado_outra_promocao', promocao_id: promocaoId, item_id: itemId });
+        }
+        const historicoExistente = historicosMesmoEvento.find((h: any) => !texto(h?.promocao_id) || texto(h?.promocao_id) === texto(promocaoId));
 
         const historicoAnterior = (historicosAtivos || [])
           .filter((h: any) => texto(h?.militar_id) === militarId && dataSomente(h?.data_promocao) < dataSomente(payloadHistorico.data_promocao))
