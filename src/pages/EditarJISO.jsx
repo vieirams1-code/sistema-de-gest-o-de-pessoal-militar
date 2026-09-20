@@ -324,27 +324,27 @@ export default function EditarJISO() {
   const isClosed = ['Concluída', 'Cancelada'].includes(jiso.status);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-7 space-y-5">
-        <div className="rounded-2xl bg-gradient-to-r from-[#1e3a5f] to-[#0f233a] p-6 text-white shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+        <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => navigate(createPageUrl('AgendarJISO'))}>
+              <Button variant="ghost" size="icon" className="text-slate-500 hover:bg-slate-100 hover:text-[#1e3a5f]" onClick={() => navigate(createPageUrl('AgendarJISO'))}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs text-blue-200">{jiso.codigo || 'JISO'}</span>
+                  <span className="font-mono text-xs text-slate-500">{jiso.codigo || 'JISO'}</span>
                   <Badge className={STATUS_CLASS[jiso.status] || STATUS_CLASS.Rascunho}>{jiso.status}</Badge>
                 </div>
-                <h1 className="text-2xl font-black">{jiso.militar_posto} {jiso.militar_nome}</h1>
-                <p className="text-sm text-slate-300">Matrícula {jiso.militar_matricula_atual || jiso.militar_matricula || '—'} · {jiso.atestados?.length || 0} atestado(s)</p>
+                <h1 className="text-2xl font-bold text-[#1e3a5f]">{jiso.militar_posto} {jiso.militar_nome}</h1>
+                <p className="text-sm text-slate-500">Matrícula {jiso.militar_matricula_atual || jiso.militar_matricula || '—'} · {jiso.atestados?.length || 0} atestado(s)</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {canManage && !isClosed && <Button variant="outline" onClick={cancelJiso} className="border-white/30 bg-white/10 text-white hover:bg-white/20">Cancelar JISO</Button>}
+              {canManage && !isClosed && <Button variant="outline" onClick={cancelJiso} className="border-slate-200 text-slate-600 hover:bg-slate-50">Cancelar JISO</Button>}
               {(canManage || canDecide) && !isClosed && (
-                <Button onClick={saveAll} disabled={updateMutation.isPending} className="bg-white text-[#1e3a5f] hover:bg-slate-100">
+                <Button onClick={saveAll} disabled={updateMutation.isPending} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
                   <Save className="mr-2 h-4 w-4" /> Salvar
                 </Button>
               )}
