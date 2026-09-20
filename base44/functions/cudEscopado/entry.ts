@@ -2026,6 +2026,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ---- Preservação da trilha documental de promoções publicadas ----
+    // A tela envia o formulário completo. Se uma versão antiga/concorrente
+    // vier com ato ou boletim em branco, preservamos o valor já publicado;
+    // assim um salvamento de outro campo não apaga a referência oficial.
+    if (entityName === 'Promocao' && operation === 'update' && registroExistente) {
+      const statusFinal = String(dataValidada?.status ?? registroExistente?.status ?? '').trim().toLowerCase();
+      const promocaoPublicada = ['publicada', 'publicado', 'consolidada', 'consolidado', 'publicada_parcial'].includes(statusFinal);
+      if (promocaoPublicada) {
+        dataValidada = { ...dataValidada };
+        for (const campo of ['boletim_referencia', 'ato_referencia']) {
+          const valorNovo = String(dataValidada?.[campo] ?? '').trim();
+          const valorAtual = String(registroExistente?.[campo] ?? '').trim();
+          if (!valorNovo && valorAtual) dataValidada[campo] = registroExistente[campo];
+        }
+      }
+    }
+
     // ---- Execução com service role ----
     const entity = getEntity(base44, entityName);
     let resultado = null;
