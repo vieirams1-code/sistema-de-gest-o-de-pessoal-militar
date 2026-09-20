@@ -37,6 +37,58 @@ function compararPromocaoComCadastro(postoPromocao: unknown, postoCadastro: unkn
   return 'inferior';
 }
 
+function postoAnteriorPrevisto(postoNovo: unknown, quadroNovo: unknown) {
+  const indiceNovo = indicePosto(postoNovo);
+  if (indiceNovo <= 0) return '';
+  if (indiceNovo === POSTOS_HIERARQUIA.indexOf('Aspirante a Oficial')) return '';
+  if (
+    indiceNovo === POSTOS_HIERARQUIA.indexOf('2º Tenente')
+    && chavePosto(quadroNovo) === chavePosto('QAOBM')
+  ) {
+    return 'Subtenente';
+  }
+  return POSTOS_HIERARQUIA[indiceNovo - 1] || '';
+}
+
+function resolverOrigemHistorica({
+  militar,
+  promocao,
+  historicoAnterior,
+}: {
+  militar: any;
+  promocao: any;
+  historicoAnterior: any;
+}) {
+  if (historicoAnterior) {
+    return {
+      posto: texto(historicoAnterior?.posto_graduacao_novo),
+      quadro: texto(historicoAnterior?.quadro_novo),
+      origem: 'historico_anterior',
+    };
+  }
+
+  const comparacaoCadastro = compararPromocaoComCadastro(
+    promocao?.posto_graduacao,
+    militar?.posto_graduacao,
+  );
+  if (comparacaoCadastro === 'superior') {
+    return {
+      posto: texto(militar?.posto_graduacao),
+      quadro: texto(militar?.quadro),
+      origem: 'cadastro_atual',
+    };
+  }
+
+  const postoPrevisto = postoAnteriorPrevisto(promocao?.posto_graduacao, promocao?.quadro);
+  const transicaoQaobm = chavePosto(promocao?.posto_graduacao) === chavePosto('2º Tenente')
+    && chavePosto(promocao?.quadro) === chavePosto('QAOBM');
+  return {
+    posto: postoPrevisto,
+    quadro: postoPrevisto && !transicaoQaobm ? texto(promocao?.quadro) : '',
+    origem: postoPrevisto ? 'hierarquia_institucional' : 'inicio_cadeia',
+  };
+}
+
 const EXECUCOES_EM_ANDAMENTO = (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ ?? new Set<string>();
 (globalThis as any).__PUBLICAR_PROMOCAO_OFICIAL_LOCK__ = EXECUCOES_EM_ANDAMENTO;
 
@@ -203,21 +255,39 @@ Deno.serve(async (req) => {
         const militarEncontrado = await Militar.get(item.militar_id).catch(() => null);
         if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId });
 
+        const dataPromocao = dataSomente(promocao.data_promocao);
+        const historicoAnterior = (historicosAtivos || [])
+          .filter((h: any) => (
+            normalizar(h?.status_registro) === 'ativo'
+            && texto(h?.militar_id) === militarId
+            && dataSomente(h?.data_promocao) < dataPromocao
+          ))
+          .sort((a: any, b: any) => (
+            dataSomente(b?.data_promocao).localeCompare(dataSomente(a?.data_promocao))
+            || texto(b?.created_date).localeCompare(texto(a?.created_date))
+          ))[0] || null;
+        const origemHistorica = resolverOrigemHistorica({
+          militar: militarEncontrado,
+          promocao,
+          historicoAnterior,
+        });
+
         const payloadHistorico = {
           militar_id: militarId,
           promocao_id: promocaoId,
-          posto_graduacao_anterior: texto(militarEncontrado?.posto_graduacao),
-          quadro_anterior: texto(militarEncontrado?.quadro),
+          posto_graduacao_anterior: origemHistorica.posto,
+          quadro_anterior: origemHistorica.quadro,
           posto_graduacao_novo: texto(promocao.posto_graduacao),
           quadro_novo: texto(promocao.quadro),
-          data_promocao: dataSomente(promocao.data_promocao),
-          data_publicacao: dataSomente(promocao.data_publicacao) || dataSomente(promocao.data_promocao),
+          data_promocao: dataPromocao,
+          data_publicacao: dataSomente(promocao.data_publicacao) || dataPromocao,
           boletim_referencia: texto(promocao.boletim_referencia),
           ato_referencia: texto(promocao.ato_referencia),
           antiguidade_referencia_ordem: Number(item.ordem),
+          antiguidade_referencia_id: texto(historicoAnterior?.id),
           origem_dado: 'publicacao_promocao',
           status_registro: 'ativo',
-          observacoes: `Registro gerado pela publicação da promoção ${promocaoId}.`,
+          observacoes: `Registro gerado pela publicação da promoção ${promocaoId}. Origem anterior: ${origemHistorica.origem}.`,
         };
 
         const historicosMesmoEvento = (historicosAtivos || []).filter((h: any) => normalizar(h?.status_registro) === 'ativo' && texto(h?.militar_id) === militarId && normalizar(h?.posto_graduacao_novo) === normalizar(payloadHistorico.posto_graduacao_novo) && normalizar(h?.quadro_novo) === normalizar(payloadHistorico.quadro_novo) && dataSomente(h?.data_promocao) === dataSomente(payloadHistorico.data_promocao));
@@ -226,11 +296,6 @@ Deno.serve(async (req) => {
           throw montarErro({ etapa: 'vincular_historico', motivo: 'historico_vinculado_outra_promocao', promocao_id: promocaoId, item_id: itemId });
         }
         const historicoExistente = historicosMesmoEvento.find((h: any) => !texto(h?.promocao_id) || texto(h?.promocao_id) === texto(promocaoId));
-
-        const historicoAnterior = (historicosAtivos || [])
-          .filter((h: any) => texto(h?.militar_id) === militarId && dataSomente(h?.data_promocao) < dataSomente(payloadHistorico.data_promocao))
-          .sort((a: any, b: any) => dataSomente(b?.data_promocao).localeCompare(dataSomente(a?.data_promocao)) || texto(b?.created_date).localeCompare(texto(a?.created_date)))[0] || null;
-        payloadHistorico.antiguidade_referencia_id = texto(historicoAnterior?.id);
 
         let historico = historicoExistente;
         if (!historico) {
