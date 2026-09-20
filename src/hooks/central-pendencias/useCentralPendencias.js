@@ -700,6 +700,7 @@ export default function useCentralPendencias() {
       alta: itens.filter((p) => p.prioridade === 'alta').length,
       publicacoes: itens.filter((p) => p.categoriaSlug === 'publicacoes').length,
       atestados: itens.filter((p) => p.categoriaSlug === 'atestados').length,
+      jiso: itens.filter((p) => p.categoriaSlug === 'jiso').length,
       ferias: itens.filter((p) => p.categoriaSlug === 'ferias').length,
       legadoOutros: itens.filter((p) => ['legado', 'outros'].includes(p.categoriaSlug)).length,
     };
