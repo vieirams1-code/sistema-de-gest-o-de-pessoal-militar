@@ -97,7 +97,6 @@ const menuGroups = [
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes', actionKey: 'perm_visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, moduleKey: 'registros_militar', actionKey: 'perm_visualizar_registros_militar' },
           { name: 'Conferência Cadastral', page: 'ConferenciasMilitares', icon: ShieldCheck, moduleKey: 'acesso_conferencias_militares', actionKey: 'perm_visualizar_conferencias_militares' },
-          { name: 'Central de Conferências', page: 'CentralConferencias', icon: ClipboardCheck, moduleKey: 'central_conferencias', actionKey: 'visualizar_central_conferencias' },
           { name: 'Armamentos', page: 'Armamentos', icon: Sword, moduleKey: 'armamentos', actionKey: 'perm_visualizar_armamentos' },
         ],
       },
@@ -193,6 +192,19 @@ const menuGroups = [
         description: 'Planejamento operacional em regime 24x72',
         items: [
           { name: 'Painel de Sargenteação', page: 'Sargenteacao', icon: CalendarClock, moduleKey: 'sargenteacao', actionKey: 'visualizar_sargenteacao' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'FERRAMENTAS',
+    sections: [
+      {
+        title: 'Ferramentas',
+        icon: ClipboardCheck,
+        description: 'Recursos auxiliares para conferência e apoio administrativo',
+        items: [
+          { name: 'Central de Conferências', page: 'CentralConferencias', icon: ClipboardCheck, moduleKey: 'central_conferencias', actionKey: 'visualizar_central_conferencias' },
         ],
       },
     ],
