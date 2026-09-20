@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Clock, FileText, MapPin, Plus, Search, Users } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock, FileText, MapPin, Plus, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -116,47 +116,52 @@ export default function AgendarJISO() {
   if (isLoading || !isAccessResolved) return null;
   if (!canAccessModule('atestados') || !canView) return <AccessDenied modulo="JISO / Atestados" />;
 
+  const stats = [
+    { label: 'Total', value: lista.length, icon: FileText, color: 'text-[#1e3a5f]', bg: 'bg-[#1e3a5f]/10' },
+    { label: 'Agendadas', value: lista.filter((item) => item.status === 'Agendada').length, icon: CalendarDays, color: 'text-blue-600', bg: 'bg-blue-100' },
+    { label: 'Aguardando resultado', value: lista.filter((item) => ['Realizada', 'Resultado Registrado'].includes(item.status)).length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
+    { label: 'Concluídas', value: lista.filter((item) => item.status === 'Concluída').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-7 space-y-5">
-        <div className="rounded-2xl bg-gradient-to-r from-[#1e3a5f] to-[#0f233a] p-6 text-white shadow-lg">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-200">
-                <CalendarDays className="h-4 w-4" /> Gestão independente
-              </div>
-              <h1 className="text-3xl font-black">Juntas de Inspeção de Saúde</h1>
-              <p className="mt-1 text-sm text-slate-300">Cada JISO reúne um ou vários atestados do mesmo militar.</p>
-            </div>
-            {canManage && (
-              <Button onClick={() => setShowCreate(true)} className="bg-white text-[#1e3a5f] hover:bg-slate-100">
-                <Plus className="mr-2 h-4 w-4" /> Nova JISO
-              </Button>
-            )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+          <div>
+            <h1 className="text-3xl font-bold text-[#1e3a5f]">Juntas de Inspeção de Saúde</h1>
+            <p className="text-slate-500">Agendamento, atestados vinculados e resultados das JISOs</p>
           </div>
+          {canManage && (
+            <Button onClick={() => setShowCreate(true)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Plus className="mr-2 h-5 w-5" /> Nova JISO
+            </Button>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            ['Total', lista.length],
-            ['Agendadas', lista.filter((item) => item.status === 'Agendada').length],
-            ['Aguardando resultado', lista.filter((item) => ['Realizada', 'Resultado Registrado'].includes(item.status)).length],
-            ['Concluídas', lista.filter((item) => item.status === 'Concluída').length],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-2xl font-black text-[#1e3a5f]">{value}</p>
-              <p className="text-xs font-medium text-slate-500">{label}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          {stats.map((stat) => (
+            <div key={stat.label} className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                </div>
+                <div>
+                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                  <p className="text-xs text-slate-500">{stat.label}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 md:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por militar, matrícula, código ou TARS..." className="pl-9" />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-56"><SelectValue /></SelectTrigger>
+        <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-3 mb-5">
+          <div className="flex flex-col md:flex-row gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por militar, matrícula, código ou TARS..." className="pl-9 h-10 border-slate-200" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full md:w-56 h-10 border-slate-200"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="TODOS">Todos os status</SelectItem>
               {Object.keys(STATUS_CLASS).map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
@@ -175,7 +180,14 @@ export default function AgendarJISO() {
             <p className="mt-1 text-sm text-slate-500">Crie uma JISO e vincule os atestados que serão analisados.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <h2 className="text-lg font-bold text-[#1e3a5f]">JISOs cadastradas</h2>
+              <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{filtered.length}</span>
+              <div className="flex-1 h-px bg-slate-200" />
+            </div>
+            <div className="space-y-3">
             {filtered.map((item) => (
               <button
                 key={item.id}
@@ -202,6 +214,7 @@ export default function AgendarJISO() {
                 </div>
               </button>
             ))}
+            </div>
           </div>
         )}
       </div>
