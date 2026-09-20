@@ -72,6 +72,7 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
   const [detalhes, setDetalhes] = useState(null);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mensagemModelo, setMensagemModelo] = useState('');
+  const [expandido, setExpandido] = useState(false);
   const modeloCampanhaRef = useRef('');
 
   const portalLink = useMemo(() => {
@@ -120,7 +121,8 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
     setMensagemModelo('');
     modeloCampanhaRef.current = '';
     setFeedback({ tipo: '', texto: '' });
-    carregarPreview();
+    setExpandido(false);
+    // A prévia só é carregada quando a seção for expandida.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campanha?.id, canSend, portalLink]);
 
@@ -242,11 +244,31 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
             Envia aos militares incluídos nesta campanha o prazo, o link do Portal do Militar e a orientação para recadastramento e escolha de férias.
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => carregarPreview()} disabled={loading || processando}>
-          <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Atualizar prévia
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {expandido && (
+            <Button type="button" variant="outline" size="sm" onClick={() => carregarPreview()} disabled={loading || processando}>
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Atualizar prévia
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const novoEstado = !expandido;
+              setExpandido(novoEstado);
+              if (novoEstado && !preview) carregarPreview();
+            }}
+            aria-expanded={expandido}
+          >
+            {expandido ? <ChevronUp className="mr-1.5 h-4 w-4" /> : <ChevronDown className="mr-1.5 h-4 w-4" />}
+            {expandido ? 'Recolher' : 'Expandir'}
+          </Button>
+        </div>
       </div>
 
+      {expandido && (
+        <>
       {feedback.texto && (
         <div className={`mt-4 rounded-xl border p-3 text-sm ${
           feedback.tipo === 'erro'
@@ -447,6 +469,8 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
         <p className="mt-3 text-xs text-slate-500">
           A fila é persistente. Se o processamento tiver sido interrompido, use “Continuar envio”; mensagens já concluídas não serão reenviadas.
         </p>
+      )}
+        </>
       )}
     </section>
   );
