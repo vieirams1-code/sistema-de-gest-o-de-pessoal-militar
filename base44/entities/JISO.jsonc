@@ -1,9 +1,16 @@
 {
   "name": "JISO",
   "type": "object",
+  "title": "Processo de Junta de Inspe\u00e7\u00e3o de Sa\u00fade",
+  "description": "Processo independente de JISO. Re\u00fane um ou v\u00e1rios atestados do mesmo militar.",
   "properties": {
+    "codigo": {
+      "type": "string",
+      "description": "Identificador operacional leg\u00edvel da JISO."
+    },
     "atestado_id": {
-      "type": "string"
+      "type": "string",
+      "description": "LEGADO: v\u00ednculo unit\u00e1rio anterior \u00e0 entidade JISOAtestado."
     },
     "militar_id": {
       "type": "string"
@@ -27,6 +34,13 @@
       "type": "string",
       "format": "date"
     },
+    "hora_jiso": {
+      "type": "string",
+      "description": "Hor\u00e1rio no formato HH:MM."
+    },
+    "local_jiso": {
+      "type": "string"
+    },
     "secao_jiso": {
       "type": "string"
     },
@@ -34,38 +48,146 @@
       "type": "string"
     },
     "nup": {
+      "type": "string",
+      "description": "TARS/NUP relacionado \u00e0 inspe\u00e7\u00e3o."
+    },
+    "numero_ata": {
       "type": "string"
+    },
+    "ata_jiso": {
+      "type": "string",
+      "description": "LEGADO: n\u00famero da ata."
     },
     "resultado_jiso": {
       "type": "string"
     },
     "dias_original": {
-      "type": "number"
+      "type": "number",
+      "description": "LEGADO: snapshot do atestado unit\u00e1rio."
     },
     "dias_jiso": {
-      "type": "number"
+      "type": "number",
+      "description": "Quantidade de dias reconhecida pela Junta."
     },
-    "ata_jiso": {
-      "type": "string"
+    "data_inicio_efeito": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_termino_efeito": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_retorno_efeito": {
+      "type": "string",
+      "format": "date"
     },
     "parecer_jiso": {
       "type": "string"
     },
     "status": {
+      "type": "string",
+      "enum": [
+        "Rascunho",
+        "Aguardando Agendamento",
+        "Agendada",
+        "Realizada",
+        "Resultado Registrado",
+        "Conclu\u00edda",
+        "Cancelada"
+      ],
+      "default": "Rascunho"
+    },
+    "realizada_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "concluida_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelada_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "motivo_cancelamento": {
       "type": "string"
     },
     "observacoes": {
       "type": "string"
     },
+    "arquivo_ata_jiso": {
+      "type": "string"
+    },
     "texto_publicacao": {
       "type": "string"
+    },
+    "publicacao_id": {
+      "type": "string"
+    },
+    "status_publicacao": {
+      "type": "string",
+      "enum": [
+        "Aguardando Nota",
+        "Aguardando Publica\u00e7\u00e3o",
+        "Publicado"
+      ],
+      "default": "Aguardando Nota"
+    },
+    "whatsapp_status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "enviado",
+        "legado"
+      ],
+      "default": "pendente"
+    },
+    "whatsapp_enviado_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "whatsapp_enviado_por": {
+      "type": "string"
+    },
+    "whatsapp_mensagem": {
+      "type": "string"
+    },
+    "whatsapp_data_agendada_snapshot": {
+      "type": "string",
+      "format": "date"
+    },
+    "whatsapp_hora_agendada_snapshot": {
+      "type": "string"
+    },
+    "template_id": {
+      "type": "string"
+    },
+    "template_hash": {
+      "type": "string"
+    },
+    "origem": {
+      "type": "string",
+      "enum": [
+        "NATIVA",
+        "MIGRACAO_LEGADO"
+      ],
+      "default": "NATIVA"
+    },
+    "versao": {
+      "type": "number",
+      "default": 1
     },
     "render_metadata": {
       "type": "object"
     }
   },
   "required": [
-    "atestado_id",
     "militar_id"
-  ]
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
 }
