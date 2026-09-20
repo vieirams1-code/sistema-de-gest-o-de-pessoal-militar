@@ -147,7 +147,7 @@ export default function PortalFeriasView({ onBack }) {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!selectedPeriodoId) {
+    if (!selectedPeriodoId && !naoGozo) {
       setErrorMsg('Não foi possível preparar suas opções de férias. Atualize a página e tente novamente.');
       return;
     }
@@ -628,7 +628,7 @@ export default function PortalFeriasView({ onBack }) {
                     className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                   />
                   <span className="flex-1">
-                    <span className="block text-sm font-bold text-slate-900">Não vou tirar férias neste plano</span>
+                    <span className="block text-sm font-bold text-slate-900">Não quero tirar férias</span>
                     <span className="block text-xs text-slate-500 mt-1 leading-relaxed">
                       Registre formalmente que você optou por não gozar férias neste plano. O período aquisitivo continua aguardando definição da sua unidade.
                     </span>
