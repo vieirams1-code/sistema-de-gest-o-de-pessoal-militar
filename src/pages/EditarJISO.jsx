@@ -114,7 +114,7 @@ export default function EditarJISO() {
 
   const candidatos = useMemo(() => {
     const linked = new Set((jiso?.atestados || []).map((item) => item.id));
-    return atestadosEscopo.filter((item) => item.militar_id === jiso?.militar_id && !linked.has(item.id));
+    return atestadosEscopo.filter((item) => item.militar_id === jiso?.militar_id && !linked.has(item.id) && !item.jiso_vinculo_ativo);
   }, [atestadosEscopo, jiso]);
 
   const { data: templates = [] } = useQuery({
