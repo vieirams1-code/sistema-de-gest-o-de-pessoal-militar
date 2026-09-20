@@ -1,0 +1,428 @@
+{
+  "gerado_em": "2026-09-20",
+  "finalidade": "Backup lógico antes de preencher referências determinísticas restantes da cadeia de antiguidade.",
+  "regra": "Para histórico ativo sem referência, vincular o histórico ativo imediatamente anterior do mesmo militar com data de promoção menor.",
+  "total_atualizacoes": 35,
+  "registros": [
+    {
+      "id": "6a2975a0f98774e20bf8b283",
+      "militar_id": "69eba21037e783e6f7cb3802",
+      "data_promocao": "2022-10-14",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a29620468f54ca1c0a533f5"
+      },
+      "referencia_data": "2016-04-04"
+    },
+    {
+      "id": "6a29759b4a5b77728801dcc1",
+      "militar_id": "69eba1f986c590fcd08cb3fd",
+      "data_promocao": "2022-10-14",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2962023c7ca1052e24504c"
+      },
+      "referencia_data": "2016-04-04"
+    },
+    {
+      "id": "6a29759a838162241c2fdd42",
+      "militar_id": "69ef59462c982752c36f9be3",
+      "data_promocao": "2022-10-14",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2962030b14e3947fbe1a62"
+      },
+      "referencia_data": "2016-04-04"
+    },
+    {
+      "id": "6a29759ad171e64c178d863d",
+      "militar_id": "69eb83fcb6e67be4e0bde701",
+      "data_promocao": "2022-10-14",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2961ff2ab5add4cbe78a84"
+      },
+      "referencia_data": "2016-04-04"
+    },
+    {
+      "id": "6a2975987054d17d79503abc",
+      "militar_id": "69eb8d2843b99045923b18e3",
+      "data_promocao": "2022-10-14",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2961fe13f3233f21118e60"
+      },
+      "referencia_data": "2016-04-04"
+    },
+    {
+      "id": "6a296b36042bc5f891db431a",
+      "militar_id": "69eb840fa5c67224ff3c8a7c",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f1d6dddd0e551aea83"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b35a6664f8e743ccf38",
+      "militar_id": "69eb81df25862e6bbf125aec",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f7176f42c4b44edebf"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b3454e6feac75226487",
+      "militar_id": "69eb7ba0cc99a8a0094e431d",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f6fa919cab811e99e3"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b34e053bce082eb15b6",
+      "militar_id": "69eb81eb3ac62d3ab5e715ee",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f3cfad142f786b748a"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b333452efba8a36edeb",
+      "militar_id": "69ef5966956d86d227f6f019",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957eee6129b76ce12c7e4"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b318b6310973fecdbf4",
+      "militar_id": "69eba1e6edfa2ff14959bc0e",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957e246d2b6ebdb491f3d"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2e8076ff1f99ba140f",
+      "militar_id": "69eba20cedfa2ff14959bc35",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957ef88d9d9430af62edf"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2d2468eb93a33cb048",
+      "militar_id": "69eb840b7e271890fb600c7b",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f8c9de611e27643b3a"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2c3dbaaedd53dd920f",
+      "militar_id": "69eb8d21873e9930fca97c19",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957dc953b3be8999474a0"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2bb7fd22e23488db92",
+      "militar_id": "69eb8404c45b988032f76687",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957dbe9afad0d376eadca"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2a1aa46069c62e32bd",
+      "militar_id": "69eb7ba3e1051a7daa81e2d8",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957e7262035938f02b313"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2ac02e08beb5c3f73d",
+      "militar_id": "69eb82cf69bc68dbdb9e2509",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f748580f23bb9e2551"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b29de3b05f802fc6bea",
+      "militar_id": "69eb81b40b05c59b1aaf9196",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957e5801d9423d2c65ba9"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b28e52ed64f7bd5422e",
+      "militar_id": "69eb83ff05e89a8e8f959e8c",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a295f9c5a4fe30c637a8c5b"
+      },
+      "referencia_data": "2015-03-27"
+    },
+    {
+      "id": "6a296b276a1fb7baacd88dce",
+      "militar_id": "69eb8d1edb261d158e1ab711",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957de74cbf62e2bd11d4a"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b26c589be5e106fc1bf",
+      "militar_id": "69eb83f8977cf40700ad1293",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f5fad0cdbbee3dbb0d"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b251f0eeb9def63702e",
+      "militar_id": "69ef596d16cf11ee36f2e708",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957ddd396d78dbd1d3ca7"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2572874a9355fc3c25",
+      "militar_id": "69ef767d5a42118ee0d828ca",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957daf529dc9b06871f94"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b241da6d6951b3e7e4f",
+      "militar_id": "69eba21792048467799aad29",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f48739ada312e71f3b"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b2328d0b35d4cfb7097",
+      "militar_id": "69eba1fdbd020579eba69449",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f0d8b687fa3fae99cd"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b229148b37a3ca815d3",
+      "militar_id": "69eba1f15b1edf53ac41681b",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a295f9b03d60845e374ff1c"
+      },
+      "referencia_data": "2015-03-27"
+    },
+    {
+      "id": "6a296b22c4ce4a67e52500e5",
+      "militar_id": "69eba1ea17385f5eaabbde72",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957f2654a16c4722656b0"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b20534ff366642f6bad",
+      "militar_id": "69eb8d1ba830a170c30ae027",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957e8b11ac72184e65f5e"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b1fafe4e6575607c5be",
+      "militar_id": "69eb7b9c644dc9c69d791de3",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957e1fa0f40c432aa2808"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b1c680512d6b9fcec75",
+      "militar_id": "69eb8d1115f9ab411c07067c",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957dff743288e51460417"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b1c1bec440ba7093159",
+      "militar_id": "69eba1f503bce7ecfcc850f3",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957e508f13ed90dc53560"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a296b1bfb4bc8aab0b915a9",
+      "militar_id": "69eb8d1862e1a9569fd4cb22",
+      "data_promocao": "2021-11-24",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a2957db5fb8a15243e8fbb0"
+      },
+      "referencia_data": "2015-03-23"
+    },
+    {
+      "id": "6a0e7e70bfac2897a394168f",
+      "militar_id": "69ef6469ad174c5445637f8e",
+      "data_promocao": "2025-03-02",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a0e7dc91065ac70186ab05b"
+      },
+      "referencia_data": "2020-07-02"
+    },
+    {
+      "id": "6a0e7de57a8239f95fde9609",
+      "militar_id": "69eb745c46fd763ea067a7af",
+      "data_promocao": "2025-03-02",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a0e750934219339446acb58"
+      },
+      "referencia_data": "2022-12-02"
+    },
+    {
+      "id": "6a02744ffe7975323b2ec6ce",
+      "militar_id": "69eb81c57b037c09a3a4ade5",
+      "data_promocao": "2023-12-02",
+      "antes": {
+        "antiguidade_referencia_id": ""
+      },
+      "depois": {
+        "antiguidade_referencia_id": "6a02749848a2a9d783107d1c"
+      },
+      "referencia_data": "2023-07-02"
+    }
+  ]
+}
