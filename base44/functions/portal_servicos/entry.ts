@@ -100,9 +100,14 @@ function campanhaPodeReceberResposta(campanha: any, militar: any, membrosPorGrup
   const status = String(campanha?.status || '').trim().toLowerCase();
   const statusAberto = new Set(['aberta_coleta', 'aberta', 'ativa', 'em_andamento']);
   if (!statusAberto.has(status)) return false;
-  const hoje = new Date().toISOString().slice(0, 10);
+  // O Portal usa o horário de Campo Grande para a abertura e o fechamento de campanhas.
+  const agoraCampoGrande = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString().slice(0, 16);
+  const hoje = agoraCampoGrande.slice(0, 10);
   if (campanha?.data_inicio && String(campanha.data_inicio).slice(0, 10) > hoje) return false;
-  if (campanha?.data_fim_militar && String(campanha.data_fim_militar).slice(0, 10) < hoje) return false;
+  const dataFim = String(campanha?.data_fim_militar || '').slice(0, 10);
+  const horaFim = String(campanha?.hora_fim_militar || '').slice(0, 5);
+  if (dataFim && dataFim < hoje) return false;
+  if (dataFim === hoje && /^\d{2}:\d{2}$/.test(horaFim) && `${dataFim}T${horaFim}` < agoraCampoGrande) return false;
   return matchMilitarCampanha(campanha, militar, membrosPorGrupo);
 }
 
