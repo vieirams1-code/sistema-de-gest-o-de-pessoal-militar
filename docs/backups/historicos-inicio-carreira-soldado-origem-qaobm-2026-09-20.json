@@ -1,0 +1,2379 @@
+{
+  "criado_em": "2026-09-20",
+  "motivo": "Correção da origem histórica: Soldado como início da carreira de praças e 2º Tenente QAOBM oriundo de Subtenente combatente.",
+  "checkpoint_antes": "6ab0449bb35d8b593cacf159",
+  "resumo": {
+    "historicos_soldado": 106,
+    "soldado_com_graduacao_anterior": 46,
+    "soldado_com_quadro_anterior": 106,
+    "historicos_qaobm": 1
+  },
+  "alteracoes": [
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a07242097a433c2d77a0f",
+      "antes": {
+        "id": "6a2a07242097a433c2d77a0f",
+        "militar_id": "6a1ef3b280d8695210c4b4aa",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a072355792049f70a3d2f",
+      "antes": {
+        "id": "6a2a072355792049f70a3d2f",
+        "militar_id": "69eb84980eac6eab9609628a",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a072221cf84c09debab4b",
+      "antes": {
+        "id": "6a2a072221cf84c09debab4b",
+        "militar_id": "69eb81db977cf40700ad1120",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a072106907958de1ed738",
+      "antes": {
+        "id": "6a2a072106907958de1ed738",
+        "militar_id": "69ef59426290f15bbbe5dda2",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a0720df44d42e8d8ae08d",
+      "antes": {
+        "id": "6a2a0720df44d42e8d8ae08d",
+        "militar_id": "69ef593dab99be4b5f722273",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a072046553b893a3038fc",
+      "antes": {
+        "id": "6a2a072046553b893a3038fc",
+        "militar_id": "69eb81e3c52ba7943ff69d1a",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a071f40758f5752240eeb",
+      "antes": {
+        "id": "6a2a071f40758f5752240eeb",
+        "militar_id": "69eba201a1b98c259b10503a",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a071e461d11f0851d7780",
+      "antes": {
+        "id": "6a2a071e461d11f0851d7780",
+        "militar_id": "69eb81d82c00b13adb8bf6d3",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2a071e15faa436268c1501",
+      "antes": {
+        "id": "6a2a071e15faa436268c1501",
+        "militar_id": "69eb840895902f712e50c8f2",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a29620468f54ca1c0a533f5",
+      "antes": {
+        "id": "6a29620468f54ca1c0a533f5",
+        "militar_id": "69eba21037e783e6f7cb3802",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2962030b14e3947fbe1a62",
+      "antes": {
+        "id": "6a2962030b14e3947fbe1a62",
+        "militar_id": "69ef59462c982752c36f9be3",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a296203b76deb7c5daabce2",
+      "antes": {
+        "id": "6a296203b76deb7c5daabce2",
+        "militar_id": "69eb7b9469762d853c9dc634",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2962023c7ca1052e24504c",
+      "antes": {
+        "id": "6a2962023c7ca1052e24504c",
+        "militar_id": "69eba1f986c590fcd08cb3fd",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2962000715a835b541c2af",
+      "antes": {
+        "id": "6a2962000715a835b541c2af",
+        "militar_id": "69eb8d14c784f768b36c2eb0",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2961ff2ab5add4cbe78a84",
+      "antes": {
+        "id": "6a2961ff2ab5add4cbe78a84",
+        "militar_id": "69eb83fcb6e67be4e0bde701",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2961fe13f3233f21118e60",
+      "antes": {
+        "id": "6a2961fe13f3233f21118e60",
+        "militar_id": "69eb8d2843b99045923b18e3",
+        "promocao_id": "6a29604174b22d313fc86a66",
+        "data_promocao": "2016-04-04",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a295f9c5a4fe30c637a8c5b",
+      "antes": {
+        "id": "6a295f9c5a4fe30c637a8c5b",
+        "militar_id": "69eb83ff05e89a8e8f959e8c",
+        "promocao_id": "6a295eb28d105fbc0ff47f03",
+        "data_promocao": "2015-03-27",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a295f9b03d60845e374ff1c",
+      "antes": {
+        "id": "6a295f9b03d60845e374ff1c",
+        "militar_id": "69eba1f15b1edf53ac41681b",
+        "promocao_id": "6a295eb28d105fbc0ff47f03",
+        "data_promocao": "2015-03-27",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f9a5c9cb18d7849e7e",
+      "antes": {
+        "id": "6a2957f9a5c9cb18d7849e7e",
+        "militar_id": "69eba01a18ed86c9f7904970",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Soldado",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f8c9de611e27643b3a",
+      "antes": {
+        "id": "6a2957f8c9de611e27643b3a",
+        "militar_id": "69eb840b7e271890fb600c7b",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f7176f42c4b44edebf",
+      "antes": {
+        "id": "6a2957f7176f42c4b44edebf",
+        "militar_id": "69eb81df25862e6bbf125aec",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f748580f23bb9e2551",
+      "antes": {
+        "id": "6a2957f748580f23bb9e2551",
+        "militar_id": "69eb82cf69bc68dbdb9e2509",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f6fa919cab811e99e3",
+      "antes": {
+        "id": "6a2957f6fa919cab811e99e3",
+        "militar_id": "69eb7ba0cc99a8a0094e431d",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f5fad0cdbbee3dbb0d",
+      "antes": {
+        "id": "6a2957f5fad0cdbbee3dbb0d",
+        "militar_id": "69eb83f8977cf40700ad1293",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f48739ada312e71f3b",
+      "antes": {
+        "id": "6a2957f48739ada312e71f3b",
+        "militar_id": "69eba21792048467799aad29",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f3cfad142f786b748a",
+      "antes": {
+        "id": "6a2957f3cfad142f786b748a",
+        "militar_id": "69eb81eb3ac62d3ab5e715ee",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f2654a16c4722656b0",
+      "antes": {
+        "id": "6a2957f2654a16c4722656b0",
+        "militar_id": "69eba1ea17385f5eaabbde72",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f1d6dddd0e551aea83",
+      "antes": {
+        "id": "6a2957f1d6dddd0e551aea83",
+        "militar_id": "69eb840fa5c67224ff3c8a7c",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957f0d8b687fa3fae99cd",
+      "antes": {
+        "id": "6a2957f0d8b687fa3fae99cd",
+        "militar_id": "69eba1fdbd020579eba69449",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957ef88d9d9430af62edf",
+      "antes": {
+        "id": "6a2957ef88d9d9430af62edf",
+        "militar_id": "69eba20cedfa2ff14959bc35",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957eee6129b76ce12c7e4",
+      "antes": {
+        "id": "6a2957eee6129b76ce12c7e4",
+        "militar_id": "69ef5966956d86d227f6f019",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e8b11ac72184e65f5e",
+      "antes": {
+        "id": "6a2957e8b11ac72184e65f5e",
+        "militar_id": "69eb8d1ba830a170c30ae027",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e7262035938f02b313",
+      "antes": {
+        "id": "6a2957e7262035938f02b313",
+        "militar_id": "69eb7ba3e1051a7daa81e2d8",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e67ddb3f31983da11f",
+      "antes": {
+        "id": "6a2957e67ddb3f31983da11f",
+        "militar_id": "69eb849ba2be7a2748351649",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e5801d9423d2c65ba9",
+      "antes": {
+        "id": "6a2957e5801d9423d2c65ba9",
+        "militar_id": "69eb81b40b05c59b1aaf9196",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e508f13ed90dc53560",
+      "antes": {
+        "id": "6a2957e508f13ed90dc53560",
+        "militar_id": "69eba1f503bce7ecfcc850f3",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e246d2b6ebdb491f3d",
+      "antes": {
+        "id": "6a2957e246d2b6ebdb491f3d",
+        "militar_id": "69eba1e6edfa2ff14959bc0e",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e1fa0f40c432aa2808",
+      "antes": {
+        "id": "6a2957e1fa0f40c432aa2808",
+        "militar_id": "69eb7b9c644dc9c69d791de3",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957e0e72a8b74bff4b110",
+      "antes": {
+        "id": "6a2957e0e72a8b74bff4b110",
+        "militar_id": "69eb84938c7191d75478ad75",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Soldado",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957dff743288e51460417",
+      "antes": {
+        "id": "6a2957dff743288e51460417",
+        "militar_id": "69eb8d1115f9ab411c07067c",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957de74cbf62e2bd11d4a",
+      "antes": {
+        "id": "6a2957de74cbf62e2bd11d4a",
+        "militar_id": "69eb8d1edb261d158e1ab711",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957ddd396d78dbd1d3ca7",
+      "antes": {
+        "id": "6a2957ddd396d78dbd1d3ca7",
+        "militar_id": "69ef596d16cf11ee36f2e708",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957dc953b3be8999474a0",
+      "antes": {
+        "id": "6a2957dc953b3be8999474a0",
+        "militar_id": "69eb8d21873e9930fca97c19",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957dbe9afad0d376eadca",
+      "antes": {
+        "id": "6a2957dbe9afad0d376eadca",
+        "militar_id": "69eb8404c45b988032f76687",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957db5fb8a15243e8fbb0",
+      "antes": {
+        "id": "6a2957db5fb8a15243e8fbb0",
+        "militar_id": "69eb8d1862e1a9569fd4cb22",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a2957daf529dc9b06871f94",
+      "antes": {
+        "id": "6a2957daf529dc9b06871f94",
+        "militar_id": "69ef767d5a42118ee0d828ca",
+        "promocao_id": "6a295357db851537ae34f966",
+        "data_promocao": "2015-03-23",
+        "posto_graduacao_anterior": "Cabo",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a0cc743a2dae58c32f58b66",
+      "antes": {
+        "id": "6a0cc743a2dae58c32f58b66",
+        "militar_id": "69eb746cbc70b596ef9c2d9f",
+        "promocao_id": "",
+        "data_promocao": "2025-11-24",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a0601f3ba041e65c37f638e",
+      "antes": {
+        "id": "6a0601f3ba041e65c37f638e",
+        "militar_id": "69eb800c548ca64021161850",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fb3cabaff9cb4996d422",
+      "antes": {
+        "id": "6a05fb3cabaff9cb4996d422",
+        "militar_id": "69eb768283ccb7f995b8838c",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fb223d3412076887dcda",
+      "antes": {
+        "id": "6a05fb223d3412076887dcda",
+        "militar_id": "69eb7ffe0a97bc7b6cb7d39e",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fb0baad536d6ac13f91c",
+      "antes": {
+        "id": "6a05fb0baad536d6ac13f91c",
+        "militar_id": "69eb747354186a6665d3cf1f",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05faf2b4e0781f2dea0457",
+      "antes": {
+        "id": "6a05faf2b4e0781f2dea0457",
+        "militar_id": "69eb76783a9f0111a1889df2",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fad2b321e3496edd8fd0",
+      "antes": {
+        "id": "6a05fad2b321e3496edd8fd0",
+        "militar_id": "69eb801d927baaecbb7015ed",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fabcb555556f4aa6be9f",
+      "antes": {
+        "id": "6a05fabcb555556f4aa6be9f",
+        "militar_id": "69eb8020b2e87fdd53c721a5",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05faa6cc0e1d535a292436",
+      "antes": {
+        "id": "6a05faa6cc0e1d535a292436",
+        "militar_id": "69eb80045f7db0057d7d44f4",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fa812a86e0063b762104",
+      "antes": {
+        "id": "6a05fa812a86e0063b762104",
+        "militar_id": "69eb7ffb620d9c8c1033f2a2",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fa686adba083f63e07c3",
+      "antes": {
+        "id": "6a05fa686adba083f63e07c3",
+        "militar_id": "69eb7689e50a518ed42f577d",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fa3fe364e76699cc7432",
+      "antes": {
+        "id": "6a05fa3fe364e76699cc7432",
+        "militar_id": "69eb7685569113074f4452aa",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fa288dcb8bd3f9937ce9",
+      "antes": {
+        "id": "6a05fa288dcb8bd3f9937ce9",
+        "militar_id": "69eb801997afdaec9c24b2f8",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05fa10ca04e23398646ab3",
+      "antes": {
+        "id": "6a05fa10ca04e23398646ab3",
+        "militar_id": "69eb746f6272d2a46bd50001",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f9edb0d58515f0ee7f6c",
+      "antes": {
+        "id": "6a05f9edb0d58515f0ee7f6c",
+        "militar_id": "69eb767e218a658a0b4ebc66",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f9d5a526732407570d55",
+      "antes": {
+        "id": "6a05f9d5a526732407570d55",
+        "militar_id": "69eb80083a9f0111a188a768",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f9be29c981acce124618",
+      "antes": {
+        "id": "6a05f9be29c981acce124618",
+        "militar_id": "69eb7463cc99a8a0094e3aa2",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f9a590c3c7e13b1b152e",
+      "antes": {
+        "id": "6a05f9a590c3c7e13b1b152e",
+        "militar_id": "69eb767b73ef7f54c4fe04bc",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f95c2dcd6b76e8a2e75c",
+      "antes": {
+        "id": "6a05f95c2dcd6b76e8a2e75c",
+        "militar_id": "69eb7673e2b6dfeaa0182c1f",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f93f42afa57c5bab12d1",
+      "antes": {
+        "id": "6a05f93f42afa57c5bab12d1",
+        "militar_id": "69eb80027591ba90e7ae9b39",
+        "promocao_id": "6a09f827de12f4a6e42af8c9",
+        "data_promocao": "2025-11-03",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QPTBM",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QPTBM",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f4791885bf2317ab2684",
+      "antes": {
+        "id": "6a05f4791885bf2317ab2684",
+        "militar_id": "69eba06d8e9e392d75701fa0",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f464e3e612cc3d10f35c",
+      "antes": {
+        "id": "6a05f464e3e612cc3d10f35c",
+        "militar_id": "69eba06900794e9b919a54a0",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f445a4ead44357c8d8ad",
+      "antes": {
+        "id": "6a05f445a4ead44357c8d8ad",
+        "militar_id": "69eba0657149a564076b371c",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f42b3a041779c82ca7a0",
+      "antes": {
+        "id": "6a05f42b3a041779c82ca7a0",
+        "militar_id": "69eba0309e1deabd2bac58f5",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f4137fca8748271d9fc1",
+      "antes": {
+        "id": "6a05f4137fca8748271d9fc1",
+        "militar_id": "69eba02ca178891a718e738b",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f3fe1e83bdc33485eb1e",
+      "antes": {
+        "id": "6a05f3fe1e83bdc33485eb1e",
+        "militar_id": "69eba028a4cc478fdcbad8f3",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f3e3bf7c675b98e56fe8",
+      "antes": {
+        "id": "6a05f3e3bf7c675b98e56fe8",
+        "militar_id": "69eba024a1c3bf545e4eb876",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f3c890c3c7e13b1b0ed0",
+      "antes": {
+        "id": "6a05f3c890c3c7e13b1b0ed0",
+        "militar_id": "69eba01da1b98c259b104f2a",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f3accb14e4c63aba0293",
+      "antes": {
+        "id": "6a05f3accb14e4c63aba0293",
+        "militar_id": "69eba017f69fb567252d25f4",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f397c6bb0d94f19b0f56",
+      "antes": {
+        "id": "6a05f397c6bb0d94f19b0f56",
+        "militar_id": "69eba01369395236aa837ec8",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f3754574ccd9e39ec8ab",
+      "antes": {
+        "id": "6a05f3754574ccd9e39ec8ab",
+        "militar_id": "69eba010178e83cc270f1395",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f35c3c73c01ed02b41d2",
+      "antes": {
+        "id": "6a05f35c3c73c01ed02b41d2",
+        "militar_id": "69eba00dc03f7451e0b9e8fb",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f3452b897098e95dd941",
+      "antes": {
+        "id": "6a05f3452b897098e95dd941",
+        "militar_id": "69eba00a2e5b47fa4aa0ba74",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f32fd78eaaecddb4b135",
+      "antes": {
+        "id": "6a05f32fd78eaaecddb4b135",
+        "militar_id": "69eba005b80021c88d8bd8f7",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f31965f56870c7de13d3",
+      "antes": {
+        "id": "6a05f31965f56870c7de13d3",
+        "militar_id": "69eba002ae8e9093112abee8",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f2f9aed8af00aee2c314",
+      "antes": {
+        "id": "6a05f2f9aed8af00aee2c314",
+        "militar_id": "69eb9fff4a8a057d0706cefc",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f2e5c80b3e4813766a94",
+      "antes": {
+        "id": "6a05f2e5c80b3e4813766a94",
+        "militar_id": "69eb81acfb47e8a4c874c1c1",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f2cabd4b503e2a19108d",
+      "antes": {
+        "id": "6a05f2cabd4b503e2a19108d",
+        "militar_id": "69f8c1e2df1924dbd76e7224",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f2acca7486b50ee1b42c",
+      "antes": {
+        "id": "6a05f2acca7486b50ee1b42c",
+        "militar_id": "69eba8adbb29cedd1d4fc3b6",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f28faed8af00aee2c2f6",
+      "antes": {
+        "id": "6a05f28faed8af00aee2c2f6",
+        "militar_id": "69eba8a985d284db12b89c80",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f278adc009e9905a8aff",
+      "antes": {
+        "id": "6a05f278adc009e9905a8aff",
+        "militar_id": "69eba8a594fe54aceb3c8623",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f2584aed3f9f042af374",
+      "antes": {
+        "id": "6a05f2584aed3f9f042af374",
+        "militar_id": "69eba89ea3b3dcbc375a77bd",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f23c878c7874794e1686",
+      "antes": {
+        "id": "6a05f23c878c7874794e1686",
+        "militar_id": "69eba89a68c09eb03cda53ab",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f223137bd0f05b8536c4",
+      "antes": {
+        "id": "6a05f223137bd0f05b8536c4",
+        "militar_id": "69eba8973887295626d4d295",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f2000dbbd9da0d68d444",
+      "antes": {
+        "id": "6a05f2000dbbd9da0d68d444",
+        "militar_id": "69eba8943b0c8bb4592e754f",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f1d1bc2d7e0aad09e2f8",
+      "antes": {
+        "id": "6a05f1d1bc2d7e0aad09e2f8",
+        "militar_id": "69eba88d6e2fc8a2c097febc",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f05d0e7c1af7b050bc6b",
+      "antes": {
+        "id": "6a05f05d0e7c1af7b050bc6b",
+        "militar_id": "69eba88917bfd22318ed2f8e",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f0358069e2a425db1d3b",
+      "antes": {
+        "id": "6a05f0358069e2a425db1d3b",
+        "militar_id": "69eba8864a850fcbc40bf2af",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05f01bd5a7c2865343dd86",
+      "antes": {
+        "id": "6a05f01bd5a7c2865343dd86",
+        "militar_id": "69eba8159fa07ae4efb49df9",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05effb36bb6fc03ae7b4fa",
+      "antes": {
+        "id": "6a05effb36bb6fc03ae7b4fa",
+        "militar_id": "69eba812f131ac0bfe7e0774",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05efdde44f71c96079a2e4",
+      "antes": {
+        "id": "6a05efdde44f71c96079a2e4",
+        "militar_id": "69eba80fce2855173cec34dc",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05efc37426a947eb6181eb",
+      "antes": {
+        "id": "6a05efc37426a947eb6181eb",
+        "militar_id": "69eba80ce4a22cc9f18b15a3",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05efa2b5a5f70eaa9ece5d",
+      "antes": {
+        "id": "6a05efa2b5a5f70eaa9ece5d",
+        "militar_id": "69eba8086115cbc876a324d6",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05ef88f271feef01149dc4",
+      "antes": {
+        "id": "6a05ef88f271feef01149dc4",
+        "militar_id": "69eba805a6e941c6467ec9e4",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05ef6a4b032f75ace2cd04",
+      "antes": {
+        "id": "6a05ef6a4b032f75ace2cd04",
+        "militar_id": "69eba80212f8fd817da714b5",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05ef438a0eb403a70955d5",
+      "antes": {
+        "id": "6a05ef438a0eb403a70955d5",
+        "militar_id": "69eba7fe37fa3a734592a19c",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05ef0bc32c8311dd04d5d1",
+      "antes": {
+        "id": "6a05ef0bc32c8311dd04d5d1",
+        "militar_id": "69eba7fb1041f73af7ccfb2e",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05eed76838c83254bbf37b",
+      "antes": {
+        "id": "6a05eed76838c83254bbf37b",
+        "militar_id": "69eb7466530412522a01e9c8",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05ee9c1fb0c64b4c19c4cf",
+      "antes": {
+        "id": "6a05ee9c1fb0c64b4c19c4cf",
+        "militar_id": "69eba7f440952e2cd45c0990",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a05ed32f0d66f1704ba3012",
+      "antes": {
+        "id": "6a05ed32f0d66f1704ba3012",
+        "militar_id": "69eba07065d2ab89f8fed6f6",
+        "promocao_id": "6a09f4dea5f6a5dc54b7bc59",
+        "data_promocao": "2024-11-22",
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "QBMP-1.a",
+        "posto_graduacao_novo": "Soldado",
+        "quadro_novo": "QBMP-1.a",
+        "antiguidade_referencia_id": "",
+        "origem_dado": "manual",
+        "status_registro": "ativo"
+      },
+      "depois": {
+        "posto_graduacao_anterior": "",
+        "quadro_anterior": "",
+        "antiguidade_referencia_id": ""
+      }
+    },
+    {
+      "entidade": "HistoricoPromocaoMilitarV2",
+      "id": "6a0ef04bbafd2896256e69cb",
+      "antes": {
+        "antiguidade_referencia_ordem": 1,
+        "promocao_id": "6a0eef0a28a3e1413489aaf7",
+        "posto_graduacao_anterior": "2º Tenente",
+        "militar_id": "69ef5d81c80882b61565245c",
+        "antiguidade_referencia_id": "",
+        "created_by": "",
+        "posto_graduacao_novo": "2º Tenente",
+        "ato_referencia": "DECRETO “P” Nº 1.089, DE 9 DE NOVEMBRO DE 2021",
+        "quadro_novo": "QAOBM",
+        "observacoes": "Registro gerado pela publicação da promoção 6a0eef0a28a3e1413489aaf7 (atual).",
+        "motivo_retificacao": "",
+        "data_promocao": "2021-11-04",
+        "updated_by": "",
+        "origem_dado": "publicacao_promocao",
+        "status_registro": "ativo",
+        "boletim_referencia": "10676",
+        "data_publicacao": "2021-11-10",
+        "quadro_anterior": "QAOBM",
+        "id": "6a0ef04bbafd2896256e69cb",
+        "created_date": "2026-05-21T11:45:15.605000",
+        "updated_date": "2026-05-21T11:45:15.605000",
+        "created_by_id": "694014f8539e0b317aa75a24",
+        "is_sample": false
+      },
+      "depois": {
+        "posto_graduacao_anterior": "Subtenente",
+        "quadro_anterior": "QBMP-1.a",
+        "antiguidade_referencia_id": ""
+      }
+    }
+  ]
+}
