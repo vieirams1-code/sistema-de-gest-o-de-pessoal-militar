@@ -5,9 +5,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import RankIcon from './RankIcon';
 
 const STATUS_PREVISTO = 'previsto';
+const STATUS_ATIVO = 'ativo';
 
 const isRegistroBloqueadoParaCorrecaoDireta = (registro) => Boolean(registro?.promocao_id);
 const valorTexto = (v) => String(v || '').trim();
+const statusRegistro = (registro) => valorTexto(registro?.status_registro || STATUS_ATIVO).toLowerCase();
 const documentoPromocao = (registro) => registro?.boletim_referencia || registro?.ato_referencia || '—';
 
 function Info({ label, value }) {

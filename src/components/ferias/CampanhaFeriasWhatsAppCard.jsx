@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
+import { ENDERECO_PUBLICO_PORTAL, ehEnderecoPublico } from '@/config/portalPublico';
 
 const erroTexto = (erro, fallback) =>
   erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
@@ -75,15 +76,15 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
   const [expandido, setExpandido] = useState(false);
   const modeloCampanhaRef = useRef('');
 
-  const portalLink = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    return `${window.location.origin}/Portal`;
-  }, []);
+  // Link oficial do Portal: endereço público fixo, nunca derivado do navegador de quem dispara.
+  const portalLink = ENDERECO_PUBLICO_PORTAL;
+  const linkPublicoValido = ehEnderecoPublico(portalLink);
 
   const campanhaAberta = normalizar(campanha?.status) === 'aberta_coleta';
   const ultimoEnvio = historico?.[0] || null;
   const podeDisparar = canSend
     && campanhaAberta
+    && linkPublicoValido
     && Boolean(preview?.whatsapp_configurado)
     && Number(preview?.publico?.com_telefone || 0) > 0
     && Boolean(mensagemModelo.trim())
@@ -295,6 +296,13 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
         </div>
       )}
 
+      {!linkPublicoValido && (
+        <div className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>O endereço do Portal configurado não é um endereço público válido. Corrija o endereço oficial do sistema antes de iniciar o disparo.</span>
+        </div>
+      )}
+
       {loading && !preview ? (
         <div className="mt-5 flex items-center gap-2 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" />Calculando o público da campanha...
@@ -343,8 +351,18 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
             {!mensagemModelo.trim() && (
               <div className="mt-2 text-xs font-semibold text-red-600">Digite uma mensagem antes de iniciar o disparo.</div>
             )}
-            <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
-              Link automático: <span className="break-all font-medium text-slate-700">{preview.link_portal}</span>
+            <div className={`mt-3 rounded-lg border p-3 text-xs ${
+              linkPublicoValido ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-700'
+            }`}>
+              <div className="font-bold uppercase tracking-wide">
+                {linkPublicoValido ? 'Link que será enviado' : 'Endereço do Portal inválido'}
+              </div>
+              <div className="mt-1 break-all font-semibold">{preview.link_portal || portalLink}</div>
+              <div className="mt-1">
+                {linkPublicoValido
+                  ? 'Este é o endereço público oficial do sistema. Todos os disparos usam exatamente este link.'
+                  : 'O link precisa apontar para o endereço público do sistema. Endereços de pré-visualização não são aceitos.'}
+              </div>
             </div>
           </div>
 
@@ -408,6 +426,11 @@ export default function CampanhaFeriasWhatsAppCard({ campanha, canSend = false }
                       <div className="mt-1 text-xs text-slate-500">
                         {formatarDataHora(envio.created_date || envio.inicio_em)} · {envio.total_enviados || 0} enviados · {envio.total_falhas || 0} falhas · {envio.total_sem_contato || 0} sem telefone
                       </div>
+                      {envio.link_destino && (
+                        <div className="mt-1 text-xs text-slate-500">
+                          Link enviado: <span className="break-all font-medium text-slate-700">{envio.link_destino}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {emAndamento && !processando && (

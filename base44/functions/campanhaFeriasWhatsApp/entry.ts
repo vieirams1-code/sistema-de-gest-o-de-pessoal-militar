@@ -6,6 +6,7 @@ import {
 } from '../../shared/messaging/evolutionWhatsAppProvider.ts';
 import { CORS_HEADERS, json } from '../../shared/utils/httpJson.ts';
 import { normalizar, texto } from '../../shared/utils/texto.ts';
+import { resolverLinkPortal } from '../../shared/portal/portalUrl.ts';
 
 const HEADERS = { ...CORS_HEADERS, 'Content-Type': 'application/json' };
 const LIMITE_CORPORACAO = 5000;
@@ -38,18 +39,6 @@ function formatarDataBR(value: unknown) {
   const iso = texto(value).slice(0, 10);
   const partes = iso.split('-');
   return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : iso;
-}
-
-function validarLinkPortal(value: unknown) {
-  const raw = texto(value);
-  if (!raw || raw.length > 500) throw Object.assign(new Error('Link do Portal do Militar inválido.'), { status: 400 });
-  try {
-    const url = new URL(raw);
-    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('protocol');
-    return url.toString();
-  } catch {
-    throw Object.assign(new Error('Link do Portal do Militar inválido.'), { status: 400 });
-  }
 }
 
 function validarModeloMensagem(value: unknown) {
@@ -264,7 +253,8 @@ Deno.serve(async (req: Request) => {
     if (acao === 'PREVIEW') {
       const publico = await carregarPublico(base44, campanha);
       const resumo = resumoPublico(publico);
-      const linkPortal = validarLinkPortal(payload?.link_portal);
+      // O link é sempre resolvido para o endereço público oficial do Portal.
+      const linkPortal = resolverLinkPortal(payload?.link_portal);
       const exemplo = publico[0]
         ? renderizarMensagem(publico[0], campanha, linkPortal)
         : MODELO_MENSAGEM
@@ -302,7 +292,7 @@ Deno.serve(async (req: Request) => {
       const emAndamento = existentes.find((item: any) => ['EM_PREPARACAO', 'EM_PROCESSAMENTO'].includes(item?.status));
       if (emAndamento) return json({ error: 'Já existe um envio em processamento para esta campanha.', envio_id: emAndamento.id }, 409);
 
-      const linkPortal = validarLinkPortal(payload?.link_portal);
+      const linkPortal = resolverLinkPortal(payload?.link_portal);
       const modeloMensagem = validarModeloMensagem(payload?.mensagem_modelo);
       const publico = await carregarPublico(base44, campanha);
       const resumo = resumoPublico(publico);
