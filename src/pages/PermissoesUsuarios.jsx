@@ -417,9 +417,14 @@ export default function PermissoesUsuarios() {
     // Consulta direta ao backend para não depender do cache do React Query.
     if (isNewAcesso) {
       const emailNormalizado = normalizeEmail(userUserEmail);
+      const idEmEdicao = existingUserId || null;
       try {
         const existentes = await listarAcessosUsuariosAdmin();
-        if ((existentes || []).some((acesso) => normalizeEmail(acesso?.user_email) === emailNormalizado)) {
+        // O próprio registro em edição nunca conta como duplicidade.
+        if ((existentes || []).some((acesso) => (
+          normalizeEmail(acesso?.user_email) === emailNormalizado
+          && String(acesso?.id || '') !== String(idEmEdicao || '')
+        ))) {
           alert(DUPLICATE_ACCESS_MESSAGE);
           return;
         }
@@ -608,6 +613,10 @@ export default function PermissoesUsuarios() {
       const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(targetIsSuperAdmin ? fullAccessPermissions : reloadedPermissions);
       setSelectedUser(refreshedAccess);
+      // Após criar, a tela passa a editar o registro recém-criado: o próximo
+      // salvamento atualiza o mesmo registro em vez de tentar criar de novo
+      // (o que era bloqueado como e-mail já utilizado).
+      setIsNewAcesso(false);
       if (targetIsSuperAdmin) {
         setTechnicalWarning('Superadmin protegido: alterações críticas foram preservadas com acesso total.');
       }
