@@ -22,7 +22,10 @@ import useCoberturaPlano from '@/components/ferias/useCoberturaPlano';
 import GeracaoFeriasPlanoV2 from '@/components/ferias/GeracaoFeriasPlanoV2';
 import RegistrarPendenciaNaoRespondente from '@/components/ferias/RegistrarPendenciaNaoRespondente';
 import useLotacaoFiltro from '@/components/ferias/useLotacaoFiltro';
+import useMilitaresComCov from '@/components/ferias/useMilitaresComCov';
+import DistribuicaoMensalFerias from '@/components/ferias/DistribuicaoMensalFerias';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
+import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 
 const MESES = [
   { val: '01', nome: 'Janeiro', curto: 'Jan' },
@@ -175,6 +178,7 @@ export default function PainelPlanoFeriasV2() {
   const [filtroMes, setFiltroMes] = useState('TODOS');
   const [filtroLotacao, setFiltroLotacao] = useState([]);
   const lotacaoFiltro = useLotacaoFiltro(filtroLotacao, userEmail);
+  const militaresCov = useMilitaresComCov();
 
   const [selecionado, setSelecionado] = useState(null);
   const [mesesGestor, setMesesGestor] = useState([]);
@@ -494,7 +498,16 @@ export default function PainelPlanoFeriasV2() {
         if (mapa[p.mes]) mapa[p.mes].push(op);
       });
     });
-    return mapa;
+    // Ordenação institucional: posto/graduação do mais antigo ao mais moderno.
+    return Object.fromEntries(Object.entries(mapa).map(([mes, pessoas]) => [
+      mes,
+      ordenarMilitaresPorAntiguidadeInstitucional(pessoas.map((op) => ({
+        ...op,
+        posto_graduacao: op.militar_posto,
+        quadro: op.militar_quadro,
+        nome_completo: op.militar_nome,
+      }))),
+    ]));
   }, [opcoes]);
 
   const abrirCobertura = () => { setSelecionado(null); setVisao('cobertura'); };
@@ -717,35 +730,13 @@ export default function PainelPlanoFeriasV2() {
               onCriar={criarCampanhaSelecionados}
             />
           ) : (
-            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-5">
-              {MESES.map((mes) => {
-                const pessoas = distribuicao[mes.val] || [];
-                const pct = totalPublico ? Math.min(100, Math.round((pessoas.length / totalPublico) * 100)) : 0;
-                return (
-                  <div key={mes.val} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-black text-slate-900">{mes.nome}</h3>
-                        <p className="text-xs text-slate-500 mt-1">{pessoas.length} militar(es) programado(s)</p>
-                      </div>
-                      <span className="text-xs font-bold text-blue-700 bg-blue-50 rounded-full px-2 py-1">{pct}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-slate-100 mt-4 overflow-hidden">
-                      <div className="h-full rounded-full bg-blue-600" style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {pessoas.slice(0, 6).map((p) => (
-                        <button key={p.id} type="button" onClick={() => abrirMilitar(p)} className="w-full flex justify-between gap-3 text-left text-xs hover:text-blue-700">
-                          <span className="truncate font-semibold">{p.militar_nome}</span>
-                          <span className="text-slate-400 shrink-0">{p.militar_posto}</span>
-                        </button>
-                      ))}
-                      {!pessoas.length && <p className="text-xs text-slate-400">Nenhuma definição neste mês.</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <DistribuicaoMensalFerias
+              meses={MESES}
+              distribuicao={distribuicao}
+              totalPublico={totalPublico}
+              militaresCov={militaresCov}
+              onAbrirMilitar={abrirMilitar}
+            />
           )}
         </div>
       </div>
