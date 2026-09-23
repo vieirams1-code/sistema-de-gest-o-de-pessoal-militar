@@ -21,6 +21,8 @@ import { Button } from '@/components/ui/button';
 import useCoberturaPlano from '@/components/ferias/useCoberturaPlano';
 import GeracaoFeriasPlanoV2 from '@/components/ferias/GeracaoFeriasPlanoV2';
 import RegistrarPendenciaNaoRespondente from '@/components/ferias/RegistrarPendenciaNaoRespondente';
+import useLotacaoFiltro from '@/components/ferias/useLotacaoFiltro';
+import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 
 const MESES = [
   { val: '01', nome: 'Janeiro', curto: 'Jan' },
@@ -171,6 +173,8 @@ export default function PainelPlanoFeriasV2() {
   const [filtroCampanha, setFiltroCampanha] = useState('TODAS');
   const [filtroStatus, setFiltroStatus] = useState('TODOS');
   const [filtroMes, setFiltroMes] = useState('TODOS');
+  const [filtroLotacao, setFiltroLotacao] = useState([]);
+  const lotacaoFiltro = useLotacaoFiltro(filtroLotacao, userEmail);
 
   const [selecionado, setSelecionado] = useState(null);
   const [mesesGestor, setMesesGestor] = useState([]);
@@ -242,8 +246,14 @@ export default function PainelPlanoFeriasV2() {
 
     const comResposta = opcoes.map((op) => {
       const publico = publicoPorMilitar.get(String(op.militar_id || ''));
+      // A lotação do cadastro do militar é a fonte oficial: o registro de resposta
+      // guarda apenas o snapshot do envio e fica desatualizado após movimentações.
+      const lotacaoAtual = publico?.lotacao_id
+        ? { lotacao_id: publico.lotacao_id, lotacao_nome: publico.lotacao_nome }
+        : { lotacao_id: op.lotacao_id || '', lotacao_nome: op.lotacao_nome || '' };
       return {
         ...op,
+        ...lotacaoAtual,
         campanhas_alvo: publico?.campanhas_alvo || (
           op.campanha_id
             ? [{ campanha_id: op.campanha_id, titulo: op.campanha_titulo || '' }]
@@ -320,6 +330,7 @@ export default function PainelPlanoFeriasV2() {
           && op.campanhas_alvo.some((campanha) => String(campanha.campanha_id || '') === filtroCampanha);
         if (!pertenceCampanha) return false;
       }
+      if (lotacaoFiltro.idsSelecionados && !lotacaoFiltro.idsSelecionados.has(String(op.lotacao_id || ''))) return false;
       if (filtroStatus !== 'TODOS' && statusOpcao(op).label !== filtroStatus) return false;
       if (filtroMes !== 'TODOS') {
         const solicitado = [1, 2, 3].some((n) => mesesDaOpcao(op, n).includes(filtroMes));
@@ -327,7 +338,7 @@ export default function PainelPlanoFeriasV2() {
       }
       return true;
     });
-  }, [linhasPainel, busca, filtroCampanha, filtroStatus, filtroMes]);
+  }, [linhasPainel, busca, filtroCampanha, filtroStatus, filtroMes, lotacaoFiltro.idsSelecionados]);
 
   const abrirMilitar = (op) => {
     setSelecionado(op);
@@ -599,7 +610,7 @@ export default function PainelPlanoFeriasV2() {
 
           {visao === 'lista' ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.4fr)_minmax(150px,.7fr)_minmax(150px,.7fr)_minmax(150px,.7fr)] gap-3 mt-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.4fr)_minmax(190px,1.1fr)_minmax(150px,.8fr)_minmax(150px,.8fr)_minmax(140px,.8fr)] gap-3 mt-5">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -609,6 +620,16 @@ export default function PainelPlanoFeriasV2() {
                     className="w-full h-10 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                   />
                 </div>
+
+                <MultiSelectFiltro
+                  placeholder="Todas as lotações"
+                  options={lotacaoFiltro.options}
+                  groupedOptions={lotacaoFiltro.groupedOptions}
+                  value={filtroLotacao}
+                  onChange={setFiltroLotacao}
+                  groupSearchPlaceholder="Buscar lotação..."
+                  triggerClassName="h-10 w-full bg-white border-slate-200"
+                />
 
                 <select value={filtroCampanha} onChange={(e) => setFiltroCampanha(e.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
                   <option value="TODAS">Todos os grupos / campanhas</option>

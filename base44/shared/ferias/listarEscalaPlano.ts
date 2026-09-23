@@ -88,7 +88,7 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
     const alvos = campanhasConsulta.filter((c: any) => matchMilitarCampanha(c, militar, membros));
     if (!alvos.length) continue;
     const id = textoId(militar?.id);
-    publicoMap.set(id, { militar_id: id, militar_nome: militar?.nome_completo || militar?.nome_guerra || '', militar_nome_guerra: militar?.nome_guerra || '', militar_posto: militar?.posto_graduacao || '', militar_matricula: militar?.matricula || '', militar_quadro: militar?.quadro || '', lotacao_id: militar?.estrutura_id || militar?.subgrupamento_id || militar?.lotacao_id || '', lotacao_nome: militar?.lotacao || militar?.estrutura_nome || 'Não informada', campanhas_alvo: alvos.map((c: any) => ({ campanha_id: c.id, titulo: c.titulo || '' })) });
+    publicoMap.set(id, { militar_id: id, militar_nome: militar?.nome_completo || militar?.nome_guerra || '', militar_nome_guerra: militar?.nome_guerra || '', militar_posto: militar?.posto_graduacao || '', militar_matricula: militar?.matricula || '', militar_quadro: militar?.quadro || '', lotacao_id: militar?.estrutura_id || militar?.subgrupamento_id || militar?.lotacao_id || '', lotacao_nome: militar?.estrutura_nome || militar?.lotacao || 'Não informada', campanhas_alvo: alvos.map((c: any) => ({ campanha_id: c.id, titulo: c.titulo || '' })) });
   }
   const publico = Array.from(publicoMap.values());
   let cobertura: any[] | null = null;
