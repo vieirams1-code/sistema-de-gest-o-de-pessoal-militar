@@ -216,22 +216,13 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Nenhuma opção informada para saneamento.' }, 400);
       }
 
-      const { casos } = await calcularCasos(base44);
-      const casoPorOpcao = new Map(casos.map((c: any) => [c.opcao_id, c]));
-
       const corrigidos: any[] = [];
       const falhas: any[] = [];
 
       for (const item of solicitadas) {
         const opcaoId = texto(item?.opcao_id);
-        const caso: any = casoPorOpcao.get(opcaoId);
-
-        if (!caso) {
-          falhas.push({ opcao_id: opcaoId, motivo: 'Opção não encontrada entre as vinculadas a período inativado (já saneada).' });
-          continue;
-        }
-        if (!caso.pode_corrigir) {
-          falhas.push({ opcao_id: opcaoId, motivo: caso.motivo_bloqueio });
+        if (!opcaoId) {
+          falhas.push({ opcao_id: '', motivo: 'Identificador da opção não informado.' });
           continue;
         }
 
@@ -242,13 +233,31 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
-          const contexto = await carregarContextoMilitar(base44, caso.militar_id);
-          const anoCampanha = Number(opcao?.ano_referencia || new Date().getFullYear() + 1);
+          const militarId = texto(opcao.militar_id);
+          const periodoAtual = await base44.asServiceRole.entities.PeriodoAquisitivo
+            .get(texto(opcao.periodo_aquisitivo_id))
+            .catch(() => null);
 
-          const periodoInformado = texto(item?.periodo_aquisitivo_id);
+          if (!periodoEstaInativo(periodoAtual)) {
+            falhas.push({ opcao_id: opcaoId, motivo: 'A opção não está vinculada a um período inativado (já saneada).' });
+            continue;
+          }
+          if (opcao?.gerado_ferias_efetivas === true) {
+            falhas.push({ opcao_id: opcaoId, motivo: 'As férias desta resposta já foram geradas.' });
+            continue;
+          }
+          if (!militarId) {
+            falhas.push({ opcao_id: opcaoId, motivo: 'Resposta sem militar vinculado.' });
+            continue;
+          }
+
+          const contexto = await carregarContextoMilitar(base44, militarId);
+          const anoCampanha = Number(opcao?.ano_referencia || new Date().getFullYear() + 1);
           const ordenados = [...(contexto.periodos || [])].sort((a: any, b: any) =>
             String(a?.inicio_aquisitivo || '').localeCompare(String(b?.inicio_aquisitivo || ''))
           );
+
+          const periodoInformado = texto(item?.periodo_aquisitivo_id);
           const sugestao = periodoMaisAntigoElegivel(contexto.periodos, contexto.ferias, contexto.ajustes, anoCampanha);
 
           const alvo = periodoInformado
@@ -266,8 +275,10 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
-          const inelegiveis = mesesInelegiveis(caso.meses_escolhidos, resumo);
+          const mesesEscolhidos = extrairMeses(opcao);
+          const inelegiveis = mesesInelegiveis(mesesEscolhidos, resumo);
           const diasDireito = Math.max(0, resumo.dias_sem_previsao);
+          const periodoAtualResumo = montarResumoPeriodo(periodoAtual);
 
           await base44.asServiceRole.entities.OpcaoFeriasMilitar.update(opcaoId, {
             periodo_aquisitivo_id: alvo.id,
@@ -275,16 +286,21 @@ Deno.serve(async (req: Request) => {
             periodo_fim: alvo.fim_aquisitivo || '',
             dias_direito: diasDireito,
             status_camada_1: inelegiveis.length ? 'Pendente_Reanalise' : 'Pendente',
-            justificativa_ajuste_gestor: `Saneamento: período inativado ${caso.periodo_atual?.ref || caso.periodo_atual?.id || ''} reapontado para ${referenciaPeriodo(alvo)}${inelegiveis.length ? `. Meses fora da elegibilidade do novo período: ${inelegiveis.join(', ')}.` : '.'}`,
+            justificativa_ajuste_gestor: `Saneamento: período inativado ${periodoAtualResumo?.ref || ''} reapontado para ${referenciaPeriodo(alvo)}${inelegiveis.length ? `. Meses fora da elegibilidade do novo período: ${inelegiveis.join(', ')}.` : '.'}`,
           });
 
-          await registrarAuditoria(base44, user, opcao, caso, alvo, inelegiveis);
+          await registrarAuditoria(base44, user, opcao, {
+            militar_id: militarId,
+            militar_nome: opcao?.militar_nome || '',
+            periodo_atual: periodoAtualResumo,
+            meses_escolhidos: mesesEscolhidos,
+          }, alvo, inelegiveis);
 
           corrigidos.push({
             opcao_id: opcaoId,
-            militar_id: caso.militar_id,
-            militar_nome: caso.militar_nome,
-            periodo_anterior_ref: caso.periodo_atual?.ref || '',
+            militar_id: militarId,
+            militar_nome: opcao?.militar_nome || '',
+            periodo_anterior_ref: periodoAtualResumo?.ref || '',
             periodo_novo_ref: referenciaPeriodo(alvo),
             dias_direito: diasDireito,
             meses_inelegiveis: inelegiveis,

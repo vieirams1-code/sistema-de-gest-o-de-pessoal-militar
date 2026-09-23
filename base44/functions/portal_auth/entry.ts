@@ -189,7 +189,26 @@ Deno.serve(async (req: Request) => {
 
         const matriculaCadastrada = normalizeMatricula(militar?.matricula);
         const militarAtivo = militar && militar.status !== 'Inativo' && militar.status_cadastro !== 'Inativo' && militar.status !== 'Falecido';
-        const matriculaValida = militarAtivo && matriculaCadastrada && matriculaInput === matriculaCadastrada;
+
+        // Além do cadastro, aceita a matrícula atual registrada no histórico de
+        // matrículas. Sem isso, uma divergência entre cadastro e histórico
+        // bloqueia o acesso mesmo com o militar informando o número correto.
+        const matriculasAceitas = new Set<string>();
+        if (matriculaCadastrada) matriculasAceitas.add(matriculaCadastrada);
+        try {
+          const MatriculaMilitar = base44.asServiceRole?.entities?.MatriculaMilitar || base44.entities?.MatriculaMilitar;
+          if (MatriculaMilitar && sessao.militar_id) {
+            const historico = await MatriculaMilitar.filter({ militar_id: sessao.militar_id }, '-created_date', 20, 0);
+            const lista = Array.isArray(historico) ? historico : [];
+            const atual = lista.find((m: any) => m?.is_atual === true)
+              || lista.find((m: any) => String(m?.situacao || '').toLowerCase() === 'ativa')
+              || lista[0];
+            const normalizadaHistorico = normalizeMatricula(atual?.matricula || atual?.matricula_normalizada);
+            if (normalizadaHistorico) matriculasAceitas.add(normalizadaHistorico);
+          }
+        } catch (_eHistorico) {}
+
+        const matriculaValida = militarAtivo && matriculasAceitas.has(matriculaInput);
 
         if (!matriculaValida) {
           const novasTentativas = (sessao.otp_attempts || 0) + 1;
@@ -609,4 +628,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-

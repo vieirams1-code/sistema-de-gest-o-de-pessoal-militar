@@ -258,6 +258,7 @@ const menuGroups = [
             tab: 'adicoes',
             anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }],
           },
+          { name: 'Saneamento de Dados', page: 'SaneamentoCadastral', icon: ShieldCheck, adminOnly: true },
           { name: 'Backup do Sistema', page: 'BackupSistema', icon: Archive, adminOnly: true },
         ],
       },

@@ -15,6 +15,7 @@ import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 import DescontosFerias from '@/pages/DescontosFerias';
 import InativacaoPeriodoLote from '@/pages/InativacaoPeriodoLote';
+import SaneamentoCadastral from '@/pages/SaneamentoCadastral';
 import PortalApp from '@/portal/PortalApp';
 import { getPageAccessPolicy } from '@/config/pageAccessPolicy';
 
@@ -332,6 +333,17 @@ function App() {
                 <AuthenticatedAppWrapper currentPageName="InativacaoPeriodoLote">
                   <RequireAdmin>
                     <InativacaoPeriodoLote />
+                  </RequireAdmin>
+                </AuthenticatedAppWrapper>
+              }
+            />
+            {/* Saneamento assistido de matrícula divergente e de opções de férias órfãs. Admin-only. */}
+            <Route
+              path="/SaneamentoCadastral"
+              element={
+                <AuthenticatedAppWrapper currentPageName="SaneamentoCadastral">
+                  <RequireAdmin>
+                    <SaneamentoCadastral />
                   </RequireAdmin>
                 </AuthenticatedAppWrapper>
               }
