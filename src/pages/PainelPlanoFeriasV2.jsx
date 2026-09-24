@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock3,
   LayoutList,
+  Printer,
   RefreshCw,
   Search,
   Users,
@@ -24,6 +25,7 @@ import RegistrarPendenciaNaoRespondente from '@/components/ferias/RegistrarPende
 import useLotacaoFiltro from '@/components/ferias/useLotacaoFiltro';
 import useMilitaresComCov from '@/components/ferias/useMilitaresComCov';
 import DistribuicaoMensalFerias from '@/components/ferias/DistribuicaoMensalFerias';
+import DistribuicaoMensalFeriasImpressao from '@/components/ferias/DistribuicaoMensalFeriasImpressao';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 
@@ -181,6 +183,7 @@ export default function PainelPlanoFeriasV2() {
   const militaresCov = useMilitaresComCov();
 
   const [selecionado, setSelecionado] = useState(null);
+  const [emitidoEm, setEmitidoEm] = useState(new Date());
   const [mesesGestor, setMesesGestor] = useState([]);
   const [saneando, setSaneando] = useState(false);
   const [reatribuindo, setReatribuindo] = useState(false);
@@ -510,6 +513,19 @@ export default function PainelPlanoFeriasV2() {
     ]));
   }, [opcoes]);
 
+  const abrirDistribuicao = () => { setEmitidoEm(new Date()); setVisao('meses'); };
+
+  const imprimirDistribuicao = () => {
+    const tituloAnterior = document.title;
+    document.title = `Distribuição por mês - ${planoAtual?.titulo || 'Plano de Férias'}`;
+    const restaurarTitulo = () => {
+      document.title = tituloAnterior;
+      window.removeEventListener('afterprint', restaurarTitulo);
+    };
+    window.addEventListener('afterprint', restaurarTitulo);
+    window.print();
+  };
+
   const abrirCobertura = () => { setSelecionado(null); setVisao('cobertura'); };
 
   const alternarCobertura = (militarId) => setMilitaresSelecionados((atuais) => atuais.includes(militarId) ? atuais.filter((id) => id !== militarId) : [...atuais, militarId]);
@@ -613,7 +629,7 @@ export default function PainelPlanoFeriasV2() {
             <button onClick={() => setVisao('lista')} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'lista' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
               <LayoutList className="w-4 h-4" /> Lista de militares
             </button>
-            <button onClick={() => setVisao('meses')} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'meses' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
+            <button onClick={abrirDistribuicao} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'meses' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
               <BarChart3 className="w-4 h-4" /> Distribuição por mês
             </button>
             {podeVerCobertura && <button onClick={abrirCobertura} className={`h-11 flex items-center gap-2 text-sm font-bold border-b-2 ${visao === 'cobertura' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500'}`}>
@@ -730,13 +746,26 @@ export default function PainelPlanoFeriasV2() {
               onCriar={criarCampanhaSelecionados}
             />
           ) : (
-            <DistribuicaoMensalFerias
-              meses={MESES}
-              distribuicao={distribuicao}
-              totalPublico={totalPublico}
-              militaresCov={militaresCov}
-              onAbrirMilitar={abrirMilitar}
-            />
+            <>
+              <DistribuicaoMensalFerias
+                meses={MESES}
+                distribuicao={distribuicao}
+                totalPublico={totalPublico}
+                militaresCov={militaresCov}
+                onAbrirMilitar={abrirMilitar}
+                onImprimir={imprimirDistribuicao}
+              />
+
+              <DistribuicaoMensalFeriasImpressao
+                planoTitulo={planoAtual?.titulo}
+                anoReferencia={planoAtual?.ano_referencia}
+                meses={MESES}
+                distribuicao={distribuicao}
+                totalPublico={totalPublico}
+                militaresCov={militaresCov}
+                emitidoEm={emitidoEm}
+              />
+            </>
           )}
         </div>
       </div>
