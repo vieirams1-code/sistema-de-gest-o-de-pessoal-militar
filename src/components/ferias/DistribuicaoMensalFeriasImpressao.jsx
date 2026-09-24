@@ -87,6 +87,15 @@ const CSS_IMPRESSAO = `
     .dme-cov svg { width: 2.6mm !important; height: 2.6mm !important; }
     .dme-vazio { font-size: 7.8pt !important; font-style: italic !important; color: #4b5563 !important; margin: 1.2mm 0 0 0 !important; }
 
+    .dme-grupo { margin-top: 1mm !important; }
+    .dme-grupo-titulo {
+      font-size: 7pt !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      color: #374151 !important;
+      margin: 1mm 0 0.4mm 0 !important;
+    }
+
     .dme-rodape {
       margin-top: 3mm !important;
       border-top: 0.35mm solid #6b7280 !important;
@@ -127,6 +136,21 @@ function MilitarLinha({ pessoa, militaresCov }) {
   );
 }
 
+function GrupoImpressao({ titulo, pessoas, militaresCov }) {
+  if (!pessoas.length) return null;
+
+  return (
+    <div className="dme-grupo">
+      <p className="dme-grupo-titulo">{titulo} · {pessoas.length}</p>
+      <ul className="dme-lista">
+        {pessoas.map((pessoa, index) => (
+          <MilitarLinha key={`${pessoa?.id || pessoa?.militar_id}-${index}`} pessoa={pessoa} militaresCov={militaresCov} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function DistribuicaoMensalFeriasImpressao({
   planoTitulo,
   anoReferencia,
@@ -151,23 +175,21 @@ export default function DistribuicaoMensalFeriasImpressao({
 
         <div className="dme-grid">
           {meses.map((mes) => {
-            const pessoas = distribuicao?.[mes.val] || [];
+            const grupos = distribuicao?.[mes.val] || { integrais: [], fracionados: [] };
+            const integrais = grupos.integrais || [];
+            const fracionados = grupos.fracionados || [];
+            const total = integrais.length + fracionados.length;
             return (
               <section key={mes.val} className="dme-bloco">
                 <div className="dme-bloco-topo">
                   <h2>{mes.nome}</h2>
-                  <span className="dme-contagem">{pessoas.length}</span>
+                  <span className="dme-contagem">{total}</span>
                 </div>
 
-                {pessoas.length > 0 ? (
-                  <ul className="dme-lista">
-                    {pessoas.map((pessoa, index) => (
-                      <MilitarLinha key={`${pessoa?.id || pessoa?.militar_id}-${index}`} pessoa={pessoa} militaresCov={militaresCov} />
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="dme-vazio">Nenhuma definição neste mês.</p>
-                )}
+                {total === 0 && <p className="dme-vazio">Nenhuma definição neste mês.</p>}
+
+                <GrupoImpressao titulo="Integral · 30 dias" pessoas={integrais} militaresCov={militaresCov} />
+                <GrupoImpressao titulo="Fracionado" pessoas={fracionados} militaresCov={militaresCov} />
               </section>
             );
           })}
@@ -178,6 +200,7 @@ export default function DistribuicaoMensalFeriasImpressao({
           <p>
             <IconeCatalogo value={militaresCov?.icone} /> militar com a tag COV ativa.
           </p>
+          <p><strong>Integral</strong> 30 dias gozados em um único mês; <strong>Fracionado</strong> dias divididos em mais de um mês.</p>
           <p>Lista integral de cada mês, do posto/graduação mais antigo ao mais moderno.</p>
         </footer>
       </article>

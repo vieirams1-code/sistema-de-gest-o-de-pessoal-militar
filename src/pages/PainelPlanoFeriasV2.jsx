@@ -185,6 +185,7 @@ export default function PainelPlanoFeriasV2() {
   const [selecionado, setSelecionado] = useState(null);
   const [emitidoEm, setEmitidoEm] = useState(new Date());
   const [mesesGestor, setMesesGestor] = useState([]);
+  const [modoIntegral, setModoIntegral] = useState(false);
   const [saneando, setSaneando] = useState(false);
   const [reatribuindo, setReatribuindo] = useState(false);
 
@@ -350,12 +351,16 @@ export default function PainelPlanoFeriasV2() {
   const abrirMilitar = (op) => {
     setSelecionado(op);
     const atual = decisaoAtual(op).map((p) => p.mes);
+    // Se a escala já foi salva como integral, reabre nesse modo mesmo que a
+    // modalidade original informada pelo militar seja fracionada.
+    setModoIntegral(numeroFracoes(op) > 1 && atual.length === 1);
     setMesesGestor(Array.from({ length: numeroFracoes(op) }, (_, idx) => atual[idx] || ''));
   };
 
   const fecharDrawer = () => {
     setSelecionado(null);
     setMesesGestor([]);
+    setModoIntegral(false);
   };
 
   const selecionarMes = (indice, mes) => {
@@ -368,7 +373,9 @@ export default function PainelPlanoFeriasV2() {
 
   const salvarDefinicao = async () => {
     if (!selecionado || !podeAprovar || saving) return;
-    const qtd = numeroFracoes(selecionado);
+    // O gestor pode transformar uma escala fracionada em integral: nesse caso a
+    // definição é enviada como uma única parcela com todos os dias de direito.
+    const qtd = modoIntegral ? 1 : numeroFracoes(selecionado);
     const escolhidos = mesesGestor.slice(0, qtd);
     if (escolhidos.some((m) => !m)) {
       setFeedback({ type: 'error', message: 'Selecione o mês definitivo de todas as frações.' });
@@ -380,7 +387,9 @@ export default function PainelPlanoFeriasV2() {
     }
 
     const ano = Number(planoAtual?.ano_referencia || campanhaAtual?.ano_referencia || new Date().getFullYear() + 1);
-    const dias = diasPorFracao(selecionado);
+    const dias = modoIntegral
+      ? [Math.max(1, Number(selecionado.dias_direito || 30))]
+      : diasPorFracao(selecionado);
     const parcelas = escolhidos.map((mes, idx) => {
       const regra = regraMes(selecionado, mes, ano);
       return {
@@ -502,14 +511,19 @@ export default function PainelPlanoFeriasV2() {
       });
     });
     // Ordenação institucional: posto/graduação do mais antigo ao mais moderno.
+    // Em cada mês, as férias integrais (30 dias em um único mês) ficam acima das fracionadas.
+    const ordenar = (pessoas) => ordenarMilitaresPorAntiguidadeInstitucional(pessoas.map((op) => ({
+      ...op,
+      posto_graduacao: op.militar_posto,
+      quadro: op.militar_quadro,
+      nome_completo: op.militar_nome,
+    })));
     return Object.fromEntries(Object.entries(mapa).map(([mes, pessoas]) => [
       mes,
-      ordenarMilitaresPorAntiguidadeInstitucional(pessoas.map((op) => ({
-        ...op,
-        posto_graduacao: op.militar_posto,
-        quadro: op.militar_quadro,
-        nome_completo: op.militar_nome,
-      }))),
+      {
+        integrais: ordenar(pessoas.filter((op) => decisaoAtual(op).length <= 1)),
+        fracionados: ordenar(pessoas.filter((op) => decisaoAtual(op).length > 1)),
+      },
     ]));
   }, [opcoes]);
 
@@ -894,7 +908,28 @@ export default function PainelPlanoFeriasV2() {
               <h3 className="font-black text-base text-slate-900">Definição do gestor</h3>
               <p className="text-xs text-slate-500 mt-1 mb-4">Escolha somente os meses definitivos. As datas serão calculadas pelo sistema conforme as regras do período aquisitivo.</p>
 
-              {numeroFracoes(selecionado) === 1 ? (
+              {numeroFracoes(selecionado) > 1 && (
+                <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
+                    onClick={() => setModoIntegral(false)}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${!modoIntegral ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    Fracionado · {diasPorFracao(selecionado).join(' + ')} dias
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
+                    onClick={() => setModoIntegral(true)}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${modoIntegral ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    Integral · {Math.max(1, Number(selecionado.dias_direito || 30))} dias
+                  </button>
+                </div>
+              )}
+
+              {(numeroFracoes(selecionado) === 1 || modoIntegral) ? (
                 <IntegralPicker op={selecionado} value={mesesGestor[0] || ''} onChange={(mes) => selecionarMes(0, mes)} />
               ) : (
                 <div className="space-y-3">
@@ -923,10 +958,13 @@ export default function PainelPlanoFeriasV2() {
                 </div>
               )}
 
-              {mesesGestor.filter(Boolean).length > 0 && (
+              {(modoIntegral ? [mesesGestor[0]] : mesesGestor).filter(Boolean).length > 0 && (
                 <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
                   <span className="font-bold">Definição:</span>{' '}
-                  {mesesGestor.filter(Boolean).map((m, idx) => `${diasPorFracao(selecionado)[idx]} dias em ${nomeMes(m)}`).join(' · ')}
+                  {(modoIntegral ? [mesesGestor[0]] : mesesGestor.filter(Boolean))
+                    .filter(Boolean)
+                    .map((m, idx) => `${(modoIntegral ? [Math.max(1, Number(selecionado.dias_direito || 30))] : diasPorFracao(selecionado))[idx]} dias em ${nomeMes(m)}`)
+                    .join(' · ')}
                 </div>
               )}
 
