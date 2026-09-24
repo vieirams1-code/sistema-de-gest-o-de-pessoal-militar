@@ -82,6 +82,69 @@ export async function listarEscalaPlano(args: any): Promise<Response> {
   let opcoes = todasOpcoes.filter((op: any) => idsEscopo.has(textoId(op?.militar_id)) && (idsCampanhas.has(op.campanha_id) || (!payload.campanha_id && planoId && textoId(op.plano_ferias_institucional_id) === planoId))).map((op: any) => ({ ...op, campanha_titulo: campanhas.find((c: any) => c.id === op.campanha_id)?.titulo || '' }));
   const consolidado = Boolean(planoId && !payload.campanha_id);
   if (consolidado) opcoes = consolidarOpcoesPlano(opcoes);
+  // Elegibilidade canônica por resposta: o painel precisa oferecer exatamente os
+  // meses que o serviço aceita na definição do gestor. Sem esse cálculo a tela
+  // exibia meses recusados pela validação, devolvendo erro 400 ao salvar.
+  const anoElegibilidade = Number(
+    campanhasConsulta[0]?.ano_referencia || campanhas[0]?.ano_referencia || (new Date().getFullYear() + 1)
+  );
+  const idsMilitaresResposta = [...new Set(opcoes.map((op: any) => textoId(op?.militar_id)).filter(Boolean))];
+  const idsPeriodosResposta = [...new Set(opcoes.map((op: any) => textoId(op?.periodo_aquisitivo_id)).filter(Boolean))];
+  const periodosResposta = new Map<string, any>();
+  const feriasPorMilitarResposta = new Map<string, any[]>();
+  const ajustesPorMilitarResposta = new Map<string, any[]>();
+  if (idsMilitaresResposta.length) {
+    try {
+      const consultaResposta = { militar_id: { $in: idsMilitaresResposta } };
+      const [periodos, feriasResposta, ajustesResposta] = await Promise.all([
+        idsPeriodosResposta.length
+          ? listarTodos(base44.asServiceRole.entities.PeriodoAquisitivo, { id: { $in: idsPeriodosResposta } })
+          : [],
+        listarTodos(base44.asServiceRole.entities.Ferias, consultaResposta),
+        listarTodos(base44.asServiceRole.entities.AjusteSaldoFerias, { ...consultaResposta, status: 'ativo' }),
+      ]);
+      for (const periodo of periodos) periodosResposta.set(textoId(periodo?.id), periodo);
+      for (const item of feriasResposta) {
+        const id = textoId(item?.militar_id);
+        if (!id) continue;
+        if (!feriasPorMilitarResposta.has(id)) feriasPorMilitarResposta.set(id, []);
+        feriasPorMilitarResposta.get(id)!.push(item);
+      }
+      for (const item of ajustesResposta) {
+        const id = textoId(item?.militar_id);
+        if (!id) continue;
+        if (!ajustesPorMilitarResposta.has(id)) ajustesPorMilitarResposta.set(id, []);
+        ajustesPorMilitarResposta.get(id)!.push(item);
+      }
+    } catch (erroElegibilidade: any) {
+      // A falha no cálculo não pode impedir a listagem principal do painel.
+      console.error('[listarEscalaPlano] Falha ao calcular elegibilidade das respostas:', erroElegibilidade?.message || erroElegibilidade);
+    }
+  }
+  opcoes = opcoes.map((op: any) => {
+    const periodo = periodosResposta.get(textoId(op?.periodo_aquisitivo_id));
+    if (!periodo) return op;
+    const militarId = textoId(op?.militar_id);
+    const resumo = calcularResumoPeriodoPlano(
+      periodo,
+      feriasPorMilitarResposta.get(militarId) || [],
+      ajustesPorMilitarResposta.get(militarId) || [],
+      anoElegibilidade,
+    );
+    return {
+      ...op,
+      resumo_periodo: {
+        dias_sem_previsao: resumo.dias_sem_previsao,
+        dias_comprometidos: resumo.dias_comprometidos,
+        elegivel_plano: resumo.elegivel_plano,
+        primeira_data_legal_gozo: resumo.primeira_data_legal_gozo,
+        limite_fruicao: resumo.limite_fruicao,
+        meses_disponiveis: (resumo.meses_elegiveis || [])
+          .filter((m: any) => m?.permitido && m?.data_inicio)
+          .map((m: any) => ({ mes: m.mes, data_inicio: m.data_inicio })),
+      },
+    };
+  });
   const membros = await carregarMembrosPorGrupo(base44, campanhasConsulta);
   const publicoMap = new Map<string, any>();
   for (const militar of militares) {

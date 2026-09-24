@@ -67,7 +67,59 @@ function adicionarUmDia(dataStr) {
   return dt.toISOString().slice(0, 10);
 }
 
-function regraMes(op, mes, ano) {
+// Meses e datas oficiais calculados pelo serviço para o período aquisitivo da
+// resposta. Quando o serviço informa a elegibilidade, o painel usa exatamente
+// essa relação, evitando oferecer meses que a validação do backend recusa.
+function mesesDisponiveis(op) {
+  const meses = op?.resumo_periodo?.meses_disponiveis;
+  return Array.isArray(meses) ? meses : null;
+}
+
+function motivoIndisponibilidade(op) {
+  const resumo = op?.resumo_periodo;
+  if (!resumo) return '';
+  const esperados = Math.max(1, Number(op?.dias_direito || 30));
+  const disponiveis = Number(resumo.dias_sem_previsao || 0);
+  if (disponiveis <= 0) {
+    return 'Este período aquisitivo não possui dias disponíveis para escalar neste plano.';
+  }
+  if (disponiveis < esperados) {
+    return `Este período possui apenas ${disponiveis} dia(s) disponível(is) e a escala exige ${esperados} dia(s).`;
+  }
+  if (!resumo.elegivel_plano) {
+    if (resumo.limite_fruicao && resumo.primeira_data_legal_gozo && resumo.primeira_data_legal_gozo > resumo.limite_fruicao) {
+      return `O prazo limite de fruição deste período (${formatarDataBR(resumo.limite_fruicao)}) já foi ultrapassado.`;
+    }
+    if (resumo.primeira_data_legal_gozo) {
+      return `O direito deste período só pode ser gozado a partir de ${formatarDataBR(resumo.primeira_data_legal_gozo)}, fora do ano deste plano.`;
+    }
+    return 'Este período aquisitivo não está elegível para este plano.';
+  }
+  if (mesesDisponiveis(op)?.length === 0) {
+    if (resumo.limite_fruicao) {
+      return `O prazo limite de fruição deste período (${formatarDataBR(resumo.limite_fruicao)}) já foi ultrapassado e não há mês disponível no plano.`;
+    }
+    return 'Nenhum mês deste período está disponível para escalar neste plano.';
+  }
+  return '';
+}
+
+function opcoesDeMes(op) {
+  const disponiveis = mesesDisponiveis(op);
+  if (!disponiveis) return MESES.map((m) => ({ val: m.val, nome: m.nome }));
+  const valores = disponiveis
+    .map((m) => String(m?.mes || '').padStart(2, '0'))
+    .filter((m) => /^\d{2}$/.test(m));
+  // Mantém visível uma definição já salva mesmo que o mês deixe de ser oferecido.
+  decisaoAtual(op).forEach((p) => { if (!valores.includes(p.mes)) valores.push(p.mes); });
+  return [...new Set(valores)].map((val) => ({ val, nome: nomeMes(val) }));
+}
+
+function regraMes(op, mes, ano, disponiveis) {
+  if (disponiveis) {
+    const regra = disponiveis.find((m) => String(m?.mes || '').padStart(2, '0') === String(mes || '').padStart(2, '0'));
+    return { permitido: Boolean(regra?.data_inicio), dataInicio: regra?.data_inicio || '', primeiraDataLegal: '' };
+  }
   const inicioMes = `${ano}-${mes}-01`;
   const fimMes = new Date(Date.UTC(Number(ano), Number(mes), 0)).toISOString().slice(0, 10);
   const primeiraDataLegal = adicionarUmDia(op?.periodo_fim || '');
@@ -387,12 +439,19 @@ export default function PainelPlanoFeriasV2() {
       return;
     }
 
+    const bloqueio = motivoIndisponibilidade(selecionado);
+    if (bloqueio) {
+      setFeedback({ type: 'error', message: bloqueio });
+      return;
+    }
+
     const ano = Number(planoAtual?.ano_referencia || campanhaAtual?.ano_referencia || new Date().getFullYear() + 1);
+    const disponiveis = mesesDisponiveis(selecionado);
     const dias = modoIntegral
       ? [Math.max(1, Number(selecionado.dias_direito || 30))]
       : diasPorFracao(selecionado);
     const parcelas = escolhidos.map((mes, idx) => {
-      const regra = regraMes(selecionado, mes, ano);
+      const regra = regraMes(selecionado, mes, ano, disponiveis);
       return {
         etapa: idx + 1,
         dias: dias[idx] || dias[0],
@@ -407,7 +466,9 @@ export default function PainelPlanoFeriasV2() {
     if (invalida) {
       setFeedback({
         type: 'error',
-        message: `O mês escolhido é anterior ao início legal do gozo. Primeira data possível: ${formatarDataBR(invalida.primeiraDataLegal)}.`,
+        message: disponiveis
+          ? 'O mês escolhido não está disponível para este período aquisitivo. Escolha um dos meses oferecidos.'
+          : `O mês escolhido é anterior ao início legal do gozo. Primeira data possível: ${formatarDataBR(invalida.primeiraDataLegal)}.`,
       });
       return;
     }
@@ -546,6 +607,8 @@ export default function PainelPlanoFeriasV2() {
   const alternarCobertura = (militarId) => setMilitaresSelecionados((atuais) => atuais.includes(militarId) ? atuais.filter((id) => id !== militarId) : [...atuais, militarId]);
   const alternarTodosCobertura = () => setMilitaresSelecionados((atuais) => atuais.length === cobertura.length ? [] : cobertura.map((m) => m.militar_id));
   const criarCampanhaSelecionados = () => navigate(`/PlanosFerias?planoId=${encodeURIComponent(planoId)}&novaCampanha=1&militares=${encodeURIComponent(militaresSelecionados.join(','))}`);
+
+  const bloqueioDefinicao = selecionado && !selecionado.sem_resposta ? motivoIndisponibilidade(selecionado) : '';
 
   if (loading) {
     return (
@@ -951,7 +1014,7 @@ export default function PainelPlanoFeriasV2() {
                           className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 disabled:bg-slate-100"
                         >
                           <option value="">Selecionar mês definitivo...</option>
-                          {MESES.map((m) => <option key={m.val} value={m.val}>{m.nome}</option>)}
+                          {opcoesDeMes(selecionado).map((m) => <option key={m.val} value={m.val}>{m.nome}</option>)}
                         </select>
                       </div>
                     );
@@ -973,6 +1036,12 @@ export default function PainelPlanoFeriasV2() {
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-medium text-amber-800">Seu perfil pode consultar as respostas, mas não possui permissão para definir a escala.</div>
               )}
 
+              {bloqueioDefinicao && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-medium leading-relaxed text-amber-800">
+                  {bloqueioDefinicao}
+                </div>
+              )}
+
               {feedback && (
                 <div className={`mt-4 rounded-lg border px-3 py-3 text-xs font-medium leading-relaxed ${feedback.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
                   {feedback.message}
@@ -981,7 +1050,7 @@ export default function PainelPlanoFeriasV2() {
 
               <Button
                 type="button"
-                disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
+                disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas || Boolean(bloqueioDefinicao)}
                 onClick={salvarDefinicao}
                 className="w-full mt-4 bg-blue-700 hover:bg-blue-800 text-white font-bold h-11"
               >
@@ -1028,9 +1097,10 @@ function SectionLabel({ children }) {
 }
 
 function IntegralPicker({ op, value, onChange }) {
+  const disponiveis = mesesDisponiveis(op);
   const opcoes = [1, 2, 3]
     .map((n) => ({ numero: n, mes: mesesDaOpcao(op, n)[0] || '' }))
-    .filter((item) => item.mes);
+    .filter((item) => item.mes && (!disponiveis || disponiveis.some((m) => String(m?.mes || '').padStart(2, '0') === item.mes)));
 
   return (
     <div>
@@ -1052,7 +1122,7 @@ function IntegralPicker({ op, value, onChange }) {
       <label className="block text-xs font-bold text-slate-500 mt-4 mb-1.5">Ou escolha outro mês</label>
       <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
         <option value="">Selecionar mês...</option>
-        {MESES.map((m) => <option key={m.val} value={m.val}>{m.nome}</option>)}
+        {opcoesDeMes(op).map((m) => <option key={m.val} value={m.val}>{m.nome}</option>)}
       </select>
     </div>
   );
