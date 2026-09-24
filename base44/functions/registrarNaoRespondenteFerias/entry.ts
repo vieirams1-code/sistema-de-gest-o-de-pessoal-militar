@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { filtrarEscopo, listarTodos } from '../../shared/ferias/listarEscalaPlano.ts';
-import { calcularResumoPeriodoPlano, feriasVinculadasAoPlano, periodoMaisAntigoElegivel, textoId } from '../../shared/ferias/resumoPeriodoPlano.ts';
+import { calcularResumoPeriodoPlano, periodoMaisAntigoElegivel, textoId } from '../../shared/ferias/resumoPeriodoPlano.ts';
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -74,7 +74,11 @@ export default async function (req: Request): Promise<Response> {
       listarTodos(base44.asServiceRole.entities.Ferias, { militar_id: militarAlvoId }),
       listarTodos(base44.asServiceRole.entities.AjusteSaldoFerias, { militar_id: militarAlvoId }),
     ]);
-    const elegivel = periodoMaisAntigoElegivel(periodos, feriasVinculadasAoPlano(ferias, planoId), ajustes, ano);
+    // O cálculo canônico considera TODAS as férias com impacto no período, mesmo as
+    // que não possuem vínculo com o plano. Pré-filtrar por plano inflava o saldo
+    // disponível e fazia o registro apontar para um período já comprometido, o que
+    // bloqueava a definição posterior do gestor no painel.
+    const elegivel = periodoMaisAntigoElegivel(periodos, ferias, ajustes, ano);
     if (!elegivel) {
       return json({ error: 'O militar não possui período aquisitivo elegível com saldo para este plano.' }, 409);
     }

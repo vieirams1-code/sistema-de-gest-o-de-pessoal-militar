@@ -349,6 +349,7 @@ export default function PainelPlanoFeriasV2() {
   }, [linhasPainel, busca, filtroCampanha, filtroStatus, filtroMes, lotacaoFiltro.idsSelecionados]);
 
   const abrirMilitar = (op) => {
+    setFeedback(null);
     setSelecionado(op);
     const atual = decisaoAtual(op).map((p) => p.mes);
     // Se a escala já foi salva como integral, reabre nesse modo mesmo que a
@@ -972,11 +973,17 @@ export default function PainelPlanoFeriasV2() {
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-medium text-amber-800">Seu perfil pode consultar as respostas, mas não possui permissão para definir a escala.</div>
               )}
 
+              {feedback && (
+                <div className={`mt-4 rounded-lg border px-3 py-3 text-xs font-medium leading-relaxed ${feedback.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                  {feedback.message}
+                </div>
+              )}
+
               <Button
                 type="button"
                 disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
                 onClick={salvarDefinicao}
-                className="w-full mt-4 bg-blue-700 hover:bg-blue-800 h-11 font-bold"
+                className="w-full mt-4 bg-blue-700 hover:bg-blue-800 text-white font-bold h-11"
               >
                 {saving ? 'Salvando...' : (decisaoAtual(selecionado).length ? 'Salvar alteração' : 'Confirmar definição')}
               </Button>
