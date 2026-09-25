@@ -161,13 +161,6 @@ function numeroFracoes(op) {
   return 1;
 }
 
-function diasPorFracao(op) {
-  if (op?.modalidade === '3_ETAPAS_10') return [10, 10, 10];
-  if (op?.modalidade === '2_ETAPAS_15') return [15, 15];
-  if (op?.modalidade === 'CUSTOM') return [Math.max(1, Number(op?.dias_direito || 30))];
-  return [30];
-}
-
 function nomeModalidade(op) {
   if (op?.modalidade === '3_ETAPAS_10') return 'Fracionada · 10 + 10 + 10 dias';
   if (op?.modalidade === '2_ETAPAS_15') return 'Fracionada · 15 + 15 dias';
@@ -182,6 +175,37 @@ function decisaoAtual(op) {
       dias: Number(p?.dias || 0),
     }))
     .filter((p) => /^\d{2}$/.test(p.mes));
+}
+
+function diasDireitoDe(op) {
+  return Math.max(1, Number(op?.dias_direito || 30));
+}
+
+// Divisões de dias que o gestor pode aplicar. Independe da modalidade informada
+// pelo militar: quem não respondeu no prazo entra como integral, mas o gestor
+// pode definir as férias fracionadas (o servidor valida o total de dias).
+function modosDisponiveis(op) {
+  const dias = diasDireitoDe(op);
+  const modos = [{ id: 'integral', label: `Integral · ${dias} dias`, dias: [dias] }];
+  if (dias >= 30) {
+    modos.push({ id: '2_ETAPAS_15', label: 'Fracionado · 15 + 15 dias', dias: [15, 15] });
+    modos.push({ id: '3_ETAPAS_10', label: 'Fracionado · 10 + 10 + 10 dias', dias: [10, 10, 10] });
+  }
+  return modos;
+}
+
+function diasDoModo(op, modo) {
+  const encontrado = modosDisponiveis(op).find((m) => m.id === modo);
+  return encontrado ? encontrado.dias : [diasDireitoDe(op)];
+}
+
+function modoInicialGestor(op) {
+  // Se a escala já foi salva como parcela única, reabre nesse modo mesmo que a
+  // modalidade original informada pelo militar seja fracionada.
+  if (numeroFracoes(op) > 1 && decisaoAtual(op).length === 1) return 'integral';
+  if (op?.modalidade === '3_ETAPAS_10') return '3_ETAPAS_10';
+  if (op?.modalidade === '2_ETAPAS_15') return '2_ETAPAS_15';
+  return 'integral';
 }
 
 function statusOpcao(op) {
@@ -237,7 +261,7 @@ export default function PainelPlanoFeriasV2() {
   const [selecionado, setSelecionado] = useState(null);
   const [emitidoEm, setEmitidoEm] = useState(new Date());
   const [mesesGestor, setMesesGestor] = useState([]);
-  const [modoIntegral, setModoIntegral] = useState(false);
+  const [modoGestor, setModoGestor] = useState('integral');
   const [saneando, setSaneando] = useState(false);
   const [reatribuindo, setReatribuindo] = useState(false);
   const [previaPendencia, setPreviaPendencia] = useState({ loading: false, data: null, error: '' });
@@ -434,17 +458,16 @@ export default function PainelPlanoFeriasV2() {
     setPreviaPendencia({ loading: false, data: null, error: '' });
     setSelecionado(op);
     const atual = decisaoAtual(op).map((p) => p.mes);
-    // Se a escala já foi salva como integral, reabre nesse modo mesmo que a
-    // modalidade original informada pelo militar seja fracionada.
-    setModoIntegral(numeroFracoes(op) > 1 && atual.length === 1);
-    setMesesGestor(Array.from({ length: numeroFracoes(op) }, (_, idx) => atual[idx] || ''));
+    const modo = modoInicialGestor(op);
+    setModoGestor(modo);
+    setMesesGestor(Array.from({ length: diasDoModo(op, modo).length }, (_, idx) => atual[idx] || ''));
     if (op.sem_resposta) carregarPreviaPendencia(op);
   };
 
   const fecharDrawer = () => {
     setSelecionado(null);
     setMesesGestor([]);
-    setModoIntegral(false);
+    setModoGestor('integral');
     setPreviaPendencia({ loading: false, data: null, error: '' });
     setFeedbackPendencia(null);
   };
@@ -457,14 +480,24 @@ export default function PainelPlanoFeriasV2() {
     });
   };
 
+  const trocarModoGestor = (modo) => {
+    setModoGestor(modo);
+    setFeedback(null);
+    const qtd = diasDoModo(selecionado, modo).length;
+    setMesesGestor((prev) => Array.from({ length: qtd }, (_, idx) => prev[idx] || ''));
+  };
+
   const salvarDefinicao = async () => {
     if (!selecionado || !podeAprovar || saving) return;
-    // O gestor pode transformar uma escala fracionada em integral: nesse caso a
-    // definição é enviada como uma única parcela com todos os dias de direito.
-    const qtd = modoIntegral ? 1 : numeroFracoes(selecionado);
-    const escolhidos = mesesGestor.slice(0, qtd);
+    // O gestor define livremente a divisão (integral ou fracionada) e o sistema
+    // envia as parcelas com os dias correspondentes a cada modo escolhido.
+    const dias = diasDoModo(selecionado, modoGestor);
+    const escolhidos = mesesGestor.slice(0, dias.length);
     if (escolhidos.some((m) => !m)) {
-      setFeedback({ type: 'error', message: 'Selecione o mês definitivo de todas as frações.' });
+      setFeedback({
+        type: 'error',
+        message: dias.length > 1 ? 'Selecione o mês definitivo de todas as frações.' : 'Selecione o mês definitivo.',
+      });
       return;
     }
     if (new Set(escolhidos).size !== escolhidos.length) {
@@ -480,9 +513,6 @@ export default function PainelPlanoFeriasV2() {
 
     const ano = Number(planoAtual?.ano_referencia || campanhaAtual?.ano_referencia || new Date().getFullYear() + 1);
     const disponiveis = mesesDisponiveis(selecionado);
-    const dias = modoIntegral
-      ? [Math.max(1, Number(selecionado.dias_direito || 30))]
-      : diasPorFracao(selecionado);
     const parcelas = escolhidos.map((mes, idx) => {
       const regra = regraMes(selecionado, mes, ano, disponiveis);
       return {
@@ -603,7 +633,7 @@ export default function PainelPlanoFeriasV2() {
           resumo_periodo: dados.resumo_periodo || null,
         });
         setMesesGestor([]);
-        setModoIntegral(false);
+        setModoGestor('integral');
       }
       setFeedbackPendencia({ type: 'success', message: mensagem });
     } catch (err) {
@@ -1032,34 +1062,28 @@ export default function PainelPlanoFeriasV2() {
               <h3 className="font-black text-base text-slate-900">Definição do gestor</h3>
               <p className="text-xs text-slate-500 mt-1 mb-4">Escolha somente os meses definitivos. As datas serão calculadas pelo sistema conforme as regras do período aquisitivo.</p>
 
-              {numeroFracoes(selecionado) > 1 && (
-                <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
-                  <button
-                    type="button"
-                    disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
-                    onClick={() => setModoIntegral(false)}
-                    className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${!modoIntegral ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
-                  >
-                    Fracionado · {diasPorFracao(selecionado).join(' + ')} dias
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
-                    onClick={() => setModoIntegral(true)}
-                    className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${modoIntegral ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
-                  >
-                    Integral · {Math.max(1, Number(selecionado.dias_direito || 30))} dias
-                  </button>
+              {modosDisponiveis(selecionado).length > 1 && (
+                <div className="mb-4 space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                  {modosDisponiveis(selecionado).map((modo) => (
+                    <button
+                      key={modo.id}
+                      type="button"
+                      disabled={!podeAprovar || saving || selecionado.gerado_ferias_efetivas}
+                      onClick={() => trocarModoGestor(modo.id)}
+                      className={`w-full rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${modoGestor === modo.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+                    >
+                      {modo.label}
+                    </button>
+                  ))}
                 </div>
               )}
 
-              {(numeroFracoes(selecionado) === 1 || modoIntegral) ? (
+              {diasDoModo(selecionado, modoGestor).length === 1 ? (
                 <IntegralPicker op={selecionado} value={mesesGestor[0] || ''} onChange={(mes) => selecionarMes(0, mes)} />
               ) : (
                 <div className="space-y-3">
-                  {Array.from({ length: numeroFracoes(selecionado) }).map((_, idx) => {
+                  {diasDoModo(selecionado, modoGestor).map((dias, idx) => {
                     const sugerido = mesesDaOpcao(selecionado, 1)[idx] || '';
-                    const dias = diasPorFracao(selecionado)[idx];
                     return (
                       <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <div className="flex items-center justify-between gap-3 mb-2">
@@ -1082,12 +1106,13 @@ export default function PainelPlanoFeriasV2() {
                 </div>
               )}
 
-              {(modoIntegral ? [mesesGestor[0]] : mesesGestor).filter(Boolean).length > 0 && (
+              {mesesGestor.slice(0, diasDoModo(selecionado, modoGestor).length).some(Boolean) && (
                 <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
                   <span className="font-bold">Definição:</span>{' '}
-                  {(modoIntegral ? [mesesGestor[0]] : mesesGestor.filter(Boolean))
-                    .filter(Boolean)
-                    .map((m, idx) => `${(modoIntegral ? [Math.max(1, Number(selecionado.dias_direito || 30))] : diasPorFracao(selecionado))[idx]} dias em ${nomeMes(m)}`)
+                  {diasDoModo(selecionado, modoGestor)
+                    .map((dias, idx) => ({ dias, mes: mesesGestor[idx] || '' }))
+                    .filter((p) => p.mes)
+                    .map((p) => `${p.dias} dias em ${nomeMes(p.mes)}`)
                     .join(' · ')}
                 </div>
               )}
