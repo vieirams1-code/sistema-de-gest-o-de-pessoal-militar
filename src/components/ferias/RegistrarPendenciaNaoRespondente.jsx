@@ -19,9 +19,10 @@ export default function RegistrarPendenciaNaoRespondente({ podeRegistrar, salvan
   }
 
   const verificando = Boolean(previa?.loading);
-  const bloqueio = previa?.error || '';
   const elegivel = previa?.data || null;
-  const podeEnviar = Boolean(justificativa.trim()) && !salvando && !verificando && !bloqueio;
+  // A consulta de elegibilidade é apenas informativa: uma falha nela nunca pode
+  // impedir o registro. A validação definitiva é feita pelo servidor ao salvar.
+  const podeEnviar = Boolean(justificativa.trim()) && !salvando;
 
   return (
     <div className="mt-6 pt-5 border-t border-slate-200">
@@ -41,11 +42,6 @@ export default function RegistrarPendenciaNaoRespondente({ podeRegistrar, salvan
             <Clock3 className="w-3.5 h-3.5" />
             Verificando o período aquisitivo elegível...
           </span>
-        ) : bloqueio ? (
-          <span className="inline-flex items-start gap-2 text-red-700">
-            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            <span>{bloqueio}</span>
-          </span>
         ) : elegivel ? (
           <span className="inline-flex items-start gap-2 text-slate-700">
             <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-600" />
@@ -53,6 +49,11 @@ export default function RegistrarPendenciaNaoRespondente({ podeRegistrar, salvan
               Período elegível: <strong>{formatarDataBR(elegivel.periodo?.inicio)} a {formatarDataBR(elegivel.periodo?.fim)}</strong> · serão liberados{' '}
               <strong>{elegivel.dias_liberados} dia(s)</strong> para definição.
             </span>
+          </span>
+        ) : previa?.error ? (
+          <span className="inline-flex items-start gap-2 text-slate-500">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>Não foi possível confirmar o período elegível agora. O registro será validado ao salvar.</span>
           </span>
         ) : (
           <span className="text-slate-500">Período aquisitivo ainda não verificado.</span>
@@ -70,7 +71,7 @@ export default function RegistrarPendenciaNaoRespondente({ podeRegistrar, salvan
         className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
       />
 
-      {!justificativa.trim() && !bloqueio && !verificando && (
+      {!justificativa.trim() && (
         <p className="mt-1.5 text-xs text-slate-500">Informe a justificativa para habilitar o registro.</p>
       )}
 

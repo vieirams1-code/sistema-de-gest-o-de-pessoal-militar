@@ -912,17 +912,13 @@ export default function PainelPlanoFeriasV2() {
           <div className="px-5 py-5">
             {selecionado.sem_resposta ? (
               <div>
-                <div className={`rounded-xl border p-4 ${previaPendencia.error ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start gap-3">
-                    <Clock3 className={`w-5 h-5 mt-0.5 shrink-0 ${previaPendencia.error ? 'text-red-600' : 'text-slate-500'}`} />
+                    <Clock3 className="w-5 h-5 mt-0.5 shrink-0 text-slate-500" />
                     <div>
-                      <h3 className={`font-black text-sm ${previaPendencia.error ? 'text-red-800' : 'text-slate-800'}`}>
-                        {previaPendencia.error ? 'Definição indisponível para este militar' : 'Este militar ainda não respondeu'}
-                      </h3>
+                      <h3 className="font-black text-sm text-slate-800">Este militar ainda não respondeu</h3>
                       {previaPendencia.loading ? (
                         <p className="text-xs text-slate-500 mt-1 leading-relaxed">Verificando o período aquisitivo elegível deste militar...</p>
-                      ) : previaPendencia.error ? (
-                        <p className="text-xs text-red-700 mt-1 leading-relaxed">{previaPendencia.error}</p>
                       ) : previaPendencia.data ? (
                         <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                           O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções. Ao registrar a pendência serão liberados{' '}
@@ -931,7 +927,7 @@ export default function PainelPlanoFeriasV2() {
                         </p>
                       ) : (
                         <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                          O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções.
+                          O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções. Registre a pendência para liberar a definição administrativa — o período elegível é confirmado pelo sistema no momento do registro.
                         </p>
                       )}
                     </div>
