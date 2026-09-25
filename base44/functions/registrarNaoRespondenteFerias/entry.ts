@@ -38,9 +38,13 @@ export default async function (req: Request): Promise<Response> {
     const planoId = textoId(payload?.plano_id);
     const campanhaId = textoId(payload?.campanha_id);
     const militarAlvoId = textoId(payload?.militar_alvo_id);
+    const previa = payload?.preview === true;
     const justificativa = String(payload?.justificativa || '').trim();
-    if (!planoId || !campanhaId || !militarAlvoId || !justificativa) {
-      return json({ error: 'Plano, campanha, militar e justificativa são obrigatórios.' }, 400);
+    if (!planoId || !campanhaId || !militarAlvoId) {
+      return json({ error: 'Plano, campanha e militar são obrigatórios.' }, 400);
+    }
+    if (!previa && !justificativa) {
+      return json({ error: 'A justificativa administrativa é obrigatória.' }, 400);
     }
 
     const plano = await base44.asServiceRole.entities.PlanoFeriasInstitucional.get(planoId);
@@ -81,6 +85,34 @@ export default async function (req: Request): Promise<Response> {
     const elegivel = periodoMaisAntigoElegivel(periodos, ferias, ajustes, ano);
     if (!elegivel) {
       return json({ error: 'O militar não possui período aquisitivo elegível com saldo para este plano.' }, 409);
+    }
+
+    const resumoPeriodo = {
+      dias_sem_previsao: elegivel.resumo.dias_sem_previsao,
+      dias_comprometidos: elegivel.resumo.dias_comprometidos,
+      elegivel_plano: elegivel.resumo.elegivel_plano,
+      primeira_data_legal_gozo: elegivel.resumo.primeira_data_legal_gozo,
+      limite_fruicao: elegivel.resumo.limite_fruicao,
+      meses_disponiveis: (elegivel.resumo.meses_elegiveis || [])
+        .filter((m: any) => m?.permitido && m?.data_inicio)
+        .map((m: any) => ({ mes: m.mes, data_inicio: m.data_inicio })),
+    };
+
+    // Modo consulta: devolve a mesma elegibilidade que o registro usaria, para o
+    // painel informar o gestor antes de qualquer ação.
+    if (previa) {
+      return json({
+        ok: true,
+        preview: true,
+        periodo: {
+          id: elegivel.periodo.id,
+          inicio: elegivel.periodo.inicio_aquisitivo || '',
+          fim: elegivel.periodo.fim_aquisitivo || '',
+          ano_referencia: elegivel.periodo.ano_referencia || '',
+        },
+        resumo_periodo: resumoPeriodo,
+        dias_liberados: elegivel.resumo.dias_sem_previsao,
+      });
     }
 
     const agora = new Date().toISOString();
@@ -144,6 +176,7 @@ export default async function (req: Request): Promise<Response> {
     return json({
       ok: true,
       opcao,
+      resumo_periodo: resumoPeriodo,
       message: `Pendência registrada. As férias de ${militar.nome_completo || 'militar'} já podem ser definidas administrativamente (${elegivel.resumo.dias_sem_previsao} dia(s)).`,
     }, 201);
   } catch (error: any) {

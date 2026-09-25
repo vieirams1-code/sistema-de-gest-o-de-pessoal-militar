@@ -240,6 +240,8 @@ export default function PainelPlanoFeriasV2() {
   const [modoIntegral, setModoIntegral] = useState(false);
   const [saneando, setSaneando] = useState(false);
   const [reatribuindo, setReatribuindo] = useState(false);
+  const [previaPendencia, setPreviaPendencia] = useState({ loading: false, data: null, error: '' });
+  const [feedbackPendencia, setFeedbackPendencia] = useState(null);
 
   const carregar = async (idPlano = '') => {
     setLoading(true);
@@ -400,20 +402,51 @@ export default function PainelPlanoFeriasV2() {
     });
   }, [linhasPainel, busca, filtroCampanha, filtroStatus, filtroMes, lotacaoFiltro.idsSelecionados]);
 
+  // Consulta a mesma regra canônica usada no registro: informa ao gestor, antes de
+  // qualquer ação, se existe período elegível e quantos dias serão liberados.
+  const carregarPreviaPendencia = async (op) => {
+    const campanhaAlvo = (op?.campanhas_alvo || [])[0];
+    if (!planoId || !campanhaAlvo?.campanha_id) {
+      setPreviaPendencia({ loading: false, data: null, error: 'Não foi possível identificar a campanha deste militar.' });
+      return;
+    }
+    setPreviaPendencia({ loading: true, data: null, error: '' });
+    try {
+      const res = await base44.functions.invoke('registrarNaoRespondenteFerias', {
+        preview: true,
+        plano_id: planoId,
+        campanha_id: campanhaAlvo.campanha_id,
+        militar_alvo_id: op.militar_id,
+      });
+      setPreviaPendencia({ loading: false, data: res.data || null, error: '' });
+    } catch (err) {
+      setPreviaPendencia({
+        loading: false,
+        data: null,
+        error: err?.response?.data?.error || err?.message || 'Não foi possível verificar o período aquisitivo deste militar.',
+      });
+    }
+  };
+
   const abrirMilitar = (op) => {
     setFeedback(null);
+    setFeedbackPendencia(null);
+    setPreviaPendencia({ loading: false, data: null, error: '' });
     setSelecionado(op);
     const atual = decisaoAtual(op).map((p) => p.mes);
     // Se a escala já foi salva como integral, reabre nesse modo mesmo que a
     // modalidade original informada pelo militar seja fracionada.
     setModoIntegral(numeroFracoes(op) > 1 && atual.length === 1);
     setMesesGestor(Array.from({ length: numeroFracoes(op) }, (_, idx) => atual[idx] || ''));
+    if (op.sem_resposta) carregarPreviaPendencia(op);
   };
 
   const fecharDrawer = () => {
     setSelecionado(null);
     setMesesGestor([]);
     setModoIntegral(false);
+    setPreviaPendencia({ loading: false, data: null, error: '' });
+    setFeedbackPendencia(null);
   };
 
   const selecionarMes = (indice, mes) => {
@@ -543,11 +576,11 @@ export default function PainelPlanoFeriasV2() {
     if (!selecionado?.sem_resposta || !podeAprovar || saving) return;
     const campanhaAlvo = (selecionado.campanhas_alvo || [])[0];
     if (!campanhaAlvo?.campanha_id) {
-      setFeedback({ type: 'error', message: 'Não foi possível identificar a campanha deste militar.' });
+      setFeedbackPendencia({ type: 'error', message: 'Não foi possível identificar a campanha deste militar.' });
       return;
     }
     setSaving(true);
-    setFeedback(null);
+    setFeedbackPendencia(null);
     try {
       const res = await base44.functions.invoke('registrarNaoRespondenteFerias', {
         plano_id: planoId,
@@ -555,11 +588,26 @@ export default function PainelPlanoFeriasV2() {
         militar_alvo_id: selecionado.militar_id,
         justificativa,
       });
-      setFeedback({ type: 'success', message: res.data?.message || 'Pendência registrada.' });
-      setSelecionado(null);
+      const dados = res.data || {};
+      const mensagem = dados.message || 'Pendência registrada.';
+      const militarAtual = selecionado;
       await carregar(planoId);
+      // Mantém o painel aberto já na Definição do gestor, com os meses liberados
+      // pelo mesmo cálculo que o servidor aplicou no registro.
+      if (dados.opcao) {
+        setSelecionado({
+          ...militarAtual,
+          ...dados.opcao,
+          id: dados.opcao.id || militarAtual.id,
+          sem_resposta: false,
+          resumo_periodo: dados.resumo_periodo || null,
+        });
+        setMesesGestor([]);
+        setModoIntegral(false);
+      }
+      setFeedbackPendencia({ type: 'success', message: mensagem });
     } catch (err) {
-      setFeedback({ type: 'error', message: err?.response?.data?.error || err?.message || 'Falha ao registrar a pendência.' });
+      setFeedbackPendencia({ type: 'error', message: err?.response?.data?.error || err?.message || 'Falha ao registrar a pendência.' });
     } finally {
       setSaving(false);
     }
@@ -864,14 +912,28 @@ export default function PainelPlanoFeriasV2() {
           <div className="px-5 py-5">
             {selecionado.sem_resposta ? (
               <div>
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className={`rounded-xl border p-4 ${previaPendencia.error ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex items-start gap-3">
-                    <Clock3 className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                    <Clock3 className={`w-5 h-5 mt-0.5 shrink-0 ${previaPendencia.error ? 'text-red-600' : 'text-slate-500'}`} />
                     <div>
-                      <h3 className="font-black text-sm text-red-800">Este militar ainda não respondeu</h3>
-                      <p className="text-xs text-red-700 mt-1 leading-relaxed">
-                        O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções. Por isso não há meses ou período aquisitivo disponíveis para definição pelo gestor.
-                      </p>
+                      <h3 className={`font-black text-sm ${previaPendencia.error ? 'text-red-800' : 'text-slate-800'}`}>
+                        {previaPendencia.error ? 'Definição indisponível para este militar' : 'Este militar ainda não respondeu'}
+                      </h3>
+                      {previaPendencia.loading ? (
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Verificando o período aquisitivo elegível deste militar...</p>
+                      ) : previaPendencia.error ? (
+                        <p className="text-xs text-red-700 mt-1 leading-relaxed">{previaPendencia.error}</p>
+                      ) : previaPendencia.data ? (
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                          O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções. Ao registrar a pendência serão liberados{' '}
+                          <strong>{previaPendencia.data.dias_liberados} dia(s)</strong> do período{' '}
+                          {formatarDataBR(previaPendencia.data.periodo?.inicio)} a {formatarDataBR(previaPendencia.data.periodo?.fim)} para definição pelo gestor.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                          O militar pertence ao público-alvo do Plano de Férias, mas ainda não enviou suas opções.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -893,6 +955,8 @@ export default function PainelPlanoFeriasV2() {
                   podeRegistrar={podeAprovar}
                   salvando={saving}
                   onRegistrar={registrarPendencia}
+                  previa={previaPendencia}
+                  feedback={feedbackPendencia}
                 />
               </div>
             ) : (
@@ -1045,6 +1109,12 @@ export default function PainelPlanoFeriasV2() {
               {feedback && (
                 <div className={`mt-4 rounded-lg border px-3 py-3 text-xs font-medium leading-relaxed ${feedback.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
                   {feedback.message}
+                </div>
+              )}
+
+              {feedbackPendencia && (
+                <div className={`mt-4 rounded-lg border px-3 py-3 text-xs font-medium leading-relaxed ${feedbackPendencia.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                  {feedbackPendencia.message}
                 </div>
               )}
 
