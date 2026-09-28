@@ -37,6 +37,7 @@ const CSS_IMPRESSAO = `
     .dme-header h1 { font-size: 14pt !important; font-weight: 700 !important; text-transform: uppercase !important; margin: 0 !important; letter-spacing: normal !important; }
     .dme-sub { font-size: 9.5pt !important; margin: 1mm 0 0 0 !important; }
     .dme-emissao { font-size: 8.5pt !important; margin: 0.6mm 0 0 0 !important; }
+    .dme-filtros { font-size: 8.5pt !important; font-style: italic !important; margin: 0.6mm 0 0 0 !important; }
 
     .dme-grid {
       display: grid !important;
@@ -159,6 +160,7 @@ export default function DistribuicaoMensalFeriasImpressao({
   totalPublico,
   militaresCov,
   emitidoEm,
+  filtrosDescricao,
 }) {
   return (
     <section className="dme-print-root" aria-hidden="true">
@@ -171,6 +173,7 @@ export default function DistribuicaoMensalFeriasImpressao({
           <p className="dme-emissao">
             Emitido em {formatarEmissao(emitidoEm)} · {totalPublico} militares no plano
           </p>
+          {filtrosDescricao && <p className="dme-filtros">Recorte aplicado — {filtrosDescricao}</p>}
         </header>
 
         <div className="dme-grid">

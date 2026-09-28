@@ -26,6 +26,8 @@ import useLotacaoFiltro from '@/components/ferias/useLotacaoFiltro';
 import useMilitaresComCov from '@/components/ferias/useMilitaresComCov';
 import DistribuicaoMensalFerias from '@/components/ferias/DistribuicaoMensalFerias';
 import DistribuicaoMensalFeriasImpressao from '@/components/ferias/DistribuicaoMensalFeriasImpressao';
+import FiltrosDistribuicaoMensalFerias from '@/components/ferias/FiltrosDistribuicaoMensalFerias';
+import useTagsMilitarFiltro from '@/components/ferias/useTagsMilitarFiltro';
 import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
 
@@ -257,6 +259,10 @@ export default function PainelPlanoFeriasV2() {
   const [filtroLotacao, setFiltroLotacao] = useState([]);
   const lotacaoFiltro = useLotacaoFiltro(filtroLotacao, userEmail);
   const militaresCov = useMilitaresComCov();
+  const [filtroLotacaoMensal, setFiltroLotacaoMensal] = useState([]);
+  const [filtroTagsMensal, setFiltroTagsMensal] = useState([]);
+  const lotacaoMensalFiltro = useLotacaoFiltro(filtroLotacaoMensal, userEmail);
+  const tagsMensalFiltro = useTagsMilitarFiltro(filtroTagsMensal, visao === 'meses');
 
   const [selecionado, setSelecionado] = useState(null);
   const [emitidoEm, setEmitidoEm] = useState(new Date());
@@ -425,6 +431,30 @@ export default function PainelPlanoFeriasV2() {
       return true;
     });
   }, [linhasPainel, busca, filtroCampanha, filtroStatus, filtroMes, lotacaoFiltro.idsSelecionados]);
+
+  // Recorte da Distribuição por mês: lotação (com descendentes) e tags de militar.
+  // A lotação considerada é a do cadastro do militar, a mesma usada na aba de lista.
+  const opcoesDistribuicao = useMemo(() => {
+    const idsLotacao = lotacaoMensalFiltro.idsSelecionados;
+    const idsTags = tagsMensalFiltro.idsSelecionados;
+    if (!idsLotacao && !idsTags) return opcoes;
+
+    const lotacaoPorMilitar = new Map(
+      linhasPainel.map((linha) => [String(linha.militar_id || ''), String(linha.lotacao_id || '')]),
+    );
+
+    return opcoes.filter((op) => {
+      const militarId = String(op.militar_id || '');
+      if (idsTags && !idsTags.has(militarId)) return false;
+      if (idsLotacao) {
+        const lotacaoId = lotacaoPorMilitar.get(militarId) || String(op.lotacao_id || '');
+        if (!idsLotacao.has(lotacaoId)) return false;
+      }
+      return true;
+    });
+  }, [opcoes, linhasPainel, lotacaoMensalFiltro.idsSelecionados, tagsMensalFiltro.idsSelecionados]);
+
+  const filtroDistribuicaoAtivo = filtroLotacaoMensal.length > 0 || filtroTagsMensal.length > 0;
 
   // Consulta a mesma regra canônica usada no registro: informa ao gestor, antes de
   // qualquer ação, se existe período elegível e quantos dias serão liberados.
@@ -645,7 +675,7 @@ export default function PainelPlanoFeriasV2() {
 
   const distribuicao = useMemo(() => {
     const mapa = Object.fromEntries(MESES.map((m) => [m.val, []]));
-    opcoes.forEach((op) => {
+    opcoesDistribuicao.forEach((op) => {
       decisaoAtual(op).forEach((p) => {
         if (mapa[p.mes]) mapa[p.mes].push(op);
       });
@@ -665,7 +695,37 @@ export default function PainelPlanoFeriasV2() {
         fracionados: ordenar(pessoas.filter((op) => decisaoAtual(op).length > 1)),
       },
     ]));
-  }, [opcoes]);
+  }, [opcoesDistribuicao]);
+
+  // Militares efetivamente exibidos na distribuição (com mês definido).
+  const totalRecorte = useMemo(() => {
+    const ids = new Set();
+    Object.values(distribuicao).forEach((grupos) => {
+      [...(grupos.integrais || []), ...(grupos.fracionados || [])].forEach((pessoa) => {
+        const id = String(pessoa?.militar_id || '');
+        if (id) ids.add(id);
+      });
+    });
+    return ids.size;
+  }, [distribuicao]);
+
+  const filtrosDistribuicaoDescricao = useMemo(() => {
+    if (!filtroDistribuicaoAtivo) return '';
+    const partes = [];
+    if (filtroLotacaoMensal.length) {
+      const nomes = filtroLotacaoMensal.map((id) => (
+        lotacaoMensalFiltro.options.find((o) => o.value === String(id))?.labelText || String(id)
+      ));
+      partes.push(`Lotação: ${nomes.join(', ')}`);
+    }
+    if (filtroTagsMensal.length) {
+      const nomes = filtroTagsMensal.map((id) => (
+        tagsMensalFiltro.tags.find((tag) => String(tag.id) === String(id))?.nome || String(id)
+      ));
+      partes.push(`Tags: ${nomes.join(', ')}`);
+    }
+    return partes.join(' · ');
+  }, [filtroDistribuicaoAtivo, filtroLotacaoMensal, filtroTagsMensal, lotacaoMensalFiltro.options, tagsMensalFiltro.tags]);
 
   const abrirDistribuicao = () => { setEmitidoEm(new Date()); setVisao('meses'); };
 
@@ -903,10 +963,22 @@ export default function PainelPlanoFeriasV2() {
             />
           ) : (
             <>
+              <FiltrosDistribuicaoMensalFerias
+                lotacaoOptions={lotacaoMensalFiltro.options}
+                lotacaoGroupedOptions={lotacaoMensalFiltro.groupedOptions}
+                filtroLotacao={filtroLotacaoMensal}
+                onFiltroLotacao={setFiltroLotacaoMensal}
+                tags={tagsMensalFiltro.tags}
+                filtroTags={filtroTagsMensal}
+                onFiltroTags={setFiltroTagsMensal}
+                exibidos={totalRecorte}
+                total={totalPublico}
+              />
+
               <DistribuicaoMensalFerias
                 meses={MESES}
                 distribuicao={distribuicao}
-                totalPublico={totalPublico}
+                totalPublico={filtroDistribuicaoAtivo ? totalRecorte : totalPublico}
                 militaresCov={militaresCov}
                 onAbrirMilitar={abrirMilitar}
                 onImprimir={imprimirDistribuicao}
@@ -915,6 +987,7 @@ export default function PainelPlanoFeriasV2() {
               <DistribuicaoMensalFeriasImpressao
                 planoTitulo={planoAtual?.titulo}
                 anoReferencia={planoAtual?.ano_referencia}
+                filtrosDescricao={filtrosDistribuicaoDescricao}
                 meses={MESES}
                 distribuicao={distribuicao}
                 totalPublico={totalPublico}
