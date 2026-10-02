@@ -364,10 +364,12 @@ async function usuarioPodeAgirSobreMilitarPortal(base44: any, user: any, militar
 
 function sanitizarItemAnexoCampanha(item: any, incluirUrl = false): any {
   if (!item) return item;
-  if (typeof item === 'string') return incluirUrl ? item : { nome: 'Arquivo enviado' };
+  if (typeof item === 'string') return incluirUrl ? item : { nome: 'Arquivo enviado', presente: Boolean(item.trim()) };
   if (typeof item !== 'object') return null;
   const seguro: any = {
     nome: item.nome || item.nome_original || item.name || 'Arquivo enviado',
+    presente: Boolean(item.url),
+    tamanho: item.tamanho,
   };
   if (incluirUrl && item.url) seguro.url = item.url;
   return seguro;
@@ -402,6 +404,7 @@ function sanitizarRespostaCampanha(resposta: any, modo: 'VISUALIZAR' | 'EXPORTAR
     homologado_por_nome: modo === 'ANEXOS' ? undefined : resposta.homologado_por_nome,
     data_homologacao: modo === 'ANEXOS' ? undefined : resposta.data_homologacao,
     arquivo_devolucao_nome: resposta.arquivo_devolucao_nome || '',
+    arquivo_devolucao_presente: Boolean(resposta.arquivo_devolucao_url),
     arquivo_devolucao_url: incluirUrl ? (resposta.arquivo_devolucao_url || '') : '',
   };
 
@@ -2810,7 +2813,7 @@ Deno.serve(async (req: Request) => {
 
         for (const c of camposObrigatorios) {
           if (c.tipo === 'upload_arquivo') {
-            if (!arquivosObj[c.id]?.url && !arquivosObj[c.id]) {
+            if (!(typeof arquivosObj[c.id] === 'string' ? arquivosObj[c.id].trim() : arquivosObj[c.id]?.url)) {
               return new Response(JSON.stringify({ error: `O anexo da pergunta "${c.pergunta}" é obrigatório.` }), {
                 status: 400,
                 headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
