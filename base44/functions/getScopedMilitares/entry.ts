@@ -31,6 +31,10 @@ const CAMPOS_BASE_MILITAR = [
     'estrutura_id',
     'estrutura_nome',
     'estrutura_tipo',
+    // Identificadores organizacionais não sensíveis para consumidores legados
+    // que ainda exibem controles locais de escopo (a segurança é backend).
+    'grupamento_id',
+    'subgrupamento_id',
     'situacao_militar',
     'status_cadastro',
     'comportamento',
