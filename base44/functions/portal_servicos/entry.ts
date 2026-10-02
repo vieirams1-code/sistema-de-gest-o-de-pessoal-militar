@@ -85,6 +85,7 @@ async function carregarMembrosPorGrupo(base44: any, campanhas: any[] = []): Prom
 }
 
 function matchMilitarCampanha(campanha: any, militar: any, membrosPorGrupo: Map<string, Set<string>> = new Map()): boolean {
+  if (!militar || normalizeText(militar.status_cadastro || 'Ativo') !== 'ativo' || ['inativo', 'falecido'].includes(normalizeText(militar.status))) return false;
   const baseEscopo = campanha.tipo_escopo === 'TODOS' || campanha.tipo_escopo === 'SEM_ESCOPO' || !campanha.tipo_escopo ||
     ((campanha.tipo_escopo === 'UNIDADES' || campanha.tipo_escopo === 'UNIDADES_E_GRUPOS') && matchMilitarEscopoUnidade(militar, campanha.escopo_unidades_ids || [])) ||
     (campanha.tipo_escopo === 'QUADROS' && (campanha.escopo_quadros || []).includes(militar.quadro)) ||
