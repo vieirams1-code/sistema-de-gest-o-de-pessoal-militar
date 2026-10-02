@@ -13,7 +13,7 @@ function carregar(nome, client) {
   const entry = readFileSync('base44/functions/'+nome+'/entry.ts','utf8')
     .replace(/^import .*;\n/gm,'');
   vm.runInContext(ts.transpileModule(
-    "const createClientFromRequest = () => __client;\n"+utility+"\n"+entry,
+    "const createClientFromRequest = () => __client;\nconst atualizarCadastroMilitar = (() => {\n"+utility+"\nreturn atualizarCadastroMilitar;})();\n"+entry,
     {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}
   ).outputText,context);
   return async body => {
