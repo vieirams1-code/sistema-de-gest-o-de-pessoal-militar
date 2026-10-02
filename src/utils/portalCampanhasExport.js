@@ -125,8 +125,7 @@ export async function baixarAnexosCampanhaZip(campanha, militares, onProgress = 
     try {
       const res = await fetch(item.url);
       if (!res.ok) {
-        console.warn(`Falha ao baixar arquivo de ${item.url}: HTTP ${res.status}`);
-        continue;
+        throw new Error(`HTTP ${res.status}`);
       }
 
       const buffer = await res.arrayBuffer();
@@ -145,7 +144,7 @@ export async function baixarAnexosCampanhaZip(campanha, militares, onProgress = 
 
       zipFiles[nomeFinal] = uint8;
     } catch (err) {
-      console.error(`Erro ao processar anexo ${item.nomeFormatado}:`, err);
+      throw new Error(`Não foi possível baixar ${item.nomeFormatado}: ${err.message}. O ZIP não foi gerado; tente novamente.`);
     }
   }
 
