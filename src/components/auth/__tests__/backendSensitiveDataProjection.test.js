@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { canDisplayScopedMilitar, isMilitarWithinClientScope } from '../../../services/scopedMilitarDisplayAccess.js';
 
 const read = (relative) => readFileSync(new URL(relative, import.meta.url), 'utf8');
 
@@ -115,4 +116,45 @@ test('snapshots de duplicidade e merge não copiam cadastro pessoal completo', (
     assert.doesNotMatch(snapshotBlock, new RegExp(campo), `${campo} não deve entrar no snapshot de merge`);
     assert.doesNotMatch(queuePayloadBlock, new RegExp(campo), `${campo} não deve entrar no payload persistido da fila`);
   }
+});
+
+test('ficha individual respeita autorização do getScopedMilitares e valida as permissões funcionais', () => {
+  const options = {
+    militar: { id: 'militar-sidrolandia', estrutura_id: 'unidade-sidrolandia' },
+    requestedId: 'militar-sidrolandia',
+    isAccessResolved: true,
+    canViewModule: true,
+    canViewAction: true,
+  };
+  assert.equal(canDisplayScopedMilitar(options), true, 'o DTO escopado pode omitir IDs legados de lotação');
+  assert.equal(canDisplayScopedMilitar({ ...options, requestedId: 'outro-militar' }), false);
+  assert.equal(canDisplayScopedMilitar({ ...options, militar: null }), false);
+  assert.equal(canDisplayScopedMilitar({ ...options, isAccessResolved: false }), false);
+  assert.equal(canDisplayScopedMilitar({ ...options, canViewModule: false }), false);
+  assert.equal(canDisplayScopedMilitar({ ...options, canViewAction: false }), false);
+  assert.match(verMilitar, /canDisplayScopedMilitar\(\{/);
+  assert.match(verMilitar, /queryFn: \(\) => fetchScopedMilitares\(\{/);
+  assert.doesNotMatch(verMilitar, /hasAccess\(militar\) \|\| hasSelfAccess\(militar\)/);
+  assert.match(scopedMilitares, /const canViewMilitares = isAdminByRole \|\| \(/);
+});
+
+test('escopo legado acompanha estrutura_id, filhos por parent_id e todos os vínculos ativos', () => {
+  const acessos = [
+    { tipo_acesso: 'subsetor', subgrupamento_id: '1-gbm' },
+    { tipo_acesso: 'unidade', subgrupamento_id: 'unidade-externa' },
+  ];
+  const unidadesFilhas = [
+    { id: 'unidade-sidrolandia', parent_id: '1-gbm' },
+    { id: 'unidade-estranha', parent_id: 'outro-gbm' },
+  ];
+  const verifica = (registro) => isMilitarWithinClientScope({ registro, acessos, unidadesFilhas });
+  assert.equal(verifica({ estrutura_id: '1-gbm' }), true);
+  assert.equal(verifica({ estrutura_id: 'unidade-sidrolandia' }), true);
+  assert.equal(verifica({ estrutura_id: 'unidade-externa' }), true);
+  assert.equal(verifica({ estrutura_id: 'unidade-estranha' }), false);
+  assert.equal(verifica({ estrutura_id: 'outro-gbm' }), false);
+  assert.equal(isMilitarWithinClientScope({ registro: { estrutura_id: 'unidade-sidrolandia' }, acessos, unidadesFilhas: [] }), false);
+  assert.equal(isMilitarWithinClientScope({ registro: { grupamento_id: 'comando' }, acessos: [{ tipo_acesso: 'setor', grupamento_id: 'comando' }] }), true);
+  assert.equal(isMilitarWithinClientScope({ registro: { grupamento_id: 'outro-comando' }, acessos: [{ tipo_acesso: 'setor', grupamento_id: 'comando' }] }), false);
+  assert.match(scopedMilitares.match(/const CAMPOS_BASE_MILITAR = \[([\s\S]*?)\];/)?.[1] || '', /'grupamento_id'[\s\S]*'subgrupamento_id'/);
 });
