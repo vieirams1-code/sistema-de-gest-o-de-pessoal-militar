@@ -36,3 +36,5 @@ As operações entre entidades são coordenadas com precondições, auditoria e 
 Para reconciliar uma operação interrompida, verificar tokens da promoção/militar, journal, vínculo, histórico e cadastro. Liberar tokens somente após confirmar o estado coerente ou restaurar a operação; nunca remover a trava apenas por tempo decorrido.
 
 Atos oficiais ausentes e regras institucionais de antiguidade pendentes permanecem sujeitos a comprovação/homologação. Essas mudanças não inventam dados nem homologam snapshots de antiguidade.
+
+Resultado final: 103/103 testes direcionados; 568 testes Node gerais (564 aprovados, 4 falhas em JISO/Planos de Férias); 70/70 testes Vitest. Compilação e lint da tela alterada aprovados.
