@@ -57,6 +57,8 @@ export async function atualizarCadastroMilitar(
     descricao:'Aplicação de promoção com vínculo confirmado e vigência verificada.',
     metadata:{militar_id:militarId,historico_id:h.id,executado_por:contexto.executado_por,origem:contexto.origem,dados_anteriores:original,dados_novos:payload}
   });
+  const vinculo = itens.find((i:any) => texto(i.militar_id) === militarId && texto(i.historico_promocao_v2_id) === texto(h.id));
+  await E.PromocaoMilitar.update(vinculo.id,{cadastro_anterior_promocao:original});
   const relido = await E.Militar.get(militarId);
   if (Object.keys(original).some(k => texto(relido[k]) !== texto(original[k]))) throw new Error('cadastro_alterado_durante_publicacao');
   let erro = '';

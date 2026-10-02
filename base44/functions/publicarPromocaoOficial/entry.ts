@@ -352,7 +352,7 @@ Deno.serve(async (req) => {
         );
 
         // Confirmar vínculo antes de qualquer escrita no cadastro.
-        const snapshotItem = Object.fromEntries(['status','publicado','historico_promocao_v2_id','atualizar_cadastro_militar','motivo_atualizacao_cadastro','resultado_aplicacao_cadastro'].map(k => [k,item[k] ?? (k === 'publicado' || k === 'atualizar_cadastro_militar' ? false : '')]));
+        const snapshotItem = Object.fromEntries(['status','publicado','historico_promocao_v2_id','atualizar_cadastro_militar','motivo_atualizacao_cadastro','resultado_aplicacao_cadastro','cadastro_anterior_promocao'].map(k => [k,item[k] ?? (k === 'cadastro_anterior_promocao' ? {} : (k === 'publicado' || k === 'atualizar_cadastro_militar' ? false : ''))]));
         desfazer.push(() => PromocaoMilitar.update(item.id,snapshotItem));
         await PromocaoMilitar.update(item.id, {
           status:'publicado',publicado:true,historico_promocao_v2_id:historico.id,

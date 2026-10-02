@@ -114,6 +114,10 @@
       "format": "date-time",
       "description": "Data/hora da última atualização do registro.",
       "default": ""
+    },
+    "cadastro_anterior_promocao": {
+      "type": "object",
+      "description": "Valores cadastrais exatos anteriores à aplicação oficial, usados na reversão segura."
     }
   }
 }

@@ -28,7 +28,7 @@ async function parsePayload(req: any) {
   const candidates: any[] = [req?.body, req?.body?.data, req?.data, req?.payload, (globalThis as any)?.input];
   try { if (typeof req?.json === 'function') candidates.push(await req.json()); } catch (_) {}
   for (const c of candidates) {
-    if (c && typeof c === 'object') return c?.data && typeof c.data === 'object' ? c.data : c;
+    if (c && typeof c === 'object') return c?.body && typeof c.body === 'object' ? c.body : c?.data && typeof c.data === 'object' ? c.data : c;
   }
   return {};
 }
@@ -111,7 +111,8 @@ Deno.serve(async (req) => {
       return erro({ status: 404, etapa: 'validacao', motivo: 'promocao_militar_nao_encontrado', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId } });
     }
 
-    const militarId = texto(itemAtual?.militar_id) || texto(item?.militar_id);
+    if (texto(itemAtual.promocao_id) !== promocaoId) return erro({status:409,etapa:'validacao',motivo:'item_nao_pertence_promocao'});
+    const militarId = texto(itemAtual?.militar_id);
     if (!authIsAdmin) {
       const scopeResponse = await base44.functions.invoke('getUserPermissions', { scopeMilitarIds: militarId ? [militarId] : [] });
       const scopeAuthz = scopeResponse?.data ?? scopeResponse ?? {};
@@ -121,7 +122,7 @@ Deno.serve(async (req) => {
     }
 
     // O histórico é resolvido pelo registro do banco; só caímos no payload se faltar.
-    const historicoId = texto(itemAtual?.historico_promocao_v2_id) || texto(item?.historico_promocao_v2_id);
+    const historicoId = texto(itemAtual?.historico_promocao_v2_id);
 
     // Valida que o item está de fato publicado antes de reverter.
     const itemPublicado = Boolean(itemAtual?.publicado) || STATUS_PROMOCAO_PUBLICADA.has(normalizar(itemAtual?.status));
@@ -138,6 +139,13 @@ Deno.serve(async (req) => {
       return erro({ status: 404, etapa: 'validacao', motivo: 'historico_nao_encontrado', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId, historico_promocao_v2_id: historicoId } });
     }
 
+    if (texto(historicoAtual.militar_id) !== militarId || texto(historicoAtual.promocao_id) !== promocaoId || normalizar(historicoAtual.status_registro) !== 'ativo') {
+      return erro({status:409,etapa:'validacao',motivo:'historico_divergente_vinculo'});
+    }
+    const posteriores = await Historico.filter({militar_id:militarId,status_registro:'ativo'},undefined,5000);
+    if (posteriores.some((h:any) => texto(h.id) !== historicoId && texto(h.data_promocao).split('T')[0] >= texto(historicoAtual.data_promocao).split('T')[0])) {
+      return erro({status:409,etapa:'validacao',motivo:'reversao_bloqueada_por_evento_posterior'});
+    }
     let militarAnterior: any = null;
     const precisaRollbackCadastro = Boolean(itemAtual?.atualizar_cadastro_militar) || normalizar(itemAtual?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
     if (precisaRollbackCadastro) {
@@ -150,6 +158,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    const snapshotCadastro = itemAtual.cadastro_anterior_promocao;
+    const destinoRestauracao = snapshotCadastro?.posto_graduacao && snapshotCadastro?.quadro
+      ? snapshotCadastro
+      : {posto_graduacao:texto(historicoAtual.posto_graduacao_anterior),quadro:texto(historicoAtual.quadro_anterior)};
+    if (precisaRollbackCadastro && (!texto(destinoRestauracao.posto_graduacao) || !texto(destinoRestauracao.quadro))) {
+      return erro({status:409,etapa:'validacao',motivo:'origem_cadastral_nao_comprovada'});
+    }
     // === Vínculo opcional com Curso de Formação (ParticipanteCursoFormacao). ===
     // A reversão também deve devolver o participante de 'promovido' para o status pré-publicação.
     let participante: any = null;
@@ -211,10 +226,9 @@ Deno.serve(async (req) => {
       await Historico.update(historicoId, { status_registro: 'cancelado', motivo_retificacao: motivo, observacoes: [texto(historicoAtual?.observacoes), trilhaAdmin].filter(Boolean).join('\n') });
 
       if (precisaRollbackCadastro) {
-        await Militar.update(militarAnterior.id, {
-          posto_graduacao: texto(historicoAtual?.posto_graduacao_anterior),
-          quadro: texto(historicoAtual?.quadro_anterior),
-        });
+        await Militar.update(militarAnterior.id, destinoRestauracao);
+        const restaurado = await Militar.get(militarAnterior.id);
+        if (Object.keys(destinoRestauracao).some(k => texto(restaurado[k]) !== texto(destinoRestauracao[k]))) throw new Error('restauracao_cadastro_nao_confirmada');
       }
 
       await PromocaoMilitar.update(itemId, { status: 'cancelado', publicado: false });

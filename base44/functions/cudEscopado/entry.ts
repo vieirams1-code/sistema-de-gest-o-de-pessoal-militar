@@ -1921,7 +1921,7 @@ Deno.serve(async (req) => {
       }
     }
     if (entityName === 'PromocaoMilitar' && ['create','update'].includes(operation)) {
-      const camposProtegidos = ['status','publicado','historico_promocao_v2_id','atualizar_cadastro_militar','resultado_aplicacao_cadastro','ordem'];
+      const camposProtegidos = ['status','publicado','historico_promocao_v2_id','atualizar_cadastro_militar','resultado_aplicacao_cadastro','ordem','cadastro_anterior_promocao'];
       const possuiCadeia = oficialExistente || registroExistente?.publicado === true || Boolean(registroExistente?.historico_promocao_v2_id);
       const alterouProtegido = camposProtegidos.some(campo => Object.hasOwn(dataValidada || {},campo) && String(dataValidada[campo] ?? '').trim() !== String(registroExistente?.[campo] ?? '').trim());
       const publicouDiretamente = dataValidada?.publicado === true || Boolean(dataValidada?.historico_promocao_v2_id) || statusOficiaisPromocao.includes(String(dataValidada?.status || '').trim().toLowerCase());
