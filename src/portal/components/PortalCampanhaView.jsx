@@ -137,6 +137,10 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (Object.values(uploadingFiles).some(Boolean) || submitting) {
+      setErrorMsg('Aguarde a conclusão do upload antes de enviar a resposta.');
+      return;
+    }
     setErrorMsg(null);
     setSuccessMsg(null);
 
