@@ -5,6 +5,7 @@ import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   Megaphone,
+  FolderDown,
   Plus,
   Calendar,
   UserCheck,
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { baixarAnexosCampanhaZip } from '@/utils/portalCampanhasExport';
 
 const TIPOS_CAMPOS_FORMULARIO = [
   { tipo: 'texto_curto', label: 'Texto Curto', icone: '📝', desc: 'Para nomes, termos ou respostas pontuais' },
@@ -59,6 +61,24 @@ export default function GerirCampanhasPortal() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
+
+  const handleBaixarTodosDocumentos = async (campanha) => {
+    if (!canDownloadAttachments || actionLoading) return;
+    setActionLoading(true);
+    try {
+      const res = await base44.functions.invoke('portal_servicos', {
+        acao: 'CAMPANHA_ANEXOS_RETORNO', campanha_id: campanha.id,
+      });
+      const resultado = await baixarAnexosCampanhaZip(campanha, res.data?.militares || [], (atual, total, msg) => {
+        setFeedback({ type: '', msg: total ? `${msg} (${atual}/${total})` : msg });
+      });
+      setFeedback({ type: 'success', msg: `ZIP gerado com ${resultado.totalBaixados} documento(s), identificados por militar e pergunta.` });
+    } catch (erro) {
+      setFeedback({ type: 'error', msg: erro.message || 'Não foi possível baixar os documentos.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Filtros e Paginação (Tabela de Campanhas)
   const [searchTerm, setSearchTerm] = useState('');
@@ -837,6 +857,17 @@ export default function GerirCampanhasPortal() {
                                 title="Disparar Lembretes"
                               >
                                 <Bell className="w-4 h-4" />
+                              </button>
+                            )}
+                            {canDownloadAttachments && ['FORMULARIO_DINAMICO', 'ASSINATURA_DOCUMENTO'].includes(camp.tipo) && (
+                              <button
+                                onClick={() => handleBaixarTodosDocumentos(camp)}
+                                disabled={actionLoading}
+                                className="p-1.5 text-indigo-700 hover:bg-indigo-50 rounded transition-colors"
+                                title="Baixar todos os documentos (ZIP), identificados por militar"
+                                aria-label={`Baixar todos os documentos (ZIP) de ${camp.titulo}`}
+                              >
+                                <FolderDown className="w-4 h-4" />
                               </button>
                             )}
                             {canOpenResponses && (
