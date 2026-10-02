@@ -1911,6 +1911,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (['operacao_token','operacao_promocao_token'].some(c => Object.hasOwn(dataValidada || {},c))) {
+      return Response.json({error:'Campo interno de operação oficial.',motivo:'campo_operacional_protegido'}, {status:409});
+    }
     // Operações oficiais passam pelas funções coordenadas, nunca por CRUD genérico.
     const statusOficiaisPromocao = ['publicada_parcial','publicada','publicado','consolidada','consolidado','ativa','ativo','historica','homologada'];
     const oficialExistente = statusOficiaisPromocao.includes(String(registroExistente?.status || '').trim().toLowerCase());

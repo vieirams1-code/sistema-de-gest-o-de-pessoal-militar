@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 
 const texto = (valor: unknown) => String(valor ?? '').trim();
 const normalizar = (valor: unknown) => texto(valor)
@@ -63,8 +63,28 @@ function snapshotCampos(registro: any, campos: string[]) {
   }, {} as Record<string, unknown>);
 }
 
+
+async function adquirirTrava(entity: any, id: string, campo: string) {
+  if (typeof entity.updateMany !== 'function') throw new Error('controle_concorrencia_indisponivel');
+  const token = crypto.randomUUID();
+  const resultado = await entity.updateMany(
+    {id, $or:[{[campo]:''},{[campo]:null},{[campo]:{$exists:false}}]},
+    {$set:{[campo]:token}}
+  );
+  if (resultado?.success !== true || resultado.updated !== 1) throw new Error('operacao_oficial_em_andamento');
+  return token;
+}
+async function liberarTrava(entity: any, id: string, campo: string, token: string) {
+  if (!token) return;
+  await entity.updateMany({id,[campo]:token},{$set:{[campo]:''}});
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
+  let travaId = '';
+  let travaToken = '';
+  let militarTravaId = '';
+  let militarTravaToken = '';
 
   try {
     const authUser = await base44.auth.me();
@@ -85,6 +105,8 @@ Deno.serve(async (req) => {
     const PromocaoMilitar = base44.asServiceRole.entities.PromocaoMilitar;
     const Historico = base44.asServiceRole.entities.HistoricoPromocaoMilitarV2;
 
+    travaId = promocaoId;
+    travaToken = await adquirirTrava(Promocao,promocaoId,'operacao_token');
     const promocaoAntes = await Promocao.get(promocaoId).catch(() => null);
     if (!promocaoAntes?.id) {
       return Response.json({ success: false, etapa: 'validacao', motivo: 'promocao_nao_encontrada' }, { status: 404 });
@@ -186,5 +208,10 @@ Deno.serve(async (req) => {
       etapa: 'erro_interno',
       motivo: error?.message || 'erro_interno_sincronizacao',
     }, { status: 500 });
+  } finally {
+    try { if (militarTravaToken) await liberarTrava(base44.asServiceRole.entities.Militar,militarTravaId,'operacao_promocao_token',militarTravaToken); }
+    catch (_) { console.error('Trava cadastral mantida para reconciliação',militarTravaId); }
+    try { if (travaToken) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
+    catch (_) { console.error('Trava oficial mantida para reconciliação',travaId); }
   }
 });

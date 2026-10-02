@@ -97,6 +97,11 @@
       "format": "date-time",
       "description": "Data/hora da última atualização da promoção.",
       "default": ""
+    },
+    "operacao_token": {
+      "type": "string",
+      "description": "Token de exclusão mútua de operação oficial. Campo interno.",
+      "default": ""
     }
   },
   "required": [

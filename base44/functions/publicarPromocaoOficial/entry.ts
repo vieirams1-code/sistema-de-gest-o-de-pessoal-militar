@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { atualizarCadastroMilitar } from './utils.ts';
 
 const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada_parcial', 'publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
@@ -176,10 +176,27 @@ async function parseBase44Payload(req: any) {
   return {};
 }
 
+
+async function adquirirTrava(entity: any, id: string, campo: string) {
+  if (typeof entity.updateMany !== 'function') throw new Error('controle_concorrencia_indisponivel');
+  const token = crypto.randomUUID();
+  const resultado = await entity.updateMany(
+    {id, $or:[{[campo]:''},{[campo]:null},{[campo]:{$exists:false}}]},
+    {$set:{[campo]:token}}
+  );
+  if (resultado?.success !== true || resultado.updated !== 1) throw new Error('operacao_oficial_em_andamento');
+  return token;
+}
+async function liberarTrava(entity: any, id: string, campo: string, token: string) {
+  if (!token) return;
+  await entity.updateMany({id,[campo]:token},{$set:{[campo]:''}});
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
   let lockId = '';
+  let tokenPersistido = '';
   try {
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ success: false, etapa: 'autorizacao', motivo: 'nao_autenticado' }, { status: 401 });
@@ -222,6 +239,7 @@ Deno.serve(async (req) => {
     const PromocaoMilitar = base44.asServiceRole.entities.PromocaoMilitar;
     const Promocao = base44.asServiceRole.entities.Promocao;
 
+    tokenPersistido = await adquirirTrava(Promocao, texto(promocaoId), 'operacao_token');
     const promocaoPersistida = await Promocao.get(promocaoId).catch(() => null);
     const itensPersistidos = await PromocaoMilitar.filter({ promocao_id: promocaoId }, undefined, 5000);
     const idsSolicitados = new Set((itens || []).map((item: any) => texto(item?.id)).filter(Boolean));
@@ -449,6 +467,10 @@ Deno.serve(async (req) => {
     const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao'});
     return Response.json({ ...erroInterno, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [{ ...erroInterno, message: erroInterno.motivo }] }, { status: 500 });
   } finally {
+    if (tokenPersistido) {
+      try { await liberarTrava(base44.asServiceRole.entities.Promocao,lockId,'operacao_token',tokenPersistido); }
+      catch (_) { console.error('Trava de promoção mantida para reconciliação',lockId); }
+    }
     if (lockId) EXECUCOES_EM_ANDAMENTO.delete(lockId);
   }
 });

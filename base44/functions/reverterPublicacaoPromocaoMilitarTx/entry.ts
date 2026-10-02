@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 
 const texto = (valor: unknown) => String(valor ?? '').trim();
 const normalizar = (valor: unknown) => texto(valor).toLowerCase();
@@ -49,8 +49,28 @@ function erro({ status, etapa, motivo, contexto = {} }: any) {
   }, { status });
 }
 
+
+async function adquirirTrava(entity: any, id: string, campo: string) {
+  if (typeof entity.updateMany !== 'function') throw new Error('controle_concorrencia_indisponivel');
+  const token = crypto.randomUUID();
+  const resultado = await entity.updateMany(
+    {id, $or:[{[campo]:''},{[campo]:null},{[campo]:{$exists:false}}]},
+    {$set:{[campo]:token}}
+  );
+  if (resultado?.success !== true || resultado.updated !== 1) throw new Error('operacao_oficial_em_andamento');
+  return token;
+}
+async function liberarTrava(entity: any, id: string, campo: string, token: string) {
+  if (!token) return;
+  await entity.updateMany({id,[campo]:token},{$set:{[campo]:''}});
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
+  let travaId = '';
+  let travaToken = '';
+  let militarTravaId = '';
+  let militarTravaToken = '';
   try {
     const authUser = await base44.auth.me();
     if (!authUser) return erro({ status: 401, etapa: 'autorizacao', motivo: 'nao_autenticado' });
@@ -105,6 +125,9 @@ Deno.serve(async (req) => {
     const Militar = base44.asServiceRole.entities.Militar;
     const ParticipanteCurso = base44.asServiceRole.entities.ParticipanteCursoFormacao;
 
+    travaId = promocaoId;
+    travaToken = await adquirirTrava(Promocao,promocaoId,'operacao_token');
+
     // === Sempre confiar no estado ATUAL do banco, não no payload (que pode estar defasado). ===
     const itemAtual = await PromocaoMilitar.get(itemId).catch(() => null);
     if (!itemAtual?.id) {
@@ -149,6 +172,8 @@ Deno.serve(async (req) => {
     let militarAnterior: any = null;
     const precisaRollbackCadastro = Boolean(itemAtual?.atualizar_cadastro_militar) || normalizar(itemAtual?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
     if (precisaRollbackCadastro) {
+      militarTravaId = militarId;
+      militarTravaToken = await adquirirTrava(Militar,militarId,'operacao_promocao_token');
       militarAnterior = await Militar.get(militarId).catch(() => null);
       if (!militarAnterior?.id) {
         return erro({ status: 404, etapa: 'validacao', motivo: 'militar_nao_encontrado', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
@@ -310,5 +335,10 @@ Deno.serve(async (req) => {
     });
   } catch (error: any) {
     return erro({ status: 500, etapa: 'erro_interno', motivo: error?.message || 'erro_interno_reversao' });
+  } finally {
+    try { if (militarTravaToken) await liberarTrava(base44.asServiceRole.entities.Militar,militarTravaId,'operacao_promocao_token',militarTravaToken); }
+    catch (_) { console.error('Trava cadastral mantida para reconciliação',militarTravaId); }
+    try { if (travaToken) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
+    catch (_) { console.error('Trava oficial mantida para reconciliação',travaId); }
   }
 });

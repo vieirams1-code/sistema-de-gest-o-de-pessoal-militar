@@ -1,3 +1,18 @@
+
+async function adquirirTrava(entity: any, id: string, campo: string) {
+  if (typeof entity.updateMany !== 'function') throw new Error('controle_concorrencia_indisponivel');
+  const token = crypto.randomUUID();
+  const resultado = await entity.updateMany(
+    {id, $or:[{[campo]:''},{[campo]:null},{[campo]:{$exists:false}}]},
+    {$set:{[campo]:token}}
+  );
+  if (resultado?.success !== true || resultado.updated !== 1) throw new Error('operacao_oficial_em_andamento');
+  return token;
+}
+async function liberarTrava(entity: any, id: string, campo: string, token: string) {
+  if (!token) return;
+  await entity.updateMany({id,[campo]:token},{$set:{[campo]:''}});
+}
 const texto = (v: unknown) => String(v ?? '').trim();
 const chave = (v: unknown) => texto(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[°º]/g, 'o').replace(/[-–—.]/g, ' ').replace(/\s+/g, ' ').toLowerCase();
 const postos = ['Soldado','Cabo','3º Sargento','2º Sargento','1º Sargento','Subtenente','Aspirante a Oficial','2º Tenente','1º Tenente','Capitão','Major','Tenente-Coronel','Coronel'];
@@ -21,6 +36,8 @@ export async function atualizarCadastroMilitar(
   contexto: {executado_por:string; origem:string; historico_id?:string}
 ): Promise<UpdateMilitarResult> {
   const E = base44.asServiceRole.entities;
+  const tokenCadastro = await adquirirTrava(E.Militar,militarId,'operacao_promocao_token');
+  try {
   const antes = await E.Militar.get(militarId);
   if (!antes) throw new Error('militar_nao_encontrado');
   const h = contexto.historico_id ? await E.HistoricoPromocaoMilitarV2.get(contexto.historico_id) : null;
@@ -81,4 +98,8 @@ export async function atualizarCadastroMilitar(
   // Falha no log final não invalida uma gravação já confirmada.
   try { await E.AssistenteLog.update(log.id,{acao:success ? 'atualizar_militar_confirmado' : 'atualizacao_militar_falhou',metadata:{militar_id:militarId,historico_id:h.id,dados_anteriores:original,dados_novos:payload,updates,rollback_completo:rollback,erro}}); } catch (e) { console.error('Falha ao concluir log de promoção', log.id); }
   return {militar_id:militarId,matricula:texto(antes.matricula),success,updates,erro_api:success ? undefined : erro || 'releitura_divergente',rollback_completo:rollback};
+  } finally {
+    try { await liberarTrava(E.Militar,militarId,'operacao_promocao_token',tokenCadastro); }
+    catch (_) { console.error('Trava cadastral mantida para reconciliação',militarId); }
+  }
 }
