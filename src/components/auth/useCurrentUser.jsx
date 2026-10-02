@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { clearImpersonation } from '@/utils/impersonation';
+import { isMilitarWithinClientScope } from '@/services/scopedMilitarDisplayAccess';
 import { useAuth } from '@/lib/AuthContext';
 
 /**
@@ -206,14 +207,22 @@ export function useCurrentUser() {
   // Mantido por compatibilidade com getMilitarScopeFilters quando o usuário
   // tem visão de subsetor e precisa enxergar as unidades-filhas.
   // Esta é uma chamada leve e fora do escopo do Lote 1A.
-  const requiresUnidades = modoAcesso === 'subsetor' && Boolean(subgrupamentoId);
+  // A API escopada usa parent_id para identificar filhas e consolida TODOS
+  // os vínculos ativos; espelhar essa semântica nos controles locais de UI.
+  const subsetorAccessIds = [...new Set(
+    acessos
+      .filter((item) => normalizeAccessMode(item?.tipo_acesso) === 'subsetor')
+      .map((item) => item?.subgrupamento_id)
+      .filter(Boolean)
+  )].sort();
+  const requiresUnidades = subsetorAccessIds.length > 0;
   const {
     data: unidadesFilhas = [],
     isLoading: loadingUnidades,
     isFetched: fetchedUnidades,
   } = useQuery({
-    queryKey: ['unidadesFilhas', subgrupamentoId],
-    queryFn: () => base44.entities.Subgrupamento.filter({ tipo: 'Unidade', grupamento_id: subgrupamentoId }),
+    queryKey: ['unidadesFilhas', subsetorAccessIds.join('|')],
+    queryFn: () => base44.entities.Subgrupamento.filter({ parent_id: { $in: subsetorAccessIds } }),
     enabled: requiresUnidades,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -289,43 +298,27 @@ export function useCurrentUser() {
     return Boolean(key) && actions[key] === true;
   };
 
-  // Verificação de escopo por registro (mantida da API anterior).
+  // Apenas conveniência para interfaces legadas. A autorização efetiva de
+  // leitura e gravação continua sendo verificada pelas funções de backend.
   const hasAccess = (registro) => {
     if (!registro) return false;
     if (hasAbsoluteAccess || modoAcesso === 'admin') return true;
-
-    if (modoAcesso === 'setor') {
-      return (
-        registro.grupamento_id === subgrupamentoId
-        || registro.subgrupamento_id === subgrupamentoId
-      );
-    }
-
-    if (modoAcesso === 'subsetor') {
-      const scopeIds = [subgrupamentoId, ...(unidadesFilhas || []).map((u) => u.id)];
-      return scopeIds.includes(registro.subgrupamento_id);
-    }
-
-    if (modoAcesso === 'unidade') {
-      return registro.subgrupamento_id === subgrupamentoId;
-    }
-
-    if (modoAcesso === 'proprio') {
-      return (
-        registro.created_by === userEmail
-        || registro.militar_email === userEmail
-        || registro.email === userEmail
-      );
-    }
-
-    return false;
+    return isMilitarWithinClientScope({
+      registro,
+      acessos,
+      unidadesFilhas,
+      userEmail,
+    });
   };
 
   const hasSelfAccess = (registro) => {
     if (!registro) return false;
     if (isAdmin) return true;
 
-    if (linkedMilitarId && registro.id === linkedMilitarId) {
+    if (
+      (linkedMilitarId && registro.id === linkedMilitarId)
+      || acessos.some((item) => item?.militar_id && registro.id === item.militar_id)
+    ) {
       return true;
     }
 
@@ -338,8 +331,11 @@ export function useCurrentUser() {
       registro.usuario_email,
     ].filter(Boolean);
 
-    const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
-    return knownEmails.some((email) => possibleEmails.includes(email));
+    const knownEmails = [userEmail, linkedMilitarEmail, ...acessos.map((item) => item?.militar_email)]
+      .map(toLowerSafe)
+      .filter(Boolean);
+    const normalizedRecordEmails = possibleEmails.map(toLowerSafe).filter(Boolean);
+    return knownEmails.some((email) => normalizedRecordEmails.includes(email));
   };
 
   // Filtros de escopo de Militar — preservados para GlobalMilitarSearch,
