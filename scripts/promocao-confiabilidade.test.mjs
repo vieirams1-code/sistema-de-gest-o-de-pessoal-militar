@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import {webcrypto} from 'node:crypto';
 import ts from 'typescript';
 
 function carregar(nome, client) {
   let handler;
-  const context = vm.createContext({console,Response,Request,Intl,Date,Map,Set,Object,
+  const context = vm.createContext({console,Response,Request,Intl,Date,Map,Set,Object,crypto:webcrypto,
     __client:client,Deno:{serve:fn => {handler=fn;}}});
   const utility = readFileSync('base44/functions/publicarPromocaoOficial/utils.ts','utf8')
     .replace(/export /g,'');
@@ -37,6 +38,12 @@ function ambiente({fail=()=>{},posto='Soldado',data='2020-01-01'}={}) {
       const row={...structuredClone(patch),id:name+'-'+(list.length+1)};list.push(row);operations.push([name,'create']);
       fail(name,'create','after',row);return structuredClone(row);
     },
+    updateMany:async(query,patch)=>{
+      const matches=(row,q)=>Object.entries(q).every(([k,v])=>k==='$or' ? v.some(c=>matches(row,c)) : (v && typeof v==='object' && Object.hasOwn(v,'$exists')) ? Object.hasOwn(row,k)===v.$exists : row[k]===v);
+      const found=list.filter(r=>matches(r,query));
+      for(const row of found)Object.assign(row,structuredClone(patch.$set || {}));
+      return {success:true,updated:found.length};
+    },
     update:async(id,patch)=>{
       fail(name,'update','before',patch);
       const row=list.find(r=>r.id===id);if(!row)throw Error('not found');
@@ -44,10 +51,10 @@ function ambiente({fail=()=>{},posto='Soldado',data='2020-01-01'}={}) {
       fail(name,'update','after',patch);return structuredClone(row);
     }
   }]));
-  const client={auth:{me:async()=>({role:'admin',email:'test@example.com'})},asServiceRole:{entities}};
+  const client={auth:{me:async()=>({role:'admin',email:'test@example.com'})},asServiceRole:{entities},functions:{invoke:async()=>({data:{actions:{}}})}};
   const publicar=carregar('publicarPromocaoOficial',client);
   const manter=carregar('sincronizarHistoricoPromocaoPublicadaTx',client);
-  return {rows,operations,publicar,manter,
+  return {rows,operations,publicar,manter,client,
     payload:()=>({promocao_id:'p1',promocao:structuredClone(rows.Promocao[0]),itens:structuredClone(rows.PromocaoMilitar),temAlteracoesPendentes:false})};
 }
 test('publicação confirma vínculo antes do cadastro e mantém ato',async()=>{
@@ -130,4 +137,62 @@ test('falha documental após gravação restaura pai e filho',async()=>{
   const r=await a.manter({promocao_id:'p1',patch_promocao:{ato_referencia:'Portaria 20'}});
   assert.equal(r.success,false);assert.equal(r.rollback_completo,true);
   assert.equal(a.rows.Promocao[0].ato_referencia,'Portaria 10');assert.equal(a.rows.HistoricoPromocaoMilitarV2[0].ato_referencia,'Portaria 10');
+});
+
+test('consolidação falha sem esconder itens aplicados e repetição reconcilia lote',async()=>{
+  let once=true;const a=ambiente({fail:(n,op,stage)=>{if(once&&n==='Promocao'&&op==='update'&&stage==='before'){once=false;throw Error('lote indisponível');}}});
+  const r=await a.publicar(a.payload());assert.equal(r.success,false);assert.equal(r.publicados,1);assert.equal(r.reconciliacao_pendente,true);
+  const retry=await a.publicar(a.payload());assert.equal(retry.success,true);
+  assert.equal(a.rows.Promocao[0].status,'publicada');assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,1);
+});
+test('inclusão complementar não reaplica item publicado nem perde total do lote',async()=>{
+  const a=ambiente();await a.publicar(a.payload());
+  a.rows.Militar.push({id:'m2',posto_graduacao:'Soldado',quadro:'QBMP-1.a'});
+  a.rows.PromocaoMilitar.push({id:'i2',promocao_id:'p1',militar_id:'m2',ordem:2,status:'elegivel',publicado:false});
+  const r=await a.publicar(a.payload());assert.equal(r.success,true);assert.equal(r.publicados,1);
+  assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,2);assert.equal(a.rows.Promocao[0].total_militares_vinculados,2);
+});
+test('trava persistida bloqueia execução em outra instância sem qualquer efeito',async()=>{
+  const a=ambiente();a.rows.Promocao[0].operacao_token='outra-instancia';
+  const r=await a.publicar(a.payload());assert.equal(r.success,false);assert.equal(a.rows.Militar[0].posto_graduacao,'Soldado');
+  assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,0);assert.equal(a.rows.Promocao[0].operacao_token,'outra-instancia');
+});
+test('duas instâncias simultâneas não duplicam publicação',async()=>{
+  const a=ambiente();const outra=carregar('publicarPromocaoOficial',a.client);const p=a.payload();
+  const results=await Promise.all([a.publicar(p),outra(p)]);
+  assert.equal(results.filter(r=>r.success===true).length,1);
+  assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,1);
+  assert.equal(a.rows.Promocao[0].operacao_token,'');assert.equal(a.rows.Militar[0].operacao_promocao_token,'');
+});
+test('reversão restaura o cadastro exato, incluindo aliases',async()=>{
+  const a=ambiente();a.rows.Militar[0].posto='Soldado';
+  await a.publicar(a.payload());
+  const reverter=carregar('reverterPublicacaoPromocaoMilitarTx',a.client);
+  const r=await reverter({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste controlado'});
+  assert.equal(r.success,true);assert.equal(a.rows.Militar[0].posto_graduacao,'Soldado');
+  assert.equal(a.rows.Militar[0].posto,'Soldado');assert.equal(a.rows.HistoricoPromocaoMilitarV2[0].status_registro,'cancelado');
+});
+test('reversão rejeita evento posterior e item de outra promoção',async()=>{
+  const a=ambiente();await a.publicar(a.payload());
+  const reverter=carregar('reverterPublicacaoPromocaoMilitarTx',a.client);
+  a.rows.HistoricoPromocaoMilitarV2.push({id:'posterior',militar_id:'m1',status_registro:'ativo',data_promocao:'2021-01-01'});
+  const r=await reverter({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,false);assert.equal(r.motivo,'reversao_bloqueada_por_evento_posterior');assert.equal(a.rows.Militar[0].posto_graduacao,'Cabo');
+});
+
+test('CRUD genérico recusa adulterar estado oficial e suas travas',async()=>{
+  const source=readFileSync('base44/functions/cudEscopado/entry.ts','utf8');
+  const start=source.indexOf("    if (['operacao_token','operacao_promocao_token']");
+  const end=source.indexOf('    // ---- Barreiras de integridade de Promoções/Antiguidade ----',start);
+  const block=source.slice(start,end);
+  for(const caso of [
+    {entityName:'Promocao',operation:'update',registroExistente:{status:'publicada',ato_referencia:'A'},dataValidada:{ato_referencia:'B'}},
+    {entityName:'PromocaoMilitar',operation:'update',registroExistente:{status:'publicado',publicado:true},dataValidada:{publicado:false}},
+    {entityName:'PromocaoMilitar',operation:'create',registroExistente:null,dataValidada:{status:'publicado',publicado:true}},
+    {entityName:'Militar',operation:'update',registroExistente:{},dataValidada:{operacao_promocao_token:''}},
+  ]){
+    const sandbox=vm.createContext({...caso,Response,Object});
+    const result=await vm.runInContext('(async()=>{'+block+'return null;})()',sandbox);
+    assert.equal(result.status,409);
+  }
 });
