@@ -2811,6 +2811,26 @@ Deno.serve(async (req: Request) => {
         const respostasObj = typeof respostas_json === 'object' ? (respostas_json || {}) : (JSON.parse(respostas_json || '{}'));
         const arquivosObj = typeof arquivos_anexados_json === 'object' ? (arquivos_anexados_json || {}) : (JSON.parse(arquivos_anexados_json || '{}'));
 
+        for (const [campoId, item] of Object.entries(arquivosObj)) {
+          const campo = (formConfig?.campos || []).find((c: any) => c.id === campoId && c.tipo === 'upload_arquivo');
+          const arquivo: any = item;
+          const url = typeof arquivo === 'string' ? arquivo : arquivo?.url;
+          const nome = typeof arquivo === 'string' ? arquivo : arquivo?.nome;
+          const ext = String(nome || '').split('?')[0].split('.').pop()?.toLowerCase();
+          let urlValida = false;
+          try {
+            const parsed = new URL(url);
+            urlValida = parsed.protocol === 'https:' && ['base44.app', 'app.base44.com'].includes(parsed.hostname)
+              && parsed.pathname.startsWith('/api/apps/694014f8539e0b317aa75a23/files/');
+          } catch (_erroUrl) {}
+          if (!campo || !urlValida || !['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx'].includes(ext || '')
+            || (arquivo?.tamanho !== undefined && (!Number.isFinite(arquivo.tamanho) || arquivo.tamanho <= 0 || arquivo.tamanho > 15 * 1024 * 1024))) {
+            return new Response(JSON.stringify({ error: 'Anexo inválido: confira a pergunta, o link, o formato e o limite de 15MB.' }), {
+              status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
         for (const c of camposObrigatorios) {
           if (c.tipo === 'upload_arquivo') {
             if (!(typeof arquivosObj[c.id] === 'string' ? arquivosObj[c.id].trim() : arquivosObj[c.id]?.url)) {
@@ -2854,7 +2874,9 @@ Deno.serve(async (req: Request) => {
             campanha_id,
             militar_id: militarId,
           });
-        } catch (_e) {}
+        } catch (erroConsulta) {
+          throw erroConsulta;
+        }
 
         const respostaPayload = {
           campanha_id,
