@@ -58,3 +58,41 @@ test('backend valida campo, origem, formato e tamanho',()=>{
  for(const item of [{},{url:'javascript:alert(1)',nome:'a.jpg'}, {url:'https://example.com/a.jpg',nome:'a.jpg'}, {...JSON.parse(response('jpg').arquivos_anexados_json).cert,tamanho:16*1024*1024}, {...JSON.parse(response('exe').arquivos_anexados_json).cert}]) assert.equal(validate({cert:item}).status,400);
  assert.equal(validate({outro:JSON.parse(response('jpg').arquivos_anexados_json).cert}).status,400);
 });
+
+const scopeSource = source.slice(source.indexOf('function normalizeText'), source.indexOf('function vinculoGrupoValidoHoje'))
+  + source.slice(source.indexOf('function matchMilitarCampanha'), source.indexOf('function campanhaPodeReceberResposta'));
+const scopeCtx = vm.createContext({});
+vm.runInContext(ts.transpile(scopeSource), scopeCtx);
+test('público de campanhas exclui cadastro inativo em todos os escopos',()=>{
+ const active={id:'m',status_cadastro:'Ativo',situacao_militar:'Designado',lotacao_id:'u',quadro:'Q'};
+ const inactive={...active,status_cadastro:' Inativo '};
+ const groups=new Map([['g',new Set(['m'])]]);
+ for(const config of [{tipo_escopo:'TODOS'},{tipo_escopo:'UNIDADES',escopo_unidades_ids:['u']},{tipo_escopo:'QUADROS',escopo_quadros:['Q']},{tipo_escopo:'SELECAO_MILITARES',escopo_militares_ids:['m']},{tipo_escopo:'SEM_ESCOPO',escopo_grupos_ids:['g']}]){
+   assert.equal(scopeCtx.matchMilitarCampanha(config,active,groups),true);
+   assert.equal(scopeCtx.matchMilitarCampanha(config,inactive,groups),false);
+ }
+ assert.equal(scopeCtx.matchMilitarCampanha({tipo_escopo:'TODOS'},{...active,status:'Falecido'}),false);
+ assert.equal(scopeCtx.matchMilitarCampanha({tipo_escopo:'TODOS'},{id:'legado'}),true);
+});
+test('ZIP com vários documentos e militares preserva todos e evita nomes duplicados',async()=>{
+ const oldFetch=globalThis.fetch,oldDocument=globalThis.document,oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL,oldTimer=globalThis.setTimeout;
+ let blob;
+ globalThis.document={createElement:()=>({click(){}}),body:{appendChild(){},removeChild(){}}};
+ URL.createObjectURL=b=>{blob=b;return 'blob:test';};URL.revokeObjectURL=()=>{};globalThis.setTimeout=()=>0;
+ try {
+   const docs={cert:{url:'https://example.test/1.jpg',nome:'1.jpg'},second:{url:'https://example.test/2.pdf',nome:'2.pdf'},third:{url:'https://example.test/3.jpg',nome:'3.jpg'},removed:{url:'https://example.test/4.png',nome:'4.png'}};
+   const camp={...campaign,config_formulario:JSON.stringify({campos:[{id:'cert',tipo:'upload_arquivo',pergunta:'Certificado'},{id:'second',tipo:'upload_arquivo',pergunta:'Declaração'},{id:'third',tipo:'upload_arquivo',pergunta:'Certificado'}]})};
+   const rows=[{status_resposta:'Respondido',militar_matricula:'123',militar_posto:'Tenente',militar_nome:'Ana Silva',resposta_completa:{arquivos_anexados_json:JSON.stringify(docs)}},{status_resposta:'Respondido',militar_matricula:'456',militar_nome:'Ana Silva',resposta_completa:{arquivos_anexados_json:JSON.stringify({cert:docs.cert})}}];
+   globalThis.fetch=async url=>new Response(new Uint8Array([Number(String(url).match(/\/(\d)\./)[1])]),{status:200});
+   const result=await baixarAnexosCampanhaZip(camp,rows);
+   assert.equal(result.totalBaixados,5);
+   const files=unzipSync(new Uint8Array(await blob.arrayBuffer()));
+   assert.equal(Object.keys(files).length,5);
+   assert.ok(files['[123] Tenente Ana Silva - Certificado.jpg']);
+   assert.ok(files['[123] Tenente Ana Silva - Declaração.pdf']);
+   assert.ok(files['[123] Tenente Ana Silva - Certificado (1).jpg']);
+   assert.ok(files['[123] Tenente Ana Silva - Anexo removed.png']);
+   assert.ok(files['[456] Ana Silva - Certificado.jpg']);
+   assert.deepEqual([...files['[123] Tenente Ana Silva - Certificado (1).jpg']],[3]);
+ } finally {globalThis.fetch=oldFetch;globalThis.document=oldDocument;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;globalThis.setTimeout=oldTimer;}
+});
