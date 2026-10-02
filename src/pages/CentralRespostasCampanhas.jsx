@@ -225,14 +225,14 @@ export default function CentralRespostasCampanhas() {
     respostasData.militares.forEach((m) => {
       if (m.status_resposta !== 'Respondido' || !m.resposta_completa) return;
       const resp = m.resposta_completa;
-      if (resp.arquivo_devolucao_url) count++;
+      if (resp.arquivo_devolucao_presente || resp.arquivo_devolucao_url) count++;
       if (resp.arquivos_anexados_json) {
         try {
           const arqObj = typeof resp.arquivos_anexados_json === 'string'
             ? JSON.parse(resp.arquivos_anexados_json)
             : resp.arquivos_anexados_json;
           Object.values(arqObj || {}).forEach((item) => {
-            if (item && (typeof item === 'string' || item.url)) count++;
+            if (item && (typeof item === 'string' ? item.trim() : (item.presente || item.url))) count++;
           });
         } catch (_e) {}
       }
@@ -652,7 +652,7 @@ export default function CentralRespostasCampanhas() {
                         {campanhaSelecionada?.tipo === 'ASSINATURA_DOCUMENTO' && (
                           <>
                             <td className="p-3">
-                              {resp.arquivo_devolucao_url ? (
+                              {(resp.arquivo_devolucao_presente || resp.arquivo_devolucao_url) ? (
                                 <div className="flex items-center gap-1.5 text-purple-900 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-200 max-w-[200px]">
                                   <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                                   <span className="truncate text-[11px]" title={resp.arquivo_devolucao_nome || 'Arquivo Assinado'}>
@@ -691,7 +691,7 @@ export default function CentralRespostasCampanhas() {
 
                               return (
                                 <td key={p.id} className="p-3">
-                                  {url ? (
+                                  {(item?.presente || url) ? (
                                     <div className="flex items-center gap-1.5 text-purple-900 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-200 max-w-[200px]">
                                       <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                                       <span className="truncate text-[11px]" title={nome}>{nome}</span>
@@ -897,7 +897,7 @@ export default function CentralRespostasCampanhas() {
                               {i + 1}. {c.pergunta}
                             </span>
                             {c.tipo === 'upload_arquivo' ? (
-                              anexoUrl ? (
+                              (anexo?.presente || anexoUrl) ? (
                                 <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 mt-1">
                                   <span className="font-semibold text-slate-800 truncate">{anexoNome}</span>
                                   <a
