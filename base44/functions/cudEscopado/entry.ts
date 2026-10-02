@@ -1911,7 +1911,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (['operacao_token','operacao_promocao_token'].some(c => Object.hasOwn(dataValidada || {},c))) {
+    if (['operacao_token','operacao_promocao_token','cadastro_anterior_promocao'].some(c => Object.hasOwn(dataValidada || {},c))) {
       return Response.json({error:'Campo interno de operação oficial.',motivo:'campo_operacional_protegido'}, {status:409});
     }
     // Operações oficiais passam pelas funções coordenadas, nunca por CRUD genérico.

@@ -201,3 +201,19 @@ test('CRUD genérico recusa adulterar estado oficial e suas travas',async()=>{
     assert.equal(result.status,409);
   }
 });
+
+test('falha de compensação mantém trava e não permite nova tentativa cega',async()=>{
+  const a=ambiente({fail:(n,op,stage,p)=>{
+    if(n==='Militar'&&op==='update'&&stage==='before'&&p.posto_graduacao==='Cabo')throw Error('erro cadastro');
+    if(n==='HistoricoPromocaoMilitarV2'&&op==='update'&&p.status_registro==='cancelado')throw Error('erro compensação');
+  }});
+  const r=await a.publicar(a.payload());assert.equal(r.success,false);assert.equal(r.errors[0].rollback_completo,false);
+  assert.ok(a.rows.Promocao[0].operacao_token);
+  const retry=await a.publicar(a.payload());assert.equal(retry.success,false);assert.equal(a.rows.Militar[0].posto_graduacao,'Soldado');
+});
+test('reversão rejeita promoção-pai incompatível com item persistido',async()=>{
+  const a=ambiente();await a.publicar(a.payload());a.rows.Promocao.push({...a.rows.Promocao[0],id:'p2',operacao_token:''});
+  const reverter=carregar('reverterPublicacaoPromocaoMilitarTx',a.client);
+  const r=await reverter({promocao:{id:'p2'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,false);assert.equal(r.motivo,'item_nao_pertence_promocao');assert.equal(a.rows.Militar[0].posto_graduacao,'Cabo');
+});

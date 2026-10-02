@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
     const snapshotCadastro = itemAtual.cadastro_anterior_promocao;
     const destinoRestauracao = snapshotCadastro?.posto_graduacao && snapshotCadastro?.quadro
       ? snapshotCadastro
-      : {posto_graduacao:texto(historicoAtual.posto_graduacao_anterior),quadro:texto(historicoAtual.quadro_anterior)};
+      : {};
     if (precisaRollbackCadastro && (!texto(destinoRestauracao.posto_graduacao) || !texto(destinoRestauracao.quadro))) {
       return erro({status:409,etapa:'validacao',motivo:'origem_cadastral_nao_comprovada'});
     }
