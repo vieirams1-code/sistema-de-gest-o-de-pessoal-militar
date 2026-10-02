@@ -187,7 +187,7 @@ test('reversão rejeita evento posterior e item de outra promoção',async()=>{
 
 test('CRUD genérico recusa adulterar estado oficial e suas travas',async()=>{
   const source=readFileSync('base44/functions/cudEscopado/entry.ts','utf8');
-  const start=source.indexOf("    if (['operacao_token','operacao_promocao_token']");
+  const start=source.indexOf("    if (['operacao_token'");
   const end=source.indexOf('    // ---- Barreiras de integridade de Promoções/Antiguidade ----',start);
   const block=source.slice(start,end);
   for(const caso of [
