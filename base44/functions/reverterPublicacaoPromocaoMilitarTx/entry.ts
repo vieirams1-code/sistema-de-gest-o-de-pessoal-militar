@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // O histórico é resolvido pelo registro do banco; só caímos no payload se faltar.
+    // O histórico é resolvido exclusivamente pelo registro persistido.
     const historicoId = texto(itemAtual?.historico_promocao_v2_id);
 
     // Valida que o item está de fato publicado antes de reverter.
@@ -187,8 +187,9 @@ Deno.serve(async (req) => {
     }
 
     const snapshotCadastro = itemAtual.cadastro_anterior_promocao;
+    const camposCadastro = ['posto_graduacao','posto_graduação','posto_graduacao_atual','posto_grad','posto','graduacao','quadro','quadro_atual','militar_quadro'];
     const destinoRestauracao = snapshotCadastro?.posto_graduacao && snapshotCadastro?.quadro
-      ? snapshotCadastro
+      ? Object.fromEntries(camposCadastro.filter(k => Object.hasOwn(snapshotCadastro,k)).map(k => [k,snapshotCadastro[k]]))
       : {};
     if (precisaRollbackCadastro && (!texto(destinoRestauracao.posto_graduacao) || !texto(destinoRestauracao.quadro))) {
       return erro({status:409,etapa:'validacao',motivo:'origem_cadastral_nao_comprovada'});
@@ -251,11 +252,22 @@ Deno.serve(async (req) => {
     const itensAutoritativos = await PromocaoMilitar.filter({promocao_id:promocaoId},undefined,5000);
     const statusPromocao = statusPromocaoPosReversao((itensAutoritativos || []).map((registro: any) => (String(registro?.id) === String(itemId) ? { ...registro, status: 'cancelado', publicado: false } : registro)));
 
+    // O journal é obrigatório antes da primeira escrita, inclusive em reversão sem curso.
+    await base44.asServiceRole.entities.AssistenteLog.create({
+      tipo:'reversao_promocao', acao:'reversao_iniciada', descricao:motivo,
+      metadata:{promocao_id:promocaoId,item_id:itemId,historico_id:historicoId,militar_id:militarId,
+        executado_por:authUser.email,token:travaToken,historico_anterior:historicoSnapshot,
+        item_anterior:itemSnapshot,promocao_anterior:promocaoSnapshot,
+        cadastro_anterior:militarAnterior,restauracao:destinoRestauracao,participante_anterior:participanteSnapshot}
+    });
+
     try {
       await Historico.update(historicoId, { status_registro: 'cancelado', motivo_retificacao: motivo, observacoes: [texto(historicoAtual?.observacoes), trilhaAdmin].filter(Boolean).join('\n') });
 
       if (precisaRollbackCadastro) {
-        await Militar.update(militarAnterior.id, destinoRestauracao);
+        const precondicoes = Object.fromEntries(Object.keys(destinoRestauracao).map(k => [k,Object.hasOwn(militarAnterior,k) ? militarAnterior[k] : {$exists:false}]));
+        const result = await Militar.updateMany({id:militarAnterior.id,operacao_promocao_token:militarTravaToken,...precondicoes},{$set:destinoRestauracao});
+        if (result?.success !== true || result.updated !== 1) throw new Error('cadastro_alterado_durante_reversao');
         const restaurado = await Militar.get(militarAnterior.id);
         if (Object.keys(destinoRestauracao).some(k => texto(restaurado[k]) !== texto(destinoRestauracao[k]))) throw new Error('restauracao_cadastro_nao_confirmada');
       }
@@ -315,7 +327,10 @@ Deno.serve(async (req) => {
           const keys = Object.keys(destinoRestauracao);
           if (keys.some(k => texto(atual[k]) !== texto(destinoRestauracao[k]) && texto(atual[k]) !== texto(militarAnterior[k]))) throw new Error('alteracao_concorrente');
           const anterior = Object.fromEntries(keys.map(k=>[k,militarAnterior[k] ?? '']));
-          await Militar.update(militarAnterior.id,anterior);
+          if (keys.every(k => texto(atual[k]) === texto(anterior[k]))) return;
+          const precondicoes = Object.fromEntries(keys.map(k => [k,Object.hasOwn(atual,k) ? atual[k] : {$exists:false}]));
+          const result = await Militar.updateMany({id:militarAnterior.id,operacao_promocao_token:militarTravaToken,...precondicoes},{$set:anterior});
+          if (result?.success !== true || result.updated !== 1) throw new Error('compensacao_bloqueada_alteracao_concorrente');
           const relido = await Militar.get(militarAnterior.id);
           if (keys.some(k=>texto(relido[k]) !== texto(anterior[k]))) throw new Error('restauracao_nao_confirmada');
         });
