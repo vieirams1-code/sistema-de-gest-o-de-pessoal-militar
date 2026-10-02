@@ -39,8 +39,13 @@ import { getPostoGraduacaoMilitar, getQuadroMilitar } from '@/utils/militarPosto
 import { isMilitarAtivo } from '@/utils/militarStatus';
 
 export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
-  const { hasAccess, hasSelfAccess } = useCurrentUser();
-  const canAccess = hasAccess(militar) || hasSelfAccess(militar);
+  const { hasAccess, hasSelfAccess, canAccessModule, canAccessAction } = useCurrentUser();
+  // Componente legado: os campos de estrutura atuais são tratados no hook,
+  // mas o menu também exige a permissão funcional de visualizar militares.
+  // Nenhuma verificação client-side substitui o escopo imposto pelo backend.
+  const canAccess = canAccessModule('militares')
+    && canAccessAction('visualizar_militares')
+    && (hasAccess(militar) || hasSelfAccess(militar));
   const lotacaoAtual = militar.lotacao_atual || militar.lotacao;
   return (
     <motion.div
