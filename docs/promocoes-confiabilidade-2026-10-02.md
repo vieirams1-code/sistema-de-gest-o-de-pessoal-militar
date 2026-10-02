@@ -38,3 +38,15 @@ Para reconciliar uma operação interrompida, verificar tokens da promoção/mil
 Atos oficiais ausentes e regras institucionais de antiguidade pendentes permanecem sujeitos a comprovação/homologação. Essas mudanças não inventam dados nem homologam snapshots de antiguidade.
 
 Resultado final: 103/103 testes direcionados; 568 testes Node gerais (564 aprovados, 4 falhas em JISO/Planos de Férias); 70/70 testes Vitest. Compilação e lint da tela alterada aprovados.
+
+## Continuação: concorrência na reversão e tentativa de homologação
+
+Checkpoint inicial desta continuação: 6abfd4bfd23620e15578e82a (cb8f877348566031924d47d0e8367b8e1c84023a).
+
+A reversão passa a gravar journal obrigatório em AssistenteLog antes da primeira alteração. O snapshot de restauração aceita somente campos de posto/quadro e aliases; outros campos não são aplicados.
+
+A restauração cadastral e sua compensação usam updateMany com token e precondições sobre todos os campos envolvidos. A compensação da aplicação cadastral usa o mesmo controle. Edição concorrente entre leitura e gravação é preservada; se a compensação não puder ser confirmada, a trava permanece para reconciliação.
+
+Validação desta continuação: 29/29 testes de confiabilidade, incluindo seis regressões novas; conjunto ampliado com Promoções, Antiguidade e barreiras de permissão: 148/149 aprovados. A falha foi o teste preexistente de JISO (nome canViewJisoAgenda esperado no código). Helpers de aplicação comparados e idênticos; git diff --check sem erros. Não houve mudança de frontend nesta continuação.
+
+A sondagem somente de leitura pelo CLI base44 exec --data-env dev não executou o script: o CLI solicitou login por dispositivo. O processo foi encerrado. O conector consegue consultar entidades, mas não oferece invocação de funções nesta sessão. Nenhum registro de homologação foi criado e nenhum cadastro real foi alterado por esta etapa. A separação da base dev e o ciclo completo no runtime continuam sem homologação.
