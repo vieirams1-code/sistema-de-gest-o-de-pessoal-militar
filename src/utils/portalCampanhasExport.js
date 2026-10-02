@@ -65,7 +65,7 @@ export async function baixarAnexosCampanhaZip(campanha, militares, onProgress = 
     const prefixoMilitar = `[${matricula}] ${posto}${nome}`.trim();
 
     // 1. Assinatura de Documentos / Devolução de Documento
-    if (campanha.tipo === 'ASSINATURA_DOCUMENTO' && resp.arquivo_devolucao_url) {
+    if (resp.arquivo_devolucao_url) {
       const ext = obterExtensao(resp.arquivo_devolucao_nome || resp.arquivo_devolucao_url);
       const docLabel = sanitizarNomeArquivo(campanha.titulo || 'Termo_Assinado');
       const nomeFinal = sanitizarNomeArquivo(`${prefixoMilitar} - ${docLabel}.${ext}`);
@@ -88,8 +88,8 @@ export async function baixarAnexosCampanhaZip(campanha, militares, onProgress = 
         } catch (_e) {}
       }
 
-      camposUpload.forEach((c) => {
-        const item = arquivosObj[c.id];
+      Object.entries(arquivosObj || {}).forEach(([campoId, item]) => {
+        const c = camposUpload.find((campo) => campo.id === campoId) || { pergunta: `Anexo ${campoId}` };
         const url = typeof item === 'object' ? item?.url : item;
         const nomeOrig = typeof item === 'object' ? item?.nome || item?.nome_original : '';
 
