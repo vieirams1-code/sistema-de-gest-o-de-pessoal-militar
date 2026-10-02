@@ -59,6 +59,9 @@ function resolverOrigemHistorica({
   promocao: any;
   historicoAnterior: any;
 }) {
+  if (indicePosto(promocao?.posto_graduacao) === 0) {
+    return { posto: '', quadro: '', origem: 'inicio_cadeia' };
+  }
   if (historicoAnterior) {
     return {
       posto: texto(historicoAnterior?.posto_graduacao_novo),
@@ -240,6 +243,11 @@ Deno.serve(async (req) => {
       return Response.json({ ...erroValidacaoServidor, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [erroValidacaoServidor] }, { status: 400 });
     }
 
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Campo_Grande', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+    const dataEfetiva = dataSomente(promocao.data_promocao);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataEfetiva) || Number.isNaN(Date.parse(dataEfetiva)) || new Date(dataEfetiva).toISOString().slice(0, 10) !== dataEfetiva || dataEfetiva > hoje) {
+      return Response.json({ success:false, etapa:'validacao_servidor', motivo:'promocao_sem_vigencia', publicados:0 }, {status:409});
+    }
     const warnings: any[] = [];
     const errors: any[] = [];
     const historicos: any[] = [];
@@ -249,6 +257,10 @@ Deno.serve(async (req) => {
     const historicosAtivos = await Historico.filter({ status_registro: 'ativo' });
 
     for (const item of itens) {
+      // Repetições e inclusão complementar não reaplicam itens já concluídos.
+      if (item.publicado === true || STATUS_PROMOCAO_PUBLICADA.has(normalizar(item.status))) continue;
+      const desfazer: Array<() => Promise<any>> = [];
+      let preservarCadeia = false;
       const itemId = texto(item?.id) || null;
       const militarId = texto(item?.militar_id) || null;
       try {
@@ -284,7 +296,7 @@ Deno.serve(async (req) => {
           boletim_referencia: texto(promocao.boletim_referencia),
           ato_referencia: texto(promocao.ato_referencia),
           antiguidade_referencia_ordem: Number(item.ordem),
-          antiguidade_referencia_id: texto(historicoAnterior?.id),
+          antiguidade_referencia_id: indicePosto(promocao.posto_graduacao) === 0 ? '' : texto(historicoAnterior?.id),
           origem_dado: 'publicacao_promocao',
           status_registro: 'ativo',
           observacoes: `Registro gerado pela publicação da promoção ${promocaoId}. Origem anterior: ${origemHistorica.origem}.`,
@@ -297,11 +309,27 @@ Deno.serve(async (req) => {
         }
         const historicoExistente = historicosMesmoEvento.find((h: any) => !texto(h?.promocao_id) || texto(h?.promocao_id) === texto(promocaoId));
 
+        if (historicosMesmoEvento.length > 1) throw new Error('historicos_duplicados_evento');
+        const journal = await base44.asServiceRole.entities.AssistenteLog.create({
+          tipo:'publicacao_promocao', acao:'publicacao_item_iniciada',
+          descricao:'Estado anterior preservado antes da publicação.',
+          metadata:{promocao_id:promocaoId,item_id:itemId,militar_id:militarId,item_antes:item,historico_antes:historicoExistente || null,militar_antes:militarEncontrado}
+        });
         let historico = historicoExistente;
         if (!historico) {
-          historico = await Historico.create(payloadHistorico).catch(() => null);
+          // Manter o candidato identificável caso a API grave e perca a resposta.
+          desfazer.push(async () => {
+            const candidatos = await Historico.filter({promocao_id:promocaoId,militar_id:militarId,status_registro:'ativo'}, undefined, 5000);
+            for (const h of candidatos.filter((h:any) => dataSomente(h.data_promocao) === dataPromocao)) {
+              await Historico.update(h.id,{status_registro:'cancelado',observacoes:payloadHistorico.observacoes + ' Publicação não concluída; compensação registrada.'});
+            }
+          });
+          historico = await Historico.create(payloadHistorico);
           if (!historico?.id) throw montarErro({ etapa: 'criar_historico', motivo: 'historico_criacao_falhou', promocao_id: promocaoId, item_id: itemId });
         } else {
+          const campos = Object.keys(payloadHistorico);
+          const snapshot = Object.fromEntries(campos.map(k => [k, historicoExistente[k] ?? '']));
+          desfazer.push(() => Historico.update(historicoExistente.id,snapshot));
           historico = await Historico.update(historico.id, {
             promocao_id: promocaoId,
             posto_graduacao_novo: payloadHistorico.posto_graduacao_novo,
@@ -323,10 +351,24 @@ Deno.serve(async (req) => {
           texto(militarEncontrado?.posto_graduacao)
         );
 
+        // Confirmar vínculo antes de qualquer escrita no cadastro.
+        const snapshotItem = Object.fromEntries(['status','publicado','historico_promocao_v2_id','atualizar_cadastro_militar','motivo_atualizacao_cadastro','resultado_aplicacao_cadastro'].map(k => [k,item[k] ?? (k === 'publicado' || k === 'atualizar_cadastro_militar' ? false : '')]));
+        desfazer.push(() => PromocaoMilitar.update(item.id,snapshotItem));
+        await PromocaoMilitar.update(item.id, {
+          status:'publicado',publicado:true,historico_promocao_v2_id:historico.id,
+          atualizar_cadastro_militar:false,resultado_aplicacao_cadastro:'cadastro_preservado'
+        });
+        const itemConfirmado = await PromocaoMilitar.get(item.id);
+        if (itemConfirmado.publicado !== true || texto(itemConfirmado.historico_promocao_v2_id) !== texto(historico.id)) throw new Error('vinculo_nao_confirmado');
+
+        const posterior = historicosAtivos.some((h:any) => texto(h.militar_id) === militarId && dataSomente(h.data_promocao) > dataPromocao && dataSomente(h.data_promocao) <= hoje);
+        const podeAplicar = comparacaoCadastro === 'superior' && !posterior && dataSomente(militarEncontrado.data_promocao_atual) <= dataPromocao;
         let resultadoAplicacao = 'cadastro_preservado';
         let motivoAplicacao = 'Cadastro atual preservado (superior ao evento histórico).';
 
-        if (comparacaoCadastro === 'superior') {
+        if (podeAplicar) {
+          // Marcar a intenção antes da escrita; se houver falha, restaurar junto ao vínculo.
+          await PromocaoMilitar.update(item.id,{atualizar_cadastro_militar:true,resultado_aplicacao_cadastro:'imediatamente_superior'});
           const atualizacaoMilitar = await atualizarCadastroMilitar(
             base44,
             militarId!,
@@ -339,9 +381,10 @@ Deno.serve(async (req) => {
               origem: 'publicacao_oficial_promocao',
               historico_id: historico?.id
             }
-          ).catch(() => null);
+          );
 
           if (!atualizacaoMilitar || !atualizacaoMilitar.success) {
+            preservarCadeia = atualizacaoMilitar?.rollback_completo === false;
             throw montarErro({
               etapa: 'atualizar_militar',
               motivo: atualizacaoMilitar?.erro_api || 'update_militar_falhou',
@@ -363,27 +406,38 @@ Deno.serve(async (req) => {
           warnings.push({ etapa: 'aplicar_cadastro', motivo: 'cadastro_preservado_superior_ao_historico', promocao_id: promocaoId, item_id: itemId, militar_id: militarId });
         }
 
-        await PromocaoMilitar.update(item.id, {
-          status: 'publicado',
-          publicado: true,
-          historico_promocao_v2_id: texto(historico?.id),
-          atualizar_cadastro_militar: comparacaoCadastro === 'superior',
-          motivo_atualizacao_cadastro: motivoAplicacao,
-          resultado_aplicacao_cadastro: resultadoAplicacao,
-        });
+        if (!podeAplicar) {
+          await PromocaoMilitar.update(item.id, {
+            atualizar_cadastro_militar:false,motivo_atualizacao_cadastro:motivoAplicacao,
+            resultado_aplicacao_cadastro:resultadoAplicacao
+          });
+        }
+        try { await base44.asServiceRole.entities.AssistenteLog.update(journal.id,{acao:'publicacao_item_concluida'}); }
+        catch (_) { warnings.push({motivo:'log_final_pendente',item_id:itemId,journal_id:journal.id}); }
 
         historicos.push({ promocao_militar_id: item.id, historico_promocao_v2_id: texto(historico?.id) });
         militarIdsAfetados.add(militarId!);
         publicados += 1;
       } catch (error: any) {
+        const falhasRollback: string[] = [];
+        if (!preservarCadeia) {
+          for (const undo of [...desfazer].reverse()) {
+            try { await undo(); } catch (e:any) { falhasRollback.push(e.message || String(e)); }
+          }
+        } else {
+          falhasRollback.push('cadastro_sem_restauracao_confirmada; preservar cadeia para revisão');
+        }
         const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId });
-        errors.push({ ...erroItem, message: erroItem?.motivo || error?.message || 'Falha ao publicar item.' });
+        errors.push({ ...erroItem, message: error?.message || erroItem?.motivo || 'Falha ao publicar item.',rollback_completo:falhasRollback.length === 0,falhas_rollback:falhasRollback });
       }
     }
 
     if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente'});
-    const statusFinal = publicados === 0 ? 'rascunho' : (publicados < itens.length ? 'publicada_parcial' : 'publicada');
-    const totalVinculados = (await PromocaoMilitar.filter({ promocao_id: promocaoId })).length;
+    const itensFinais = await PromocaoMilitar.filter({promocao_id:promocaoId}, undefined, 5000);
+    const operacionais = itensFinais.filter((i:any) => !STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(normalizar(i.status)));
+    const totalPublicados = operacionais.filter((i:any) => i.publicado === true && normalizar(i.status) === 'publicado').length;
+    const statusFinal = totalPublicados === 0 ? 'rascunho' : (totalPublicados < operacionais.length ? 'publicada_parcial' : 'publicada');
+    const totalVinculados = itensFinais.length;
     await Promocao.update(promocaoId, { status: statusFinal, total_militares_vinculados: totalVinculados });
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
