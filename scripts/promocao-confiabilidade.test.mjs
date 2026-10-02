@@ -217,3 +217,65 @@ test('reversão rejeita promoção-pai incompatível com item persistido',async(
   const r=await reverter({promocao:{id:'p2'},item:{id:'i1'},motivo:'Teste'});
   assert.equal(r.success,false);assert.equal(r.motivo,'item_nao_pertence_promocao');assert.equal(a.rows.Militar[0].posto_graduacao,'Cabo');
 });
+
+test('reversão não inicia escritas sem journal durável',async()=>{
+  let armed=false;
+  const a=ambiente({fail:(n,op)=>{if(armed&&n==='AssistenteLog'&&op==='create')throw Error('auditoria indisponível');}});
+  await a.publicar(a.payload());armed=true;const before=a.operations.length;
+  const r=await carregar('reverterPublicacaoPromocaoMilitarTx',a.client)({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,false);assert.equal(a.operations.length,before);
+  assert.equal(a.rows.Militar[0].posto_graduacao,'Cabo');
+  assert.equal(a.rows.Promocao[0].operacao_token,'');
+});
+test('reversão preserva alteração concorrente no instante da gravação',async()=>{
+  const a=ambiente();await a.publicar(a.payload());
+  const entity=a.client.asServiceRole.entities.Militar,native=entity.updateMany;
+  entity.updateMany=async(q,p)=>{
+    if(p.$set.posto_graduacao==='Soldado')a.rows.Militar[0].posto_graduacao='Sargento';
+    return native(q,p);
+  };
+  const r=await carregar('reverterPublicacaoPromocaoMilitarTx',a.client)({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,false);assert.equal(r.rollback_completo,false);
+  assert.equal(a.rows.Militar[0].posto_graduacao,'Sargento');
+  assert.equal(a.rows.HistoricoPromocaoMilitarV2[0].status_registro,'ativo');
+  assert.ok(a.rows.Promocao[0].operacao_token);assert.ok(a.rows.Militar[0].operacao_promocao_token);
+});
+test('compensação da reversão preserva edição entre leitura e gravação',async()=>{
+  let armed=false;
+  const a=ambiente({fail:(n,op,stage)=>{if(armed&&n==='Promocao'&&op==='update'&&stage==='before')throw Error('consolidação indisponível');}});
+  await a.publicar(a.payload());armed=true;
+  const entity=a.client.asServiceRole.entities.Militar,native=entity.updateMany;
+  entity.updateMany=async(q,p)=>{
+    if(p.$set.posto_graduacao==='Cabo')a.rows.Militar[0].posto_graduacao='Sargento';
+    return native(q,p);
+  };
+  const r=await carregar('reverterPublicacaoPromocaoMilitarTx',a.client)({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,false);assert.equal(r.rollback_completo,false);
+  assert.equal(a.rows.Militar[0].posto_graduacao,'Sargento');assert.ok(a.rows.Militar[0].operacao_promocao_token);
+});
+test('resposta perdida na reversão compensa cadastro e mantém publicação',async()=>{
+  let armed=false,once=true;
+  const a=ambiente({fail:(n,op,stage)=>{if(armed&&once&&n==='Militar'&&op==='update'&&stage==='after'){once=false;throw Error('resposta perdida');}}});
+  await a.publicar(a.payload());armed=true;
+  const r=await carregar('reverterPublicacaoPromocaoMilitarTx',a.client)({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,false);assert.equal(r.rollback_completo,true);
+  assert.equal(a.rows.Militar[0].posto_graduacao,'Cabo');assert.equal(a.rows.PromocaoMilitar[0].publicado,true);
+  assert.equal(a.rows.HistoricoPromocaoMilitarV2[0].status_registro,'ativo');
+});
+test('snapshot de reversão não altera campos fora de posto e quadro',async()=>{
+  const a=ambiente();a.rows.Militar[0].nome_completo='Cadastro original';await a.publicar(a.payload());
+  a.rows.PromocaoMilitar[0].cadastro_anterior_promocao.nome_completo='Valor indevido';
+  const r=await carregar('reverterPublicacaoPromocaoMilitarTx',a.client)({promocao:{id:'p1'},item:{id:'i1'},motivo:'Teste'});
+  assert.equal(r.success,true);assert.equal(a.rows.Militar[0].nome_completo,'Cadastro original');
+});
+test('compensação da publicação não sobrescreve edição após releitura',async()=>{
+  const a=ambiente({fail:(n,op,stage,p)=>{if(n==='Militar'&&op==='update'&&stage==='before'&&p.posto_graduacao==='Cabo')throw Error('falha inicial');}});
+  const entity=a.client.asServiceRole.entities.Militar,native=entity.updateMany;
+  entity.updateMany=async(q,p)=>{
+    if(p.$set.posto_graduacao==='Soldado')a.rows.Militar[0].posto_graduacao='Sargento';
+    return native(q,p);
+  };
+  const r=await a.publicar(a.payload());
+  assert.equal(r.success,false);assert.equal(a.rows.Militar[0].posto_graduacao,'Sargento');
+  assert.ok(a.rows.Militar[0].operacao_promocao_token);
+});
