@@ -95,7 +95,9 @@ export async function atualizarCadastroMilitar(
     try {
       const atualRollback = await E.Militar.get(militarId);
       if (Object.keys(payload).some(k => texto(atualRollback[k]) !== payload[k] && texto(atualRollback[k]) !== texto(original[k]))) throw new Error('rollback_bloqueado_alteracao_concorrente');
-      await E.Militar.update(militarId, original);
+      const precondicoes = Object.fromEntries(Object.keys(original).map(k => [k,Object.hasOwn(atualRollback,k) ? atualRollback[k] : {$exists:false}]));
+      const result = await E.Militar.updateMany({id:militarId,operacao_promocao_token:tokenCadastro,...precondicoes},{$set:original});
+      if (result?.success !== true || result.updated !== 1) throw new Error('rollback_bloqueado_alteracao_concorrente');
       const restaurado = await E.Militar.get(militarId);
       rollback = Object.keys(original).every(k => texto(restaurado[k]) === texto(original[k]));
     } catch (e:any) { erro += '; ' + (e.message || String(e)); }
