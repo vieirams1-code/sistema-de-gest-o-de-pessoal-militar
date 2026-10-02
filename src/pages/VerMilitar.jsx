@@ -61,6 +61,7 @@ import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularP
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { canDisplayScopedMilitar } from '@/services/scopedMilitarDisplayAccess';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
@@ -177,7 +178,7 @@ export default function VerMilitar() {
   const id = searchParams.get('id');
   const registrosLivro = [];
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { isAdmin, hasAccess, hasSelfAccess, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeVerDadosSensiveisMilitar = isAdmin || (
     canAccessModule('militares') && canAccessAction('ver_dados_sensiveis_militar')
   );
@@ -297,7 +298,15 @@ export default function VerMilitar() {
   const militarDestinoMerge = militarDestinoMergeData?.militares?.[0] || null;
 
   const postoGraduacaoMilitar = getPostoGraduacaoOficial(militar);
-  const canViewMilitar = militar ? hasAccess(militar) || hasSelfAccess(militar) : false;
+  // A função getScopedMilitares já impõe escopo e permissões no servidor.
+  // Não repetir a validação com campos de lotação que podem faltar no DTO.
+  const canViewMilitar = canDisplayScopedMilitar({
+    militar,
+    requestedId: id,
+    isAccessResolved,
+    canViewModule: canAccessModule('militares'),
+    canViewAction: canAccessAction('visualizar_militares'),
+  });
   const comportamentoElegivel = militar ? !isOficial(postoGraduacaoMilitar) : false;
 
   const { data: feriasBundle = { ferias: [] } } = useQuery({
