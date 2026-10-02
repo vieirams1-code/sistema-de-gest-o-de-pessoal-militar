@@ -329,10 +329,10 @@ export default function CentralRespostasCampanhas() {
                 onClick={handleBaixarZipLote}
                 disabled={actionLoading}
                 className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md h-10 px-4 disabled:opacity-40"
-                title="Baixar todos os anexos organizados em ZIP"
+                title="Baixar todos os documentos da campanha com matrícula, nome do militar e pergunta no nome de cada arquivo"
               >
                 <FolderDown className="w-4 h-4 mr-1.5" />
-                Baixar Anexos (ZIP)
+                Baixar todos os documentos (ZIP)
               </Button>
             )}
           </div>
