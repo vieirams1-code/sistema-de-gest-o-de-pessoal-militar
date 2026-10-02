@@ -323,7 +323,8 @@ export async function sincronizarHistoricoPromocaoPublicada({
 
   return sincronizarHistoricoPromocaoPublicadaTx({
     promocaoId: promocaoDepois.id,
-    patch: promocaoDepois,
+    patch: Object.fromEntries(camposMantidos.filter(campo => texto(promocaoAntes?.[campo]) !== texto(promocaoDepois?.[campo])).map(campo => [campo,promocaoDepois[campo]])),
+    valoresAnteriores: promocaoAntes,
   });
 }
 
@@ -331,26 +332,24 @@ export async function sincronizarHistoricoPromocaoPublicadaTx({
   promocaoId = '',
   idsHistoricos = [],
   patch = {},
+  valoresAnteriores = null,
 } = {}) {
   const idsUnicos = [...new Set((idsHistoricos || []).map((id) => texto(id)).filter(Boolean))];
   const payload = {
     promocao_id: texto(promocaoId),
     historico_ids: idsUnicos,
-    patch_promocao: {
-      status: texto(patch?.status),
-      posto_graduacao: texto(patch?.posto_graduacao),
-      quadro: texto(patch?.quadro),
-      data_promocao: dataSomente(patch?.data_promocao),
-      data_publicacao: dataSomente(patch?.data_publicacao),
-      boletim_referencia: texto(patch?.boletim_referencia),
-      ato_referencia: texto(patch?.ato_referencia),
-      observacoes: texto(patch?.observacoes),
-    },
+    valores_anteriores: valoresAnteriores,
+    patch_promocao: Object.fromEntries(
+      ['status','posto_graduacao','quadro','data_promocao','data_publicacao','boletim_referencia','ato_referencia','observacoes']
+        .filter(campo => Object.hasOwn(patch,campo))
+        .map(campo => [campo,campo.startsWith('data_') ? dataSomente(patch[campo]) : texto(patch[campo])])
+    ),
   };
 
   try {
     const response = await base44.functions.invoke('sincronizarHistoricoPromocaoPublicadaTx', { body: payload });
-    return response?.data || { atualizados: 0, ignorado: false };
+    if (response?.data?.success !== true) throw new Error(response?.data?.motivo || 'Sincronização não confirmada pelo servidor.');
+    return response.data;
   } catch (error) {
     diagLog('sincronizacao-historico:tx:erro', {
       promocaoId: payload.promocao_id,

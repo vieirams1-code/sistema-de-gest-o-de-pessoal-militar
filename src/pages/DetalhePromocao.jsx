@@ -667,7 +667,7 @@ export default function DetalhePromocao() {
         promocaoDepois: promocaoAtualizada,
       });
 
-      if (sincronizacao?.ignorado) {
+      if (sincronizacao?.ignorado && !['publicada','publicado','consolidada','consolidado','ativa','ativo','historica','homologada','publicada_parcial'].includes(texto(promocao.status).toLowerCase())) {
         diagLog('salvar-promocao:rascunho-update:enviando', { promocaoId: promocao.id, status: promocao.status, patchPromocao });
         const retornoPromocao = await atualizarEscopado('Promocao', promocao.id, patchPromocao);
         diagLog('salvar-promocao:rascunho-update:retorno', { promocaoId: promocao.id, retornoPromocao });

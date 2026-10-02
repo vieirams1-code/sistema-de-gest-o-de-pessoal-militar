@@ -94,6 +94,18 @@ Deno.serve(async (req) => {
     }
 
     const patchPromocao = montarPatchPromocao(payload);
+    // Dados vazios não apagam documentação previamente gravada.
+    for (const campo of ['ato_referencia','boletim_referencia']) {
+      if (!texto(patchPromocao[campo]) && texto(promocaoAntes[campo])) delete patchPromocao[campo];
+    }
+    const esperado = payload?.valores_anteriores;
+    if (esperado && Object.keys(patchPromocao).some(campo => Object.hasOwn(esperado,campo) && texto(esperado[campo]) !== texto(promocaoAntes[campo]))) {
+      return Response.json({success:false,etapa:'controle_concorrencia',motivo:'promocao_alterada_recarregue'}, {status:409});
+    }
+    // Alterar destino ou vigência de uma publicação exige retificação própria.
+    if (['posto_graduacao','quadro','data_promocao'].some(campo => Object.hasOwn(patchPromocao,campo) && texto(patchPromocao[campo]) !== texto(promocaoAntes[campo]))) {
+      return Response.json({success:false,etapa:'validacao',motivo:'alteracao_estrutural_exige_retificacao'}, {status:409});
+    }
     if (Object.keys(patchPromocao).length === 0) {
       return Response.json({ success: true, atualizados: 0, ignorado: true });
     }
@@ -131,8 +143,12 @@ Deno.serve(async (req) => {
     try {
       await Promocao.update(promocaoId, patchPai);
       for (const historico of historicosAtivos) {
-        await Historico.update(historico.id, patchHistorico);
         atualizados.push(texto(historico.id));
+        const patchIndividual = {...patchHistorico};
+        for (const campo of ['ato_referencia','boletim_referencia'] as const) {
+          if (!texto(patchIndividual[campo]) && texto(historico[campo])) delete patchIndividual[campo];
+        }
+        await Historico.update(historico.id, patchIndividual);
       }
     } catch (error: any) {
       const falhasRollback: any[] = [];

@@ -47,3 +47,14 @@ test('ZIP preserva bytes, extensão e recusa download com erro',async()=>{
    await assert.rejects(baixarAnexosCampanhaZip(campaign,rows),/ZIP não foi gerado/);assert.equal(clicked,false);
  } finally {globalThis.fetch=oldFetch;globalThis.document=oldDocument;URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;globalThis.setTimeout=oldTimer;}
 });
+
+const validationStart=source.indexOf('        for (const [campoId, item] of Object.entries(arquivosObj))');
+const validationEnd=source.indexOf('        for (const c of camposObrigatorios)',validationStart);
+const validation=new Function('arquivosObj','formConfig','Response','URL','CORS_HEADERS',ts.transpile(source.slice(validationStart,validationEnd)));
+test('backend valida campo, origem, formato e tamanho',()=>{
+ const config={campos:[{id:'cert',tipo:'upload_arquivo'}]};
+ const validate=files=>validation(files,config,Response,URL,{});
+ for(const ext of ['jpg','jpeg','png','pdf','doc','docx','xls','xlsx']) assert.equal(validate(JSON.parse(response(ext).arquivos_anexados_json)),undefined);
+ for(const item of [{},{url:'javascript:alert(1)',nome:'a.jpg'}, {url:'https://example.com/a.jpg',nome:'a.jpg'}, {...JSON.parse(response('jpg').arquivos_anexados_json).cert,tamanho:16*1024*1024}, {...JSON.parse(response('exe').arquivos_anexados_json).cert}]) assert.equal(validate({cert:item}).status,400);
+ assert.equal(validate({outro:JSON.parse(response('jpg').arquivos_anexados_json).cert}).status,400);
+});
