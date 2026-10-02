@@ -678,8 +678,7 @@ export default function CentralRespostasCampanhas() {
                                   <span className="truncate text-[11px]" title={resp.arquivo_devolucao_nome || 'Arquivo Assinado'}>
                                     {resp.arquivo_devolucao_nome || 'Arquivo Assinado'}
                                   </span>
-                                  <a
-                                    href={resp.arquivo_devolucao_url}
+                                  {resp.arquivo_devolucao_url && (<a href={resp.arquivo_devolucao_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
@@ -687,7 +686,7 @@ export default function CentralRespostasCampanhas() {
                                     title="Baixar Anexo"
                                   >
                                     <Download className="w-3.5 h-3.5" />
-                                  </a>
+                                  </a>)}
                                 </div>
                               ) : (
                                 <span className="text-slate-400 italic">Sem anexo</span>
@@ -715,8 +714,7 @@ export default function CentralRespostasCampanhas() {
                                     <div className="flex items-center gap-1.5 text-purple-900 font-bold bg-purple-50 px-2 py-1 rounded-lg border border-purple-200 max-w-[200px]">
                                       <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                                       <span className="truncate text-[11px]" title={nome}>{nome}</span>
-                                      <a
-                                        href={url}
+                                      {url && (<a href={url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={(e) => e.stopPropagation()}
@@ -724,7 +722,7 @@ export default function CentralRespostasCampanhas() {
                                         title="Baixar Anexo"
                                       >
                                         <Download className="w-3.5 h-3.5" />
-                                      </a>
+                                      </a>)}
                                     </div>
                                   ) : (
                                     <span className="text-slate-400">-</span>
@@ -920,14 +918,13 @@ export default function CentralRespostasCampanhas() {
                               (anexo?.presente || anexoUrl) ? (
                                 <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 mt-1">
                                   <span className="font-semibold text-slate-800 truncate">{anexoNome}</span>
-                                  <a
-                                    href={anexoUrl}
+                                  {anexoUrl && (<a href={anexoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-700 font-bold hover:underline flex items-center"
                                   >
                                     <Download className="w-3.5 h-3.5 mr-1" /> Baixar
-                                  </a>
+                                  </a>)}
                                 </div>
                               ) : (
                                 <span className="text-slate-400 italic">Nenhum arquivo enviado</span>
