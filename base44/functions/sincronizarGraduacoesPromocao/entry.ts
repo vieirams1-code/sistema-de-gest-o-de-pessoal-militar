@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { atualizarCadastroMilitar } from './utils.ts';
 
 const POSTOS_HIERARQUIA = [
@@ -213,6 +213,9 @@ Deno.serve(async (req) => {
 
       // Filtro de "publicados"
       const mHistoricos = mHistoricosRaw.filter(h => {
+        const dataEvento = texto(h.data_promocao).split('T')[0];
+        const hoje = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Campo_Grande',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dataEvento) || dataEvento > hoje) return false;
         const statusReg = normalizar(h.status_registro);
         if (['cancelado', 'cancelada', 'retificado', 'retificada'].includes(statusReg)) return false;
 

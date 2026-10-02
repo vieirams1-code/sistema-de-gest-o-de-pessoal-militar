@@ -41,7 +41,12 @@ function ambiente({fail=()=>{},posto='Soldado',data='2020-01-01'}={}) {
     updateMany:async(query,patch)=>{
       const matches=(row,q)=>Object.entries(q).every(([k,v])=>k==='$or' ? v.some(c=>matches(row,c)) : (v && typeof v==='object' && Object.hasOwn(v,'$exists')) ? Object.hasOwn(row,k)===v.$exists : row[k]===v);
       const found=list.filter(r=>matches(r,query));
-      for(const row of found)Object.assign(row,structuredClone(patch.$set || {}));
+      const dados=patch.$set || {};
+      const trava=Object.keys(dados).every(k=>['operacao_token','operacao_promocao_token'].includes(k));
+      if(!trava)fail(name,'update','before',dados);
+      for(const row of found)Object.assign(row,structuredClone(dados));
+      if(!trava&&found.length)operations.push([name,'update',structuredClone(dados)]);
+      if(!trava)fail(name,'update','after',dados);
       return {success:true,updated:found.length};
     },
     update:async(id,patch)=>{

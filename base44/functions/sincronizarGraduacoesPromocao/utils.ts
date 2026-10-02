@@ -79,7 +79,11 @@ export async function atualizarCadastroMilitar(
   const relido = await E.Militar.get(militarId);
   if (Object.keys(original).some(k => texto(relido[k]) !== texto(original[k]))) throw new Error('cadastro_alterado_durante_publicacao');
   let erro = '';
-  try { await E.Militar.update(militarId,payload); } catch (e:any) { erro = e.message || String(e); }
+  try {
+    const precondicoes = Object.fromEntries(Object.keys(original).map(k => [k, Object.hasOwn(antes,k) ? antes[k] : {$exists:false}]));
+    const result = await E.Militar.updateMany({id:militarId,operacao_promocao_token:tokenCadastro,...precondicoes},{$set:payload});
+    if (result?.success !== true || result.updated !== 1) throw new Error('cadastro_alterado_durante_publicacao');
+  } catch (e:any) { erro = e.message || String(e); }
   let depois: any;
   try { depois = await E.Militar.get(militarId); } catch (e:any) { erro = erro || e.message; }
   const updates = Object.keys(payload).map(campo => ({campo,anterior:original[campo],esperado:payload[campo],apos_releitura:texto(depois?.[campo]),confirmado:!!depois && texto(depois[campo]) === payload[campo]}));
