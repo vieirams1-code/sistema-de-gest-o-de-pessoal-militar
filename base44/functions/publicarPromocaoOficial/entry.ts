@@ -197,6 +197,7 @@ Deno.serve(async (req) => {
 
   let lockId = '';
   let tokenPersistido = '';
+  let manterTrava = false;
   try {
     const authUser = await base44.auth.me();
     if (!authUser) return Response.json({ success: false, etapa: 'autorizacao', motivo: 'nao_autenticado' }, { status: 401 });
@@ -445,6 +446,7 @@ Deno.serve(async (req) => {
         } else {
           falhasRollback.push('cadastro_sem_restauracao_confirmada; preservar cadeia para revisão');
         }
+        if (falhasRollback.length) manterTrava = true;
         const erroItem = error?.motivo ? error : montarErro({ etapa: 'processar_item', motivo: 'falha_publicacao_item', promocao_id: promocaoId, item_id: itemId });
         errors.push({ ...erroItem, message: error?.message || erroItem?.motivo || 'Falha ao publicar item.',rollback_completo:falhasRollback.length === 0,falhas_rollback:falhasRollback });
       }
@@ -467,7 +469,7 @@ Deno.serve(async (req) => {
     const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao'});
     return Response.json({ ...erroInterno, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [{ ...erroInterno, message: erroInterno.motivo }] }, { status: 500 });
   } finally {
-    if (tokenPersistido) {
+    if (tokenPersistido && !manterTrava) {
       try { await liberarTrava(base44.asServiceRole.entities.Promocao,lockId,'operacao_token',tokenPersistido); }
       catch (_) { console.error('Trava de promoção mantida para reconciliação',lockId); }
     }

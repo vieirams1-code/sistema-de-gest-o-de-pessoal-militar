@@ -37,6 +37,8 @@ async function parsePayload(req: any) {
 function erro({ status, etapa, motivo, contexto = {} }: any) {
   return Response.json({
     success: false,
+    rollback_completo: contexto.rollback_completo,
+    falhas_rollback: contexto.falhas_rollback,
     etapa,
     motivo,
     campo_faltante: contexto.campo_faltante || null,
@@ -69,6 +71,7 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   let travaId = '';
   let travaToken = '';
+  let manterTrava = false;
   let militarTravaId = '';
   let militarTravaToken = '';
   try {
@@ -298,21 +301,28 @@ Deno.serve(async (req) => {
 
       await Promocao.update(promocaoId, { status: statusPromocao });
     } catch (error: any) {
-      try { await Historico.update(historicoId, historicoSnapshot); } catch (_) {}
-      try { await PromocaoMilitar.update(itemId, itemSnapshot); } catch (_) {}
-      try { await Promocao.update(promocaoId, promocaoSnapshot); } catch (_) {}
-      if (participante?.id && participanteSnapshot) {
-        try { await ParticipanteCurso.update(participante.id, participanteSnapshot); } catch (_) {}
-      }
+      const falhasRollback: string[] = [];
+      const compensar = async (nome:string, fn:()=>Promise<any>) => {
+        try { await fn(); } catch (e:any) { falhasRollback.push(nome + ': ' + (e.message || String(e))); }
+      };
+      await compensar('historico',()=>Historico.update(historicoId,historicoSnapshot));
+      await compensar('item',()=>PromocaoMilitar.update(itemId,itemSnapshot));
+      await compensar('promocao',()=>Promocao.update(promocaoId,promocaoSnapshot));
+      if (participante?.id && participanteSnapshot) await compensar('participante',()=>ParticipanteCurso.update(participante.id,participanteSnapshot));
       if (precisaRollbackCadastro && militarAnterior?.id) {
-        try {
-            await Militar.update(militarAnterior.id, {
-                posto_graduacao: militarAnterior?.posto_graduacao,
-                quadro: militarAnterior?.quadro,
-            });
-        } catch (_) {}
+        await compensar('militar',async()=>{
+          const atual = await Militar.get(militarAnterior.id);
+          const keys = Object.keys(destinoRestauracao);
+          if (keys.some(k => texto(atual[k]) !== texto(destinoRestauracao[k]) && texto(atual[k]) !== texto(militarAnterior[k]))) throw new Error('alteracao_concorrente');
+          const anterior = Object.fromEntries(keys.map(k=>[k,militarAnterior[k] ?? '']));
+          await Militar.update(militarAnterior.id,anterior);
+          const relido = await Militar.get(militarAnterior.id);
+          if (keys.some(k=>texto(relido[k]) !== texto(anterior[k]))) throw new Error('restauracao_nao_confirmada');
+        });
       }
-      return erro({ status: 500, etapa: 'transacao', motivo: error?.message || 'falha_reversao', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId, historico_promocao_v2_id: historicoId, participante_curso_id: participante?.id || null } });
+      manterTrava = falhasRollback.length > 0;
+      return erro({status:500,etapa:'transacao',motivo:error?.message || 'falha_reversao',contexto:{promocao_id:promocaoId,promocao_militar_id:itemId,militar_id:militarId,historico_promocao_v2_id:historicoId,rollback_completo:!manterTrava,falhas_rollback:falhasRollback}});
+
     }
 
     return Response.json({
@@ -337,9 +347,9 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     return erro({ status: 500, etapa: 'erro_interno', motivo: error?.message || 'erro_interno_reversao' });
   } finally {
-    try { if (militarTravaToken) await liberarTrava(base44.asServiceRole.entities.Militar,militarTravaId,'operacao_promocao_token',militarTravaToken); }
+    try { if (militarTravaToken && !manterTrava) await liberarTrava(base44.asServiceRole.entities.Militar,militarTravaId,'operacao_promocao_token',militarTravaToken); }
     catch (_) { console.error('Trava cadastral mantida para reconciliação',militarTravaId); }
-    try { if (travaToken) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
+    try { if (travaToken && !manterTrava) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
     catch (_) { console.error('Trava oficial mantida para reconciliação',travaId); }
   }
 });

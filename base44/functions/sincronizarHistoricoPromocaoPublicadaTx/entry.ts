@@ -83,6 +83,7 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   let travaId = '';
   let travaToken = '';
+  let manterTrava = false;
   let militarTravaId = '';
   let militarTravaToken = '';
 
@@ -186,6 +187,7 @@ Deno.serve(async (req) => {
       } catch (rollbackError: any) {
         falhasRollback.push({ entidade: 'Promocao', id: promocaoId, erro: rollbackError?.message || String(rollbackError) });
       }
+      manterTrava = falhasRollback.length > 0;
       return Response.json({
         success: false,
         etapa: 'sincronizacao_transacional',
@@ -211,7 +213,7 @@ Deno.serve(async (req) => {
   } finally {
     try { if (militarTravaToken) await liberarTrava(base44.asServiceRole.entities.Militar,militarTravaId,'operacao_promocao_token',militarTravaToken); }
     catch (_) { console.error('Trava cadastral mantida para reconciliação',militarTravaId); }
-    try { if (travaToken) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
+    try { if (travaToken && !manterTrava) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
     catch (_) { console.error('Trava oficial mantida para reconciliação',travaId); }
   }
 });

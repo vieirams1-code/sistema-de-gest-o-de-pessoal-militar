@@ -37,6 +37,7 @@ export async function atualizarCadastroMilitar(
 ): Promise<UpdateMilitarResult> {
   const E = base44.asServiceRole.entities;
   const tokenCadastro = await adquirirTrava(E.Militar,militarId,'operacao_promocao_token');
+  let podeLiberarCadastro = true;
   try {
   const antes = await E.Militar.get(militarId);
   if (!antes) throw new Error('militar_nao_encontrado');
@@ -99,11 +100,12 @@ export async function atualizarCadastroMilitar(
       rollback = Object.keys(original).every(k => texto(restaurado[k]) === texto(original[k]));
     } catch (e:any) { erro += '; ' + (e.message || String(e)); }
   }
+  if (!success && !rollback) podeLiberarCadastro = false;
   // Falha no log final não invalida uma gravação já confirmada.
   try { await E.AssistenteLog.update(log.id,{acao:success ? 'atualizar_militar_confirmado' : 'atualizacao_militar_falhou',metadata:{militar_id:militarId,historico_id:h.id,dados_anteriores:original,dados_novos:payload,updates,rollback_completo:rollback,erro}}); } catch (e) { console.error('Falha ao concluir log de promoção', log.id); }
   return {militar_id:militarId,matricula:texto(antes.matricula),success,updates,erro_api:success ? undefined : erro || 'releitura_divergente',rollback_completo:rollback};
   } finally {
-    try { await liberarTrava(E.Militar,militarId,'operacao_promocao_token',tokenCadastro); }
+    try { if (podeLiberarCadastro) await liberarTrava(E.Militar,militarId,'operacao_promocao_token',tokenCadastro); }
     catch (_) { console.error('Trava cadastral mantida para reconciliação',militarId); }
   }
 }
