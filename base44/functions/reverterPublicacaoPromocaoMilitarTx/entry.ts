@@ -28,7 +28,7 @@ async function parsePayload(req: any) {
   const candidates: any[] = [req?.body, req?.body?.data, req?.data, req?.payload, (globalThis as any)?.input];
   try { if (typeof req?.json === 'function') candidates.push(await req.json()); } catch (_) {}
   for (const c of candidates) {
-    if (c && typeof c === 'object') return c?.body && typeof c.body === 'object' ? c.body : c?.data && typeof c.data === 'object' ? c.data : c;
+    if (c && typeof c === 'object' && (c.promocao?.id || c.item?.id || c.body || c.data)) return c?.body && typeof c.body === 'object' ? c.body : c?.data && typeof c.data === 'object' ? c.data : c;
   }
   return {};
 }
@@ -245,7 +245,8 @@ Deno.serve(async (req) => {
     const promocaoSnapshot = { status: promocaoAtual?.status };
     const participanteSnapshot = participante ? { status: participante?.status, status_pre_publicacao: participante?.status_pre_publicacao || null, data_status_atual: participante?.data_status_atual } : null;
     const AuditCurso = base44.asServiceRole.entities.AuditCursoFormacao;
-    const statusPromocao = statusPromocaoPosReversao((itensPromocao || []).map((registro: any) => (String(registro?.id) === String(itemId) ? { ...registro, status: 'cancelado', publicado: false } : registro)));
+    const itensAutoritativos = await PromocaoMilitar.filter({promocao_id:promocaoId},undefined,5000);
+    const statusPromocao = statusPromocaoPosReversao((itensAutoritativos || []).map((registro: any) => (String(registro?.id) === String(itemId) ? { ...registro, status: 'cancelado', publicado: false } : registro)));
 
     try {
       await Historico.update(historicoId, { status_registro: 'cancelado', motivo_retificacao: motivo, observacoes: [texto(historicoAtual?.observacoes), trilhaAdmin].filter(Boolean).join('\n') });
