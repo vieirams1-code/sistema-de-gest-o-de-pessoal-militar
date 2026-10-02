@@ -99,7 +99,27 @@ export default function CentralRespostasCampanhas() {
         acao: canViewResponses ? 'CAMPANHA_DETALHES_RETORNO' : 'CAMPANHA_APROVACAO_RETORNO',
         campanha_id: camp.id,
       });
-      setRespostasData(res.data);
+      const dados = res.data;
+      if (canDownloadAttachments) {
+        try {
+          const anexosRes = await base44.functions.invoke('portal_servicos', {
+            acao: 'CAMPANHA_ANEXOS_RETORNO',
+            campanha_id: camp.id,
+          });
+          const porMilitar = new Map((anexosRes.data?.militares || []).map((m) => [m.militar_id, m.resposta_completa]));
+          dados.militares = (dados.militares || []).map((m) => {
+            const anexo = porMilitar.get(m.militar_id);
+            if (!anexo || !m.resposta_completa) return m;
+            return { ...m, resposta_completa: { ...m.resposta_completa,
+              arquivos_anexados_json: anexo.arquivos_anexados_json,
+              arquivo_devolucao_url: anexo.arquivo_devolucao_url,
+            } };
+          });
+        } catch (erroAnexos) {
+          setFeedback({ type: 'error', msg: erroAnexos.message || 'Falha ao carregar links dos anexos. Os metadados permanecem disponíveis.' });
+        }
+      }
+      setRespostasData(dados);
       setPagina(1);
     } catch (err) {
       setFeedback({ type: 'error', msg: err.message || 'Falha ao carregar respostas da campanha.' });
