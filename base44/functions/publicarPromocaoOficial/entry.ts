@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { atualizarCadastroMilitar } from './utils.ts';
 
-const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada_parcial', 'publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
 const STATUS_ITEM_BLOQUEADO_PUBLICACAO = new Set(['bloqueado', 'bloqueada', 'cancelado', 'cancelada', 'retificado', 'retificada']);
 
 const texto = (valor: unknown) => String(valor ?? '').trim();
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
     const Promocao = base44.asServiceRole.entities.Promocao;
 
     const promocaoPersistida = await Promocao.get(promocaoId).catch(() => null);
-    const itensPersistidos = await PromocaoMilitar.filter({ promocao_id: promocaoId });
+    const itensPersistidos = await PromocaoMilitar.filter({ promocao_id: promocaoId }, undefined, 5000);
     const idsSolicitados = new Set((itens || []).map((item: any) => texto(item?.id)).filter(Boolean));
     const itensAutoritativos = (itensPersistidos || []).filter((item: any) => idsSolicitados.has(texto(item?.id)));
 
@@ -254,7 +254,7 @@ Deno.serve(async (req) => {
     const militarIdsAfetados = new Set<string>();
     let publicados = 0;
 
-    const historicosAtivos = await Historico.filter({ status_registro: 'ativo' });
+    const historicosAtivos = await Historico.filter({ status_registro: 'ativo' }, undefined, 5000);
 
     for (const item of itens) {
       // Repetições e inclusão complementar não reaplicam itens já concluídos.
@@ -368,7 +368,7 @@ Deno.serve(async (req) => {
 
         if (podeAplicar) {
           // Marcar a intenção antes da escrita; se houver falha, restaurar junto ao vínculo.
-          await PromocaoMilitar.update(item.id,{atualizar_cadastro_militar:true,resultado_aplicacao_cadastro:'imediatamente_superior'});
+          await PromocaoMilitar.update(item.id,{atualizar_cadastro_militar:true,resultado_aplicacao_cadastro:'imediatamente_superior',motivo_atualizacao_cadastro:'Aplicação oficial após confirmação do vínculo.'});
           const atualizacaoMilitar = await atualizarCadastroMilitar(
             base44,
             militarId!,
@@ -438,7 +438,11 @@ Deno.serve(async (req) => {
     const totalPublicados = operacionais.filter((i:any) => i.publicado === true && normalizar(i.status) === 'publicado').length;
     const statusFinal = totalPublicados === 0 ? 'rascunho' : (totalPublicados < operacionais.length ? 'publicada_parcial' : 'publicada');
     const totalVinculados = itensFinais.length;
-    await Promocao.update(promocaoId, { status: statusFinal, total_militares_vinculados: totalVinculados });
+    try {
+      await Promocao.update(promocaoId, { status: statusFinal, total_militares_vinculados: totalVinculados });
+    } catch (e:any) {
+      return Response.json({success:false,etapa:'consolidacao_lote',motivo:'consolidacao_pendente_repetir_publicacao',publicados,militar_ids_afetados:Array.from(militarIdsAfetados),historicos,warnings,errors:[...errors,{message:e.message}],reconciliacao_pendente:true},{status:500});
+    }
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
   } catch (error: any) {

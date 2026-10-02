@@ -2,7 +2,7 @@
   "name": "AssistenteLog",
   "type": "object",
   "title": "Log do Assistente de Procedimentos",
-  "description": "Hist\u00f3rico de perguntas e respostas do assistente de procedimentos.",
+  "description": "Histórico de perguntas e respostas do assistente de procedimentos.",
   "properties": {
     "tipo_procedimento": {
       "type": "string",
@@ -67,6 +67,22 @@
     "data_pergunta": {
       "type": "date",
       "default": ""
+    },
+    "tipo": {
+      "type": "string",
+      "description": "Tipo de operação auditada."
+    },
+    "acao": {
+      "type": "string",
+      "description": "Etapa e resultado da operação."
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descrição da alteração."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Estado anterior, destino e resultado de operações de promoção."
     }
   },
   "required": []

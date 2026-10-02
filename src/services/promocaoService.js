@@ -14,7 +14,7 @@ const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'cancelada', 'retifi
 
 const STATUS_PROMOCAO_RASCUNHO = new Set(['rascunho']);
 
-const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada_parcial', 'publicada', 'publicado', 'consolidada', 'consolidado', 'ativa', 'ativo', 'historica', 'homologada']);
 const STATUS_ITEM_BLOQUEADO_PUBLICACAO = new Set(['bloqueado', 'bloqueada', 'cancelado', 'cancelada', 'retificado', 'retificada']);
 
 function dataSomente(valor) {

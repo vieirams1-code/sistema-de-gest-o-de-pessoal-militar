@@ -8,7 +8,7 @@ const normalizar = (valor: unknown) => texto(valor)
 const dataSomente = (valor: unknown) => texto(valor).split('T')[0];
 
 const STATUS_OFICIAL = new Set([
-  'publicada', 'publicado', 'consolidada', 'consolidado',
+  'publicada_parcial', 'publicada', 'publicado', 'consolidada', 'consolidado',
   'ativa', 'ativo', 'historica', 'homologada',
 ]);
 
@@ -111,8 +111,8 @@ Deno.serve(async (req) => {
     }
 
     const [historicosDaPromocao, itensDaPromocao] = await Promise.all([
-      Historico.filter({ promocao_id: promocaoId }),
-      PromocaoMilitar.filter({ promocao_id: promocaoId }),
+      Historico.filter({ promocao_id: promocaoId }, undefined, 5000),
+      PromocaoMilitar.filter({ promocao_id: promocaoId }, undefined, 5000),
     ]);
     const historicosAtivos = (historicosDaPromocao || []).filter(
       (registro: any) => normalizar(registro?.status_registro || 'ativo') === 'ativo',

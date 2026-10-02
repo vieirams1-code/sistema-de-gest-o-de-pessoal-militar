@@ -1911,6 +1911,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Operações oficiais passam pelas funções coordenadas, nunca por CRUD genérico.
+    const statusOficiaisPromocao = ['publicada_parcial','publicada','publicado','consolidada','consolidado','ativa','ativo','historica','homologada'];
+    const oficialExistente = statusOficiaisPromocao.includes(String(registroExistente?.status || '').trim().toLowerCase());
+    if (entityName === 'Promocao' && operation === 'update' && oficialExistente) {
+      const camposOficiais = ['status','posto_graduacao','quadro','data_promocao','data_publicacao','boletim_referencia','ato_referencia','observacoes','total_militares_vinculados'];
+      if (camposOficiais.some(campo => Object.hasOwn(dataValidada || {},campo) && String(dataValidada[campo] ?? '').trim() !== String(registroExistente[campo] ?? '').trim())) {
+        return Response.json({error:'Use a manutenção coordenada da promoção publicada.',motivo:'manutencao_oficial_exige_sincronizacao'}, {status:409});
+      }
+    }
+    if (entityName === 'PromocaoMilitar' && ['create','update'].includes(operation)) {
+      const camposProtegidos = ['status','publicado','historico_promocao_v2_id','atualizar_cadastro_militar','resultado_aplicacao_cadastro','ordem'];
+      const possuiCadeia = oficialExistente || registroExistente?.publicado === true || Boolean(registroExistente?.historico_promocao_v2_id);
+      const alterouProtegido = camposProtegidos.some(campo => Object.hasOwn(dataValidada || {},campo) && String(dataValidada[campo] ?? '').trim() !== String(registroExistente?.[campo] ?? '').trim());
+      const publicouDiretamente = dataValidada?.publicado === true || Boolean(dataValidada?.historico_promocao_v2_id) || statusOficiaisPromocao.includes(String(dataValidada?.status || '').trim().toLowerCase());
+      if ((operation === 'create' && publicouDiretamente) || (operation === 'update' && alterouProtegido && (possuiCadeia || publicouDiretamente))) {
+        return Response.json({error:'Vínculo oficial deve ser mantido pelo fluxo de publicação ou reversão.',motivo:'vinculo_oficial_protegido'}, {status:409});
+      }
+    }
+
     // ---- Barreiras de integridade de Promoções/Antiguidade ----
     // A validação vive no backend para impedir que chamadas diretas, concorrentes
     // ou telas antigas criem filhos órfãos ou apaguem parte da cadeia oficial.
