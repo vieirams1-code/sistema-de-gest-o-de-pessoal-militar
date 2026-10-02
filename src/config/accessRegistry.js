@@ -156,7 +156,7 @@ const militares = {
       { check: "canAccessAction('perm_visualizar_conferencias_militares')", effect: 'Carrega mapa de conferências' },
     ],
     'pages/VerMilitar.jsx': [
-      { check: 'hasAccess(militar) || hasSelfAccess(militar)', effect: 'canViewMilitar' },
+      { check: 'canDisplayScopedMilitar sobre retorno de getScopedMilitares + módulo/ação', effect: 'canViewMilitar sem revalidar campos legados omitidos pelo DTO' },
       { check: 'isAdmin', effect: 'Exibe botão Editar' },
       { check: "canAccessAction('visualizar_acervo_historico')", effect: 'Aba Acervo Histórico' },
       { check: "canAccessAction('gerir_acervo_historico')", effect: 'Gestão de acervo' },
