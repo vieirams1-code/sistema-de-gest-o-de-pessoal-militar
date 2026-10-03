@@ -1,4 +1,4 @@
-const STATUS_FINALIZADO = new Set(['Realizada', 'Cancelada']);
+const STATUS_FINALIZADO = new Set(['Realizada', 'Resultado Registrado', 'Concluída', 'Cancelada']);
 
 const toDate = (isoDate) => {
   if (!isoDate) return null;
@@ -13,6 +13,11 @@ export function montarAgendaJiso({ atestados = [], jisos = [], hoje = new Date()
   hojeRef.setHours(0, 0, 0, 0);
 
   const formaisPorAtestado = new Map();
+  const atestadosComProcesso = new Set((atestados || []).filter(a => a.jiso_id_derivado || a.jiso_id).map(a => toKey(a.id)));
+  for (const jiso of jisos || []) {
+    if (jiso.atestado_id) atestadosComProcesso.add(toKey(jiso.atestado_id));
+    for (const id of jiso.atestado_ids || []) atestadosComProcesso.add(toKey(id));
+  }
 
   for (const jiso of Array.isArray(jisos) ? jisos : []) {
     const dataJiso = toDate(jiso?.data_jiso);
@@ -35,7 +40,7 @@ export function montarAgendaJiso({ atestados = [], jisos = [], hoje = new Date()
     if (!dataAgendada || dataAgendada < hojeRef) continue;
 
     const atestadoKey = toKey(atestado?.id);
-    if (!atestadoKey || formaisPorAtestado.has(atestadoKey)) continue;
+    if (!atestadoKey || atestadosComProcesso.has(atestadoKey) || formaisPorAtestado.has(atestadoKey)) continue;
 
     fallbacks.push({
       id: `fallback-${atestado.id}`,
