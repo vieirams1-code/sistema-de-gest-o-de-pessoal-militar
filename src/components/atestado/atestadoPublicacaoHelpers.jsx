@@ -41,7 +41,7 @@ export function getEstadoAtestadoPorPublicacoes(atestado, publicacoesVinculadas 
     (a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0)
   )[0];
 
-  const precisaJiso = atestado?.necessita_jiso || atestado?.fluxo_homologacao === 'jiso' || Number(atestado?.dias || 0) > 15;
+  const precisaJiso = Boolean(atestado?.jiso_id_derivado || atestado?.jiso_id || atestado?.necessita_jiso || atestado?.fluxo_homologacao === 'jiso');
 
   let statusJiso = null;
   if (atasAtivas.length > 0) {
