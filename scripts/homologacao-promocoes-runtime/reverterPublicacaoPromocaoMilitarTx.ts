@@ -1,0 +1,370 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+
+const texto = (valor: unknown) => String(valor ?? '').trim();
+const normalizar = (valor: unknown) => texto(valor).toLowerCase();
+
+// Status considerados "publicados" no PromocaoMilitar.
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
+// Reversão de promoção originada de curso NÃO restaura automaticamente o status
+// anterior do participante. O vínculo do curso passa a ficar pendente de
+// decisão administrativa manual, mantendo a rastreabilidade (promocao_id).
+const STATUS_PARTICIPANTE_PENDENTE_REANALISE = 'pendente_reanalise';
+
+// Frase exigida para confirmar a reversão EXCEPCIONAL (promoção originada de curso).
+const FRASE_CONFIRMACAO_EXCEPCIONAL = 'CONFIRMO REVERSÃO E CIÊNCIA DA PENDÊNCIA';
+const PERMISSAO_REVERSAO_EXCEPCIONAL = 'reverter_promocao_excepcional';
+
+// Status do participante que caracterizam vínculo "ativo" com a promoção a ser revertida.
+const STATUS_PARTICIPANTE_VINCULADO = new Set(['promovido', 'pendente_reanalise']);
+
+function statusPromocaoPosReversao(itens: any[] = []) {
+  const publicados = (itens || []).filter((item) => Boolean(item?.publicado) && normalizar(item?.status) === 'publicado').length;
+  if (publicados === 0) return 'rascunho';
+  if (publicados < (itens || []).length) return 'publicada_parcial';
+  return 'publicada';
+}
+
+async function parsePayload(req: any) {
+  const candidates: any[] = [req?.body, req?.body?.data, req?.data, req?.payload, (globalThis as any)?.input];
+  try { if (typeof req?.json === 'function') candidates.push(await req.json()); } catch (_) {}
+  for (const c of candidates) {
+    if (c && typeof c === 'object' && (c.promocao?.id || c.item?.id || c.body || c.data)) return c?.body && typeof c.body === 'object' ? c.body : c?.data && typeof c.data === 'object' ? c.data : c;
+  }
+  return {};
+}
+
+// Resposta de erro detalhada e padronizada com todos os identificadores relevantes.
+function erro({ status, etapa, motivo, contexto = {} }: any) {
+  return Response.json({
+    success: false,
+    rollback_completo: contexto.rollback_completo,
+    falhas_rollback: contexto.falhas_rollback,
+    etapa,
+    motivo,
+    campo_faltante: contexto.campo_faltante || null,
+    validacao_bloqueada: contexto.validacao_bloqueada || null,
+    promocao_id: contexto.promocao_id || null,
+    militar_id: contexto.militar_id || null,
+    promocao_militar_id: contexto.promocao_militar_id || null,
+    participante_curso_id: contexto.participante_curso_id || null,
+    historico_promocao_v2_id: contexto.historico_promocao_v2_id || null,
+  }, { status });
+}
+
+
+async function adquirirTrava(entity: any, id: string, campo: string) {
+  if (typeof entity.updateMany !== 'function') throw new Error('controle_concorrencia_indisponivel');
+  const token = crypto.randomUUID();
+  const resultado = await entity.updateMany(
+    {id, $or:[{[campo]:''},{[campo]:null},{[campo]:{$exists:false}}]},
+    {$set:{[campo]:token}}
+  );
+  if (resultado?.success !== true || resultado.updated !== 1) throw new Error('operacao_oficial_em_andamento');
+  return token;
+}
+async function liberarTrava(entity: any, id: string, campo: string, token: string) {
+  if (!token) return;
+  await entity.updateMany({id,[campo]:token},{$set:{[campo]:''}});
+}
+
+export async function executar(req: Request) {
+  const base44 = createClientFromRequest(req);
+  let travaId = '';
+  let travaToken = '';
+  let manterTrava = false;
+  let militarTravaId = '';
+  let militarTravaToken = '';
+  try {
+    const authUser = await base44.auth.me();
+    if (!authUser) return erro({ status: 401, etapa: 'autorizacao', motivo: 'nao_autenticado' });
+    const authIsAdmin = String(authUser.role || '').trim().toLowerCase() === 'admin';
+    const authzBaseResponse = await base44.functions.invoke('getUserPermissions', {});
+    const authzBase = authzBaseResponse?.data ?? authzBaseResponse ?? {};
+    const temPermissaoReversaoExcepcional = authIsAdmin || authzBase?.actions?.[PERMISSAO_REVERSAO_EXCEPCIONAL] === true;
+    if (!authIsAdmin && !temPermissaoReversaoExcepcional) {
+      return erro({ status: 403, etapa: 'autorizacao', motivo: 'permissao_ausente', contexto: { campo_faltante: PERMISSAO_REVERSAO_EXCEPCIONAL } });
+    }
+    const payload = await parsePayload(req);
+    const promocao = payload?.promocao || {};
+    const item = payload?.item || {};
+    const itensPromocao = Array.isArray(payload?.itensPromocao) ? payload.itensPromocao : [];
+    const motivoRaw = payload?.motivo;
+    const motivoReversaoRaw = payload?.motivo_reversao;
+    const observacoesRaw = payload?.observacoes;
+    const observacaoRaw = payload?.observacao;
+    const motivo = texto(motivoRaw) || texto(motivoReversaoRaw);
+    const observacoes = texto(observacoesRaw) || texto(observacaoRaw);
+    const usuario = payload?.usuario || null;
+    const modoAdmin = payload?.modo_admin === true || payload?.modoAdmin === true;
+    const fraseConfirmacao = texto(payload?.frase_confirmacao || payload?.fraseConfirmacao);
+
+    const promocaoId = texto(promocao?.id);
+    const itemId = texto(item?.id);
+
+    if (!promocaoId) return erro({ status: 400, etapa: 'validacao', motivo: 'promocao_nao_carregada', contexto: { campo_faltante: 'promocao.id' } });
+    if (!itemId) return erro({ status: 400, etapa: 'validacao', motivo: 'item_nao_carregado', contexto: { campo_faltante: 'item.id', promocao_id: promocaoId } });
+    if (!motivo) {
+      return Response.json({
+        success: false,
+        etapa: 'validacao',
+        motivo: 'motivo_obrigatorio',
+        campo_faltante: 'motivo',
+        promocao_id: promocaoId,
+        promocao_militar_id: itemId,
+        debug: {
+          payload_keys_recebidas: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+          motivo_raw: motivoRaw ?? null,
+          motivo_reversao_raw: motivoReversaoRaw ?? null,
+          motivo_normalizado: motivo,
+          observacoes_raw: observacoesRaw ?? null,
+          observacao_raw: observacaoRaw ?? null,
+        },
+      }, { status: 400 });
+    }
+
+    const Historico = base44.asServiceRole.entities.HistoricoPromocaoMilitarV2;
+    const PromocaoMilitar = base44.asServiceRole.entities.PromocaoMilitar;
+    const Promocao = base44.asServiceRole.entities.Promocao;
+    const Militar = base44.asServiceRole.entities.Militar;
+    const ParticipanteCurso = base44.asServiceRole.entities.ParticipanteCursoFormacao;
+
+    travaId = promocaoId;
+    travaToken = await adquirirTrava(Promocao,promocaoId,'operacao_token');
+
+    // === Sempre confiar no estado ATUAL do banco, não no payload (que pode estar defasado). ===
+    const itemAtual = await PromocaoMilitar.get(itemId).catch(() => null);
+    if (!itemAtual?.id) {
+      return erro({ status: 404, etapa: 'validacao', motivo: 'promocao_militar_nao_encontrado', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId } });
+    }
+
+    if (texto(itemAtual.promocao_id) !== promocaoId) return erro({status:409,etapa:'validacao',motivo:'item_nao_pertence_promocao'});
+    const militarId = texto(itemAtual?.militar_id);
+    if (!authIsAdmin) {
+      const scopeResponse = await base44.functions.invoke('getUserPermissions', { scopeMilitarIds: militarId ? [militarId] : [] });
+      const scopeAuthz = scopeResponse?.data ?? scopeResponse ?? {};
+      if (!scopeAuthz?.scopeCheck?.allAllowed) {
+        return erro({ status: 403, etapa: 'autorizacao', motivo: 'militar_fora_escopo', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+      }
+    }
+
+    // O histórico é resolvido exclusivamente pelo registro persistido.
+    const historicoId = texto(itemAtual?.historico_promocao_v2_id);
+
+    // Valida que o item está de fato publicado antes de reverter.
+    const itemPublicado = Boolean(itemAtual?.publicado) || STATUS_PROMOCAO_PUBLICADA.has(normalizar(itemAtual?.status));
+    if (!itemPublicado) {
+      return erro({ status: 400, etapa: 'validacao', motivo: 'item_nao_publicado', contexto: { validacao_bloqueada: 'item_nao_publicado', promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+    }
+
+    if (!historicoId) {
+      return erro({ status: 400, etapa: 'validacao', motivo: 'historico_ausente', contexto: { campo_faltante: 'historico_promocao_v2_id', promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+    }
+
+    const historicoAtual = await Historico.get(historicoId).catch(() => null);
+    if (!historicoAtual?.id) {
+      return erro({ status: 404, etapa: 'validacao', motivo: 'historico_nao_encontrado', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId, historico_promocao_v2_id: historicoId } });
+    }
+
+    if (texto(historicoAtual.militar_id) !== militarId || texto(historicoAtual.promocao_id) !== promocaoId || normalizar(historicoAtual.status_registro) !== 'ativo') {
+      return erro({status:409,etapa:'validacao',motivo:'historico_divergente_vinculo'});
+    }
+    const posteriores = await Historico.filter({militar_id:militarId,status_registro:'ativo'},undefined,5000);
+    if (posteriores.some((h:any) => texto(h.id) !== historicoId && texto(h.data_promocao).split('T')[0] >= texto(historicoAtual.data_promocao).split('T')[0])) {
+      return erro({status:409,etapa:'validacao',motivo:'reversao_bloqueada_por_evento_posterior'});
+    }
+    let militarAnterior: any = null;
+    const precisaRollbackCadastro = Boolean(itemAtual?.atualizar_cadastro_militar) || normalizar(itemAtual?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
+    if (precisaRollbackCadastro) {
+      militarTravaId = militarId;
+      militarTravaToken = await adquirirTrava(Militar,militarId,'operacao_promocao_token');
+      militarAnterior = await Militar.get(militarId).catch(() => null);
+      if (!militarAnterior?.id) {
+        return erro({ status: 404, etapa: 'validacao', motivo: 'militar_nao_encontrado', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+      }
+      if (texto(militarAnterior?.posto_graduacao) !== texto(historicoAtual?.posto_graduacao_novo) || texto(militarAnterior?.quadro) !== texto(historicoAtual?.quadro_novo)) {
+        return erro({ status: 409, etapa: 'validacao', motivo: 'rollback_cadastro_bloqueado_divergencia', contexto: { validacao_bloqueada: 'cadastro_divergente_do_publicado', promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId, historico_promocao_v2_id: historicoId } });
+      }
+    }
+
+    const snapshotCadastro = itemAtual.cadastro_anterior_promocao;
+    const camposCadastro = ['posto_graduacao','posto_graduação','posto_graduacao_atual','posto_grad','posto','graduacao','quadro','quadro_atual','militar_quadro'];
+    const destinoRestauracao = snapshotCadastro?.posto_graduacao && snapshotCadastro?.quadro
+      ? Object.fromEntries(camposCadastro.filter(k => Object.hasOwn(snapshotCadastro,k)).map(k => [k,snapshotCadastro[k]]))
+      : {};
+    if (precisaRollbackCadastro && (!texto(destinoRestauracao.posto_graduacao) || !texto(destinoRestauracao.quadro))) {
+      return erro({status:409,etapa:'validacao',motivo:'origem_cadastral_nao_comprovada'});
+    }
+    // === Vínculo opcional com Curso de Formação (ParticipanteCursoFormacao). ===
+    // A reversão também deve devolver o participante de 'promovido' para o status pré-publicação.
+    let participante: any = null;
+    if (militarId && typeof ParticipanteCurso?.filter === 'function') {
+      const vinculos = await ParticipanteCurso.filter({ promocao_id: promocaoId, militar_id: militarId }).catch(() => []);
+      participante = (vinculos || []).find((p: any) => normalizar(p?.status) === 'promovido') || (vinculos || [])[0] || null;
+    }
+
+    // === FLUXO EXCEPCIONAL: promoção originada de Curso de Formação ===
+    // Detectado o vínculo, a reversão vira ação administrativa excepcional e exige:
+    // permissão específica + Modo Admin + frase de confirmação exata + motivo.
+    const ehReversaoOriginadaDeCurso = Boolean(
+      participante?.id && STATUS_PARTICIPANTE_VINCULADO.has(normalizar(participante?.status)),
+    );
+
+    if (ehReversaoOriginadaDeCurso) {
+      const contextoExcepcional = {
+        promocao_id: promocaoId,
+        promocao_militar_id: itemId,
+        militar_id: militarId,
+        participante_curso_id: participante?.id || null,
+      };
+
+      if (!temPermissaoReversaoExcepcional) {
+        return erro({ status: 403, etapa: 'autorizacao', motivo: 'permissao_ausente', contexto: { ...contextoExcepcional, campo_faltante: PERMISSAO_REVERSAO_EXCEPCIONAL, validacao_bloqueada: 'reversao_excepcional_sem_permissao' } });
+      }
+      if (!modoAdmin) {
+        return erro({ status: 403, etapa: 'autorizacao', motivo: 'modo_admin_ausente', contexto: { ...contextoExcepcional, campo_faltante: 'modo_admin', validacao_bloqueada: 'reversao_excepcional_sem_modo_admin' } });
+      }
+      if (fraseConfirmacao !== FRASE_CONFIRMACAO_EXCEPCIONAL) {
+        return erro({ status: 400, etapa: 'validacao', motivo: 'frase_confirmacao_invalida', contexto: { ...contextoExcepcional, campo_faltante: 'frase_confirmacao', validacao_bloqueada: 'frase_confirmacao_invalida' } });
+      }
+      if (!motivo) {
+        return erro({ status: 400, etapa: 'validacao', motivo: 'motivo_obrigatorio', contexto: { ...contextoExcepcional, campo_faltante: 'motivo' } });
+      }
+    }
+
+    if (!ehReversaoOriginadaDeCurso && !authIsAdmin) {
+      return erro({ status: 403, etapa: 'autorizacao', motivo: 'reversao_comum_requer_administrador_plataforma', contexto: { promocao_id: promocaoId, promocao_militar_id: itemId, militar_id: militarId } });
+    }
+
+    // Regra de produção: ao reverter, o participante 'promovido' NÃO volta para
+    // aprovado/aguardando_nova_etapa. Passa para 'pendente_reanalise', mantendo
+    // promocao_id para rastreabilidade. Qualquer retorno ao curso é ação manual.
+    const participanteEstaPromovido = participante ? normalizar(participante?.status) === 'promovido' : false;
+    const statusPrePublicacao = texto(participante?.status_pre_publicacao);
+    const statusParticipantePosReversao = STATUS_PARTICIPANTE_PENDENTE_REANALISE;
+
+    const trilhaAdmin = ['[REVERSAO_ADMINISTRATIVA]', `motivo=${motivo}`, observacoes ? `observacoes=${observacoes}` : '', texto(usuario?.email) ? `usuario=${texto(usuario.email)}` : '', `data=${new Date().toISOString()}`].filter(Boolean).join(' | ');
+    const historicoSnapshot = { status_registro: historicoAtual?.status_registro, motivo_retificacao: historicoAtual?.motivo_retificacao, observacoes: historicoAtual?.observacoes };
+    const itemSnapshot = { status: itemAtual?.status, publicado: itemAtual?.publicado };
+    const promocaoAtual = await Promocao.get(promocaoId).catch(() => null);
+    const promocaoSnapshot = { status: promocaoAtual?.status };
+    const participanteSnapshot = participante ? { status: participante?.status, status_pre_publicacao: participante?.status_pre_publicacao || null, data_status_atual: participante?.data_status_atual } : null;
+    const AuditCurso = base44.asServiceRole.entities.AuditCursoFormacao;
+    const itensAutoritativos = await PromocaoMilitar.filter({promocao_id:promocaoId},undefined,5000);
+    const statusPromocao = statusPromocaoPosReversao((itensAutoritativos || []).map((registro: any) => (String(registro?.id) === String(itemId) ? { ...registro, status: 'cancelado', publicado: false } : registro)));
+
+    // O journal é obrigatório antes da primeira escrita, inclusive em reversão sem curso.
+    await base44.asServiceRole.entities.AssistenteLog.create({
+      tipo:'reversao_promocao', acao:'reversao_iniciada', descricao:motivo,
+      metadata:{promocao_id:promocaoId,item_id:itemId,historico_id:historicoId,militar_id:militarId,
+        executado_por:authUser.email,token:travaToken,historico_anterior:historicoSnapshot,
+        item_anterior:itemSnapshot,promocao_anterior:promocaoSnapshot,
+        cadastro_anterior:militarAnterior,restauracao:destinoRestauracao,participante_anterior:participanteSnapshot}
+    });
+
+    try {
+      await Historico.update(historicoId, { status_registro: 'cancelado', motivo_retificacao: motivo, observacoes: [texto(historicoAtual?.observacoes), trilhaAdmin].filter(Boolean).join('\n') });
+
+      if (precisaRollbackCadastro) {
+        const precondicoes = Object.fromEntries(Object.keys(destinoRestauracao).map(k => [k,Object.hasOwn(militarAnterior,k) ? militarAnterior[k] : {$exists:false}]));
+        const result = await Militar.updateMany({id:militarAnterior.id,operacao_promocao_token:militarTravaToken,...precondicoes},{$set:destinoRestauracao});
+        if (result?.success !== true || result.updated !== 1) throw new Error('cadastro_alterado_durante_reversao');
+        const restaurado = await Militar.get(militarAnterior.id);
+        if (Object.keys(destinoRestauracao).some(k => texto(restaurado[k]) !== texto(destinoRestauracao[k]))) throw new Error('restauracao_cadastro_nao_confirmada');
+      }
+
+      await PromocaoMilitar.update(itemId, { status: 'cancelado', publicado: false });
+
+      // Reverte o participante do curso (promovido -> pendente_reanalise).
+      // promocao_id é PRESERVADO para rastreabilidade. status_pre_publicacao é limpo.
+      if (participante?.id && participanteEstaPromovido) {
+        await ParticipanteCurso.update(participante.id, {
+          status: statusParticipantePosReversao,
+          status_pre_publicacao: null,
+          data_status_atual: new Date().toISOString(),
+        });
+
+        // Auditoria da reversão: pendência de reanálise (decisão manual posterior).
+        try {
+          await AuditCurso.create({
+            curso_id: texto(participante?.curso_id) || null,
+            participante_id: participante.id,
+            militar_id: militarId,
+            acao: 'promocao_revertida_pendente_reanalise',
+            status_anterior: 'promovido',
+            status_novo: statusParticipantePosReversao,
+            justificativa: motivo,
+            dados_novos: {
+              promocao_id: promocaoId,
+              promocao_militar_id: itemId,
+              status_pre_publicacao_registrado: statusPrePublicacao || null,
+              reversao_excepcional: ehReversaoOriginadaDeCurso,
+              modo_admin: ehReversaoOriginadaDeCurso ? true : null,
+              frase_confirmacao_validada: ehReversaoOriginadaDeCurso ? true : null,
+              motivo_reversao: motivo || null,
+              estrutura_id: usuario?.estrutura_id || null,
+              estrutura_nome: usuario?.estrutura_nome || null,
+            },
+            usuario_id: usuario?.id || null,
+            usuario_nome: usuario?.full_name || usuario?.email || null,
+            data_hora: new Date().toISOString(),
+          });
+        } catch (_) { /* auditoria não bloqueia a reversão */ }
+      }
+
+      await Promocao.update(promocaoId, { status: statusPromocao });
+    } catch (error: any) {
+      const falhasRollback: string[] = [];
+      const compensar = async (nome:string, fn:()=>Promise<any>) => {
+        try { await fn(); } catch (e:any) { falhasRollback.push(nome + ': ' + (e.message || String(e))); }
+      };
+      await compensar('historico',()=>Historico.update(historicoId,historicoSnapshot));
+      await compensar('item',()=>PromocaoMilitar.update(itemId,itemSnapshot));
+      await compensar('promocao',()=>Promocao.update(promocaoId,promocaoSnapshot));
+      if (participante?.id && participanteSnapshot) await compensar('participante',()=>ParticipanteCurso.update(participante.id,participanteSnapshot));
+      if (precisaRollbackCadastro && militarAnterior?.id) {
+        await compensar('militar',async()=>{
+          const atual = await Militar.get(militarAnterior.id);
+          const keys = Object.keys(destinoRestauracao);
+          if (keys.some(k => texto(atual[k]) !== texto(destinoRestauracao[k]) && texto(atual[k]) !== texto(militarAnterior[k]))) throw new Error('alteracao_concorrente');
+          const anterior = Object.fromEntries(keys.map(k=>[k,militarAnterior[k] ?? '']));
+          if (keys.every(k => texto(atual[k]) === texto(anterior[k]))) return;
+          const precondicoes = Object.fromEntries(keys.map(k => [k,Object.hasOwn(atual,k) ? atual[k] : {$exists:false}]));
+          const result = await Militar.updateMany({id:militarAnterior.id,operacao_promocao_token:militarTravaToken,...precondicoes},{$set:anterior});
+          if (result?.success !== true || result.updated !== 1) throw new Error('compensacao_bloqueada_alteracao_concorrente');
+          const relido = await Militar.get(militarAnterior.id);
+          if (keys.some(k=>texto(relido[k]) !== texto(anterior[k]))) throw new Error('restauracao_nao_confirmada');
+        });
+      }
+      manterTrava = falhasRollback.length > 0;
+      return erro({status:500,etapa:'transacao',motivo:error?.message || 'falha_reversao',contexto:{promocao_id:promocaoId,promocao_militar_id:itemId,militar_id:militarId,historico_promocao_v2_id:historicoId,rollback_completo:!manterTrava,falhas_rollback:falhasRollback}});
+
+    }
+
+    return Response.json({
+      success: true,
+      historicoCancelado: true,
+      cadastroRestaurado: Boolean(precisaRollbackCadastro),
+      promocaoRecalculada: true,
+      statusPromocao,
+      promocao_id: promocaoId,
+      militar_id: militarId,
+      promocao_militar_id: itemId,
+      historico_promocao_v2_id: historicoId,
+      participante_curso_id: participante?.id || null,
+      participanteRevertido: Boolean(participante?.id && participanteEstaPromovido),
+      participante_status_anterior: participanteSnapshot?.status || null,
+      participante_status_novo: (participante?.id && participanteEstaPromovido) ? statusParticipantePosReversao : null,
+      participante_pendente_reanalise: Boolean(participante?.id && participanteEstaPromovido),
+      reversao_excepcional: ehReversaoOriginadaDeCurso,
+      modo_admin: ehReversaoOriginadaDeCurso ? modoAdmin : false,
+      frase_confirmacao_validada: ehReversaoOriginadaDeCurso ? (fraseConfirmacao === FRASE_CONFIRMACAO_EXCEPCIONAL) : null,
+    });
+  } catch (error: any) {
+    return erro({ status: 500, etapa: 'erro_interno', motivo: error?.message || 'erro_interno_reversao' });
+  } finally {
+    try { if (militarTravaToken && !manterTrava) await liberarTrava(base44.asServiceRole.entities.Militar,militarTravaId,'operacao_promocao_token',militarTravaToken); }
+    catch (_) { console.error('Trava cadastral mantida para reconciliação',militarTravaId); }
+    try { if (travaToken && !manterTrava) await liberarTrava(base44.asServiceRole.entities.Promocao,travaId,'operacao_token',travaToken); }
+    catch (_) { console.error('Trava oficial mantida para reconciliação',travaId); }
+  }
+}

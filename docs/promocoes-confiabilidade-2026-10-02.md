@@ -50,3 +50,25 @@ A restauração cadastral e sua compensação usam updateMany com token e precon
 Validação desta continuação: 29/29 testes de confiabilidade, incluindo seis regressões novas; conjunto ampliado com Promoções, Antiguidade e barreiras de permissão: 148/149 aprovados. A falha foi o teste preexistente de JISO (nome canViewJisoAgenda esperado no código). Helpers de aplicação comparados e idênticos; git diff --check sem erros. Não houve mudança de frontend nesta continuação.
 
 A sondagem somente de leitura pelo CLI base44 exec --data-env dev não executou o script: o CLI solicitou login por dispositivo. O processo foi encerrado. O conector consegue consultar entidades, mas não oferece invocação de funções nesta sessão. Nenhum registro de homologação foi criado e nenhum cadastro real foi alterado por esta etapa. A separação da base dev e o ciclo completo no runtime continuam sem homologação.
+
+## Homologação isolada do runtime — 03/10/2026
+
+O login seguro no navegador foi concluído pelo administrador. Criou-se somente na base dev um militar fictício inativo, matrícula HOMO-PROM-20261003, duas promoções fictícias e seus vínculos. Nenhum cadastro de pessoa real foi alterado.
+
+O painel Test Function não encaminha X-Data-Env, inclusive em invocações encadeadas do SDK. A tentativa encadeada foi bloqueada antes de qualquer escrita: a fixture dev não existia no ambiente recebido pela função. O filtro id, o filtro _id, o $or e o retorno {success:true,updated:1} foram confirmados com updateMany na fixture dev. Não foi necessário enfraquecer o controle de concorrência.
+
+Para testar sem fallback produtivo, usou-se um runner temporário que fixa dev no servidor e executa cópias dos handlers com SDK real e banco remoto. As cópias diferem exclusivamente no wrapper Deno.serve convertido em função exportada; equivalência conferida por comparação integral e helper idêntico. Código e fixture são preservados em scripts/homologacao-promocoes-runtime para reprodução. O endpoint temporário foi desativado ao concluir.
+
+Resultados observados:
+
+| Cenário | Resultado |
+| --- | --- |
+| Vigência 2099-01-01 | Recusada com promocao_sem_vigencia; sem histórico ou alteração militar |
+| Publicação vigente | Soldado → Cabo; um histórico ativo e vínculo confirmado; snapshot Soldado/QBMP-1.a |
+| Repetição | Recusada com promocao_ja_publicada; mesmo histórico, sem duplicação |
+| Edição do ato com boletim vazio | Ato atualizado no pai e histórico; boletim anterior e graduação preservados |
+| Reversão | Soldado/QBMP-1.a restaurados; item e histórico cancelados; pai rascunho; travas liberadas |
+
+IDs dev: militar 6ac0ffb2f676ca265e9b8007; promoção 6ac1017d2084a0f0eedc2c80; item 6ac1017d3dff8d9b85c0f71a; histórico 6ac1038f999281707753cf87; promoção futura 6ac1017d9d2a1f81eb8c83a6. Permanecem identificados como fictícios, com militar inativo e evento concluído cancelado, conservando auditoria.
+
+Após o ciclo, 29/29 testes de confiabilidade aprovados novamente. Concorrência e falhas induzidas permanecem validadas por simulação, não por stress no banco remoto. O ciclo realizado não equivale à homologação de todas as telas nem resolve o encaminhamento de ambiente do executor Base44. Não há garantia absoluta contra indisponibilidade da plataforma, e interrupções com compensação incompleta continuam exigindo reconciliação das travas.
