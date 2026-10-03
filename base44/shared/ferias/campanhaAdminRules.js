@@ -1,6 +1,6 @@
 // Regras compartilhadas da administração de campanhas de férias.
 function falhar(mensagem, status = 400) {
-  throw Object.assign(new Error(mensagem), { status });
+  throw Object.assign(new Error(mensagem), { status, code: 'CAMPANHA_VALIDATION' });
 }
 
 export function validarNomeCampanha(valor) {
