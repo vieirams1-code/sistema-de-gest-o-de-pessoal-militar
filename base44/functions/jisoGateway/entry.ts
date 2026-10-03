@@ -28,8 +28,8 @@ function pickJisoData(input: Record<string, unknown>) {
 
 function statusFromLegacy(atestado: Record<string, any>) {
   const status = asText(atestado?.status_jiso, 100).toLowerCase();
-  if (status.includes('homologado pela jiso')) return 'Concluída';
-  if (atestado?.data_jiso_agendada) return 'Agendada';
+  if (status.includes('homologado pela jiso')) return atestado.resultado_jiso ? 'Resultado Registrado' : 'Realizada';
+  if (atestado?.data_jiso_agendada && atestado?.hora_jiso_agendada) return 'Agendada';
   return 'Aguardando Agendamento';
 }
 
@@ -413,7 +413,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, codigo }, perm.canSensitive, perm.canPublish) });
     }
 
-    const isMigrationAction = action === 'MIGRACAO_DRY_RUN' || action === 'MIGRACAO_APLICAR';
+    const isMigrationAction = ['MIGRACAO_DRY_RUN', 'MIGRACAO_APLICAR', 'RECONCILIAR_DRY_RUN', 'RECONCILIAR_APLICAR'].includes(action);
     const jisoId = asId(payload.jiso_id);
     const jiso = isMigrationAction ? null : await findOne(base44, 'JISO', { id: jisoId });
     if (!isMigrationAction) await assertJisoScope(base44, jiso, allowedMilitarIds, perm.isAdmin);
@@ -540,6 +540,35 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, publicacao: { id: publicacao.id, status: publicacao.status }, jiso: projectJiso({ ...jiso, ...patch }, perm.canSensitive, perm.canPublish) });
     }
 
+    if (action === 'RECONCILIAR_DRY_RUN' || action === 'RECONCILIAR_APLICAR') {
+      if (!perm.isAdmin) return error(403, 'ADMIN_REQUIRED', 'A reconciliação exige administrador.');
+      const apply = action === 'RECONCILIAR_APLICAR';
+      const parents = await listAll(base44, 'JISO');
+      const links = await listAll(base44, 'JISOAtestado', { status: 'Ativo' });
+      const publications = await listAll(base44, 'PublicacaoExOfficio', { tipo: 'Ata JISO' });
+      const report: any[] = [];
+      for (const parent of parents.filter(item => item.origem === 'MIGRACAO_LEGADO' && item.status !== 'Cancelada')) {
+        const ids = unique(links.filter(link => link.jiso_id === parent.id).map(link => asId(link.atestado_id)));
+        const matches = publications.filter(pub => publicationActive(pub) && pub.militar_id === parent.militar_id && (!pub.jiso_id || pub.jiso_id === parent.id) && ids.length > 0 && ids.length === pub.atestados_jiso_ids?.length && ids.every(id => pub.atestados_jiso_ids.includes(id)));
+        if (matches.length !== 1) { report.push({ jiso_id: parent.id, acao: 'CONFERIR', motivo: matches.length ? 'MAIS_DE_UMA_ATA' : 'SEM_ATA_UNIVOCA' }); continue; }
+        const pub = matches[0];
+        const otherParents = parents.filter(item => item.id !== parent.id && item.status !== 'Cancelada' && links.filter(link => link.jiso_id === item.id).some(link => ids.includes(link.atestado_id)));
+        if (otherParents.length) { report.push({ jiso_id: parent.id, acao: 'CONFERIR', motivo: 'ATESTADO_EM_MAIS_DE_UM_PROCESSO' }); continue; }
+        const patch = publicationPatch(parent, pub);
+        if (patch.status !== 'Concluída' && !parent.resultado_jiso) patch.status = 'Realizada';
+        const changed = pub.jiso_id !== parent.id || Object.entries(patch).some(([key, value]) => JSON.stringify(parent[key] ?? '') !== JSON.stringify(value ?? ''));
+        report.push({ jiso_id: parent.id, publicacao_id: pub.id, acao: changed ? 'VINCULAR_E_SINCRONIZAR' : 'JA_CONCILIADO', resultado_legado_pendente: !parent.resultado_jiso, status: patch.status });
+        if (!apply || !changed) continue;
+        const before = { status: parent.status, status_publicacao: parent.status_publicacao, publicacao_id: parent.publicacao_id || '', versao: parent.versao };
+        await audit(base44, auditUser, 'RECONCILIAR_ANTES', parent.id, { before, publicacao_id: pub.id, atestado_ids: ids });
+        await base44.asServiceRole.entities.PublicacaoExOfficio.update(pub.id, { jiso_id: parent.id });
+        await base44.asServiceRole.entities.JISO.update(parent.id, { ...patch, versao: Number(parent.versao || 0) + 1 });
+        await syncJisoBoard(base44, { ...parent, ...patch }, ids.length);
+        await audit(base44, auditUser, 'RECONCILIAR_APLICAR', parent.id, { before, after: patch, publicacao_id: pub.id });
+      }
+      return Response.json({ success: true, apply, report });
+    }
+
     if (action === 'MIGRACAO_DRY_RUN' || action === 'MIGRACAO_APLICAR') {
       if (!perm.isAdmin) return error(403, 'ADMIN_REQUIRED', 'A migração exige administrador.');
       const apply = action === 'MIGRACAO_APLICAR';
@@ -567,6 +596,10 @@ Deno.serve(async (req) => {
           hora_jiso: atestado.hora_jiso_agendada || '',
           status: statusFromLegacy(atestado),
           arquivo_ata_jiso: atestado.arquivo_ata_jiso || '',
+          ...(atestado.resultado_jiso ? { resultado_jiso: atestado.resultado_jiso } : {}),
+          ...(atestado.parecer_jiso ? { parecer_jiso: atestado.parecer_jiso } : {}),
+          ...(atestado.dias_jiso != null ? { dias_jiso: Number(atestado.dias_jiso) } : {}),
+          ...(atestado.numero_ata ? { numero_ata: atestado.numero_ata } : {}),
           status_publicacao: atestado.status_publicacao || 'Aguardando Nota',
           whatsapp_status: atestado.jiso_whatsapp_status || 'legado',
           whatsapp_enviado_em: atestado.jiso_whatsapp_enviado_em || '',
