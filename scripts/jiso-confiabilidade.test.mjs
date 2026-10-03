@@ -10,6 +10,7 @@ import { montarAgendaJiso } from '../src/utils/jiso/montarAgendaJiso.js';
 const gatewayCode = buildSync({ entryPoints: ['base44/functions/jisoGateway/entry.ts'], bundle: true, platform: 'node', format: 'cjs', write: false, external: ['npm:*'] }).outputFiles[0].text;
 const notificationSource = fs.readFileSync('base44/functions/notificarJisoWhatsAppTemplate/entry.ts','utf8').replace(/import \{ evolutionWhatsAppProvider \} from '[^']+';/, 'const evolutionWhatsAppProvider = globalThis.__provider;');
 const notificationCode = buildSync({ stdin: { contents: notificationSource, loader: 'ts', resolveDir: process.cwd() + '/base44/functions/notificarJisoWhatsAppTemplate' }, bundle: true, platform: 'node', format: 'cjs', write: false, external: ['npm:*'] }).outputFiles[0].text;
+const bundleCode = buildSync({ entryPoints: ['base44/functions/getScopedAtestadosBundleV2/entry.ts'], bundle: true, platform: 'node', format: 'cjs', write: false, external: ['npm:*'] }).outputFiles[0].text;
 const rulesCode = buildSync({ entryPoints: ['base44/shared/jisoRules.ts'], bundle: true, platform: 'node', format: 'cjs', write: false }).outputFiles[0].text;
 const matches = (row, query) => Object.entries(query || {}).every(([key,val]) => val && typeof val === 'object' && '$in' in val ? val.$in.includes(row[key]) : row[key] === val);
 function harness({ actions = { gerir_jiso:true }, admin = false, seed = {}, blocked = [], authError = '', authenticatedRole = 'user', failures = {} } = {}) {
@@ -42,7 +43,7 @@ function harness({ actions = { gerir_jiso:true }, admin = false, seed = {}, bloc
     functions:{invoke:async(name,payload)=>{
       assert.equal(name,'getUserPermissions');
       const requested=payload.scopeMilitarIds||[];
-      return {data:authError ? {error:authError} : {isAdmin:admin,modules:{atestados:true},actions,effectiveUserEmail:payload.effectiveEmail||'audit@example.invalid',scopeCheck:{allowedIds:requested.filter(id=>!blocked.includes(id)),allAllowed:requested.every(id=>!blocked.includes(id))}}};
+      return {data:authError ? {error:authError} : {isAdmin:admin,hasGlobalScope:admin,modules:{atestados:true},actions,effectiveUserEmail:payload.effectiveEmail||'audit@example.invalid',scopeCheck:{allowedIds:requested.filter(id=>!blocked.includes(id)),allAllowed:requested.every(id=>!blocked.includes(id))}}};
     }},
   };
   let handler, sent=0;
@@ -50,9 +51,10 @@ function harness({ actions = { gerir_jiso:true }, admin = false, seed = {}, bloc
     __provider:{sendTextMessage:async()=>{sent++;return {success:true};}} };
   vm.runInNewContext(gatewayCode,context);
   const call=async payload=>{const res=await handler({json:async()=>payload,method:'POST'});return {status:res.status,body:await res.json()};};
+  const useBundle=()=>vm.runInNewContext(bundleCode,context);
   const useNotification=()=>vm.runInNewContext(notificationCode,context);
   const module={exports:{}};vm.runInNewContext(rulesCode,{module,exports:module.exports,console});
-  return {db,call,useNotification,rules:module.exports,client,get sent(){return sent;}};
+  return {db,call,useBundle,useNotification,rules:module.exports,client,get sent(){return sent;}};
 }
 
 test('gestor não cria decisão e não deixa processo órfão',async()=>{
@@ -175,3 +177,36 @@ test('WhatsApp confere local e bloqueia reenvio confirmado',async()=>{
   assert.equal((await h.call(payload)).status,200);assert.equal(h.sent,1);
   assert.equal((await h.call(payload)).status,409);assert.equal(h.sent,1);
 });
+test('DTO operacional transmite os efeitos sem expor a decisão clínica', async () => {
+  const h=harness({ admin:true,seed:{ JISO:[{id:'j1',militar_id:'m1',status:'Resultado Registrado',resultado_jiso:'Prorrogado',parecer_jiso:'privado',data_inicio_efeito:'2026-09-01',data_termino_efeito:'2026-09-20',data_retorno_efeito:'2026-09-21',dias_jiso:20}] } });
+  h.useBundle(); const r=await h.call({});
+  assert.equal(r.status,200);assert.equal(r.body.atestados[0].jiso_efeito.dias,20);assert.equal(r.body.atestados[0].dias,10);
+});
+test('revogação suspende o efeito e novo resultado o reativa',async()=>{
+  const h=harness({admin:true,seed:{...decidedSeed,PublicacaoExOfficio:[{id:'p1',jiso_id:'j1',tipo:'Ata JISO',numero_bg:'12',data_bg:'2026-10-03'}]}});
+  await h.rules.syncJisoPublication(h.client,h.db.PublicacaoExOfficio[0]);
+  h.db.PublicacaoExOfficio[0].foi_tornada_sem_efeito=true;
+  await h.rules.syncJisoPublication(h.client,h.db.PublicacaoExOfficio[0]);
+  assert.equal(h.db.JISO[0].efeito_suspenso,true);
+  const r=await h.call({acao:'ATUALIZAR',jiso_id:'j1',jiso:{resultado_jiso:'Apto',status:'Resultado Registrado'}});
+  assert.equal(r.status,200);assert.equal(h.db.JISO[0].efeito_suspenso,false);
+});
+test('checklist acompanha agendamento e resultado, sem concluir publicação pendente',async()=>{
+  const h=harness({admin:true,seed:{QuadroOperacional:[{id:'q1',ativo:true}],ColunaOperacional:[{id:'c1',quadro_id:'q1',ativa:true,nome:'JISO'}]}});
+  const r=await h.call({acao:'ATUALIZAR',jiso_id:'j1',jiso:{numero_ata:'12',resultado_jiso:'Homologado',status:'Resultado Registrado'}});
+  assert.equal(r.status,200);
+  const items=h.db.CardChecklistItem;
+  assert.equal(items.find(i=>i.titulo==='Registrar resultado').concluido,true);
+  assert.equal(items.find(i=>i.titulo==='Publicar Ata JISO').concluido,false);
+  assert.equal(h.db.CardOperacional[0].checklist_resumo,'3/5');
+});
+test('reconciliação faz prévia sem escrever e vincula apenas correspondência exata',async()=>{
+  const h=harness({admin:true,seed:{JISO:[{id:'j1',militar_id:'m1',origem:'MIGRACAO_LEGADO',status:'Agendada',versao:1}],PublicacaoExOfficio:[{id:'p1',militar_id:'m1',tipo:'Ata JISO',atestados_jiso_ids:['a1'],numero_bg:'12',data_bg:'2026-10-03'}]}});
+  const preview=await h.call({acao:'RECONCILIAR_DRY_RUN'});assert.equal(preview.status,200);assert.equal(h.db.PublicacaoExOfficio[0].jiso_id,undefined);assert.equal(h.db.AssistenteLog?.length||0,0);
+  const apply=await h.call({acao:'RECONCILIAR_APLICAR'});assert.equal(apply.status,200);assert.equal(h.db.PublicacaoExOfficio[0].jiso_id,'j1');assert.equal(h.db.JISO[0].status,'Concluída');assert.equal(h.db.JISO[0].resultado_jiso,undefined);
+});
+test('reconciliação não escolhe uma ata entre correspondências ambíguas',async()=>{
+  const h=harness({admin:true,seed:{JISO:[{id:'j1',militar_id:'m1',origem:'MIGRACAO_LEGADO',status:'Agendada',versao:1}],PublicacaoExOfficio:[{id:'p1',militar_id:'m1',tipo:'Ata JISO',atestados_jiso_ids:['a1']},{id:'p2',militar_id:'m1',tipo:'Ata JISO',atestados_jiso_ids:['a1']}]}});
+  const r=await h.call({acao:'RECONCILIAR_APLICAR'});assert.equal(r.status,200);assert.equal(r.body.report[0].acao,'CONFERIR');assert.equal(h.db.PublicacaoExOfficio[0].jiso_id,undefined);
+});
+
