@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { jisoContextKey, invalidateJisoQueries } from '@/services/jisoService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { createPageUrl } from '@/utils';
 import { useToast } from '@/components/ui/use-toast';
@@ -11,13 +12,8 @@ import { Button } from '@/components/ui/button';
 import {
   encaminharAtestadoParaJiso,
   isStatusAtestadoBloqueado,
-  marcarAtestadoJisoEmAnalise,
 } from '@/services/atestadosService';
 import { formatarDataSegura } from '@/utils/central-pendencias/centralPendencias.helpers';
-
-function normalizarTexto(valor) {
-  return String(valor || '').trim().toLowerCase();
-}
 
 export default function CentralPendenciaAtestadoModal({
   open,
@@ -28,7 +24,7 @@ export default function CentralPendenciaAtestadoModal({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canAccessAction } = useCurrentUser();
+  const { canAccessAction, user } = useCurrentUser();
   const indiceSeguro = Number.isInteger(indiceAtual) ? indiceAtual : 0;
 
   const pendenciaAtual = useMemo(() => {
@@ -40,11 +36,11 @@ export default function CentralPendenciaAtestadoModal({
   const atestadoIdAtual = pendenciaAtual?.atestadoId || null;
 
   const { data: atestadoDetalhado, refetch: refetchAtestado } = useQuery({
-    queryKey: ['atestado-central-modal', atestadoIdAtual],
+    queryKey: ['atestado-central-modal', atestadoIdAtual, jisoContextKey(user?.email)],
     queryFn: async () => {
       if (!atestadoIdAtual) return null;
-      const rows = await base44.entities.Atestado.filter({ id: atestadoIdAtual });
-      return rows?.[0] || null;
+      const bundle = await fetchScopedAtestadosBundle();
+      return bundle.atestados.find(item => item.id === atestadoIdAtual) || null;
     },
     enabled: open && Boolean(atestadoIdAtual),
     staleTime: 0,
@@ -55,59 +51,30 @@ export default function CentralPendenciaAtestadoModal({
     return {
       ...pendenciaAtual,
       statusAtestado: atestadoDetalhado?.status_jiso || atestadoDetalhado?.status || pendenciaAtual.statusAtestado,
-      necessitaHomologacaoJiso: atestadoDetalhado?.necessita_jiso ? 'Sim' : pendenciaAtual.necessitaHomologacaoJiso,
+      necessitaHomologacaoJiso: atestadoDetalhado?.jiso_id_derivado ? 'JISO vinculada' : 'Sem JISO vinculada',
       observacoesAtestado: atestadoDetalhado?.observacoes || pendenciaAtual.observacoesAtestado,
     };
   }, [atestadoDetalhado, pendenciaAtual]);
 
-  const statusJisoNormalizado = normalizarTexto(atestadoDetalhado?.status_jiso || atestadoView?.statusAtestado);
   const atestadoBloqueado = isStatusAtestadoBloqueado({
     statusJiso: atestadoDetalhado?.status_jiso || atestadoView?.statusAtestado,
     status: atestadoDetalhado?.status,
   });
 
-  const precisaFluxoJiso = Boolean(
-    atestadoDetalhado?.necessita_jiso
-    || normalizarTexto(atestadoDetalhado?.fluxo_homologacao).includes('jiso')
-    || Number(atestadoDetalhado?.dias || atestadoView?.quantidadeDias || 0) > 15
-  );
-
-  const jaEncaminhadoParaJiso = Boolean(
-    atestadoDetalhado?.data_jiso_agendada
-    || atestadoDetalhado?.jiso_id
-    || statusJisoNormalizado.includes('aguardando jiso')
-    || statusJisoNormalizado.includes('homologado pela jiso')
-    || statusJisoNormalizado.includes('em análise')
-  );
-
-  const podeEncaminharParaJiso = Boolean(
-    atestadoIdAtual
-    && atestadoDetalhado
-    && !atestadoBloqueado
-    && precisaFluxoJiso
-    && !jaEncaminhadoParaJiso
-    && canAccessAction('gerir_jiso')
-  );
-
-  const existeStatusLeve = atestadoDetalhado && Object.prototype.hasOwnProperty.call(atestadoDetalhado, 'status_jiso');
-
-  const podeMarcarComoAnalisado = Boolean(
-    atestadoIdAtual
-    && existeStatusLeve
-    && !atestadoBloqueado
-    && !statusJisoNormalizado.includes('em análise')
-    && canAccessAction('gerir_jiso')
-  );
+  const jisoId = atestadoDetalhado?.jiso_id_derivado || atestadoDetalhado?.jiso_id;
+  const podeEncaminharParaJiso = Boolean(atestadoIdAtual && atestadoDetalhado && !atestadoBloqueado && !atestadoDetalhado.jiso_vinculo_ativo && canAccessAction('gerir_jiso'));
 
   const linkModuloCompleto = useMemo(() => {
     if (!pendenciaAtual) return '';
+    if (jisoId) return createPageUrl('EditarJISO') + '?jiso_id=' + jisoId;
     if (pendenciaAtual.atestadoId) {
       return `${createPageUrl('VerAtestado')}?id=${pendenciaAtual.atestadoId}`;
     }
     return pendenciaAtual.origemLink || '';
-  }, [pendenciaAtual]);
+  }, [pendenciaAtual, jisoId]);
 
   const sincronizarCentralEAberto = async () => {
+    await invalidateJisoQueries(queryClient);
     await queryClient.invalidateQueries({ queryKey: ['central-pendencias'] });
     if (atestadoIdAtual) {
       await queryClient.invalidateQueries({ queryKey: ['atestado-central-modal', atestadoIdAtual] });
@@ -134,25 +101,7 @@ export default function CentralPendenciaAtestadoModal({
     },
   });
 
-  const marcarAnalisadoMutation = useMutation({
-    mutationFn: async () => {
-      if (!atestadoDetalhado?.id) throw new Error('Atestado não carregado para marcação.');
-      await marcarAtestadoJisoEmAnalise(atestadoDetalhado);
-    },
-    onSuccess: async () => {
-      await sincronizarCentralEAberto();
-      toast({ title: 'Atestado marcado como analisado', description: 'Status leve atualizado com sucesso.' });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Falha ao marcar como analisado',
-        description: error?.message || 'Não foi possível concluir a ação.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const emAcao = encaminharJisoMutation.isPending || marcarAnalisadoMutation.isPending;
+  const emAcao = encaminharJisoMutation.isPending;
 
   const navegar = (direcao) => {
     const proximoIndice = indiceSeguro + direcao;
@@ -204,18 +153,6 @@ export default function CentralPendenciaAtestadoModal({
                   >
                     {encaminharJisoMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                     Encaminhar para JISO
-                  </Button>
-                ) : null}
-
-                {podeMarcarComoAnalisado ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => marcarAnalisadoMutation.mutate()}
-                    disabled={emAcao}
-                  >
-                    {marcarAnalisadoMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Marcar como analisado
                   </Button>
                 ) : null}
 

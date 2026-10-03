@@ -49,6 +49,12 @@ function ambiente({fail=()=>{},posto='Soldado',data='2020-01-01'}={}) {
       if(!trava)fail(name,'update','after',dados);
       return {success:true,updated:found.length};
     },
+    delete:async id=>{
+      fail(name,'delete','before',id);
+      const index=list.findIndex(r=>r.id===id);if(index<0)throw Error('not found');
+      list.splice(index,1);operations.push([name,'delete',id]);
+      fail(name,'delete','after',id);
+    },
     update:async(id,patch)=>{
       fail(name,'update','before',patch);
       const row=list.find(r=>r.id===id);if(!row)throw Error('not found');
@@ -278,4 +284,46 @@ test('compensação da publicação não sobrescreve edição após releitura',a
   const r=await a.publicar(a.payload());
   assert.equal(r.success,false);assert.equal(a.rows.Militar[0].posto_graduacao,'Sargento');
   assert.ok(a.rows.Militar[0].operacao_promocao_token);
+});
+
+function prepararExclusao(a) {
+  Object.assign(a.rows.PromocaoMilitar[0],{status:'cancelado',publicado:false,historico_promocao_v2_id:'h1',atualizar_cadastro_militar:false,resultado_aplicacao_cadastro:'cadastro_restaurado'});
+  a.rows.HistoricoPromocaoMilitarV2.push({id:'h1',promocao_id:'p1',militar_id:'m1',status_registro:'cancelado'});
+  return carregar('excluirCadeiaPromocaoMilitarTx',a.client);
+}
+const payloadExclusao={promocaoMilitarId:'i1',motivo:'Teste isolado da barreira de exclusão'};
+test('exclusão recusa publicação ativa e cadastro ainda aplicado sem alterar militar',async()=>{
+  for(const aplicado of [false,true]){
+    const a=ambiente();const excluir=prepararExclusao(a);
+    Object.assign(a.rows.PromocaoMilitar[0],aplicado ? {atualizar_cadastro_militar:true} : {status:'publicado',publicado:true});
+    const r=await excluir(payloadExclusao);
+    assert.equal(r.success,false);assert.equal(r.status,409);
+    assert.equal(a.operations.length,0);assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,1);
+  }
+});
+test('exclusão não remove dados sem journal durável',async()=>{
+  const a=ambiente({fail:(n,op)=>{if(n==='AssistenteLog'&&op==='create')throw Error('journal indisponivel');}});
+  const excluir=prepararExclusao(a);const r=await excluir(payloadExclusao);
+  assert.equal(r.success,false);assert.equal(a.rows.PromocaoMilitar.length,1);assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,1);
+  assert.equal(a.rows.Promocao[0].operacao_token,'');
+});
+test('exclusão cancelada preserva snapshots duráveis e não reaplica reversão cadastral',async()=>{
+  const a=ambiente();const excluir=prepararExclusao(a);const r=await excluir(payloadExclusao);
+  assert.equal(r.success,true);assert.equal(r.cadastroRestaurado,false);
+  assert.equal(a.rows.PromocaoMilitar.length,0);assert.equal(a.rows.HistoricoPromocaoMilitarV2.length,0);
+  const log=a.rows.AssistenteLog[0];assert.equal(log.metadata.item_antes.id,'i1');assert.equal(log.metadata.historico_antes.id,'h1');
+  assert.equal(a.operations.some(([n,op])=>n==='Militar'&&op==='update'),false);
+});
+test('falha parcial na exclusão mantém journal e trava para reconciliação',async()=>{
+  const a=ambiente({fail:(n,op,phase)=>{if(n==='PromocaoMilitar'&&op==='delete'&&phase==='before')throw Error('falha_item');}});
+  const excluir=prepararExclusao(a);const r=await excluir(payloadExclusao);
+  assert.equal(r.success,false);assert.equal(r.reconciliacao_pendente,true);
+  assert.ok(a.rows.Promocao[0].operacao_token);assert.ok(a.rows.AssistenteLog[0].metadata.historico_antes);
+  const repeticao=await excluir(payloadExclusao);assert.equal(repeticao.motivo,'operacao_oficial_em_andamento');
+});
+test('exclusão rejeita histórico de outro militar ou ainda ativo',async()=>{
+  for(const patch of [{militar_id:'m2'},{status_registro:'ativo'}]){
+    const a=ambiente();const excluir=prepararExclusao(a);Object.assign(a.rows.HistoricoPromocaoMilitarV2[0],patch);
+    const r=await excluir(payloadExclusao);assert.equal(r.success,false);assert.equal(a.operations.length,0);
+  }
 });
