@@ -3,7 +3,7 @@ import { executar as editar } from './sincronizarHistoricoPromocaoPublicadaTx.ts
 import { executar as reverter } from './reverterPublicacaoPromocaoMilitarTx.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 
-// Ferramenta de homologação: apenas base dev, administrador e fixture explicitamente fictícia.
+// Homologação dos mesmos handlers com SDK real: apenas dev, admin e fixture fictícia.
 // Nunca aceita IDs de militares reais nem permite escolher outro ambiente.
 const MATRICULA = 'HOMO-PROM-20261003';
 const NOME = '[HOMOLOGAÇÃO PROMOÇÕES 2026-10-03] MILITAR FICTÍCIO';
