@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
 
     const trilhaAdmin = ['[REVERSAO_ADMINISTRATIVA]', `motivo=${motivo}`, observacoes ? `observacoes=${observacoes}` : '', texto(usuario?.email) ? `usuario=${texto(usuario.email)}` : '', `data=${new Date().toISOString()}`].filter(Boolean).join(' | ');
     const historicoSnapshot = { status_registro: historicoAtual?.status_registro, motivo_retificacao: historicoAtual?.motivo_retificacao, observacoes: historicoAtual?.observacoes };
-    const itemSnapshot = { status: itemAtual?.status, publicado: itemAtual?.publicado };
+    const itemSnapshot = { status: itemAtual?.status, publicado: itemAtual?.publicado, atualizar_cadastro_militar: itemAtual?.atualizar_cadastro_militar ?? false, resultado_aplicacao_cadastro: itemAtual?.resultado_aplicacao_cadastro ?? '' };
     const promocaoAtual = await Promocao.get(promocaoId).catch(() => null);
     const promocaoSnapshot = { status: promocaoAtual?.status };
     const participanteSnapshot = participante ? { status: participante?.status, status_pre_publicacao: participante?.status_pre_publicacao || null, data_status_atual: participante?.data_status_atual } : null;
@@ -272,7 +272,7 @@ Deno.serve(async (req) => {
         if (Object.keys(destinoRestauracao).some(k => texto(restaurado[k]) !== texto(destinoRestauracao[k]))) throw new Error('restauracao_cadastro_nao_confirmada');
       }
 
-      await PromocaoMilitar.update(itemId, { status: 'cancelado', publicado: false });
+      await PromocaoMilitar.update(itemId, { status: 'cancelado', publicado: false, atualizar_cadastro_militar: false, resultado_aplicacao_cadastro: precisaRollbackCadastro ? 'cadastro_restaurado' : 'cadastro_preservado' });
 
       // Reverte o participante do curso (promovido -> pendente_reanalise).
       // promocao_id é PRESERVADO para rastreabilidade. status_pre_publicacao é limpo.
