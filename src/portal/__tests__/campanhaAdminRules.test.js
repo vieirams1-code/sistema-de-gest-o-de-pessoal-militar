@@ -4,7 +4,6 @@ import { validarNomeCampanha, validarProrrogacaoCampanha } from '../../../base44
 
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
-import { validarNomeCampanha, validarProrrogacaoCampanha } from '../../../base44/shared/ferias/campanhaAdminRules.js';
 
 const original = readFileSync(new URL('../../../base44/functions/portal_servicos/entry.ts', import.meta.url), 'utf8');
 const codigo = transformSync(original.replace(/^import .*;\n/gm, ''), { loader: 'ts', format: 'cjs' }).code;
