@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import CampanhaGeralAdminActions from '@/components/portal/CampanhaGeralAdminActions';
 import { baixarAnexosCampanhaZip } from '@/utils/portalCampanhasExport';
 
 const TIPOS_CAMPOS_FORMULARIO = [
@@ -43,7 +44,9 @@ const TIPOS_CAMPOS_FORMULARIO = [
 
 export default function GerirCampanhasPortal() {
   const navigate = useNavigate();
-  const { canAccessAction } = useCurrentUser();
+  const { canAccessAction, isAdmin = false } = useCurrentUser();
+  const canAdminCampaigns = isAdmin || canAccessAction('admin_campanhas');
+  const [modoAdmin, setModoAdmin] = useState(false);
   const canViewCampaigns = canAccessAction('visualizar_campanhas_gerais');
   const canCreateCampaigns = canAccessAction('criar_campanhas');
   const canEditCampaigns = canAccessAction('editar_campanhas');
@@ -693,6 +696,7 @@ export default function GerirCampanhasPortal() {
             </div>
 
             <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
+              {canAdminCampaigns && canEditCampaigns && <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)} className={modoAdmin ? 'bg-rose-700 hover:bg-rose-800' : ''}>{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>}
               <button
                 type="button"
                 onClick={carregarDados}
@@ -839,6 +843,10 @@ export default function GerirCampanhasPortal() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
+                            <CampanhaGeralAdminActions campanha={camp} enabled={modoAdmin && canAdminCampaigns && canEditCampaigns} disabled={actionLoading} onUpdated={async (updated, message) => {
+                              setCampanhas((atuais) => atuais.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+                              setFeedback({ type: 'success', msg: message });
+                            }} />
                             {canEditCampaigns && camp.status !== 'Aberta_Coleta' && (
                               <button
                                 onClick={() => handleReabrirCampanha(camp)}
