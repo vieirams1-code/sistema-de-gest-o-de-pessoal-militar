@@ -529,7 +529,7 @@ export default function Home() {
         {(podeVerAtestados || podeVerPublicacoes) && <div className="mb-6">
           {afastamentosPanelOpen ? (
             <AfastamentosVigentesPanel
-              atestados={atestados}
+              atestados={jisoBundle?.atestados?.length ? jisoBundle.atestados : atestados}
               registrosLivro={registrosLivro}
               ferias={podeVerFerias ? ferias : []}
               enabled={afastamentosPanelOpen}
