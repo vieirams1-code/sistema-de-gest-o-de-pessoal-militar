@@ -2926,6 +2926,9 @@ Deno.serve(async (req: Request) => {
         });
     }
   } catch (err: any) {
+    if (err?.code === 'CAMPANHA_VALIDATION') {
+      return new Response(JSON.stringify({ error: err.message }), { status: err.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+    }
     console.error(`[portal_servicos][${correlationId}] Erro inesperado:`, err?.message || err);
 
     return new Response(JSON.stringify({
