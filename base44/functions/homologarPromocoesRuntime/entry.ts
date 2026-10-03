@@ -47,6 +47,13 @@ Deno.serve(async (req) => {
       }
       return Response.json({success:true,...await resumo()});
     }
+    if (payload.acao === 'testar_trava') {
+      const p = (await E.Promocao.filter({chave_agrupamento:CHAVE+'-FUTURO'},undefined,2))[0];
+      if (!p || p.origem !== 'homologacao_dev' || p.operacao_token) throw new Error('fixture_trava_invalida');
+      const resultadoId = await E.Promocao.updateMany({id:p.id},{$set:{operacao_token:''}});
+      const resultadoMongo = await E.Promocao.updateMany({_id:p.id},{$set:{operacao_token:''}});
+      return Response.json({success:true,ambiente,resultado:{id:resultadoId,_id:resultadoMongo},...await resumo()});
+    }
     if (!payload.acao || payload.acao === 'verificar') return Response.json({success:true,...await resumo()});
     const futuro = payload.acao === 'vigencia_futura';
     const pais = await E.Promocao.filter({chave_agrupamento:CHAVE+(futuro ? '-FUTURO' : '')},undefined,2);
