@@ -10,7 +10,7 @@ export function aplicarEfeitosJiso(atestados = [], jisos = []) {
         efeito = { id: jiso.id, data_inicio: jiso.data_inicio_efeito, data_termino: jiso.data_termino_efeito, data_retorno: jiso.data_retorno_efeito, dias: jiso.dias_jiso };
       }
     }
-    if (!efeito || (!efeito.data_inicio || !efeito.data_termino) && Number(efeito.dias) !== 0) {
+    if (!efeito || (!efeito.data_inicio || !efeito.data_termino) && !(efeito.dias != null && Number(efeito.dias) === 0)) {
       resultado.push(atestado);
       continue;
     }
