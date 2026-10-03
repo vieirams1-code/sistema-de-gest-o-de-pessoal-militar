@@ -86,6 +86,7 @@ import GratificacoesFuncao from './pages/GratificacoesFuncao';
 import Home from './pages/Home';
 import DashboardAcervo from './pages/DashboardAcervo';
 import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
+import HistoricoAlteracoesPromocoes from './pages/HistoricoAlteracoesPromocoes';
 import ImportarMedalhaDomPedroII from './pages/ImportarMedalhaDomPedroII';
 import ImportarMedalhaTempoServico from './pages/ImportarMedalhaTempoServico';
 import IndicacoesDomPedroII from './pages/IndicacoesDomPedroII';
@@ -221,6 +222,7 @@ export const PAGES = {
     "CadastrarRegistroRP": CadastrarRegistroRP,
     "RevisaoDuplicidadesMilitar": RevisaoDuplicidadesMilitar,
     "RastreamentoPromocoes": RastreamentoPromocoes,
+    "HistoricoAlteracoesPromocoes": HistoricoAlteracoesPromocoes,
     "Promocoes": Promocoes,
     "DetalhePromocao": DetalhePromocao,
     "VisualizacaoGestorEfetivo": VisualizacaoGestorEfetivo,
