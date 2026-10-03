@@ -1,3 +1,4 @@
+import { aplicarEfeitosJiso } from '../utils/jiso/jisoEffects.js';
 import { isAtestadoVigente, isJisoVigente } from './statusOperacionalService.js';
 import {
   calcularDiasUnicosNaJanela,
@@ -29,11 +30,12 @@ export function consolidarSaudeMilitar(atestados = [], jisos = [], hoje = new Da
   const ultimoAtestado = atestadosOrdenados[0] || null;
   const quantidadeAtestados = atestadosValidos.length;
 
-  const afastamentoAtivo = atestadosValidos.some((a) => isAtestadoVigente(a, hoje));
+  const operacionais = aplicarEfeitosJiso(atestadosValidos, jisos);
+  const afastamentoAtivo = operacionais.some((a) => isAtestadoVigente(a, hoje));
   const possuiJiso = (jisos || []).some((j) => isJisoVigente(j, hoje));
 
   // Cálculo de dias afastados nos últimos 12 meses (365 dias)
-  const periodos = atestadosValidos.map(normalizarPeriodoAtestado);
+  const periodos = operacionais.map(normalizarPeriodoAtestado);
   const intervalosValidos = periodos
     .filter((p) => p.valido)
     .map((p) => ({
