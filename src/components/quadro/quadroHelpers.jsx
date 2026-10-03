@@ -62,8 +62,7 @@ export function avaliarFluxoJiso({ card, atestadoVinculado, vinculoAtestado }) {
   );
   const fluxoJisoAtivo =
     atestadoVinculado?.fluxo_homologacao === 'jiso' ||
-    atestadoVinculado?.necessita_jiso === true ||
-    Number(atestadoVinculado?.dias || 0) > 15;
+    atestadoVinculado?.necessita_jiso === true;
 
   const isCardJisoElegivel =
     isCardJisoAutomatico &&
