@@ -77,6 +77,7 @@ export default function EditarJISO() {
   const canPublish = canAccessAction('publicar_ata_jiso');
   const [form, setFormState] = useState(EMPTY_FORM);
   const [dirty, setDirty] = useState(false);
+  const [tagsText, setTagsText] = useState('');
   const setForm = (value) => { setDirty(true); setFormState(value); };
   const [showAdd, setShowAdd] = useState(false);
   const [selectedAddIds, setSelectedAddIds] = useState([]);
@@ -106,6 +107,7 @@ export default function EditarJISO() {
       ...jiso,
       dias_jiso: jiso.dias_jiso ?? '',
     });
+    setTagsText((jiso.tags || []).join(', '));
     if (jiso.publicacao) setPublication(current => ({ ...current, ...jiso.publicacao }));
   }, [jiso, dirty]);
 
@@ -191,7 +193,7 @@ export default function EditarJISO() {
   };
   const saveAll = async () => {
     const status = form.status === 'Aguardando Agendamento' && form.data_jiso && form.hora_jiso ? 'Agendada' : form.status;
-    try { await updateMutation.mutateAsync(buildPatch(status)); } catch (_error) { /* onError reports it */ }
+    try { await updateMutation.mutateAsync(buildPatch(status)); } catch { /* onError reports it */ }
   };
 
   const addMutation = useMutation({
@@ -364,6 +366,8 @@ export default function EditarJISO() {
           </div>
         </div>
 
+        {jiso.efeito_suspenso && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Os efeitos da decisão estão suspensos após a retirada da publicação. Confira o resultado antes de emitir outra ata.</p>}
+        {canSensitive && jiso.origem === 'MIGRACAO_LEGADO' && jiso.publicacao_id && !jiso.resultado_jiso && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">A ata histórica está vinculada, mas o resultado clínico não consta nos dados migrados. Consulte o documento original antes de completar essa informação.</p>}
         <div className="grid gap-5 xl:grid-cols-12">
           <div className="space-y-5 xl:col-span-7">
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -426,7 +430,7 @@ export default function EditarJISO() {
                 <div><Label>Data de retorno efetiva</Label><Input type="date" value={form.data_retorno_efeito} onChange={(e) => setForm((p) => ({ ...p, data_retorno_efeito: e.target.value }))} disabled={!canDecide || isClosed} className="mt-1.5" /></div>
               </div>
               <div className="mt-4"><Label>Parecer da JISO</Label><Textarea value={form.parecer_jiso} onChange={(e) => setForm((p) => ({ ...p, parecer_jiso: e.target.value }))} disabled={!canDecide || isClosed} className="mt-1.5 min-h-28" /></div>
-              <div className="mt-4"><Label>Tags da JISO (separadas por vírgula)</Label><Input value={(form.tags || []).join(', ')} onChange={(e) => setForm(p => ({ ...p, tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean) }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
+              <div className="mt-4"><Label>Tags da JISO (separadas por vírgula)</Label><Input value={tagsText} onChange={(e) => { setTagsText(e.target.value); setForm(p => ({ ...p, tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean) })); }} disabled={!canManage || isClosed} className="mt-1.5" /></div>
               <div className="mt-4"><Label>Observações administrativas</Label><Textarea value={form.observacoes} onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
               {canDecide && !isClosed && (
                 <div className="mt-4 flex justify-end gap-2">
