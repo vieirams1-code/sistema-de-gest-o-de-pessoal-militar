@@ -113,7 +113,10 @@ export default function Promocoes() {
     queryFn: () => base44.entities.Militar.list(),
   });
 
-  const totaisReais = useMemo(() => agruparTotaisReais(historicosQuery.data || []), [historicosQuery.data]);
+  const totaisReais = useMemo(() => ({
+    ...agruparTotaisReais(historicosQuery.data || []),
+    ...agruparTotaisReais(promocoesMilitaresQuery.data || []),
+  }), [historicosQuery.data, promocoesMilitaresQuery.data]);
   const promocoesOrdenadas = useMemo(() => ordenarPromocoes(promocoesQuery.data || []), [promocoesQuery.data]);
   const isLoading = promocoesQuery.isLoading || historicosQuery.isLoading || promocoesMilitaresQuery.isLoading || militaresQuery.isLoading;
   const error = promocoesQuery.error || historicosQuery.error || promocoesMilitaresQuery.error || militaresQuery.error;
@@ -198,6 +201,7 @@ export default function Promocoes() {
       queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais-historicos-v2'] });
       queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais-promocoes-militares'] });
     },
+    onError: (error) => toast({ title: 'Exclusão não concluída', description: error.message, variant: 'destructive' }),
   });
 
   const confirmarExclusaoPromocao = (promocao) => {
