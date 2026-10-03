@@ -34,23 +34,30 @@ export default function SincronizacaoPromocoesDialog({ open, onOpenChange }) {
       queryClient.invalidateQueries({ queryKey: ['gestor-efetivo-militares'] });
       queryClient.invalidateQueries({ queryKey: ['gestor-efetivo-lotacoes'] });
       queryClient.invalidateQueries({ queryKey: ['militar'] });
-      toast({ title: 'Sincronização concluída', description: 'Os cadastros militares foram atualizados com sucesso.' });
+      const falhas = data.resumo?.falhas || [];
+      toast({ title: falhas.length ? 'Sincronização com pendências' : 'Sincronização concluída', description: `${data.resumo?.atualizados || 0} cadastro(s) atualizado(s); ${falhas.length} falha(s).`, variant: falhas.length ? 'destructive' : 'default' });
     },
     onError: (error) => {
-      toast({ title: 'Erro na sincronização', description: error.message, variant: 'destructive' });
+      toast({ title: 'Sincronização não confirmada', description: `${error.message} Atualize o diagnóstico antes de tentar novamente.`, variant: 'destructive' });
+      queryClient.invalidateQueries({ queryKey: ['sincronizacao-promocoes-preview'] });
+      queryClient.invalidateQueries({ queryKey: ['militar'] });
+      queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais-militares'] });
     },
   });
 
   const divergencias = previewQuery.data?.resumo?.divergencias || [];
   const resumo = previewQuery.data?.resumo || {};
+  const falhasExecucao = resultadoExecucao?.resumo?.falhas || [];
 
   const handleSincronizar = () => {
+    if (syncMutation.isPending || previewQuery.isFetching || previewQuery.isError) return;
     if (window.confirm('Deseja realmente sincronizar as graduações? Esta ação atualizará o cadastro principal dos militares com base na promoção mais recente.')) {
       syncMutation.mutate();
     }
   };
 
   const handleClose = () => {
+    if (syncMutation.isPending) return;
     setEtapa('preview');
     setResultadoExecucao(null);
     onOpenChange(false);
@@ -116,6 +123,8 @@ export default function SincronizacaoPromocoesDialog({ open, onOpenChange }) {
                         Analisando promoções e cadastros...
                       </TableCell>
                     </TableRow>
+                  ) : previewQuery.isError ? (
+                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-red-700">Não foi possível concluir o diagnóstico: {previewQuery.error?.message}. Atualize para tentar novamente.</TableCell></TableRow>
                   ) : divergencias.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="h-32 text-center text-slate-500">
@@ -154,7 +163,7 @@ export default function SincronizacaoPromocoesDialog({ open, onOpenChange }) {
                 <CheckCircle2 className="h-8 w-8 text-green-600" />
               </div>
               <h3 className="text-xl font-bold text-slate-900">Sincronização Finalizada</h3>
-              <p className="text-slate-500">O processo foi concluído com sucesso.</p>
+              <p className={falhasExecucao.length ? 'text-amber-700' : 'text-slate-500'}>{falhasExecucao.length ? `O processo terminou com ${falhasExecucao.length} falha(s). Confira as pendências abaixo.` : 'O processo foi concluído sem falhas registradas.'}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -172,6 +181,17 @@ export default function SincronizacaoPromocoesDialog({ open, onOpenChange }) {
               </div>
             </div>
 
+            {falhasExecucao.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Cadastros que exigem revisão</AlertTitle>
+                <AlertDescription>
+                  <ul className="mt-2 space-y-1">
+                    {falhasExecucao.map((falha, indice) => <li key={indice}>{falha.militar || falha.militar_id || 'Militar'}: {falha.erro || falha.motivo || 'Atualização não confirmada.'}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
               <div>
@@ -187,10 +207,10 @@ export default function SincronizacaoPromocoesDialog({ open, onOpenChange }) {
         <DialogFooter className="border-t pt-4">
           {etapa === 'preview' ? (
             <>
-              <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+              <Button variant="outline" onClick={handleClose} disabled={syncMutation.isPending}>Cancelar</Button>
               <Button
                 onClick={handleSincronizar}
-                disabled={divergencias.length === 0 || syncMutation.isPending}
+                disabled={divergencias.length === 0 || syncMutation.isPending || previewQuery.isFetching || previewQuery.isError}
                 className="bg-blue-700 hover:bg-blue-800"
               >
                 {syncMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
