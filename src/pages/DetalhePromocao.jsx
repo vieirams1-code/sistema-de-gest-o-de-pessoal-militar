@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, RefreshCw, Trash2, UserPlus } from 'lucide-react';
@@ -374,6 +374,12 @@ export default function DetalhePromocao() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const promocaoId = searchParams.get('id');
+  const documentoEditado = useRef(false);
+  const turmaEditada = useRef(false);
+  useEffect(() => {
+    documentoEditado.current = false;
+    turmaEditada.current = false;
+  }, [promocaoId]);
 
   const [rascunhoPromocao, setRascunhoPromocao] = useState(montarRascunhoPromocao());
   const [promocaoBaseComparacao, setPromocaoBaseComparacao] = useState(null);
@@ -434,7 +440,7 @@ export default function DetalhePromocao() {
 
   const promocao = promocaoQuery.data;
   useEffect(() => {
-    if (!promocao) return;
+    if (!promocao || documentoEditado.current) return;
     setPromocaoBaseComparacao(promocao);
   }, [promocao]);
 
@@ -480,7 +486,7 @@ export default function DetalhePromocao() {
     };
   }, [turma]);
   useEffect(() => {
-    setTurmaBaseComparacao(turma);
+    if (!turmaEditada.current) setTurmaBaseComparacao(turma);
   }, [turma]);
 
   const listaExibida = useMemo(() => turma, [turma]);
@@ -552,11 +558,11 @@ export default function DetalhePromocao() {
 
 
   useEffect(() => {
-    if (promocao) setRascunhoPromocao(montarRascunhoPromocao(promocao));
+    if (promocao && !documentoEditado.current) setRascunhoPromocao(montarRascunhoPromocao(promocao));
   }, [promocao]);
 
   useEffect(() => {
-    setRascunhoTurma(turma.map((registro) => montarRascunhoItemTurma(registro, promocao)));
+    if (!turmaEditada.current) setRascunhoTurma(turma.map((registro) => montarRascunhoItemTurma(registro, promocao)));
   }, [promocao, turma]);
 
   // Detecta vínculo com Curso de Formação ao abrir o modal de reversão (fluxo excepcional).
@@ -618,10 +624,12 @@ export default function DetalhePromocao() {
   }, [promocaoReferenciaCadastro, rascunhoTurma, turmaBaseComparacao]);
 
   const atualizarCampoPromocao = (campo, valor) => {
+    documentoEditado.current = true;
     setRascunhoPromocao((atual) => ({ ...atual, [campo]: valor }));
   };
 
   const atualizarRascunhoTurma = (registroId, campo, valor) => {
+    turmaEditada.current = true;
     setRascunhoTurma((atuais) => atuais.map((registro) => {
       if (String(registro.id) !== String(registroId)) return registro;
       if (typeof campo === 'object' && campo !== null) return { ...registro, ...campo };
@@ -635,6 +643,10 @@ export default function DetalhePromocao() {
       ['detalhe-promocao', promocaoId],
       ['detalhe-promocao-promocao-militar'],
       ['detalhe-promocao-militares'],
+      ['detalhe-promocao-historicos-v2'],
+      ['detalhe-promocao-promocoes'],
+      ['militar'],
+      ['ver-historico-promocoes'],
       ['antiguidade-previa'],
       ['previa-antiguidade-geral'],
       ['antiguidade-previa-geral'],
@@ -649,21 +661,18 @@ export default function DetalhePromocao() {
       const retorno = await queryClient.invalidateQueries({ queryKey });
       diagLog('cache:invalidate:retorno', { queryKey, retorno });
     }));
-    await Promise.all(keys.map(async (queryKey) => {
-      diagLog('cache:refetch:executando', { queryKey, type: 'active' });
-      const retorno = await queryClient.refetchQueries({ queryKey, type: 'active' });
-      diagLog('cache:refetch:retorno', { queryKey, retorno });
-    }));
+    // invalidateQueries já relê as consultas ativas; evitar uma segunda rodada.
   };
 
   const salvarPromocaoMutation = useMutation({
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
-      const patchPromocao = montarPatchPromocao(rascunhoPromocao, promocao);
-      const promocaoAtualizada = { ...promocao, ...patchPromocao };
+      const baseEdicao = promocaoBaseComparacao || promocao;
+      const patchPromocao = montarPatchPromocao(rascunhoPromocao, baseEdicao);
+      const promocaoAtualizada = { ...baseEdicao, ...patchPromocao };
       diagLog('salvar-promocao:sincronizacao-oficial:chamada', { promocaoId: promocao.id, status: promocao.status });
       const sincronizacao = await sincronizarHistoricoPromocaoPublicada({
-        promocaoAntes: promocao,
+        promocaoAntes: baseEdicao,
         promocaoDepois: promocaoAtualizada,
       });
 
@@ -675,7 +684,8 @@ export default function DetalhePromocao() {
 
       return { sincronizacao };
     },
-    onSuccess: async (resultado, registroPromocao) => {
+    onSuccess: async (resultado) => {
+      documentoEditado.current = false;
       setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao, promocao) } : atual));
       const totalSincronizado = Number(resultado?.sincronizacao?.atualizados) || 0;
       const descricao = totalSincronizado > 0
@@ -759,6 +769,7 @@ export default function DetalhePromocao() {
       return alteradosComPatch.map((x) => x.registro);
     },
     onSuccess: async (alterados = []) => {
+      turmaEditada.current = false;
       if (alterados.length > 0) {
         const atualizacoes = new Map(alterados.map((registro) => [String(registro.id), registro]));
         setTurmaBaseComparacao((atuais) => atuais.map((registro) => (
@@ -1023,7 +1034,14 @@ export default function DetalhePromocao() {
         });
       }
     },
-    onError: (error) => toast({ title: 'Falha ao publicar promoção', description: error.message, variant: 'destructive' }),
+    onError: async (error) => {
+      const resultado = error.resultadoPublicacao || {};
+      const publicados = Number(resultado.publicados) || 0;
+      const pendente = resultado.reconciliacao_pendente || resultado.errors?.some((item) => item.rollback_completo === false);
+      const detalhes = [publicados > 0 ? `${publicados} militar(es) já publicado(s).` : '', pendente ? 'Há uma operação pendente de revisão; não libere as travas nem repita sem conferir o estado.' : '', error.message].filter(Boolean).join(' ');
+      toast({ title: publicados > 0 ? 'Publicação parcialmente concluída' : 'Publicação não concluída', description: detalhes, variant: 'destructive' });
+      await invalidarDados();
+    },
   });
 
   const confirmarPublicacaoPromocao = () => {
@@ -1060,9 +1078,9 @@ export default function DetalhePromocao() {
     temAlteracoesPendentes,
     contextoPublicacao,
   }), [itensValidacaoPublicacao, promocaoReferenciaCadastro, temAlteracoesPendentes, contextoPublicacao]);
-  const publicarBloqueado = isLoading || salvando || !validacaoPublicacao.valido;
+  const publicarBloqueado = isLoading || Boolean(error) || salvando || !validacaoPublicacao.valido;
   const bloqueioPublicarTexto = publicarBloqueado
-    ? (isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
+    ? (error ? 'Não foi possível carregar todos os dados. Atualize antes de publicar.' : isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
     : 'Pronto para publicar oficialmente.';
 
   const promocaoPublicada = ehPromocaoPublicada(promocao);
