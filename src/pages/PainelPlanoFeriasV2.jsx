@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Clock3,
   LayoutList,
-  Printer,
   RefreshCw,
   Search,
   Users,
