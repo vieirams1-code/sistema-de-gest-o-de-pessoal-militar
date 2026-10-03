@@ -11,8 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
-import { jisoService } from '@/services/jisoService';
+import { jisoService, jisoContextKey, invalidateJisoQueries } from '@/services/jisoService';
 import { createPageUrl } from '@/utils';
 
 const STATUS_CLASS = {
@@ -43,8 +42,9 @@ function formatDate(value) {
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
-  const canView = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
+  const { canAccessModule, canAccessAction, isLoading, isAccessResolved, user } = useCurrentUser();
+  const canView = ['visualizar_atestados', 'gerir_jiso', 'registrar_decisao_jiso', 'publicar_ata_jiso'].some(canAccessAction);
+  const contextKey = jisoContextKey(user?.email);
   const canManage = canAccessAction('gerir_jiso');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
@@ -54,16 +54,15 @@ export default function AgendarJISO() {
   const [form, setForm] = useState(initialForm);
 
   const { data: lista = [], isLoading: loadingJisos, error } = useQuery({
-    queryKey: ['jisos-independentes'],
+    queryKey: ['jisos-independentes', contextKey],
     queryFn: async () => (await jisoService.listar()).jisos || [],
     enabled: isAccessResolved && canAccessModule('atestados') && canView,
   });
 
   const { data: atestados = [] } = useQuery({
-    queryKey: ['atestados-para-jiso'],
+    queryKey: ['atestados-para-jiso', contextKey],
     queryFn: async () => {
-      const bundle = await fetchScopedAtestadosBundle({ functionName: 'getScopedAtestadosBundleV2', dtoVersion: 'operacional-v2' });
-      return bundle?.atestados || [];
+      return (await jisoService.atestadosDisponiveis()).atestados || [];
     },
     enabled: showCreate && canManage,
   });
@@ -91,7 +90,7 @@ export default function AgendarJISO() {
     return lista.filter((item) => {
       if (statusFilter !== 'TODOS' && item.status !== statusFilter) return false;
       if (!term) return true;
-      return [item.codigo, item.militar_nome, item.militar_matricula, item.finalidade_jiso, item.nup]
+      return [item.codigo, item.militar_nome, item.militar_matricula, item.finalidade_jiso, item.nup, ...(item.tags || [])]
         .some((value) => String(value || '').toLowerCase().includes(term));
     });
   }, [lista, search, statusFilter]);
@@ -99,7 +98,7 @@ export default function AgendarJISO() {
   const createMutation = useMutation({
     mutationFn: () => jisoService.criar({ atestadoIds: selectedIds, jiso: form }),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['jisos-independentes'] });
+      invalidateJisoQueries(queryClient);
       setShowCreate(false);
       setSelectedIds([]);
       setForm(initialForm);
@@ -202,6 +201,7 @@ export default function AgendarJISO() {
                       <span className="font-mono text-xs font-bold text-slate-500">{item.codigo || 'JISO sem código'}</span>
                       <Badge className={STATUS_CLASS[item.status] || STATUS_CLASS.Rascunho}>{item.status || 'Rascunho'}</Badge>
                       {item.whatsapp_status === 'enviado' && <Badge className="bg-emerald-50 text-emerald-700">WhatsApp enviado</Badge>}
+                      {(item.tags || []).map(tag => <Badge key={tag} variant="outline">{tag}</Badge>)}
                     </div>
                     <h2 className="truncate text-lg font-bold text-slate-900">{item.militar_posto} {item.militar_nome}</h2>
                     <p className="text-sm text-slate-500">Matrícula {item.militar_matricula_atual || item.militar_matricula || '—'}</p>
