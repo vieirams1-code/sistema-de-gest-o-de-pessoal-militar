@@ -91,7 +91,7 @@ export async function syncJisoChecklist(base44, cardId, jiso, totalAtestados) {
     ['Conferir atestados vinculados', totalAtestados > 0],
     ['Agendar JISO', Boolean(jiso.data_jiso && jiso.hora_jiso)],
     ['Notificar militar', jiso.whatsapp_status === 'enviado'],
-    ['Registrar resultado', ['Resultado Registrado','Concluída'].includes(jiso.status)],
+    ['Registrar resultado', Boolean(jiso.resultado_jiso || jiso.resultado_registrado_em)],
     ['Publicar Ata JISO', jiso.status_publicacao === 'Publicado' && jiso.status === 'Concluída'],
   ];
   const items = await base44.asServiceRole.entities.CardChecklistItem.filter({ card_id: cardId }, 'ordem', 500, 0);
