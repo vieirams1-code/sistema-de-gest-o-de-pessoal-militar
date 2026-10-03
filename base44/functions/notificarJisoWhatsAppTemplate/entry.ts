@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { syncJisoChecklist } from '../../shared/jisoRules.ts';
 import { evolutionWhatsAppProvider } from '../../shared/portal/otp/providers/evolutionWhatsAppProvider.ts';
 
 const FUNCTION_VERSION = 'jiso-template-v4-2026-10-03';
@@ -337,6 +338,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    try {
+      const cards = await base44.asServiceRole.entities.CardOperacional.filter({ origem_registro_id: context.jisoId, tipo_automacao: 'JISO_INDEPENDENTE' }, undefined, 100, 0);
+      for (const card of cards || []) await syncJisoChecklist(base44, card.id, { ...context.jiso, whatsapp_status: 'enviado' }, context.atestados.length);
+    } catch (boardError) { console.warn('[notificarJisoWhatsAppTemplate] quadro pendente de sincronização', boardError); }
     return jsonResponse({
       success: true,
       tracking_saved: true,
