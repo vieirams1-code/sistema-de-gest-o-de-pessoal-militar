@@ -242,6 +242,28 @@
     "criado_por_email": {
       "type": "string",
       "description": "E-mail do usu\u00e1rio que originou a publica\u00e7\u00e3o (ex.: gateway de Descontos em F\u00e9rias). Permite que o autor enxergue a publica\u00e7\u00e3o no painel mesmo fora do escopo de militar."
+    },
+    "numero_ata": {
+      "type": "string"
+    },
+    "resultado_jiso": {
+      "type": "string"
+    },
+    "dias_jiso": {
+      "type": "number",
+      "description": "Quantidade de dias reconhecida pela Junta."
+    },
+    "data_inicio_efeito": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_termino_efeito": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_retorno_efeito": {
+      "type": "string",
+      "format": "date"
     }
   },
   "required": [
