@@ -1,3 +1,4 @@
+import { aplicarEfeitosJiso } from '../utils/jiso/jisoEffects.js';
 export const STATUS_OPERACIONAL = {
   JISO: 'JISO',
   AFASTADO: 'AFASTADO',
@@ -35,7 +36,7 @@ function normalizeStatus(value) {
 export function isJisoVigente(jiso, hoje) {
   if (!jiso || !hoje) return false;
   const status = normalizeStatus(jiso.status);
-  if (status === 'realizada' || status === 'cancelada') return false;
+  if (['realizada', 'resultado registrado', 'concluída', 'cancelada'].includes(status)) return false;
 
   const dataJiso = parseDate(jiso.data_jiso);
   if (!dataJiso) return false;
@@ -54,7 +55,7 @@ export function isAtestadoVigente(atestado, hoje) {
   if (!dataInicio) return false;
   if (!dataFim) return status === 'ativo' || status === 'em curso';
 
-  return hoje >= dataInicio && hoje <= dataFim;
+  return hoje >= dataInicio && (atestado.data_retorno ? hoje < dataFim : hoje <= dataFim);
 }
 
 export function isFeriasVigente(ferias, hoje) {
@@ -110,7 +111,7 @@ export function determinarStatusOperacional({ jisos = [], atestados = [], ferias
   }
 
   // Verificar Atestados
-  const atestadoAtivo = atestados.find(a => isAtestadoVigente(a, hojeRef));
+  const atestadoAtivo = aplicarEfeitosJiso(atestados, jisos).find(a => isAtestadoVigente(a, hojeRef));
   if (atestadoAtivo) {
     resultados.push({
       status: STATUS_OPERACIONAL.AFASTADO,
