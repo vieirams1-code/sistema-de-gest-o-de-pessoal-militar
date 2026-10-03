@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { requirePortalSession, extractClientIp, extractUserAgent, registrarAuditoriaPortal } from '../../shared/portal/requirePortalSession.ts';
 import { generateCorrelationId } from '../../shared/portal/portalCrypto.ts';
 import { loadAuthConfig } from '../../shared/portal/otp/otpService.ts';
+import { validarNomeCampanha, validarProrrogacaoCampanha } from '../../shared/ferias/campanhaAdminRules.js';
 
 export function assertNoClientSuppliedMilitarId(body: unknown): void {
   if (body && typeof body === 'object') {
@@ -284,7 +285,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string, payload: any = {}): 
   if (acao === 'PLANO_CAMPANHA_OBTER_OU_CRIAR' || acao === 'PLANO_CAMPANHA_CRIAR') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_SCOPE_OPTIONS') return ['perm_visualizar_planos_ferias'];
   if (acao === 'PLANO_CAMPANHA_SALVAR') return ['perm_visualizar_planos_ferias'];
-  if (acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR' || acao === 'PLANO_CAMPANHA_REABRIR' || acao === 'PLANO_CAMPANHA_PRORROGAR') {
+  if (acao === 'PLANO_CAMPANHA_RENOMEAR' || acao === 'PLANO_CAMPANHA_ARQUIVAR' || acao === 'PLANO_CAMPANHA_DESATIVAR' || acao === 'PLANO_CAMPANHA_REABRIR' || acao === 'PLANO_CAMPANHA_PRORROGAR') {
     return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'PLANO_CAMPANHA_EXCLUIR') {
@@ -339,6 +340,7 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
     'PLANO_CAMPANHA_DESATIVAR',
     'PLANO_CAMPANHA_REABRIR',
     'PLANO_CAMPANHA_PRORROGAR',
+    'PLANO_CAMPANHA_RENOMEAR',
     'PLANO_CAMPANHA_EXCLUIR',
     'PLANO_GERAR_LOTE_FERIAS',
     'PLANO_INSTITUCIONAL_GERAR_FERIAS',
@@ -1642,6 +1644,7 @@ Deno.serve(async (req: Request) => {
         case 'PLANO_CAMPANHA_ARQUIVAR':
         case 'PLANO_CAMPANHA_DESATIVAR':
         case 'PLANO_CAMPANHA_REABRIR':
+        case 'PLANO_CAMPANHA_RENOMEAR':
         case 'PLANO_CAMPANHA_PRORROGAR': {
           const { campanha_id } = payload;
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
@@ -1653,25 +1656,16 @@ Deno.serve(async (req: Request) => {
           if (!planoCampanha || String(planoCampanha.status || '').toUpperCase() !== 'ATIVO') {
             return new Response(JSON.stringify({ error: 'O plano precisa estar ativo para alterar o status da campanha.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           }
+          if (acao === 'PLANO_CAMPANHA_RENOMEAR') {
+            const titulo = validarNomeCampanha(payload.titulo);
+            const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, { titulo });
+            await registrarAuditoriaFerias(base44, user, 'CAMPANHA_FERIAS_RENOMEADA', {
+              plano_id: planoCampanha.id, campanha_id,
+            }, { titulo_anterior: campanha.titulo || '', titulo_novo: titulo, respostas_preservadas: true });
+            return new Response(JSON.stringify({ ok: true, campanha: updated, message: 'Nome da campanha atualizado.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
           if (acao === 'PLANO_CAMPANHA_PRORROGAR') {
-            const novaDataFim = String(payload.nova_data_fim_militar || '').slice(0, 10);
-            const novaHoraFim = String(payload.nova_hora_fim_militar || '').slice(0, 5);
-            const justificativa = String(payload.justificativa || '').trim();
-            const formatoData = /^\d{4}-\d{2}-\d{2}$/;
-            const formatoHora = /^\d{2}:\d{2}$/;
-            const agoraCampoGrande = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString().slice(0, 16);
-            if (String(campanha.status || '').toLowerCase() !== 'encerrada') {
-              return new Response(JSON.stringify({ error: 'Somente campanhas encerradas por prazo podem ser prorrogadas.' }), { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-            if (!formatoData.test(novaDataFim) || !formatoHora.test(novaHoraFim)) {
-              return new Response(JSON.stringify({ error: 'Informe a nova data e hora limite da campanha.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-            if (`${novaDataFim}T${novaHoraFim}` <= agoraCampoGrande) {
-              return new Response(JSON.stringify({ error: 'O novo prazo precisa estar no futuro (horário de Campo Grande).' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
-            if (justificativa.length < 5) {
-              return new Response(JSON.stringify({ error: 'Informe uma justificativa para a prorrogação.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
-            }
+            const { novaDataFim, novaHoraFim, justificativa } = validarProrrogacaoCampanha(campanha, payload);
             const prazoAnterior = String(campanha.data_fim_militar || '').slice(0, 10);
             const horaAnterior = String(campanha.hora_fim_militar || '').slice(0, 5);
             const campanhaProrrogada = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, {
