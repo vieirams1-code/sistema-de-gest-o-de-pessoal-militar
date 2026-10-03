@@ -52,7 +52,8 @@ Deno.serve(async (req) => {
       if (!p || p.origem !== 'homologacao_dev' || p.operacao_token) throw new Error('fixture_trava_invalida');
       const resultadoId = await E.Promocao.updateMany({id:p.id},{$set:{operacao_token:''}});
       const resultadoMongo = await E.Promocao.updateMany({_id:p.id},{$set:{operacao_token:''}});
-      return Response.json({success:true,ambiente,resultado:{id:resultadoId,_id:resultadoMongo},...await resumo()});
+      const resultadoOr = await E.Promocao.updateMany({id:p.id,$or:[{operacao_token:''},{operacao_token:null},{operacao_token:{$exists:false}}]},{$set:{operacao_token:''}});
+      return Response.json({success:true,ambiente,resultado:{id:resultadoId,_id:resultadoMongo,or:resultadoOr},...await resumo()});
     }
     if (!payload.acao || payload.acao === 'verificar') return Response.json({success:true,...await resumo()});
     const futuro = payload.acao === 'vigencia_futura';
