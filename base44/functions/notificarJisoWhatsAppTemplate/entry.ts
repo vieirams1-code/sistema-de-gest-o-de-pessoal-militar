@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { evolutionWhatsAppProvider } from '../../shared/portal/otp/providers/evolutionWhatsAppProvider.ts';
 
-const FUNCTION_VERSION = 'jiso-template-v3-2026-08-29';
+const FUNCTION_VERSION = 'jiso-template-v4-2026-10-03';
 const MODULO_TEMPLATE = 'WhatsApp Notificações';
 const TIPO_TEMPLATE = 'Notificação de JISO WA';
 
@@ -109,6 +109,7 @@ async function resolverAutorizacaoJiso(base44: any, payload: any, militarId: str
 async function loadContext(base44: any, payload: any) {
   const jisoId = normalizeText(payload?.jiso_id);
   const atestadoId = normalizeText(payload?.atestado_id);
+  if (!jisoId) throw Object.assign(new Error('As notificações devem ser enviadas pelo processo JISO independente.'), { status: 410 });
 
   if (jisoId) {
     const jisos = await base44.asServiceRole.entities.JISO.filter({ id: jisoId }, undefined, 1, 0);
@@ -119,7 +120,8 @@ async function loadContext(base44: any, payload: any) {
     const atestados = ids.length
       ? await base44.asServiceRole.entities.Atestado.filter({ id: { $in: ids } }, 'data_inicio', 500, 0)
       : [];
-    const principal = atestados[0] || {
+    const principalLink = links.find((link: any) => link.tipo_vinculo === 'Principal') || links[0];
+    const principal = atestados.find((item: any) => item.id === principalLink?.atestado_id) || {
       militar_id: jiso.militar_id,
       militar_nome: jiso.militar_nome,
       militar_posto: jiso.militar_posto,
@@ -133,8 +135,8 @@ async function loadContext(base44: any, payload: any) {
       atestado: principal,
       atestados,
       militarId: normalizeText(jiso.militar_id),
-      dataJiso: normalizeText(payload?.data_jiso || jiso.data_jiso),
-      horaJiso: normalizeText(payload?.hora_jiso || jiso.hora_jiso),
+      dataJiso: normalizeText(jiso.data_jiso),
+      horaJiso: normalizeText(jiso.hora_jiso),
     };
   }
 
@@ -149,7 +151,7 @@ async function loadContext(base44: any, payload: any) {
     atestadoId,
     atestado,
     atestados: [atestado],
-    militarId: normalizeText(payload?.militar_id || atestado.militar_id),
+    militarId: normalizeText(atestado.militar_id),
     dataJiso: normalizeText(payload?.data_jiso || atestado.data_jiso_agendada),
     horaJiso: normalizeText(payload?.hora_jiso || atestado.hora_jiso_agendada),
   };
@@ -172,7 +174,9 @@ Deno.serve(async (req) => {
     }
 
     const authz = await resolverAutorizacaoJiso(base44, payload, context.militarId);
+    if (context.jiso?.status !== 'Agendada') return jsonResponse({ success: false, error: 'Notificações de agendamento exigem uma JISO no estado Agendada.' }, 409);
     const effectiveEmail = normalizeText(authz?.effectiveUserEmail || authUser.email);
+    const localJiso = normalizeText(context.jiso?.local_jiso);
     const militares = await base44.asServiceRole.entities.Militar.filter({ id: context.militarId }, undefined, 1, 0);
     const militar = militares?.[0];
     if (!militar) return jsonResponse({ success: false, error: 'Militar não encontrado' }, 404);
@@ -196,6 +200,10 @@ Deno.serve(async (req) => {
       matricula: normalizeText(militar?.matricula_atual || militar?.matricula || context.atestado?.militar_matricula),
       data_jiso: formatDateBR(context.dataJiso),
       hora_jiso: context.horaJiso,
+      local_jiso: localJiso,
+      secao_jiso: normalizeText(context.jiso?.secao_jiso),
+      codigo_jiso: normalizeText(context.jiso?.codigo),
+      total_atestados: String(context.atestados.length),
       dias_atestado: context.atestados.length > 1 ? `${totalDias} dias em ${context.atestados.length} atestados` : normalizeText(context.atestado?.dias),
       tipo_afastamento: tipos.join(', '),
       data_inicio: formatDateBR(datasInicio[0] || ''),
@@ -223,6 +231,7 @@ Deno.serve(async (req) => {
         template_hash: templateHash,
         data_jiso_snapshot: context.dataJiso,
         hora_jiso_snapshot: context.horaJiso,
+        local_jiso_snapshot: localJiso,
         total_atestados: context.atestados.length,
       });
     }
@@ -237,29 +246,32 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, error: 'A data ou o horário da JISO mudou após a prévia. Gere uma nova prévia antes de enviar.' }, 409);
     }
 
+    if (normalizeText(payload?.local_jiso_snapshot) !== localJiso) return jsonResponse({ success: false, error: 'O local mudou após a prévia. Gere uma nova prévia.' }, 409);
+    const previousNotifications = await base44.asServiceRole.entities.JISONotificacao.filter({ jiso_id: context.jisoId }, '-created_date', 500, 0);
+    const sameSchedule = (item: any) => item.data_jiso_snapshot === context.dataJiso && item.hora_jiso_snapshot === context.horaJiso && normalizeText(item.local_jiso_snapshot) === localJiso;
+    if (previousNotifications.some((item: any) => sameSchedule(item) && ['Enviada','Em envio','Verificar envio'].includes(item.status)) ||
+        (context.jiso?.whatsapp_status === 'enviado' && context.jiso.whatsapp_data_agendada_snapshot === context.dataJiso && context.jiso.whatsapp_hora_agendada_snapshot === context.horaJiso && normalizeText(context.jiso.whatsapp_local_agendado_snapshot) === localJiso)) {
+      return jsonResponse({ success: false, error: 'Já existe envio confirmado ou em verificação para este agendamento. Confira o histórico antes de tentar novamente.' }, 409);
+    }
     const rawTelefone = militar.whatsapp || militar.telefone_celular || militar.telefone || militar.celular;
     if (!rawTelefone) return jsonResponse({ success: false, error: 'Militar não possui telefone cadastrado' }, 400);
 
-    const dispatchRes = await evolutionWhatsAppProvider.sendTextMessage({ to: rawTelefone, text: mensagemFinal }, base44.asServiceRole);
+    // Persist an intent before dispatch. An uncertain delivery must not be automatically retried.
+    const intent = await base44.asServiceRole.entities.JISONotificacao.create({
+      jiso_id: context.jisoId, militar_id: context.militarId,
+      tipo: context.jiso?.whatsapp_enviado_em ? 'Reagendamento' : 'Agendamento', canal: 'WhatsApp', status: 'Em envio',
+      destinatario: String(rawTelefone), mensagem: mensagemFinal,
+      data_jiso_snapshot: context.dataJiso, hora_jiso_snapshot: context.horaJiso, local_jiso_snapshot: localJiso,
+      template_id: template.id, template_hash: templateHash, enviado_por: effectiveEmail,
+    });
+    let dispatchRes;
+    try { dispatchRes = await evolutionWhatsAppProvider.sendTextMessage({ to: rawTelefone, text: mensagemFinal }, base44.asServiceRole); }
+    catch (dispatchError: any) {
+      await base44.asServiceRole.entities.JISONotificacao.update(intent.id, { status: 'Verificar envio', erro: dispatchError?.message || 'Entrega não confirmada.' });
+      return jsonResponse({ success: false, error: 'Não foi possível confirmar a entrega. Confira o envio antes de reenviar.' }, 502);
+    }
     if (!dispatchRes.success) {
-      if (context.mode === 'jiso') {
-        await base44.asServiceRole.entities.JISONotificacao.create({
-          jiso_id: context.jisoId,
-          militar_id: context.militarId,
-          tipo: context.jiso?.whatsapp_enviado_em ? 'Reagendamento' : 'Agendamento',
-          canal: 'WhatsApp',
-          status: 'Falhou',
-          destinatario: String(rawTelefone),
-          mensagem: mensagemFinal,
-          data_jiso_snapshot: context.dataJiso,
-          hora_jiso_snapshot: context.horaJiso,
-          template_id: template.id,
-          template_nome: template.nome || template.tipo_registro,
-          template_hash: templateHash,
-          enviado_por: effectiveEmail,
-          erro: dispatchRes.error || 'Falha no provedor',
-        });
-      }
+      await base44.asServiceRole.entities.JISONotificacao.update(intent.id, { status: 'Falhou', erro: dispatchRes.error || 'Falha no provedor' });
       return jsonResponse({ success: false, error: dispatchRes.error || 'Falha ao enviar WhatsApp', telefone: rawTelefone }, 502);
     }
 
@@ -274,10 +286,12 @@ Deno.serve(async (req) => {
           whatsapp_mensagem: mensagemFinal,
           whatsapp_data_agendada_snapshot: context.dataJiso,
           whatsapp_hora_agendada_snapshot: context.horaJiso,
+          whatsapp_local_agendado_snapshot: localJiso,
+          versao: Number(context.jiso.versao || 0) + 1,
           template_id: template.id,
           template_hash: templateHash,
         });
-        await base44.asServiceRole.entities.JISONotificacao.create({
+        await base44.asServiceRole.entities.JISONotificacao.update(intent.id, {
           jiso_id: context.jisoId,
           militar_id: context.militarId,
           tipo,
@@ -287,6 +301,7 @@ Deno.serve(async (req) => {
           mensagem: mensagemFinal,
           data_jiso_snapshot: context.dataJiso,
           hora_jiso_snapshot: context.horaJiso,
+        local_jiso_snapshot: localJiso,
           template_id: template.id,
           template_nome: template.nome || template.tipo_registro,
           template_hash: templateHash,
@@ -313,6 +328,7 @@ Deno.serve(async (req) => {
         enviado_por: effectiveEmail,
         data_jiso_snapshot: context.dataJiso,
         hora_jiso_snapshot: context.horaJiso,
+        local_jiso_snapshot: localJiso,
         template_id: template.id,
         template_nome: template.nome || template.tipo_registro,
         template_hash: templateHash,
