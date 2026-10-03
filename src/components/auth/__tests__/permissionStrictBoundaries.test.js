@@ -126,8 +126,9 @@ test('Atestados possui uma única permissão canônica de exclusão', () => {
 });
 
 test('JISO separa gestão administrativa de registro da decisão', () => {
-  assert.match(agendarJiso, /const canViewJisoAgenda = canAccessAction\('gerir_jiso'\) \|\| canAccessAction\('registrar_decisao_jiso'\);/);
-  assert.match(editarJiso, /const canRegistrarDecisaoJiso = canAccessAction\('registrar_decisao_jiso'\);/);
+  assert.match(agendarJiso, /const canManage = canAccessAction\('gerir_jiso'\);/);
+  assert.match(agendarJiso, /const canView = \['visualizar_atestados', 'gerir_jiso', 'registrar_decisao_jiso', 'publicar_ata_jiso'\]\.some\(canAccessAction\);/);
+  assert.match(editarJiso, /const canDecide = canAccessAction\('registrar_decisao_jiso'\) && canSensitive;/);
   assert.doesNotMatch(editarJiso, /canAccessAction\('gerir_jiso'\) \|\| canAccessAction\('registrar_decisao_jiso'\)/);
   assert.match(centralAtestado, /&& canAccessAction\('gerir_jiso'\)/);
   assert.match(quadroCard, /permiteEditarDataJiso = !!vinculoAtestado\?\.referencia_id && canAccessAction\('gerir_jiso'\)/);
