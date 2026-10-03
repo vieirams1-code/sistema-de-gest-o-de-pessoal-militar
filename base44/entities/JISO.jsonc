@@ -195,6 +195,9 @@
       },
       "description": "Tags administrativas do processo JISO.",
       "default": []
+    },
+    "whatsapp_local_agendado_snapshot": {
+      "type": "string"
     }
   },
   "required": [
