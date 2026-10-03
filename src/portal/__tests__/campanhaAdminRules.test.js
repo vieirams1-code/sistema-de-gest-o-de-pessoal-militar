@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
 
 const original = readFileSync(new URL('../../../base44/functions/portal_servicos/entry.ts', import.meta.url), 'utf8');
-const codigo = transformSync(original.replace(/^import .*;\n/gm, ''), { loader: 'ts', format: 'cjs' }).code;
+const codigo = transformSync(original.replace(/^import[\s\S]*?;\n/gm, ''), { loader: 'ts', format: 'cjs' }).code;
 function endpoint(role = 'admin', actions = {}) {
   let handler;
   let campanha = { id: 'camp', tipo: 'PLANO_FERIAS', titulo: 'Antigo', status: 'Encerrada', plano_ferias_institucional_id: 'plano', data_fim_militar: '2026-10-01', hora_fim_militar: '23:59' };
