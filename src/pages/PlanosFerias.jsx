@@ -5,7 +5,6 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { CalendarDays, ChevronLeft, Edit3, FolderArchive, Plus, RefreshCw, Users, X, Eye, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import CampanhaAdminActions from '@/components/ferias/CampanhaAdminActions';
 
 const mensagemErro = (erro, fallback) =>
   erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
@@ -86,6 +85,7 @@ export default function PlanosFerias() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [campanhaForm, setCampanhaForm] = useState(null);
   const [modalRespostas, setModalRespostas] = useState(null);
+  const [modalProrrogacao, setModalProrrogacao] = useState(null);
   const [respostasCampanha, setRespostasCampanha] = useState(null);
   const [carregandoRespostas, setCarregandoRespostas] = useState(false);
   const [auditoria, setAuditoria] = useState([]);
@@ -414,6 +414,40 @@ export default function PlanosFerias() {
     }
   };
 
+  const abrirProrrogacao = (campanha) => {
+    if (!modoAdmin || !podeAdminFerias) return;
+    setModalProrrogacao({
+      campanha,
+      nova_data_fim_militar: campanha.data_fim_militar || new Date().toISOString().slice(0, 10),
+      nova_hora_fim_militar: campanha.hora_fim_militar || '23:59',
+      justificativa: '',
+    });
+    setFeedback({ tipo: '', texto: '' });
+  };
+
+  const confirmarProrrogacao = async (evento) => {
+    evento.preventDefault();
+    if (!modalProrrogacao?.campanha || !modoAdmin || !podeAdminFerias) return;
+    setSalvando(true);
+    try {
+      const resposta = await invocarAcaoStatusCampanha({
+        acao: 'PLANO_CAMPANHA_PRORROGAR',
+        plano_id: selecionado?.id,
+        campanha_id: modalProrrogacao.campanha.id,
+        nova_data_fim_militar: modalProrrogacao.nova_data_fim_militar,
+        nova_hora_fim_militar: modalProrrogacao.nova_hora_fim_militar,
+        justificativa: modalProrrogacao.justificativa,
+      });
+      setModalProrrogacao(null);
+      setFeedback({ tipo: 'sucesso', texto: resposta.data?.message || 'Campanha prorrogada com sucesso.' });
+      await carregar();
+    } catch (erro) {
+      setFeedback({ tipo: 'erro', texto: mensagemErro(erro, 'Não foi possível prorrogar a campanha.') });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const abrirRespostas = async (campanha) => {
     if (!podeVisualizarRespostas) return;
     setModalRespostas(campanha);
@@ -501,6 +535,17 @@ export default function PlanosFerias() {
           </form>
         </div>
       )}
+      {modalProrrogacao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={confirmarProrrogacao} className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Prorrogar campanha</h2><p className="text-xs text-slate-500">{modalProrrogacao.campanha.titulo}</p></div><button type="button" onClick={() => setModalProrrogacao(null)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Prazo anterior: <strong>{modalProrrogacao.campanha.data_fim_militar || 'não registrado'}{modalProrrogacao.campanha.hora_fim_militar ? ` às ${modalProrrogacao.campanha.hora_fim_militar}` : ' (hora não registrada)'}</strong>. As respostas existentes serão preservadas e a prorrogação ficará registrada no histórico.</div>
+            <div className="grid grid-cols-2 gap-3"><div><label className="text-xs font-bold text-slate-700">Nova data limite *</label><Input required type="date" value={modalProrrogacao.nova_data_fim_militar} onChange={(e) => setModalProrrogacao({ ...modalProrrogacao, nova_data_fim_militar: e.target.value })} /></div><div><label className="text-xs font-bold text-slate-700">Nova hora limite *</label><Input required type="time" value={modalProrrogacao.nova_hora_fim_militar} onChange={(e) => setModalProrrogacao({ ...modalProrrogacao, nova_hora_fim_militar: e.target.value })} /></div></div>
+            <div><label className="text-xs font-bold text-slate-700">Justificativa *</label><textarea required minLength={5} value={modalProrrogacao.justificativa} onChange={(e) => setModalProrrogacao({ ...modalProrrogacao, justificativa: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-sm" rows={3} placeholder="Ex.: necessidade de conceder prazo complementar aos pendentes." /></div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><Button type="button" variant="outline" onClick={() => setModalProrrogacao(null)}>Cancelar</Button><Button type="submit" disabled={salvando} className="bg-emerald-700 hover:bg-emerald-800">{salvando ? 'Prorrogando...' : 'Confirmar prorrogação'}</Button></div>
+          </form>
+        </div>
+      )}
       {modalRespostas && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><h2 className="text-lg font-black text-slate-900">Respostas da campanha</h2><p className="text-xs text-slate-500">{modalRespostas.titulo}</p></div><button type="button" onClick={() => setModalRespostas(null)} className="text-slate-400 hover:text-slate-700" aria-label="Fechar"><X className="w-5 h-5" /></button></div>{carregandoRespostas ? <div className="p-10 text-center text-sm text-slate-500">Carregando respostas...</div> : <><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">{[['Público', respostasCampanha?.total_alvo ?? 0], ['Respondidos', respostasCampanha?.total_respondidos ?? 0], ['Pendentes', respostasCampanha?.total_pendentes ?? 0], ['Adesão', `${respostasCampanha?.percentual ?? 0}%`]].map(([rotulo, valor]) => <div key={rotulo} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs text-slate-500">{rotulo}</p><p className="text-xl font-black text-slate-900">{valor}</p></div>)}</div><div className="divide-y divide-slate-100 rounded-xl border border-slate-200">{(respostasCampanha?.militares || []).length === 0 ? <div className="p-8 text-center text-sm text-slate-500">Nenhuma resposta encontrada.</div> : (respostasCampanha.militares || []).map((militar) => <div key={militar.militar_id || militar.id || militar.militar_matricula} className="flex items-center justify-between gap-3 p-3"><div><p className="font-bold text-sm text-slate-800">{militar.militar_nome || 'Militar sem nome'}</p><p className="text-xs text-slate-500">{militar.militar_matricula || '-'} · {militar.militar_lotacao || '-'}</p></div><span className={`rounded-lg px-2 py-1 text-xs font-bold ${militar.status_resposta === 'Respondido' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{militar.status_resposta || 'Pendente'}</span></div>)}</div></>}</div></div>
       )}
@@ -557,11 +602,7 @@ export default function PlanosFerias() {
                     <div className="flex gap-2 flex-wrap">
                       {(podeEditarCampanhas || podeAdminFerias) && <Button type="button" onClick={() => navigate('/ConfigurarCampanhaFerias?planoId=' + selecionado.id + '&campanhaId=' + campanha.id)} className="bg-blue-700 hover:bg-blue-800">Abrir campanha</Button>}
                       {podeVisualizarRespostas && <Button type="button" variant="outline" onClick={() => abrirRespostas(campanha)}><Eye className="w-4 h-4 mr-1.5" />Ver respostas</Button>}
-                      <CampanhaAdminActions campanha={campanha} enabled={modoAdmin && podeAdminFerias && selecionado.status !== 'ARQUIVADO'} disabled={salvando} onUpdated={async () => {
-                        await carregar();
-                        const res = await base44.functions.invoke('portal_servicos', { acao: 'PLANO_AUDITORIA_LISTAR', plano_id: selecionado.id });
-                        setAuditoria(res.data?.auditoria || []);
-                      }} />
+                      {modoAdmin && podeAdminFerias && campanha.status === 'Encerrada' && <Button type="button" variant="outline" onClick={() => abrirProrrogacao(campanha)} disabled={salvando} className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"><RefreshCw className="w-4 h-4 mr-1.5" />Prorrogar prazo</Button>}
                       {modoAdmin && podeAdminFerias && campanha.status !== 'Arquivada' && <Button type="button" variant="outline" onClick={() => alterarStatusCampanha(campanha, 'PLANO_CAMPANHA_ARQUIVAR', 'arquivada')} disabled={salvando} className="border-amber-200 text-amber-700 hover:bg-amber-50"><FolderArchive className="w-4 h-4 mr-1.5" />Arquivar</Button>}
                       {modoAdmin && podeAdminFerias && campanha.status === 'Arquivada' && <Button type="button" variant="outline" onClick={() => alterarStatusCampanha(campanha, 'PLANO_CAMPANHA_REABRIR', 'aberta para coleta')} disabled={salvando} className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"><RefreshCw className="w-4 h-4 mr-1.5" />Reabrir</Button>}
                       {modoAdmin && podeAdminFerias && podeExcluirCampanhas && campanha.status === 'Arquivada' && <Button type="button" variant="outline" onClick={() => excluirCampanha(campanha)} disabled={salvando} className="border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4 mr-1.5" />Excluir</Button>}
