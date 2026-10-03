@@ -72,3 +72,15 @@ Resultados observados:
 IDs dev: militar 6ac0ffb2f676ca265e9b8007; promoção 6ac1017d2084a0f0eedc2c80; item 6ac1017d3dff8d9b85c0f71a; histórico 6ac1038f999281707753cf87; promoção futura 6ac1017d9d2a1f81eb8c83a6. Permanecem identificados como fictícios, com militar inativo e evento concluído cancelado, conservando auditoria.
 
 Após o ciclo, 29/29 testes de confiabilidade aprovados novamente. Concorrência e falhas induzidas permanecem validadas por simulação, não por stress no banco remoto. O ciclo realizado não equivale à homologação de todas as telas nem resolve o encaminhamento de ambiente do executor Base44. Não há garantia absoluta contra indisponibilidade da plataforma, e interrupções com compensação incompleta continuam exigindo reconciliação das travas.
+
+## Revisão de backend e interface — 03/10/2026
+
+A exclusão legada tentava restaurar o cadastro por fora da reversão protegida. Esse caminho foi removido: exclusão exige item cancelado/retificado, restauração cadastral confirmada e históricos compatíveis. Usa trava compartilhada do pai e journal obrigatório com snapshots antes de excluir. Falha após a primeira exclusão mantém a trava e identifica reconciliação pendente. A reversão passa a limpar o indicador de aplicação cadastral; sua compensação preserva o indicador anterior. Registros legados inconclusivos são bloqueados para revisão.
+
+Na interface, atualização de consultas preserva documentos e ordem editados localmente. O salvamento usa a versão-base original para detectar conflito. Ações concorrentes ficam bloqueadas. Publicação valida data real e vigência e exige sucesso explícito do backend; erros parciais preservam quantidades e sinais de reconciliação. Sincronização diferencia falhas de resultados vazios e expõe falhas por militar. A listagem contabiliza vínculos de rascunhos e informa falhas de exclusão.
+
+Validação: 41/41 testes direcionados de confiabilidade e interface; conjunto de utilitários de Promoções mais esses testes, 70/70. ESLint dos quatro arquivos frontend alterados, git diff --check e compilação final npm run build aprovados. O build informa apenas Browserslist desatualizado.
+
+Verificação no navegador com dados de teste: listagem apresenta um militar em cada rascunho fictício; promoção de 2099 mantém publicação desabilitada com justificativa de vigência; ato e ordem editados sem salvar permanecem após Atualizar. Essa preservação não inclui recarregamento completo do navegador ou troca de rota. Nenhuma publicação, reversão, sincronização efetiva ou exclusão foi executada na interface nesta revisão; nenhum cadastro de pessoa real foi alterado. Exclusão e suas falhas foram testadas com SDK simulado, sem exclusão permanente de fixtures remotas.
+
+A revisão não constitui homologação integral de todos os cenários de interface nem teste de stress da plataforma. Continua a limitação de encaminhamento de ambiente no executor Base44 descrita acima. O runner temporário permanece desativado.
