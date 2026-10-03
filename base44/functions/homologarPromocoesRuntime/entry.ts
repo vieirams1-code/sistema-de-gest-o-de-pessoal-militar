@@ -11,11 +11,12 @@ Deno.serve(async (req) => {
   const ambiente = 'dev';
   const headers = new Headers(req.headers);
   headers.set('X-Data-Env',ambiente);
-  const base44 = createClientFromRequest(new Request(req,{headers}));
+  const requestDev = new Request(req,{headers});
+  const base44 = createClientFromRequest(requestDev);
   try {
     const usuario = await base44.auth.me();
     if (usuario?.role !== 'admin') return Response.json({success:false,motivo:'administrador_obrigatorio'}, {status:403});
-    const raw = await req.json();
+    const raw = await requestDev.json();
     const payload = raw?.body || raw?.data || raw || {};
     const E = base44.asServiceRole.entities;
     const militares = await E.Militar.filter({matricula:MATRICULA},undefined,2);
