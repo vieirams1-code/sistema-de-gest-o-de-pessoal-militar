@@ -252,6 +252,14 @@ export default function Promocoes() {
             Atualizar
           </Button>
           {isAdmin && (
+            <Button asChild variant="outline" className="h-11 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50">
+              <Link to={createPageUrl('HistoricoAlteracoesPromocoes')}>
+                <History className="h-4 w-4 mr-2" />
+                Alterações automáticas
+              </Link>
+            </Button>
+          )}
+          {isAdmin && (
             <Button
               variant="outline"
               className="h-11 rounded-xl border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
