@@ -1334,7 +1334,7 @@ Deno.serve(async (req: Request) => {
 
         case 'CAMPANHA_RENOMEAR':
         case 'CAMPANHA_PRORROGAR': {
-          const campanha_id = textoId(payload.campanha_id);
+          const campanha_id = String(payload.campanha_id || '').trim();
           if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
           const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
           if (!campanha) return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
