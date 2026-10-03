@@ -63,7 +63,14 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
     bloqueios.push('Promoção já publicada/consolidada.');
   }
 
-  if (!dataSomente(promocao?.data_promocao)) bloqueios.push('Informe a data da promoção antes de publicar.');
+  const dataPromocao = dataSomente(promocao?.data_promocao);
+  if (!dataPromocao) bloqueios.push('Informe a data da promoção antes de publicar.');
+  else {
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Campo_Grande', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const dataValida = /^\d{4}-\d{2}-\d{2}$/.test(dataPromocao) && !Number.isNaN(Date.parse(dataPromocao)) && new Date(dataPromocao).toISOString().slice(0, 10) === dataPromocao;
+    if (!dataValida) bloqueios.push('Informe uma data de promoção válida.');
+    else if (dataPromocao > hoje) bloqueios.push('A promoção ainda não está vigente. Aguarde a data da promoção para publicar.');
+  }
   if (!texto(promocao?.posto_graduacao)) bloqueios.push('Informe o posto/graduação destino antes de publicar.');
   if (!texto(promocao?.quadro)) bloqueios.push('Informe o quadro destino antes de publicar.');
   if (!Array.isArray(itens) || itens.length === 0) bloqueios.push('Inclua ao menos um militar antes de publicar.');
