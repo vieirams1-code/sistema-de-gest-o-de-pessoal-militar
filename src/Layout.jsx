@@ -146,6 +146,7 @@ const menuGroups = [
         description: 'Progressão e reconhecimento funcional',
         items: [
           { name: 'Promoções', page: 'Promocoes', icon: ListOrdered, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
+          { name: 'Alterações automáticas', page: 'HistoricoAlteracoesPromocoes', icon: History, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
           {
             name: 'Antiguidade',
             page: 'AntiguidadePrevia',
