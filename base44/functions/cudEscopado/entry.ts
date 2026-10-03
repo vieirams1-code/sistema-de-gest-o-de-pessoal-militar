@@ -1128,7 +1128,7 @@ async function resolverMilitarIdPorCard(base44, cardId) {
 }
 
 function ehCardJisoAutomatico(card) {
-  return Boolean(card?.criado_automaticamente && String(card?.origem_tipo || '') === 'Atestado/JISO');
+  return Boolean(card?.criado_automaticamente && (String(card?.origem_tipo || '') === 'Atestado/JISO' || card?.tipo_automacao === 'JISO_INDEPENDENTE'));
 }
 
 function possuiAlgumaAction(actions, ...chaves) {
@@ -1582,7 +1582,7 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
-        if (possuiSyncJiso && data?.origem_tipo !== undefined && String(data.origem_tipo) !== 'Atestado/JISO') {
+        if (possuiSyncJiso && data?.origem_tipo !== undefined && String(data.origem_tipo) !== String(registroExistente?.origem_tipo || 'Atestado/JISO')) {
           return Response.json({ error: 'Acesso negado: automação JISO não pode alterar a origem do card.' }, { status: 403 });
         }
       } else if (entityName === 'HistoricoPromocaoMilitarV2') {
