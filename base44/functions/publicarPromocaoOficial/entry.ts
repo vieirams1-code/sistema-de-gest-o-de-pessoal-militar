@@ -177,6 +177,7 @@ async function parseBase44Payload(req: any) {
 }
 
 
+// Trava condicional validada com o SDK real na base isolada de homologação.
 async function adquirirTrava(entity: any, id: string, campo: string) {
   if (typeof entity.updateMany !== 'function') throw new Error('controle_concorrencia_indisponivel');
   const token = crypto.randomUUID();
