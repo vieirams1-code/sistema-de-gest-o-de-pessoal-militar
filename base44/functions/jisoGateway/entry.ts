@@ -51,7 +51,7 @@ async function getAuthz(base44: any, payload: Record<string, unknown>) {
   return authz;
 }
 
-function permissions(authz: any, authUser: any) {
+function permissions(authz: any) {
   const isAdmin = authz?.isAdmin === true;
   const actions = authz?.actions || {};
   return {
@@ -119,7 +119,7 @@ async function activeLinksForJiso(base44: any, jisoId: string) {
   return await base44.asServiceRole.entities.JISOAtestado.filter({ jiso_id: jisoId, status: 'Ativo' }, 'ordem');
 }
 
-async function assertJisoScope(base44: any, jiso: any, allowedMilitarIds: Set<string>, isAdmin: boolean) {
+async function assertJisoScope(_base44: any, jiso: any, allowedMilitarIds: Set<string>, isAdmin: boolean) {
   if (!jiso) throw Object.assign(new Error('JISO não encontrada.'), { status: 404, code: 'JISO_NOT_FOUND' });
   if (!isAdmin && !allowedMilitarIds.has(asId(jiso.militar_id))) {
     throw Object.assign(new Error('JISO fora do escopo permitido.'), { status: 403, code: 'JISO_OUT_OF_SCOPE' });
@@ -146,7 +146,7 @@ async function audit(base44: any, authUser: any, action: string, jisoId: string,
   }
 }
 
-async function buildDetail(base44: any, jiso: any, canSensitive: boolean) {
+async function buildDetail(base44: any, jiso: any, canSensitive: boolean, canPublish = false) {
   const links = await activeLinksForJiso(base44, jiso.id);
   const atestadoIds = unique(links.map((link: any) => asId(link.atestado_id)));
   let atestados: any[] = [];
@@ -178,7 +178,12 @@ async function buildDetail(base44: any, jiso: any, canSensitive: boolean) {
   const publications = await base44.asServiceRole.entities.PublicacaoExOfficio.filter({ jiso_id: jiso.id, tipo: 'Ata JISO' }, '-created_date', 500, 0);
   const active = publications.find(publicationActive);
   const safePublication = active ? { id: active.id, status: publicationStatus(active), numero_bg: active.numero_bg, data_bg: active.data_bg, nota_para_bg: active.nota_para_bg, data_publicacao: active.data_publicacao } : null;
-  return { ...projectJiso(jiso, canSensitive), vinculos: links, atestados, notificacoes: safeNotifications, publicacao: safePublication };
+  const militares = await base44.asServiceRole.entities.Militar.filter({ id: jiso.militar_id }, undefined, 1, 0);
+  const militar = militares?.[0] || {};
+  const contextFields = ['id','nome_completo','nome_guerra','posto_graduacao','quadro','matricula','matricula_atual','grupamento_id','subgrupamento_id','subgrupamento_tipo'];
+  const militar_contexto = Object.fromEntries(contextFields.filter(key => Object.hasOwn(militar, key)).map(key => [key, militar[key]]));
+  const templates_ata = canPublish ? await base44.asServiceRole.entities.TemplateTexto.filter({ tipo_registro: 'Ata JISO', ativo: true }, '-updated_date', 500, 0) : [];
+  return { ...projectJiso(jiso, canSensitive), vinculos: links, atestados, notificacoes: safeNotifications, publicacao: safePublication, militar_contexto, templates_ata };
 }
 
 async function validateSelectedAtestados(
@@ -331,7 +336,7 @@ Deno.serve(async (req) => {
     try { payload = await req.json(); } catch (_e) { payload = {}; }
     const action = asText(payload?.acao || payload?.action, 80).toUpperCase();
     const authz = await getAuthz(base44, { effectiveEmail: payload.effectiveEmail });
-    const perm = permissions(authz, authUser);
+    const perm = permissions(authz);
     if (!perm.canView) return error(403, 'FORBIDDEN', 'Acesso à gestão de JISO não autorizado.');
 
     const atestadosEscopo = await scopedAtestados(base44, payload, perm.isAdmin);
@@ -346,6 +351,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === 'ATESTADOS_DISPONIVEIS') {
+      if (!perm.canManage) return error(403, 'FORBIDDEN_MANAGE', 'Permissão gerir_jiso é obrigatória.');
+      const parents = await listAll(base44, 'JISO');
+      const openIds = new Set(parents.filter(item => OPEN_STATUSES.has(item.status)).map(item => item.id));
+      const activeLinks = await listAll(base44, 'JISOAtestado', { status: 'Ativo' });
+      const occupied = new Set(activeLinks.filter(link => openIds.has(link.jiso_id)).map(link => link.atestado_id));
+      const fields = ['id','militar_id','militar_nome','militar_posto','militar_matricula','data_inicio','data_termino','dias','tipo_afastamento'];
+      return Response.json({ success: true, atestados: atestadosEscopo.filter(item => !occupied.has(item.id)).map(item => Object.fromEntries(fields.map(key => [key, item[key]]))) });
+    }
     if (action === 'LISTAR') {
       const rows = await listAll(base44, 'JISO');
       if (!perm.isAdmin) {
@@ -369,7 +383,7 @@ Deno.serve(async (req) => {
     if (action === 'DETALHAR') {
       const jiso = await findOne(base44, 'JISO', { id: asId(payload.jiso_id) });
       await assertJisoScope(base44, jiso, allowedMilitarIds, perm.isAdmin);
-      return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive) });
+      return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive, perm.canPublish) });
     }
 
     if (action === 'CRIAR') {
@@ -404,7 +418,7 @@ Deno.serve(async (req) => {
       }
       await syncJisoBoard(base44, { ...jiso, ...updated, codigo }, ids.length);
       await audit(base44, auditUser, 'CRIAR', jiso.id, { atestado_ids: ids });
-      return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, codigo }, perm.canSensitive) });
+      return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, codigo }, perm.canSensitive, perm.canPublish) });
     }
 
     const isMigrationAction = action === 'MIGRACAO_DRY_RUN' || action === 'MIGRACAO_APLICAR';
@@ -418,14 +432,15 @@ Deno.serve(async (req) => {
       if (!perm.canManage) return error(403, 'FORBIDDEN_MANAGE', 'Permissão gerir_jiso é obrigatória.');
       const ids = unique((Array.isArray(payload.atestado_ids) ? payload.atestado_ids : []).map(asId));
       const atestados = await validateSelectedAtestados(base44, ids, allowedAtestadoIds, perm.isAdmin, asId(jiso.militar_id));
-      await createLinks(base44, jiso, atestados, authUser);
+      await createLinks(base44, jiso, atestados, auditUser);
       await syncJisoBoard(base44, jiso, (await activeLinksForJiso(base44, jisoId)).length);
       await audit(base44, auditUser, 'VINCULAR_ATESTADOS', jisoId, { atestado_ids: ids });
-      return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive) });
+      return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive, perm.canPublish) });
     }
 
     if (action === 'REMOVER_VINCULO') {
       if (!perm.canManage) return error(403, 'FORBIDDEN_MANAGE', 'Permissão gerir_jiso é obrigatória.');
+      if (!asText(payload.motivo, 500)) return error(400, 'MOTIVO_REQUIRED', 'Informe o motivo da retirada.');
       const atestadoId = asId(payload.atestado_id);
       const link = await findOne(base44, 'JISOAtestado', { jiso_id: jisoId, atestado_id: atestadoId, status: 'Ativo' });
       if (!link) return error(404, 'VINCULO_NOT_FOUND', 'Vínculo ativo não encontrado.');
@@ -434,7 +449,7 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.JISOAtestado.update(link.id, {
         status: 'Removido',
         removido_em: new Date().toISOString(),
-        removido_por: authUser.email || '',
+        removido_por: auditUser.email || '',
         motivo_remocao: asText(payload.motivo, 500),
       });
       if (link.tipo_vinculo === 'Principal') {
@@ -443,7 +458,7 @@ Deno.serve(async (req) => {
       }
       await syncJisoBoard(base44, jiso, Math.max(0, linksAtivos.length - 1));
       await audit(base44, auditUser, 'REMOVER_VINCULO', jisoId, { atestado_id: atestadoId });
-      return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive) });
+      return Response.json({ success: true, jiso: await buildDetail(base44, jiso, perm.canSensitive, perm.canPublish) });
     }
 
     if (action === 'ATUALIZAR') {
@@ -463,7 +478,7 @@ Deno.serve(async (req) => {
       const updated = await base44.asServiceRole.entities.JISO.update(jisoId, patch);
       await syncJisoBoard(base44, { ...jiso, ...updated, ...patch }, (await activeLinksForJiso(base44, jisoId)).length);
       await audit(base44, auditUser, 'ATUALIZAR', jisoId, { campos: Object.keys(patch) });
-      return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, ...patch }, perm.canSensitive) });
+      return Response.json({ success: true, jiso: await buildDetail(base44, { ...jiso, ...updated, ...patch }, perm.canSensitive, perm.canPublish) });
     }
 
     if (action === 'CANCELAR') {
@@ -474,7 +489,7 @@ Deno.serve(async (req) => {
       const updated = await base44.asServiceRole.entities.JISO.update(jisoId, patch);
       await syncJisoBoard(base44, { ...jiso, ...updated, ...patch }, (await activeLinksForJiso(base44, jisoId)).length);
       await audit(base44, auditUser, 'CANCELAR', jisoId, { motivo });
-      return Response.json({ success: true, jiso: projectJiso({ ...jiso, ...updated, ...patch }, perm.canSensitive) });
+      return Response.json({ success: true, jiso: projectJiso({ ...jiso, ...updated, ...patch }, perm.canSensitive, perm.canPublish) });
     }
 
     if (action === 'PUBLICAR_ATA') {
@@ -527,7 +542,7 @@ Deno.serve(async (req) => {
       catch (publicationError) { await base44.asServiceRole.entities.PublicacaoExOfficio.delete(publicacao.id); throw publicationError; }
       await syncJisoBoard(base44, { ...jiso, ...patch }, atestadoIds.length);
       await audit(base44, auditUser, 'PUBLICAR_ATA', jisoId, { publicacao_id: publicacao.id, atestado_ids: atestadoIds });
-      return Response.json({ success: true, publicacao: { id: publicacao.id, status: publicacao.status }, jiso: projectJiso({ ...jiso, ...patch }, perm.canSensitive) });
+      return Response.json({ success: true, publicacao: { id: publicacao.id, status: publicacao.status }, jiso: projectJiso({ ...jiso, ...patch }, perm.canSensitive, perm.canPublish) });
     }
 
     if (action === 'MIGRACAO_DRY_RUN' || action === 'MIGRACAO_APLICAR') {
