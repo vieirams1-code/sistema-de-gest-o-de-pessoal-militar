@@ -373,8 +373,8 @@ export default function Home() {
 
   const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamentoValidas.length + inconsistenciasCadastrais.length;
   const afastamentosParciais = React.useMemo(() => {
-    return buildAfastamentosVigentes({ atestados, registrosLivro }).length;
-  }, [atestados, registrosLivro]);
+    return buildAfastamentosVigentes({ atestados: jisoBundle?.atestados?.length ? jisoBundle.atestados : atestados, registrosLivro }).length;
+  }, [atestados, jisoBundle, registrosLivro]);
 
   const registrosRecentes = registrosLivro.slice(0, 5);
   const jisosAgendadas = React.useMemo(() => {
