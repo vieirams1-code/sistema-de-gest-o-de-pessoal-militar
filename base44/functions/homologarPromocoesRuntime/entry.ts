@@ -1,3 +1,6 @@
+import { executar as publicar } from './publicarPromocaoOficial.ts';
+import { executar as editar } from './sincronizarHistoricoPromocaoPublicadaTx.ts';
+import { executar as reverter } from './reverterPublicacaoPromocaoMilitarTx.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 
 // Ferramenta de homologação: apenas base dev, administrador e fixture explicitamente fictícia.
@@ -75,7 +78,8 @@ Deno.serve(async (req) => {
       dados = {promocao:{id:p.id},item:{id:itens[0].id},motivo:'Homologação isolada da reversão cadastral'};
     } else throw new Error('acao_invalida');
     let resultado;
-    try { const r = await base44.functions.invoke(nomeFuncao,dados);resultado = r?.data ?? r; }
+    try { const executar = nomeFuncao === 'publicarPromocaoOficial' ? publicar : nomeFuncao === 'sincronizarHistoricoPromocaoPublicadaTx' ? editar : reverter;
+      const r = await executar(new Request(requestDev.url,{method:'POST',headers,body:JSON.stringify(dados)})); resultado = await r.json(); }
     catch (e:any) { resultado = e?.response?.data || {success:false,motivo:e?.message}; }
     return Response.json({success:true,acao:payload.acao,resultado,...await resumo()});
   } catch(e:any) {

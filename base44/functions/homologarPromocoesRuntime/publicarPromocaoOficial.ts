@@ -192,7 +192,7 @@ async function liberarTrava(entity: any, id: string, campo: string, token: strin
   await entity.updateMany({id,[campo]:token},{$set:{[campo]:''}});
 }
 
-Deno.serve(async (req) => {
+export async function executar(req: Request) {
   const base44 = createClientFromRequest(req);
 
   let lockId = '';
@@ -475,4 +475,4 @@ Deno.serve(async (req) => {
     }
     if (lockId) EXECUCOES_EM_ANDAMENTO.delete(lockId);
   }
-});
+}
