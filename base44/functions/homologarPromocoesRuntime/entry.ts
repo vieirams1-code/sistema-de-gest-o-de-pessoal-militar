@@ -6,9 +6,12 @@ const MATRICULA = 'HOMO-PROM-20261003';
 const NOME = '[HOMOLOGAÇÃO PROMOÇÕES 2026-10-03] MILITAR FICTÍCIO';
 const CHAVE = 'HOMO-PROM-20261003-CICLO';
 Deno.serve(async (req) => {
-  const ambiente = req.headers.get('X-Data-Env');
-  if (ambiente !== 'dev') return Response.json({success:false,motivo:'homologacao_exige_header_dev',ambiente:ambiente || 'ausente'}, {status:409});
-  const base44 = createClientFromRequest(req);
+  // O executor do painel não encaminha a seleção Teste como header.
+  // Fixar dev no servidor, inclusive para as invocações encadeadas; não há fallback para prod.
+  const ambiente = 'dev';
+  const headers = new Headers(req.headers);
+  headers.set('X-Data-Env',ambiente);
+  const base44 = createClientFromRequest(new Request(req,{headers}));
   try {
     const usuario = await base44.auth.me();
     if (usuario?.role !== 'admin') return Response.json({success:false,motivo:'administrador_obrigatorio'}, {status:403});
