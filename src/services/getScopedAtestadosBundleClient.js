@@ -2,7 +2,7 @@ import { base44 } from '@/api/base44Client';
 import { getEffectiveEmail as readEffectiveEmailFromStorage } from '@/utils/impersonation';
 
 export async function fetchScopedAtestadosBundle(payload = {}) {
-  const { functionName = 'getScopedAtestadosBundle', ...requestPayload } = payload;
+  const { functionName = 'getScopedAtestadosBundleV2', ...requestPayload } = payload;
   const effectiveEmail = requestPayload.effectiveEmail !== undefined ? requestPayload.effectiveEmail : readEffectiveEmailFromStorage();
   const finalPayload = { ...requestPayload };
   if (effectiveEmail) finalPayload.effectiveEmail = effectiveEmail;
