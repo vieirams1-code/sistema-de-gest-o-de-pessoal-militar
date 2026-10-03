@@ -38,7 +38,9 @@
         "Preparada",
         "Enviada",
         "Falhou",
-        "Legado"
+        "Legado",
+        "Em envio",
+        "Verificar envio"
       ],
       "default": "Preparada"
     },
@@ -75,6 +77,9 @@
       "type": "object"
     },
     "erro": {
+      "type": "string"
+    },
+    "local_jiso_snapshot": {
       "type": "string"
     }
   },
