@@ -68,7 +68,7 @@ const CAMPOS_ATESTADO_OPERACIONAL = [
   'numero_bg', 'data_bg', 'apostilada_por_id', 'tornada_sem_efeito_por_id',
   'medico_nome_snapshot', 'medico_crm_snapshot', 'medico', 'crm_medico',
   'jiso_vinculo_ativo', 'jiso_id_derivado', 'jiso_codigo', 'jiso_status', 'jiso_data', 'jiso_hora',
-  'created_date', 'updated_date',
+  'jiso_efeito', 'created_date', 'updated_date',
 ];
 const CAMPOS_ATESTADO_SENSIVEIS = [
   'cid_10', 'cid', 'diagnostico', 'diagnostico_descricao', 'observacoes', 'observacao', 'parecer_jiso',
@@ -78,7 +78,7 @@ const CAMPOS_ATESTADO_SENSIVEIS = [
 const CAMPOS_JISO_OPERACIONAL = [
   'id', 'codigo', 'atestado_id', 'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula',
   'data_jiso', 'hora_jiso', 'local_jiso', 'status', 'finalidade_jiso', 'secao_jiso',
-  'whatsapp_status', 'publicacao_id', 'created_date', 'updated_date',
+  'whatsapp_status', 'publicacao_id', 'status_publicacao', 'tags', 'data_inicio_efeito', 'data_termino_efeito', 'data_retorno_efeito', 'dias_jiso', 'efeito_suspenso', 'atestado_ids', 'created_date', 'updated_date',
 ];
 const CAMPOS_JISO_SENSIVEIS = ['resultado_jiso', 'dias_jiso', 'parecer', 'parecer_jiso', 'observacoes', 'cid_10', 'diagnostico'];
 
@@ -109,10 +109,12 @@ async function enriquecerAtestadosComJiso(base44, atestados, jisos) {
 
   const jisoPorId = new Map((jisos || []).map((item) => [item.id, item]));
   const vinculoPorAtestado = new Map();
+  const efeitoPorAtestado = new Map();
   for (const link of links || []) {
     const parent = jisoPorId.get(link.jiso_id);
     if (!parent || parent.status === 'Cancelada') continue;
     if (!vinculoPorAtestado.has(link.atestado_id)) vinculoPorAtestado.set(link.atestado_id, { link, parent });
+    if (!efeitoPorAtestado.has(link.atestado_id) && !parent.efeito_suspenso && ['Resultado Registrado', 'Concluída'].includes(parent.status)) efeitoPorAtestado.set(link.atestado_id, parent);
   }
 
   return (atestados || []).map((atestado) => {
@@ -120,7 +122,11 @@ async function enriquecerAtestadosComJiso(base44, atestados, jisos) {
     if (!vinculo) return { ...atestado, jiso_vinculo_ativo: false };
     return {
       ...atestado,
-      jiso_vinculo_ativo: true,
+      jiso_vinculo_ativo: !['Concluída', 'Cancelada'].includes(vinculo.parent.status),
+      jiso_efeito: efeitoPorAtestado.has(atestado.id) ? (() => {
+        const parent = efeitoPorAtestado.get(atestado.id);
+        return { id: parent.id, data_inicio: parent.data_inicio_efeito, data_termino: parent.data_termino_efeito, data_retorno: parent.data_retorno_efeito, dias: parent.dias_jiso };
+      })() : null,
       jiso_id_derivado: vinculo.parent.id,
       jiso_codigo: vinculo.parent.codigo || '',
       jiso_status: vinculo.parent.status || '',
