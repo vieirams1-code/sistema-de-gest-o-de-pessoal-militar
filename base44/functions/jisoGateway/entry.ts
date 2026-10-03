@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { assertEditable, DECISION_FIELDS, MANAGEMENT_FIELDS, projectJiso, validateJiso, validatePublication, publicationActive, publicationStatus, publicationPatch } from '../../shared/jisoRules.ts';
+import { assertEditable, DECISION_FIELDS, MANAGEMENT_FIELDS, projectJiso, validateJiso, validatePublication, publicationActive, publicationStatus, publicationPatch, syncJisoChecklist } from '../../shared/jisoRules.ts';
 
 const OPEN_STATUSES = new Set(['Rascunho', 'Aguardando Agendamento', 'Agendada', 'Realizada', 'Resultado Registrado']);
 const JISO_FIELDS = new Set([
@@ -292,6 +292,7 @@ async function syncJisoBoard(base44: any, jiso: any, totalAtestados = 0) {
 
     if (card?.id) {
       await base44.asServiceRole.entities.CardOperacional.update(card.id, payload);
+      await syncJisoChecklist(base44, card.id, jiso, totalAtestados);
       return;
     }
 
@@ -311,16 +312,7 @@ async function syncJisoBoard(base44: any, jiso: any, totalAtestados = 0) {
       origem_automatica: true,
       autor_nome: 'Sistema',
     });
-    const checklist = ['Conferir atestados vinculados', 'Agendar JISO', 'Notificar militar', 'Registrar resultado', 'Publicar Ata JISO'];
-    for (let index = 0; index < checklist.length; index += 1) {
-      await base44.asServiceRole.entities.CardChecklistItem.create({
-        card_id: card.id,
-        titulo: checklist[index],
-        concluido: false,
-        ordem: index + 1,
-      });
-    }
-    await base44.asServiceRole.entities.CardOperacional.update(card.id, { checklist_resumo: `0/${checklist.length}` });
+    await syncJisoChecklist(base44, card.id, jiso, totalAtestados);
   } catch (boardError) {
     console.warn('[jisoGateway] sincronização do quadro não concluída', boardError);
   }
@@ -473,7 +465,10 @@ Deno.serve(async (req) => {
       if (scheduleChanged) patch.whatsapp_status = 'pendente';
       if (patch.status === 'Agendada' && jiso.status !== 'Agendada') patch.agendada_em = new Date().toISOString();
       if (patch.status === 'Realizada' && jiso.status !== 'Realizada') patch.realizada_em = patch.realizada_em || new Date().toISOString();
-      if (patch.status === 'Resultado Registrado' && jiso.status !== 'Resultado Registrado') patch.resultado_registrado_em = new Date().toISOString();
+      if (patch.status === 'Resultado Registrado' || patch.resultado_jiso !== undefined) {
+        patch.resultado_registrado_em = new Date().toISOString();
+        patch.efeito_suspenso = false;
+      }
       patch.versao = Number(jiso.versao || 0) + 1;
       const updated = await base44.asServiceRole.entities.JISO.update(jisoId, patch);
       await syncJisoBoard(base44, { ...jiso, ...updated, ...patch }, (await activeLinksForJiso(base44, jisoId)).length);
