@@ -3,7 +3,7 @@ export const CLOSED_JISO = new Set(['Concluída', 'Cancelada']);
 export const DECISION_FIELDS = new Set(['numero_ata', 'resultado_jiso', 'dias_jiso', 'data_inicio_efeito', 'data_termino_efeito', 'data_retorno_efeito', 'parecer_jiso', 'arquivo_ata_jiso']);
 export const MANAGEMENT_FIELDS = new Set(['data_jiso', 'hora_jiso', 'local_jiso', 'secao_jiso', 'finalidade_jiso', 'nup', 'observacoes', 'tags']);
 export const SENSITIVE_JISO = new Set(['parecer_jiso', 'parecer', 'resultado_jiso', 'observacoes', 'arquivo_ata_jiso', 'texto_publicacao', 'whatsapp_mensagem', 'render_metadata', 'diagnostico', 'cid_10']);
-export const OPERATIONAL_JISO = ['id','codigo','atestado_id','militar_id','militar_nome','militar_posto','militar_matricula','militar_matricula_atual','data_jiso','hora_jiso','local_jiso','secao_jiso','finalidade_jiso','nup','numero_ata','dias_jiso','data_inicio_efeito','data_termino_efeito','data_retorno_efeito','status','status_publicacao','publicacao_id','whatsapp_status','whatsapp_enviado_em','whatsapp_enviado_por','origem','versao','tags','created_date','updated_date','agendada_em','realizada_em','resultado_registrado_em','concluida_em','cancelada_em'];
+export const OPERATIONAL_JISO = ['id','codigo','atestado_id','militar_id','militar_nome','militar_posto','militar_matricula','militar_matricula_atual','data_jiso','hora_jiso','local_jiso','secao_jiso','finalidade_jiso','nup','numero_ata','dias_jiso','data_inicio_efeito','data_termino_efeito','data_retorno_efeito','status','status_publicacao','publicacao_id','whatsapp_status','whatsapp_enviado_em','whatsapp_enviado_por','origem','versao','tags','created_date','updated_date','agendada_em','realizada_em','resultado_registrado_em','concluida_em','cancelada_em','efeito_suspenso'];
 export function fail(code, message, status = 422) {
   throw Object.assign(new Error(message), { status, code });
 }
@@ -36,6 +36,7 @@ export function publicationPatch(jiso, pub) {
     status_publicacao: state,
     status: active && state === 'Publicado' ? 'Concluída' : (jiso.resultado_jiso || jiso.resultado_registrado_em ? 'Resultado Registrado' : (jiso.realizada_em ? 'Realizada' : 'Aguardando Agendamento')),
     concluida_em: active && state === 'Publicado' ? (jiso.concluida_em || new Date().toISOString()) : '',
+    efeito_suspenso: !active && Boolean(jiso.publicacao_id),
   };
 }
 export function validDate(value) {
@@ -76,6 +77,29 @@ export async function syncJisoPublication(base44, pub, removed = false) {
   const active = publications.find(p => (!removed || p.id !== pub.id) && publicationActive(p));
   const patch = publicationPatch(jiso, active || null);
   await base44.asServiceRole.entities.JISO.update(jiso.id, { ...patch, versao: Number(jiso.versao || 0) + 1 });
+  const updated = { ...jiso, ...patch };
+  const links = await base44.asServiceRole.entities.JISOAtestado.filter({ jiso_id: jiso.id, status: 'Ativo' }, 'ordem', 500, 0);
   const cards = await base44.asServiceRole.entities.CardOperacional.filter({ origem_registro_id: jiso.id, tipo_automacao: 'JISO_INDEPENDENTE' }, undefined, 100, 0);
-  for (const card of cards || []) await base44.asServiceRole.entities.CardOperacional.update(card.id, { status: CLOSED_JISO.has(patch.status || jiso.status) ? 'Concluído' : 'Ativo' });
+  for (const card of cards || []) {
+    await base44.asServiceRole.entities.CardOperacional.update(card.id, { status: CLOSED_JISO.has(patch.status || jiso.status) ? 'Concluído' : 'Ativo' });
+    await syncJisoChecklist(base44, card.id, updated, links.length);
+  }
+}
+
+export async function syncJisoChecklist(base44, cardId, jiso, totalAtestados) {
+  const states = [
+    ['Conferir atestados vinculados', totalAtestados > 0],
+    ['Agendar JISO', Boolean(jiso.data_jiso && jiso.hora_jiso)],
+    ['Notificar militar', jiso.whatsapp_status === 'enviado'],
+    ['Registrar resultado', ['Resultado Registrado','Concluída'].includes(jiso.status)],
+    ['Publicar Ata JISO', jiso.status_publicacao === 'Publicado' && jiso.status === 'Concluída'],
+  ];
+  const items = await base44.asServiceRole.entities.CardChecklistItem.filter({ card_id: cardId }, 'ordem', 500, 0);
+  for (let index = 0; index < states.length; index++) {
+    const [title, done] = states[index];
+    const item = items.find(item => item.titulo === title);
+    if (item) await base44.asServiceRole.entities.CardChecklistItem.update(item.id, { concluido: done });
+    else await base44.asServiceRole.entities.CardChecklistItem.create({ card_id: cardId, titulo: title, concluido: done, ordem: index + 1 });
+  }
+  await base44.asServiceRole.entities.CardOperacional.update(cardId, { checklist_resumo: states.filter(([, done]) => done).length + '/' + states.length });
 }
