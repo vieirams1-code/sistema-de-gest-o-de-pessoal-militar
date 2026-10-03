@@ -1,5 +1,4 @@
-import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
-import { atualizarEscopado } from '@/services/cudEscopadoClient';
+import { jisoService } from '@/services/jisoService';
 
 const STATUS_BLOQUEADOS = ['homologado', 'encerrado', 'cancelado', 'finalizado'];
 
@@ -15,26 +14,9 @@ export function isStatusAtestadoBloqueado({ statusJiso, status }) {
 export async function encaminharAtestadoParaJiso(atestado = {}) {
   if (!atestado?.id) throw new Error('Atestado inválido para encaminhamento.');
 
-  const payload = {
-    necessita_jiso: true,
-    status_jiso: atestado.status_jiso || 'Aguardando JISO',
-  };
-
-  await atualizarEscopado('Atestado', atestado.id, payload);
-  await sincronizarAtestadoJisoNoQuadro({ ...atestado, ...payload });
-
-  return payload;
+  return jisoService.criar({ atestadoIds: [atestado.id], jiso: { finalidade_jiso: 'LTS' } });
 }
 
-export async function marcarAtestadoJisoEmAnalise(atestado = {}) {
-  if (!atestado?.id) throw new Error('Atestado inválido para marcação.');
-  if (!Object.prototype.hasOwnProperty.call(atestado, 'status_jiso')) {
-    throw new Error('Campo status_jiso indisponível para este atestado.');
-  }
-
-  if (isStatusAtestadoBloqueado({ statusJiso: atestado.status_jiso, status: atestado.status })) {
-    throw new Error('Status finalizado/homologado não permite marcação em análise.');
-  }
-
-  await atualizarEscopado('Atestado', atestado.id, { status_jiso: 'Em análise' });
+export async function marcarAtestadoJisoEmAnalise() {
+  throw new Error('A análise e o resultado devem ser registrados no processo JISO independente.');
 }
