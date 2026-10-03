@@ -1168,6 +1168,8 @@ async function buscarRegistroExistente(base44, entityName, registroId) {
   }
 }
 
+import { syncJisoPublication, validatePublication, publicationStatus } from '../../shared/jisoRules.ts';
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -1189,6 +1191,9 @@ Deno.serve(async (req) => {
     const registroId = payload?.registroId ? String(payload.registroId) : null;
     const data = payload?.data && typeof payload.data === 'object' ? payload.data : {};
     const effectiveEmailRaw = payload?.effectiveEmail;
+    // Independent JISO writes must pass its lifecycle gateway, including for admins and bulk.
+    if (entityName === 'JISO') return Response.json({ error: 'Use o fluxo independente de JISO.', code: 'USE_JISO_GATEWAY' }, { status: 409 });
+    if (entityName === 'PublicacaoExOfficio' && operation === 'bulk') return Response.json({ error: 'Publicações exigem validação individual.' }, { status: 409 });
 
     // ---- Validação de allowlist ----
     if (!entityName || !ENTIDADES_PERMITIDAS.has(entityName)) {
@@ -2065,6 +2070,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (entityName === 'Atestado' && operation === 'delete') {
+      const links = await base44.asServiceRole.entities.JISOAtestado.filter({ atestado_id: registroId, status: 'Ativo' }, undefined, 1, 0);
+      if (links?.length) return Response.json({ error: 'O atestado está vinculado a uma JISO. Preserve o histórico ou retire o vínculo antes da exclusão.', code: 'ATESTADO_VINCULADO_JISO' }, { status: 409 });
+    }
+    if (entityName === 'PublicacaoExOfficio' && (data?.jiso_id || registroExistente?.jiso_id)) {
+      if (operation === 'create') return Response.json({ error: 'Crie a ata pelo processo JISO.', code: 'USE_JISO_GATEWAY' }, { status: 409 });
+      if (data.jiso_id && data.jiso_id !== registroExistente?.jiso_id) return Response.json({ error: 'Não é permitido trocar o processo JISO da ata.' }, { status: 409 });
+      validatePublication({ ...registroExistente, ...dataValidada });
+      if (operation === 'update') dataValidada.status = publicationStatus({ ...registroExistente, ...dataValidada });
+    }
     // ---- Execução com service role ----
     const entity = getEntity(base44, entityName);
     let resultado = null;
@@ -2105,6 +2120,9 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (entityName === 'PublicacaoExOfficio' && registroExistente?.jiso_id) {
+      await syncJisoPublication(base44, operation === 'delete' ? registroExistente : { ...registroExistente, ...resultado }, operation === 'delete');
+    }
     return Response.json({
       ok: true,
       entityName,
