@@ -13,13 +13,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
-import { jisoService } from '@/services/jisoService';
+import { jisoService, jisoContextKey, invalidateJisoQueries } from '@/services/jisoService';
 import { aplicarTemplate, buildTemplateVarsContrato } from '@/components/utils/templateUtils.js';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { createPageUrl } from '@/utils';
+import { getEffectiveEmail } from '@/utils/impersonation';
 
 const EMPTY_FORM = {
   data_jiso: '',
@@ -38,6 +38,7 @@ const EMPTY_FORM = {
   observacoes: '',
   arquivo_ata_jiso: '',
   status: 'Aguardando Agendamento',
+  tags: [],
 };
 
 const STATUS_CLASS = {
@@ -57,7 +58,7 @@ const formatDate = (value) => {
 };
 
 const calcPublicationStatus = ({ nota_para_bg, numero_bg, data_bg }) => {
-  if (numero_bg || data_bg) return 'Publicado';
+  if (numero_bg && data_bg) return 'Publicado';
   if (nota_para_bg) return 'Aguardando Publicação';
   return 'Aguardando Nota';
 };
@@ -68,11 +69,15 @@ export default function EditarJISO() {
   const [params] = useSearchParams();
   const jisoId = params.get('jiso_id');
   const { canAccessModule, canAccessAction, isLoading, isAccessResolved, user } = useCurrentUser();
-  const canView = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
+  const canView = ['visualizar_atestados', 'gerir_jiso', 'registrar_decisao_jiso', 'publicar_ata_jiso'].some(canAccessAction);
+  const contextKey = jisoContextKey(user?.email);
+  const canSensitive = canAccessAction('ver_dados_sensiveis_atestado');
   const canManage = canAccessAction('gerir_jiso');
-  const canDecide = canAccessAction('registrar_decisao_jiso');
+  const canDecide = canAccessAction('registrar_decisao_jiso') && canSensitive;
   const canPublish = canAccessAction('publicar_ata_jiso');
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setFormState] = useState(EMPTY_FORM);
+  const [dirty, setDirty] = useState(false);
+  const setForm = (value) => { setDirty(true); setFormState(value); };
   const [showAdd, setShowAdd] = useState(false);
   const [selectedAddIds, setSelectedAddIds] = useState([]);
   const [showWhatsapp, setShowWhatsapp] = useState(false);
@@ -88,26 +93,26 @@ export default function EditarJISO() {
   });
 
   const detailQuery = useQuery({
-    queryKey: ['jiso-detalhe', jisoId],
+    queryKey: ['jiso-detalhe', jisoId, contextKey],
     queryFn: async () => (await jisoService.detalhar(jisoId)).jiso,
     enabled: Boolean(jisoId && isAccessResolved && canView),
   });
   const jiso = detailQuery.data;
 
   useEffect(() => {
-    if (!jiso) return;
-    setForm({
+    if (!jiso || dirty) return;
+    setFormState({
       ...EMPTY_FORM,
       ...jiso,
       dias_jiso: jiso.dias_jiso ?? '',
     });
-  }, [jiso]);
+    if (jiso.publicacao) setPublication(current => ({ ...current, ...jiso.publicacao }));
+  }, [jiso, dirty]);
 
   const { data: atestadosEscopo = [] } = useQuery({
-    queryKey: ['atestados-adicionar-jiso', jiso?.militar_id],
+    queryKey: ['atestados-adicionar-jiso', jiso?.militar_id, contextKey],
     queryFn: async () => {
-      const bundle = await fetchScopedAtestadosBundle({ functionName: 'getScopedAtestadosBundleV2', dtoVersion: 'operacional-v2' });
-      return bundle?.atestados || [];
+      return (await jisoService.atestadosDisponiveis()).atestados || [];
     },
     enabled: Boolean(showAdd && jiso?.militar_id),
   });
@@ -117,20 +122,8 @@ export default function EditarJISO() {
     return atestadosEscopo.filter((item) => item.militar_id === jiso?.militar_id && !linked.has(item.id) && !item.jiso_vinculo_ativo);
   }, [atestadosEscopo, jiso]);
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['templates-texto-jiso-independente'],
-    queryFn: () => base44.entities.TemplateTexto.list(),
-    enabled: Boolean(jiso && canPublish),
-  });
-
-  const { data: militar = null } = useQuery({
-    queryKey: ['militar-jiso-independente', jiso?.militar_id],
-    queryFn: async () => {
-      const rows = await base44.entities.Militar.filter({ id: jiso.militar_id });
-      return rows?.[0] || null;
-    },
-    enabled: Boolean(jiso?.militar_id),
-  });
+  const templates = jiso?.templates_ata || [];
+  const militar = jiso?.militar_contexto || null;
 
   const templateAta = useMemo(() => getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templates, {
     grupamento_id: militar?.grupamento_id,
@@ -140,7 +133,11 @@ export default function EditarJISO() {
 
   const textoPublicacao = useMemo(() => {
     if (!templateAta?.template || !jiso) return '';
-    const principal = jiso.atestados?.[0] || {};
+    const principalId = jiso.vinculos?.find(item => item.tipo_vinculo === 'Principal')?.atestado_id;
+    const principal = jiso.atestados?.find(item => item.id === principalId) || jiso.atestados?.[0] || {};
+    const linked = jiso.atestados || [];
+    const starts = linked.map(item => item.data_inicio).filter(Boolean).sort();
+    const ends = linked.map(item => item.data_termino).filter(Boolean).sort();
     const varsContrato = buildTemplateVarsContrato({
       ...principal,
       militar,
@@ -156,27 +153,45 @@ export default function EditarJISO() {
       nup: form.nup || '',
       parecer_jiso: form.parecer_jiso || '',
       numero_ata: form.numero_ata || '',
-      total_atestados: String(jiso.atestados?.length || 0),
+      total_atestados: String(linked.length),
+      atestados_resumo: linked.map(item => `${formatDate(item.data_inicio)} a ${formatDate(item.data_termino)} (${item.dias || 0} dias)`).join('; '),
+      data_inicio: formatDate(form.data_inicio_efeito || starts[0]),
+      data_termino: formatDate(form.data_termino_efeito || ends[ends.length - 1]),
+      data_retorno: formatDate(form.data_retorno_efeito),
+      dias_jiso: String(form.dias_jiso ?? ''),
+      resultado_jiso: form.resultado_jiso || '',
+      data_inicio_efeito: formatDate(form.data_inicio_efeito),
+      data_termino_efeito: formatDate(form.data_termino_efeito),
+      data_retorno_efeito: formatDate(form.data_retorno_efeito),
     });
-  }, [templateAta, jiso, militar, form.finalidade_jiso, form.secao_jiso, form.data_jiso, form.nup, form.parecer_jiso, form.numero_ata]);
+  }, [templateAta, jiso, militar, form]);
 
   const updateMutation = useMutation({
-    mutationFn: (patch) => jisoService.atualizar(jisoId, patch),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jiso-detalhe', jisoId] });
-      queryClient.invalidateQueries({ queryKey: ['jisos-independentes'] });
+    mutationFn: (patch) => jisoService.atualizar(jisoId, patch, jiso?.versao),
+    onSuccess: (data) => {
+      setDirty(false);
+      if (data?.jiso) {
+        setFormState({ ...EMPTY_FORM, ...data.jiso, dias_jiso: data.jiso.dias_jiso ?? '' });
+        queryClient.setQueryData(['jiso-detalhe', jisoId, contextKey], data.jiso);
+      }
+      invalidateJisoQueries(queryClient);
     },
     onError: (err) => alert(err?.message || 'Não foi possível atualizar a JISO.'),
   });
 
+  const buildPatch = (status = form.status) => {
+    const keys = [
+      ...(canManage ? ['data_jiso','hora_jiso','local_jiso','secao_jiso','finalidade_jiso','nup','observacoes','tags'] : []),
+      ...(canDecide ? ['numero_ata','resultado_jiso','dias_jiso','data_inicio_efeito','data_termino_efeito','data_retorno_efeito','parecer_jiso','arquivo_ata_jiso'] : []),
+    ];
+    const patch = Object.fromEntries(keys.filter(key => JSON.stringify(form[key] ?? '') !== JSON.stringify(jiso[key] ?? '')).map(key => [key, form[key]]));
+    if (patch.dias_jiso !== undefined) patch.dias_jiso = form.dias_jiso === '' ? null : Number(form.dias_jiso);
+    if (status !== jiso.status) patch.status = status;
+    return patch;
+  };
   const saveAll = async () => {
     const status = form.status === 'Aguardando Agendamento' && form.data_jiso && form.hora_jiso ? 'Agendada' : form.status;
-    await updateMutation.mutateAsync({
-      ...form,
-      status,
-      dias_jiso: form.dias_jiso === '' ? null : Number(form.dias_jiso),
-      texto_publicacao: textoPublicacao || form.texto_publicacao || '',
-    });
+    try { await updateMutation.mutateAsync(buildPatch(status)); } catch (_error) { /* onError reports it */ }
   };
 
   const addMutation = useMutation({
@@ -184,8 +199,7 @@ export default function EditarJISO() {
     onSuccess: () => {
       setShowAdd(false);
       setSelectedAddIds([]);
-      queryClient.invalidateQueries({ queryKey: ['jiso-detalhe', jisoId] });
-      queryClient.invalidateQueries({ queryKey: ['jisos-independentes'] });
+      invalidateJisoQueries(queryClient);
     },
     onError: (err) => alert(err?.message || 'Não foi possível vincular os atestados.'),
   });
@@ -195,7 +209,7 @@ export default function EditarJISO() {
     if (!motivo) return;
     try {
       await jisoService.removerVinculo(jisoId, atestadoId, motivo);
-      queryClient.invalidateQueries({ queryKey: ['jiso-detalhe', jisoId] });
+      invalidateJisoQueries(queryClient);
     } catch (err) {
       alert(err?.message || 'Não foi possível remover o vínculo.');
     }
@@ -209,7 +223,7 @@ export default function EditarJISO() {
       const response = await base44.integrations.Core.UploadFile({ file });
       const fileUrl = response?.file_url || response?.url;
       setForm((current) => ({ ...current, arquivo_ata_jiso: fileUrl || '' }));
-      await updateMutation.mutateAsync({ arquivo_ata_jiso: fileUrl || '' });
+
     } catch (err) {
       alert(err?.message || 'Não foi possível enviar a ata.');
     } finally {
@@ -224,14 +238,16 @@ export default function EditarJISO() {
       return;
     }
     try {
+      if (dirty) { alert('Salve as alterações antes de preparar o WhatsApp.'); return; }
       await updateMutation.mutateAsync({
         data_jiso: form.data_jiso,
         hora_jiso: form.hora_jiso,
         local_jiso: form.local_jiso,
-        status: 'Agendada',
+        ...(['Rascunho', 'Aguardando Agendamento', 'Agendada'].includes(jiso.status) ? { status: 'Agendada' } : {}),
       });
       const response = await base44.functions.invoke('notificarJisoWhatsAppTemplate', {
         action: 'preview',
+        effectiveEmail: getEffectiveEmail() || undefined,
         jiso_id: jisoId,
         data_jiso: form.data_jiso,
         hora_jiso: form.hora_jiso,
@@ -252,20 +268,21 @@ export default function EditarJISO() {
     try {
       const response = await base44.functions.invoke('notificarJisoWhatsAppTemplate', {
         action: 'send',
+        effectiveEmail: getEffectiveEmail() || undefined,
         jiso_id: jisoId,
         mensagem_final: whatsappMessage.trim(),
         template_id: whatsappPreview.template_id,
         template_hash: whatsappPreview.template_hash,
         data_jiso_snapshot: whatsappPreview.data_jiso_snapshot,
         hora_jiso_snapshot: whatsappPreview.hora_jiso_snapshot,
+        local_jiso_snapshot: whatsappPreview.local_jiso_snapshot,
       });
       const data = response?.data || response;
       if (!data?.success) throw new Error(data?.error || 'Falha ao enviar a notificação.');
       setShowWhatsapp(false);
       setWhatsappPreview(null);
-      queryClient.invalidateQueries({ queryKey: ['jiso-detalhe', jisoId] });
-      queryClient.invalidateQueries({ queryKey: ['jisos-independentes'] });
-      alert('Notificação enviada e registrada no histórico da JISO.');
+      invalidateJisoQueries(queryClient);
+      alert(data.tracking_saved === false ? (data.warning || 'Mensagem enviada, mas o histórico não pôde ser gravado. Não reenvie sem conferir.') : 'Notificação enviada e registrada no histórico da JISO.');
     } catch (err) {
       alert(err?.message || 'Não foi possível enviar a notificação.');
     } finally {
@@ -276,12 +293,8 @@ export default function EditarJISO() {
   const publishMutation = useMutation({
     mutationFn: async () => {
       if (!textoPublicacao) throw new Error('O template ativo de Ata JISO não foi encontrado ou não gerou texto.');
-      await updateMutation.mutateAsync({
-        ...form,
-        status: 'Resultado Registrado',
-        texto_publicacao: textoPublicacao,
-        dias_jiso: form.dias_jiso === '' ? null : Number(form.dias_jiso),
-      });
+      if (dirty) throw new Error('Salve as alterações antes de gerar a publicação.');
+      if (jiso.status !== 'Resultado Registrado') throw new Error('Registre o resultado antes de gerar a publicação.');
       const renderMetadata = buildTemplateRenderMetadata({
         template: templateAta,
         modulo: 'PublicacaoExOfficio',
@@ -296,8 +309,7 @@ export default function EditarJISO() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jiso-detalhe', jisoId] });
-      queryClient.invalidateQueries({ queryKey: ['jisos-independentes'] });
+      invalidateJisoQueries(queryClient);
       alert('Ata JISO encaminhada para o fluxo de publicações.');
     },
     onError: (err) => alert(err?.message || 'Não foi possível publicar a Ata JISO.'),
@@ -308,8 +320,7 @@ export default function EditarJISO() {
     if (!motivo) return;
     try {
       await jisoService.cancelar(jisoId, motivo);
-      queryClient.invalidateQueries({ queryKey: ['jiso-detalhe', jisoId] });
-      queryClient.invalidateQueries({ queryKey: ['jisos-independentes'] });
+      invalidateJisoQueries(queryClient);
     } catch (err) {
       alert(err?.message || 'Não foi possível cancelar a JISO.');
     }
@@ -321,7 +332,8 @@ export default function EditarJISO() {
   if (detailQuery.isLoading) return <div className="p-16 text-center text-slate-500">Carregando JISO...</div>;
   if (detailQuery.error || !jiso) return <div className="p-8 text-center text-red-600">{detailQuery.error?.message || 'JISO não encontrada.'}</div>;
 
-  const isClosed = ['Concluída', 'Cancelada'].includes(jiso.status);
+  const isClosed = ['Concluída', 'Cancelada'].includes(jiso.status) || Boolean(jiso.publicacao_id);
+  const isScheduleFinished = ['Realizada', 'Resultado Registrado', 'Concluída', 'Cancelada'].includes(jiso.status);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -357,20 +369,20 @@ export default function EditarJISO() {
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-[#1e3a5f]"><CalendarDays className="h-5 w-5" /> Agendamento e identificação</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                <div><Label>Data da JISO</Label><Input type="date" value={form.data_jiso} onChange={(e) => setForm((p) => ({ ...p, data_jiso: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
-                <div><Label>Horário</Label><Input type="time" value={form.hora_jiso} onChange={(e) => setForm((p) => ({ ...p, hora_jiso: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
-                <div><Label>Local</Label><Input value={form.local_jiso} onChange={(e) => setForm((p) => ({ ...p, local_jiso: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
-                <div><Label>Seção JISO</Label><Input value={form.secao_jiso} onChange={(e) => setForm((p) => ({ ...p, secao_jiso: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
+                <div><Label>Data da JISO</Label><Input type="date" value={form.data_jiso} onChange={(e) => setForm((p) => ({ ...p, data_jiso: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
+                <div><Label>Horário</Label><Input type="time" value={form.hora_jiso} onChange={(e) => setForm((p) => ({ ...p, hora_jiso: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
+                <div><Label>Local</Label><Input value={form.local_jiso} onChange={(e) => setForm((p) => ({ ...p, local_jiso: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
+                <div><Label>Seção JISO</Label><Input value={form.secao_jiso} onChange={(e) => setForm((p) => ({ ...p, secao_jiso: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
                 <div>
                   <Label>Finalidade</Label>
-                  <Select value={form.finalidade_jiso || 'LTS'} onValueChange={(value) => setForm((p) => ({ ...p, finalidade_jiso: value }))} disabled={isClosed}>
+                  <Select value={form.finalidade_jiso || 'LTS'} onValueChange={(value) => setForm((p) => ({ ...p, finalidade_jiso: value }))} disabled={!canManage || isClosed}>
                     <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                     <SelectContent>{['LTS', 'V.A.F', 'Reserva Remunerada', 'Atestado de Origem'].map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div><Label>TARS/NUP</Label><Input value={form.nup} onChange={(e) => setForm((p) => ({ ...p, nup: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
+                <div><Label>TARS/NUP</Label><Input value={form.nup} onChange={(e) => setForm((p) => ({ ...p, nup: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
               </div>
-              {canManage && !isClosed && (
+              {canManage && !isClosed && !isScheduleFinished && (
                 <div className="mt-4 flex justify-end">
                   <Button variant="outline" onClick={prepareWhatsapp}><MessageCircle className="mr-2 h-4 w-4" /> Preparar WhatsApp</Button>
                 </div>
@@ -383,10 +395,10 @@ export default function EditarJISO() {
                 {canManage && !isClosed && <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}><Plus className="mr-1.5 h-4 w-4" /> Adicionar</Button>}
               </div>
               <div className="space-y-2">
-                {(jiso.atestados || []).map((atestado, index) => (
+                {(jiso.atestados || []).map((atestado) => (
                   <div key={atestado.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 md:flex-row md:items-center md:justify-between">
                     <button type="button" onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)} className="min-w-0 text-left">
-                      <div className="flex items-center gap-2"><Badge variant="outline">{index === 0 ? 'Principal' : 'Complementar'}</Badge><span className="text-sm font-semibold">{atestado.tipo_afastamento || 'Atestado médico'}</span></div>
+                      <div className="flex items-center gap-2"><Badge variant="outline">{jiso.vinculos?.find(link => link.atestado_id === atestado.id)?.tipo_vinculo || 'Complementar'}</Badge><span className="text-sm font-semibold">{atestado.tipo_afastamento || 'Atestado médico'}</span></div>
                       <p className="mt-1 text-xs text-slate-500">{formatDate(atestado.data_inicio)} a {formatDate(atestado.data_termino)} · {atestado.dias || 0} dia(s)</p>
                     </button>
                     {canManage && !isClosed && (jiso.atestados?.length || 0) > 1 && (
@@ -414,11 +426,12 @@ export default function EditarJISO() {
                 <div><Label>Data de retorno efetiva</Label><Input type="date" value={form.data_retorno_efeito} onChange={(e) => setForm((p) => ({ ...p, data_retorno_efeito: e.target.value }))} disabled={!canDecide || isClosed} className="mt-1.5" /></div>
               </div>
               <div className="mt-4"><Label>Parecer da JISO</Label><Textarea value={form.parecer_jiso} onChange={(e) => setForm((p) => ({ ...p, parecer_jiso: e.target.value }))} disabled={!canDecide || isClosed} className="mt-1.5 min-h-28" /></div>
-              <div className="mt-4"><Label>Observações administrativas</Label><Textarea value={form.observacoes} onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
+              <div className="mt-4"><Label>Tags da JISO (separadas por vírgula)</Label><Input value={(form.tags || []).join(', ')} onChange={(e) => setForm(p => ({ ...p, tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean) }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
+              <div className="mt-4"><Label>Observações administrativas</Label><Textarea value={form.observacoes} onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))} disabled={!canManage || isClosed} className="mt-1.5" /></div>
               {canDecide && !isClosed && (
                 <div className="mt-4 flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => updateMutation.mutate({ status: 'Realizada', realizada_em: new Date().toISOString() })}>Marcar como realizada</Button>
-                  <Button onClick={() => updateMutation.mutate({ ...form, status: 'Resultado Registrado', dias_jiso: form.dias_jiso === '' ? null : Number(form.dias_jiso), texto_publicacao: textoPublicacao })} className="bg-indigo-700 hover:bg-indigo-800">Registrar resultado</Button>
+                  <Button variant="outline" disabled={updateMutation.isPending || jiso.status === 'Resultado Registrado'} onClick={() => updateMutation.mutate({ status: 'Realizada' })}>Marcar como realizada</Button>
+                  <Button disabled={updateMutation.isPending} onClick={() => updateMutation.mutate(buildPatch('Resultado Registrado'))} className="bg-indigo-700 hover:bg-indigo-800">Registrar resultado</Button>
                 </div>
               )}
             </section>
@@ -460,11 +473,11 @@ export default function EditarJISO() {
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-[#1e3a5f]"><FileText className="h-5 w-5" /> Publicação da Ata JISO</h2>
               <div className="space-y-3">
-                <div><Label>Data da publicação</Label><Input type="date" value={publication.data_publicacao} onChange={(e) => setPublication((p) => ({ ...p, data_publicacao: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
-                <div><Label>Nota para BG</Label><Input value={publication.nota_para_bg} onChange={(e) => setPublication((p) => ({ ...p, nota_para_bg: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
+                <div><Label>Data da publicação</Label><Input type="date" value={publication.data_publicacao} onChange={(e) => setPublication((p) => ({ ...p, data_publicacao: e.target.value }))} disabled={!canPublish || isClosed} className="mt-1.5" /></div>
+                <div><Label>Nota para BG</Label><Input value={publication.nota_para_bg} onChange={(e) => setPublication((p) => ({ ...p, nota_para_bg: e.target.value }))} disabled={!canPublish || isClosed} className="mt-1.5" /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Número BG</Label><Input value={publication.numero_bg} onChange={(e) => setPublication((p) => ({ ...p, numero_bg: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
-                  <div><Label>Data BG</Label><Input type="date" value={publication.data_bg} onChange={(e) => setPublication((p) => ({ ...p, data_bg: e.target.value }))} disabled={isClosed} className="mt-1.5" /></div>
+                  <div><Label>Número BG</Label><Input value={publication.numero_bg} onChange={(e) => setPublication((p) => ({ ...p, numero_bg: e.target.value }))} disabled={!canAccessAction('publicar_bg') || !canPublish || isClosed} className="mt-1.5" /></div>
+                  <div><Label>Data BG</Label><Input type="date" value={publication.data_bg} onChange={(e) => setPublication((p) => ({ ...p, data_bg: e.target.value }))} disabled={!canAccessAction('publicar_bg') || !canPublish || isClosed} className="mt-1.5" /></div>
                 </div>
                 <div>
                   <Label>Texto gerado</Label>
@@ -472,10 +485,12 @@ export default function EditarJISO() {
                     {textoPublicacao || 'Cadastre o resultado e verifique se existe um template ativo de Ata JISO.'}
                   </div>
                 </div>
+                {dirty && <p className="text-xs text-amber-700">Há alterações não salvas. Salve antes de gerar a publicação.</p>}
+                {!canSensitive && <p className="text-xs text-slate-500">O parecer, o resultado e o arquivo exigem permissão para dados sensíveis.</p>}
                 {jiso.publicacao_id ? (
                   <Badge className="bg-emerald-100 text-emerald-800">Publicação vinculada · {jiso.status_publicacao}</Badge>
                 ) : canPublish && !isClosed && (
-                  <Button className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={!form.resultado_jiso || publishMutation.isPending} onClick={() => publishMutation.mutate()}>
+                  <Button className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={jiso.status !== 'Resultado Registrado' || !jiso.numero_ata || dirty || publishMutation.isPending || !canSensitive} onClick={() => publishMutation.mutate()}>
                     <FileText className="mr-2 h-4 w-4" /> {publishMutation.isPending ? 'Publicando...' : 'Gerar publicação da JISO'}
                   </Button>
                 )}
