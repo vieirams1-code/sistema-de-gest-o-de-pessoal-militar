@@ -287,6 +287,7 @@ function MilitarCard({
                 type="number"
                 min={1}
                 value={registro.ordem}
+                disabled={acaoEmAndamento}
                 onChange={(event) => onAtualizar(registro.id, 'ordem', event.target.value === '' ? '' : Number(event.target.value))}
                 aria-label={`Ordem de antiguidade de ${nomeMilitar(militar)}`}
               />
@@ -1180,6 +1181,7 @@ export default function DetalhePromocao() {
                 <CardTitle>Dados da Promoção</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <fieldset disabled={salvando} className="space-y-4">
                 <Field label="Posto/graduação">
                   <Select value={rascunhoPromocao.posto_graduacao || SELECT_VAZIO} onValueChange={(valor) => atualizarCampoPromocao('posto_graduacao', valor === SELECT_VAZIO ? '' : valor)}>
                     <SelectTrigger>
@@ -1226,6 +1228,7 @@ export default function DetalhePromocao() {
                     onChange={(event) => atualizarCampoPromocao('observacoes', event.target.value)}
                   />
                 </details>
+                </fieldset>
               </CardContent>
             </Card>
 
