@@ -241,11 +241,9 @@ Motivo: promocao.id ausente no frontend`);
       || 'nao_informado'
     );
 
-    throw new Error(`Falha ao publicar promoção
-Etapa: ${etapaErro}
-Motivo: ${motivoErro}
-Item: ${itemIdErro}
-Militar: ${militarIdErro}`);
+    const erro = new Error(`Falha ao publicar promoção\nEtapa: ${etapaErro}\nMotivo: ${motivoErro}\nItem: ${itemIdErro}\nMilitar: ${militarIdErro}`);
+    erro.resultadoPublicacao = dadosErro;
+    throw erro;
   }
 
   const etapa = response?.data?.etapa || null;
@@ -261,10 +259,13 @@ Militar: ${militarIdErro}`);
         return erro?.message;
       }).filter(Boolean));
     }
-    if (mensagens.length > 0) throw montarErroPublicacao(mensagens);
+    const erro = montarErroPublicacao(mensagens.length ? mensagens : ['Publicação não confirmada pelo servidor.']);
+    erro.resultadoPublicacao = response?.data;
+    throw erro;
   }
 
-  return response?.data || { publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [] };
+  if (response?.data?.success !== true) throw new Error('Publicação não confirmada pelo servidor. Atualize os dados antes de tentar novamente.');
+  return response.data;
 }
 
 
@@ -517,8 +518,8 @@ export async function reverterPublicacaoPromocaoMilitar({
     body: payload,
   });
   const data = response?.data || response || {};
-  if (data?.success === false) {
-    throw new Error(data?.motivo || 'Falha ao reverter publicação da promoção militar.');
+  if (data?.success !== true) {
+    throw new Error(data?.motivo || 'Reversão não confirmada pelo servidor. Atualize os dados antes de tentar novamente.');
   }
 
   return {
@@ -1489,12 +1490,14 @@ export async function diagnosticarDivergenciasGraduacoes() {
   const response = await base44.functions.invoke('sincronizarGraduacoesPromocao', {
     body: { dryRun: true },
   });
-  return response?.data || response;
+  if (response?.data?.success !== true) throw new Error(response?.data?.motivo || response?.data?.error || 'Diagnóstico não confirmado pelo servidor.');
+  return response.data;
 }
 
 export async function executarSincronizacaoGraduacoes() {
   const response = await base44.functions.invoke('sincronizarGraduacoesPromocao', {
     body: { dryRun: false, confirmacao: 'SINCRONIZAR' },
   });
-  return response?.data || response;
+  if (response?.data?.success !== true) throw new Error(response?.data?.motivo || response?.data?.error || 'Sincronização não confirmada pelo servidor.');
+  return response.data;
 }
