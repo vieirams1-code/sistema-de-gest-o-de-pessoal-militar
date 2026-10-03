@@ -51,7 +51,7 @@ function harness({ actions = { gerir_jiso:true }, admin = false, seed = {}, bloc
   vm.runInNewContext(gatewayCode,context);
   const call=async payload=>{const res=await handler({json:async()=>payload,method:'POST'});return {status:res.status,body:await res.json()};};
   const useNotification=()=>vm.runInNewContext(notificationCode,context);
-  const module={exports:{}};vm.runInNewContext(rulesCode,{module,exports:module.exports,require,console});
+  const module={exports:{}};vm.runInNewContext(rulesCode,{module,exports:module.exports,console});
   return {db,call,useNotification,rules:module.exports,client,get sent(){return sent;}};
 }
 
