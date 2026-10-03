@@ -567,8 +567,8 @@ export async function excluirCadeiaPromocaoMilitar({
     },
   });
   const data = response?.data || response || {};
-  if (data?.success === false) {
-    throw new Error(data?.motivo || 'Falha ao excluir definitivamente promoção militar.');
+  if (data?.success !== true) {
+    throw new Error(data?.motivo || 'Exclusão não confirmada pelo servidor. Atualize os dados antes de tentar novamente.');
   }
 
   return {
