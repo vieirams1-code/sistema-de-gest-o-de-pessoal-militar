@@ -1296,7 +1296,7 @@ export default function DetalhePromocao() {
                         key={registro.id}
                         registro={registro}
                         original={original}
-                        acaoEmAndamento={removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
+                        acaoEmAndamento={salvando || removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
                         promocao={promocaoContextoAtual}
                         promocaoContext={promocaoContext}
                         promocaoPublicada={promocaoPublicada}
