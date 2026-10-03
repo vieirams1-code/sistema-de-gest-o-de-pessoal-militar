@@ -9,7 +9,7 @@ import { montarAgendaJiso } from '../src/utils/jiso/montarAgendaJiso.js';
 
 const gatewayCode = buildSync({ entryPoints: ['base44/functions/jisoGateway/entry.ts'], bundle: true, platform: 'node', format: 'cjs', write: false, external: ['npm:*'] }).outputFiles[0].text;
 const notificationSource = fs.readFileSync('base44/functions/notificarJisoWhatsAppTemplate/entry.ts','utf8').replace(/import \{ evolutionWhatsAppProvider \} from '[^']+';/, 'const evolutionWhatsAppProvider = globalThis.__provider;');
-const notificationCode = buildSync({ stdin: { contents: notificationSource, loader: 'ts', resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'cjs', write: false, external: ['npm:*'] }).outputFiles[0].text;
+const notificationCode = buildSync({ stdin: { contents: notificationSource, loader: 'ts', resolveDir: process.cwd() + '/base44/functions/notificarJisoWhatsAppTemplate' }, bundle: true, platform: 'node', format: 'cjs', write: false, external: ['npm:*'] }).outputFiles[0].text;
 const rulesCode = buildSync({ entryPoints: ['base44/shared/jisoRules.ts'], bundle: true, platform: 'node', format: 'cjs', write: false }).outputFiles[0].text;
 const matches = (row, query) => Object.entries(query || {}).every(([key,val]) => val && typeof val === 'object' && '$in' in val ? val.$in.includes(row[key]) : row[key] === val);
 function harness({ actions = { gerir_jiso:true }, admin = false, seed = {}, blocked = [], authError = '', authenticatedRole = 'user', failures = {} } = {}) {
