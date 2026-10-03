@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { requirePortalSession, extractClientIp, extractUserAgent, registrarAuditoriaPortal } from '../../shared/portal/requirePortalSession.ts';
 import { generateCorrelationId } from '../../shared/portal/portalCrypto.ts';
 import { loadAuthConfig } from '../../shared/portal/otp/otpService.ts';
+import { validarNomeCampanhaGeral, validarProrrogacaoCampanhaGeral } from '../../shared/portal/campanhaGeralAdminRules.js';
 
 export function assertNoClientSuppliedMilitarId(body: unknown): void {
   if (body && typeof body === 'object') {
@@ -301,6 +302,7 @@ function permissoesNecessariasAcaoAdminPortal(acao: string, payload: any = {}): 
     return ['perm_visualizar_planos_ferias', 'perm_admin_campanhas_ferias'];
   }
   if (acao === 'CAMPANHA_LISTAR') return ['perm_visualizar_campanhas_gerais'];
+  if (acao === 'CAMPANHA_RENOMEAR' || acao === 'CAMPANHA_PRORROGAR') return ['perm_admin_campanhas', 'perm_editar_campanhas'];
   if (acao === 'CAMPANHA_SCOPE_OPTIONS') return ['perm_criar_campanhas', 'perm_editar_campanhas'];
   if (acao === 'CAMPANHA_CONTEXTO_RETORNO') {
     return [
@@ -332,6 +334,8 @@ async function autorizarAcaoAdminPortal(base44: any, user: any, acao: string, pa
   const authz = authzResponse?.data ?? authzResponse ?? {};
   const necessarias = permissoesNecessariasAcaoAdminPortal(acao, payload);
   const exigeTodas = [
+    'CAMPANHA_RENOMEAR',
+    'CAMPANHA_PRORROGAR',
     'PLANO_INSTITUCIONAL_EXCLUIR',
     'PLANO_INSTITUCIONAL_ARQUIVAR',
     'PLANO_INSTITUCIONAL_DESARQUIVAR',
@@ -1326,6 +1330,40 @@ Deno.serve(async (req: Request) => {
             status: 200,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
+        }
+
+        case 'CAMPANHA_RENOMEAR':
+        case 'CAMPANHA_PRORROGAR': {
+          const campanha_id = textoId(payload.campanha_id);
+          if (!campanha_id) return new Response(JSON.stringify({ error: 'ID da campanha não informado.' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          const campanha = await base44.asServiceRole.entities.CampanhaPortal.get(campanha_id);
+          if (!campanha) return new Response(JSON.stringify({ error: 'Campanha não encontrada.' }), { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          if (campanha.tipo === 'PLANO_FERIAS' || campanha.plano_ferias_institucional_id) {
+            return new Response(JSON.stringify({ error: 'Esta ação é exclusiva das campanhas gerais.' }), { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+          }
+          let update: any;
+          let detalhes: any;
+          if (acao === 'CAMPANHA_RENOMEAR') {
+            const titulo = validarNomeCampanhaGeral(payload.titulo);
+            update = { titulo };
+            detalhes = { titulo_anterior: campanha.titulo, titulo_novo: titulo };
+          } else {
+            const { data, justificativa } = validarProrrogacaoCampanhaGeral(campanha, payload);
+            update = {
+              data_fim_militar: data,
+              status: 'Aberta_Coleta',
+              data_fim_militar_original: campanha.data_fim_militar_original || campanha.data_fim_militar || '',
+              quantidade_prorrogacoes: Number(campanha.quantidade_prorrogacoes || 0) + 1,
+            };
+            detalhes = { prazo_anterior: campanha.data_fim_militar || '', novo_prazo: data, status_anterior: campanha.status, justificativa };
+          }
+          const updated = await base44.asServiceRole.entities.CampanhaPortal.update(campanha_id, update);
+          await registrarAuditoriaPortal(base44, {
+            acao, resultado: true, recurso_tipo: 'CampanhaPortal', recurso_id: campanha_id,
+            correlation_id: correlationId, ip_origem: extractClientIp(req), user_agent: extractUserAgent(req),
+            metadata_sanitizada: JSON.stringify({ ...detalhes, usuario_email: user.email, respostas_preservadas: true }),
+          });
+          return new Response(JSON.stringify({ ok: true, campanha: updated, message: acao === 'CAMPANHA_RENOMEAR' ? 'Nome da campanha atualizado.' : 'Prazo prorrogado. Respostas existentes preservadas.' }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
         }
 
         // Editar Campanha
@@ -2932,6 +2970,9 @@ Deno.serve(async (req: Request) => {
         });
     }
   } catch (err: any) {
+    if (err?.code === 'CAMPANHA_GERAL_VALIDATION') {
+      return new Response(JSON.stringify({ error: err.message }), { status: err.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+    }
     console.error(`[portal_servicos][${correlationId}] Erro inesperado:`, err?.message || err);
 
     return new Response(JSON.stringify({
