@@ -115,7 +115,7 @@ export default function CardItem({ card, onClick }) {
 
   if (card.tipo_automacao === 'JISO_INDEPENDENTE') {
     return (
-      <div onClick={() => onClick(card)} className="cursor-pointer rounded-xl border border-indigo-200 bg-white p-3.5 shadow-sm hover:shadow-md">
+      <div onClick={() => navigate(createPageUrl('EditarJISO') + '?jiso_id=' + card.origem_registro_id)} className="cursor-pointer rounded-xl border border-indigo-200 bg-white p-3.5 shadow-sm hover:shadow-md">
         <div className="mb-2 flex items-center gap-2 text-indigo-800"><ShieldPlus className="h-4 w-4" /><span className="text-xs font-semibold">Processo JISO</span></div>
         <p className="text-sm font-semibold text-slate-800">{card.titulo}</p>
         <p className="mt-1 text-xs text-slate-500">{card.descricao}</p>
