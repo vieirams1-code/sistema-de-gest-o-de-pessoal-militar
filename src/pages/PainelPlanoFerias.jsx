@@ -10,7 +10,6 @@ import {
   History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import CampanhaAdminActions from '@/components/ferias/CampanhaAdminActions';
 import ResumoCotasMensais from '@/components/ferias-portal/ResumoCotasMensais';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
@@ -835,8 +834,7 @@ export default function PainelPlanoFerias() {
         </div>
 
         {/* AÇÕES NO TOPO: ADMIN E GERAÇÃO NO SGP */}
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-          <CampanhaAdminActions campanha={campanhaSelecionada} enabled={modoAdmin && podeAdminFerias && !todasCampanhasSelecionadas && planos.some((p) => p.id === campanhaSelecionada?.plano_ferias_institucional_id && p.status === 'ATIVO')} disabled={actionLoading} onUpdated={recarregarPainelAtual} />
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
           {podeAdminFerias && <button
             type="button"
             onClick={() => setModoAdmin(!modoAdmin)}
