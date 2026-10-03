@@ -1,3 +1,4 @@
+import { aplicarEfeitosJiso } from '../utils/jiso/jisoEffects.js';
 import { addDays, format } from 'date-fns';
 
 const TIPOS_LIVRO_AFASTAMENTO = new Set([
@@ -40,9 +41,11 @@ function computeDataTerminoLivro(registro) {
 function isAtestadoVigente(atestado, hoje) {
   const status = normalizeStatus(atestado?.status);
   if (status === 'cancelado' || status === 'encerrado') return false;
+  const dataInicio = parseDateOnly(atestado?.data_inicio);
+  if (dataInicio && hoje < dataInicio) return false;
   const dataFim = parseDateOnly(atestado?.data_retorno || atestado?.data_termino);
   if (!dataFim) return status === 'ativo' || status === 'em curso';
-  return hoje <= dataFim;
+  return atestado.data_retorno ? hoje < dataFim : hoje <= dataFim;
 }
 
 function getTipoAtestado(atestado) {
@@ -65,7 +68,7 @@ function mapAtestadosVigentes(atestados, hoje) {
         militarNome: atestado.militar_nome || 'Militar não identificado',
         postoGraduacao: atestado.militar_posto || '-',
         tipoAfastamento: getTipoAtestado(atestado),
-        origem: 'Atestado',
+        origem: atestado.origem_efeito || 'Atestado',
         dataInicio,
         dataTermino: dataRetorno,
         status: atestado.status || 'Ativo',
@@ -157,7 +160,7 @@ export function buildAfastamentosVigentes({ atestados = [], ferias = [], registr
   hojeNormalizado.setHours(0, 0, 0, 0);
 
   const consolidados = [
-    ...mapAtestadosVigentes(atestados, hojeNormalizado),
+    ...mapAtestadosVigentes(aplicarEfeitosJiso(atestados), hojeNormalizado),
     ...mapFeriasVigentes(ferias),
     ...mapRegistroLivroVigentes(registrosLivro, hojeNormalizado),
     ...mapLtipVigentes(militaresLtip, hojeNormalizado),
