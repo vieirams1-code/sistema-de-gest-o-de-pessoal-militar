@@ -6,7 +6,6 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CampanhaFeriasWhatsAppCard from '@/components/ferias/CampanhaFeriasWhatsAppCard';
-import CampanhaAdminActions from '@/components/ferias/CampanhaAdminActions';
 
 const erroTexto = (erro, fallback) => erro?.response?.data?.error || erro?.data?.error || erro?.message || fallback;
 
@@ -21,7 +20,6 @@ export default function ConfigurarCampanhaFerias() {
   const [dadosCampanhaForm, setDadosCampanhaForm] = useState({ titulo: '', data_inicio: '', data_fim_militar: '' });
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [modoAdmin, setModoAdmin] = useState(false);
   const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
   const statusCampanha = String(campanha?.status || '').trim().toLowerCase();
   const campanhaEmEdicaoPermitida = !['arquivada', 'desativada', 'encerrada'].includes(statusCampanha);
@@ -121,10 +119,6 @@ export default function ConfigurarCampanhaFerias() {
           </div>
         </div>
         {feedback.texto && <div className={`rounded-xl border p-3 text-sm ${feedback.tipo === 'erro' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{feedback.texto}</div>}
-        {podeEnviarWhatsApp && <section className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-wrap items-center gap-2">
-          <Button type="button" variant={modoAdmin ? 'default' : 'outline'} onClick={() => setModoAdmin((atual) => !atual)}>{modoAdmin ? 'Admin ON' : 'Modo Admin'}</Button>
-          <CampanhaAdminActions campanha={campanha} enabled={modoAdmin && podeEnviarWhatsApp && String(plano?.status || '').toUpperCase() === 'ATIVO'} disabled={salvando} onUpdated={carregar} />
-        </section>}
         {podeEditarCampanha ? (
           <section className="rounded-2xl border border-blue-200 bg-white p-5">
             <div>
@@ -156,7 +150,7 @@ export default function ConfigurarCampanhaFerias() {
         ) : (
           <section className="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="font-bold text-slate-900">Campanha em modo de consulta</h2>
-            <p className="mt-1 text-sm text-slate-600">Ative o Modo Admin para editar o nome ou prorrogar uma campanha encerrada. O plano deve estar ativo.</p>
+            <p className="mt-1 text-sm text-slate-600">O nome e o prazo só podem ser alterados enquanto o plano estiver ativo e a campanha estiver em coleta.</p>
           </section>
         )}
 
