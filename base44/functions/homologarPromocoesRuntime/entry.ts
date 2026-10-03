@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     let nomeFuncao = '';
     let dados:any = {};
     if (['publicar','repetir','vigencia_futura'].includes(payload.acao)) {
-      nomeFuncao = 'publicarPromocaoOficial'; dados = {promocao_id:p.id};
+      nomeFuncao = 'publicarPromocaoOficial'; dados = {promocao_id:p.id,promocao:p,itens};
     } else if (payload.acao === 'editar_documento') {
       nomeFuncao = 'sincronizarHistoricoPromocaoPublicadaTx';
       dados = {promocao_id:p.id,patch_promocao:{ato_referencia:'ATO FICTÍCIO RETIFICADO HOMOLOGAÇÃO',boletim_referencia:''},
