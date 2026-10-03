@@ -14,7 +14,7 @@ async function parsePayload(req: any) {
   const candidates: any[] = [req?.body, req?.body?.data, req?.data, req?.payload, (globalThis as any)?.input];
   try { if (typeof req?.json === 'function') candidates.push(await req.json()); } catch (_) {}
   for (const c of candidates) {
-    if (c && typeof c === 'object' && !(c instanceof ReadableStream)) {
+    if (c && typeof c === 'object') {
       const payload = c.body || c.data || c;
       if (payload.promocaoMilitarId) return payload;
     }
