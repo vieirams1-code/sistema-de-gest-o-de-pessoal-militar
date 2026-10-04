@@ -35,7 +35,7 @@ function harness({admin=false,storageFailure=false,registryFailure=false,seed={}
  };
  return {db,call,upload,privateUploads,signed,publicUploads};
 }
-test('novo upload passa pela sessão, usa storage privado e registra propriedade',async()=>{const h=harness();const r=await h.upload();assert.equal(r.status,201);assert.ok(r.body.url.startsWith('private/'));assert.equal(h.privateUploads.length,1);assert.equal(h.publicUploads.length,0);assert.equal(h.db.PortalAnexo[0].militar_id,'ma');assert.equal(h.db.PortalAnexo[0].campo_id,'question');assert.equal(h.signed[0].expires_in,300);});
+test('novo upload passa pela sessão, usa storage privado e registra propriedade',async()=>{const h=harness();const r=await h.upload();assert.equal(r.status,201,JSON.stringify(r));assert.ok(r.body.url.startsWith('private/'));assert.equal(h.privateUploads.length,1);assert.equal(h.publicUploads.length,0);assert.equal(h.db.PortalAnexo[0].militar_id,'ma');assert.equal(h.db.PortalAnexo[0].campo_id,'question');assert.equal(h.signed[0].expires_in,300);});
 test('upload anônimo não toca armazenamento',async()=>{const h=harness();assert.equal((await h.upload({noToken:true})).status,401);assert.equal(h.privateUploads.length,0);});
 test('militar fora do público-alvo não envia arquivo',async()=>{const h=harness();h.db.CampanhaPortal[0].tipo_escopo='SELECAO_MILITARES';h.db.CampanhaPortal[0].escopo_militares_ids=['mb'];assert.equal((await h.upload()).status,403);assert.equal(h.privateUploads.length,0);});
 test('campanha encerrada e pergunta inexistente impedem upload',async()=>{const h=harness();assert.equal((await h.upload({field:'foreign'})).status,400);h.db.CampanhaPortal[0].status='ENCERRADA';assert.equal((await h.upload()).status,403);assert.equal(h.privateUploads.length,0);});
