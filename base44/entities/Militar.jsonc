@@ -42,13 +42,13 @@
         "Adido",
         "Agregado",
         "Cedido",
-        "À Disposição",
+        "\u00c0 Disposi\u00e7\u00e3o",
         "LTIP"
       ]
     },
     "destino": {
       "type": "string",
-      "description": "Campo legado — substituído por condicao_origem_destino. Mantido para compatibilidade."
+      "description": "Campo legado \u2014 substitu\u00eddo por condicao_origem_destino. Mantido para compatibilidade."
     },
     "condicao_movimento": {
       "type": "string",
@@ -56,21 +56,21 @@
         "entrada",
         "saida"
       ],
-      "description": "Movimento da condição do militar. 'entrada' indica que veio de outro órgão; 'saida' indica que foi para outro órgão. Não se aplica quando condicao = Efetivo ou LTIP."
+      "description": "Movimento da condi\u00e7\u00e3o do militar. 'entrada' indica que veio de outro \u00f3rg\u00e3o; 'saida' indica que foi para outro \u00f3rg\u00e3o. N\u00e3o se aplica quando condicao = Efetivo ou LTIP."
     },
     "condicao_origem_destino": {
       "type": "string",
-      "description": "Texto livre da origem (quando movimento = entrada) ou destino (quando movimento = saida) da condição. Não se aplica quando condicao = Efetivo ou LTIP."
+      "description": "Texto livre da origem (quando movimento = entrada) ou destino (quando movimento = saida) da condi\u00e7\u00e3o. N\u00e3o se aplica quando condicao = Efetivo ou LTIP."
     },
     "ltip_data_inicio": {
       "type": "string",
       "format": "date",
-      "description": "Data de início da LTIP (Licença para Tratamento de Interesse Particular). Obrigatória quando condicao = LTIP."
+      "description": "Data de in\u00edcio da LTIP (Licen\u00e7a para Tratamento de Interesse Particular). Obrigat\u00f3ria quando condicao = LTIP."
     },
     "ltip_data_fim": {
       "type": "string",
       "format": "date",
-      "description": "Data prevista de retorno/fim da LTIP. Obrigatória quando condicao = LTIP."
+      "description": "Data prevista de retorno/fim da LTIP. Obrigat\u00f3ria quando condicao = LTIP."
     },
     "nome_guerra": {
       "type": "string"
@@ -84,14 +84,14 @@
         "Coronel",
         "Tenente Coronel",
         "Major",
-        "Capitão",
-        "1º Tenente",
-        "2º Tenente",
+        "Capit\u00e3o",
+        "1\u00ba Tenente",
+        "2\u00ba Tenente",
         "Aspirante",
         "Subtenente",
-        "1º Sargento",
-        "2º Sargento",
-        "3º Sargento",
+        "1\u00ba Sargento",
+        "2\u00ba Sargento",
+        "3\u00ba Sargento",
         "Cabo",
         "Soldado"
       ]
@@ -118,7 +118,7 @@
       "type": "string",
       "enum": [
         "Excepcional",
-        "Ótimo",
+        "\u00d3timo",
         "Bom",
         "Insuficiente",
         "MAU"
@@ -142,8 +142,8 @@
         "Solteiro(a)",
         "Casado(a)",
         "Divorciado(a)",
-        "Viúvo(a)",
-        "União Estável"
+        "Vi\u00favo(a)",
+        "Uni\u00e3o Est\u00e1vel"
       ]
     },
     "tipo_sanguineo": {
@@ -167,11 +167,11 @@
       "enum": [
         "Ensino Fundamental Incompleto",
         "Ensino Fundamental Completo",
-        "Ensino Médio Incompleto",
-        "Ensino Médio Completo",
+        "Ensino M\u00e9dio Incompleto",
+        "Ensino M\u00e9dio Completo",
         "Ensino Superior Incompleto",
         "Ensino Superior Completo",
-        "Pós-Graduação",
+        "P\u00f3s-Gradua\u00e7\u00e3o",
         "Mestrado",
         "Doutorado"
       ]
@@ -270,7 +270,7 @@
         "Preta",
         "Parda",
         "Amarela",
-        "Indígena"
+        "Ind\u00edgena"
       ]
     },
     "logradouro": {
@@ -302,27 +302,27 @@
     },
     "grupamento_id": {
       "type": "string",
-      "description": "Campo legado — ID do grupamento ao qual o militar pertence"
+      "description": "Campo legado \u2014 ID do grupamento ao qual o militar pertence"
     },
     "grupamento_nome": {
       "type": "string",
-      "description": "Campo legado — Nome do grupamento (denormalizado)"
+      "description": "Campo legado \u2014 Nome do grupamento (denormalizado)"
     },
     "subgrupamento_id": {
       "type": "string",
-      "description": "Campo legado — ID do subgrupamento ao qual o militar pertence"
+      "description": "Campo legado \u2014 ID do subgrupamento ao qual o militar pertence"
     },
     "subgrupamento_nome": {
       "type": "string",
-      "description": "Campo legado — Nome do subgrupamento (denormalizado)"
+      "description": "Campo legado \u2014 Nome do subgrupamento (denormalizado)"
     },
     "estrutura_id": {
       "type": "string",
-      "description": "ID do nó da estrutura organizacional (Subgrupamento) ao qual o militar está lotado. Suporta os 3 níveis: Grupamento, Subgrupamento ou Unidade."
+      "description": "ID do n\u00f3 da estrutura organizacional (Subgrupamento) ao qual o militar est\u00e1 lotado. Suporta os 3 n\u00edveis: Grupamento, Subgrupamento ou Unidade."
     },
     "estrutura_nome": {
       "type": "string",
-      "description": "Nome do nó da estrutura (denormalizado)"
+      "description": "Nome do n\u00f3 da estrutura (denormalizado)"
     },
     "estrutura_tipo": {
       "type": "string",
@@ -331,16 +331,32 @@
         "Subgrupamento",
         "Unidade"
       ],
-      "description": "Tipo do nó da estrutura ao qual o militar está lotado"
+      "description": "Tipo do n\u00f3 da estrutura ao qual o militar est\u00e1 lotado"
     },
     "operacao_promocao_token": {
       "type": "string",
-      "description": "Token de exclusão mútua de operação oficial. Campo interno.",
+      "description": "Token de exclus\u00e3o m\u00fatua de opera\u00e7\u00e3o oficial. Campo interno.",
       "default": ""
     }
   },
   "required": [
     "nome_completo",
     "matricula"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    }
+  }
 }
