@@ -4,6 +4,42 @@ import { evolutionWhatsAppProvider, normalizeWhatsAppNumber } from './providers/
 import { smsProvider } from './providers/smsProvider.ts';
 import { generatePortalToken } from '../portalCrypto.ts';
 
+export interface PortalAuthConfigData {
+  [key: string]: any;
+  email_enabled: boolean;
+  sms_enabled: boolean;
+  whatsapp_enabled: boolean;
+  email_provider: string;
+  sms_provider: string;
+  whatsapp_provider: string;
+  allow_channel_choice: boolean;
+  default_channel: string;
+  otp_ttl_seconds: number;
+  otp_resend_seconds: number;
+  otp_max_attempts: number;
+  otp_max_sends_per_hour: number;
+  ativo: boolean;
+}
+export interface PublicMethodOption { canal: string; label: string; }
+
+/** Sem configuração válida, não habilitar provedor ou acesso provisório. */
+export const DEFAULT_AUTH_CONFIG: PortalAuthConfigData = Object.freeze({
+  email_enabled: false,
+  sms_enabled: false,
+  whatsapp_enabled: false,
+  email_provider: 'disabled',
+  sms_provider: 'disabled',
+  whatsapp_provider: 'disabled',
+  provisional_cpf_matricula_enabled: false,
+  allow_channel_choice: false,
+  default_channel: 'EMAIL',
+  otp_ttl_seconds: 300,
+  otp_resend_seconds: 60,
+  otp_max_attempts: 3,
+  otp_max_sends_per_hour: 3,
+  ativo: false,
+});
+
 /**
  * Normaliza uma string de CPF removendo todos os caracteres não-numéricos.
  */
