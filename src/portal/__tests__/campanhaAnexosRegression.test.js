@@ -50,13 +50,14 @@ test('ZIP preserva bytes, extensão e recusa download com erro',async()=>{
 
 const validationStart=source.indexOf('        for (const [campoId, item] of Object.entries(arquivosObj))');
 const validationEnd=source.indexOf('        for (const c of camposObrigatorios)',validationStart);
-const validation=new Function('arquivosObj','formConfig','Response','URL','CORS_HEADERS',ts.transpile(source.slice(validationStart,validationEnd)));
-test('backend valida campo, origem, formato e tamanho',()=>{
+const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+const validation=new AsyncFunction('arquivosObj','formConfig','Response','URL','CORS_HEADERS','isPrivateCampaignFile','requireCampaignFile','base44','militarId','campanha_id','previousFiles',ts.transpile(source.slice(validationStart,validationEnd)));
+test('backend valida campo, origem, formato e tamanho de referências legadas próprias',async()=>{
  const config={campos:[{id:'cert',tipo:'upload_arquivo'}]};
- const validate=files=>validation(files,config,Response,URL,{});
- for(const ext of ['jpg','jpeg','png','pdf','doc','docx','xls','xlsx']) assert.equal(validate(JSON.parse(response(ext).arquivos_anexados_json)),undefined);
- for(const item of [{},{url:'javascript:alert(1)',nome:'a.jpg'}, {url:'https://example.com/a.jpg',nome:'a.jpg'}, {...JSON.parse(response('jpg').arquivos_anexados_json).cert,tamanho:16*1024*1024}, {...JSON.parse(response('exe').arquivos_anexados_json).cert}]) assert.equal(validate({cert:item}).status,400);
- assert.equal(validate({outro:JSON.parse(response('jpg').arquivos_anexados_json).cert}).status,400);
+ const validate=files=>validation(files,config,Response,URL,{},()=>false,async()=>{throw Error('unexpected private reference');},{},'m','c',files);
+ for(const ext of ['jpg','jpeg','png','pdf','doc','docx','xls','xlsx']) assert.equal(await validate(JSON.parse(response(ext).arquivos_anexados_json)),undefined);
+ for(const item of [{},{url:'javascript:alert(1)',nome:'a.jpg'}, {url:'https://example.com/a.jpg',nome:'a.jpg'}, {...JSON.parse(response('jpg').arquivos_anexados_json).cert,tamanho:16*1024*1024}, {...JSON.parse(response('exe').arquivos_anexados_json).cert}]) assert.equal((await validate({cert:item})).status,400);
+ assert.equal((await validate({outro:JSON.parse(response('jpg').arquivos_anexados_json).cert})).status,400);
 });
 
 const scopeSource = source.slice(source.indexOf('function normalizeText'), source.indexOf('function vinculoGrupoValidoHoje'))
