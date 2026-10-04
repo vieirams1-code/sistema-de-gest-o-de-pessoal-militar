@@ -1,8 +1,8 @@
 {
   "name": "RespostaCampanhaPersonalizada",
   "type": "object",
-  "title": "Resposta de Campanha e Formulário do Portal",
-  "description": "Armazena as respostas preenchidas pelos militares em campanhas de formulários dinâmicos e devolução de documentos assinados.",
+  "title": "Resposta de Campanha e Formul\u00e1rio do Portal",
+  "description": "Armazena as respostas preenchidas pelos militares em campanhas de formul\u00e1rios din\u00e2micos e devolu\u00e7\u00e3o de documentos assinados.",
   "properties": {
     "campanha_id": {
       "type": "string",
@@ -29,7 +29,7 @@
     },
     "respostas_json": {
       "type": "string",
-      "description": "JSON com as respostas de cada campo do formulário { [campo_id]: valor }"
+      "description": "JSON com as respostas de cada campo do formul\u00e1rio { [campo_id]: valor }"
     },
     "arquivos_anexados_json": {
       "type": "string",
@@ -50,7 +50,7 @@
     "termo_aceite": {
       "type": "boolean",
       "default": false,
-      "description": "Confirmação do termo de ciência ou declaração"
+      "description": "Confirma\u00e7\u00e3o do termo de ci\u00eancia ou declara\u00e7\u00e3o"
     },
     "data_envio": {
       "type": "string",
@@ -58,12 +58,17 @@
     },
     "status": {
       "type": "string",
-      "enum": ["Enviado", "Homologado", "Rejeitado", "Pendente_Correcao"],
+      "enum": [
+        "Enviado",
+        "Homologado",
+        "Rejeitado",
+        "Pendente_Correcao"
+      ],
       "default": "Enviado"
     },
     "observacao_gestor": {
       "type": "string",
-      "description": "Despacho ou observação do gestor/RH"
+      "description": "Despacho ou observa\u00e7\u00e3o do gestor/RH"
     },
     "homologado_por_nome": {
       "type": "string"
@@ -73,5 +78,24 @@
       "format": "date-time"
     }
   },
-  "required": ["campanha_id", "militar_id"]
+  "required": [
+    "campanha_id",
+    "militar_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    }
+  }
 }
