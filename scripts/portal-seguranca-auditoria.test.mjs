@@ -6,7 +6,7 @@ import { webcrypto } from 'node:crypto';
 import { buildSync } from 'esbuild';
 import { hashPortalToken, hashOtp } from '../base44/shared/portal/portalCrypto.ts';
 const pepper='fixture-only-not-a-production-secret';
-const compile=entry=>buildSync({entryPoints:[entry],bundle:true,platform:'node',format:'cjs',write:false,external:['npm:*']}).outputFiles[0].text;
+const compile=entry=>buildSync({entryPoints:[entry],bundle:true,platform:'node',format:'cjs',write:false,external:['npm:*','@/lib/app-params','@/api/base44Client']}).outputFiles[0].text;
 const guardCode=compile('base44/shared/portal/requirePortalSession.ts');
 const authCode=compile('base44/functions/portal_auth/entry.ts');
 function runtime(extra={}) { return {crypto:webcrypto,TextEncoder,Response,Request,Date,console:{warn(){},error(){},info(){}},...extra}; }
@@ -63,7 +63,7 @@ test('falha de rede depois do envio não provoca repetição automática',async(
 test('timeout não provoca repetição automática',async()=>{const h=portalHarness({abort:true});await assert.rejects(h.call(),e=>e.status===408);assert.deepEqual(h.counts(),{direct:1,sdk:0});});
 test('SDK continua disponível quando o transporte direto não existe',async()=>{const h=portalHarness({hasDirect:false});assert.equal((await h.call()).ok,true);assert.deepEqual(h.counts(),{direct:0,sdk:1});});
 function allows(rule,user){
-  if(rule===false)return false;if(rule===true)return true;
+  if(rule===false)return false;if(rule===true)return true;if(rule&&Object.keys(rule).length===0)return true;
   if(rule.$or)return rule.$or.some(x=>allows(x,user));
   if(rule.user_condition)return !!user&&Object.entries(rule.user_condition).every(([k,v])=>user[k]===v);
   throw Error('Regra não esperada no contrato de contenção');
