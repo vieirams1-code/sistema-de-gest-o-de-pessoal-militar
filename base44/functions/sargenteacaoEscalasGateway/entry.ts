@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
+import { createSargenteacaoScope, assertRealDate } from '../../shared/sargenteacaoScope.ts';
 
 const RANKS = ['coronel','tenente coronel','major','capitao','1 tenente','2 tenente','aspirante','subtenente','1 sargento','2 sargento','3 sargento','cabo','soldado'];
 const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status }); };
@@ -10,8 +11,7 @@ const required = (value: unknown, label: string) => {
 };
 const validDate = (value: unknown, label: string) => {
   const result = required(value, label);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result)) fail(`${label} inválida.`);
-  return result;
+  return assertRealDate(result, label);
 };
 const normalize = (value: unknown) => text(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[º°ª.\-]/g, ' ').replace(/\s+/g, ' ').toLowerCase();
 const overlaps = (a: string, b: string, start: string, end: string) => Boolean(a && b && a <= end && b >= start);
@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
     const canManage = isAdmin || (permissions?.modules?.sargenteacao === true && permissions?.actions?.gerir_sargenteacao === true);
     if (!(action === 'LIST' ? canView : canManage)) fail('Sem permissão para esta operação.', 403);
     const entities = base44.asServiceRole.entities;
+    const scope = await createSargenteacaoScope(base44, permissions);
 
     if (action === 'LIST') {
       const [escalas, guarnicoes, escalados, records] = await Promise.all([
@@ -96,7 +97,19 @@ Deno.serve(async (req) => {
         entities.EscalaMilitar.list('ordem_antiguidade', 5000),
         entities.Militar.list('nome_guerra', 5000),
       ]);
+      const stations = await entities.QuartelPosto.list(undefined, 1000);
+      const stationIds = new Set(stations.filter(scope.stationAllowed).map((row: any) => row.id));
+      const visibleScales = escalas.filter((row: any) => stationIds.has(row.quartel_posto_id));
+      const scaleIds = new Set(visibleScales.map((row: any) => row.id));
+      const visibleCrews = guarnicoes.filter((row: any) => scaleIds.has(row.escala_servico_id));
+      const crewIds = new Set(visibleCrews.map((row: any) => row.id));
+      const militaryIds = await scope.allowedMilitaryIds(records);
+      const visibleAssignments = escalados.filter((row: any) =>
+        scaleIds.has(row.escala_servico_id) && crewIds.has(row.escala_guarnicao_id) &&
+        visibleCrews.some((crew: any) => crew.id === row.escala_guarnicao_id && crew.escala_servico_id === row.escala_servico_id) &&
+        militaryIds.has(row.militar_id));
       const militares = records
+        .filter((row: any) => militaryIds.has(row.id))
         .filter((item: any) => item.status_cadastro !== 'Inativo' && !['Reserva Remunerada', 'Reformado'].includes(item.situacao_militar))
         .map((item: any) => ({
           id: item.id,
@@ -110,7 +123,7 @@ Deno.serve(async (req) => {
           estrutura_nome: item.estrutura_nome,
           cnh_categoria: item.cnh_categoria,
         }));
-      return Response.json({ escalas, guarnicoes, escalados, militares });
+      return Response.json({ escalas: visibleScales, guarnicoes: visibleCrews, escalados: visibleAssignments, militares });
     }
 
     if (action === 'CREATE_SCALE') {
@@ -119,7 +132,7 @@ Deno.serve(async (req) => {
       if (end < start) fail('A data final deve ser igual ou posterior à inicial.');
       const stationId = required(body.data?.quartel_posto_id, 'Quartel/posto');
       const groupId = required(body.data?.ala_grupo_id, 'Ala/grupo');
-      const station = await entities.QuartelPosto.get(stationId);
+      const station = await scope.assertStation(stationId);
       const group = await entities.AlaGrupo.get(groupId);
       if (!station || station.ativo === false) fail('Quartel/posto inválido ou inativo.');
       if (!group || group.ativo === false || group.quartel_posto_id !== stationId) fail('Ala/grupo inválido para o quartel selecionado.');
@@ -139,6 +152,7 @@ Deno.serve(async (req) => {
       const scale = await entities.EscalaServico.get(required(body.escalaId, 'Escala'));
       const model = await entities.ModeloGuarnicao.get(required(body.modeloId, 'Modelo de guarnição'));
       if (!scale || scale.status !== 'RASCUNHO') fail('A escala precisa estar em rascunho.');
+      await scope.assertScale(scale);
       if (!model || model.ativo === false) fail('Modelo de guarnição inválido ou inativo.');
       const record = await entities.EscalaGuarnicao.create({
         escala_servico_id: scale.id,
@@ -156,6 +170,8 @@ Deno.serve(async (req) => {
       if (!crew) fail('Guarnição não encontrada.', 404);
       const scale = await entities.EscalaServico.get(crew.escala_servico_id);
       if (!scale || scale.status !== 'RASCUNHO') fail('A escala precisa estar em rascunho.');
+      await scope.assertCrew(crew);
+      await scope.assertMilitary(required(body.militarId, 'Militar'));
       const military = await entities.Militar.get(required(body.militarId, 'Militar'));
       if (!military || military.status_cadastro === 'Inativo') fail('Militar inválido ou inativo.');
       const role = text(body.funcao_operacional);
@@ -188,6 +204,9 @@ Deno.serve(async (req) => {
       if (!record) fail('Registro não encontrado.', 404);
       const scale = await entities.EscalaServico.get(record.escala_servico_id);
       if (!scale || scale.status !== 'RASCUNHO') fail('Somente escalas em rascunho podem ser alteradas.');
+      const crew = await entities.EscalaGuarnicao.get(record.escala_guarnicao_id);
+      if (!crew || crew.escala_servico_id !== record.escala_servico_id) fail('Vínculo da escala inconsistente.', 409);
+      await scope.assertCrew(crew);
       await entities.EscalaMilitar.delete(record.id);
       await recalculateCrew(entities, record.escala_guarnicao_id);
       return Response.json({ ok: true });
@@ -198,6 +217,7 @@ Deno.serve(async (req) => {
       if (!crew) fail('Guarnição não encontrada.', 404);
       const scale = await entities.EscalaServico.get(crew.escala_servico_id);
       if (!scale || scale.status !== 'RASCUNHO') fail('Somente escalas em rascunho podem ser alteradas.');
+      await scope.assertCrew(crew);
       const assignments = await entities.EscalaMilitar.filter({ escala_guarnicao_id: crew.id });
       for (const assignment of assignments) await entities.EscalaMilitar.delete(assignment.id);
       await entities.EscalaGuarnicao.delete(crew.id);
@@ -207,7 +227,9 @@ Deno.serve(async (req) => {
     if (action === 'PUBLISH_SCALE') {
       const scale = await entities.EscalaServico.get(required(body.id, 'Escala'));
       if (!scale || scale.status !== 'RASCUNHO') fail('A escala precisa estar em rascunho.');
+      await scope.assertScale(scale);
       const crews = await entities.EscalaGuarnicao.filter({ escala_servico_id: scale.id });
+      for (const crew of crews) await scope.assertCrew(crew);
       if (!crews.length) fail('Adicione ao menos uma guarnição antes de publicar.');
       if (crews.some((crew: any) => crew.status !== 'COMPLETA')) fail('Complete todas as vagas das guarnições antes de publicar.');
       await entities.EscalaServico.update(scale.id, { status: 'PUBLICADA' });
@@ -218,6 +240,7 @@ Deno.serve(async (req) => {
     if (action === 'CANCEL_SCALE') {
       const scale = await entities.EscalaServico.get(required(body.id, 'Escala'));
       if (!scale) fail('Escala não encontrada.', 404);
+      await scope.assertScale(scale);
       if (scale.status === 'ENCERRADA') fail('Escala encerrada não pode ser cancelada.');
       await entities.EscalaServico.update(scale.id, { status: 'CANCELADA' });
       return Response.json({ ok: true });
