@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCampanhaFormulario, submeterRespostaCampanha } from '../api/PortalApiClient';
-import { base44 } from '@/api/base44Client';
+import { getCampanhaFormulario, submeterRespostaCampanha, enviarAnexoCampanha, abrirAnexoCampanha } from '../api/PortalApiClient';
 import {
   FileText,
   Download,
@@ -60,7 +59,7 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
         setRespostas(r.respostas || {});
         setArquivosAnexados(r.arquivos_anexados || {});
         if (r.arquivo_devolucao_url) {
-          setArquivoDevolucao({ url: r.arquivo_devolucao_url, nome: r.arquivo_devolucao_nome || 'documento_assinado.pdf' });
+          setArquivoDevolucao({ url: r.arquivo_devolucao_url, signed_url: r.arquivo_devolucao_signed_url, nome: r.arquivo_devolucao_nome || 'documento_assinado.pdf' });
         }
         setRespostaTextoGeral(r.resposta_texto_geral || '');
         setTermoAceite(Boolean(r.termo_aceite));
@@ -99,19 +98,19 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
     setErrorMsg(null);
 
     try {
-      const uploadRes = await base44.integrations.Core.UploadFile({ file });
-      const fileUrl = uploadRes?.file_url || uploadRes?.url;
+      const uploadRes = await enviarAnexoCampanha(campanhaId, campoId, file);
+      const fileUrl = uploadRes?.url;
 
       if (!fileUrl) {
         throw new Error('Não foi possível obter o link do arquivo enviado.');
       }
 
       if (campoId === 'geral' || campoId === 'devolucao') {
-        setArquivoDevolucao({ url: fileUrl, nome: file.name });
+        setArquivoDevolucao({ url: fileUrl, signed_url: uploadRes.signed_url, nome: file.name });
       } else {
         setArquivosAnexados((prev) => ({
           ...prev,
-          [campoId]: { url: fileUrl, nome: file.name, tamanho: file.size },
+          [campoId]: { url: fileUrl, signed_url: uploadRes.signed_url, nome: file.name, tamanho: file.size },
         }));
       }
     } catch (err) {
@@ -521,7 +520,8 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                           </div>
                           <div className="flex items-center space-x-2">
                             <a
-                              href={arquivosAnexados[campo.id].url}
+                              href={arquivosAnexados[campo.id].signed_url || '#'}
+                              onClick={async (event) => { event.preventDefault(); try { await abrirAnexoCampanha(campanhaId, campo.id, arquivosAnexados[campo.id].url); } catch (error) { setErrorMsg(error.message); } }}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-emerald-700 hover:text-emerald-900 p-1"
@@ -613,7 +613,8 @@ export default function PortalCampanhaView({ campanhaId, onBack }) {
                   </div>
                   <div className="flex items-center space-x-2">
                     <a
-                      href={arquivoDevolucao.url}
+                      href={arquivoDevolucao.signed_url || '#'}
+                      onClick={async (event) => { event.preventDefault(); try { await abrirAnexoCampanha(campanhaId, 'devolucao', arquivoDevolucao.url); } catch (error) { setErrorMsg(error.message); } }}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-emerald-700 hover:text-emerald-900 p-1"
