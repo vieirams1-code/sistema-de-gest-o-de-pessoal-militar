@@ -27,7 +27,7 @@ Sondas GET sem cookies e sem Authorization, limit=1: as quatro entidades passara
 
 ## Pendências de segurança e publicação
 
-Acesso por ID/filtro e perfis deve permanecer no roteiro de verificação. Anexos já publicados ainda precisam de política privada e migração segura (SGP-002). Restrição entre unidades permanece pendente. Não considerar o sistema integralmente protegido por esta etapa.
+Consultas autorizadas somente ao campo ID confirmaram que os quatro conjuntos continuam com registros. Para cada um, GET anônimo de um ID existente retornou 404 e filtro pelo mesmo ID retornou 200 com lista vazia. Assim, a ausência de resultado não decorre de exclusão dos dados. Homologação completa com perfis e escopos autenticados permanece pendente. Anexos já publicados ainda precisam de política privada e migração segura (SGP-002). Restrição entre unidades permanece pendente. Não considerar o sistema integralmente protegido por esta etapa.
 
 As alterações de schemas e backend no sandbox são sincronizadas automaticamente pelo Base44; frontend foi compilado com sucesso, mas a versão pública completa precisa ser conferida no ciclo de publicação do app. Não foi executado comando manual de deploy ou push. GitHub é conferido após o checkpoint.
 
