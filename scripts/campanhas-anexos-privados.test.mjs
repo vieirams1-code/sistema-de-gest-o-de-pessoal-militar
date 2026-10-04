@@ -23,9 +23,10 @@ function harness({admin=false,storageFailure=false,registryFailure=false,signing
   CreateFileSignedUrl:async p=>{signed.push(p);if(signingFailure)return {};return {signed_url:'https://fixture.invalid/signed/'+signed.length};}
  }}},functions:{invoke:async()=>({data:{isAdminByRole:admin,hasGlobalScope:admin,modules:{campanhas:true},actions:{}}})}};
  let handler;vm.runInNewContext(code,{module:{exports:{}},exports:{},require:()=>({createClientFromRequest:()=>client}),Deno:{serve:fn=>handler=fn,env:{get:()=>undefined}},Request,Response,File,TextEncoder,TextDecoder,Uint8Array,URL,crypto:webcrypto,console:{warn(){},error(...args){debug.push(args.map(String).join(' '));},info(){}}});
- const call=async(payload,{noToken=false,form=false}={})=>{
+ const call=async(payload,{noToken=false,form=false,declaredLength}={})=>{
   const headers=noToken?{}:{'X-Portal-Token':token};
   if(!form)headers['Content-Type']='application/json';
+  if(declaredLength)headers['Content-Length']=String(declaredLength);
   const req=new Request('https://fixture.invalid/functions/portal_servicos',{method:'POST',headers,body:form?payload:JSON.stringify(payload)});
   const res=await handler(req);return {status:res.status,body:await res.json(),debug};
  };
@@ -53,9 +54,9 @@ test('registro de anexos é fechado por RLS para as quatro operações',()=>{con
 test('download administrativo autorizado assina anexos registrados sem mudar URI persistida',async()=>{const h=harness({admin:true});const u=await h.upload();await h.call({acao:'CAMPANHA_FORMULARIO_SUBMETER',campanha_id:'campaign',arquivos_anexados_json:{question:{url:u.body.url,nome:'fixture.pdf',tamanho:10}}});const before=h.signed.length;const r=await h.call({acao:'CAMPANHA_ANEXOS_RETORNO',campanha_id:'campaign'});assert.equal(r.status,200,JSON.stringify(r));assert.ok(h.signed.length>before);assert.equal(JSON.parse(h.db.RespostaCampanhaPersonalizada[0].arquivos_anexados_json).question.url,u.body.url);});
 test('assinatura ausente não retorna sucesso ou link público',async()=>{const h=harness({signingFailure:true});const r=await h.upload();assert.equal(r.status,502);assert.equal(r.body.url,undefined);assert.equal(h.publicUploads.length,0);});
 test('link de campo incorreto não gera assinatura',async()=>{const h=harness();const u=await h.upload();const before=h.signed.length;const r=await h.call({acao:'CAMPANHA_ANEXO_LINK',campanha_id:'campaign',campo_id:'other',file_uri:u.body.url});assert.equal(r.status,403);assert.equal(h.signed.length,before);});
-test('multipart acima de 16MB é recusado antes de armazenar',async()=>{const h=harness();const r=await h.upload({bytes:new Uint8Array(16*1024*1024+1)});assert.equal(r.status,413);assert.equal(h.privateUploads.length,0);});
+test('multipart declarado acima de 16MB é recusado antes de armazenar',async()=>{const h=harness();const f=new FormData();f.set('acao','CAMPANHA_ANEXO_ENVIAR');const r=await h.call(f,{form:true,declaredLength:16*1024*1024+1});assert.equal(r.status,413);assert.equal(h.privateUploads.length,0);});
 const otpCode=buildSync({entryPoints:['base44/shared/portal/otp/otpService.ts'],bundle:true,platform:'node',format:'cjs',write:false}).outputFiles[0].text;
-const otpModule={exports:{}};vm.runInNewContext(otpCode,{module:otpModule,exports:otpModule.exports,crypto:webcrypto,Deno:{env:{get:()=>undefined}},console:{warn(){},error(){}}});
+const otpModule={exports:{}};vm.runInNewContext(otpCode,{module:otpModule,exports:otpModule.exports,crypto:webcrypto,TextEncoder,TextDecoder,Deno:{env:{get:()=>undefined}},console:{warn(){},error(){}}});
 const {loadAuthConfig,getAvailablePublicMethods}=otpModule.exports;
 for(const kind of ['missing-entity','missing-records','query-error'])test('configuração ausente falha com métodos desativados: '+kind,async()=>{const entity=kind==='missing-records'?{filter:async()=>[],list:async()=>[]}:{filter:async()=>{throw Error('fixture failure');}};const client=kind==='missing-entity'?{}:{asServiceRole:{entities:{PortalAuthConfig:entity}}};const config=await loadAuthConfig(client);assert.equal(config.ativo,false);assert.equal(config.provisional_cpf_matricula_enabled,false);assert.equal(getAvailablePublicMethods(config).length,0);});
 test('normalização mantém configuração existente e modalidades funcionais do Portal',async()=>{const config=await loadAuthConfig({asServiceRole:{entities:{PortalAuthConfig:{filter:async()=>[{id:'fixture',ativo:true,email_enabled:true,email_provider:'base44_core',whatsapp_enabled:false,ferias_permitir_3_etapas_10d:false,otp_ttl_seconds:450}]}}}});assert.equal(config.ativo,true);assert.equal(config.email_enabled,true);assert.equal(config.ferias_permitir_3_etapas_10d,false);assert.equal(config.otp_ttl_seconds,450);});
