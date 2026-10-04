@@ -148,6 +148,58 @@ export async function portalFetch(functionName, data = {}) {
   }
 }
 
+/** Envia anexos ao backend autenticado; não utiliza armazenamento público. */
+export async function enviarAnexoCampanha(campanhaId, campoId, file) {
+  const token = getPortalToken();
+  if (!token || !appParams.serverUrl || !appParams.appId) {
+    throw new Error('Faça novo login para enviar o anexo.');
+  }
+  const form = new FormData();
+  form.set('acao', 'CAMPANHA_ANEXO_ENVIAR');
+  form.set('campanha_id', campanhaId);
+  form.set('campo_id', campoId);
+  form.set('file', file);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+  try {
+    const response = await fetch(`${appParams.serverUrl}/api/apps/${appParams.appId}/functions/portal_servicos`, {
+      method: 'POST',
+      headers: {
+        'X-App-Id': appParams.appId,
+        'X-Portal-Token': token,
+        'Authorization': `Bearer ${token}`,
+        ...(appParams.functionsVersion ? { 'Base44-Functions-Version': appParams.functionsVersion } : {}),
+      },
+      body: form,
+      signal: controller.signal,
+    });
+    if (response.status === 401) clearPortalToken();
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body?.url) {
+      const error = new Error(body?.error || 'Não foi possível enviar o anexo.');
+      error.status = response.status;
+      throw error;
+    }
+    return body;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('O envio demorou além do limite. Confira a conexão antes de tentar novamente.');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+
+/** Renova o link somente após validar a sessão e o vínculo no servidor. */
+export async function abrirAnexoCampanha(campanhaId, campoId, fileUri) {
+  const preview = window.open('about:blank', '_blank');
+  if (preview) preview.opener = null;
+  try {
+    const result = await portalFetch('portal_servicos', { acao: 'CAMPANHA_ANEXO_LINK', campanha_id: campanhaId, campo_id: campoId, file_uri: fileUri });
+    const url = new URL(result?.url);
+    if (url.protocol !== 'https:') throw new Error('Link de anexo inválido.');
+    if (preview) preview.location.href = url.href;
+    else throw new Error('Permita a abertura de uma nova aba para visualizar o anexo.');
+  } catch (error) { if (preview) preview.close(); throw error; }
+}
+
 /**
  * Inicia o desafio de autenticação identificando o militar por CPF.
  */
