@@ -258,7 +258,11 @@
             "role": "admin"
           }
         },
-        {}
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
       ]
     },
     "write": {
