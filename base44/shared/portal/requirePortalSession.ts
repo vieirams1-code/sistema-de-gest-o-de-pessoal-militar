@@ -204,7 +204,7 @@ export async function requirePortalSession(
     return {
       ok: false,
       status: 401,
-      error: `SESSAO_${sessao.status}: A sessão atual encontra-se ${sessao.status.toLowerCase()}.`,
+      error: `SESSAO_${sessao.status}: A sessão atual encontra-se ${String(sessao.status || 'inválida').toLowerCase()}.`,
     };
   }
 
@@ -231,82 +231,54 @@ export async function requirePortalSession(
   const now = new Date();
   const nowMs = now.getTime();
 
-  // 6.a Absolute Timeout
-  if (sessao.absolute_expires_at) {
-    const absExpMs = new Date(sessao.absolute_expires_at).getTime();
-    if (Number.isNaN(absExpMs) || nowMs > absExpMs) {
-      await PortalSessaoEntity.update(sessao.id, {
-        status: 'EXPIRADA',
-        motivo_revogacao: 'Absolute timeout atingido.',
-      });
-      await registrarAuditoriaPortal(base44, {
-        sessao_id: sessao.id,
-        militar_id: militarId,
-        acao: 'SESSAO_EXPIRADA',
-        resultado: false,
-        motivo_falha_sanitizado: 'Tempo máximo de sessão atingido (absolute timeout).',
-        ip_origem,
-        user_agent,
-        correlation_id,
-      });
-      return {
-        ok: false,
-        status: 401,
-        error: 'SESSAO_EXPIRADA: Tempo máximo de sessão expirado. Faça novo login.',
-      };
-    }
-  }
+  // Todo prazo presente é autoritativo, incluindo o campo legado. Nunca
+  // estender a sessão ao normalizar ou atualizar sua última atividade.
+  const deadlines = [
+    sessao.absolute_expires_at,
+    sessao.token_expires_at,
+    sessao.expires_at,
+  ].filter((value) => value !== undefined && value !== null);
+  const invalidDeadline = deadlines.length === 0 || deadlines.some((value) => {
+    const timestamp = typeof value === 'string' && value.trim()
+      ? Date.parse(value)
+      : NaN;
+    return !Number.isFinite(timestamp) || nowMs >= timestamp;
+  });
+  const lastActivityMs = sessao.last_activity_at
+    ? Date.parse(sessao.last_activity_at)
+    : NaN;
+  const idleExpired = sessao.last_activity_at && (
+    !Number.isFinite(lastActivityMs) || nowMs - lastActivityMs >= IDLE_TIMEOUT_MS
+  );
 
-  // 6.b Token Validity Timeout
-  if (sessao.token_expires_at) {
-    const tokExpMs = new Date(sessao.token_expires_at).getTime();
-    if (Number.isNaN(tokExpMs) || nowMs > tokExpMs) {
+  if (invalidDeadline || idleExpired) {
+    const reason = invalidDeadline
+      ? 'Prazo de sessão ausente, inválido ou atingido.'
+      : 'Idle timeout por inatividade.';
+    // A negativa de autorização independe da disponibilidade de escrita.
+    try {
       await PortalSessaoEntity.update(sessao.id, {
         status: 'EXPIRADA',
-        motivo_revogacao: 'Token expiration atingido.',
+        motivo_revogacao: reason,
       });
-      await registrarAuditoriaPortal(base44, {
-        sessao_id: sessao.id,
-        militar_id: militarId,
-        acao: 'SESSAO_EXPIRADA',
-        resultado: false,
-        motivo_falha_sanitizado: 'Validade do token expirada.',
-        ip_origem,
-        user_agent,
-        correlation_id,
-      });
-      return {
-        ok: false,
-        status: 401,
-        error: 'SESSAO_EXPIRADA: Validade da credencial expirou.',
-      };
+    } catch (_expirationError) {
+      console.warn('[requirePortalSession] Não foi possível persistir a expiração.', { correlation_id });
     }
-  }
-
-  // 6.c Idle Timeout (Inatividade)
-  if (sessao.last_activity_at) {
-    const lastActMs = new Date(sessao.last_activity_at).getTime();
-    if (Number.isNaN(lastActMs) || nowMs - lastActMs > IDLE_TIMEOUT_MS) {
-      await PortalSessaoEntity.update(sessao.id, {
-        status: 'EXPIRADA',
-        motivo_revogacao: 'Idle timeout por inatividade.',
-      });
-      await registrarAuditoriaPortal(base44, {
-        sessao_id: sessao.id,
-        militar_id: militarId,
-        acao: 'SESSAO_EXPIRADA',
-        resultado: false,
-        motivo_falha_sanitizado: 'Sessão expirada por inatividade (idle timeout).',
-        ip_origem,
-        user_agent,
-        correlation_id,
-      });
-      return {
-        ok: false,
-        status: 401,
-        error: 'SESSAO_EXPIRADA: Sessão expirada por inatividade.',
-      };
-    }
+    await registrarAuditoriaPortal(base44, {
+      sessao_id: sessao.id,
+      militar_id: militarId,
+      acao: 'SESSAO_EXPIRADA',
+      resultado: false,
+      motivo_falha_sanitizado: reason,
+      ip_origem,
+      user_agent,
+      correlation_id,
+    });
+    return {
+      ok: false,
+      status: 401,
+      error: 'SESSAO_EXPIRADA: Sessão expirada. Faça novo login.',
+    };
   }
 
   // 7. Sessão Válida: Atualizar última atividade de forma síncrona/aguardada
