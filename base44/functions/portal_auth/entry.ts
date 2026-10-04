@@ -245,8 +245,16 @@ Deno.serve(async (req: Request) => {
             validated_at: nowIso,
             last_activity_at: nowIso,
             expires_at: absoluteExpiresAt,
+            token_expires_at: absoluteExpiresAt,
+            absolute_expires_at: absoluteExpiresAt,
           });
-        } catch (_e) {}
+        } catch (_sessionWriteError) {
+          console.error('[portal_auth] Falha ao persistir sessão ativa.', { correlation_id });
+          return jsonResponse({
+            error: 'Não foi possível concluir o acesso. Tente novamente mais tarde.',
+            correlation_id,
+          }, 503);
+        }
 
         try {
           await registrarAuditoriaPortal(base44, {
@@ -550,7 +558,7 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: 'Código inválido ou expirado.' }, 401);
         }
 
-        if (!sessao.otp_expires_at || new Date(sessao.otp_expires_at).getTime() < now.getTime()) {
+        if (!sessao.otp_expires_at || !Number.isFinite(Date.parse(sessao.otp_expires_at)) || Date.parse(sessao.otp_expires_at) <= now.getTime()) {
           try { await PortalSessao.update(sessao.id, { status: 'EXPIRADA' }); } catch (_e) {}
           return jsonResponse({ error: 'Código inválido ou expirado.' }, 401);
         }
@@ -587,8 +595,16 @@ Deno.serve(async (req: Request) => {
             validated_at: nowIso,
             last_activity_at: nowIso,
             expires_at: absoluteExpiresAt,
+            token_expires_at: absoluteExpiresAt,
+            absolute_expires_at: absoluteExpiresAt,
           });
-        } catch (_e) {}
+        } catch (_sessionWriteError) {
+          console.error('[portal_auth] Falha ao persistir sessão ativa.', { correlation_id });
+          return jsonResponse({
+            error: 'Não foi possível concluir o acesso. Tente novamente mais tarde.',
+            correlation_id,
+          }, 503);
+        }
 
         try {
           await registrarAuditoriaPortal(base44, {
