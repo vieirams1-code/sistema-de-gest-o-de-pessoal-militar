@@ -51,7 +51,7 @@ test('ZIP preserva bytes, extensão e recusa download com erro',async()=>{
 const validationStart=source.indexOf('        for (const [campoId, item] of Object.entries(arquivosObj))');
 const validationEnd=source.indexOf('        for (const c of camposObrigatorios)',validationStart);
 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-const validation=new AsyncFunction('arquivosObj','formConfig','Response','URL','CORS_HEADERS','isPrivateCampaignFile','requireCampaignFile','base44','militarId','campanha_id','previousFiles',ts.transpile(source.slice(validationStart,validationEnd)));
+const validation=new AsyncFunction('arquivosObj','formConfig','Response','URL','CORS_HEADERS','isPrivateCampaignFile','requireCampaignFile','base44','militarId','campanha_id','previousFiles',ts.transpile(source.slice(validationStart,validationEnd),{target:ts.ScriptTarget.ES2022}));
 test('backend valida campo, origem, formato e tamanho de referências legadas próprias',async()=>{
  const config={campos:[{id:'cert',tipo:'upload_arquivo'}]};
  const validate=files=>validation(files,config,Response,URL,{},()=>false,async()=>{throw Error('unexpected private reference');},{},'m','c',files);
