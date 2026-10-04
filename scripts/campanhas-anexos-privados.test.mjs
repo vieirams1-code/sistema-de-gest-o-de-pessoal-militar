@@ -8,7 +8,7 @@ import { hashPortalToken } from '../base44/shared/portal/portalCrypto.ts';
 const code=buildSync({entryPoints:['base44/functions/portal_servicos/entry.ts'],bundle:true,platform:'node',format:'cjs',write:false,external:['npm:*']}).outputFiles[0].text;
 const token='b'.repeat(64),tokenHash=await hashPortalToken(token);
 function harness({admin=false,storageFailure=false,registryFailure=false,seed={}}={}){
- const privateUploads=[],signed=[],publicUploads=[];
+ const privateUploads=[],signed=[],publicUploads=[],debug=[];
  const db={
   PortalSessao:[{id:'session',token_hash:tokenHash,status:'ATIVA',militar_id:'ma',absolute_expires_at:new Date(Date.now()+3600000).toISOString(),last_activity_at:new Date().toISOString()}],
   Militar:[{id:'ma',nome_completo:'Fixture A',status_cadastro:'Ativo'},{id:'mb',nome_completo:'Fixture B',status_cadastro:'Ativo'}],
@@ -22,12 +22,12 @@ function harness({admin=false,storageFailure=false,registryFailure=false,seed={}
   UploadPrivateFile:async p=>{if(storageFailure)throw Error('fixture private storage failure');privateUploads.push(p);return {file_uri:'private/fixture/'+privateUploads.length+'.pdf'};},
   CreateFileSignedUrl:async p=>{signed.push(p);return {signed_url:'https://fixture.invalid/signed/'+signed.length};}
  }}},functions:{invoke:async()=>({data:{isAdminByRole:admin,hasGlobalScope:admin,modules:{campanhas:true},actions:{}}})}};
- let handler;vm.runInNewContext(code,{module:{exports:{}},exports:{},require:()=>({createClientFromRequest:()=>client}),Deno:{serve:fn=>handler=fn,env:{get:()=>undefined}},Request,Response,File,TextEncoder,TextDecoder,Uint8Array,URL,crypto:webcrypto,console:{warn(){},error(){},info(){}}});
+ let handler;vm.runInNewContext(code,{module:{exports:{}},exports:{},require:()=>({createClientFromRequest:()=>client}),Deno:{serve:fn=>handler=fn,env:{get:()=>undefined}},Request,Response,File,TextEncoder,TextDecoder,Uint8Array,URL,crypto:webcrypto,console:{warn(){},error(...args){debug.push(args.map(String).join(' '));},info(){}}});
  const call=async(payload,{noToken=false,form=false}={})=>{
   const headers=noToken?{}:{'X-Portal-Token':token};
   if(!form)headers['Content-Type']='application/json';
   const req=new Request('https://fixture.invalid/functions/portal_servicos',{method:'POST',headers,body:form?payload:JSON.stringify(payload)});
-  const res=await handler(req);return {status:res.status,body:await res.json()};
+  const res=await handler(req);return {status:res.status,body:await res.json(),debug};
  };
  const upload=async({campaign='campaign',field='question',name='fixture.pdf',bytes='%PDF-1.7 fixture',noToken=false,extra={}}={})=>{
   const f=new FormData();f.set('acao','CAMPANHA_ANEXO_ENVIAR');f.set('campanha_id',campaign);f.set('campo_id',field);f.set('file',new File([bytes],name,{type:'application/pdf'}));for(const [k,v] of Object.entries(extra))f.set(k,v);
