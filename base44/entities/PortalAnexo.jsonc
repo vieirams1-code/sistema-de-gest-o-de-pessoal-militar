@@ -1,0 +1,43 @@
+{
+  "name": "PortalAnexo",
+  "type": "object",
+  "properties": {
+    "file_uri": {
+      "type": "string"
+    },
+    "militar_id": {
+      "type": "string"
+    },
+    "campanha_id": {
+      "type": "string"
+    },
+    "campo_id": {
+      "type": "string"
+    },
+    "nome": {
+      "type": "string"
+    },
+    "tamanho": {
+      "type": "number"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "file_uri",
+    "militar_id",
+    "campanha_id",
+    "campo_id",
+    "nome",
+    "tamanho",
+    "created_at"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
