@@ -104,10 +104,9 @@ export async function portalFetch(functionName, data = {}) {
         throw timeoutError;
       }
 
-      // Se for erro de autorização/cliente, propaga imediatamente
-      if (fetchErr?.status === 401 || fetchErr?.status === 403 || fetchErr?.status === 400 || fetchErr?.status === 404 || fetchErr?.status === 405) {
-        throw fetchErr;
-      }
+      // O servidor pode ter efetivado a operação antes de falhar. Uma falha
+      // HTTP ou de rede não autoriza executar o comando novamente pelo SDK.
+      throw fetchErr;
     }
   }
 
