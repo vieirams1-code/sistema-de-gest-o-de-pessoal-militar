@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.39';
+import { createSargenteacaoScope, assertRealDate } from '../../shared/sargenteacaoScope.ts';
 
 const ENTITIES: Record<string, string> = {
   quartel: 'QuartelPosto',
@@ -22,8 +23,7 @@ const required = (v: unknown, label: string) => {
 };
 const date = (v: unknown, label: string) => {
   const result = required(v, label);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result)) fail(`${label} inválida.`);
-  return result;
+  return assertRealDate(result, label);
 };
 const active = (v: unknown) => v !== false;
 
@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
     const canManage = isAdmin || (authz?.modules?.sargenteacao === true && authz?.actions?.gerir_sargenteacao === true);
     if (!(action === 'LIST' ? canView : canManage)) fail('Sem permissão para esta operação.', 403);
     const entities = base44.asServiceRole.entities;
+    const scope = await createSargenteacaoScope(base44, authz);
 
     if (action === 'LIST') {
       const [quartel, alas, modelos, vagas, empenhos] = await Promise.all([
@@ -110,20 +111,29 @@ Deno.serve(async (req) => {
         entities.ModeloGuarnicaoVaga.list('ordem', 2000),
         entities.EmpenhoOperacional.list('-data_inicio', 500),
       ]);
-      return Response.json({ quartel, alas, modelos, vagas, empenhos });
+      const visibleStations = quartel.filter(scope.stationAllowed);
+      const stationIds = new Set(visibleStations.map((row: any) => row.id));
+      return Response.json({ quartel: visibleStations, alas: alas.filter((row: any) => stationIds.has(row.quartel_posto_id)), modelos, vagas, empenhos, scope_global: scope.global });
     }
 
+    if (tipo === 'modelo' || tipo === 'empenho') scope.assertGlobalCatalog();
+    const assertRecord = async (record: any) => {
+      if (tipo === 'quartel' && !scope.stationAllowed(record)) fail('Quartel/posto fora do escopo autorizado.', 403);
+      if (tipo === 'ala') await scope.assertStation(record.quartel_posto_id);
+    };
     const entity = entities[ENTITIES[tipo]];
     const id = value(body.id);
     if (action === 'TOGGLE') {
       if (tipo === 'empenho') fail('Use a edição para alterar o status da missão.');
       const current = await entity.get(required(id, 'Registro'));
       if (!current) fail('Registro não encontrado.', 404);
+      await assertRecord(current);
       const updated = await entity.update(id, { ativo: current.ativo === false });
       return Response.json({ record: updated });
     }
 
     const clean = sanitize(tipo, body.data);
+    await assertRecord(clean);
     if (tipo === 'ala') {
       const quartel = await entities.QuartelPosto.get(clean.quartel_posto_id);
       if (!quartel || quartel.ativo === false) fail('Selecione um quartel/posto ativo.');
@@ -132,6 +142,7 @@ Deno.serve(async (req) => {
     if (id) {
       const current = await entity.get(id);
       if (!current) fail('Registro não encontrado.', 404);
+      await assertRecord(current);
     }
     const record = id ? await entity.update(id, clean) : await entity.create(clean);
     if (tipo === 'modelo') {
