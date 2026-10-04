@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { requirePortalSession, extractClientIp, extractUserAgent, registrarAuditoriaPortal } from '../../shared/portal/requirePortalSession.ts';
 import { generateCorrelationId } from '../../shared/portal/portalCrypto.ts';
+import { readCampaignMultipart, uploadCampaignFile, requireCampaignFile, isPrivateCampaignFile, signCampaignReference, signCampaignResponse } from '../../shared/portal/campanhaPrivateFiles.ts';
 import { loadAuthConfig } from '../../shared/portal/otp/otpService.ts';
 import { validarNomeCampanhaGeral, validarProrrogacaoCampanhaGeral } from '../../shared/portal/campanhaGeralAdminRules.js';
 
@@ -435,7 +436,7 @@ function sanitizarRespostaCampanha(resposta: any, modo: 'VISUALIZAR' | 'EXPORTAR
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Portal-Token, X-App-Id, Base44-Functions-Version',
 };
 
 function prioridadeOpcaoConsolidada(opcao: any): number {
@@ -514,9 +515,17 @@ Deno.serve(async (req: Request) => {
     }
 
     let rawBody: unknown;
+    let uploadedFile: any = null;
     try {
-      rawBody = await req.json();
-    } catch (_e) {
+      if (req.headers.get('content-type')?.toLowerCase().startsWith('multipart/form-data')) {
+        const multipart = await readCampaignMultipart(req);
+        rawBody = multipart.payload;
+        uploadedFile = multipart.file;
+      } else {
+        rawBody = await req.json();
+      }
+    } catch (_e: any) {
+      if (_e?.code === 'PORTAL_ANEXO_VALIDATION') throw _e;
       return new Response(JSON.stringify({ error: 'Payload JSON inválido.' }), {
         status: 400,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -538,6 +547,8 @@ Deno.serve(async (req: Request) => {
     );
 
     const isMilitarPortalAction = Boolean(
+      acao === 'CAMPANHA_ANEXO_ENVIAR' ||
+      acao === 'CAMPANHA_ANEXO_LINK' ||
       acao === 'CAMPANHA_FORMULARIO_OBTER' ||
       acao === 'CAMPANHA_FORMULARIO_SUBMETER' ||
       acao === 'CAMPANHAS_ATIVAS_MILITAR_GET' ||
@@ -1273,6 +1284,11 @@ Deno.serve(async (req: Request) => {
             };
           });
 
+          if (acao === 'CAMPANHA_ANEXOS_RETORNO') {
+            for (const row of relacaoNominal) {
+              if (row.resposta_completa) row.resposta_completa = await signCampaignResponse(base44, row.resposta_completa);
+            }
+          }
           const totalRespondidos = relacaoNominal.filter((r) => r.status_resposta === 'Respondido').length;
           const totalPendentes = relacaoNominal.length - totalRespondidos;
 
@@ -2275,6 +2291,30 @@ Deno.serve(async (req: Request) => {
     }
 
     switch (acao) {
+      case 'CAMPANHA_ANEXO_ENVIAR':
+      case 'CAMPANHA_ANEXO_LINK': {
+        const campaign = campanhasAtivasMilitar.find((row: any) => row.id === payload.campanha_id);
+        if (!campaign) {
+          return new Response(JSON.stringify({ error: 'Campanha indisponível para este militar.' }), { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+        const campoId = String((payload as any).campo_id || '');
+        if (acao === 'CAMPANHA_ANEXO_ENVIAR') {
+          const file = await uploadCampaignFile(base44, uploadedFile, militarId, campaign, campoId);
+          return new Response(JSON.stringify({ ok: true, ...file }), { status: 201, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+        }
+        const uri = String((payload as any).file_uri || '');
+        if (!isPrivateCampaignFile(uri)) {
+          const rows = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({ campanha_id: campaign.id, militar_id: militarId });
+          const belongs = rows.some((row: any) => {
+            if (campoId === 'devolucao') return row.arquivo_devolucao_url === uri;
+            const files = typeof row.arquivos_anexados_json === 'string' ? JSON.parse(row.arquivos_anexados_json || '{}') : row.arquivos_anexados_json || {};
+            return (typeof files[campoId] === 'string' ? files[campoId] : files[campoId]?.url) === uri;
+          });
+          if (!belongs) throw Object.assign(new Error('Anexo não pertence a esta resposta.'), { code: 'PORTAL_ANEXO_VALIDATION', status: 403 });
+        }
+        const url = await signCampaignReference(base44, uri, militarId, campaign.id, campoId);
+        return new Response(JSON.stringify({ ok: true, url }), { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+      }
       // 1.3A: Cadastral
       case 'CADASTRO_GET': {
         let dependentes: unknown[] = [];
@@ -2756,6 +2796,7 @@ Deno.serve(async (req: Request) => {
           } catch (_eFmt) {}
         }
 
+        const signedExisting = await signCampaignResponse(base44, respostaExistente, true);
         let respostasParsed: any = {};
         if (respostaExistente?.respostas_json) {
           try {
@@ -2766,7 +2807,7 @@ Deno.serve(async (req: Request) => {
         let arquivosParsed: any = {};
         if (respostaExistente?.arquivos_anexados_json) {
           try {
-            arquivosParsed = typeof respostaExistente.arquivos_anexados_json === 'string' ? JSON.parse(respostaExistente.arquivos_anexados_json) : respostaExistente.arquivos_anexados_json;
+            arquivosParsed = JSON.parse(signedExisting.arquivos_anexados_json || '{}');
           } catch (_eA) {}
         }
 
@@ -2792,6 +2833,7 @@ Deno.serve(async (req: Request) => {
             data_envio: respostaExistente.data_envio,
             resposta_texto_geral: respostaExistente.resposta_texto_geral,
             arquivo_devolucao_url: respostaExistente.arquivo_devolucao_url,
+            arquivo_devolucao_signed_url: signedExisting.arquivo_devolucao_signed_url,
             arquivo_devolucao_nome: respostaExistente.arquivo_devolucao_nome,
             termo_aceite: respostaExistente.termo_aceite,
             observacao_gestor: respostaExistente.observacao_gestor,
@@ -2846,6 +2888,17 @@ Deno.serve(async (req: Request) => {
           } catch (_eFmt) {}
         }
 
+        let existentes: any[] = [];
+        try {
+          existentes = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({
+            campanha_id,
+            militar_id: militarId,
+          });
+        } catch (erroConsulta) {
+          throw erroConsulta;
+        }
+
+        const previousFiles = existentes[0]?.arquivos_anexados_json ? (typeof existentes[0].arquivos_anexados_json === 'string' ? JSON.parse(existentes[0].arquivos_anexados_json) : existentes[0].arquivos_anexados_json) : {};
         const camposObrigatorios = (formConfig?.campos || []).filter((c: any) => c.obrigatorio === true);
         const respostasObj = typeof respostas_json === 'object' ? (respostas_json || {}) : (JSON.parse(respostas_json || '{}'));
         const arquivosObj = typeof arquivos_anexados_json === 'object' ? (arquivos_anexados_json || {}) : (JSON.parse(arquivos_anexados_json || '{}'));
@@ -2862,6 +2915,14 @@ Deno.serve(async (req: Request) => {
             urlValida = parsed.protocol === 'https:' && ['base44.app', 'app.base44.com'].includes(parsed.hostname)
               && parsed.pathname.startsWith('/api/apps/694014f8539e0b317aa75a23/files/');
           } catch (_erroUrl) {}
+          if (isPrivateCampaignFile(url)) {
+            const registered = await requireCampaignFile(base44, url, militarId, campanha_id, campoId);
+            urlValida = true;
+            arquivosObj[campoId] = { url, nome: registered.nome, tamanho: registered.tamanho };
+          } else {
+            const previous = previousFiles[campoId];
+            urlValida = urlValida && url === (typeof previous === 'string' ? previous : previous?.url);
+          }
           if (!campo || !urlValida || !['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx'].includes(ext || '')
             || (arquivo?.tamanho !== undefined && (!Number.isFinite(arquivo.tamanho) || arquivo.tamanho <= 0 || arquivo.tamanho > 15 * 1024 * 1024))) {
             return new Response(JSON.stringify({ error: 'Anexo inválido: confira a pergunta, o link, o formato e o limite de 15MB.' }), {
@@ -2889,6 +2950,14 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        if (arquivo_devolucao_url) {
+          if (isPrivateCampaignFile(arquivo_devolucao_url)) {
+            await requireCampaignFile(base44, arquivo_devolucao_url, militarId, campanha_id, 'devolucao');
+          } else if (arquivo_devolucao_url !== existentes[0]?.arquivo_devolucao_url) {
+            throw Object.assign(new Error('Envie o documento pelo upload privado do Portal.'), { code: 'PORTAL_ANEXO_VALIDATION', status: 400 });
+          }
+        }
+
         // Validação para Assinatura de Documento
         if (campanha.tipo === 'ASSINATURA_DOCUMENTO' && campanha.exigir_devolucao_arquivo) {
           if (!arquivo_devolucao_url) {
@@ -2905,16 +2974,6 @@ Deno.serve(async (req: Request) => {
             status: 400,
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           });
-        }
-
-        let existentes: any[] = [];
-        try {
-          existentes = await base44.asServiceRole.entities.RespostaCampanhaPersonalizada.filter({
-            campanha_id,
-            militar_id: militarId,
-          });
-        } catch (erroConsulta) {
-          throw erroConsulta;
         }
 
         const respostaPayload = {
@@ -2970,7 +3029,7 @@ Deno.serve(async (req: Request) => {
         });
     }
   } catch (err: any) {
-    if (err?.code === 'CAMPANHA_GERAL_VALIDATION') {
+    if (err?.code === 'CAMPANHA_GERAL_VALIDATION' || err?.code === 'PORTAL_ANEXO_VALIDATION') {
       return new Response(JSON.stringify({ error: err.message }), { status: err.status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
     }
     console.error(`[portal_servicos][${correlationId}] Erro inesperado:`, err?.message || err);
