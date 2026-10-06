@@ -56,10 +56,10 @@ export default function CampanhaGeralAdminActions({ campanha, enabled, disabled,
         {form.tipo === 'nome' ? <label className="block text-sm font-bold">Nome da campanha<Input required autoFocus disabled={salvando} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></label> : <>
           <p className="text-xs text-slate-600">Prazo atual: {campanha.data_fim_militar || 'Não informado'}. Campanhas encerradas serão reabertas para coleta.</p>
           <label className="block text-sm font-bold">Nova data limite<Input required type="date" disabled={salvando} value={form.data} min={dataMinima} onChange={(e) => setForm({ ...form, data: e.target.value })} /><span className="block mt-1 text-xs font-normal text-slate-500">Escolha uma data posterior ao prazo atual e a partir de {dataMinima}.</span></label>
-          <label className="block text-sm font-bold">Justificativa<textarea required minLength={5} disabled={salvando} value={form.justificativa} onChange={(e) => setForm({ ...form, justificativa: e.target.value })} rows={3} className="w-full mt-1 border border-slate-300 rounded-xl p-3" /></label>
+          <label className="block text-sm font-bold">Justificativa (mínimo de 5 caracteres)<textarea required minLength={5} disabled={salvando} value={form.justificativa} onChange={(e) => setForm({ ...form, justificativa: e.target.value })} rows={3} className="w-full mt-1 border border-slate-300 rounded-xl p-3" /><span className="block mt-1 text-xs font-normal text-slate-500">{form.justificativa.trim().length}/5 caracteres mínimos.</span></label>
         </>}
         {erro && <p role="alert" className="text-red-700 bg-red-50 p-3 rounded-xl text-sm">{erro}</p>}
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={salvando} onClick={() => setForm(null)}>Cancelar</Button><Button type="submit" disabled={salvando || (form.tipo === 'nome' && !form.titulo.trim())}>{salvando ? 'Salvando...' : 'Salvar alteração'}</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={salvando} onClick={() => setForm(null)}>Cancelar</Button><Button type="submit" disabled={salvando || (form.tipo === 'nome' && !form.titulo.trim()) || (form.tipo === 'prazo' && (!form.data || form.justificativa.trim().length < 5))}>{salvando ? 'Salvando...' : 'Salvar alteração'}</Button></div>
       </form>
     </div>, document.body)}
   </>;
