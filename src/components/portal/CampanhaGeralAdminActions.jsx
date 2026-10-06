@@ -12,8 +12,18 @@ export default function CampanhaGeralAdminActions({ campanha, enabled, disabled,
   if (!enabled || campanha.tipo === 'PLANO_FERIAS' || campanha.plano_ferias_institucional_id) return null;
   const abrir = (tipo) => {
     setErro('');
-    setForm({ tipo, titulo: campanha.titulo || '', data: campanha.data_fim_militar || '', justificativa: '' });
+    setForm({ tipo, titulo: campanha.titulo || '', data: '', justificativa: '' });
   };
+  const dataMinima = (() => {
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Campo_Grande' }).format(new Date());
+    const prazoAtual = String(campanha.data_fim_militar || '').slice(0, 10);
+    if (!prazoAtual || prazoAtual.length !== 10) return hoje;
+    const proximoDia = new Date(`${prazoAtual}T00:00:00Z`);
+    if (Number.isNaN(proximoDia.getTime())) return hoje;
+    proximoDia.setUTCDate(proximoDia.getUTCDate() + 1);
+    const primeiroDiaValido = proximoDia.toISOString().slice(0, 10);
+    return primeiroDiaValido > hoje ? primeiroDiaValido : hoje;
+  })();
   const salvar = async (e) => {
     e.preventDefault();
     if (salvando || !enabled) return;
@@ -25,6 +35,9 @@ export default function CampanhaGeralAdminActions({ campanha, enabled, disabled,
         campanha_id: campanha.id,
         ...(form.tipo === 'nome' ? { titulo: form.titulo.trim() } : { nova_data_fim_militar: form.data, justificativa: form.justificativa.trim() }),
       });
+      if (res?.data?.error || res?.data?.ok === false) {
+        throw new Error(res.data.error || 'Não foi possível prorrogar o prazo.');
+      }
       await onUpdated(res.data.campanha, res.data.message);
       setForm(null);
     } catch (err) {
@@ -42,7 +55,7 @@ export default function CampanhaGeralAdminActions({ campanha, enabled, disabled,
         <p className="text-xs text-blue-900 bg-blue-50 border border-blue-200 rounded-xl p-3">As respostas, documentos e o público da campanha serão preservados.</p>
         {form.tipo === 'nome' ? <label className="block text-sm font-bold">Nome da campanha<Input required autoFocus disabled={salvando} value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></label> : <>
           <p className="text-xs text-slate-600">Prazo atual: {campanha.data_fim_militar || 'Não informado'}. Campanhas encerradas serão reabertas para coleta.</p>
-          <label className="block text-sm font-bold">Nova data limite<Input required type="date" disabled={salvando} value={form.data} min={campanha.data_fim_militar || undefined} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
+          <label className="block text-sm font-bold">Nova data limite<Input required type="date" disabled={salvando} value={form.data} min={dataMinima} onChange={(e) => setForm({ ...form, data: e.target.value })} /><span className="block mt-1 text-xs font-normal text-slate-500">Escolha uma data posterior ao prazo atual e a partir de {dataMinima}.</span></label>
           <label className="block text-sm font-bold">Justificativa<textarea required minLength={5} disabled={salvando} value={form.justificativa} onChange={(e) => setForm({ ...form, justificativa: e.target.value })} rows={3} className="w-full mt-1 border border-slate-300 rounded-xl p-3" /></label>
         </>}
         {erro && <p role="alert" className="text-red-700 bg-red-50 p-3 rounded-xl text-sm">{erro}</p>}
