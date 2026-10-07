@@ -1,7 +1,10 @@
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
 const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status, code: 'PORTAL_ANEXO_VALIDATION' }); };
-export const isPrivateCampaignFile = (value: any) => typeof value === 'string' && value.startsWith('private/') && !value.includes('..') && !/[?#\\]/.test(value);
+// O armazenamento privado devolve a referência como "<escopo>/private/<caminho>"
+// (ex.: "mp/private/<app>/<arquivo>"); aceitamos também o formato curto "private/...".
+const PRIVATE_CAMPAIGN_FILE_RE = /^(?:[a-z0-9_-]+\/)?private\/[^\s?#\\]+$/i;
+export const isPrivateCampaignFile = (value: any) => typeof value === 'string' && PRIVATE_CAMPAIGN_FILE_RE.test(value) && !value.includes('..');
 
 export async function readCampaignMultipart(req: Request) {
   const declared = Number(req.headers.get('content-length') || 0);
