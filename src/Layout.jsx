@@ -106,6 +106,7 @@ const menuGroups = [
         description: 'Gestão de períodos e dias adicionais',
         items: [
           { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias', actionKey: 'visualizar_ferias' },
+          { name: 'Plano Anual de Férias', page: 'PlanoAnualFerias', icon: FileSpreadsheet, moduleKey: 'ferias', actionKey: 'visualizar_plano_ferias' },
           { name: 'Ajustes de Saldo', page: 'AjustesSaldoFerias', icon: SlidersHorizontal, moduleKey: 'ferias', actionKey: 'visualizar_creditos_ferias' },
           { name: 'Descontos em Férias', page: 'DescontosFerias', icon: MinusCircle, adminOnly: true },
           { name: 'Inativação de Período em Lote', page: 'InativacaoPeriodoLote', icon: CalendarX, adminOnly: true },
