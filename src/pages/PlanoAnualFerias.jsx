@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Plus, Download } from 'lucide-react';
+import { Calendar, Plus, Download, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import { enriquecerFeriasComContextoMilitarCarregado } from '@/services/feriasMilitarContextService';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { montarPlanoAnualFerias, listarLotacoesDisponiveis, exportarPlanoExcel, exportarPlanoPDF } from '@/services/planoAnualFeriasDocumentoService';
 
 const meses = [
   { nome: 'Janeiro', valor: 'Janeiro', numero: 1 },
@@ -31,29 +32,64 @@ export default function PlanoAnualFerias() {
   const navigate = useNavigate();
   const anoAtual = new Date().getFullYear();
   const [anoSelecionado, setAnoSelecionado] = useState(anoAtual + 1);
+  const [lotacaoSelecionada, setLotacaoSelecionada] = useState('TODAS');
+  const [exportando, setExportando] = useState(false);
+  const [erroExportacao, setErroExportacao] = useState('');
 
   const { data: planos = [], isLoading: loadingPlanos } = useQuery({
     queryKey: ['planos-ferias', anoSelecionado],
     queryFn: () => base44.entities.PlanoFerias.filter({ ano_plano: anoSelecionado })
   });
 
-  const { data: ferias = [], isLoading: loadingFerias } = useQuery({
-    queryKey: ['ferias-ano', anoSelecionado],
-    queryFn: async () => {
-      const bundle = await fetchScopedPeriodosAquisitivosBundle();
-      const filtradas = (bundle?.ferias || []).filter(f => {
-        if (!f.data_inicio) return false;
-        const ano = new Date(f.data_inicio + 'T00:00:00').getFullYear();
-        return ano === anoSelecionado;
-      });
-      return enriquecerFeriasComContextoMilitarCarregado(
-        filtradas,
-        bundle?.militares || [],
-        bundle?.matriculasMilitar || [],
-        { contexto: 'operacional' },
-      );
-    }
+  // A mesma leitura protegida abastece a visualização e os dois documentos.
+  const { data: bundle, isLoading: loadingFerias, isError: erroCarregamento } = useQuery({
+    queryKey: ['ferias-documento-ano', anoSelecionado],
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
   });
+
+  const ferias = useMemo(() => {
+    const filtradas = (bundle?.ferias || []).filter((f) =>
+      f?.data_inicio && Number(String(f.data_inicio).slice(0, 4)) === anoSelecionado,
+    );
+    return enriquecerFeriasComContextoMilitarCarregado(
+      filtradas, bundle?.militares || [], bundle?.matriculasMilitar || [],
+      { contexto: 'operacional' },
+    );
+  }, [bundle, anoSelecionado]);
+
+  const lotacoesDisponiveis = useMemo(
+    () => listarLotacoesDisponiveis({
+      ferias: bundle?.ferias || [], militares: bundle?.militares || [], ano: anoSelecionado,
+    }),
+    [bundle, anoSelecionado],
+  );
+
+  const planoDocumento = useMemo(() => montarPlanoAnualFerias({
+    ano: anoSelecionado,
+    ferias: bundle?.ferias || [],
+    militares: bundle?.militares || [],
+    matriculasMilitar: bundle?.matriculasMilitar || [],
+    periodosAquisitivos: bundle?.periodosAquisitivos || [],
+    lotacao: lotacaoSelecionada,
+  }), [bundle, anoSelecionado, lotacaoSelecionada]);
+
+  // Uma exportação incompleta pode produzir um documento oficial incorreto.
+  const exportacaoBloqueada = loadingFerias || erroCarregamento
+    || Number(bundle?.partialFailures || 0) > 0 || planoDocumento.totalRegistros === 0 || exportando;
+
+  const exportar = async (formato) => {
+    if (exportacaoBloqueada) return;
+    setExportando(true);
+    setErroExportacao('');
+    try {
+      if (formato === 'pdf') await exportarPlanoPDF(planoDocumento);
+      else await exportarPlanoExcel(planoDocumento);
+    } catch (erro) {
+      setErroExportacao(erro?.message || 'Não foi possível exportar o documento.');
+    } finally {
+      setExportando(false);
+    }
+  };
 
   // Agrupar férias por mês
   const feriasPorMes = meses.map(mes => {
@@ -95,8 +131,8 @@ export default function PlanoAnualFerias() {
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Plano Anual de Férias</h1>
             <p className="text-slate-500">Visualização e controle do plano de férias por mês</p>
           </div>
-          <div className="flex gap-3">
-            <Select value={anoSelecionado.toString()} onValueChange={(v) => setAnoSelecionado(parseInt(v))}>
+          <div className="flex gap-3 flex-wrap">
+            <Select value={anoSelecionado.toString()} onValueChange={(v) => { setAnoSelecionado(parseInt(v, 10)); setLotacaoSelecionada('TODAS'); }}>
               <SelectTrigger className="w-32 bg-white">
                 <SelectValue />
               </SelectTrigger>
@@ -106,12 +142,50 @@ export default function PlanoAnualFerias() {
                 ))}
               </SelectContent>
             </Select>
-            <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+            <Select value={lotacaoSelecionada} onValueChange={setLotacaoSelecionada}>
+              <SelectTrigger className="w-64 bg-white" aria-label="Lotação do documento">
+                <SelectValue placeholder="Lotação do documento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODAS">Todas as lotações autorizadas</SelectItem>
+                {lotacoesDisponiveis.map((lotacao) => (
+                  <SelectItem key={lotacao} value={lotacao}>{lotacao}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              disabled={exportacaoBloqueada}
+              onClick={() => exportar('xlsx')}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Exportar Excel
+            </Button>
+            <Button
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+              disabled={exportacaoBloqueada}
+              onClick={() => exportar('pdf')}
+            >
               <Download className="w-4 h-4 mr-2" />
               Exportar PDF
             </Button>
           </div>
         </div>
+
+        {(erroExportacao || erroCarregamento || Number(bundle?.partialFailures || 0) > 0) && (
+          <div role="alert" className="mb-5 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {erroExportacao || (erroCarregamento
+              ? 'Falha ao carregar os registros autorizados. A emissão foi bloqueada.'
+              : 'A consulta devolveu dados incompletos. Corrija as falhas antes de emitir o documento.')}
+          </div>
+        )}
+        {!loadingFerias && !erroCarregamento && (
+          <p className="mb-5 text-sm text-slate-600">
+            Relatório selecionado: {planoDocumento.totalRegistros} período(s) de férias regulamentares,
+            referente(s) a {planoDocumento.totalMilitares} militar(es). Registros cancelados não são incluídos.
+            A exportação não altera cadastros.
+          </p>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
