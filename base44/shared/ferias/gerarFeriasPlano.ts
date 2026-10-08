@@ -67,9 +67,33 @@ export async function gerarFeriasPlano({ base44, user, payload, acao, calcularRe
   const candidates = all.filter(op => !op.gerado_ferias_efetivas && approved.has(op.status_camada_1) && op.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && op.status_camada_2 !== 'Rejeitado_Para_Revisao');
   const ano = Number(plano?.ano_referencia || campanha?.ano_referencia);
   if (!Number.isInteger(ano) || ano < 2000 || ano > 2200) return reply({ error:'Ano de referência inválido.' }, 400);
-  const load = async op => {
+  // A conferência lê cada conjunto uma vez. Consultas por resposta ultrapassam
+  // o limite de requisições em planos grandes antes de qualquer gravação.
+  const candidateIds = [...new Set(candidates.map(op => op.militar_id).filter(Boolean))];
+  const periodIds = [...new Set(candidates.map(op => op.periodo_aquisitivo_id).filter(Boolean))];
+  const [periodosIniciais, feriasIniciais, ajustesIniciais] = candidateIds.length ? await Promise.all([
+    periodIds.length ? listarTodos(entities.PeriodoAquisitivo, { id:{ $in:periodIds } }) : [],
+    listarTodos(entities.Ferias, { militar_id:{ $in:candidateIds } }),
+    listarTodos(entities.AjusteSaldoFerias, { militar_id:{ $in:candidateIds }, status:'ativo' }),
+  ]) : [[], [], []];
+  const periodosPorId = new Map(periodosIniciais.map(pa => [pa.id, pa]));
+  const agruparPorMilitar = registros => {
+    const grupos = new Map();
+    for (const registro of registros) {
+      if (!grupos.has(registro.militar_id)) grupos.set(registro.militar_id, []);
+      grupos.get(registro.militar_id).push(registro);
+    }
+    return grupos;
+  };
+  const feriasPorMilitar = agruparPorMilitar(feriasIniciais);
+  const ajustesPorMilitar = agruparPorMilitar(ajustesIniciais);
+  const load = async (op, fresh = false) => {
+    if (!fresh) return prepare(op, periodosPorId.get(op.periodo_aquisitivo_id), feriasPorMilitar.get(op.militar_id) || [], ajustesPorMilitar.get(op.militar_id) || [], ano, calcularResumoPeriodoPlano, planoId);
     const [pa, ferias, ajustes] = await Promise.all([
-      entities.PeriodoAquisitivo.get(op.periodo_aquisitivo_id),
+      op.periodo_aquisitivo_id ? entities.PeriodoAquisitivo.get(op.periodo_aquisitivo_id).catch(error => {
+        if (error?.status === 404 || error?.response?.status === 404) return null;
+        throw error;
+      }) : null,
       listarTodos(entities.Ferias, { militar_id:op.militar_id }),
       listarTodos(entities.AjusteSaldoFerias, { militar_id:op.militar_id, status:'ativo' }),
     ]);
@@ -93,7 +117,7 @@ export async function gerarFeriasPlano({ base44, user, payload, acao, calcularRe
     const op = await entities.OpcaoFeriasMilitar.get(prepared.opcao_id);
     if (op.gerado_ferias_efetivas) continue;
     if (!approved.has(op.status_camada_1) || op.decisao_camada_1_opcao === 'NAO_CONTEMPLADO' || op.status_camada_2 === 'Rejeitado_Para_Revisao') { falhas.push({ ...serialize(prepared), motivo:'A aprovação foi alterada; revise a escala.' }); continue; }
-    const item = await load(op);
+    const item = await load(op, true);
     if (item.motivo || JSON.stringify(item.parcelas) !== JSON.stringify(prepared.parcelas)) { falhas.push({ ...serialize(item), motivo:item.motivo || 'A definição mudou; atualize a prévia.' }); continue; }
     const ids = [];
     try {
