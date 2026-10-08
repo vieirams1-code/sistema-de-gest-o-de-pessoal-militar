@@ -67,8 +67,8 @@ export async function gerarFeriasPlano({ base44, user, payload, acao, calcularRe
   const candidates = all.filter(op => !op.gerado_ferias_efetivas && approved.has(op.status_camada_1) && op.decisao_camada_1_opcao !== 'NAO_CONTEMPLADO' && op.status_camada_2 !== 'Rejeitado_Para_Revisao');
   const ano = Number(plano?.ano_referencia || campanha?.ano_referencia);
   if (!Number.isInteger(ano) || ano < 2000 || ano > 2200) return reply({ error:'Ano de referência inválido.' }, 400);
-  // A conferência lê cada conjunto uma vez. Consultas por resposta ultrapassam
-  // o limite de requisições em planos grandes antes de qualquer gravação.
+  // A conferência lê cada conjunto uma vez. Consultas por resposta podem ultrapassar
+  // os limites de requisições em planos grandes antes de qualquer gravação.
   const candidateIds = [...new Set(candidates.map(op => op.militar_id).filter(Boolean))];
   const periodIds = [...new Set(candidates.map(op => op.periodo_aquisitivo_id).filter(Boolean))];
   const [periodosIniciais, feriasIniciais, ajustesIniciais] = candidateIds.length ? await Promise.all([
