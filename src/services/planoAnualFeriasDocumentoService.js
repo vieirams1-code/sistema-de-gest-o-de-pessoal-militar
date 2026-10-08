@@ -1,4 +1,5 @@
 import { ordenarMilitaresPorAntiguidadeInstitucional } from '@/utils/antiguidade/ordenacaoMilitarInstitucional';
+import { enriquecerMilitarComMatriculas, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -97,11 +98,13 @@ export function listarLotacoesDisponiveis({ ferias = [], militares = [], ano }) 
  * com escopo de acesso. Nunca modifica férias ou períodos aquisitivos.
  */
 export function montarPlanoAnualFerias({
-  ano, ferias = [], militares = [], periodosAquisitivos = [], lotacao = 'TODAS',
+  ano, ferias = [], militares = [], matriculasMilitar = [], periodosAquisitivos = [], lotacao = 'TODAS',
 }) {
-  const militaresPorId = new Map(militares.map((m) => [String(m.id), m]));
+  const indiceMatriculas = montarIndiceMatriculas(matriculasMilitar);
+  const militaresNormalizados = militares.map((m) => enriquecerMilitarComMatriculas(m, indiceMatriculas));
+  const militaresPorId = new Map(militaresNormalizados.map((m) => [String(m.id), m]));
   const periodosPorId = new Map(periodosAquisitivos.map((p) => [String(p.id), p]));
-  const ordenadosPorAntiguidade = ordenarMilitaresPorAntiguidadeInstitucional(militares);
+  const ordenadosPorAntiguidade = ordenarMilitaresPorAntiguidadeInstitucional(militaresNormalizados);
   const ordemMilitar = new Map(ordenadosPorAntiguidade.map((m, index) => [String(m.id), index]));
   const todasRegulares = ferias
     .filter((f) => f && isFeriasRegulares(f) && normalizarStatus(f) !== 'Cancelada' && dataValidaISO(f.data_inicio))
