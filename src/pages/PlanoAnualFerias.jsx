@@ -68,6 +68,7 @@ export default function PlanoAnualFerias() {
     ano: anoSelecionado,
     ferias: bundle?.ferias || [],
     militares: bundle?.militares || [],
+    matriculasMilitar: bundle?.matriculasMilitar || [],
     periodosAquisitivos: bundle?.periodosAquisitivos || [],
     lotacao: lotacaoSelecionada,
   }), [bundle, anoSelecionado, lotacaoSelecionada]);
