@@ -27,9 +27,9 @@ import { useAuth } from '@/lib/AuthContext';
  * ----------------------------------------------------------------------------
  */
 
-const ACCESS_QUERY_STALE_TIME = 30 * 1000;
-const ACCESS_QUERY_GC_TIME = 15 * 60 * 1000;
-const ACCESS_QUERY_REFETCH_INTERVAL = 60 * 1000;
+const ACCESS_QUERY_STALE_TIME = 5 * 60 * 1000;
+const ACCESS_QUERY_GC_TIME = 30 * 60 * 1000;
+const ACCESS_QUERY_REFETCH_INTERVAL = 10 * 60 * 1000;
 
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
 
@@ -118,8 +118,10 @@ export function useCurrentUser() {
     staleTime: ACCESS_QUERY_STALE_TIME,
     gcTime: ACCESS_QUERY_GC_TIME,
     retry: 1,
-    refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
+    // Performance: permissões mudam raramente. Evita revalidar a cada tela,
+    // a cada foco de janela e a cada minuto (consumia o limite de requisições).
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
     refetchInterval: ACCESS_QUERY_REFETCH_INTERVAL,
     refetchIntervalInBackground: false,
   });
