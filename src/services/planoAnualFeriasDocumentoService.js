@@ -138,6 +138,9 @@ export function montarPlanoAnualFerias({
         periodoAquisitivo: formatarIntervalo(periodo.inicio_aquisitivo, periodo.fim_aquisitivo) || texto(feria.periodo_aquisitivo_ref),
         periodoConcessivo: formatarIntervalo(incrementarUmDia(periodo.fim_aquisitivo), periodo.data_limite_gozo),
         fracionamento: rotuloFracao(feria, fracionamentos.get(chave)),
+        dataSaida: formatarData(feria.data_inicio),
+        dataRetorno: formatarData(feria.data_retorno),
+        dias: feria.dias ?? '',
         livro: textoLivro(feria),
         observacoes: observacoes(feria),
         status: normalizarStatus(feria),
@@ -173,6 +176,14 @@ function valoresLinha(item) {
   ];
 }
 
+const COLUNAS_EXCEL = [...COLUNAS.slice(0, 8), 'SAÍDA PREVISTA', 'RETORNO PREVISTO', 'QTD. DIAS', ...COLUNAS.slice(8)];
+const ULTIMA_COLUNA_EXCEL = COLUNAS_EXCEL.length - 1;
+
+function valoresLinhaExcel(item) {
+  const base = valoresLinha(item);
+  return [...base.slice(0, 8), item.dataSaida, item.dataRetorno, item.dias, ...base.slice(8)];
+}
+
 function nomeArquivo(plano, extensao) {
   const unidade = plano.lotacao === 'TODAS' ? 'Lotacoes_Autorizadas' : plano.lotacao;
   const seguro = unidade.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 45);
@@ -186,21 +197,22 @@ export async function exportarPlanoExcel(plano) {
     ['ANO ' + plano.ano + ' - ' + (plano.lotacao === 'TODAS' ? 'LOTAÇÕES AUTORIZADAS' : plano.lotacao)],
     ['Emitido em ' + new Date().toLocaleDateString('pt-BR')],
   ];
-  const mesclagens = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }, { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } }];
+  const U = ULTIMA_COLUNA_EXCEL;
+  const mesclagens = [{ s: { r: 0, c: 0 }, e: { r: 0, c: U } }, { s: { r: 1, c: 0 }, e: { r: 1, c: U } }, { s: { r: 2, c: 0 }, e: { r: 2, c: U } }];
   const linhasAlturas = [{ hpt: 26 }, { hpt: 22 }, { hpt: 18 }];
   plano.meses.forEach((mes) => {
-    mesclagens.push({ s: { r: linhas.length, c: 0 }, e: { r: linhas.length, c: 9 } });
+    mesclagens.push({ s: { r: linhas.length, c: 0 }, e: { r: linhas.length, c: U } });
     linhas.push([mes.nome.toUpperCase() + ' / ' + plano.ano]);
     linhasAlturas.push({ hpt: 23 });
-    linhas.push([...COLUNAS]);
+    linhas.push([...COLUNAS_EXCEL]);
     linhasAlturas.push({ hpt: 40 });
     if (!mes.linhas.length) {
-      mesclagens.push({ s: { r: linhas.length, c: 0 }, e: { r: linhas.length, c: 9 } });
+      mesclagens.push({ s: { r: linhas.length, c: 0 }, e: { r: linhas.length, c: U } });
       linhas.push(['SEM LANÇAMENTOS']);
       linhasAlturas.push({ hpt: 20 });
     } else {
       mes.linhas.forEach((item) => {
-        linhas.push(valoresLinha(item));
+        linhas.push(valoresLinhaExcel(item));
         linhasAlturas.push({ hpt: 37 });
       });
     }
@@ -208,15 +220,15 @@ export async function exportarPlanoExcel(plano) {
     linhasAlturas.push({ hpt: 8 });
   });
   linhas.push(['OBSERVAÇÕES GERAIS']);
-  mesclagens.push({ s: { r: linhas.length - 1, c: 0 }, e: { r: linhas.length - 1, c: 9 } });
+  mesclagens.push({ s: { r: linhas.length - 1, c: 0 }, e: { r: linhas.length - 1, c: U } });
   linhas.push(['Campo destinado a anotações e situações não automatizadas.']);
-  mesclagens.push({ s: { r: linhas.length - 1, c: 0 }, e: { r: linhas.length - 1, c: 9 } });
+  mesclagens.push({ s: { r: linhas.length - 1, c: 0 }, e: { r: linhas.length - 1, c: U } });
   linhas.push([]);
   linhas.push(['________________________________________']);
   linhas.push(['Autoridade responsável - conferir e assinar']);
   const ws = XLSX.utils.aoa_to_sheet(linhas);
   ws['!merges'] = mesclagens;
-  ws['!cols'] = [7, 22, 42, 19, 15, 31, 31, 22, 35, 35].map((wch) => ({ wch }));
+  ws['!cols'] = [7, 22, 42, 19, 15, 31, 31, 22, 16, 16, 10, 35, 35].map((wch) => ({ wch }));
   ws['!rows'] = linhasAlturas;
   ws['!pageSetup'] = { orientation: 'landscape', paperSize: 9, fitToWidth: 1, fitToHeight: 0 };
   ws['!margins'] = { left: 0.25, right: 0.25, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 };
