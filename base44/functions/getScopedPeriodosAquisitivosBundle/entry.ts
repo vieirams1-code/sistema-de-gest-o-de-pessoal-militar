@@ -23,6 +23,21 @@ async function fetchWithRetry(queryFn, label = 'query') {
   throw lastError;
 }
 
+// Performance: lê apenas as colunas usadas, paginando até o fim (sem truncar registros).
+const PAGINA_LEITURA = 2000;
+async function listarCompletoCampos(base44, entityName, sort, campos, label) {
+  const out = [];
+  for (let skip = 0; ; skip += PAGINA_LEITURA) {
+    const rows = await fetchWithRetry(
+      () => base44.asServiceRole.entities[entityName].filter({}, sort, PAGINA_LEITURA, skip, campos),
+      `${label}:${skip}`,
+    );
+    out.push(...(rows || []));
+    if (!rows || rows.length < PAGINA_LEITURA) break;
+  }
+  return out;
+}
+
 async function resolverAutorizacaoCanonica(base44, effectiveEmail) {
   const requestPayload = effectiveEmail ? { effectiveEmail } : {};
   const response = await base44.functions.invoke('getUserPermissions', requestPayload);
@@ -256,13 +271,13 @@ Deno.serve(async (req) => {
       criteriosAplicados.add('global');
       const [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ajRes]=await Promise.allSettled([
         fetchWithRetry(() => base44.asServiceRole.entities.PeriodoAquisitivo.list('-inicio_aquisitivo'),'periodos.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.Militar.list(),'militares.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.MatriculaMilitar.list('-created_date'),'matriculas.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.Ferias.list('-data_inicio'),'ferias.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.RegistroLivro.list(),'registros.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.PublicacaoExOfficio.list('-created_date'),'publicacoesExOfficio.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.ContratoDesignacaoMilitar.list('-data_inicio_contrato'),'contratosDesignacaoMilitar.admin'),
-        fetchWithRetry(() => base44.asServiceRole.entities.AjusteSaldoFerias.list('-created_date'),'ajustesSaldoFerias.admin'),
+        listarCompletoCampos(base44, 'Militar', '-created_date', CAMPOS_MILITAR_SUPORTE, 'militares.admin'),
+        listarCompletoCampos(base44, 'MatriculaMilitar', '-created_date', CAMPOS_MATRICULA_SUPORTE, 'matriculas.admin'),
+        listarCompletoCampos(base44, 'Ferias', '-data_inicio', CAMPOS_FERIAS_SUPORTE, 'ferias.admin'),
+        listarCompletoCampos(base44, 'RegistroLivro', '-created_date', [...CAMPOS_REGISTRO_LIVRO_SUPORTE, ...CAMPOS_TEXTO_REFERENCIA], 'registros.admin'),
+        listarCompletoCampos(base44, 'PublicacaoExOfficio', '-created_date', [...CAMPOS_PUBLICACAO_SUPORTE, ...CAMPOS_TEXTO_REFERENCIA], 'publicacoesExOfficio.admin'),
+        listarCompletoCampos(base44, 'ContratoDesignacaoMilitar', '-data_inicio_contrato', CAMPOS_CONTRATO_SUPORTE, 'contratosDesignacaoMilitar.admin'),
+        listarCompletoCampos(base44, 'AjusteSaldoFerias', '-created_date', CAMPOS_AJUSTE_SALDO_DETALHADO, 'ajustesSaldoFerias.admin'),
       ]);
       for (const r of [paRes,mRes,matRes,fRes,rRes,pubRes,cdmRes,ajRes]) if (r.status === 'rejected') partialFailures += 1;
       periodosAquisitivos = paRes.status === 'fulfilled' ? (paRes.value || []) : [];
