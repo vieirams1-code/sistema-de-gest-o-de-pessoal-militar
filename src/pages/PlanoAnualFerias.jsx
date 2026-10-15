@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, Download, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
-import { enriquecerFeriasComContextoMilitarCarregado } from '@/services/feriasMilitarContextService';
+import { enriquecerFeriasComContextoMilitarCarregado, feriasDeMilitarInativo } from '@/services/feriasMilitarContextService';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { montarPlanoAnualFerias, listarLotacoesDisponiveis, exportarPlanoExcel, exportarPlanoPDF } from '@/services/planoAnualFeriasDocumentoService';
 
@@ -47,31 +47,32 @@ export default function PlanoAnualFerias() {
     queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
   });
 
-  const ferias = useMemo(() => {
-    const filtradas = (bundle?.ferias || []).filter((f) =>
-      f?.data_inicio && Number(String(f.data_inicio).slice(0, 4)) === anoSelecionado,
-    );
-    return enriquecerFeriasComContextoMilitarCarregado(
-      filtradas, bundle?.militares || [], bundle?.matriculasMilitar || [],
-      { contexto: 'operacional' },
-    );
-  }, [bundle, anoSelecionado]);
+  // Férias de militares com cadastro inativo ficam ocultas dos painéis e dos
+  // documentos; o registro permanece íntegro na base.
+  const feriasVisiveis = useMemo(() => enriquecerFeriasComContextoMilitarCarregado(
+    bundle?.ferias || [], bundle?.militares || [], bundle?.matriculasMilitar || [],
+    { contexto: 'operacional' },
+  ).filter((f) => !feriasDeMilitarInativo(f)), [bundle]);
+
+  const ferias = useMemo(() => feriasVisiveis.filter((f) =>
+    f?.data_inicio && Number(String(f.data_inicio).slice(0, 4)) === anoSelecionado,
+  ), [feriasVisiveis, anoSelecionado]);
 
   const lotacoesDisponiveis = useMemo(
     () => listarLotacoesDisponiveis({
-      ferias: bundle?.ferias || [], militares: bundle?.militares || [], ano: anoSelecionado,
+      ferias: feriasVisiveis, militares: bundle?.militares || [], ano: anoSelecionado,
     }),
-    [bundle, anoSelecionado],
+    [bundle, anoSelecionado, feriasVisiveis],
   );
 
   const planoDocumento = useMemo(() => montarPlanoAnualFerias({
     ano: anoSelecionado,
-    ferias: bundle?.ferias || [],
+    ferias: feriasVisiveis,
     militares: bundle?.militares || [],
     matriculasMilitar: bundle?.matriculasMilitar || [],
     periodosAquisitivos: bundle?.periodosAquisitivos || [],
     lotacao: lotacaoSelecionada,
-  }), [bundle, anoSelecionado, lotacaoSelecionada]);
+  }), [bundle, anoSelecionado, lotacaoSelecionada, feriasVisiveis]);
 
   // Uma exportação incompleta pode produzir um documento oficial incorreto.
   const exportacaoBloqueada = loadingFerias || erroCarregamento

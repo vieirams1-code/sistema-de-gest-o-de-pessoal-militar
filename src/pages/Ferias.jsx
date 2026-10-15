@@ -64,7 +64,8 @@ import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/ferias
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
-import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
+import { base44 } from '@/api/base44Client';
+import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca, feriasDeMilitarInativo } from '@/services/feriasMilitarContextService';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
@@ -547,6 +548,23 @@ export default function Ferias() {
     enabled: isAccessResolved && canAccessModule('ferias') && canAccessAction('visualizar_ferias'),
   });
   const ferias = feriasData?.ferias || [];
+  // Militar com cadastro inativo: as férias são ocultadas dos painéis.
+  // O registro permanece íntegro na base (apenas sai da leitura operacional).
+  // A lista de inativados vem em uma única consulta — o enriquecimento por
+  // militar pode falhar parcialmente e deixar registros sem a marcação.
+  const { data: militaresInativosIds } = useQuery({
+    queryKey: ['ferias-militares-inativos'],
+    queryFn: async () => {
+      const inativos = await base44.entities.Militar.filter({ status_cadastro: 'Inativo' });
+      return new Set((inativos || []).map((m) => String(m.id)));
+    },
+    enabled: isAccessResolved && canAccessModule('ferias'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const feriasVisiveis = useMemo(
+    () => ferias.filter((f) => !feriasDeMilitarInativo(f) && !militaresInativosIds?.has(String(f.militar_id))),
+    [ferias, militaresInativosIds],
+  );
   const feriasTagsFromBundle = Array.isArray(feriasData?.feriasTags) ? feriasData.feriasTags : [];
   const tagsCatalogoFromBundle = Array.isArray(feriasData?.tagsCatalogo) ? feriasData.tagsCatalogo : [];
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
@@ -630,8 +648,8 @@ export default function Ferias() {
   });
 
   const feriasIdsEscopoTags = useMemo(
-    () => ferias.map((item) => String(item.id)).filter(Boolean),
-    [ferias],
+    () => feriasVisiveis.map((item) => String(item.id)).filter(Boolean),
+    [feriasVisiveis],
   );
 
   // Lote 2 (SGP-FER-001): bundle sempre retorna feriasTags e tagsCatalogo —
@@ -718,7 +736,7 @@ export default function Ferias() {
   const filteredFerias = useMemo(() => {
     const hasPeriodFilter = Boolean(periodStart && periodEnd);
     const hasValidPeriod = !hasPeriodFilter || parseISO(`${periodEnd}T00:00:00`) >= parseISO(`${periodStart}T00:00:00`);
-    return ferias.filter((f) => {
+    return feriasVisiveis.filter((f) => {
       const matchesSearch = feriasCorrespondeBusca(f, searchTerm);
       const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
       const cadeia = getCadeiaOperacional(f, registrosLivro);
@@ -737,7 +755,7 @@ export default function Ferias() {
       const filtroFim = parseISO(`${periodEnd}T00:00:00`);
       return matchesSearch && matchesStatus && matchesSituacao && matchesAno && matchesGozo && matchesTags && inicio <= filtroFim && fim >= filtroInicio;
     }).sort((a, b) => (getDataInicioFerias(a)?.getTime() || Infinity) - (getDataInicioFerias(b)?.getTime() || Infinity));
-  }, [ferias, searchTerm, statusFilter, periodStart, periodEnd, registrosLivro, feriasTagsAtivasMap, situacaoPeriodoFilter, anoAquisitivoFilter, statusGozoFilter, tagsFilter]);
+  }, [feriasVisiveis, searchTerm, statusFilter, periodStart, periodEnd, registrosLivro, feriasTagsAtivasMap, situacaoPeriodoFilter, anoAquisitivoFilter, statusGozoFilter, tagsFilter]);
 
   const selectedFerias = useMemo(() => filteredFerias.filter((item) => selectedFeriasIds.includes(String(item.id))), [filteredFerias, selectedFeriasIds]);
 
@@ -1147,10 +1165,10 @@ export default function Ferias() {
   if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
   const stats = {
-    total: ferias.length,
-    emCurso: ferias.filter((f) => f.status === 'Em Curso').length,
-    previstas: ferias.filter((f) => f.status === 'Prevista').length,
-    gozadas: ferias.filter((f) => f.status === 'Gozada').length,
+    total: feriasVisiveis.length,
+    emCurso: feriasVisiveis.filter((f) => f.status === 'Em Curso').length,
+    previstas: feriasVisiveis.filter((f) => f.status === 'Prevista').length,
+    gozadas: feriasVisiveis.filter((f) => f.status === 'Gozada').length,
   };
 
   return (

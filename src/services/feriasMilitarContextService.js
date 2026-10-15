@@ -7,6 +7,15 @@ import {
   resolverMatriculaAtual,
 } from './matriculaMilitarViewService.js';
 
+/**
+ * Militar com cadastro inativo: suas férias não são exibidas nos painéis.
+ * O registro permanece íntegro na base — apenas sai da leitura operacional.
+ */
+export function feriasDeMilitarInativo(ferias = {}) {
+  const status = String(ferias?.militar_status_cadastro || '').trim().toLowerCase();
+  return status === 'inativo' || status === 'inativa';
+}
+
 function pickFirstText(...values) {
   for (const value of values) {
     const parsed = String(value || '').trim();
