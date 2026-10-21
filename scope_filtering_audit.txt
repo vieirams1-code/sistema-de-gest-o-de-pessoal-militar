@@ -1,0 +1,12 @@
+src/services/medalhasAcessoService.js:export async function listarMilitaresEscopo({ base44Client, isAdmin, getMilitarScopeFilters }) {
+src/services/medalhasAcessoService.js:  const scopeFilters = getMilitarScopeFilters();
+src/services/globalMilitarSearchService.js:export function filtrarMilitaresPorEscopo(militares = [], { hasAccess, hasSelfAccess }) {
+src/services/globalMilitarSearchService.js:  return militares.filter((militar) => hasAccess?.(militar) || hasSelfAccess?.(militar));
+src/services/__tests__/globalMilitarSearchService.test.js:    hasAccess: (militar) => militar.id === 'm2',
+src/services/__tests__/globalMilitarSearchService.test.js:    hasSelfAccess: () => false,
+src/services/publicacoesPainelService.js:export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }) {
+src/services/publicacoesPainelService.js:  const scopeFilters = getMilitarScopeFilters();
+src/services/publicacoesPainelService.js:export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }) {
+src/services/publicacoesPainelService.js:  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
+src/services/publicacoesPainelService.js:export async function listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }) {
+src/services/publicacoesPainelService.js:  const militarIds = await listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters });
