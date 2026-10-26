@@ -7,24 +7,20 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeftRight, FileSearch, Link2, Unlink2 } from 'lucide-react';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { createPageUrl } from '@/utils';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { listarAtestadosPublicacaoEscopo, listarLivroPublicacoesEscopo } from '@/services/publicacoesPainelService';
+import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
+import { analisarBoletimContraRegistros } from '@/utils/boletim/auditoriaPdf';
+import * as pdfJsLib from 'pdfjs-dist/build/pdf.mjs';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
-const PDFJS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-
-let pdfJsLibPromise;
-
+// Worker empacotado no próprio aplicativo: não executa código de CDN
+// durante a leitura dos boletins (especialmente os reservados).
 async function carregarPdfJs() {
-  if (!pdfJsLibPromise) {
-    pdfJsLibPromise = import(/* @vite-ignore */ PDFJS_CDN_URL).then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN_URL;
-      return mod;
-    });
-  }
-
-  return pdfJsLibPromise;
+  pdfJsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+  return pdfJsLib;
 }
 
 function calcStatus(registro) {
@@ -515,15 +511,22 @@ async function extrairTextoPorPagina(file) {
 async function extrairNotasPdf(file) {
   const paginas = await extrairTextoPorPagina(file);
   const notas = paginas.flatMap(({ pagina, texto }) => extrairNotasDoTexto(texto, pagina));
+  const paginasSemTexto = paginas.filter(({ texto }) => (texto || '').trim().length < 15).map(p => p.pagina);
 
   const porNota = new Map();
   for (const nota of notas) {
     if (!porNota.has(nota.nota_normalizada)) {
-      porNota.set(nota.nota_normalizada, nota);
+      porNota.set(nota.nota_normalizada, { ...nota, paginas: [nota.pagina] });
+    } else {
+      const anterior = porNota.get(nota.nota_normalizada);
+      anterior.paginas.push(nota.pagina);
+      if (nota.contexto && !anterior.contexto.includes(nota.contexto)) {
+        anterior.contexto += '\n' + nota.contexto;
+      }
     }
   }
 
-  return Array.from(porNota.values());
+  return { notas: Array.from(porNota.values()), totalPaginas: paginas.length, paginasSemTexto };
 }
 
 function contarOcorrenciasNotasPendentes(pendentes = []) {
@@ -544,7 +547,10 @@ export default function ConciliacaoBoletim() {
   const cacheCorrespondencia = useRef(new Map());
   const [numeroBoletim, setNumeroBoletim] = useState('');
   const [dataBoletim, setDataBoletim] = useState('');
+  const [tipoBoletim, setTipoBoletim] = useState('BG');
   const [arquivoPdf, setArquivoPdf] = useState(null);
+  const [resultadoLeitura, setResultadoLeitura] = useState(null);
+  const [filtroAuditoria, setFiltroAuditoria] = useState('pendentes');
   const [notasEncontradas, setNotasEncontradas] = useState([]);
   const [vinculos, setVinculos] = useState({});
   const [processandoPdf, setProcessandoPdf] = useState(false);
@@ -572,6 +578,27 @@ export default function ConciliacaoBoletim() {
     queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, hasGlobalScope, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasAccess
   });
+
+  const { data: militaresBundle = {}, isLoading: isLoadingMilitares, isError: falhaConsultaMilitares } = useQuery({
+    queryKey: ['conciliacao-boletim-militares-ativos'],
+    queryFn: () => fetchScopedMilitares({ fetchAll: true, includeFoto: false, statusCadastro: 'Ativo' }),
+    enabled: isAccessResolved && hasAccess,
+    staleTime: 60_000,
+  });
+  const auditoriaInversa = useMemo(() => {
+    if (!notasEncontradas.length || falhaConsultaMilitares || !militaresBundle?.militares) {
+      return { ocorrencias: [], notasSemMilitar: [] };
+    }
+    const registros = [
+      ...registrosLivro.map(r => ({ ...r, origem_tipo: 'livro' })),
+      ...publicacoesExOfficio.map(r => ({ ...r, origem_tipo: 'ex-officio' })),
+      ...atestados.map(r => ({ ...r, origem_tipo: 'atestado' })),
+    ];
+    return analisarBoletimContraRegistros(notasEncontradas, militaresBundle.militares, registros);
+  }, [notasEncontradas, militaresBundle, registrosLivro, publicacoesExOfficio, atestados, falhaConsultaMilitares]);
+  const ocorrenciasFiltradas = useMemo(() => auditoriaInversa.ocorrencias.filter(item =>
+    filtroAuditoria === 'todos' || (filtroAuditoria === 'localizados' ? item.status === 'registro_localizado' : item.status !== 'registro_localizado')
+  ), [auditoriaInversa, filtroAuditoria]);
 
   const pendentesMap = useMemo(() => {
     const enriched = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
@@ -852,10 +879,20 @@ export default function ConciliacaoBoletim() {
       setErroProcessamento('Selecione um arquivo PDF antes de buscar notas.');
       return;
     }
+    if (tipoBoletim === 'BGR' && !isAdmin) {
+      setErroProcessamento('A varredura de boletim reservado está restrita ao administrador master nesta primeira fase.');
+      return;
+    }
+    if (!arquivoPdf.name.toLowerCase().endsWith('.pdf') || arquivoPdf.size > 30 * 1024 * 1024) {
+      setErroProcessamento('Selecione um PDF de até 30 MB.');
+      return;
+    }
 
     setProcessandoPdf(true);
     try {
-      const notas = await extrairNotasPdf(arquivoPdf);
+      const resultado = await extrairNotasPdf(arquivoPdf);
+      const notas = resultado.notas;
+      setResultadoLeitura(resultado);
       setNotasEncontradas(notas);
       setVinculos({});
       setVinculosRemovidos({});
@@ -863,12 +900,13 @@ export default function ConciliacaoBoletim() {
       setConciliacaoIniciada(false);
 
       if (notas.length === 0) {
-        setMensagemProcessamento('PDF processado, mas nenhuma nota válida foi identificada.');
+        setMensagemProcessamento('Nenhuma nota reconhecida pelo formato esperado. Isso NÃO comprova que o boletim não tenha matérias relevantes. Revise as páginas e o padrão de texto.');
       } else {
-        setMensagemProcessamento(`${notas.length} nota(s) encontrada(s) no PDF e carregada(s) para conciliação.`);
+        setMensagemProcessamento(`${notas.length} nota(s) identificada(s) em ${resultado.totalPaginas} página(s). Confira a auditoria inversa e as limitações da leitura abaixo.`);
       }
     } catch (error) {
       setErroProcessamento(error?.message || 'Não foi possível processar o PDF enviado. Verifique o arquivo e tente novamente.');
+      setResultadoLeitura(null);
       setNotasEncontradas([]);
       setVinculos({});
       setVinculosRemovidos({});
@@ -1006,7 +1044,7 @@ export default function ConciliacaoBoletim() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
-  const isCarregandoDados = isLoadingPublicacoesBundle || isLoadingAtestados;
+  const isCarregandoDados = isLoadingPublicacoesBundle || isLoadingAtestados || isLoadingMilitares;
 
   if (isCarregandoDados) {
     return (
@@ -1020,10 +1058,17 @@ export default function ConciliacaoBoletim() {
     <div className="p-4 md:p-8 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v2.1</p>
+          <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Auditoria e Conciliação de Boletins</CardTitle>
+          <p className="text-sm font-semibold text-blue-700">Importação manual de PDF · BG e BGR · leitura local, sem acesso ao SIP</p>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4">
+        <CardContent className="grid gap-4 md:grid-cols-5">
+          <div>
+            <Label>Tipo</Label>
+            <select className="w-full border rounded-md h-10 px-2" value={tipoBoletim} onChange={(e) => { setTipoBoletim(e.target.value); setNotasEncontradas([]); setResultadoLeitura(null); setConciliacaoIniciada(false); }}>
+              <option value="BG">Boletim Geral (BG)</option>
+              {isAdmin && <option value="BGR">Boletim Geral Reservado (BGR)</option>}
+            </select>
+          </div>
           <div>
             <Label>Número do boletim</Label>
             <Input value={numeroBoletim} onChange={(e) => setNumeroBoletim(e.target.value)} placeholder="Ex: 045" />
@@ -1034,7 +1079,7 @@ export default function ConciliacaoBoletim() {
           </div>
           <div>
             <Label>Upload do PDF</Label>
-            <Input type="file" accept="application/pdf" onChange={(e) => setArquivoPdf(e.target.files?.[0] || null)} />
+            <Input type="file" accept="application/pdf,.pdf" onChange={(e) => { setArquivoPdf(e.target.files?.[0] || null); setNotasEncontradas([]); setResultadoLeitura(null); setConciliacaoIniciada(false); }} />
           </div>
           <div className="flex items-end">
             <Button type="button" onClick={processarBoletim} disabled={processandoPdf} className="w-full">
@@ -1044,7 +1089,10 @@ export default function ConciliacaoBoletim() {
           </div>
         </CardContent>
         <div className="px-6 pb-4 space-y-2">
+          <p className="text-xs text-slate-600">O PDF é lido no navegador; o arquivo e o texto extraído não são armazenados por esta etapa. BGR é acessível apenas ao perfil administrador master. Não use computadores compartilhados para boletins reservados.</p>
           {processandoPdf && <p className="text-xs text-blue-600 font-medium">Processando PDF para buscar notas...</p>}
+          {resultadoLeitura?.paginasSemTexto?.length > 0 && <p className="text-xs text-amber-700 font-medium">Atenção: {resultadoLeitura.paginasSemTexto.length} página(s) sem texto extraível (ex.: {resultadoLeitura.paginasSemTexto.slice(0, 12).join(', ')}). PDF digitalizado necessita OCR e não pode ser considerado integralmente conferido.</p>}
+          {falhaConsultaMilitares && <p className="text-xs text-red-700 font-medium">Consulta do efetivo falhou. A auditoria inversa está indisponível; não interprete notas sem identificação como inexistência de militares.</p>}
           {erroProcessamento && <p className="text-xs text-red-600 font-medium">{erroProcessamento}</p>}
           {!erroProcessamento && mensagemProcessamento && <p className="text-xs text-emerald-700 font-medium">{mensagemProcessamento}</p>}
           {erroVinculo && <p className="text-xs text-red-600 font-medium">{erroVinculo}</p>}
@@ -1060,6 +1108,44 @@ export default function ConciliacaoBoletim() {
           )}
         </div>
       </Card>
+
+      {notasEncontradas.length > 0 && !falhaConsultaMilitares && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Varredura inversa — boletim → efetivo → RP</CardTitle>
+            <p className="text-sm text-slate-600">Resultados preliminares para revisão. Ausência de correspondência não comprova ausência de RP; nomes de guerra e notas compartilhadas requerem conferência.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 items-center justify-between">
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Badge className="bg-amber-100 text-amber-800">{auditoriaInversa.ocorrencias.filter(o => o.status !== 'registro_localizado').length} a conferir</Badge>
+                <Badge className="bg-emerald-100 text-emerald-800">{auditoriaInversa.ocorrencias.filter(o => o.status === 'registro_localizado').length} com nota localizada</Badge>
+                <Badge variant="outline">{auditoriaInversa.notasSemMilitar.length} notas sem militar identificado</Badge>
+              </div>
+              <select aria-label="Filtrar varredura" className="border rounded-md h-9 px-2 text-sm" value={filtroAuditoria} onChange={e => setFiltroAuditoria(e.target.value)}>
+                <option value="pendentes">Exigem conferência</option>
+                <option value="localizados">Nota localizada no RP</option>
+                <option value="todos">Todas as ocorrências</option>
+              </select>
+            </div>
+            {ocorrenciasFiltradas.length === 0 && <p className="text-sm text-slate-600">Nenhuma ocorrência nesta categoria. Isso não substitui a revisão do boletim completo.</p>}
+            {ocorrenciasFiltradas.map(item => (
+              <div key={item.id} className="rounded-lg border p-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2 justify-between">
+                  <div className="font-semibold text-sm text-slate-800">{item.militar.nome_completo || item.militar.nome_guerra} · Nota {item.nota.nota} · pág. {item.nota.pagina}</div>
+                  <Badge className={item.status === 'registro_localizado' ? 'bg-emerald-100 text-emerald-800' : item.status === 'sem_registro' ? 'bg-amber-100 text-amber-800' : 'bg-orange-100 text-orange-800'}>
+                    {item.status === 'registro_localizado' ? 'Nota localizada em RP' : item.status === 'sem_registro' ? 'Sem RP confirmado' : item.status === 'revisar_identidade' ? 'Confirmar identidade' : 'Possível RP correspondente'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-600">Identificação por: {item.criterio}. {item.registro ? `Registro sugerido: ${item.registro.tipo_registro || item.registro.tipo || 'Atestado'} (nota ${item.registro.nota_para_bg || item.registro.nota_conciliada_boletim || 'não informada'}).` : `${item.registrosDoMilitar} RP(s) cadastrados para esse militar no conjunto consultado.`}</p>
+                <TextoExpansivel texto={item.nota.contexto} />
+                {item.status !== 'registro_localizado' && <a href={createPageUrl('CadastrarRegistroRP')} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Abrir cadastro de RP (preenchimento manual)</a>}
+              </div>
+            ))}
+            {auditoriaInversa.notasSemMilitar.length > 0 && <div className="rounded-lg bg-slate-50 border p-3 text-xs text-slate-700">Existem {auditoriaInversa.notasSemMilitar.length} nota(s) sem militar ativo identificado pelo cadastro acessível. Elas podem conter militares com nomes abreviados, grafias diferentes ou atos de interesse da unidade. Revise essas notas antes de concluir a auditoria.</div>}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -1244,7 +1330,8 @@ export default function ConciliacaoBoletim() {
         </Card>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end flex-col items-end gap-2">
+        {tipoBoletim === 'BGR' && <p className="text-xs text-amber-700">No BGR, a conferência é somente visual nesta fase. A atualização automática dos RP permanece bloqueada até existir segregação de dados reservados no backend.</p>}
         <Button
           onClick={() => confirmarMutation.mutate()}
           disabled={
@@ -1252,7 +1339,8 @@ export default function ConciliacaoBoletim() {
             !dataBoletim ||
             publicacoesConciliadas.length === 0 ||
             confirmarMutation.isPending ||
-            existeDuplicidadeNosVinculos
+            existeDuplicidadeNosVinculos ||
+            tipoBoletim === 'BGR'
           }
         >
           {confirmarMutation.isPending ? 'Confirmando...' : 'Confirmar conciliação e publicar'}
