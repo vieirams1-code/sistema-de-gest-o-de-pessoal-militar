@@ -425,7 +425,7 @@ function extrairNotasDoTexto(textoPagina, pagina) {
   if (!textoPagina?.length) return [];
 
   const texto = normalizarTextoExtraido(textoPagina);
-  const regexContextual = /\bNOTA\s+N(?:\.|º|°)?\s*[:\-]?\s*([1-9]\d{3,7})\b/gi;
+  const regexContextual = /\bNOTA\s+N(?:\.|º|°)?\s*[:\-]?\s*(\d{4,9})\b/gi;
   const encontrados = [];
   const vistos = new Set();
   const matches = [...texto.matchAll(regexContextual)];
