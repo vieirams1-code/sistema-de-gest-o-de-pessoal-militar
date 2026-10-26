@@ -793,6 +793,7 @@ export default function ConciliacaoBoletim() {
 
   const confirmarMutation = useMutation({
     mutationFn: async () => {
+      if (tipoBoletim === 'BGR') throw new Error('Não é permitido persistir vínculos de BGR nesta fase.');
       if (!numeroBoletim || !dataBoletim) {
         throw new Error('Informe o número e a data do boletim antes de confirmar.');
       }
@@ -854,6 +855,7 @@ export default function ConciliacaoBoletim() {
   });
 
   const atualizarPersistenciaVinculo = async (pub, notaNormalizada) => {
+    if (tipoBoletim === 'BGR') throw new Error('Conciliação de BGR não grava vínculos no banco de RP.');
     const payload = { nota_conciliada_boletim: notaNormalizada || '' };
 
     if (pub.origem_tipo === 'atestado') {
@@ -918,6 +920,7 @@ export default function ConciliacaoBoletim() {
   };
 
   const handleVinculoManual = async (pubId, notaId) => {
+    if (tipoBoletim === 'BGR') return;
     const pub = pendentesMap.get(pubId);
     if (!pub) return;
 
@@ -974,6 +977,7 @@ export default function ConciliacaoBoletim() {
   };
 
   const iniciarConciliacao = async () => {
+    if (tipoBoletim === 'BGR') return;
     setErroVinculo('');
     setConciliacaoIniciada(true);
 
@@ -1005,6 +1009,7 @@ export default function ConciliacaoBoletim() {
   };
 
   const removerVinculo = async (pub) => {
+    if (tipoBoletim === 'BGR') return;
     const notaId = vinculosEfetivos[pub.id];
     if (!notaId) return;
 
@@ -1139,10 +1144,10 @@ export default function ConciliacaoBoletim() {
                 </div>
                 <p className="text-xs text-slate-600">Identificação por: {item.criterio}. {item.registro ? `Registro sugerido: ${item.registro.tipo_registro || item.registro.tipo || 'Atestado'} (nota ${item.registro.nota_para_bg || item.registro.nota_conciliada_boletim || 'não informada'}).` : `${item.registrosDoMilitar} RP(s) cadastrados para esse militar no conjunto consultado.`}</p>
                 <TextoExpansivel texto={item.nota.contexto} />
-                {item.status !== 'registro_localizado' && <a href={createPageUrl('CadastrarRegistroRP')} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Abrir cadastro de RP (preenchimento manual)</a>}
+                {item.status !== 'registro_localizado' && tipoBoletim === 'BG' && <a href={createPageUrl('CadastrarRegistroRP')} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Abrir cadastro de RP (preenchimento manual)</a>}
               </div>
             ))}
-            {auditoriaInversa.notasSemMilitar.length > 0 && <div className="rounded-lg bg-slate-50 border p-3 text-xs text-slate-700">Existem {auditoriaInversa.notasSemMilitar.length} nota(s) sem militar ativo identificado pelo cadastro acessível. Elas podem conter militares com nomes abreviados, grafias diferentes ou atos de interesse da unidade. Revise essas notas antes de concluir a auditoria.</div>}
+            {auditoriaInversa.notasSemMilitar.length > 0 && <details className="rounded-lg bg-slate-50 border p-3 text-xs text-slate-700"><summary className="cursor-pointer font-semibold">Revisar {auditoriaInversa.notasSemMilitar.length} nota(s) sem militar identificado</summary><p className="mt-2">Podem conter nomes abreviados, outras grafias ou atos de interesse da unidade. Não foram descartadas.</p><div className="space-y-2 mt-3">{auditoriaInversa.notasSemMilitar.map(n => <div key={n.id} className="border rounded bg-white p-2"><p className="font-semibold">Nota {n.nota} — página {n.pagina}</p><TextoExpansivel texto={n.contexto} /></div>)}</div></details>}
           </CardContent>
         </Card>
       )}
@@ -1153,10 +1158,11 @@ export default function ConciliacaoBoletim() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1 text-sm text-slate-600">
+            {tipoBoletim === 'BGR' && <p className="font-semibold text-amber-700">Boletim reservado: conciliação e alterações bloqueadas nesta fase. Use apenas a varredura inversa acima.</p>}
             <p>1) Faça a leitura do PDF na Etapa 1.</p>
             <p>2) Inicie a conciliação para aplicar os vínculos automáticos e revisar manualmente.</p>
           </div>
-          <Button type="button" onClick={iniciarConciliacao} disabled={notasEncontradas.length === 0 || conciliacaoIniciada}>
+          <Button type="button" onClick={iniciarConciliacao} disabled={tipoBoletim === 'BGR' || notasEncontradas.length === 0 || conciliacaoIniciada}>
             {conciliacaoIniciada ? 'Conciliação iniciada' : 'Iniciar conciliação'}
           </Button>
         </CardContent>
