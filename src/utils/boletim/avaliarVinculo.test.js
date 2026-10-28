@@ -36,3 +36,19 @@ test('nota lida em página de layout incerto exige revisão', () => {
   assert.equal(r.compativel, false);
   assert.equal(r.exigeRevisao, true);
 });
+
+test('detecta RP rotulado Licença Paternidade cujo próprio texto trata de dispensa recompensa', () => {
+  const registro = {
+    ...pub,
+    tipo_registro: 'Licença Paternidade',
+    texto_publicacao: 'A Comandante concede ao militar Christian Freitas Batista dispensa total do serviço e expediente, a título de recompensa.',
+  };
+  const nota = {
+    nota:'1244458', pagina:2,
+    contexto:'NOTA N. 1244458 Christian Freitas Batista recebeu dispensa total do serviço e expediente, a título de recompensa.',
+  };
+  const r = avaliarVinculoPublicacao(registro, nota, efetivo);
+  assert.equal(r.compativel, false);
+  assert.ok(r.problemas.some(p => p.includes('tipo cadastrado diverge')));
+});
+
