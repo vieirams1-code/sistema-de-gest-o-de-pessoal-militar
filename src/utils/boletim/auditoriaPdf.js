@@ -77,6 +77,7 @@ function semelhancaBasica(a, b) {
 }
 
 const TIPOS_BOLETIM = [
+  { regex: /DISPENSA.{0,95}RECOMPENSA|RECOMPENSA.{0,95}DISPENSA/, tipo: 'Dispensa Recompensa' },
   { regex: /\bELOGIO\b|ELOGIAR/, tipo: 'Elogio Individual' },
   { regex: /\bDESIGNACAO\b|\bDESIGNAR\b/, tipo: 'Designação de Função' },
   { regex: /\bDISPENSA DE FUNCAO\b|\bDISPENSAR DA FUNCAO\b/, tipo: 'Dispensa de Função' },
