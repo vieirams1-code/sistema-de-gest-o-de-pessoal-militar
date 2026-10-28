@@ -25,6 +25,7 @@ const TIPOS_IMPORTACAO = [
   { value: 'Melhoria de Comportamento', label: 'Melhoria de Comportamento', entidade: 'PublicacaoExOfficio' },
   { value: 'Punição', label: 'Punição (revisar dados específicos)', entidade: 'PublicacaoExOfficio' },
   { value: 'Curso/Estágio', label: 'Curso/Estágio', entidade: 'RegistroLivro' },
+  { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', entidade: 'RegistroLivro' },
   { value: 'Saída Férias', label: 'Saída de Férias', entidade: 'RegistroLivro' },
   { value: 'Retorno Férias', label: 'Retorno de Férias', entidade: 'RegistroLivro' },
   { value: 'Interrupção de Férias', label: 'Interrupção de Férias', entidade: 'RegistroLivro' },
