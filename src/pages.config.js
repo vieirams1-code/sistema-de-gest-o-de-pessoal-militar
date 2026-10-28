@@ -68,7 +68,7 @@ import CadastrarPunicao from './pages/CadastrarPunicao';
 import ClassificacaoPendentesLegado from './pages/ClassificacaoPendentesLegado';
 import ClassificacoesHistoricasAlteracoes from './pages/ClassificacoesHistoricasAlteracoes';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
-import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
+import ConciliacaoBoletim from './pages/ConciliacaoBoletimSimplificada';
 import ContratosDesignacao from './pages/ContratosDesignacao';
 import ControleProcessos from './pages/ControleProcessos';
 import CreditosExtraordinariosFerias from './pages/CreditosExtraordinariosFerias';
