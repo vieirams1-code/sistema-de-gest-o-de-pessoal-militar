@@ -4,6 +4,7 @@ import {
   normalizarNotaBoletim,
   identificarMilitaresEmNota,
   analisarBoletimContraRegistros,
+  inferirTipoPublicacaoNota,
 } from './auditoriaPdf.js';
 
 const militares = [
@@ -54,3 +55,17 @@ test('nota sem militar permanece na lista de revisão, não é descartada', () =
   assert.equal(res.ocorrencias.length, 0);
   assert.equal(res.notasSemMilitar.length, 1);
 });
+
+test('nota registrada em outro BG não é tratada como vínculo confirmado', () => {
+  const nota = { id: 'n-ano', nota: '12345', contexto: 'João Antônio da Silva foi designado.' };
+  const registros = [{ id:'r-antigo', militar_id:'m1', nota_para_bg:'12345', numero_bg:'071', data_bg:'2025-10-02', texto_publicacao:'outro assunto' }];
+  const resultado = analisarBoletimContraRegistros([nota], militares, registros, { numeroBoletim:'045', dataBoletim:'2026-10-28' });
+  assert.equal(resultado.ocorrencias.length, 1);
+  assert.notEqual(resultado.ocorrencias[0].status, 'registro_localizado');
+});
+
+test('tipo sugerido não é confundido com confirmação de importação', () => {
+  assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\\nELOGIO ao militar JOAO.'), 'Elogio Individual');
+  assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\\nDiversos assuntos administrativos.'), 'Geral (classificar)');
+});
+
