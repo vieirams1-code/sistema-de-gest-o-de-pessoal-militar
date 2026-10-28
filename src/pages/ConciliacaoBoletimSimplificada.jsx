@@ -366,30 +366,78 @@ export default function ConciliacaoBoletimSimplificada() {
                 const sugerida = notaSugerida(pub);
                 const escolhida = notas.find(n => n.id === (selecoesVinculo[chave] || sugerida?.id)) || null;
                 const confirmado = Boolean(vinculosConfirmados[chave]);
+                const avaliacao = avaliarVinculoPublicacao(pub, escolhida, militares, leitura);
+                const podeConfirmar = !confirmado && salvandoVinculo !== chave && tipoBoletim !== 'BGR' &&
+                  canAccessAction('publicar_bg') && !avaliacao.bloqueado &&
+                  (!avaliacao.exigeRevisao || revisoesVinculo[chave]);
                 return (
-                  <div key={chave} className="rounded-lg border border-slate-200 overflow-hidden">
-                    <div className="grid lg:grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)]">
-                      <div className="p-4 bg-slate-50 space-y-2">
-                        <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-600 uppercase">RP existente</span><ChavePublicacao pub={pub} /></div>
-                        <p className="text-sm font-semibold">{pub.militar_nome || pub.nome_completo || 'Militar cadastrado'}</p>
-                        <TextoNota texto={pub.texto_publicacao || pub.texto || pub.documento_texto || 'Sem texto no RP.'} />
+                  <div key={chave} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                    <div className="px-3 py-2 border-b flex flex-wrap justify-between items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Nota {pub.nota_para_bg}</Badge>
+                        <span className="text-xs text-slate-500">{tipoRegistro(pub)}</span>
                       </div>
-                      <div className="hidden lg:flex items-center justify-center text-slate-400 bg-white"><ArrowLeftRight className="w-5 h-5" /></div>
-                      <div className="p-4 space-y-2">
-                        <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-blue-700 uppercase">Nota encontrada no BG</span><Badge variant="outline">Pág. {escolhida?.pagina || '—'}</Badge></div>
+                      <Badge className={avaliacao.compativel ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}>
+                        {avaliacao.compativel ? 'Dados compatíveis · confira' : 'Requer conferência'}
+                      </Badge>
+                    </div>
+                    <div className="grid lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x">
+                      <div className="px-3 py-2.5 bg-slate-50 space-y-1.5 min-w-0">
+                        <p className="text-xs font-semibold text-slate-500 uppercase">RP no sistema</p>
+                        <p className="text-sm font-semibold">{pub.militar_nome || pub.nome_completo || 'Militar cadastrado'}</p>
+                        <TextoNota texto={pub.texto_publicacao || pub.texto || pub.documento_texto || 'Sem texto no RP.'} limite={220} />
+                      </div>
+                      <div className="px-3 py-2.5 space-y-1.5 min-w-0">
+                        <div className="flex justify-between items-center gap-2">
+                          <p className="text-xs font-semibold text-blue-700 uppercase">Nota do boletim</p>
+                          <span className="text-xs text-slate-500">Pág. {escolhida?.pagina || '—'}</span>
+                        </div>
                         <select aria-label={'Nota para o RP ' + pub.id}
-                          className="w-full h-9 rounded-md border px-2 text-sm bg-white" disabled={confirmado || tipoBoletim === 'BGR'}
-                          value={escolhida?.id || ''} onChange={e => setSelecoesVinculo(s => ({ ...s, [chave]: e.target.value }))}>
-                          {notas.map(n => <option key={n.id} value={n.id}>Nota {n.nota} — pág. {n.pagina}</option>)}
+                          className="w-full h-8 rounded-md border px-2 text-xs bg-white"
+                          disabled={confirmado || tipoBoletim === 'BGR'}
+                          value={escolhida?.id || ''}
+                          onChange={e => {
+                            setSelecoesVinculo(v => ({ ...v, [chave]: e.target.value }));
+                            setRevisoesVinculo(v => ({ ...v, [chave]: false }));
+                          }}>
+                          {notas.map(n => <option key={n.id} value={n.id}>Nota {n.nota} · página {n.pagina}</option>)}
                         </select>
-                        <TextoNota texto={escolhida?.contexto || 'Nota não encontrada.'} />
+                        <TextoNota texto={escolhida?.contexto || 'Nota não encontrada.'} limite={220} />
                       </div>
                     </div>
-                    <div className="border-t p-2 px-4 flex justify-end bg-white">
-                      <Button size="sm" disabled={confirmado || salvandoVinculo === chave || tipoBoletim === 'BGR' || !canAccessAction('publicar_bg')}
-                        onClick={() => confirmarVinculo(pub)}>
-                        <Check className="w-4 h-4 mr-1.5" />{confirmado ? 'Confirmado' : salvandoVinculo === chave ? 'Confirmando…' : 'Confirmar vínculo'}
-                      </Button>
+                    <div className="px-3 py-2 border-t flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span className={avaliacao.numeroOK ? 'text-emerald-700' : 'text-red-700'}>
+                          {avaliacao.numeroOK ? '✓' : '✕'} Número da nota
+                        </span>
+                        <span className={avaliacao.identidade === 'confirmada' ? 'text-emerald-700' : 'text-amber-700'}>
+                          {avaliacao.identidade === 'confirmada' ? '✓' : '!'} Militar
+                        </span>
+                        <span className={avaliacao.textoOK ? 'text-emerald-700' : 'text-amber-700'}>
+                          {avaliacao.textoOK ? '✓' : '!'} Texto {avaliacao.similaridade}% de similaridade indicativa
+                        </span>
+                        {avaliacao.problemas.length > 0 && (
+                          <span className="text-amber-700">{avaliacao.problemas.join(' · ')}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        {avaliacao.exigeRevisao && !avaliacao.bloqueado ? (
+                          <label className="flex items-start gap-2 text-xs text-amber-800 cursor-pointer">
+                            <input type="checkbox" className="mt-0.5" checked={Boolean(revisoesVinculo[chave])}
+                              onChange={e => setRevisoesVinculo(v => ({ ...v, [chave]: e.target.checked }))} />
+                            Conferi a identidade, o tipo e o conteúdo no PDF original. Confirmo este vínculo apesar das divergências indicadas.
+                          </label>
+                        ) : (
+                          <span className="text-xs text-slate-500">
+                            {avaliacao.bloqueado ? 'Vínculo bloqueado: o número da nota não corresponde ao RP.' : 'A confirmação é individual.'}
+                          </span>
+                        )}
+                        <Button size="sm" className="shrink-0" disabled={!podeConfirmar}
+                          onClick={() => confirmarVinculo(pub)}>
+                          <Check className="w-4 h-4 mr-1.5" />
+                          {confirmado ? 'Confirmado' : salvandoVinculo === chave ? 'Confirmando…' : 'Confirmar vínculo'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
