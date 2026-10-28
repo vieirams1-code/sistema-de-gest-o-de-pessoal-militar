@@ -76,7 +76,24 @@ function semelhancaBasica(a, b) {
   return comum / Math.max(Math.min(ta.size, tb.size), 1);
 }
 
-export function analisarBoletimContraRegistros(notas = [], militares = [], registros = []) {
+const TIPOS_BOLETIM = [
+  { regex: /\bELOGIO\b|ELOGIAR/, tipo: 'Elogio Individual' },
+  { regex: /\bDESIGNACAO\b|\bDESIGNAR\b/, tipo: 'Designação de Função' },
+  { regex: /\bDISPENSA DE FUNCAO\b|\bDISPENSAR DA FUNCAO\b/, tipo: 'Dispensa de Função' },
+  { regex: /\bCURSO\b|\bESTAGIO\b|\bCAPACITACAO\b/, tipo: 'Curso/Estágio' },
+  { regex: /\bTRANSCRICAO\b|\bTRANSCRIBO\b/, tipo: 'Transcrição de Documentos' },
+  { regex: /\bPUNICAO\b|\bREPREENS(AO|AO)\b|\bDETENCAO\b/, tipo: 'Punição' },
+  { regex: /\bFERIAS\b/, tipo: 'Férias (revisar modalidade)' },
+  { regex: /\bJISO\b|\bINSPECAO DE SAUDE\b/, tipo: 'Saúde / JISO (revisar)' },
+];
+
+export function inferirTipoPublicacaoNota(texto) {
+  const semCabecalho = String(texto || '').replace(/^\s*NOTA\s+N(?:\.|º|°)?\s*[:\-]?\s*\d+\s*/i, '');
+  const cabecalho = normalizarBuscaBoletim(semCabecalho.slice(0, 380));
+  return TIPOS_BOLETIM.find(regra => regra.regex.test(cabecalho))?.tipo || 'Geral (classificar)';
+}
+
+export function analisarBoletimContraRegistros(notas = [], militares = [], registros = [], boletim = {}) {
   const byMilitar = new Map();
   const ids = new Set();
   for (const registro of registros) {
@@ -101,7 +118,12 @@ export function analisarBoletimContraRegistros(notas = [], militares = [], regis
     for (const hit of identificados) {
       const registroMilitar = byMilitar.get(String(hit.militar.id)) || [];
       const notaNumero = normalizarNotaBoletim(nota.nota_normalizada || nota.nota);
-      const vinculoExato = notaNumero ? registroMilitar.find(r => chavesNotasRegistro(r).includes(notaNumero)) : null;
+      const vinculoExato = notaNumero ? registroMilitar.find(r => {
+        if (!chavesNotasRegistro(r).includes(notaNumero)) return false;
+        const mesmoNumero = !r.numero_bg || !boletim.numeroBoletim || String(r.numero_bg).replace(/^0+/, '') === String(boletim.numeroBoletim).replace(/^0+/, '');
+        const mesmaData = !r.data_bg || !boletim.dataBoletim || String(r.data_bg).slice(0, 10) === String(boletim.dataBoletim);
+        return mesmoNumero && mesmaData;
+      }) : null;
       const sugestao = vinculoExato || registroMilitar.find(r =>
         semelhancaBasica(nota.contexto, r.texto_publicacao || r.documento_texto || '') >= 0.55
       ) || null;
