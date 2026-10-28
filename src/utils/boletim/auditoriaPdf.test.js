@@ -65,7 +65,7 @@ test('nota registrada em outro BG não é tratada como vínculo confirmado', () 
 });
 
 test('tipo sugerido não é confundido com confirmação de importação', () => {
-  assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\\nELOGIO ao militar JOAO.'), 'Elogio Individual');
-  assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\\nDiversos assuntos administrativos.'), 'Geral (classificar)');
+  assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\nELOGIO ao militar JOAO.'), 'Elogio Individual');
+  assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\nDiversos assuntos administrativos.'), 'Geral (classificar)');
 });
 
