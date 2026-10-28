@@ -83,6 +83,6 @@ export function avaliarVinculoPublicacao(pub, nota, militares = [], { paginasLay
     numeroOK, identidade, similaridade, textoOK, layoutIncerto,
     problemas, exigeRevisao: problemas.length > 0,
     bloqueado: !numeroOK || !nota,
-    compativel: numeroOK && identidade === 'confirmada' && textoOK && !layoutIncerto,
+    compativel: numeroOK && identidade === 'confirmada' && textoOK && !layoutIncerto && problemas.length === 0,
   };
 }
