@@ -14,6 +14,7 @@ import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { criarEventoAuditoriaPublicacao, EVENTO_AUDITORIA_PUBLICACAO } from '@/components/publicacao/publicacaoStateMachine';
 import { normalizarNotaBoletim, normalizarBuscaBoletim, analisarBoletimContraRegistros, inferirTipoPublicacaoNota } from '@/utils/boletim/auditoriaPdf';
 import { lerBoletimPdf } from '@/utils/boletim/leituraPdf';
+import { avaliarVinculoPublicacao } from '@/utils/boletim/avaliarVinculo';
 
 const TIPOS_IMPORTACAO = [
   { value: 'Geral', label: 'Geral', entidade: 'PublicacaoExOfficio' },
@@ -37,12 +38,12 @@ const TIPOS_IMPORTACAO = [
   { value: 'Outro', label: 'Outro (Livro)', entidade: 'RegistroLivro' },
 ];
 
-function TextoNota({ texto, limite = 420 }) {
+function TextoNota({ texto, limite = 195 }) {
   const [aberto, setAberto] = useState(false);
   const value = String(texto || '');
   return (
     <div className="space-y-1">
-      <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap break-words">
+      <p className="text-sm leading-5 text-slate-700 whitespace-pre-wrap break-words">
         {aberto || value.length <= limite ? value : value.slice(0, limite) + '…'}
       </p>
       {value.length > limite && (
@@ -94,6 +95,7 @@ export default function ConciliacaoBoletimSimplificada() {
   const [erro, setErro] = useState('');
   const [selecoesVinculo, setSelecoesVinculo] = useState({});
   const [vinculosConfirmados, setVinculosConfirmados] = useState({});
+  const [revisoesVinculo, setRevisoesVinculo] = useState({});
   const [salvandoVinculo, setSalvandoVinculo] = useState(null);
   const [importarId, setImportarId] = useState(null);
   const [militarId, setMilitarId] = useState('');
@@ -136,9 +138,20 @@ export default function ConciliacaoBoletimSimplificada() {
     return analisarBoletimContraRegistros(notas, militares, registros, { numeroBoletim, dataBoletim });
   }, [leitura, notas, militares, registros, numeroBoletim, dataBoletim, erroMilitares, erroPublicacoes, erroAtestados]);
 
+  // Somente militares ativos sem RP correspondente. Casos com registro
+  // semelhante são para revisão do vínculo, não para criação em duplicidade.
   const notasSemRP = useMemo(() => auditoria.ocorrencias
-    .filter(o => o.status !== 'registro_localizado' && !importados[o.id])
-    .sort((a, b) => Number(a.nota.pagina) - Number(b.nota.pagina)), [auditoria, importados]);
+    .filter(o => {
+      if (importados[o.id] || o.registro || !['sem_registro', 'revisar_identidade'].includes(o.status)) return false;
+      return !registros.some(r =>
+        String(r.militar_id) === String(o.militar.id) &&
+        normalizarNotaBoletim(r.nota_para_bg || r.nota_conciliada_boletim) === normalizarNotaBoletim(o.nota.nota) &&
+        (!r.numero_bg || String(r.numero_bg).replace(/^0+/, '') === numeroBoletim.replace(/^0+/, '')) &&
+        (!r.data_bg || String(r.data_bg).slice(0, 10) === dataBoletim)
+      );
+    })
+    .sort((a, b) => Number(a.nota.pagina) - Number(b.nota.pagina)),
+  [auditoria, importados, registros, numeroBoletim, dataBoletim]);
 
   const listaMilitares = useMemo(() => {
     const termo = normalizarBuscaBoletim(buscaMilitar);
@@ -152,7 +165,7 @@ export default function ConciliacaoBoletimSimplificada() {
   };
 
   const reiniciar = () => {
-    setLeitura(null); setSelecoesVinculo({}); setVinculosConfirmados({}); setImportados({});
+    setLeitura(null); setSelecoesVinculo({}); setVinculosConfirmados({}); setRevisoesVinculo({}); setImportados({});
     resetarImportacao(); setMensagem(''); setErro('');
   };
 
@@ -169,7 +182,7 @@ export default function ConciliacaoBoletimSimplificada() {
     try {
       const resultado = await lerBoletimPdf(arquivo);
       setLeitura(resultado);
-      setSelecoesVinculo({}); setVinculosConfirmados({}); setImportados({}); resetarImportacao();
+      setSelecoesVinculo({}); setVinculosConfirmados({}); setRevisoesVinculo({}); setImportados({}); resetarImportacao();
       if (!resultado.notas.length) {
         setMensagem('Não foram reconhecidas notas no padrão esperado. Confira o PDF; isto não significa ausência de publicações.');
       } else {
@@ -190,8 +203,10 @@ export default function ConciliacaoBoletimSimplificada() {
     const chave = idRegistro(pub);
     const notaId = selecoesVinculo[chave] || notaSugerida(pub)?.id;
     const nota = notas.find(n => n.id === notaId);
-    if (!nota || !canAccessAction('publicar_bg')) {
-      setErro('Selecione uma nota válida e verifique sua permissão de publicar BG.');
+    const avaliacao = avaliarVinculoPublicacao(pub, nota, militares, leitura || {});
+    if (!nota || !canAccessAction('publicar_bg') || avaliacao.bloqueado ||
+        (avaliacao.exigeRevisao && !revisoesVinculo[chave])) {
+      setErro('Revise a nota, o militar e o conteúdo; confirme explicitamente as divergências antes de publicar.');
       return;
     }
     setSalvandoVinculo(chave); setErro('');
@@ -326,7 +341,10 @@ export default function ConciliacaoBoletimSimplificada() {
           {leitura?.paginasSemTexto?.length > 0 && <p className="text-sm text-amber-700">
             {leitura.paginasSemTexto.length} página(s) sem texto extraível; confira PDF digitalizado/OCR antes de importar.
           </p>}
-          {leitura?.notas?.some(n => n.textoTruncado) && <p className="text-sm text-amber-700">Algumas notas muito extensas tiveram o texto limitado na leitura. Confira o original antes de importar.</p>}
+          {leitura?.notas?.some(n => n.textoTruncado) && <p className="text-sm text-amber-700">Algumas notas extensas tiveram o texto limitado. Confira o PDF original antes de qualquer gravação.</p>}
+          {(leitura?.paginasComDuasColunas?.length || 0) > 0 && <p className="text-xs text-slate-500">Leitura por colunas aplicada em {leitura.paginasComDuasColunas.length} página(s).</p>}
+          {(leitura?.paginasLayoutIncertos?.length || 0) > 0 && <p role="alert" className="text-sm text-amber-700">Layout complexo nas páginas {leitura.paginasLayoutIncertos.join(', ')}. Compare com o PDF original antes de confirmar.</p>}
+          {!carregando && !erroMilitares && militares.length === 0 && <p className="text-sm text-amber-700">Nenhum militar ativo foi retornado no escopo. A busca por notas sem RP não pode ser considerada completa.</p>}
           {tipoBoletim === 'BGR' && <p className="text-xs text-amber-700">BGR: somente leitura local para o administrador master; nenhuma gravação no RP nesta fase.</p>}
         </CardContent>
       </Card>
