@@ -25,6 +25,15 @@ function contemNome(texto, nome) {
 }
 function tipoTexto(pub) { return pub.texto_publicacao || pub.texto || pub.documento_texto || ''; }
 
+function atoExplicitoNoTexto(texto) {
+  const t = normalizarBuscaBoletim(texto);
+  if (/DISPENSA.{0,95}RECOMPENSA|RECOMPENSA.{0,95}DISPENSA/.test(t)) return 'DISPENSA RECOMPENSA';
+  if (/LICENCA.{0,35}PATERNIDADE/.test(t)) return 'LICENCA PATERNIDADE';
+  if (/LICENCA.{0,35}MATERNIDADE/.test(t)) return 'LICENCA MATERNIDADE';
+  if (/ELOGIO INDIVIDUAL/.test(t)) return 'ELOGIO INDIVIDUAL';
+  return '';
+}
+
 /**
  * Análise conservadora: não confirma nada automaticamente. Nota numérica divergente
  * é bloqueada. Identidade/texto inconclusivos exigem verificação explícita.
@@ -59,6 +68,15 @@ export function avaliarVinculoPublicacao(pub, nota, militares = [], { paginasLay
   if (identidade === 'revisar') problemas.push('Militar reconhecido apenas por nome de guerra');
   if (identidade === 'nao_identificada') problemas.push('Militar do RP não identificado com segurança na nota');
   if (!textoOK) problemas.push('Conteúdo não suficientemente semelhante');
+  const tipoCadastrado = normalizarBuscaBoletim(pub?.tipo_registro || pub?.tipo);
+  const assuntoCadastro = atoExplicitoNoTexto(tipoTexto(pub));
+  const assuntoBG = atoExplicitoNoTexto(textoBG);
+  if (assuntoCadastro && tipoCadastrado && assuntoCadastro !== tipoCadastrado) {
+    problemas.push('O tipo cadastrado diverge do assunto explícito no texto do próprio RP');
+  }
+  if (assuntoBG && tipoCadastrado && assuntoBG !== tipoCadastrado) {
+    problemas.push('O tipo do RP diverge do assunto explícito da nota do BG');
+  }
   if (layoutIncerto) problemas.push('Texto PDF incompleto ou com layout incerto');
 
   return {
