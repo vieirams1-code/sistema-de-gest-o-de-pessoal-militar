@@ -452,7 +452,7 @@ export default function ConciliacaoBoletimSimplificada() {
                 <CardTitle className="text-lg text-[#1e3a5f] flex items-center gap-2"><FileText className="w-5 h-5" />2. Notas sem RP confirmado</CardTitle>
                 <Badge variant="outline">{notasSemRP.length} a conferir</Badge>
               </div>
-              <p className="text-sm text-slate-500">Apenas notas com militares ativos identificados. Escolha e confirme o militar antes de importar.</p>
+              <p className="text-sm text-slate-500">Identificação por nome completo ou matrícula no corpo da nota, sem usar sobrenomes isolados ou assinaturas. Confirme o militar antes de importar.</p>
             </CardHeader>
             <CardContent className="space-y-3">
               {notasSemRP.length === 0 && <p className="text-sm text-slate-500">Nenhuma nota de militar ativo sem correspondência confirmada foi identificada pelo leitor. Revise o PDF para conferir notas com grafias diferentes.</p>}
@@ -475,7 +475,7 @@ export default function ConciliacaoBoletimSimplificada() {
                     <p className="text-xs text-slate-600">
                       Militar identificado: <strong>{rotuloMilitar(item.militar)}</strong>
                       {item.status === 'possivel_correspondencia' && ' · Possível registro semelhante no sistema: confira antes de importar.'}
-                      {item.status === 'revisar_identidade' && ' · Identificação sugerida por nome de guerra: exige confirmação.'}
+                      {' · Identificação por ' + item.criterio.toLowerCase() + ' no corpo da nota.'}
                     </p>
                     <TextoNota texto={item.nota.contexto} limite={600} />
                     {aberta && (

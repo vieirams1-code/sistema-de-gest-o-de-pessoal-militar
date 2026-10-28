@@ -43,10 +43,13 @@ test('uma nota com dois militares produz duas ocorrências independentes e não 
   assert.equal(registros.length, 1);
 });
 
-test('nome de guerra único gera revisão de identidade, sem confirmação automática', () => {
+test('nome de guerra isolado não oferece importação de nota sem RP', () => {
   const nota = { id:'n2', nota:'54321', contexto: 'O militar HELENA foi designado.' };
   const res = analisarBoletimContraRegistros([nota], militares, []);
-  assert.equal(res.ocorrencias[0].status, 'revisar_identidade');
+  assert.equal(res.ocorrencias.length, 0);
+  assert.equal(res.notasSemMilitar.length, 1);
+  // A regra da conciliação de RP existente permanece independente.
+  assert.equal(identificarMilitaresEmNota(nota, militares)[0].confianca, 'revisar');
 });
 
 test('nota sem militar permanece na lista de revisão, não é descartada', () => {
@@ -68,4 +71,3 @@ test('tipo sugerido não é confundido com confirmação de importação', () =>
   assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\nELOGIO ao militar JOAO.'), 'Elogio Individual');
   assert.equal(inferirTipoPublicacaoNota('NOTA Nº 1234\nDiversos assuntos administrativos.'), 'Geral (classificar)');
 });
-

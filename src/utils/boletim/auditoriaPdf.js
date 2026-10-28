@@ -2,6 +2,8 @@
  * Auditoria inversa de boletins. Funções puras: não persistem PDFs, textos
  * de BGR, nem alteram publicações. Todo resultado exige revisão humana.
  */
+import corpoNotaAuditoria from './corpoNotaAuditoria.js';
+
 export function normalizarBuscaBoletim(valor = '') {
   return String(valor || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -32,7 +34,7 @@ function contemMatricula(texto, matricula) {
   return new RegExp('(^|\\D)' + pattern + '(?=\\D|$)').test(String(texto || ''));
 }
 
-export function identificarMilitaresEmNota(nota, militares = []) {
+export function identificarMilitaresEmNota(nota, militares = [], { permitirNomeGuerra = true } = {}) {
   const texto = String(nota?.contexto || '');
   const normalizado = normalizarBuscaBoletim(texto);
   const nomesGuerra = new Map();
@@ -50,7 +52,7 @@ export function identificarMilitaresEmNota(nota, militares = []) {
       matches.push({ militar, confianca: 'alta', criterio: 'Nome completo' });
     } else {
       const guerra = normalizarBuscaBoletim(militar.nome_guerra);
-      if (guerra.length >= 6 && nomesGuerra.get(guerra) === 1 && contemFrase(normalizado, guerra)) {
+      if (permitirNomeGuerra && guerra.length >= 6 && nomesGuerra.get(guerra) === 1 && contemFrase(normalizado, guerra)) {
         matches.push({ militar, confianca: 'revisar', criterio: 'Nome de guerra (verificar homônimos)' });
       }
     }
@@ -109,8 +111,11 @@ export function analisarBoletimContraRegistros(notas = [], militares = [], regis
 
   const ocorrencias = [];
   const notasSemMilitar = [];
-  for (const nota of notas) {
-    const identificados = identificarMilitaresEmNota(nota, militares);
+  for (const original of notas) {
+    const nota = corpoNotaAuditoria(original);
+    // Sobrenome/nome de guerra isolado não comprova quem é o destinatário.
+    // Importação requer nome completo ou matrícula no mesmo corpo exibido.
+    const identificados = identificarMilitaresEmNota(nota, militares, { permitirNomeGuerra: false });
     if (!identificados.length) {
       notasSemMilitar.push(nota);
       continue;
