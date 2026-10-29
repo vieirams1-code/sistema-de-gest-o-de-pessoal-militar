@@ -658,6 +658,7 @@ export default function Publicacoes() {
     const termo = searchTerm.toLowerCase().trim();
     const matchesSearch = termo === '' ? true :
       containsTerm(r.militar_nome, termo) ||
+      (r.coletiva === true && (containsTerm(r.texto_publicacao, termo) || (r.militares_vinculados || []).some(m => containsTerm(m.militar_nome, termo) || containsTerm(m.militar_matricula, termo)))) ||
       containsTerm(r.militar_matricula, termo) ||
       containsTerm(r.militar_matricula_atual, termo) ||
       containsTerm(r.militar_matricula_registro, termo) ||

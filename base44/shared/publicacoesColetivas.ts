@@ -13,6 +13,8 @@ export async function operarPublicacaoColetiva({ base44, operation, data, regist
   if (!['create', 'update', 'delete'].includes(operation)) return erro('Operação coletiva inválida.');
   const tipos = ['Geral', 'Transcrição de Documentos'];
   if (!tipos.includes(merged.tipo)) return erro('O modo coletivo está disponível para Geral e Transcrição de Documentos.');
+  if (!Array.isArray(merged.militares_ids)) return erro('A lista de militares é obrigatória.');
+  if (operation === 'create' && data.coletiva !== true) return erro('Identifique o registro como nota coletiva.');
   const ids = idsPublicacao({ ...merged, coletiva: true });
   if (ids.length < 1 || ids.length > 500 || ids.some(id => !id.trim())) return erro('Selecione de 1 a 500 militares.');
   const antigos = idsPublicacao(registro || {});
