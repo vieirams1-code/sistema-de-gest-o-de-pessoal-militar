@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import NotaColetivaVinculos from '@/components/rp/coletiva/NotaColetivaVinculos';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -185,7 +186,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         </div>
 
         <NotaColetivaVinculos registro={registro} />
-        {registro.coletiva && canAccessAction('editar_publicacoes') && <Button asChild variant="outline" size="sm"><a href={'/CadastrarRegistroRP?id=' + registro.id}>Editar nota coletiva</a></Button>}
+        {registro.coletiva && canAccessAction('editar_publicacoes') && <Button asChild variant="outline" size="sm"><Link to={'/CadastrarRegistroRP?id=' + registro.id}>Editar nota coletiva</Link></Button>}
         {!isDOEMS && (
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-lg border bg-slate-50 p-3">

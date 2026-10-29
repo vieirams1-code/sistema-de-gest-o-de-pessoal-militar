@@ -696,7 +696,8 @@ export default function Publicacoes() {
     if (!canAccessAction('publicar_bg')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
     const permitirReversaoPublicado = isAdmin === true;
     const registroAtual = todosRegistros.find((item) => item.id === id);
-    const escopoUpd = validarEscopoMilitar(registroAtual?.militar_id);
+    const alvosUpd = registroAtual?.coletiva ? registroAtual.militares_ids || [] : [registroAtual?.militar_id];
+    const escopoUpd = alvosUpd.map(validarEscopoMilitar).find(result => !result.permitido) || { permitido: alvosUpd.length > 0, motivo: 'Nenhum militar vinculado.' };
     if (!escopoUpd.permitido) return alert(escopoUpd.motivo);
     const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
     const validacao = validarPayloadPublicacao({
@@ -727,7 +728,8 @@ export default function Publicacoes() {
     if (!canAccessAction('excluir_publicacoes')) return alert('Ação restrita. Exige permissão de exclusão de publicações.');
     const registro = todosRegistros.find((r) => r.id === id);
     if (!registro) return;
-    const escopoDel = validarEscopoMilitar(registro?.militar_id);
+    const alvosDel = registro?.coletiva ? registro.militares_ids || [] : [registro?.militar_id];
+    const escopoDel = alvosDel.map(validarEscopoMilitar).find(result => !result.permitido) || { permitido: alvosDel.length > 0, motivo: 'Nenhum militar vinculado.' };
     if (!escopoDel.permitido) return alert(escopoDel.motivo);
     if (tipo === 'atestado') return alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
     if (tipo === 'livro' && isFeriasOperacional(registro)) return alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');

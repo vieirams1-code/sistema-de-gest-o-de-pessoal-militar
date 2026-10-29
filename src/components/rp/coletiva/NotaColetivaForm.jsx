@@ -5,6 +5,7 @@ import NotaColetivaCampos from '@/components/rp/coletiva/NotaColetivaCampos';
 import MilitaresNotaSelector from '@/components/rp/coletiva/MilitaresNotaSelector';
 import NotaColetivaVinculos from '@/components/rp/coletiva/NotaColetivaVinculos';
 import useSalvarNotaColetiva from '@/components/rp/coletiva/useSalvarNotaColetiva';
+import ExcluirNotaColetivaDialog from '@/components/rp/coletiva/ExcluirNotaColetivaDialog';
 
 export default function NotaColetivaForm({ registro, canAccessAction }) {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function NotaColetivaForm({ registro, canAccessAction }) {
       <MilitaresNotaSelector selecionados={militares} onChange={items => { setMilitares(items); setConfirmado(false); setMensagem(''); }} disabled={mutation.isPending || !editavel} />
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label="Confirmar conteúdo e militares da nota coletiva" checked={confirmado} onChange={e => setConfirmado(e.target.checked)} disabled={!editavel} /><span>Conferi o texto integral e os {militares.length} militares selecionados. Uma única nota será exibida integralmente em todos os registros vinculados.</span></label>
       <div className="flex flex-wrap justify-end gap-3">
-        {salvo && !salvo.numero_bg && !salvo.data_bg && canAccessAction('excluir_publicacoes') && <Button type="button" variant="destructive" disabled={mutation.isPending} onClick={() => { if (window.confirm('Excluir esta nota não publicada e todos os seus vínculos?')) mutation.mutate({ id: salvo.id, dados, militares, token: token.current, excluir: true }); }}>Excluir rascunho coletivo</Button>}
+        {salvo && !salvo.numero_bg && !salvo.data_bg && canAccessAction('excluir_publicacoes') && <ExcluirNotaColetivaDialog disabled={mutation.isPending} onConfirm={() => mutation.mutate({ id: salvo.id, dados, militares, token: token.current, excluir: true })} />}
         <Button type="submit" disabled={!editavel || mutation.isPending || !confirmado || !militares.length}>{mutation.isPending ? 'Salvando…' : 'Salvar nota coletiva'}</Button>
       </div>
     </form>

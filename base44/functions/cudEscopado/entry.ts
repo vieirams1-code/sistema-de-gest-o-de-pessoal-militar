@@ -1318,7 +1318,10 @@ Deno.serve(async (req) => {
     }
 
     if (entityName === 'PublicacaoExOfficio' && (registroExistente?.coletiva === true || data.coletiva === true || Object.hasOwn(data, 'militares_ids') || Object.hasOwn(data, 'militares_vinculados'))) {
-      return await operarPublicacaoColetiva({ base44, operation, data, registro: registroExistente, authz: targetPerms, admin: targetIsAdmin, email: targetEmail, userId: authUser.id, listarEscopo: listarMilitarIdsDoEscopo });
+      const permissaoColetiva = await base44.functions.invoke('getUserPermissions', isImpersonating ? { effectiveEmail: targetEmail } : {});
+      const authzColetiva = permissaoColetiva?.data ?? permissaoColetiva;
+      if (authzColetiva?.error) return Response.json({ error: authzColetiva.error }, { status: 403 });
+      return await operarPublicacaoColetiva({ base44, operation, data, registro: registroExistente, authz: authzColetiva, admin: targetIsAdmin, email: targetEmail, userId: authUser.id, listarEscopo: listarMilitarIdsDoEscopo });
     }
 
     // Operações 'bulk' não possuem um único militarAlvoId no topo;

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import NotaColetivaVinculos from '@/components/rp/coletiva/NotaColetivaVinculos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -644,6 +645,7 @@ export default function RegistrosMilitar() {
                     </div>
 
                     <p className="mt-3 text-sm text-slate-700">{getResumoTexto(registro.descricao)}</p>
+                    {registro.coletiva && <div className="mt-3"><NotaColetivaVinculos registro={registro} />{canAccessAction('editar_publicacoes') && <Button asChild variant="outline" size="sm" className="mt-2"><Link to={'/CadastrarRegistroRP?id=' + registro.id}>Editar nota coletiva</Link></Button>}</div>}
 
                     <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2 xl:grid-cols-4">
                       {!isDOEMS && <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Status:</strong> {registro.statusPublicacao}</p>}
@@ -696,7 +698,7 @@ export default function RegistrosMilitar() {
                         {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
                       </Button>
 
-                      {canManageAdminActions && (
+                      {canManageAdminActions && !registro.coletiva && (
                         <>
                           {canEditarRegistros && (
                             <Button

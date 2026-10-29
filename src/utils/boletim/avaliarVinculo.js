@@ -42,15 +42,17 @@ export function avaliarVinculoPublicacao(pub, nota, militares = [], { paginasLay
   const numeroEsperado = normalizarNotaBoletim(pub?.nota_para_bg);
   const numeroExtraido = normalizarNotaBoletim(nota?.nota);
   const numeroOK = !!numeroEsperado && numeroEsperado === numeroExtraido;
-  const militar = militares.find(m => String(m.id) === String(pub?.militar_id));
   const textoBG = nota?.contexto || '';
   const identificados = identificarMilitaresEmNota(nota, militares);
-  const identificado = identificados.find(m => String(m.militar.id) === String(pub?.militar_id));
-  const matriculaOK = contemMatricula(textoBG, pub?.militar_matricula || militar?.matricula || militar?.matricula_atual);
-  const nomeOK = contemNome(textoBG, militar?.nome_completo || pub?.militar_nome || pub?.nome_completo);
-  const identidade = identificado?.confianca === 'alta' || matriculaOK || nomeOK
-    ? 'confirmada'
-    : identificado?.confianca === 'revisar' ? 'revisar' : 'nao_identificada';
+  const participantes = pub?.coletiva ? (pub.militares_ids || []).map(id => ({ ...(pub.militares_vinculados || []).find(m => String(m.militar_id) === String(id)), militar_id: id })) : [pub];
+  const identidades = participantes.map(p => {
+    const militar = militares.find(m => String(m.id) === String(p?.militar_id));
+    const identificado = identificados.find(m => String(m.militar.id) === String(p?.militar_id));
+    const matriculaOK = contemMatricula(textoBG, p?.militar_matricula || militar?.matricula || militar?.matricula_atual);
+    const nomeOK = contemNome(textoBG, militar?.nome_completo || p?.militar_nome || p?.nome_completo);
+    return identificado?.confianca === 'alta' || matriculaOK || nomeOK ? 'confirmada' : identificado?.confianca === 'revisar' ? 'revisar' : 'nao_identificada';
+  });
+  const identidade = identidades.length && identidades.every(i => i === 'confirmada') ? 'confirmada' : identidades.includes('nao_identificada') || !identidades.length ? 'nao_identificada' : 'revisar';
 
   const rpTokens = tokens(tipoTexto(pub));
   const bgTokens = tokens(textoBG);

@@ -23,7 +23,7 @@ export async function operarPublicacaoColetiva({ base44, operation, data, regist
     const campos = Object.keys(data);
     const soApostila = campos.length > 0 && campos.every(k => ['apostilada_por_id', 'foi_apostilada'].includes(k));
     const soSemEfeito = campos.length > 0 && campos.every(k => ['tornada_sem_efeito_por_id', 'foi_tornada_sem_efeito'].includes(k));
-    const apenasBg = campos.length > 0 && campos.every(k => ['numero_bg', 'data_bg', 'nota_para_bg', 'nota_conciliada_boletim', 'status'].includes(k));
+    const apenasBg = campos.length > 0 && campos.every(k => ['numero_bg', 'data_bg', 'nota_para_bg', 'nota_conciliada_boletim', 'status', 'historico_publicacao'].includes(k));
     const acao = operation === 'create' ? 'adicionar_publicacoes' : operation === 'delete' ? 'excluir_publicacoes' : soApostila ? 'apostilar_publicacao' : soSemEfeito ? 'tornar_sem_efeito_publicacao' : apenasBg ? 'publicar_bg' : 'editar_publicacoes';
     if (authz.actions?.[acao] !== true) return erro('Sem permissão: ' + acao, 403);
     const alteraBg = ['nota_para_bg', 'numero_bg', 'data_bg'].some(k => Object.hasOwn(data, k) && String(data[k] || '') !== String(registro?.[k] || ''));
@@ -48,7 +48,8 @@ export async function operarPublicacaoColetiva({ base44, operation, data, regist
     return { militar_id: id, militar_nome: m.nome_completo || '', militar_posto: m.posto_graduacao || '', militar_matricula: m.matricula || '' };
   });
   const status = merged.numero_bg && merged.data_bg ? 'Publicado' : merged.nota_para_bg ? 'Aguardando Publicação' : 'Aguardando Nota';
-  const historico = [...(registro?.historico_coletiva || []), { acao: operation, usuario_id: userId, usuario_email: email, data: new Date().toISOString(), militares_antes: antigos, militares_depois: ids, status_antes: registro?.status || '', status_depois: status, campos_alterados: Object.keys(seguro) }];
+  if (registro?.status === 'Publicado' && status !== 'Publicado' && !admin) return erro('Somente o administrador pode reverter os dados de uma publicação já publicada.', 403);
+  const historico = [...(registro?.historico_coletiva || []), { acao: operation, usuario_id: userId, usuario_email: email, data: new Date().toISOString(), militares_antes: antigos, militares_depois: ids, status_antes: registro?.status || '', status_depois: status, campos_alterados: Object.keys(seguro), antes: Object.fromEntries(camposPermitidos.map(k => [k, registro?.[k] ?? null])), depois: Object.fromEntries(camposPermitidos.map(k => [k, merged[k] ?? null])) }];
   const final = { ...seguro, coletiva: true, militares_ids: ids, militares_vinculados: vinculos, militar_id: '', militar_nome: 'Nota coletiva · ' + ids.length + ' militares', militar_posto: '', militar_matricula: '', status, historico_coletiva: historico };
   const entity = base44.asServiceRole.entities.PublicacaoExOfficio;
   if (operation === 'create') {
