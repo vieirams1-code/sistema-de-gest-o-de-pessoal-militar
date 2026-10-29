@@ -123,6 +123,10 @@ export default function RegistrosMilitar() {
   } = useCurrentUser();
 
   const [filtroMilitarId, setFiltroMilitarId] = useState(() => searchParams.get('militar_id') || 'all');
+  useEffect(() => {
+    const militarNaUrl = searchParams.get('militar_id');
+    if (militarNaUrl) setFiltroMilitarId(militarNaUrl);
+  }, [searchParams]);
   const [buscaMilitar, setBuscaMilitar] = useState('');
   const [openMilitarPopover, setOpenMilitarPopover] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -732,7 +736,7 @@ export default function RegistrosMilitar() {
 
                     {expanded && (
                       <div className="mt-4 rounded-md border bg-slate-50 p-3 space-y-3">
-                        <p className="text-xs text-slate-600">
+                        <p className={registro.coletiva ? 'text-xs text-slate-600 whitespace-pre-wrap break-words' : 'text-xs text-slate-600'}>
                           <strong>{isDOEMS ? 'Texto publicado no DOEMS' : 'Texto completo'}:</strong> {registro.texto_publicacao || registro.descricao || '-'}
                         </p>
 
@@ -756,7 +760,7 @@ export default function RegistrosMilitar() {
                           )}
                         </div>
 
-                        {canEditarRegistros && (
+                        {canEditarRegistros && !registro.coletiva && (
                           <div className="space-y-2 rounded-md border border-red-100 bg-white p-3">
                             <p className="text-xs font-semibold text-slate-700">Ações administrativas</p>
                             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
