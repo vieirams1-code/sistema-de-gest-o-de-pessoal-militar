@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { Buffer } from 'node:buffer';
 const source = await readFile(new URL('../../../base44/shared/publicacoesColetivas.ts', import.meta.url), 'utf8');
 const { operarPublicacaoColetiva } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const dados = () => ({ coletiva: true, tipo: 'Geral', data_publicacao: '2026-10-29', texto_publicacao: 'Ata integral de TAF', militares_ids: ['m1', 'm2'], coletiva_token: '12345678-1234-1234-1234-123456789012' });
