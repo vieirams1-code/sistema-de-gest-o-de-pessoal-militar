@@ -1169,6 +1169,7 @@ async function buscarRegistroExistente(base44, entityName, registroId) {
 }
 
 import { syncJisoPublication, validatePublication, publicationStatus } from '../../shared/jisoRules.ts';
+import { operarPublicacaoColetiva } from '../../shared/publicacoesColetivas.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -1314,6 +1315,10 @@ Deno.serve(async (req) => {
       if (!militarAlvoId && ENTIDADES_FILHAS_CARD.has(entityName)) {
         militarAlvoId = await resolverMilitarIdPorCard(base44, registroExistente?.card_id);
       }
+    }
+
+    if (entityName === 'PublicacaoExOfficio' && (registroExistente?.coletiva === true || data.coletiva === true || Object.hasOwn(data, 'militares_ids') || Object.hasOwn(data, 'militares_vinculados'))) {
+      return await operarPublicacaoColetiva({ base44, operation, data, registro: registroExistente, authz: targetPerms, admin: targetIsAdmin, email: targetEmail, userId: authUser.id, listarEscopo: listarMilitarIdsDoEscopo });
     }
 
     // Operações 'bulk' não possuem um único militarAlvoId no topo;

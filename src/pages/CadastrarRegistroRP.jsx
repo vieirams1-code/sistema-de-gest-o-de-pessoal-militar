@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, BookOpenText, Search, Upload, Download, Trash2, FileText } from 'lucide-react';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
+import NotaColetivaForm from '@/components/rp/coletiva/NotaColetivaForm';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
 import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
 import FormField from '@/components/militar/FormField';
@@ -1194,6 +1195,10 @@ export default function CadastrarRegistroRP() {
     );
   }
 
+  if ((!isEditing && searchParams.get('coletiva') === '1') || registroEdicao?.coletiva === true) {
+    return <NotaColetivaForm key={registroEdicao?.id || 'nova-coletiva'} registro={registroEdicao} canAccessAction={canAccessAction} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-4xl px-4 py-8">
@@ -1209,6 +1214,7 @@ export default function CadastrarRegistroRP() {
             <h1 className="text-2xl font-bold text-[#1e3a5f]">
               {isEditing ? 'Editar Registro' : 'Novo Registro'}
             </h1>
+            {!isEditing && canAdicionarPublicacoes && <Button type="button" variant="outline" className="mt-3" onClick={() => navigate('/CadastrarRegistroRP?coletiva=1')}>Criar nota coletiva</Button>}
           </div>
         </div>
 

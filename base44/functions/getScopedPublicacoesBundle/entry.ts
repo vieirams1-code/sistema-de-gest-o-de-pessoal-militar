@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+import { filtroMilitaresPublicacao, idsPublicacao } from '../../shared/publicacoesColetivas.ts';
 const CHUNK = 200;
 const normalizeTipo = (valor: unknown) => String(valor || '').trim().toLowerCase();
 
@@ -101,7 +102,7 @@ async function listarEscopado(base44: any, entityName: string, militarIds: strin
   for (let i = 0; i < militarIds.length; i += CHUNK) {
     const chunk = militarIds.slice(i, i + CHUNK);
     const rows = await base44.asServiceRole.entities[entityName].filter(
-      { ...filtroExtra, militar_id: { $in: chunk } }, '-created_date', 1000, 0,
+      { $and: [filtroExtra, entityName === 'PublicacaoExOfficio' ? filtroMilitaresPublicacao(chunk) : { militar_id: { $in: chunk } }] }, '-created_date', 1000, 0,
     );
     out.push(...(rows || []));
   }
@@ -117,7 +118,7 @@ function deduplicar(registros: any[]) {
 }
 
 async function listarMilitaresApoio(base44: any, registros: any[]) {
-  const ids = Array.from(new Set((registros || []).map((item) => String(item?.militar_id || '')).filter(Boolean)));
+  const ids = Array.from(new Set((registros || []).flatMap(item => idsPublicacao(item))));
   if (!ids.length) return [];
   const out: any[] = [];
   for (let i = 0; i < ids.length; i += CHUNK) {
@@ -161,7 +162,7 @@ Deno.serve(async (req) => {
     if (publicacaoId) filtroExOfficio.id = publicacaoId;
     if (militarId) {
       filtroLivro.militar_id = militarId;
-      filtroExOfficio.militar_id = militarId;
+      filtroExOfficio.$or = filtroMilitaresPublicacao([militarId]).$or;
     }
     if (purpose === 'MIGRACAO') {
       if (body?.importadoLegado === true) filtroExOfficio.importado_legado = true;

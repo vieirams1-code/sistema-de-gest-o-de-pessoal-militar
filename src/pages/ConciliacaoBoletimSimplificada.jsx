@@ -145,7 +145,7 @@ export default function ConciliacaoBoletimSimplificada() {
     .filter(o => {
       if (importados[o.id] || o.registro || !['sem_registro', 'revisar_identidade'].includes(o.status)) return false;
       return !registros.some(r =>
-        String(r.militar_id) === String(o.militar.id) &&
+        (r.coletiva ? (r.militares_ids || []).map(String).includes(String(o.militar.id)) : String(r.militar_id) === String(o.militar.id)) &&
         normalizarNotaBoletim(r.nota_para_bg || r.nota_conciliada_boletim) === normalizarNotaBoletim(o.nota.nota) &&
         (!r.numero_bg || String(r.numero_bg).replace(/^0+/, '') === numeroBoletim.replace(/^0+/, '')) &&
         (!r.data_bg || String(r.data_bg).slice(0, 10) === dataBoletim)
@@ -260,7 +260,7 @@ export default function ConciliacaoBoletimSimplificada() {
       // Reconsulta o backend antes de criar para reduzir risco de RP duplicado.
       const atual = await listarLivroPublicacoesEscopo({ purpose: 'CONCILIACAO' });
       const duplicados = [...(atual.registrosLivro || []), ...(atual.publicacoesExOfficio || []), ...atestados]
-        .some(r => String(r.militar_id) === String(militar.id) &&
+        .some(r => (r.coletiva ? (r.militares_ids || []).map(String).includes(String(militar.id)) : String(r.militar_id) === String(militar.id)) &&
           normalizarNotaBoletim(r.nota_para_bg || r.nota_conciliada_boletim) === normalizarNotaBoletim(item.nota.nota) &&
           (!r.numero_bg || String(r.numero_bg).replace(/^0+/, '') === numeroBoletim.replace(/^0+/, '')) &&
           (!r.data_bg || String(r.data_bg).slice(0, 10) === dataBoletim));

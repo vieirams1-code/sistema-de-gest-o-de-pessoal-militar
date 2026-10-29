@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import NotaColetivaVinculos from '@/components/rp/coletiva/NotaColetivaVinculos';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +158,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <h3 className="text-base font-semibold text-slate-900">{registro.militar_nome_institucional || registro.militar_nome || 'Sem militar'}</h3>
-            <p className="text-sm text-slate-500">{registro.militar_nome_guerra || 'Sem nome de guerra'}</p>
+            <p className="text-sm text-slate-500">{registro.coletiva ? 'Publicação única, conteúdo integral nas fichas vinculadas' : registro.militar_nome_guerra || 'Sem nome de guerra'}</p>
             <div className="flex flex-wrap items-center gap-2">
               <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tipoVisual.className}`}>
                 <TipoIcon className="h-3.5 w-3.5" />
@@ -183,6 +184,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </div>
         </div>
 
+        <NotaColetivaVinculos registro={registro} />
+        {registro.coletiva && canAccessAction('editar_publicacoes') && <Button asChild variant="outline" size="sm"><a href={'/CadastrarRegistroRP?id=' + registro.id}>Editar nota coletiva</a></Button>}
         {!isDOEMS && (
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-lg border bg-slate-50 p-3">

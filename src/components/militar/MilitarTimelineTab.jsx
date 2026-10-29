@@ -118,7 +118,7 @@ export default function MilitarTimelineTab({ militarId, permissions = {} }) {
                   <h4 className="text-base font-bold text-slate-800 leading-snug">
                     {event.titulo}
                   </h4>
-                  <p className="text-sm text-slate-600 mt-1 line-clamp-3" title={event.descricao}>
+                  <p className={event.coletiva ? 'text-sm text-slate-600 mt-1 whitespace-pre-wrap break-words' : 'text-sm text-slate-600 mt-1 line-clamp-3'} title={event.descricao}>
                     {event.descricao}
                   </p>
                 </div>

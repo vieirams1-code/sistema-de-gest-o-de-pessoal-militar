@@ -120,6 +120,7 @@ export async function getMilitarTimeline(militarId, permissions = {}) {
           .filter(Boolean)
           .join(' — '),
         origem: isDOEMS ? 'Publicação externa' : 'PublicacaoExOfficio',
+        coletiva: item.coletiva === true,
       };
     }),
     ...(ferias || []).map(item => ({

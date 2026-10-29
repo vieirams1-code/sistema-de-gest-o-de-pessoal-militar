@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+import { filtroMilitaresPublicacao, idsPublicacao } from '../../shared/publicacoesColetivas.ts';
 const ENTIDADES = new Set(['RegistroLivro', 'PublicacaoExOfficio']);
 const CAMPOS_EDICAO_TIPO = new Set(['tipo_registro', 'tipo', 'tipo_alterado_por', 'tipo_alterado_em']);
 const TIPOS_FERIAS_OPERACIONAIS = new Set(['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias']);
@@ -96,7 +97,7 @@ async function listarRegistrosEscopados(base44: any, entityName: string, militar
   for (let i = 0; i < militarIds.length; i += CHUNK_MILITAR_IDS) {
     const chunk = militarIds.slice(i, i + CHUNK_MILITAR_IDS);
     const rows = await base44.asServiceRole.entities[entityName].filter(
-      { militar_id: { $in: chunk } },
+      entityName === 'PublicacaoExOfficio' ? filtroMilitaresPublicacao(chunk) : { militar_id: { $in: chunk } },
       '-created_date',
       1000,
       0,
@@ -148,7 +149,8 @@ Deno.serve(async (req) => {
 
     const registro = await carregarRegistro(base44, entityName, id);
     if (!registro) return erro(404, 'Registro não encontrado.');
-    if (!dentroEscopo(authz, registro?.militar_id)) return erro(403, 'Registro fora do escopo organizacional autorizado.');
+    if (!idsPublicacao(registro).every(id => dentroEscopo(authz, id))) return erro(403, 'Registro fora do escopo organizacional autorizado.');
+    if (registro.coletiva === true) return erro(409, 'Mantenha esta nota coletiva pelo cadastro de RP para preservar seus vínculos e histórico.');
 
     if (action === 'UPDATE_TYPE') {
       if (!temCapacidade(authz, 'editar_registros_militar')) {

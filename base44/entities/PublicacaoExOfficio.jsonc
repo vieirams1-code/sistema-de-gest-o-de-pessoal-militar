@@ -14,6 +14,46 @@
     "militar_matricula": {
       "type": "string"
     },
+    "coletiva": {
+      "type": "boolean",
+      "default": false
+    },
+    "coletiva_token": {
+      "type": "string"
+    },
+    "militares_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "militares_vinculados": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "militar_id": {
+            "type": "string"
+          },
+          "militar_nome": {
+            "type": "string"
+          },
+          "militar_posto": {
+            "type": "string"
+          },
+          "militar_matricula": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "historico_coletiva": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
     "tipo": {
       "type": "string",
       "enum": [
@@ -204,8 +244,7 @@
     },
     "publicacao_referencia_data_bg": {
       "type": "string",
-      "format": "date",
-      "description": "Data do BG da publica\u00e7\u00e3o referenciada"
+      "format": "date"
     },
     "publicacao_referencia_nota": {
       "type": "string",

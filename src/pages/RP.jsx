@@ -131,6 +131,7 @@ export default function RP() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline"><a href="/CadastrarRegistroRP?coletiva=1">Nova nota coletiva</a></Button>
             <Button asChild variant="outline">
               <a href={createPageUrl('CadastrarRegistroRP')}>
                 <Plus className="mr-2 h-4 w-4" />

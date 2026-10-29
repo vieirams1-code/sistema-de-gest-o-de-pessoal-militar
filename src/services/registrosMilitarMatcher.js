@@ -61,6 +61,7 @@ function extrairMatriculasMilitar(militar) {
 
 export function vinculaRegistroAoMilitar(registro, militar) {
   if (!militar || !registro) return false;
+  if (registro.coletiva === true) return (registro.militares_ids || []).map(String).includes(String(militar.id));
 
   const registroMilitarId = limparTexto(registro?.militar_id || registro?.militarId || registro?.militar?.id || registro?.militar);
   const militarId = limparTexto(militar?.id);

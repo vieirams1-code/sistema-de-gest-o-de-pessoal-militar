@@ -100,13 +100,16 @@ export function analisarBoletimContraRegistros(notas = [], militares = [], regis
   const byMilitar = new Map();
   const ids = new Set();
   for (const registro of registros) {
-    if (!registro?.id || !registro.militar_id) continue;
+    if (!registro?.id || (!registro.militar_id && !registro.coletiva)) continue;
     const chave = String(registro.origem_tipo || 'registro') + ':' + String(registro.id);
     if (ids.has(chave)) continue;
     ids.add(chave);
-    const key = String(registro.militar_id);
-    if (!byMilitar.has(key)) byMilitar.set(key, []);
-    byMilitar.get(key).push(registro);
+    const participantes = registro.coletiva ? registro.militares_ids || [] : [registro.militar_id];
+    for (const id of participantes) {
+      const key = String(id);
+      if (!byMilitar.has(key)) byMilitar.set(key, []);
+      byMilitar.get(key).push(registro);
+    }
   }
 
   const ocorrencias = [];
