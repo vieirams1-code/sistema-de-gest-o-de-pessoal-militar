@@ -1197,7 +1197,7 @@ export default function CadastrarRegistroRP() {
   }
 
   if ((!isEditing && searchParams.get('coletiva') === '1') || registroEdicao?.coletiva === true) {
-    const tiposColetivos = [...new Map([...RP_TIPOS_BASE, ...getTiposRPFiltrados({ tiposCustom, templatesAtivos, tipoAtualEdicao: registroEdicao?.tipo })].map(t => [t.value, t])).values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    const tiposColetivos = [...new Map([...RP_TIPOS_BASE, ...getTiposRPFiltrados({ tiposCustom, templatesAtivos, tipoAtualEdicao: registroEdicao?.tipo }), { value: 'Elogio Coletivo', label: 'Elogio Coletivo' }].map(t => [t.value, t])).values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
     return <NotaColetivaForm key={registroEdicao?.id || 'nova-coletiva'} registro={registroEdicao} canAccessAction={canAccessAction} tipos={tiposColetivos} />;
   }
 
