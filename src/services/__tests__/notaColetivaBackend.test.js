@@ -31,9 +31,24 @@ test('deduplica militar na mesma nota e repete operação com token sem criar ou
   const s = setup(); s.args.data.militares_ids.push('m1'); s.entity.filter = async () => [{ id: 'existente', ...dados() }];
   const res = await operarPublicacaoColetiva(s.args); assert.equal((await res.json()).data.id, 'existente'); assert.equal(s.writes.length, 0);
 });
-test('nota coletiva não permite punição nem ausência de militares', async () => {
-  const s = setup(); s.args.data.tipo = 'Punição'; assert.equal((await operarPublicacaoColetiva(s.args)).status, 400);
-  s.args.data.tipo = 'Geral'; s.args.data.militares_ids = []; assert.equal((await operarPublicacaoColetiva(s.args)).status, 400); assert.equal(s.writes.length, 0);
+test('aceita os tipos como classificação documental sem executar alterações nos militares', async () => {
+  for (const tipo of ['Punição', 'Melhoria de Comportamento', 'Saída Férias', 'Ata JISO', 'Tipo personalizado']) {
+    const s = setup(); s.args.data.tipo = tipo; s.args.data.comportamento_ingressou = 'Bom';
+    const res = await operarPublicacaoColetiva(s.args);
+    assert.equal(res.status, 200); assert.equal(s.writes.length, 1);
+    assert.equal(s.writes[0].tipo, tipo); assert.equal(s.writes[0].comportamento_ingressou, undefined);
+    assert.equal(s.writes[0].militar_id, '');
+  }
+});
+test('não permite ausência de militares', async () => {
+  const s = setup(); s.args.data.militares_ids = [];
+  assert.equal((await operarPublicacaoColetiva(s.args)).status, 400); assert.equal(s.writes.length, 0);
+});
+test('preserva cabeçalho e texto como snapshot, sem consultar o modelo durante a edição', async () => {
+  const s = setup({ operation: 'update', registro: { ...dados(), id: 'p1', modo_texto_coletivo: 'lista', modelo_coletivo_id: 'modelo1', cabecalho_coletiva: 'Cabeçalho original' }, data: { observacoes: 'Conferido' } });
+  assert.equal((await operarPublicacaoColetiva(s.args)).status, 200);
+  assert.equal(s.writes[0].texto_publicacao, undefined); assert.equal(s.writes[0].cabecalho_coletiva, undefined);
+  assert.equal(s.writes[0].historico_coletiva.at(-1).depois.cabecalho_coletiva, 'Cabeçalho original');
 });
 test('publicação de BG exige permissão própria e não aceita BG parcial', async () => {
   const s = setup(); s.args.data.numero_bg = '999'; s.args.authz.actions.publicar_bg = false;

@@ -69,6 +69,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TipoMedalha',
   'SubtipoDOEMS',
   'TemplateTexto',
+  'ModeloNotaColetiva',
   'Funcao',
   'Lotacao',
   'Promocao',

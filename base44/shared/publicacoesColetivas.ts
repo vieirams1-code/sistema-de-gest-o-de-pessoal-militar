@@ -11,8 +11,9 @@ export async function operarPublicacaoColetiva({ base44, operation, data, regist
   if (registro && registro.coletiva !== true) return erro('Não é permitido converter um registro individual por este fluxo.');
   if (registro && data.coletiva === false) return erro('Uma nota coletiva não pode ser convertida em individual.');
   if (!['create', 'update', 'delete'].includes(operation)) return erro('Operação coletiva inválida.');
-  const tipos = ['Geral', 'Transcrição de Documentos'];
-  if (!tipos.includes(merged.tipo)) return erro('O modo coletivo está disponível para Geral e Transcrição de Documentos.');
+  if (typeof merged.tipo !== 'string' || !merged.tipo.trim() || merged.tipo.length > 150) return erro('Selecione um tipo de publicação válido.');
+  if (merged.modo_texto_coletivo && !['livre', 'lista'].includes(merged.modo_texto_coletivo)) return erro('Modo de texto coletivo inválido.');
+  if (merged.modo_texto_coletivo === 'lista' && (!String(merged.cabecalho_coletiva || '').trim() || /\{\{[\s\S]*?\}\}/.test(merged.cabecalho_coletiva))) return erro('Informe o cabeçalho coletivo em texto livre, sem variáveis.');
   if (!Array.isArray(merged.militares_ids)) return erro('A lista de militares é obrigatória.');
   if (operation === 'create' && data.coletiva !== true) return erro('Identifique o registro como nota coletiva.');
   const ids = idsPublicacao({ ...merged, coletiva: true });
@@ -41,13 +42,13 @@ export async function operarPublicacaoColetiva({ base44, operation, data, regist
   if (!String(merged.texto_publicacao || '').trim() || !/^\d{4}-\d{2}-\d{2}$/.test(merged.data_publicacao || '')) return erro('Informe a data e o texto integral da publicação.');
   if (Boolean(merged.numero_bg) !== Boolean(merged.data_bg)) return erro('Informe conjuntamente o número e a data do BG.');
   if (merged.numero_bg && !String(merged.nota_para_bg || '').trim()) return erro('Informe a nota para publicar no BG.');
-  const militares = await base44.asServiceRole.entities.Militar.filter({ id: { $in: ids } }, undefined, 500, 0, ['id', 'nome_completo', 'posto_graduacao', 'matricula']);
+  const militares = await base44.asServiceRole.entities.Militar.filter({ id: { $in: ids } }, undefined, 500, 0, ['id', 'nome_completo', 'posto_graduacao', 'matricula', 'quadro']);
   if (militares.length !== ids.length) return erro('Um ou mais militares não foram encontrados. Nenhuma alteração foi gravada.');
-  const camposPermitidos = ['tipo', 'data_publicacao', 'texto_publicacao', 'nota_para_bg', 'numero_bg', 'data_bg', 'observacoes', 'nota_conciliada_boletim', 'apostilada_por_id', 'tornada_sem_efeito_por_id'];
+  const camposPermitidos = ['tipo', 'data_publicacao', 'texto_publicacao', 'modo_texto_coletivo', 'cabecalho_coletiva', 'modelo_coletivo_id', 'nota_para_bg', 'numero_bg', 'data_bg', 'observacoes', 'nota_conciliada_boletim', 'apostilada_por_id', 'tornada_sem_efeito_por_id'];
   const seguro = Object.fromEntries(camposPermitidos.filter(k => Object.hasOwn(data, k)).map(k => [k, data[k]]));
   const vinculos = ids.map(id => {
     const m = militares.find(v => String(v.id) === id);
-    return { militar_id: id, militar_nome: m.nome_completo || '', militar_posto: m.posto_graduacao || '', militar_matricula: m.matricula || '' };
+    return { militar_id: id, militar_nome: m.nome_completo || '', militar_posto: m.posto_graduacao || '', militar_matricula: m.matricula || '', militar_quadro: m.quadro || '' };
   });
   const status = merged.numero_bg && merged.data_bg ? 'Publicado' : merged.nota_para_bg ? 'Aguardando Publicação' : 'Aguardando Nota';
   if (registro?.status === 'Publicado' && status !== 'Publicado' && !admin) return erro('Somente o administrador pode reverter os dados de uma publicação já publicada.', 403);

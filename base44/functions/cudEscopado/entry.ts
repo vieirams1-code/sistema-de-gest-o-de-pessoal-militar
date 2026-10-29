@@ -70,6 +70,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'TipoMedalha',
   'SubtipoDOEMS',
   'TemplateTexto',
+  'ModeloNotaColetiva',
   'Funcao',
   'Lotacao',
   'Promocao',
@@ -226,6 +227,7 @@ const ENTIDADES_SEM_ESCOPO_MILITAR = new Set([
   'TipoMedalha',
   'SubtipoDOEMS',
   'TemplateTexto',
+  'ModeloNotaColetiva',
   'Funcao',
   'Lotacao',
   'Promocao',
@@ -1170,8 +1172,9 @@ async function buscarRegistroExistente(base44, entityName, registroId) {
 
 import { syncJisoPublication, validatePublication, publicationStatus } from '../../shared/jisoRules.ts';
 import { operarPublicacaoColetiva } from '../../shared/publicacoesColetivas.ts';
+import { operarModeloNotaColetiva } from '../../shared/modelosNotaColetiva.ts';
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
 
@@ -1241,6 +1244,10 @@ Deno.serve(async (req) => {
     // Bypass funcional cabe apenas ao administrador real da plataforma e
     // nunca deve ser herdado pelo usuário efetivo durante impersonação.
     const targetIsAdmin = !isImpersonating && authIsAdminByRole;
+
+    if (entityName === 'ModeloNotaColetiva') {
+      return operarModeloNotaColetiva({ base44, operation, registroId, data, permitido: targetIsAdmin || targetPerms.actions?.gerir_templates === true });
+    }
 
     // ---- Leitura administrativa de permissões (service-only) ----
     // Mantém PerfilPermissao/UsuarioAcesso com RLS fechada e concentra a leitura
@@ -2157,4 +2164,4 @@ Deno.serve(async (req) => {
     if (error?.detalhes) body.detalhes = error.detalhes;
     return Response.json(body, { status });
   }
-});
+}
