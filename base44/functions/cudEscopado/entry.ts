@@ -775,7 +775,6 @@ function validarCamposFeriasContratoDesignacao(data = {}, erros = []) {
   }
 
   if (tipoPrazoContrato === 'determinado') {
-    if (regraGeracaoPeriodos === 'normal') erros.push('Contrato determinado deve usar regra_geracao_periodos bloqueada ou manual.');
     if (!geraDireitoFerias && !String(data?.motivo_nao_gera_ferias || '').trim()) {
       erros.push('motivo_nao_gera_ferias é obrigatório quando contrato determinado não gera direito a férias.');
     }

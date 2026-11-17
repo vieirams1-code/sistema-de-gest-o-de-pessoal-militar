@@ -162,9 +162,7 @@ export function aplicarRegraFeriasPorTipoPrazo(payload = {}) {
     ...payload,
     tipo_prazo_contrato: TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO,
     gera_direito_ferias: geraDireitoFerias,
-    regra_geracao_periodos: regraGeracaoPeriodos === REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL
-      ? REGRA_GERACAO_PERIODOS_DESIGNACAO.BLOQUEADA
-      : regraGeracaoPeriodos,
+    regra_geracao_periodos: regraGeracaoPeriodos,
     motivo_nao_gera_ferias: geraDireitoFerias ? '' : String(payload.motivo_nao_gera_ferias || '').trim(),
   };
 }
@@ -287,9 +285,6 @@ export function validarContratoDesignacaoPayload(payload = {}) {
   }
 
   if (tipoPrazoContrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO) {
-    if (regraGeracaoPeriodos === REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL) {
-      erros.push('Contrato determinado deve usar regra_geracao_periodos bloqueada ou manual.');
-    }
     if (!geraDireitoFerias && !hasValor(payload.motivo_nao_gera_ferias)) {
       erros.push('motivo_nao_gera_ferias é obrigatório quando contrato determinado não gera direito a férias.');
     }

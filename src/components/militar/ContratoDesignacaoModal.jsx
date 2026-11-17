@@ -457,7 +457,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="sim">Sim</SelectItem></SelectContent>
                   </Select>
-                  <p className="text-xs text-slate-500">Contratos indeterminados geram férias automaticamente.</p>
+                  <p className="text-xs text-slate-500">Contratos determinados e indeterminados têm direito a férias; a regra Normal permite gerar períodos pela data-base do contrato.</p>
                 </div>
                 <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-700">Configurar data-base diferente para férias</summary>
@@ -476,7 +476,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO && <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL}>Normal</SelectItem>}
+                          <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL}>Normal</SelectItem>
                           <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.BLOQUEADA}>Bloqueada</SelectItem>
                           <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.MANUAL}>Manual</SelectItem>
                         </SelectContent>

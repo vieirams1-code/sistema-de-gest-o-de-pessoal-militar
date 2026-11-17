@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  aplicarRegraFeriasPorTipoPrazo,
   buscarEfeitosContratoDesignacaoComCache,
   contarContratosAtivosDesignacao,
   getContratoAtivoDesignacao,
@@ -196,10 +197,24 @@ test('valida regras de férias para contrato determinado', () => {
 
   assert.equal(resultado.valido, false);
   assert.doesNotMatch(resultado.erros.join('\n'), /data_fim_contrato é obrigatória/);
-  assert.match(resultado.erros.join('\n'), /bloqueada ou manual/);
+  assert.doesNotMatch(resultado.erros.join('\n'), /bloqueada ou manual/);
   assert.match(resultado.erros.join('\n'), /motivo_nao_gera_ferias/);
 });
 
+
+test('contrato determinado permite direito a férias e geração normal sem alterar a data-base', () => {
+  const dados = aplicarRegraFeriasPorTipoPrazo({
+    militar_id: 'm1', matricula_designacao: '123',
+    tipo_prazo_contrato: 'determinado', gera_direito_ferias: true,
+    regra_geracao_periodos: 'normal',
+    data_inicio_contrato: '2026-02-14', data_inclusao_para_ferias: '2026-02-14',
+    data_fim_contrato: '2027-02-13',
+  });
+  assert.equal(dados.regra_geracao_periodos, 'normal');
+  assert.equal(dados.gera_direito_ferias, true);
+  assert.equal(dados.data_inclusao_para_ferias, '2026-02-14');
+  assert.equal(validarContratoDesignacaoPayload(dados).valido, true);
+});
 
 test('memoiza verificação de efeitos do contrato por contrato_id e deduplica chamadas simultâneas', async () => {
   limparCacheEfeitosContratoDesignacao();

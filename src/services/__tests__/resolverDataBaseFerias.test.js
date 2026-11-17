@@ -98,6 +98,16 @@ test('contrato ativo com regra_geracao_periodos bloqueada bloqueia geração aut
   assertShape(resultado);
 });
 
+test('contrato determinado com geração normal resolve pela data-base do contrato', () => {
+  const resultado = resolverDataBaseFerias({
+    militar: militar(),
+    contratosDesignacao: [contrato({ tipo_prazo_contrato: 'determinado', gera_direito_ferias: true, regra_geracao_periodos: 'normal' })],
+  });
+  assert.equal(resultado.bloqueado, false);
+  assert.equal(resultado.dataBase, '2025-02-01');
+  assert.equal(resultado.origem, ORIGENS_DATA_BASE_FERIAS.CONTRATO_DESIGNACAO);
+});
+
 test('contrato ativo sem data-base bloqueia', () => {
   const resultado = resolverDataBaseFerias({
     militar: militar(),
