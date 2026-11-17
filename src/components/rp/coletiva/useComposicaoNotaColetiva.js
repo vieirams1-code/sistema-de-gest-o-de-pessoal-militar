@@ -21,6 +21,6 @@ export default function useComposicaoNotaColetiva(dados, militares, regenerar) {
       return { militares: efetivo.militares, historicos: historico.historicoPromocoes, config: configs[0] || {} };
     },
   });
-  const composicao = gerar && consulta.data ? comporTextoNotaColetiva(dados.cabecalho_coletiva, consulta.data.militares, consulta.data.historicos, consulta.data.config) : null;
-  return { texto: gerar ? composicao?.texto || '' : dados.texto_publicacao, ids: composicao?.ids, pendencias: composicao?.pendencias || 0, carregando: gerar && ids.length > 0 && consulta.isPending, erro: gerar ? consulta.error : null };
+  const composicao = gerar && ids.length > 0 && consulta.data ? comporTextoNotaColetiva(dados.cabecalho_coletiva, consulta.data.militares, consulta.data.historicos, consulta.data.config) : null;
+  return { texto: gerar ? composicao?.texto || String(dados.cabecalho_coletiva || '').trim() : dados.texto_publicacao, ids: composicao?.ids, pendencias: composicao?.pendencias || 0, carregando: gerar && ids.length > 0 && consulta.isPending, erro: gerar && ids.length > 0 ? consulta.error : null };
 }

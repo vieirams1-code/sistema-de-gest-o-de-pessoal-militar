@@ -14,11 +14,11 @@ export default function NotaColetivaForm({ registro, canAccessAction, tipos }) {
   const navigate = useNavigate();
   const [salvo, setSalvo] = useState(registro || null);
   const token = useRef(registro?.coletiva_token || crypto.randomUUID());
-  const [dados, setDados] = useState(() => ({ tipo: registro?.tipo || 'Geral', data_publicacao: registro?.data_publicacao || new Date().toISOString().slice(0, 10), texto_publicacao: registro?.texto_publicacao || '', modo_texto_coletivo: registro?.modo_texto_coletivo || 'livre', cabecalho_coletiva: registro?.cabecalho_coletiva || '', modelo_coletivo_id: registro?.modelo_coletivo_id || '', nota_para_bg: registro?.nota_para_bg || '', numero_bg: registro?.numero_bg || '', data_bg: registro?.data_bg || '', observacoes: registro?.observacoes || '' }));
+  const [dados, setDados] = useState(() => ({ tipo: registro?.tipo || 'Geral', data_publicacao: registro?.data_publicacao || new Date().toISOString().slice(0, 10), texto_publicacao: registro?.texto_publicacao || '', modo_texto_coletivo: registro?.modo_texto_coletivo || (registro ? 'livre' : 'lista'), cabecalho_coletiva: registro?.cabecalho_coletiva || '', modelo_coletivo_id: registro?.modelo_coletivo_id || '', nota_para_bg: registro?.nota_para_bg || '', numero_bg: registro?.numero_bg || '', data_bg: registro?.data_bg || '', observacoes: registro?.observacoes || '' }));
   const [militares, setMilitares] = useState(registro?.militares_vinculados || []);
   const [confirmado, setConfirmado] = useState(false);
   const [mensagem, setMensagem] = useState('');
-  const [regenerar, setRegenerar] = useState(false);
+  const [regenerar, setRegenerar] = useState(!registro);
   const composicao = useComposicaoNotaColetiva(dados, militares, regenerar);
   const bloqueado = composicao.carregando || !!composicao.erro || !composicao.texto?.trim() || (dados.modo_texto_coletivo === 'lista' && (!dados.cabecalho_coletiva.trim() || /\{\{[\s\S]*?\}\}/.test(dados.cabecalho_coletiva)));
   const mutation = useSalvarNotaColetiva(result => {
