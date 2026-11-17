@@ -95,6 +95,24 @@ export default function AgendarJISO() {
     });
   }, [lista, search, statusFilter]);
 
+  const groups = useMemo(() => {
+    const pendingByType = new Map();
+    const finalized = [];
+    filtered.forEach((item) => {
+      if (['Concluída', 'Cancelada'].includes(item.status) || Boolean(item.publicacao_id)) {
+        finalized.push(item);
+        return;
+      }
+      const type = String(item.finalidade_jiso || '').trim() || 'Sem finalidade informada';
+      if (!pendingByType.has(type)) pendingByType.set(type, []);
+      pendingByType.get(type).push(item);
+    });
+    const pending = [...pendingByType.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+      .map(([title, items]) => ({ title, items, finalized: false }));
+    return finalized.length ? [...pending, { title: 'JISOs finalizadas', items: finalized, finalized: true }] : pending;
+  }, [filtered]);
+
   const createMutation = useMutation({
     mutationFn: () => jisoService.criar({ atestadoIds: selectedIds, jiso: form }),
     onSuccess: (data) => {
@@ -180,15 +198,12 @@ export default function AgendarJISO() {
             <p className="mt-1 text-sm text-slate-500">Crie uma JISO e vincule os atestados que serão analisados.</p>
           </div>
         ) : (
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
-              <h2 className="text-lg font-bold text-[#1e3a5f]">JISOs cadastradas</h2>
-              <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{filtered.length}</span>
-              <div className="flex-1 h-px bg-slate-200" />
-            </div>
+          <div className="space-y-6">
+            {groups.map((group) => {
+              const heading = <><span>{group.title}</span><Badge variant="secondary">{group.items.length}</Badge></>;
+              const items = (
             <div className="space-y-3">
-            {filtered.map((item) => (
+            {group.items.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -216,6 +231,21 @@ export default function AgendarJISO() {
               </button>
             ))}
             </div>
+              );
+              return group.finalized ? (
+                <details key={group.title} className="rounded-xl border border-border bg-card p-4">
+                  <summary className="cursor-pointer text-lg font-bold text-foreground">
+                    <span className="ml-2 inline-flex items-center gap-3">{heading}</span>
+                  </summary>
+                  <div className="mt-4">{items}</div>
+                </details>
+              ) : (
+                <section key={group.title}>
+                  <h2 className="mb-4 flex items-center gap-3 text-lg font-bold text-foreground">{heading}</h2>
+                  {items}
+                </section>
+              );
+            })}
           </div>
         )}
       </div>
