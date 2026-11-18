@@ -71,6 +71,7 @@ const ToastClose = React.forwardRef(({ className, ...props }, ref) => (
     {...props}
   >
     <X className="h-4 w-4" />
+    <span className="sr-only">Close</span>
   </button>
 ));
 ToastClose.displayName = "ToastClose";
