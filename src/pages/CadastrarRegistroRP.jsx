@@ -201,7 +201,9 @@ export default function CadastrarRegistroRP() {
   const procedimentoId = !isEditing ? searchParams.get('procedimento_id') : null;
   const procedimentoPrazoId = !isEditing ? searchParams.get('procedimento_prazo_id') : null;
   const tipoProcedimentoRP = procedimentoId ? searchParams.get('tipo') : null;
-  const destinoRetorno = procedimentoId ? '/Procedimentos' : createPageUrl('RP');
+  const destinoRetorno = procedimentoId
+    ? `/Procedimentos?${new URLSearchParams({ procedimento_id: procedimentoId })}`
+    : createPageUrl('RP');
 
   const {
     canAccessModule,
@@ -1235,7 +1237,8 @@ export default function CadastrarRegistroRP() {
   };
 
   const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !hasTemplateConflict;
-  const canAdvanceFromStep2 = !!formData.militar_id;
+  const canAdvanceFromStep2 = !!formData.militar_id
+    && (tipoProcedimentoRP !== TIPOS_RP_PROCEDIMENTO.designacao || formData.militar_id === procedimentoOrigem?.encarregado_id);
   const canAdvanceFromStep3 = !!formData.data_registro && (
     formData.tipo_registro !== DESIGNACAO_PROVISORIA || Boolean(formData.funcao?.trim() && formData.data_designacao)
   );
@@ -1283,7 +1286,7 @@ export default function CadastrarRegistroRP() {
   }
 
   if ((!isEditing && searchParams.get('coletiva') === '1' && !procedimentoId) || registroEdicao?.coletiva === true) {
-    const tiposColetivos = [...new Map([...RP_TIPOS_BASE, ...getTiposRPFiltrados({ tiposCustom, templatesAtivos, tipoAtualEdicao: registroEdicao?.tipo }), { value: 'Elogio Coletivo', label: 'Elogio Coletivo' }].map(t => [t.value, t])).values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    const tiposColetivos = [...new Map([...RP_TIPOS_BASE, ...getTiposRPFiltrados({ tiposCustom, templatesAtivos, tipoAtualEdicao: registroEdicao?.tipo }), { value: 'Elogio Coletivo', label: 'Elogio Coletivo' }].map(t => [t.value, t])).values()].filter((tipo) => !tipoRPDeProcedimento(tipo.value) && tipo.value !== DESIGNACAO_PROVISORIA).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
     return <NotaColetivaForm key={registroEdicao?.id || 'nova-coletiva'} registro={registroEdicao} canAccessAction={canAccessAction} tipos={tiposColetivos} />;
   }
 
@@ -1292,7 +1295,7 @@ export default function CadastrarRegistroRP() {
       <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('RP'))}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(destinoRetorno)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -1463,7 +1466,7 @@ export default function CadastrarRegistroRP() {
               )}
 
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => navigate(createPageUrl('RP'))}>
+                <Button type="button" variant="outline" onClick={() => navigate(destinoRetorno)}>
                   Cancelar
                 </Button>
                 <Button
@@ -1490,6 +1493,9 @@ export default function CadastrarRegistroRP() {
                   onChange={handleChange}
                   onMilitarSelect={handleMilitarSelect}
                 />
+                {tipoProcedimentoRP === TIPOS_RP_PROCEDIMENTO.designacao && !canAdvanceFromStep2 && (
+                  <p className="mt-2 text-sm text-slate-600">Selecione o encarregado cadastrado no PAD.</p>
+                )}
               </div>
 
               <div className="flex justify-end gap-3">

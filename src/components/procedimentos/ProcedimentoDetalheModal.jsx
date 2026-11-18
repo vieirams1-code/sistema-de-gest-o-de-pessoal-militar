@@ -28,7 +28,7 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
   const podeEditar = canAccessAction('perm_editar_processo_controle');
   const podeGerar = canAccessAction('adicionar_publicacoes');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['procedimento-administrativo', procedimentoId],
     queryFn: () => obterProcedimentoEscopado(procedimentoId),
     enabled: open && !!procedimentoId,
@@ -70,6 +70,8 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
         </DialogHeader>
 
         {isLoading && <p className="py-6 text-center text-sm text-slate-500">Carregando procedimento...</p>}
+
+        {isError && <p className="py-6 text-center text-sm text-slate-700" role="alert">Não foi possível carregar o procedimento.</p>}
 
         {procedimento && (
           <div className="space-y-4">
@@ -142,7 +144,7 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                           {p.tipo} · {p.dias || 0} dias · até {formatarData(p.data_fim)}
                         </p>
                         {p.motivo && <p className="text-xs text-slate-500">{p.motivo}</p>}
-                        {podeGerar && !procedimento.sigiloso && p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
+                        {podeGerar && !procedimento.sigiloso && procedimento.numero_portaria && p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
                           <Link className="mt-1 inline-block text-sm font-medium text-blue-700 hover:underline" to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id)}>
                             Gerar publicação da prorrogação
                           </Link>

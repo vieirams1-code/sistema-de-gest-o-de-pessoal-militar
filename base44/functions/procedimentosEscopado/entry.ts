@@ -73,7 +73,7 @@ async function resolverAutorizacao(base44) {
   return resposta?.data ?? resposta ?? {};
 }
 
-export default async function (req) {
+Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const authUser = await base44.auth
@@ -269,6 +269,10 @@ export default async function (req) {
           return Response.json({ error: 'Ação negada: permissão necessária para excluir procedimento.' }, { status: 403 });
         }
         if (!id) return Response.json({ error: 'ID do procedimento é obrigatório.' }, { status: 400 });
+        const publicacoes = await Publicacoes.filter({ procedimento_id: id }, undefined, 1, 0);
+        if (publicacoes.length) {
+          return Response.json({ error: 'O procedimento tem publicações vinculadas. Arquive-o para manter o histórico.' }, { status: 409 });
+        }
         await Envolvidos.deleteMany({ procedimento_id: id });
         await Prazos.deleteMany({ procedimento_id: id });
         await Procedimentos.delete(id);
@@ -281,4 +285,4 @@ export default async function (req) {
   } catch (error) {
     return Response.json({ error: error?.message || 'Erro ao processar procedimentos.' }, { status: 500 });
   }
-}
+});

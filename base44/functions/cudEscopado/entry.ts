@@ -2094,7 +2094,13 @@ export default async function(req) {
       validatePublication({ ...registroExistente, ...dataValidada });
       if (operation === 'update') dataValidada.status = publicationStatus({ ...registroExistente, ...dataValidada });
     }
-    if (entityName === 'PublicacaoExOfficio' && operation === 'create' && (data.procedimento_id || data.procedimento_prazo_id)) {
+    const tipoRPPertenceAProcedimento = entityName === 'PublicacaoExOfficio' && [
+      'Portaria de Instauração de Procedimento', 'Designação de Encarregado de PAD',
+      'Prorrogação de Prazo de Procedimento', 'Solução de Procedimento',
+    ].includes(dataValidada?.tipo);
+
+    if (entityName === 'PublicacaoExOfficio' && operation === 'create'
+      && (tipoRPPertenceAProcedimento || data.procedimento_id || data.procedimento_prazo_id)) {
       const validacao = await base44.functions.invoke('procedimentosEscopado', {
         action: 'validarPublicacao',
         id: data.procedimento_id,
@@ -2109,7 +2115,8 @@ export default async function(req) {
       const alterouVinculo = camposVinculo.some((campo) =>
         Object.hasOwn(data, campo) && String(data[campo] || '') !== String(registroExistente?.[campo] || ''),
       );
-      if (alterouVinculo || (registroExistente?.procedimento_id && dataValidada.tipo && dataValidada.tipo !== registroExistente.tipo)) {
+      const mudouTipo = dataValidada.tipo && dataValidada.tipo !== registroExistente?.tipo;
+      if (alterouVinculo || (mudouTipo && (tipoRPPertenceAProcedimento || registroExistente?.procedimento_id))) {
         return Response.json({ error: 'O vínculo e o tipo do ato de procedimento não podem ser alterados.' }, { status: 409 });
       }
     }

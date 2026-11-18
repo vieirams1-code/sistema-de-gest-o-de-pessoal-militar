@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Gavel, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,9 @@ export default function Procedimentos() {
 
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
   const [formModal, setFormModal] = useState({ open: false, procedimento: null, envolvidos: [] });
-  const [detalhe, setDetalhe] = useState({ open: false, id: null });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const detalheId = searchParams.get('procedimento_id');
+  const abrirDetalhe = (id) => setSearchParams(id ? { procedimento_id: id } : {}, { replace: true });
   const [prorrogar, setProrrogar] = useState({ open: false, procedimento: null });
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -156,7 +159,7 @@ export default function Procedimentos() {
               key={p.id}
               procedimento={p}
               envolvidos={envolvidosPorProcedimento.get(p.id) || []}
-              onOpen={(procedimento) => setDetalhe({ open: true, id: procedimento.id })}
+              onOpen={(procedimento) => abrirDetalhe(procedimento.id)}
             />
           ))}
         </div>
@@ -171,11 +174,11 @@ export default function Procedimentos() {
       />
 
       <ProcedimentoDetalheModal
-        open={detalhe.open}
-        onOpenChange={(open) => setDetalhe((prev) => ({ ...prev, open }))}
-        procedimentoId={detalhe.id}
+        open={Boolean(detalheId)}
+        onOpenChange={(open) => { if (!open) abrirDetalhe(null); }}
+        procedimentoId={detalheId}
         onEdit={(procedimento, listaEnvolvidos) => {
-          setDetalhe({ open: false, id: null });
+          abrirDetalhe(null);
           setFormModal({ open: true, procedimento, envolvidos: listaEnvolvidos || [] });
         }}
         onProrrogar={(procedimento) => setProrrogar({ open: true, procedimento })}
