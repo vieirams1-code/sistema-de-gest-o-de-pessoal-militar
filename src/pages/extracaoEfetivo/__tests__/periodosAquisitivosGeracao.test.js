@@ -61,3 +61,27 @@ test('rotina de geração automática não cria mais de um período futuro', () 
   assert.equal(futuros.length, 1);
   assert.equal(futuros[0].inicio_aquisitivo, '2026-10-09');
 });
+
+test('contrato determinado gera um único ciclo em 26/10/2025 a 25/10/2026, mesmo após o vencimento', () => {
+  const periodos = calcularPeriodosAquisitivosParaGeracao({
+    dataBase: '2026-10-26',
+    hoje: '2026-11-18',
+    vigenciaContrato: { inicio: '2025-10-26', fim: '2026-10-25' },
+  });
+  assert.deepEqual(refs(periodos), ['2025/2026']);
+  assert.equal(periodos[0].inicio_aquisitivo, '2025-10-26');
+  assert.equal(periodos[0].fim_aquisitivo, '2026-10-25');
+});
+
+test('uma renovação cobre o ciclo seguinte sem projetar outro, e ciclos incompletos são descartados', () => {
+  const opcoes = { dataBase: '2025-10-26', hoje: '2026-11-18' };
+  assert.deepEqual(refs(calcularPeriodosAquisitivosParaGeracao({
+    ...opcoes, vigenciaContrato: { inicio: '2025-10-26', fim: '2027-10-25' },
+  })), ['2025/2026', '2026/2027']);
+  assert.deepEqual(refs(calcularPeriodosAquisitivosParaGeracao({
+    ...opcoes, vigenciaContrato: { inicio: '2025-10-26', fim: '2027-10-24' },
+  })), ['2025/2026']);
+  assert.deepEqual(calcularPeriodosAquisitivosParaGeracao({
+    ...opcoes, vigenciaContrato: { inicio: '2025-10-26', fim: '' },
+  }), []);
+});
