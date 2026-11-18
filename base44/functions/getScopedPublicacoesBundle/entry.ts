@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 import { filtroMilitaresPublicacao, idsPublicacao } from '../../shared/publicacoesColetivas.ts';
+import { TIPOS_RP_SEM_MILITAR } from '../../shared/publicacoesProcedimento.ts';
 const CHUNK = 200;
 const normalizeTipo = (valor: unknown) => String(valor || '').trim().toLowerCase();
 
@@ -117,6 +118,24 @@ function deduplicar(registros: any[]) {
   );
 }
 
+async function listarPublicacoesProcedimentoSemMilitar(base44: any, filtro: any) {
+  const publicacoes = await base44.asServiceRole.entities.PublicacaoExOfficio.filter({
+    ...filtro,
+    tipo: { $in: TIPOS_RP_SEM_MILITAR },
+    militar_id: '',
+    procedimento_id: { $nin: ['', null] },
+  }, '-created_date', 10000, 0);
+  const ids = [...new Set<string>((publicacoes || []).map((registro: any) => String(registro.procedimento_id || '')).filter(Boolean))];
+  const procedimentosVisiveis = new Set<string>();
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const procedimentos = await base44.asServiceRole.entities.ProcedimentoProcesso.filter(
+      { id: { $in: ids.slice(i, i + CHUNK) }, sigiloso: { $ne: true } }, undefined, CHUNK, 0, ['id'],
+    );
+    for (const procedimento of procedimentos || []) procedimentosVisiveis.add(String(procedimento.id));
+  }
+  return (publicacoes || []).filter((registro: any) => procedimentosVisiveis.has(String(registro.procedimento_id)));
+}
+
 async function listarMilitaresApoio(base44: any, registros: any[]) {
   const ids = Array.from(new Set((registros || []).flatMap(item => idsPublicacao(item))));
   if (!ids.length) return [];
@@ -195,6 +214,19 @@ Deno.serve(async (req) => {
           .catch(() => []);
         publicacoesExOfficio = deduplicar([...(publicacoesExOfficio || []), ...(autor || [])]);
       }
+    }
+
+    const podeLerProcedimentos = authz?.modules?.controle_processos === true && authz?.actions?.visualizar_controle_processos === true;
+    if (config.exOfficio && militarIds !== null && !militarId
+      && ['CONTROL', 'RP', 'PUBLICACOES', 'REGISTRO_RP', 'CONCILIACAO'].includes(purpose)) {
+      const atosSemMilitar = podeLerProcedimentos
+        ? await listarPublicacoesProcedimentoSemMilitar(base44, filtroExOfficio)
+        : [];
+      publicacoesExOfficio = [
+        ...publicacoesExOfficio.filter((registro: any) => registro.militar_id
+          || !registro.procedimento_id || !TIPOS_RP_SEM_MILITAR.includes(registro.tipo)),
+        ...atosSemMilitar,
+      ];
     }
 
     const registrosLivro = deduplicar(registrosLivroBase || []);

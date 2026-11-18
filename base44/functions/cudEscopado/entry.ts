@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { TIPOS_RP_PROCEDIMENTO, TIPOS_RP_SEM_MILITAR } from '../../shared/publicacoesProcedimento.ts';
 
 // =====================================================================
 // cudEscopado — Backend Hardening Lote 1
@@ -1283,7 +1284,7 @@ export default async function(req) {
 
     // ---- Identificar militar_id alvo ----
     // Entidades administrativas não pertencem ao escopo de um militar específico.
-    const exigeEscopoMilitar = !ENTIDADES_SEM_ESCOPO_MILITAR.has(entityName);
+    let exigeEscopoMilitar = !ENTIDADES_SEM_ESCOPO_MILITAR.has(entityName);
     let militarAlvoId = null;
     let registroExistente = null;
 
@@ -1328,6 +1329,37 @@ export default async function(req) {
       const authzColetiva = permissaoColetiva?.data ?? permissaoColetiva;
       if (authzColetiva?.error) return Response.json({ error: authzColetiva.error }, { status: 403 });
       return await operarPublicacaoColetiva({ base44, operation, data, registro: registroExistente, authz: authzColetiva, admin: targetIsAdmin, email: targetEmail, userId: authUser.id, listarEscopo: listarMilitarIdsDoEscopo });
+    }
+
+    const publicacaoProcedimento = entityName === 'PublicacaoExOfficio'
+      && (operation === 'create' ? data.procedimento_id : registroExistente?.procedimento_id)
+      && TIPOS_RP_SEM_MILITAR.includes(operation === 'create' ? data.tipo : registroExistente?.tipo);
+    const militarNovo = publicacaoProcedimento && operation === 'update' && Object.hasOwn(data, 'militar_id')
+      ? String(data.militar_id || '').trim()
+      : militarAlvoId;
+    const alterouMilitarProcedimento = publicacaoProcedimento && operation === 'update'
+      && (militarNovo || '') !== (militarAlvoId || '');
+
+    if (publicacaoProcedimento && ((!militarAlvoId && !militarNovo) || alterouMilitarProcedimento)) {
+      if (alterouMilitarProcedimento && !targetIsAdmin && targetPerms.actions?.editar_publicacoes !== true) {
+        return Response.json({ error: 'A alteração do militar exige permissão para editar publicações.' }, { status: 403 });
+      }
+      if (operation !== 'create') {
+        const acesso = await base44.functions.invoke('procedimentosEscopado', {
+          action: 'validarAcessoPublicacao', id: registroExistente.procedimento_id,
+          ...(isImpersonating ? { effectiveEmail: targetEmail } : {}),
+        }).catch((error) => error?.response);
+        if (acesso?.data?.ok !== true) {
+          return Response.json({ error: acesso?.data?.error || 'Sem acesso ao procedimento da publicação.' }, { status: 403 });
+        }
+      }
+      if (alterouMilitarProcedimento && !targetIsAdmin) {
+        const permitidos = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
+        if (permitidos !== null && [militarAlvoId, militarNovo].some((id) => id && !permitidos.includes(id))) {
+          return Response.json({ error: 'Acesso negado: militar fora do seu escopo.' }, { status: 403 });
+        }
+      }
+      exigeEscopoMilitar = false;
     }
 
     // Operações 'bulk' não possuem um único militarAlvoId no topo;
@@ -2094,16 +2126,15 @@ export default async function(req) {
       validatePublication({ ...registroExistente, ...dataValidada });
       if (operation === 'update') dataValidada.status = publicationStatus({ ...registroExistente, ...dataValidada });
     }
-    const tipoRPPertenceAProcedimento = entityName === 'PublicacaoExOfficio' && [
-      'Portaria de Instauração de Procedimento', 'Designação de Encarregado de PAD',
-      'Prorrogação de Prazo de Procedimento', 'Solução de Procedimento',
-    ].includes(dataValidada?.tipo);
+    const tipoRPPertenceAProcedimento = entityName === 'PublicacaoExOfficio'
+      && TIPOS_RP_PROCEDIMENTO.includes(dataValidada?.tipo);
 
     if (entityName === 'PublicacaoExOfficio' && operation === 'create'
       && (tipoRPPertenceAProcedimento || data.procedimento_id || data.procedimento_prazo_id)) {
       const validacao = await base44.functions.invoke('procedimentosEscopado', {
         action: 'validarPublicacao',
         id: data.procedimento_id,
+        ...(isImpersonating ? { effectiveEmail: targetEmail } : {}),
         data: { tipo: dataValidada.tipo, militar_id: militarAlvoId, procedimento_prazo_id: data.procedimento_prazo_id },
       }).catch((error) => error?.response);
       if (validacao?.data?.ok !== true) {
@@ -2118,6 +2149,14 @@ export default async function(req) {
       const mudouTipo = dataValidada.tipo && dataValidada.tipo !== registroExistente?.tipo;
       if (alterouVinculo || (mudouTipo && (tipoRPPertenceAProcedimento || registroExistente?.procedimento_id))) {
         return Response.json({ error: 'O vínculo e o tipo do ato de procedimento não podem ser alterados.' }, { status: 409 });
+      }
+    }
+    if (publicacaoProcedimento && (operation === 'create' || alterouMilitarProcedimento)) {
+      dataValidada = { ...dataValidada, militar_id: militarNovo || '' };
+      if (!militarNovo) {
+        for (const campo of ['militar_nome', 'militar_posto', 'militar_matricula', 'militar_matricula_atual', 'militar_matricula_vinculo']) {
+          dataValidada[campo] = '';
+        }
       }
     }
     // ---- Execução com service role ----

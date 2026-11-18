@@ -68,8 +68,8 @@ function limparEnvolvido(envolvido = {}, procedimentoId) {
   };
 }
 
-async function resolverAutorizacao(base44) {
-  const resposta = await base44.functions.invoke('getUserPermissions', {});
+async function resolverAutorizacao(base44, effectiveEmail) {
+  const resposta = await base44.functions.invoke('getUserPermissions', effectiveEmail ? { effectiveEmail } : {});
   return resposta?.data ?? resposta ?? {};
 }
 
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     const data = payload?.data && typeof payload.data === 'object' ? payload.data : {};
     const id = payload?.id ? String(payload.id) : null;
 
-    const authz = await resolverAutorizacao(base44).catch(() => ({}));
+    const authz = await resolverAutorizacao(base44, payload?.effectiveEmail).catch(() => ({}));
     const isAdmin = authz?.isAdmin === true;
     const actions = authz?.actions || {};
     const modules = authz?.modules || {};
@@ -125,6 +125,18 @@ Deno.serve(async (req) => {
         const publicacoes = (registrosRP || []).map(({ id, tipo, status, nota_para_bg, numero_bg, data_bg, procedimento_prazo_id }) =>
           ({ id, tipo, status, nota_para_bg, numero_bg, data_bg, procedimento_prazo_id }));
         return Response.json({ ok: true, procedimento, envolvidos: envolvidos || [], prazos: prazos || [], publicacoes });
+      }
+
+      case 'validarAcessoPublicacao': {
+        if (!id) return Response.json({ error: 'Informe o procedimento.' }, { status: 400 });
+        const procedimento = await Procedimentos.get(id).catch((error) => {
+          if ((error?.status ?? error?.response?.status) === 404) return null;
+          throw error;
+        });
+        if (!procedimento || procedimento.sigiloso) {
+          return Response.json({ error: 'Procedimento indisponível para publicação no RP.' }, { status: 403 });
+        }
+        return Response.json({ ok: true });
       }
 
       case 'validarPublicacao': {

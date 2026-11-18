@@ -17,7 +17,7 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 import NotaColetivaForm from '@/components/rp/coletiva/NotaColetivaForm';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
 import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
-import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO, tipoRPDeProcedimento, montarTextoProcedimento, montarTextoDesignacaoProvisoria } from '@/components/procedimentos/procedimentoPublicacao';
+import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO, tipoRPDeProcedimento, aceitaPublicacaoSemMilitar, montarTextoProcedimento, montarTextoDesignacaoProvisoria } from '@/components/procedimentos/procedimentoPublicacao';
 import { obterProcedimentoEscopado } from '@/services/procedimentosEscopadoClient';
 import FormField from '@/components/militar/FormField';
 import {
@@ -343,25 +343,15 @@ export default function CadastrarRegistroRP() {
   );
 
   useEffect(() => {
-    if (!origemValida) return;
-    const investigado = origemProcedimento.data.envolvidos.filter((pessoa) => pessoa.papel === 'Investigado');
-    const pessoa = tipoProcedimentoRP === TIPOS_RP_PROCEDIMENTO.solucao && investigado.length === 1
-      ? investigado[0]
-      : {
-        militar_id: procedimentoOrigem.encarregado_id,
-        nome: procedimentoOrigem.encarregado_nome,
-        posto: procedimentoOrigem.encarregado_posto,
-        matricula: procedimentoOrigem.encarregado_matricula,
-      };
-    if (!pessoa.militar_id) return;
+    if (!origemValida || tipoProcedimentoRP !== TIPOS_RP_PROCEDIMENTO.designacao) return;
     setFormData((prev) => prev.militar_id ? prev : {
       ...prev,
-      militar_id: pessoa.militar_id,
-      militar_nome: pessoa.nome,
-      militar_posto: pessoa.posto,
-      militar_matricula: pessoa.matricula,
+      militar_id: procedimentoOrigem.encarregado_id,
+      militar_nome: procedimentoOrigem.encarregado_nome,
+      militar_posto: procedimentoOrigem.encarregado_posto,
+      militar_matricula: procedimentoOrigem.encarregado_matricula,
     });
-  }, [origemValida, origemProcedimento.data, procedimentoOrigem, tipoProcedimentoRP]);
+  }, [origemValida, procedimentoOrigem, tipoProcedimentoRP]);
 
   // Fetch existing record when editing
   const {
@@ -701,6 +691,9 @@ export default function CadastrarRegistroRP() {
   }, [formData.tipo_registro, tipoTemplateSelecionado, templatesAtivos]);
 
   const usaTextoProcedimento = tipoRPDeProcedimento(formData.tipo_registro) || formData.tipo_registro === DESIGNACAO_PROVISORIA;
+  const militarOpcional = Boolean(
+    (procedimentoId || registroEdicao?.procedimento_id) && aceitaPublicacaoSemMilitar(formData.tipo_registro),
+  );
   const hasTemplateConflict = !usaTextoProcedimento && conflitoTemplateSelecionado.temConflito;
   const statusCalculadoFormulario = useMemo(
     () => calcularStatusPublicacaoRegistro(formData),
@@ -749,8 +742,8 @@ export default function CadastrarRegistroRP() {
   }, [registroEdicao]);
 
   useEffect(() => {
-    setTextoEditadoManualmente(false);
-  }, [formData.tipo_registro, formData.militar_id, templateAtivoSelecionado?.id]);
+    if (!militarOpcional) setTextoEditadoManualmente(false);
+  }, [formData.tipo_registro, formData.militar_id, templateAtivoSelecionado?.id, militarOpcional]);
 
   useEffect(() => {
     if (!selectedFerias || !militarIdSelecionado) return;
@@ -813,7 +806,7 @@ export default function CadastrarRegistroRP() {
       const textoGerado = formData.tipo_registro === DESIGNACAO_PROVISORIA
         ? montarTextoDesignacaoProvisoria(formData, formData.autoridade_designacao)
         : origemValida
-          ? montarTextoProcedimento(procedimentoOrigem, formData.tipo_registro, prazoOrigem, Boolean(formData.doems_arquivo))
+          ? montarTextoProcedimento(procedimentoOrigem, formData.tipo_registro, prazoOrigem, Boolean(formData.doems_arquivo), formData)
           : '';
       setFormData((prev) => prev.texto_publicacao === textoGerado ? prev : { ...prev, texto_publicacao: textoGerado });
       return;
@@ -1148,10 +1141,12 @@ export default function CadastrarRegistroRP() {
     }
 
     // Lote Trava Emergencial — escopo de escrita
-    const militarAlvoId = registroEdicao?.militar_id || formData.militar_id;
-    const escopo = validarEscopoMilitar(militarAlvoId);
-    if (!escopo.permitido) {
-      alert(escopo.motivo);
+    const militaresAlvo = militarOpcional
+      ? [...new Set([registroEdicao?.militar_id, formData.militar_id].filter(Boolean))]
+      : [registroEdicao?.militar_id || formData.militar_id];
+    const escopoNegado = militaresAlvo.map(validarEscopoMilitar).find((escopo) => !escopo.permitido);
+    if (escopoNegado) {
+      alert(escopoNegado.motivo);
       return;
     }
 
@@ -1237,7 +1232,7 @@ export default function CadastrarRegistroRP() {
   };
 
   const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !hasTemplateConflict;
-  const canAdvanceFromStep2 = !!formData.militar_id
+  const canAdvanceFromStep2 = (militarOpcional || Boolean(formData.militar_id))
     && (tipoProcedimentoRP !== TIPOS_RP_PROCEDIMENTO.designacao || formData.militar_id === procedimentoOrigem?.encarregado_id);
   const canAdvanceFromStep3 = !!formData.data_registro && (
     formData.tipo_registro !== DESIGNACAO_PROVISORIA || Boolean(formData.funcao?.trim() && formData.data_designacao)
@@ -1303,9 +1298,9 @@ export default function CadastrarRegistroRP() {
               <BookOpenText className="h-3.5 w-3.5" /> RP — Registro de Publicações
             </div>
             <h1 className="text-2xl font-bold text-[#1e3a5f]">
-              {isEditing ? 'Editar Registro' : 'Novo Registro'}
+              {isEditing ? 'Editar Registro' : procedimentoId ? selectedTipo?.label || 'Nova publicação do procedimento' : 'Novo Registro'}
             </h1>
-            {!isEditing && canAdicionarPublicacoes && <Button type="button" variant="outline" className="mt-3" onClick={() => navigate('/CadastrarRegistroRP?coletiva=1')}>Criar nota coletiva</Button>}
+            {!isEditing && !procedimentoId && canAdicionarPublicacoes && <Button type="button" variant="outline" className="mt-3" onClick={() => navigate('/CadastrarRegistroRP?coletiva=1')}>Criar nota coletiva</Button>}
           </div>
         </div>
 
@@ -1314,7 +1309,7 @@ export default function CadastrarRegistroRP() {
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {[
                 { id: 1, label: 'Tipo' },
-                { id: 2, label: 'Militar' },
+                { id: 2, label: militarOpcional ? 'Militar (opcional)' : 'Militar' },
                 { id: 3, label: 'Registro' },
                 { id: 4, label: 'Finalização' },
               ].map(item => {
@@ -1487,7 +1482,12 @@ export default function CadastrarRegistroRP() {
           {step === 2 && (
             <>
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Militar</h2>
+                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">{militarOpcional ? 'Militar a mencionar (opcional)' : 'Militar'}</h2>
+                {militarOpcional && (
+                  <p className="mb-3 text-sm text-slate-500">
+                    Selecione um militar se ele deve constar nesta publicação. Você pode avançar com o campo vazio.
+                  </p>
+                )}
                 <MilitarSelector
                   value={formData.militar_id}
                   onChange={handleChange}
@@ -1514,7 +1514,7 @@ export default function CadastrarRegistroRP() {
                     }
                   }}
                 >
-                  Avançar
+                  {militarOpcional && !formData.militar_id ? 'Avançar sem militar' : 'Avançar'}
                 </Button>
               </div>
             </>

@@ -17,7 +17,7 @@ function addDias(base, dias) {
   return data.toISOString().slice(0, 10);
 }
 
-export default function ProrrogarPrazoModal({ open, onOpenChange, procedimento, onSaved }) {
+export default function ProrrogarPrazoModal({ open, onOpenChange, procedimento, gerarPublicacao, onSaved }) {
   const { toast } = useToast();
   const [dias, setDias] = useState(30);
   const [motivo, setMotivo] = useState('');
@@ -33,16 +33,16 @@ export default function ProrrogarPrazoModal({ open, onOpenChange, procedimento, 
   const novoPrazo = addDias(base, dias);
 
   const handleSalvar = async () => {
-    if (!Number(dias)) {
+    if (!Number.isInteger(Number(dias)) || Number(dias) <= 0) {
       toast({ title: 'Informe a quantidade de dias.', variant: 'destructive' });
       return;
     }
     setSalvando(true);
     try {
-      await registrarPrazoProcedimentoEscopado(procedimento.id, { dias: Number(dias), motivo });
+      const { prazo } = await registrarPrazoProcedimentoEscopado(procedimento.id, { dias: Number(dias), motivo });
       toast({ title: 'Prorrogação registrada.', description: `Novo prazo final: ${formatarData(novoPrazo)}` });
       onOpenChange(false);
-      onSaved?.();
+      onSaved?.(prazo);
     } catch (e) {
       toast({ title: 'Erro ao prorrogar prazo', description: e.message, variant: 'destructive' });
     } finally {
@@ -54,7 +54,7 @@ export default function ProrrogarPrazoModal({ open, onOpenChange, procedimento, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Prorrogar prazo</DialogTitle>
+          <DialogTitle>{gerarPublicacao ? 'Publicação de prorrogação de prazo' : 'Prorrogar prazo'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -76,7 +76,7 @@ export default function ProrrogarPrazoModal({ open, onOpenChange, procedimento, 
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={salvando}>Cancelar</Button>
-          <Button onClick={handleSalvar} disabled={salvando}>{salvando ? 'Registrando...' : 'Registrar prorrogação'}</Button>
+          <Button onClick={handleSalvar} disabled={salvando}>{salvando ? 'Registrando...' : gerarPublicacao ? 'Registrar e abrir publicação' : 'Registrar prorrogação'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

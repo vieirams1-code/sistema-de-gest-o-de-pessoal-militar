@@ -10,16 +10,16 @@ const CARDS = [
 
 export default function ProcedimentoResumoCards({ resumo = {} }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       {CARDS.map(({ key, label, icon: Icon, classe }) => (
-        <div key={key} className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2">
-            <span className={`rounded-lg p-1.5 ${classe}`}>
-              <Icon className="h-4 w-4" />
-            </span>
-            <span className="text-xs font-medium text-slate-500">{label}</span>
+        <div key={key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${classe}`}>
+            <Icon className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold text-[#1e3a5f]">{resumo[key] || 0}</p>
+            <p className="text-xs text-slate-500">{label}</p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-800">{resumo[key] || 0}</p>
         </div>
       ))}
     </div>

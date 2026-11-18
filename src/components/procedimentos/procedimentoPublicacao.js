@@ -13,7 +13,27 @@ export function tipoRPDeProcedimento(tipo) {
   return Object.values(TIPOS_RP_PROCEDIMENTO).includes(tipo);
 }
 
-export function montarTextoProcedimento(procedimento, tipo, prazo, temAnexo) {
+export const ROTULOS_PUBLICACAO_PROCEDIMENTO = {
+  [TIPOS_RP_PROCEDIMENTO.instauracao]: 'Publicação da portaria de instauração',
+  [TIPOS_RP_PROCEDIMENTO.prorrogacao]: 'Publicação de prorrogação de prazo',
+  [TIPOS_RP_PROCEDIMENTO.solucao]: 'Publicação de solução',
+};
+
+export function urlPublicacaoProcedimento(procedimentoId, tipo, prazoId) {
+  const params = new URLSearchParams({ tipo, procedimento_id: procedimentoId });
+  if (prazoId) params.set('procedimento_prazo_id', prazoId);
+  return `/CadastrarRegistroRP?${params}`;
+}
+
+export function aceitaPublicacaoSemMilitar(tipo) {
+  return Object.hasOwn(ROTULOS_PUBLICACAO_PROCEDIMENTO, tipo);
+}
+
+export function publicacaoProcedimentoSemMilitar(registro) {
+  return Boolean(registro?.procedimento_id && !registro.militar_id && aceitaPublicacaoSemMilitar(registro.tipo));
+}
+
+export function montarTextoProcedimento(procedimento, tipo, prazo, temAnexo, militar) {
   const { numero_portaria, data_portaria, tipo_procedimento } = procedimento;
   const especie = tipo_procedimento === 'PAD' ? 'Processo Administrativo Disciplinar (PAD)' : tipo_procedimento;
   const referencia = numero_portaria
@@ -23,17 +43,23 @@ export function montarTextoProcedimento(procedimento, tipo, prazo, temAnexo) {
   const oficial = [procedimento.encarregado_posto, procedimento.encarregado_quadro, procedimento.encarregado_nome].filter(Boolean).join(' ');
   const matricula = procedimento.encarregado_matricula ? `, matrícula nº ${procedimento.encarregado_matricula}` : '';
   const anexo = temAnexo ? ' O inteiro teor segue anexo ao presente Boletim.' : '';
+  const militarJaMencionado = tipo === TIPOS_RP_PROCEDIMENTO.instauracao && militar?.militar_id === procedimento.encarregado_id && oficial;
+  const nomeMilitar = [militar?.militar_posto, militar?.militar_nome].filter(Boolean).join(' ');
+  const matriculaMilitar = militar?.militar_matricula ? `, matrícula nº ${militar.militar_matricula}` : '';
+  const mencao = militar?.militar_id && nomeMilitar && !militarJaMencionado
+    ? ` Militar mencionado: ${nomeMilitar}${matriculaMilitar}.`
+    : '';
 
   switch (tipo) {
     case TIPOS_RP_PROCEDIMENTO.instauracao:
-      return `${autoridade} torna pública a ${referencia}, que instaura ${especie}${oficial ? ` e nomeia como encarregado ${oficial}${matricula}` : ''}.${anexo} Em consequência: (1) Ciente; (2) Publique-se.`;
+      return `${autoridade} torna pública a ${referencia}, que dispõe sobre a instauração de ${especie}${oficial ? ` e designa como encarregado ${oficial}${matricula}` : ''}.${anexo}${mencao} Em consequência: (1) Ciente; (2) Publique-se.`;
     case TIPOS_RP_PROCEDIMENTO.designacao:
       return `${autoridade} torna pública a ${referencia}, que designa como encarregado do ${especie} o militar ${oficial}${matricula}.${anexo}`;
     case TIPOS_RP_PROCEDIMENTO.prorrogacao:
       if (!prazo) return '';
-      return `${autoridade} torna pública a prorrogação, por ${prazo.dias} dias, do prazo do procedimento de ${especie} instaurado pela ${referencia}, com novo prazo até ${formatarData(prazo.data_fim)}.${anexo}`;
+      return `${autoridade} torna pública a prorrogação, por ${prazo.dias} dias, do prazo do procedimento de ${especie} instaurado pela ${referencia}, com novo prazo até ${formatarData(prazo.data_fim)}.${anexo}${mencao}`;
     case TIPOS_RP_PROCEDIMENTO.solucao:
-      return `${autoridade} torna pública a Solução do procedimento de ${especie} instaurado pela ${referencia}.${anexo}`;
+      return `${autoridade} torna pública a Solução do procedimento de ${especie} instaurado pela ${referencia}.${anexo}${mencao}`;
     default:
       return '';
   }

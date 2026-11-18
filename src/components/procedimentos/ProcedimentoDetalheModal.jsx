@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { TIPOS_RP_PROCEDIMENTO } from './procedimentoPublicacao';
+import { ROTULOS_PUBLICACAO_PROCEDIMENTO, TIPOS_RP_PROCEDIMENTO, urlPublicacaoProcedimento } from './procedimentoPublicacao';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Lock, Pencil, Trash2 } from 'lucide-react';
+import { CalendarClock, FileText, Lock, Pencil, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -39,13 +39,15 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
   const prazos = [...(data?.prazos || [])].sort((a, b) => String(b.data_fim || '').localeCompare(String(a.data_fim || '')));
   const prazo = classificarPrazo(procedimento);
   const publicacoes = data?.publicacoes || [];
-  const publicacaoUrl = (tipo, prazoId) => {
-    const params = new URLSearchParams({ tipo, procedimento_id: procedimentoId });
-    if (prazoId) params.set('procedimento_prazo_id', prazoId);
-    return `/CadastrarRegistroRP?${params}`;
-  };
+  const publicacaoUrl = (tipo, prazoId) => urlPublicacaoProcedimento(procedimentoId, tipo, prazoId);
   const temPublicacao = (tipo, prazoId) =>
     publicacoes.some((pub) => pub.tipo === tipo && (!prazoId || pub.procedimento_prazo_id === prazoId));
+  const prorrogacaoPendente = prazos.find((item) =>
+    item.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, item.id),
+  );
+  const podePublicarProcedimento = podeGerar && procedimento?.numero_portaria && !procedimento.sigiloso;
+  const podeRegistrarPrazo = podeEditar && Boolean(procedimento?.prazo_final || procedimento?.data_instauracao)
+    && !['Solucionado', 'Arquivado', 'Cancelado'].includes(procedimento?.status);
 
   const handleExcluir = async () => {
     if (!procedimento) return;
@@ -104,6 +106,43 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
               />
             </div>
 
+            {podeGerar && !procedimento.sigiloso && (
+              <section className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#1e3a5f]">
+                  <FileText className="h-4 w-4" /> Gerar publicação
+                </h3>
+                {!procedimento.numero_portaria ? (
+                  <p className="text-sm text-slate-600">Cadastre o número da portaria na ficha para gerar sua publicação.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {!temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.instauracao)}>Gerar publicação da portaria</Link>
+                      </Button>
+                    )}
+                    {prorrogacaoPendente ? (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.prorrogacao, prorrogacaoPendente.id)}>Gerar publicação de prorrogação</Link>
+                      </Button>
+                    ) : podeRegistrarPrazo && (
+                      <Button variant="outline" size="sm" onClick={() => onProrrogar(procedimento, true)}>
+                        Gerar publicação de prorrogação
+                      </Button>
+                    )}
+                    {!temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao) && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.solucao)}>Gerar publicação de solução</Link>
+                      </Button>
+                    )}
+                    {temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao)
+                      && !prorrogacaoPendente && !podeRegistrarPrazo && (
+                        <p className="text-sm text-slate-600">Consulte os atos gerados no histórico de publicações.</p>
+                      )}
+                  </div>
+                )}
+              </section>
+            )}
+
             {procedimento.objeto && (
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-slate-400">Objeto</p>
@@ -144,7 +183,7 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                           {p.tipo} · {p.dias || 0} dias · até {formatarData(p.data_fim)}
                         </p>
                         {p.motivo && <p className="text-xs text-slate-500">{p.motivo}</p>}
-                        {podeGerar && !procedimento.sigiloso && procedimento.numero_portaria && p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
+                        {podePublicarProcedimento && p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
                           <Link className="mt-1 inline-block text-sm font-medium text-blue-700 hover:underline" to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id)}>
                             Gerar publicação da prorrogação
                           </Link>
@@ -164,26 +203,13 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                 <ul className="divide-y rounded-lg border border-slate-200">
                   {publicacoes.map((pub) => (
                     <li key={pub.id} className="flex flex-wrap justify-between gap-2 px-3 py-2 text-sm">
-                      <span>{pub.tipo}</span>
+                      <span>{ROTULOS_PUBLICACAO_PROCEDIMENTO[pub.tipo] || pub.tipo}</span>
                       <span className="text-slate-600">
                         {[pub.status, pub.nota_para_bg && `Nota ${pub.nota_para_bg}`, pub.numero_bg && `BG ${pub.numero_bg}`, pub.data_bg && formatarData(pub.data_bg)].filter(Boolean).join(' · ')}
                       </span>
                     </li>
                   ))}
                 </ul>
-              )}
-              {podeGerar && !procedimento.sigiloso && (
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    [TIPOS_RP_PROCEDIMENTO.instauracao, 'Gerar portaria de instauração', procedimento.numero_portaria],
-                    [TIPOS_RP_PROCEDIMENTO.designacao, 'Gerar designação de encarregado', procedimento.tipo_procedimento === 'PAD' && procedimento.encarregado_id && procedimento.numero_portaria],
-                    [TIPOS_RP_PROCEDIMENTO.solucao, 'Gerar publicação da solução', procedimento.numero_portaria],
-                  ].filter(([tipo, , disponivel]) => disponivel && !temPublicacao(tipo)).map(([tipo, label]) => (
-                    <Button key={tipo} asChild variant="outline" size="sm">
-                      <Link to={publicacaoUrl(tipo)}>{label}</Link>
-                    </Button>
-                  ))}
-                </div>
               )}
             </section>
 
@@ -204,7 +230,7 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
           )}
           {podeEditar && procedimento && (
             <>
-              {!['Solucionado', 'Arquivado', 'Cancelado'].includes(procedimento.status) && (
+              {podeRegistrarPrazo && (
                 <Button variant="outline" onClick={() => onProrrogar(procedimento)}>Prorrogar prazo</Button>
               )}
               <Button onClick={() => onEdit(procedimento, envolvidos)}>

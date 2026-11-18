@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Gavel, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { listarProcedimentosEscopado } from '@/services/procedimentosEscopadoClient';
 import ProcedimentoResumoCards from '@/components/procedimentos/ProcedimentoResumoCards';
 import ProcedimentoFiltros from '@/components/procedimentos/ProcedimentoFiltros';
-import ProcedimentoCard from '@/components/procedimentos/ProcedimentoCard';
+import ProcedimentoLinha from '@/components/procedimentos/ProcedimentoLinha';
+import { TIPOS_RP_PROCEDIMENTO, urlPublicacaoProcedimento } from '@/components/procedimentos/procedimentoPublicacao';
 import ProcedimentoFormModal from '@/components/procedimentos/ProcedimentoFormModal';
 import ProcedimentoDetalheModal from '@/components/procedimentos/ProcedimentoDetalheModal';
 import ProrrogarPrazoModal from '@/components/procedimentos/ProrrogarPrazoModal';
@@ -19,6 +20,7 @@ const FILTROS_INICIAIS = {
 
 export default function Procedimentos() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { canAccessAction } = useCurrentUser();
   const podeCriar = canAccessAction('perm_criar_processo_controle');
 
@@ -27,7 +29,7 @@ export default function Procedimentos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const detalheId = searchParams.get('procedimento_id');
   const abrirDetalhe = (id) => setSearchParams(id ? { procedimento_id: id } : {}, { replace: true });
-  const [prorrogar, setProrrogar] = useState({ open: false, procedimento: null });
+  const [prorrogar, setProrrogar] = useState({ open: false, procedimento: null, gerarPublicacao: false });
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['procedimentos-administrativos'],
@@ -102,25 +104,19 @@ export default function Procedimentos() {
   const abrirNovo = () => setFormModal({ open: true, procedimento: null, envolvidos: [] });
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 p-4 lg:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="rounded-xl bg-[#173764] p-2.5 text-white">
-            <Gavel className="h-5 w-5" />
-          </span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Procedimentos Administrativos</h1>
-            <p className="text-sm text-slate-500">
-              Cadastro de PAD, inquéritos técnicos e sindicâncias, com prazos, encarregados e envolvidos.
-            </p>
+            <h1 className="text-3xl font-bold text-[#1e3a5f]">Procedimentos Administrativos</h1>
+            <p className="text-slate-500">Cadastro, controle de prazos e publicações dos procedimentos.</p>
           </div>
+          {podeCriar && (
+            <Button className="self-start bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]" onClick={abrirNovo}>
+              <Plus className="mr-2 h-5 w-5" /> Novo procedimento
+            </Button>
+          )}
         </div>
-        {podeCriar && (
-          <Button onClick={abrirNovo}>
-            <Plus className="mr-1 h-4 w-4" /> Novo procedimento
-          </Button>
-        )}
-      </div>
 
       <ProcedimentoResumoCards resumo={resumo} />
 
@@ -153,15 +149,27 @@ export default function Procedimentos() {
           )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtrados.map((p) => (
-            <ProcedimentoCard
-              key={p.id}
-              procedimento={p}
-              envolvidos={envolvidosPorProcedimento.get(p.id) || []}
-              onOpen={(procedimento) => abrirDetalhe(procedimento.id)}
-            />
-          ))}
+        <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-left text-slate-600">
+                {['Procedimento', 'Encarregado', 'Investigado', 'Prazo final', 'Situação'].map((label) => (
+                  <th key={label} scope="col" className="px-4 py-3 font-semibold">{label}</th>
+                ))}
+                <th scope="col" className="px-4 py-3 text-right font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtrados.map((procedimento) => (
+                <ProcedimentoLinha
+                  key={procedimento.id}
+                  procedimento={procedimento}
+                  envolvidos={envolvidosPorProcedimento.get(procedimento.id) || []}
+                  onOpen={() => abrirDetalhe(procedimento.id)}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -181,7 +189,7 @@ export default function Procedimentos() {
           abrirDetalhe(null);
           setFormModal({ open: true, procedimento, envolvidos: listaEnvolvidos || [] });
         }}
-        onProrrogar={(procedimento) => setProrrogar({ open: true, procedimento })}
+        onProrrogar={(procedimento, gerarPublicacao = false) => setProrrogar({ open: true, procedimento, gerarPublicacao })}
         onChanged={invalidar}
       />
 
@@ -189,8 +197,15 @@ export default function Procedimentos() {
         open={prorrogar.open}
         onOpenChange={(open) => setProrrogar((prev) => ({ ...prev, open }))}
         procedimento={prorrogar.procedimento}
-        onSaved={invalidar}
+        gerarPublicacao={prorrogar.gerarPublicacao}
+        onSaved={(prazo) => {
+          invalidar();
+          if (prorrogar.gerarPublicacao && prazo?.id) {
+            navigate(urlPublicacaoProcedimento(prorrogar.procedimento.id, TIPOS_RP_PROCEDIMENTO.prorrogacao, prazo.id));
+          }
+        }}
       />
+      </div>
     </div>
   );
 }

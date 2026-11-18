@@ -123,6 +123,8 @@ export default function ProcedimentoFormModal({ open, onOpenChange, procedimento
             </div>
           </div>
 
+          <p className="text-xs text-slate-500">Informe os dados da portaria já emitida. Na ficha, você poderá gerar a publicação para o boletim.</p>
+
           <div className="grid gap-3 sm:grid-cols-4">
             <div>
               <Label>Data da portaria</Label>

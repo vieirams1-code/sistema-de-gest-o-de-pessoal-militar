@@ -4,7 +4,7 @@
  * Unifica os antigos módulos Livro e PublicacaoExOfficio em uma única fonte de verdade.
  */
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
-import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO } from '@/components/procedimentos/procedimentoPublicacao';
+import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO, ROTULOS_PUBLICACAO_PROCEDIMENTO } from '@/components/procedimentos/procedimentoPublicacao';
 
 // ─── Constantes de módulo ───────────────────────────────────────────────────
 export const MODULO_LIVRO = 'Livro';
@@ -22,7 +22,7 @@ export const DOEMS_SUBTIPOS = [
 // ─── Base de tipos ──────────────────────────────────────────────────────────
 export const RP_TIPOS_BASE = [
   ...Object.values(TIPOS_RP_PROCEDIMENTO).map((tipo) => ({
-    value: tipo, label: tipo, grupo: 'Procedimentos', modulo: MODULO_EX_OFFICIO,
+    value: tipo, label: ROTULOS_PUBLICACAO_PROCEDIMENTO[tipo] || tipo, grupo: 'Procedimentos', modulo: MODULO_EX_OFFICIO,
     sexo: null, descricao: 'Publicação vinculada a um procedimento cadastrado.',
   })),
   {

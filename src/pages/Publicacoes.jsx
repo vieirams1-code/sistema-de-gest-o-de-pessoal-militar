@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { publicacaoProcedimentoSemMilitar } from '@/components/procedimentos/procedimentoPublicacao';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -699,7 +700,7 @@ export default function Publicacoes() {
     const registroAtual = todosRegistros.find((item) => item.id === id);
     const alvosUpd = registroAtual?.coletiva ? registroAtual.militares_ids || [] : [registroAtual?.militar_id];
     const escopoUpd = alvosUpd.map(validarEscopoMilitar).find(result => !result.permitido) || { permitido: alvosUpd.length > 0, motivo: 'Nenhum militar vinculado.' };
-    if (!escopoUpd.permitido) return alert(escopoUpd.motivo);
+    if (!publicacaoProcedimentoSemMilitar(registroAtual) && !escopoUpd.permitido) return alert(escopoUpd.motivo);
     const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
     const validacao = validarPayloadPublicacao({
       registroAtual,
@@ -731,7 +732,7 @@ export default function Publicacoes() {
     if (!registro) return;
     const alvosDel = registro?.coletiva ? registro.militares_ids || [] : [registro?.militar_id];
     const escopoDel = alvosDel.map(validarEscopoMilitar).find(result => !result.permitido) || { permitido: alvosDel.length > 0, motivo: 'Nenhum militar vinculado.' };
-    if (!escopoDel.permitido) return alert(escopoDel.motivo);
+    if (!publicacaoProcedimentoSemMilitar(registro) && !escopoDel.permitido) return alert(escopoDel.motivo);
     if (tipo === 'atestado') return alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
     if (tipo === 'livro' && isFeriasOperacional(registro)) return alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
     if (registro.status_calculado === STATUS_PUBLICACAO.PUBLICADO && registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
