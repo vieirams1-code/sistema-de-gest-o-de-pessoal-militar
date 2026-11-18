@@ -36,6 +36,7 @@ export async function obterProcedimentoEscopado(id) {
     procedimento: resp?.procedimento || null,
     envolvidos: resp?.envolvidos || [],
     prazos: resp?.prazos || [],
+    publicacoes: resp?.publicacoes || [],
   };
 }
 

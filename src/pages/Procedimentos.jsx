@@ -26,7 +26,7 @@ export default function Procedimentos() {
   const [detalhe, setDetalhe] = useState({ open: false, id: null });
   const [prorrogar, setProrrogar] = useState({ open: false, procedimento: null });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['procedimentos-administrativos'],
     queryFn: listarProcedimentosEscopado,
   });
@@ -74,7 +74,7 @@ export default function Procedimentos() {
       if (filtros.encarregado_id && p.encarregado_id !== filtros.encarregado_id) return false;
       if (filtros.envolvido_id) {
         const vinculos = envolvidosPorProcedimento.get(p.id) || [];
-        if (!vinculos.some((e) => e.militar_id === filtros.envolvido_id)) return false;
+        if (!vinculos.some((e) => e.papel === 'Investigado' && e.militar_id === filtros.envolvido_id)) return false;
       }
       return true;
     });
@@ -131,6 +131,11 @@ export default function Procedimentos() {
       {isLoading ? (
         <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
           Carregando procedimentos...
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center" role="alert">
+          <p className="text-sm text-slate-700">Não foi possível carregar os procedimentos.</p>
+          <Button variant="outline" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button>
         </div>
       ) : filtrados.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">

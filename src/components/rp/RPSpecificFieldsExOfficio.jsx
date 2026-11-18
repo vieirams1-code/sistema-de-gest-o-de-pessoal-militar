@@ -191,6 +191,7 @@ export default function RPSpecificFieldsExOfficio({
         </div>
       );
 
+    case 'Designação Provisória para Responder por Função':
     case 'Designação de Função':
     case 'Dispensa de Função':
       return (
@@ -206,13 +207,22 @@ export default function RPSpecificFieldsExOfficio({
               required
             />
             <FormField
-              label="Data"
+              label="Data de início"
               name="data_designacao"
               value={formData.data_designacao}
               onChange={handleChange}
               type="date"
               required
             />
+            {tipoRegistro === 'Designação Provisória para Responder por Função' && (
+              <FormField
+                label="Autoridade que designa"
+                name="autoridade_designacao"
+                value={formData.autoridade_designacao || ''}
+                onChange={handleChange}
+                placeholder="A Comandante do 1º Grupamento de Bombeiros Militar"
+              />
+            )}
           </div>
         </div>
       );

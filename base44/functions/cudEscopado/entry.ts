@@ -2094,6 +2094,25 @@ export default async function(req) {
       validatePublication({ ...registroExistente, ...dataValidada });
       if (operation === 'update') dataValidada.status = publicationStatus({ ...registroExistente, ...dataValidada });
     }
+    if (entityName === 'PublicacaoExOfficio' && operation === 'create' && (data.procedimento_id || data.procedimento_prazo_id)) {
+      const validacao = await base44.functions.invoke('procedimentosEscopado', {
+        action: 'validarPublicacao',
+        id: data.procedimento_id,
+        data: { tipo: dataValidada.tipo, militar_id: militarAlvoId, procedimento_prazo_id: data.procedimento_prazo_id },
+      }).catch((error) => error?.response);
+      if (validacao?.data?.ok !== true) {
+        return Response.json({ error: validacao?.data?.error || 'Não foi possível validar o ato do procedimento.' }, { status: 409 });
+      }
+    }
+    if (entityName === 'PublicacaoExOfficio' && operation === 'update') {
+      const camposVinculo = ['procedimento_id', 'procedimento_prazo_id'];
+      const alterouVinculo = camposVinculo.some((campo) =>
+        Object.hasOwn(data, campo) && String(data[campo] || '') !== String(registroExistente?.[campo] || ''),
+      );
+      if (alterouVinculo || (registroExistente?.procedimento_id && dataValidada.tipo && dataValidada.tipo !== registroExistente.tipo)) {
+        return Response.json({ error: 'O vínculo e o tipo do ato de procedimento não podem ser alterados.' }, { status: 409 });
+      }
+    }
     // ---- Execução com service role ----
     const entity = getEntity(base44, entityName);
     let resultado = null;

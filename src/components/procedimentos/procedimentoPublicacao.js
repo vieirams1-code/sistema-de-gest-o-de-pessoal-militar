@@ -1,4 +1,4 @@
-import { formatarData } from './procedimentoConfig';
+import { formatarData } from './procedimentoConfig.js';
 
 export const TIPOS_RP_PROCEDIMENTO = {
   instauracao: 'Portaria de Instauração de Procedimento',

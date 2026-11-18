@@ -1,4 +1,5 @@
 import { resolverTipoFeriasCanonico } from '../ferias/feriasTipoResolver.js';
+import { DESIGNACAO_PROVISORIA, tipoRPDeProcedimento } from '../procedimentos/procedimentoPublicacao.js';
 import { MODULO_DOCUMENTOS_MILITARES } from '../../services/documentosMilitares/documentoMilitarVarsService.js';
 import { lintTemplateDocumentoMilitar } from '../../services/documentosMilitares/documentoMilitarTemplateService.js';
 import { TIPO_TEMPLATE_NOTIFICACAO_JISO_WA } from '../../constants/whatsappTemplates.js';
@@ -37,6 +38,7 @@ export function normalizarModulo(modulo = '') {
 }
 
 export function tipoExigeTemplate(tipoRegistro = '') {
+  if (tipoRegistro === DESIGNACAO_PROVISORIA || tipoRPDeProcedimento(tipoRegistro)) return false;
   const t = String(tipoRegistro).trim().toLowerCase();
   return (
     t !== 'geral' &&

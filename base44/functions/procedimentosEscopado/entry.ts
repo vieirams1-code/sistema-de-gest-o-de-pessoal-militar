@@ -30,6 +30,11 @@ const CAMPOS_PROCEDIMENTO = [
 ];
 
 const STATUS_ENCERRADOS = ['Solucionado', 'Arquivado', 'Cancelado'];
+const TIPO_INSTAURACAO = 'Portaria de Instauração de Procedimento';
+const TIPO_DESIGNACAO = 'Designação de Encarregado de PAD';
+const TIPO_PRORROGACAO = 'Prorrogação de Prazo de Procedimento';
+const TIPO_SOLUCAO = 'Solução de Procedimento';
+const TIPOS_DE_PUBLICACAO = [TIPO_INSTAURACAO, TIPO_DESIGNACAO, TIPO_PRORROGACAO, TIPO_SOLUCAO];
 
 const hojeIso = () => new Date().toISOString().slice(0, 10);
 
@@ -96,6 +101,7 @@ export default async function (req) {
     const Procedimentos = base44.asServiceRole.entities.ProcedimentoProcesso;
     const Envolvidos = base44.asServiceRole.entities.ProcedimentoEnvolvido;
     const Prazos = base44.asServiceRole.entities.ProcedimentoPrazoHistorico;
+    const Publicacoes = base44.asServiceRole.entities.PublicacaoExOfficio;
 
     switch (action) {
       case 'listar': {
@@ -111,11 +117,49 @@ export default async function (req) {
         if (!id) return Response.json({ error: 'ID do procedimento é obrigatório.' }, { status: 400 });
         const procedimento = await Procedimentos.get(id).catch((e) => (e.status === 404 ? null : Promise.reject(e)));
         if (!procedimento) return Response.json({ error: 'Procedimento não encontrado.' }, { status: 404 });
-        const [envolvidos, prazos] = await Promise.all([
+        const [envolvidos, prazos, registrosRP] = await Promise.all([
           Envolvidos.filter({ procedimento_id: id }, undefined, 500, 0),
           Prazos.filter({ procedimento_id: id }, '-data_fim', 200, 0),
+          Publicacoes.filter({ procedimento_id: id }, '-created_date', 200, 0),
         ]);
-        return Response.json({ ok: true, procedimento, envolvidos: envolvidos || [], prazos: prazos || [] });
+        const publicacoes = (registrosRP || []).map(({ id, tipo, status, nota_para_bg, numero_bg, data_bg, procedimento_prazo_id }) =>
+          ({ id, tipo, status, nota_para_bg, numero_bg, data_bg, procedimento_prazo_id }));
+        return Response.json({ ok: true, procedimento, envolvidos: envolvidos || [], prazos: prazos || [], publicacoes });
+      }
+
+      case 'validarPublicacao': {
+        if (!can('adicionar_publicacoes')) {
+          return Response.json({ error: 'Sem permissão para criar publicação.' }, { status: 403 });
+        }
+        const tipo = String(data.tipo || '');
+        const prazoId = String(data.procedimento_prazo_id || '');
+        if (!id || !TIPOS_DE_PUBLICACAO.includes(tipo) || (tipo === TIPO_PRORROGACAO) !== Boolean(prazoId)) {
+          return Response.json({ error: 'Informe um procedimento e um ato válidos.' }, { status: 400 });
+        }
+
+        const procedimento = await Procedimentos.get(id);
+        if (!procedimento || procedimento.sigiloso || !procedimento.numero_portaria) {
+          return Response.json({ error: 'Procedimento indisponível para publicação no RP.' }, { status: 409 });
+        }
+        if (tipo === TIPO_DESIGNACAO && (procedimento.tipo_procedimento !== 'PAD' || !procedimento.encarregado_id
+          || procedimento.encarregado_id !== data.militar_id)) {
+          return Response.json({ error: 'Selecione o encarregado que consta na ficha do PAD.' }, { status: 400 });
+        }
+        if (prazoId) {
+          const prazo = await Prazos.get(prazoId);
+          if (!prazo || prazo.procedimento_id !== id || prazo.tipo !== 'Prorrogação') {
+            return Response.json({ error: 'A prorrogação selecionada não pertence ao procedimento.' }, { status: 400 });
+          }
+        }
+        const registros = await Publicacoes.filter({
+          procedimento_id: id,
+          tipo,
+          ...(prazoId ? { procedimento_prazo_id: prazoId } : {}),
+        }, undefined, 1, 0);
+        if (registros.length) {
+          return Response.json({ error: 'Já existe uma publicação vinculada para este ato.' }, { status: 409 });
+        }
+        return Response.json({ ok: true });
       }
 
       case 'criar': {

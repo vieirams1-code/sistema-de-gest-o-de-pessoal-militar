@@ -17,6 +17,8 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 import NotaColetivaForm from '@/components/rp/coletiva/NotaColetivaForm';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
 import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
+import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO, tipoRPDeProcedimento, montarTextoProcedimento, montarTextoDesignacaoProvisoria } from '@/components/procedimentos/procedimentoPublicacao';
+import { obterProcedimentoEscopado } from '@/services/procedimentosEscopadoClient';
 import FormField from '@/components/militar/FormField';
 import {
   getTiposRPFiltrados,
@@ -196,6 +198,10 @@ export default function CadastrarRegistroRP() {
   const queryClient = useQueryClient();
   const registroId = searchParams.get('id');
   const isEditing = !!registroId;
+  const procedimentoId = !isEditing ? searchParams.get('procedimento_id') : null;
+  const procedimentoPrazoId = !isEditing ? searchParams.get('procedimento_prazo_id') : null;
+  const tipoProcedimentoRP = procedimentoId ? searchParams.get('tipo') : null;
+  const destinoRetorno = procedimentoId ? '/Procedimentos' : createPageUrl('RP');
 
   const {
     canAccessModule,
@@ -317,6 +323,43 @@ export default function CadastrarRegistroRP() {
     effectiveEmail: resolvedAccessContext?.effectiveEmail || user?.email || 'self',
   }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, user?.email]);
   const canRunScopedQueries = Boolean(isAccessResolved && hasAccess && canAcessarFormulario);
+
+  const origemProcedimento = useQuery({
+    queryKey: ['procedimento-administrativo', procedimentoId, escopoQueryKey],
+    queryFn: () => obterProcedimentoEscopado(procedimentoId),
+    enabled: Boolean(canRunScopedQueries && procedimentoId),
+  });
+  const procedimentoOrigem = origemProcedimento.data?.procedimento;
+  const prazoOrigem = origemProcedimento.data?.prazos.find(
+    (prazo) => prazo.id === procedimentoPrazoId && prazo.tipo === 'Prorrogação',
+  );
+  const origemValida = Boolean(
+    procedimentoOrigem?.numero_portaria && !procedimentoOrigem.sigiloso && tipoRPDeProcedimento(tipoProcedimentoRP)
+    && (tipoProcedimentoRP !== TIPOS_RP_PROCEDIMENTO.prorrogacao || prazoOrigem)
+    && (tipoProcedimentoRP !== TIPOS_RP_PROCEDIMENTO.designacao
+      || (procedimentoOrigem.tipo_procedimento === 'PAD' && procedimentoOrigem.encarregado_id)),
+  );
+
+  useEffect(() => {
+    if (!origemValida) return;
+    const investigado = origemProcedimento.data.envolvidos.filter((pessoa) => pessoa.papel === 'Investigado');
+    const pessoa = tipoProcedimentoRP === TIPOS_RP_PROCEDIMENTO.solucao && investigado.length === 1
+      ? investigado[0]
+      : {
+        militar_id: procedimentoOrigem.encarregado_id,
+        nome: procedimentoOrigem.encarregado_nome,
+        posto: procedimentoOrigem.encarregado_posto,
+        matricula: procedimentoOrigem.encarregado_matricula,
+      };
+    if (!pessoa.militar_id) return;
+    setFormData((prev) => prev.militar_id ? prev : {
+      ...prev,
+      militar_id: pessoa.militar_id,
+      militar_nome: pessoa.nome,
+      militar_posto: pessoa.posto,
+      militar_matricula: pessoa.matricula,
+    });
+  }, [origemValida, origemProcedimento.data, procedimentoOrigem, tipoProcedimentoRP]);
 
   // Fetch existing record when editing
   const {
@@ -540,11 +583,13 @@ export default function CadastrarRegistroRP() {
     });
     if (isEditing) return tiposBase;
     return tiposBase.filter((tipo) => {
+      if (procedimentoId) return tipo.value === tipoProcedimentoRP && canAdicionarPublicacoes;
+      if (tipoRPDeProcedimento(tipo.value)) return false;
       if (tipo?.value === 'Apostila') return canApostilarPublicacao;
       if (tipo?.value === 'Tornar sem Efeito') return canTornarSemEfeitoPublicacao;
       return canAdicionarPublicacoes;
     });
-  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao, canAdicionarPublicacoes, canApostilarPublicacao, canTornarSemEfeitoPublicacao]);
+  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao, canAdicionarPublicacoes, canApostilarPublicacao, canTornarSemEfeitoPublicacao, procedimentoId, tipoProcedimentoRP]);
 
   const tiposFiltradosBusca = useMemo(() => {
     return tiposFiltrados.filter(t => matchesTipoRPSearch(t, tipoSearch));
@@ -653,7 +698,8 @@ export default function CadastrarRegistroRP() {
     return getConflitoTemplatePorTipo(tipoTemplateSelecionado, templatesAtivos);
   }, [formData.tipo_registro, tipoTemplateSelecionado, templatesAtivos]);
 
-  const hasTemplateConflict = conflitoTemplateSelecionado.temConflito;
+  const usaTextoProcedimento = tipoRPDeProcedimento(formData.tipo_registro) || formData.tipo_registro === DESIGNACAO_PROVISORIA;
+  const hasTemplateConflict = !usaTextoProcedimento && conflitoTemplateSelecionado.temConflito;
   const statusCalculadoFormulario = useMemo(
     () => calcularStatusPublicacaoRegistro(formData),
     [formData.nota_para_bg, formData.numero_bg, formData.data_bg, formData.tipo_registro]
@@ -758,10 +804,21 @@ export default function CadastrarRegistroRP() {
   ]);
 
   useEffect(() => {
+    if (textoEditadoManualmente && formData.texto_publicacao) return;
+
+    if (tipoRPDeProcedimento(formData.tipo_registro) || formData.tipo_registro === DESIGNACAO_PROVISORIA) {
+      if (isEditing) return;
+      const textoGerado = formData.tipo_registro === DESIGNACAO_PROVISORIA
+        ? montarTextoDesignacaoProvisoria(formData, formData.autoridade_designacao)
+        : origemValida
+          ? montarTextoProcedimento(procedimentoOrigem, formData.tipo_registro, prazoOrigem, Boolean(formData.doems_arquivo))
+          : '';
+      setFormData((prev) => prev.texto_publicacao === textoGerado ? prev : { ...prev, texto_publicacao: textoGerado });
+      return;
+    }
+
     if (!templateAtivoSelecionado?.template) return;
     if (!formData.tipo_registro || !moduloAtual) return;
-
-    if (textoEditadoManualmente && formData.texto_publicacao) return;
 
     // Se for DOEMS, não aplicar template (o texto é manual ou colado)
     if (isRegistroPublicacaoDOEMS) return;
@@ -806,6 +863,10 @@ export default function CadastrarRegistroRP() {
     medicoAtestadoSelecionado,
     atestadosMilitar,
     medicosDisponiveisRP,
+    isEditing,
+    origemValida,
+    procedimentoOrigem,
+    prazoOrigem,
   ]);
 
   const handleChange = (name, value) => {
@@ -890,6 +951,10 @@ export default function CadastrarRegistroRP() {
       const payloadExOfficio = {
         ...exOfficioBase,
         tipo: tipo_registro || data.tipo || '',
+        ...(procedimentoId ? {
+          procedimento_id: procedimentoId,
+          ...(procedimentoPrazoId ? { procedimento_prazo_id: procedimentoPrazoId } : {}),
+        } : {}),
         data_publicacao: exOfficioBase.data_publicacao || data.data_registro || '',
         status: exOfficioBase.status || 'Aguardando Nota',
       };
@@ -899,7 +964,7 @@ export default function CadastrarRegistroRP() {
         user,
         sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
       });
-      if (metadataRender) {
+      if (metadataRender && !tipoRPDeProcedimento(data.tipo_registro) && data.tipo_registro !== DESIGNACAO_PROVISORIA) {
         payloadLivro.render_metadata = metadataRender;
         payloadExOfficio.render_metadata = metadataRender;
       }
@@ -1017,6 +1082,7 @@ export default function CadastrarRegistroRP() {
         queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
         queryClient.invalidateQueries({ queryKey: ['publicacoes-lista'] }),
         queryClient.invalidateQueries({ queryKey: ['registros-militar-registros'] }),
+        queryClient.invalidateQueries({ queryKey: ['procedimento-administrativo'] }),
         queryClient.invalidateQueries({ queryKey: ['militares'] }),
         queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] }),
         ...(refIdApostila ? [queryClient.invalidateQueries({ queryKey: ['publicacao', refIdApostila] })] : []),
@@ -1025,7 +1091,7 @@ export default function CadastrarRegistroRP() {
         title: 'Registro salvo com sucesso',
         description: isEditing ? 'As alterações foram persistidas.' : 'Novo registro de publicação criado.',
       });
-      navigate(createPageUrl('RP'));
+      navigate(destinoRetorno);
     },
     onError: (error) => {
       toast({
@@ -1042,6 +1108,12 @@ export default function CadastrarRegistroRP() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (step !== 4) return;
+    if (procedimentoId && (!origemValida || formData.tipo_registro !== tipoProcedimentoRP)) return;
+    if ((tipoRPDeProcedimento(formData.tipo_registro) || formData.tipo_registro === DESIGNACAO_PROVISORIA)
+      && !formData.texto_publicacao?.trim()) {
+      toast({ title: 'Informe o texto da publicação.', variant: 'destructive' });
+      return;
+    }
     if (isSubmittingRef.current || saveMutation.isPending) return;
 
     const moduloValidacao = getModuloByTipo(formData.tipo_registro, tiposCustom);
@@ -1060,7 +1132,7 @@ export default function CadastrarRegistroRP() {
     );
 
     if (templateObrigatorioAusenteNoSubmit) return;
-    if (conflitoTemplateNoSubmit.temConflito) return;
+    if (!usaTextoProcedimento && conflitoTemplateNoSubmit.temConflito) return;
     const acaoObrigatoria = isEditing
       ? 'editar_publicacoes'
       : formData.tipo_registro === 'Apostila'
@@ -1164,7 +1236,9 @@ export default function CadastrarRegistroRP() {
 
   const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !hasTemplateConflict;
   const canAdvanceFromStep2 = !!formData.militar_id;
-  const canAdvanceFromStep3 = !!formData.data_registro;
+  const canAdvanceFromStep3 = !!formData.data_registro && (
+    formData.tipo_registro !== DESIGNACAO_PROVISORIA || Boolean(formData.funcao?.trim() && formData.data_designacao)
+  );
   const estadosCarregamentoRP = [
     fetchingRegistro ? 'Atualizando registro em edição' : null,
     (fetchingTiposCustom || fetchingTemplatesAtivos) ? 'Atualizando catálogo de tipos/templates' : null,
@@ -1196,7 +1270,19 @@ export default function CadastrarRegistroRP() {
     );
   }
 
-  if ((!isEditing && searchParams.get('coletiva') === '1') || registroEdicao?.coletiva === true) {
+  if (procedimentoId && origemProcedimento.isPending) {
+    return <p className="p-8 text-center" role="status">Carregando procedimento...</p>;
+  }
+  if (procedimentoId && !origemValida) {
+    return (
+      <div className="space-y-3 p-8 text-center" role="alert">
+        <p>Não foi possível abrir este ato. Confira a portaria, a prorrogação e as permissões do procedimento.</p>
+        <Button onClick={() => navigate(destinoRetorno)}>Voltar a Procedimentos</Button>
+      </div>
+    );
+  }
+
+  if ((!isEditing && searchParams.get('coletiva') === '1' && !procedimentoId) || registroEdicao?.coletiva === true) {
     const tiposColetivos = [...new Map([...RP_TIPOS_BASE, ...getTiposRPFiltrados({ tiposCustom, templatesAtivos, tipoAtualEdicao: registroEdicao?.tipo }), { value: 'Elogio Coletivo', label: 'Elogio Coletivo' }].map(t => [t.value, t])).values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
     return <NotaColetivaForm key={registroEdicao?.id || 'nova-coletiva'} registro={registroEdicao} canAccessAction={canAccessAction} tipos={tiposColetivos} />;
   }
@@ -1290,7 +1376,7 @@ export default function CadastrarRegistroRP() {
                       <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
                       <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Publicação'}</p>
                     </div>
-                    {(!isEditing || permitirAjusteTipoLegadoPublicado) && (
+                    {((!isEditing && !procedimentoId) || permitirAjusteTipoLegadoPublicado) && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -1615,7 +1701,7 @@ export default function CadastrarRegistroRP() {
                     {moduloAtual === MODULO_EX_OFFICIO && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-slate-700">
-                          Anexo da publicação externa (opcional)
+                          {tipoRPDeProcedimento(formData.tipo_registro) ? 'Anexo do ato (opcional)' : 'Anexo da publicação externa (opcional)'}
                         </Label>
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
@@ -1672,7 +1758,7 @@ export default function CadastrarRegistroRP() {
                       </div>
                     )}
 
-                    {moduloAtual === MODULO_EX_OFFICIO && (
+                    {moduloAtual === MODULO_EX_OFFICIO && !tipoRPDeProcedimento(formData.tipo_registro) && (
                       <p className="mt-2 text-xs text-slate-500">
                         Use este campo quando a publicação for uma Publicação Externa no DOEMS. Link e anexo permanecem opcionais.
                       </p>
@@ -1688,7 +1774,7 @@ export default function CadastrarRegistroRP() {
                         )}
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
+                        {usaTextoProcedimento ? 'Revise a redação, a fundamentação e os encaminhamentos antes de salvar.' : TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
                           ? 'Texto derivado do template com sobrescrita manual.'
                           : 'Texto derivado do template.'}
                       </p>
