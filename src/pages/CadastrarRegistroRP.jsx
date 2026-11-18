@@ -1015,6 +1015,22 @@ export default function CadastrarRegistroRP() {
         return criado;
       }
 
+      if (procedimentoId && aceitaPublicacaoSemMilitar(data.tipo_registro)) {
+        const evento = criarEventoAuditoriaPublicacao({
+          registro: { ...payloadExOfficio, origem_tipo: 'ex-officio' },
+          evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
+          usuario: user,
+          resumo: 'Criação de publicação vinculada ao procedimento.',
+          estadoNovo: calcularStatusPublicacaoRegistro(payloadExOfficio),
+          depois: extrairSnapshotPublicacao(payloadExOfficio),
+          metadata: { procedimento_id: procedimentoId },
+        });
+        return criarEscopado('PublicacaoExOfficio', {
+          ...payloadExOfficio,
+          historico_publicacao: [evento],
+        });
+      }
+
       const criado = await criarEscopado('PublicacaoExOfficio', payloadExOfficio);
       const eventoCriacao = criarEventoAuditoriaPublicacao({
         registro: { ...criado, origem_tipo: 'ex-officio' },
@@ -1204,6 +1220,10 @@ export default function CadastrarRegistroRP() {
       status: statusCalculadoFormulario,
       ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
     };
+    if (militarOpcional) {
+      delete payload.militares_ids;
+      delete payload.militares_vinculados;
+    }
     if (PLACEHOLDER_RESIDUAL_REGEX.test(String(payload.texto_publicacao || ''))) {
       alert(PLACEHOLDER_RESIDUAL_MENSAGEM);
       return;

@@ -1325,6 +1325,9 @@ export default async function(req) {
     }
 
     if (entityName === 'PublicacaoExOfficio' && (registroExistente?.coletiva === true || data.coletiva === true || Object.hasOwn(data, 'militares_ids') || Object.hasOwn(data, 'militares_vinculados'))) {
+      if (registroExistente?.procedimento_id || data.procedimento_id || TIPOS_RP_PROCEDIMENTO.includes(data.tipo)) {
+        return Response.json({ error: 'Atos de procedimento são registrados na própria ficha.' }, { status: 409 });
+      }
       const permissaoColetiva = await base44.functions.invoke('getUserPermissions', isImpersonating ? { effectiveEmail: targetEmail } : {});
       const authzColetiva = permissaoColetiva?.data ?? permissaoColetiva;
       if (authzColetiva?.error) return Response.json({ error: authzColetiva.error }, { status: 403 });
