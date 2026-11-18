@@ -42,6 +42,11 @@ export const PAGE_ACCESS_POLICY = {
     actionKey: 'visualizar_sargenteacao',
     moduleName: 'Sargenteação',
   },
+  Procedimentos: {
+    moduleKey: 'controle_processos',
+    actionKey: 'visualizar_controle_processos',
+    moduleName: 'Controle de Processos e Procedimentos',
+  },
 };
 
 const NORMALIZED = Object.fromEntries(

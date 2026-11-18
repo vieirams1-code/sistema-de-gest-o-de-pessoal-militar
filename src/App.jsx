@@ -13,6 +13,7 @@ import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
+import Procedimentos from '@/pages/Procedimentos';
 import DescontosFerias from '@/pages/DescontosFerias';
 import InativacaoPeriodoLote from '@/pages/InativacaoPeriodoLote';
 import SaneamentoCadastral from '@/pages/SaneamentoCadastral';
@@ -358,6 +359,21 @@ function App() {
                   <RequireAdmin>
                     <DiagnosticoAcesso />
                   </RequireAdmin>
+                </AuthenticatedAppWrapper>
+              }
+            />
+            {/* Procedimentos Administrativos (PAD, Inquérito Técnico, Sindicância, IPM) */}
+            <Route
+              path="/Procedimentos"
+              element={
+                <AuthenticatedAppWrapper currentPageName="Procedimentos">
+                  <RequireAction
+                    moduleKey="controle_processos"
+                    actionKey="visualizar_controle_processos"
+                    moduleName="Controle de Processos e Procedimentos"
+                  >
+                    <Procedimentos />
+                  </RequireAction>
                 </AuthenticatedAppWrapper>
               }
             />

@@ -2,29 +2,53 @@
   "name": "ProcedimentoPrazoHistorico",
   "type": "object",
   "title": "Hist\u00f3rico de Prazos do Procedimento",
+  "description": "Trilha dos prazos do procedimento (instaura\u00e7\u00e3o e prorroga\u00e7\u00f5es), base para as publica\u00e7\u00f5es de prazo.",
   "properties": {
     "procedimento_id": {
       "type": "string",
       "default": ""
     },
-    "tipo_prazo": {
+    "tipo": {
       "type": "string",
-      "default": "inicial"
+      "enum": [
+        "Instaura\u00e7\u00e3o",
+        "Prorroga\u00e7\u00e3o",
+        "Solu\u00e7\u00e3o"
+      ],
+      "enumColors": [
+        "blue",
+        "yellow",
+        "green"
+      ],
+      "default": "Prorroga\u00e7\u00e3o"
     },
-    "data_prazo": {
-      "type": "date",
+    "dias": {
+      "type": "number",
+      "default": 0
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
       "default": ""
     },
-    "motivo_prorrogacao": {
+    "data_fim": {
+      "type": "string",
+      "format": "date",
+      "default": ""
+    },
+    "motivo": {
       "type": "string",
       "default": ""
     },
-    "nova_data_final": {
-      "type": "date",
+    "criado_por_email": {
+      "type": "string",
       "default": ""
     }
   },
-  "required": [],
+  "required": [
+    "procedimento_id",
+    "tipo"
+  ],
   "rls": {
     "create": false,
     "read": false,

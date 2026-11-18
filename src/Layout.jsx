@@ -39,6 +39,7 @@ import {
   GraduationCap,
   SlidersHorizontal,
   Megaphone,
+  Gavel,
   MinusCircle,
   CalendarX,
 } from 'lucide-react';
@@ -127,6 +128,7 @@ const menuGroups = [
             actionKey: 'visualizar_acervo_historico',
           },
           { name: 'Controle de Processos', page: 'ControleProcessos', icon: FolderKanban, moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos' },
+          { name: 'Procedimentos', page: 'Procedimentos', icon: Gavel, moduleKey: 'acesso_controle_processos', actionKey: 'perm_visualizar_controle_processos' },
         ],
       },
       {

@@ -2,12 +2,13 @@
   "name": "ProcedimentoEnvolvido",
   "type": "object",
   "title": "Envolvido do Procedimento",
+  "description": "Militares vinculados a um procedimento administrativo, com o papel exercido (investigado, testemunha, etc.).",
   "properties": {
     "procedimento_id": {
       "type": "string",
       "default": ""
     },
-    "tipo_envolvido": {
+    "militar_id": {
       "type": "string",
       "default": ""
     },
@@ -15,16 +16,45 @@
       "type": "string",
       "default": ""
     },
-    "responsavel": {
+    "posto": {
       "type": "string",
       "default": ""
+    },
+    "quadro": {
+      "type": "string",
+      "default": ""
+    },
+    "matricula": {
+      "type": "string",
+      "default": ""
+    },
+    "papel": {
+      "type": "string",
+      "enum": [
+        "Investigado",
+        "Testemunha",
+        "Encarregado",
+        "Autoridade",
+        "Outro"
+      ],
+      "enumColors": [
+        "red",
+        "blue",
+        "purple",
+        "yellow",
+        "gray"
+      ],
+      "default": "Investigado"
     },
     "observacao": {
       "type": "string",
       "default": ""
     }
   },
-  "required": [],
+  "required": [
+    "procedimento_id",
+    "papel"
+  ],
   "rls": {
     "create": false,
     "read": false,

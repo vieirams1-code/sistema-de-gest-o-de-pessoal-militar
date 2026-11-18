@@ -1,12 +1,28 @@
 {
   "name": "ProcedimentoProcesso",
   "type": "object",
-  "title": "Procedimento e Processo",
-  "description": "Controle externo de procedimentos administrativos/militares.",
+  "title": "Procedimento Administrativo",
+  "description": "Cadastro central dos procedimentos administrativos (PAD, Inqu\u00e9rito T\u00e9cnico, Sindic\u00e2ncia, IPM) que originam publica\u00e7\u00f5es no RP.",
   "properties": {
     "tipo_procedimento": {
       "type": "string",
-      "default": ""
+      "enum": [
+        "PAD",
+        "Inqu\u00e9rito T\u00e9cnico",
+        "Sindic\u00e2ncia",
+        "IPM",
+        "Processo Administrativo",
+        "Outro"
+      ],
+      "enumColors": [
+        "red",
+        "blue",
+        "yellow",
+        "purple",
+        "gray",
+        "gray"
+      ],
+      "default": "PAD"
     },
     "numero_procedimento": {
       "type": "string",
@@ -17,26 +33,45 @@
       "default": ""
     },
     "data_portaria": {
-      "type": "date",
+      "type": "string",
+      "format": "date",
       "default": ""
     },
     "data_instauracao": {
-      "type": "date",
+      "type": "string",
+      "format": "date",
       "default": ""
     },
+    "prazo_inicial_dias": {
+      "type": "number",
+      "default": 60
+    },
     "prazo_final": {
-      "type": "date",
+      "type": "string",
+      "format": "date",
       "default": ""
     },
     "autoridade_instauradora": {
       "type": "string",
       "default": ""
     },
-    "responsavel_id": {
+    "encarregado_id": {
       "type": "string",
       "default": ""
     },
-    "responsavel_nome": {
+    "encarregado_nome": {
+      "type": "string",
+      "default": ""
+    },
+    "encarregado_posto": {
+      "type": "string",
+      "default": ""
+    },
+    "encarregado_quadro": {
+      "type": "string",
+      "default": ""
+    },
+    "encarregado_matricula": {
       "type": "string",
       "default": ""
     },
@@ -52,24 +87,63 @@
       "type": "boolean",
       "default": false
     },
-    "observacoes": {
+    "prioridade_risco": {
       "type": "string",
-      "default": ""
+      "enum": [
+        "Baixa",
+        "M\u00e9dia",
+        "Alta"
+      ],
+      "enumColors": [
+        "green",
+        "yellow",
+        "red"
+      ],
+      "default": "M\u00e9dia"
     },
     "status": {
       "type": "string",
-      "default": "Em andamento"
-    },
-    "prioridade_risco": {
-      "type": "string",
-      "default": "M\u00e9dia"
+      "enum": [
+        "Instaurado",
+        "Em andamento",
+        "Prorrogado",
+        "Aguardando solu\u00e7\u00e3o",
+        "Solucionado",
+        "Arquivado",
+        "Cancelado"
+      ],
+      "enumColors": [
+        "blue",
+        "blue",
+        "yellow",
+        "yellow",
+        "green",
+        "gray",
+        "red"
+      ],
+      "default": "Instaurado"
     },
     "prorrogacoes_count": {
-      "type": "integer",
+      "type": "number",
       "default": 0
+    },
+    "data_solucao": {
+      "type": "string",
+      "format": "date",
+      "default": ""
+    },
+    "resultado_solucao": {
+      "type": "string",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
     }
   },
-  "required": [],
+  "required": [
+    "tipo_procedimento"
+  ],
   "rls": {
     "create": false,
     "read": false,
