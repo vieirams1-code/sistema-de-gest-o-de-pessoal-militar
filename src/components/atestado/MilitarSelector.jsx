@@ -51,7 +51,7 @@ function MilitarResumo({ militar, matricula }) {
   );
 }
 
-export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
+export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false, opcional = false }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -226,7 +226,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-slate-700">
-        Militar <span className="text-red-500">*</span>
+        {opcional ? 'Militar a mencionar (opcional)' : <>Militar <span className="text-red-500">*</span></>}
       </label>
       
       {selectedMilitar ? (

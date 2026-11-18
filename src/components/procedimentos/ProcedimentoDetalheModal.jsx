@@ -1,6 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { ROTULOS_PUBLICACAO_PROCEDIMENTO, TIPOS_RP_PROCEDIMENTO, urlPublicacaoProcedimento } from './procedimentoPublicacao';
+import { ROTULOS_PUBLICACAO_PROCEDIMENTO, TIPOS_RP_PROCEDIMENTO } from './procedimentoPublicacao';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, FileText, Lock, Pencil, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -21,7 +20,7 @@ function Campo({ label, valor }) {
   );
 }
 
-export default function ProcedimentoDetalheModal({ open, onOpenChange, procedimentoId, onEdit, onProrrogar, onChanged }) {
+export default function ProcedimentoDetalheModal({ open, onOpenChange, procedimentoId, onEdit, onProrrogar, onPublicar, onChanged }) {
   const { toast } = useToast();
   const { canAccessAction } = useCurrentUser();
   const podeExcluir = canAccessAction('perm_excluir_processo_controle');
@@ -39,7 +38,6 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
   const prazos = [...(data?.prazos || [])].sort((a, b) => String(b.data_fim || '').localeCompare(String(a.data_fim || '')));
   const prazo = classificarPrazo(procedimento);
   const publicacoes = data?.publicacoes || [];
-  const publicacaoUrl = (tipo, prazoId) => urlPublicacaoProcedimento(procedimentoId, tipo, prazoId);
   const temPublicacao = (tipo, prazoId) =>
     publicacoes.some((pub) => pub.tipo === tipo && (!prazoId || pub.procedimento_prazo_id === prazoId));
   const prorrogacaoPendente = prazos.find((item) =>
@@ -116,13 +114,13 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {!temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && (
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.instauracao)}>Gerar publicação da portaria</Link>
+                      <Button type="button" variant="outline" size="sm" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.instauracao)}>
+                        Gerar publicação da portaria
                       </Button>
                     )}
                     {prorrogacaoPendente ? (
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.prorrogacao, prorrogacaoPendente.id)}>Gerar publicação de prorrogação</Link>
+                      <Button type="button" variant="outline" size="sm" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.prorrogacao, prorrogacaoPendente)}>
+                        Gerar publicação de prorrogação
                       </Button>
                     ) : podeRegistrarPrazo && (
                       <Button variant="outline" size="sm" onClick={() => onProrrogar(procedimento, true)}>
@@ -130,8 +128,8 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                       </Button>
                     )}
                     {!temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao) && (
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.solucao)}>Gerar publicação de solução</Link>
+                      <Button type="button" variant="outline" size="sm" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.solucao)}>
+                        Gerar publicação de solução
                       </Button>
                     )}
                     {temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao)
@@ -184,9 +182,9 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                         </p>
                         {p.motivo && <p className="text-xs text-slate-500">{p.motivo}</p>}
                         {podePublicarProcedimento && p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
-                          <Link className="mt-1 inline-block text-sm font-medium text-blue-700 hover:underline" to={publicacaoUrl(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id)}>
+                          <button type="button" className="mt-1 text-sm font-medium text-blue-700 hover:underline" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.prorrogacao, p)}>
                             Gerar publicação da prorrogação
-                          </Link>
+                          </button>
                         )}
                       </div>
                     </li>

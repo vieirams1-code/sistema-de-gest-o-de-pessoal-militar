@@ -19,6 +19,7 @@ import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
 import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
 import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO, tipoRPDeProcedimento, aceitaPublicacaoSemMilitar, montarTextoProcedimento, montarTextoDesignacaoProvisoria } from '@/components/procedimentos/procedimentoPublicacao';
 import { obterProcedimentoEscopado } from '@/services/procedimentosEscopadoClient';
+import { criarPublicacaoProcedimento, enviarAnexoPublicacao } from '@/services/publicacaoProcedimentoService';
 import FormField from '@/components/militar/FormField';
 import {
   getTiposRPFiltrados,
@@ -892,21 +893,8 @@ export default function CadastrarRegistroRP() {
 
     setUploadingDoems(true);
     try {
-      const uploadResponse = await base44.integrations.Core.UploadFile({ file });
-      const payload = uploadResponse && typeof uploadResponse === 'object' ? uploadResponse : {};
-      const fileUrl = String(payload.file_url || payload.url || payload.signedUrl || '').trim();
-
-      const bucket = String(payload.storage_bucket || payload.bucket || payload.bucket_name || '').trim();
-      const objectPath = String(payload.storage_object_path || payload.object_path || payload.path || '').trim();
-
-      setFormData(prev => ({
-        ...prev,
-        doems_arquivo: fileUrl,
-        doems_arquivo_bucket: bucket,
-        doems_arquivo_path: objectPath,
-        doems_arquivo_nome: file.name,
-        doems_arquivo_mime: file.type,
-      }));
+      const anexo = await enviarAnexoPublicacao(file);
+      setFormData(prev => ({ ...prev, ...anexo }));
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       toast({
@@ -1016,19 +1004,7 @@ export default function CadastrarRegistroRP() {
       }
 
       if (procedimentoId && aceitaPublicacaoSemMilitar(data.tipo_registro)) {
-        const evento = criarEventoAuditoriaPublicacao({
-          registro: { ...payloadExOfficio, origem_tipo: 'ex-officio' },
-          evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
-          usuario: user,
-          resumo: 'Criação de publicação vinculada ao procedimento.',
-          estadoNovo: calcularStatusPublicacaoRegistro(payloadExOfficio),
-          depois: extrairSnapshotPublicacao(payloadExOfficio),
-          metadata: { procedimento_id: procedimentoId },
-        });
-        return criarEscopado('PublicacaoExOfficio', {
-          ...payloadExOfficio,
-          historico_publicacao: [evento],
-        });
+        return criarPublicacaoProcedimento(payloadExOfficio, user);
       }
 
       const criado = await criarEscopado('PublicacaoExOfficio', payloadExOfficio);
@@ -1512,6 +1488,7 @@ export default function CadastrarRegistroRP() {
                   value={formData.militar_id}
                   onChange={handleChange}
                   onMilitarSelect={handleMilitarSelect}
+                  opcional={militarOpcional}
                 />
                 {tipoProcedimentoRP === TIPOS_RP_PROCEDIMENTO.designacao && !canAdvanceFromStep2 && (
                   <p className="mt-2 text-sm text-slate-600">Selecione o encarregado cadastrado no PAD.</p>

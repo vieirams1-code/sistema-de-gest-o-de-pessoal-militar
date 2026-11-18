@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Gavel, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { listarProcedimentosEscopado } from '@/services/procedimentosEscopadoCli
 import ProcedimentoResumoCards from '@/components/procedimentos/ProcedimentoResumoCards';
 import ProcedimentoFiltros from '@/components/procedimentos/ProcedimentoFiltros';
 import ProcedimentoLinha from '@/components/procedimentos/ProcedimentoLinha';
-import { TIPOS_RP_PROCEDIMENTO, urlPublicacaoProcedimento } from '@/components/procedimentos/procedimentoPublicacao';
+import { TIPOS_RP_PROCEDIMENTO } from '@/components/procedimentos/procedimentoPublicacao';
+import ProcedimentoPublicacaoModal from '@/components/procedimentos/ProcedimentoPublicacaoModal';
 import ProcedimentoFormModal from '@/components/procedimentos/ProcedimentoFormModal';
 import ProcedimentoDetalheModal from '@/components/procedimentos/ProcedimentoDetalheModal';
 import ProrrogarPrazoModal from '@/components/procedimentos/ProrrogarPrazoModal';
@@ -20,7 +21,6 @@ const FILTROS_INICIAIS = {
 
 export default function Procedimentos() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { canAccessAction } = useCurrentUser();
   const podeCriar = canAccessAction('perm_criar_processo_controle');
 
@@ -30,6 +30,8 @@ export default function Procedimentos() {
   const detalheId = searchParams.get('procedimento_id');
   const abrirDetalhe = (id) => setSearchParams(id ? { procedimento_id: id } : {}, { replace: true });
   const [prorrogar, setProrrogar] = useState({ open: false, procedimento: null, gerarPublicacao: false });
+  const [publicacao, setPublicacao] = useState(null);
+  const abrirPublicacao = (procedimento, tipo, prazo) => setPublicacao({ procedimento, tipo, prazo });
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['procedimentos-administrativos'],
@@ -189,6 +191,7 @@ export default function Procedimentos() {
           abrirDetalhe(null);
           setFormModal({ open: true, procedimento, envolvidos: listaEnvolvidos || [] });
         }}
+        onPublicar={abrirPublicacao}
         onProrrogar={(procedimento, gerarPublicacao = false) => setProrrogar({ open: true, procedimento, gerarPublicacao })}
         onChanged={invalidar}
       />
@@ -201,10 +204,27 @@ export default function Procedimentos() {
         onSaved={(prazo) => {
           invalidar();
           if (prorrogar.gerarPublicacao && prazo?.id) {
-            navigate(urlPublicacaoProcedimento(prorrogar.procedimento.id, TIPOS_RP_PROCEDIMENTO.prorrogacao, prazo.id));
+            abrirPublicacao(prorrogar.procedimento, TIPOS_RP_PROCEDIMENTO.prorrogacao, prazo);
           }
         }}
       />
+
+      {publicacao && (
+        <ProcedimentoPublicacaoModal
+          {...publicacao}
+          onClose={() => setPublicacao(null)}
+          onSaved={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['procedimento-administrativo', publicacao.procedimento.id] }),
+              queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+              queryClient.invalidateQueries({ queryKey: ['publicacoes-lista'] }),
+              queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] }),
+              queryClient.invalidateQueries({ queryKey: ['registros-militar-registros'] }),
+            ]);
+            setPublicacao(null);
+          }}
+        />
+      )}
       </div>
     </div>
   );

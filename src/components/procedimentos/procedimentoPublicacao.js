@@ -19,12 +19,6 @@ export const ROTULOS_PUBLICACAO_PROCEDIMENTO = {
   [TIPOS_RP_PROCEDIMENTO.solucao]: 'Publicação de solução',
 };
 
-export function urlPublicacaoProcedimento(procedimentoId, tipo, prazoId) {
-  const params = new URLSearchParams({ tipo, procedimento_id: procedimentoId });
-  if (prazoId) params.set('procedimento_prazo_id', prazoId);
-  return `/CadastrarRegistroRP?${params}`;
-}
-
 export function aceitaPublicacaoSemMilitar(tipo) {
   return Object.hasOwn(ROTULOS_PUBLICACAO_PROCEDIMENTO, tipo);
 }
