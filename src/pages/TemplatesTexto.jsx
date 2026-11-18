@@ -1421,6 +1421,11 @@ export default function TemplatesTexto() {
                   className={`font-mono text-sm whitespace-pre-wrap break-words overflow-x-hidden [word-break:break-word] ${variaveisInvalidas.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                   placeholder="Digite o texto do template. Use {{variavel}} para dados dinâmicos."
                 />
+                {templateProcedimento && variaveisInvalidas.length > 0 && (
+                  <p className="mt-2 text-xs text-red-700" role="alert">
+                    Variáveis indisponíveis para este ato: {variaveisInvalidas.join(', ')}.
+                  </p>
+                )}
               </div>
 
               {normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES && (
@@ -1517,7 +1522,7 @@ export default function TemplatesTexto() {
             </Button>
                 <Button
                   onClick={handleSaveTemplate}
-                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError}
+                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError || Boolean(templateProcedimento && variaveisInvalidas.length)}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >
                   {saveMutation.isPending ? (
