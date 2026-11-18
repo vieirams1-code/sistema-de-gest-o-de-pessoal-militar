@@ -26,6 +26,10 @@ import { aplicarTemplate, buildPreviewTemplateVars, extrairVariaveisDoTemplate }
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { TIPO_TEMPLATE_HOMOLOGACAO_ATESTADO_ACOMPANHAMENTO } from '@/components/atestado/atestadoTemplateVars';
 import AccessDenied from '@/components/auth/AccessDenied';
+import {
+  TEMPLATES_PROCEDIMENTOS, listarVariaveisTemplateProcedimento, obterModeloInicialProcedimento,
+  obterVariaveisPreviewProcedimento, renderizarTemplateProcedimento,
+} from '@/components/procedimentos/procedimentoTemplates';
 import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 import {
   ESCOPO_TEMPLATE,
@@ -71,6 +75,7 @@ const MODULO_LABELS = {
 };
 
 const TIPOS_TEMPLATE_ADICIONAIS = [
+  ...TEMPLATES_PROCEDIMENTOS.filter((item) => item.especie).map((item) => ({ ...item, modulo: MODULO_EX_OFFICIO })),
   DOCUMENTOS_MILITARES_TEMPLATE_OPTION,
   {
     value: TIPO_TEMPLATE_NOTIFICACAO_JISO_WA,
@@ -125,6 +130,16 @@ const TIPO_REGISTRO_CATEGORIAS = [
     label: 'Férias',
     tipos: ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias', 'Dispensa com Desconto em Férias'],
   },
+  {
+    key: 'procedimentos',
+    label: 'Procedimentos',
+    tipos: TEMPLATES_PROCEDIMENTOS.filter((item) => !item.especie).map((item) => item.value),
+  },
+  ...['PAD', 'Inquérito Técnico'].map((especie) => ({
+    key: especie,
+    label: `Procedimentos — ${especie}`,
+    tipos: TEMPLATES_PROCEDIMENTOS.filter((item) => item.especie === especie).map((item) => item.value),
+  })),
   {
     key: 'atestados_saude',
     label: 'Atestados / Saúde',
@@ -247,7 +262,7 @@ async function updateTemplate(id, payload) {
 function getTipoDisplay(tipo) {
   const tipoCanonicoFerias = resolverTipoFeriasCanonico(tipo);
   if (tipoCanonicoFerias) return getLabelTipoFerias(tipoCanonicoFerias);
-  return TIPO_LABEL_OVERRIDES[tipo] || tipo;
+  return TEMPLATES_PROCEDIMENTOS.find((item) => item.value === tipo)?.label || TIPO_LABEL_OVERRIDES[tipo] || tipo;
 }
 
 function getTipoSelectLabel(modulo, tipo) {
@@ -976,7 +991,10 @@ export default function TemplatesTexto() {
     );
   }, [estrutura, editingTemplate?.subsetor_id]);
 
-  const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
+  const templateProcedimento = TEMPLATES_PROCEDIMENTOS.find((item) => item.value === editingTemplate?.tipo_registro);
+  const selectedTipoVars = templateProcedimento
+    ? { grupo: 'Dados do procedimento', cor: 'blue', variaveis: listarVariaveisTemplateProcedimento(templateProcedimento.ato) }
+    : VARS_POR_TIPO[editingTemplate?.tipo_registro];
   const isTipoComportamentoCalculado = TIPOS_TEMPLATE_COMPORTAMENTO_CALCULADO.includes(editingTemplate?.tipo_registro);
   const estruturaById = useMemo(
     () => new Map((estrutura || []).map((item) => [item.id, item])),
@@ -1010,9 +1028,10 @@ export default function TemplatesTexto() {
     const genericos = moduloNormalizado === MODULO_DOCUMENTOS_MILITARES ? GRUPOS_DOCUMENTOS_MILITARES : moduloNormalizado === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : moduloNormalizado === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : [];
     genericos.forEach(g => g.variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, ''))));
 
-    if (VARS_POR_TIPO[tipo]) {
-      VARS_POR_TIPO[tipo].variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, '')));
-    }
+    const varsTipo = templateProcedimento && templateProcedimento.value === tipo
+      ? listarVariaveisTemplateProcedimento(templateProcedimento.ato)
+      : VARS_POR_TIPO[tipo]?.variaveis || [];
+    varsTipo.forEach((variavel) => validas.add(variavel.v.slice(2, -2)));
 
     return validas;
   };
@@ -1037,7 +1056,7 @@ export default function TemplatesTexto() {
 
   const handleSaveTemplate = () => {
     if (!editingTemplate) return;
-    if (templateConflictError) return;
+    if (templateConflictError || (templateProcedimento && variaveisInvalidas.length)) return;
     const lint = getSafeLintResult(lintTemplateOnSave({
       modulo: editingTemplate?.modulo || '',
       tipoRegistro: editingTemplate?.tipo_registro || '',
@@ -1238,7 +1257,9 @@ export default function TemplatesTexto() {
                         : buildPreviewTemplateVars();
                       const textoPreviewBruto = normalizeTemplateModulo(editingTemplate.modulo) === MODULO_DOCUMENTOS_MILITARES
                         ? previewTemplateDocumentoMilitar(editingTemplate.template)
-                        : aplicarTemplate(editingTemplate.template, previewVars);
+                        : templateProcedimento
+                          ? renderizarTemplateProcedimento(editingTemplate.template, obterVariaveisPreviewProcedimento(templateProcedimento.ato, templateProcedimento.especie))
+                          : aplicarTemplate(editingTemplate.template, previewVars);
                       const textoPreview = normalizarTextoDocumentoMilitar(textoPreviewBruto);
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
@@ -1383,6 +1404,13 @@ export default function TemplatesTexto() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <Label className="text-sm font-medium text-slate-700">Texto do Template <span className="text-red-500">*</span></Label>
+                  {templateProcedimento && !editingTemplate.template?.trim() && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setEditingTemplate((atual) => ({
+                      ...atual, template: obterModeloInicialProcedimento(templateProcedimento.ato),
+                    }))}>
+                      Usar modelo inicial
+                    </Button>
+                  )}
                 </div>
                 <Textarea
                   ref={textareaRef}

@@ -74,6 +74,7 @@
       "type": "string",
       "description": "Tipo do cat\u00e1logo RP ou personalizado. Na modalidade coletiva, classifica\u00e7\u00e3o exclusivamente documental."
     },
+    "render_metadata": { "type": "object", "additionalProperties": true },
     "procedimento_id": { "type": "string" },
     "procedimento_prazo_id": { "type": "string" },
     "autoridade_designacao": { "type": "string" },

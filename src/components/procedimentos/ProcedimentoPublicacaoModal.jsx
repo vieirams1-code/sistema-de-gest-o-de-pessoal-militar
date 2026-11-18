@@ -1,6 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -15,13 +19,31 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { criarPublicacaoProcedimento, enviarAnexoPublicacao } from '@/services/publicacaoProcedimentoService';
 import { formatarData } from './procedimentoConfig';
 import { ROTULOS_PUBLICACAO_PROCEDIMENTO, montarTextoProcedimento } from './procedimentoPublicacao';
+import {
+  TEMPLATES_PROCEDIMENTOS, montarVariaveisTemplateProcedimento, renderizarTemplateProcedimento, resolverTemplateProcedimento,
+} from './procedimentoTemplates';
 
 export default function ProcedimentoPublicacaoModal({ procedimento, tipo, prazo, onClose, onSaved }) {
-  const { canAccessAction, user } = useCurrentUser();
+  const { canAccessAction, user, acesso, subgrupamentoId, subgrupamentoTipo, resolvedAccessContext } = useCurrentUser();
   const podeSalvar = canAccessAction('adicionar_publicacoes');
   const podeInformarBoletim = canAccessAction('publicar_bg');
   const { validar } = useUsuarioPodeAgirSobreMilitar();
   const { toast } = useToast();
+
+  const tiposTemplate = TEMPLATES_PROCEDIMENTOS.filter((item) =>
+    item.ato === tipo && (!item.especie || item.especie === procedimento.tipo_procedimento),
+  ).map((item) => item.value);
+  const modelos = useQuery({
+    queryKey: ['templates-texto', 'procedimentos', tiposTemplate, resolvedAccessContext?.effectiveEmail],
+    queryFn: () => base44.entities.TemplateTexto.filter({ tipo_registro: { $in: tiposTemplate } }, '-updated_date', 1000),
+    enabled: podeSalvar,
+  });
+  const template = resolverTemplateProcedimento(tipo, procedimento.tipo_procedimento, modelos.data || [], {
+    grupamento_id: acesso?.grupamento_id || user?.grupamento_id,
+    subgrupamento_id: subgrupamentoId || acesso?.subgrupamento_id || user?.subgrupamento_id,
+    subgrupamento_tipo: subgrupamentoTipo || acesso?.subgrupamento_tipo || user?.subgrupamento_tipo,
+    unidade_id: acesso?.unidade_id || user?.unidade_id,
+  });
 
   const [form, setForm] = useState(() => ({
     data_publicacao: format(new Date(), 'yyyy-MM-dd'),
@@ -39,13 +61,19 @@ export default function ProcedimentoPublicacaoModal({ procedimento, tipo, prazo,
   const [salvando, setSalvando] = useState(false);
   const bloqueioEnvio = useRef(false);
   const [erro, setErro] = useState('');
-  const texto = textoEditado ?? montarTextoProcedimento(procedimento, tipo, prazo, Boolean(arquivo), form);
+  const textoSugerido = template
+    ? renderizarTemplateProcedimento(template.template, montarVariaveisTemplateProcedimento({
+      procedimento, ato: tipo, prazo, anexo: Boolean(arquivo), form,
+    }))
+    : montarTextoProcedimento(procedimento, tipo, prazo, Boolean(arquivo), form);
+  const texto = textoEditado ?? textoSugerido;
+  const buscandoTemplate = podeSalvar && modelos.isPending;
 
   const alterar = (campo, valor) => setForm((anterior) => ({ ...anterior, [campo]: valor }));
 
   async function salvar(evento) {
     evento.preventDefault();
-    if (bloqueioEnvio.current || !podeSalvar) return;
+    if (bloqueioEnvio.current || !podeSalvar || buscandoTemplate) return;
 
     setErro('');
     if (form.militar_id) {
@@ -65,6 +93,10 @@ export default function ProcedimentoPublicacaoModal({ procedimento, tipo, prazo,
         procedimento_id: procedimento.id,
         ...(prazo ? { procedimento_prazo_id: prazo.id } : {}),
         texto_publicacao: texto,
+        ...(template ? { render_metadata: buildTemplateRenderMetadata({
+          template, modulo: 'ExOfficio', user,
+          sourceOfTruth: TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE,
+        }) } : {}),
       }, user, async () => {
         if (!arquivo) return {};
         if (!anexoEnviado.current) anexoEnviado.current = await enviarAnexoPublicacao(arquivo);
@@ -109,6 +141,7 @@ export default function ProcedimentoPublicacaoModal({ procedimento, tipo, prazo,
                   militar_nome: militar.militar_nome,
                   militar_posto: militar.militar_posto,
                   militar_matricula: militar.militar_matricula,
+                  quadro: militar.quadro || '',
                 }))}
               />
             </div>
@@ -137,6 +170,15 @@ export default function ProcedimentoPublicacaoModal({ procedimento, tipo, prazo,
                   <Button type="button" variant="ghost" size="sm" onClick={() => setTextoEditado(null)}>Restaurar texto sugerido</Button>
                 )}
               </div>
+              <p className="text-xs text-slate-500">
+                {buscandoTemplate ? 'Carregando template…' : template ? `Template: ${template.nome || template.tipo_registro}` : 'Modelo padrão'}
+              </p>
+              {modelos.isError && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800" role="status">
+                  Não foi possível consultar os templates cadastrados.
+                  <Button type="button" variant="ghost" size="sm" onClick={() => modelos.refetch()}>Tentar novamente</Button>
+                </div>
+              )}
               <Textarea id="procedimento-publicacao-texto" className="mt-1" rows={6} required value={texto} onChange={(e) => setTextoEditado(e.target.value)} />
             </div>
 
@@ -177,7 +219,7 @@ export default function ProcedimentoPublicacaoModal({ procedimento, tipo, prazo,
           {erro && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" disabled={salvando} onClick={onClose}>Cancelar</Button>
-            <Button type="submit" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={!podeSalvar || salvando}>
+            <Button type="submit" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={!podeSalvar || salvando || buscandoTemplate}>
               {salvando ? 'Salvando...' : 'Salvar publicação'}
             </Button>
           </DialogFooter>

@@ -4,6 +4,7 @@
  * Unifica os antigos módulos Livro e PublicacaoExOfficio em uma única fonte de verdade.
  */
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { TEMPLATES_PROCEDIMENTOS } from '@/components/procedimentos/procedimentoTemplates';
 import { DESIGNACAO_PROVISORIA, TIPOS_RP_PROCEDIMENTO, ROTULOS_PUBLICACAO_PROCEDIMENTO } from '@/components/procedimentos/procedimentoPublicacao';
 
 // ─── Constantes de módulo ───────────────────────────────────────────────────
@@ -489,7 +490,7 @@ export function getTiposRPFiltrados({
   // 3. Templates ativos de ambos os módulos
   templatesAtivos
     .forEach((tmpl) => {
-      if (!tmpl?.tipo_registro) return;
+      if (!tmpl?.tipo_registro || TEMPLATES_PROCEDIMENTOS.some((item) => item.especie && item.value === tmpl.tipo_registro)) return;
       const moduloTemplate = getTemplateAtivoPorTipo(tmpl.tipo_registro, tmpl.modulo, templatesAtivos)?.modulo;
       if (!moduloTemplate) return;
       mergeTipoMaps(map, {
