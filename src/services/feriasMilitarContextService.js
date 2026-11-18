@@ -71,6 +71,7 @@ export function aplicarContextoMilitarNaFerias(ferias = {}, militar = null, { co
     }, { contexto }),
     militar_mesclado: mesclado,
     militar_status_cadastro: militar?.status_cadastro || null,
+    militar_quadro: pickFirstText(militar?.quadro, ferias?.militar_quadro),
   };
 }
 
@@ -125,12 +126,24 @@ export function enriquecerFeriasComContextoMilitarCarregado(
     .map((item) => aplicarContextoMilitarNaFerias(item, byId.get(String(item?.militar_id || '')) || null, { contexto }));
 }
 
+const TAMANHO_LOTE_MILITARES = 40;
+
 export async function enriquecerFeriasComContextoMilitar(ferias = [], { contexto = 'operacional', filtrarMesclados = false } = {}) {
   const militarIds = [...new Set((ferias || []).map((item) => String(item?.militar_id || '')).filter(Boolean))];
   if (!militarIds.length) return [];
 
   const { base44 } = await import('../api/base44Client.js');
-  const resultados = await Promise.allSettled(militarIds.map((id) => base44.entities.Militar.filter({ id })));
+
+  // Consulta em lotes: uma requisição por militar estourava o limite de requisições
+  // e deixava registros sem o contexto (posto/quadro) usado nos templates.
+  const lotes = [];
+  for (let i = 0; i < militarIds.length; i += TAMANHO_LOTE_MILITARES) {
+    lotes.push(militarIds.slice(i, i + TAMANHO_LOTE_MILITARES));
+  }
+
+  const resultados = await Promise.allSettled(
+    lotes.map((lote) => base44.entities.Militar.filter({ id: { $in: lote } })),
+  );
   const colecoes = resultados
     .filter((resultado) => resultado.status === 'fulfilled')
     .map((resultado) => resultado.value || []);
