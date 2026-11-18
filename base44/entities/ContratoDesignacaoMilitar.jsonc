@@ -24,6 +24,23 @@
       "type": "date",
       "default": ""
     },
+    "historico_renovacoes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tipo": { "type": "string" },
+          "data_fim_anterior": { "type": "string" },
+          "data_inicio_renovacao": { "type": "string" },
+          "data_fim_nova": { "type": "string" },
+          "boletim_referencia": { "type": "string" },
+          "data_publicacao": { "type": "string" },
+          "observacoes": { "type": "string" },
+          "registrado_em": { "type": "string" },
+          "registrado_por": { "type": "string" }
+        }
+      }
+    },
     "data_inclusao_para_ferias": {
       "type": "date",
       "default": ""

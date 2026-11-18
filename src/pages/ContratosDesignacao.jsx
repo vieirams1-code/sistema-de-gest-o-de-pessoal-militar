@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, Edit3, Eye, Loader2, MoreHorizontal, Plus, Se
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
+import RenovarContratoDesignacaoModal, { contratoPodeRenovar, HistoricoRenovacoesContrato } from '@/components/militar/RenovarContratoDesignacaoModal';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -259,6 +260,7 @@ export default function ContratosDesignacao() {
   const [salvandoContrato, setSalvandoContrato] = useState(false);
   const [excluindoContrato, setExcluindoContrato] = useState(null);
   const [finalizandoContrato, setFinalizandoContrato] = useState(null);
+  const [renovandoContrato, setRenovandoContrato] = useState(null);
   const [modoAdmin, setModoAdmin] = useState(false);
   const [offset, setOffset] = useState(0);
   const effectiveEmail = getEffectiveEmail();
@@ -614,6 +616,11 @@ export default function ContratosDesignacao() {
                                 <DropdownMenuItem onSelect={() => setContratoDetalhe(contrato)}>
                                   <Eye className="h-4 w-4" />Detalhes
                                 </DropdownMenuItem>
+                                {canEdit && contratoPodeRenovar(contrato) && (
+                                  <DropdownMenuItem onSelect={() => setRenovandoContrato(contrato)}>
+                                    Renovar por 1 ano
+                                  </DropdownMenuItem>
+                                )}
                                 {canFinish && situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO && situacaoDerivada !== SITUACAO_CONTRATO_DESIGNACAO.CANCELADO && (
                                   <DropdownMenuItem onSelect={() => setFinalizandoContrato(contrato)}>
                                     <CheckCircle2 className="h-4 w-4" />Finalizar contrato
@@ -767,6 +774,10 @@ export default function ContratosDesignacao() {
         isSubmitting={salvandoContrato}
       />
 
+      {renovandoContrato && (
+        <RenovarContratoDesignacaoModal contrato={renovandoContrato} onClose={() => setRenovandoContrato(null)} />
+      )}
+
       {contratoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-4xl rounded-2xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
@@ -804,6 +815,7 @@ export default function ContratosDesignacao() {
                   {contratoDetalhe.finalizado_por && <DetailItem label="Finalizado por" value={contratoDetalhe.finalizado_por} />}
                   {contratoDetalhe.gera_direito_ferias === false && <div className="md:col-span-2"><DetailItem label="Motivo para não gerar férias" value={contratoDetalhe.motivo_nao_gera_ferias} /></div>}
                   <div className="md:col-span-2"><DetailItem label="Observações" value={contratoDetalhe.observacoes} /></div>
+                  <HistoricoRenovacoesContrato contrato={contratoDetalhe} />
                 </>);
               })()}
             </div>

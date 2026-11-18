@@ -196,6 +196,18 @@ export async function atualizarEscopado(entityName, registroId, data) {
   return resp?.data || resp;
 }
 
+export async function renovarContratoDesignacaoEscopado(registroId, data, effectiveEmail) {
+  if (!registroId) throw new Error('Selecione o contrato a renovar.');
+  const resp = await invocar({
+    entityName: 'ContratoDesignacaoMilitar',
+    operation: 'renovar',
+    registroId: String(registroId),
+    data,
+    ...(effectiveEmail ? { effectiveEmail } : {}),
+  });
+  return resp?.data || resp;
+}
+
 export async function bulkEscopado(entityName, itens) {
   assertEntidadePermitida(entityName);
   if (!Array.isArray(itens)) throw new Error('cudEscopado: itens deve ser um array.');

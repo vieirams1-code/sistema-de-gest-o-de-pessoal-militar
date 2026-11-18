@@ -154,7 +154,7 @@ const CAMPOS_PUBLICACAO_SUPORTE = [
 ];
 const CAMPOS_CONTRATO_SUPORTE = [
   'id', 'militar_id', 'status_contrato', 'data_inicio_contrato', 'data_fim_contrato', 'data_inclusao_para_ferias',
-  'gera_direito_ferias', 'regra_geracao_periodos',
+  'gera_direito_ferias', 'regra_geracao_periodos', 'tipo_prazo_contrato',
 ];
 const CAMPOS_AJUSTE_SALDO_SUPORTE = [
   'id', 'militar_id', 'periodo_aquisitivo_id', 'periodo_aquisitivo_ref', 'tipo', 'dias', 'status', 'created_date',

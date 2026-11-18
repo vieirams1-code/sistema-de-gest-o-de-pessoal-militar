@@ -6,6 +6,7 @@ import {
   normalizarStatusContratoDesignacao,
   STATUS_CONTRATO_DESIGNACAO,
 } from './contratosDesignacaoMilitarService.js';
+import { contratoDesignacaoDeterminado } from '../../base44/shared/contratoDesignacaoVigencia.js';
 
 export const CODIGOS_BLOQUEIO_DATA_BASE_FERIAS = Object.freeze({
   MILITAR_SEM_DATA_INCLUSAO: 'MILITAR_SEM_DATA_INCLUSAO',
@@ -163,7 +164,10 @@ function resolverPeloContrato(contratoAtivo, { validarDatas, bloquearDataContrat
   const elegibilidade = validarElegibilidadeContrato(contratoAtivo, warnings);
   if (elegibilidade.bloqueado) return elegibilidade.payload;
 
-  if (!contratoAtivo?.data_inclusao_para_ferias) {
+  const dataBase = contratoDesignacaoDeterminado(contratoAtivo)
+    ? contratoAtivo.data_inicio_contrato
+    : contratoAtivo.data_inclusao_para_ferias;
+  if (!dataBase) {
     return criarRetorno({
       bloqueado: true,
       codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_SEM_DATA_BASE,
@@ -173,7 +177,7 @@ function resolverPeloContrato(contratoAtivo, { validarDatas, bloquearDataContrat
   }
 
   const resultadoContrato = normalizarDataBaseOuBloquear({
-    dataBase: contratoAtivo.data_inclusao_para_ferias,
+    dataBase,
     origem: ORIGENS_DATA_BASE_FERIAS.CONTRATO_DESIGNACAO,
     contratoId,
     campoLabel: 'Data de inclusão para férias do contrato de designação',

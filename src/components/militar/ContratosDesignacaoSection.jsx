@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
+import RenovarContratoDesignacaoModal, { contratoPodeRenovar } from '@/components/militar/RenovarContratoDesignacaoModal';
 import EncerrarContratoDesignacaoModal from '@/components/militar/EncerrarContratoDesignacaoModal';
 import CancelarContratoDesignacaoModal from '@/components/militar/CancelarContratoDesignacaoModal';
 import ExcluirContratoDesignacaoModal from '@/components/militar/ExcluirContratoDesignacaoModal';
@@ -67,6 +68,7 @@ export default function ContratosDesignacaoSection({
   const [edicao, setEdicao] = useState(null);
   const [edicaoBloqueiaCadeia, setEdicaoBloqueiaCadeia] = useState(false);
   const [encerrar, setEncerrar] = useState(null);
+  const [renovar, setRenovar] = useState(null);
   const [cancelar, setCancelar] = useState(null);
   const [excluir, setExcluir] = useState(null);
 
@@ -154,7 +156,7 @@ export default function ContratosDesignacaoSection({
               <Badge variant="outline">{ordenados.length}</Badge>
             </CardTitle>
             <p className="text-sm text-slate-500 mt-1">
-              Registro administrativo próprio do militar. Esta seção não altera matrícula, férias, saldos, Livro, publicações ou geradores automaticamente.
+              Consulte a vigência dos contratos de designação e registre renovações.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
@@ -246,6 +248,9 @@ export default function ContratosDesignacaoSection({
                         <Button size="sm" variant="outline" onClick={() => setDetalhe(contrato)}>Ver detalhes</Button>
                         <Button size="sm" variant="outline" onClick={() => revisarPeriodosMilitar(contrato.militar_id || militarId)}>Revisar períodos aquisitivos</Button>
                         {canEdit && <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(contrato)}><Edit3 className="mr-1 h-4 w-4" />Editar contrato</Button>}
+                        {canEdit && contratoPodeRenovar(contrato) && (
+                          <Button size="sm" variant="outline" onClick={() => setRenovar(contrato)}>Renovar por 1 ano</Button>
+                        )}
                         {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
                         {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar</Button>}
                         {canExcluir && <Button size="sm" variant="destructive" onClick={() => setExcluir(contrato)}>Excluir contrato</Button>}
@@ -287,6 +292,8 @@ export default function ContratosDesignacaoSection({
           onSubmit={handleEdit}
           isSubmitting={isSaving}
         />
+        {renovar && <RenovarContratoDesignacaoModal contrato={renovar} onClose={() => setRenovar(null)} />}
+
         <EncerrarContratoDesignacaoModal
           open={Boolean(encerrar)}
           onOpenChange={(open) => !open && setEncerrar(null)}

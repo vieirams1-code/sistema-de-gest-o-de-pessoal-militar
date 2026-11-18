@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { contratoPodeRenovar, HistoricoRenovacoesContrato } from '@/components/militar/RenovarContratoDesignacaoModal';
 import { AlertTriangle, Check, ChevronsUpDown, LockKeyhole } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -338,6 +339,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               <p className="text-xs text-slate-500">Observações</p>
               <p className="font-medium text-slate-700 whitespace-pre-wrap">{form.observacoes || '—'}</p>
             </div>
+            <HistoricoRenovacoesContrato contrato={contrato} />
           </div>
         ) : (
           <div className="space-y-5 px-6 pb-2">
@@ -450,6 +452,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                 <div className="space-y-2">
                   <Label>Data de fim {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO ? '*' : ''}</Label>
                   <Input type="date" value={form.data_fim_contrato} onChange={(e) => update('data_fim_contrato', e.target.value)} disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO} />
+                  {contratoPodeRenovar(contrato) && <p className="text-xs text-slate-500">Use “Renovar por 1 ano” para prorrogar esta vigência e registrar o evento.</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Gera direito a férias</Label>
@@ -457,15 +460,15 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="sim">Sim</SelectItem></SelectContent>
                   </Select>
-                  <p className="text-xs text-slate-500">Contratos determinados e indeterminados têm direito a férias; a regra Normal permite gerar períodos pela data-base do contrato.</p>
+                  <p className="text-xs text-slate-500">Para contratos determinados, a geração usa o início do contrato e considera somente ciclos anuais completos cobertos pela vigência.</p>
                 </div>
                 <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-700">Configurar data-base diferente para férias</summary>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Data-base de férias opcional</Label>
-                      <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} disabled={campoCadeiaBloqueado('data_inclusao_para_ferias')} />
-                      <p className="text-xs text-slate-500">Se não informada, será salva igual à data de início do contrato.</p>
+                      <Input type="date" value={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO ? form.data_inicio_contrato : form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO || campoCadeiaBloqueado('data_inclusao_para_ferias')} />
+                      <p className="text-xs text-slate-500">Para prazo determinado, a data-base da geração é o início do contrato.</p>
                     </div>
                     <div className="space-y-2">
                       <Label>Regra de geração de períodos *</Label>

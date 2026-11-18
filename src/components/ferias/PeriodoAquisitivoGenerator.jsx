@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { bulkEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
-import { parseDateOnlyStrict } from '@/services/dateOnlyService';
+import { normalizeDateOnly, parseDateOnlyStrict } from '@/services/dateOnlyService';
+import { contratoDesignacaoDeterminado } from '../../../base44/shared/contratoDesignacaoVigencia.js';
 import {
   calcularPeriodosAquisitivosParaGeracao,
   montarChavePeriodoAquisitivo,
@@ -59,6 +60,7 @@ function getDescricaoCodigoBloqueio(codigo) {
     DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO: 'com data-base do contrato anterior ao início do contrato',
     CONTRATO_ATIVO_NAO_GERA_FERIAS: 'com contrato ativo que não gera férias',
     CONTRATO_ATIVO_GERACAO_BLOQUEADA: 'com geração automática bloqueada pelo contrato',
+    CONTRATO_DETERMINADO_VIGENCIA_INVALIDA: 'com vigência inválida no contrato determinado',
   };
 
   return descricoes[codigo] || `com bloqueio ${codigo || 'não identificado'}`;
@@ -195,6 +197,7 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
       let origemMilitarDataInclusao = 0;
       let origemContratoDesignacao = 0;
       let origemDataBaseIndividual = null;
+      let semCicloCobertoIndividual = false;
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
@@ -268,10 +271,30 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
           origemDataBaseIndividual = resolucaoDataBase.origem;
         }
 
+        const contrato = resolucaoDataBase.contratoId
+          ? contratosDoMilitar.find((item) => String(item.id) === String(resolucaoDataBase.contratoId))
+          : null;
+        let vigenciaContrato;
+        if (contratoDesignacaoDeterminado(contrato)) {
+          const inicio = normalizeDateOnly(contrato.data_inicio_contrato);
+          const fim = normalizeDateOnly(contrato.data_fim_contrato);
+          if (!inicio || !fim || fim < inicio) {
+            registrarBloqueio({
+              militar, resolucaoDataBase,
+              codigoBloqueio: 'CONTRATO_DETERMINADO_VIGENCIA_INVALIDA',
+              mensagem: 'Informe datas válidas de início e fim no contrato de designação.',
+            });
+            continue;
+          }
+          vigenciaContrato = { inicio, fim };
+        }
+
         const candidatosGeracao = calcularPeriodosAquisitivosParaGeracao({
           dataBase: dataInclusao,
           hoje,
+          vigenciaContrato,
         });
+        if (escopo === 'individual' && vigenciaContrato && !candidatosGeracao.length) semCicloCobertoIndividual = true;
 
         for (const candidato of candidatosGeracao) {
           const chaveCandidato = montarChavePeriodoAquisitivo({
@@ -320,9 +343,11 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
       const mensagemOrigemIndividual = getMensagemOrigemDataBase(origemDataBaseIndividual);
 
       if (novosPeriodos.length > 0) {
-        const resultadoBulk = await bulkEscopado('PeriodoAquisitivo', novosPeriodos.map((periodo) => ({ acao: 'create', ...periodo })));
+        const resultadoBulk = await bulkEscopado('PeriodoAquisitivo', novosPeriodos.map((periodo) => ({ acao: 'create', origem_geracao: 'automatica', ...periodo })));
         if (resultadoBulk?.sucesso !== novosPeriodos.length) {
-          throw new Error('Nem todos os períodos aquisitivos puderam ser gerados com segurança.');
+          queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
+          const detalhe = resultadoBulk?.resultados?.find((item) => !item.ok)?.error;
+          throw new Error(detalhe || 'Nem todos os períodos aquisitivos puderam ser gerados com segurança.');
         }
         queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
 
@@ -348,7 +373,9 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
         setResult({
           success: true,
           count: 0,
-          message: escopo === 'all'
+          message: semCicloCobertoIndividual
+            ? 'A vigência do contrato não cobre um período anual integral dentro do prazo de gozo.'
+            : escopo === 'all'
             ? `0 período(s) aquisitivo(s) gerado(s) com sucesso. Todos os períodos aquisitivos já estão atualizados. ${resumoOrigens}${sufixoBloqueios}`
             : `O militar selecionado já está com os períodos aquisitivos atualizados. ${mensagemOrigemIndividual}`,
         });
@@ -357,7 +384,7 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
       console.error('Erro ao gerar períodos:', error);
       setResult({
         success: false,
-        message: 'Erro ao gerar períodos aquisitivos. Tente novamente.',
+        message: error?.message || 'Erro ao gerar períodos aquisitivos. Tente novamente.',
       });
     } finally {
       setGenerating(false);
@@ -380,7 +407,7 @@ export default function PeriodoAquisitivoGenerator({ canGenerate = false }) {
           <DialogTitle>Gerar Períodos Aquisitivos</DialogTitle>
           <DialogDescription>
             Gere períodos aquisitivos automaticamente para todos os militares operacionais
-            ou apenas para um militar específico, respeitando contratos de designação ativos e a data-base de férias resolvida.
+            ou apenas para um militar específico. Contratos por prazo determinado geram somente ciclos anuais completos cobertos pela vigência.
           </DialogDescription>
         </DialogHeader>
 

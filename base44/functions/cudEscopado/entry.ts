@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { TIPOS_RP_PROCEDIMENTO, TIPOS_RP_SEM_MILITAR } from '../../shared/publicacoesProcedimento.ts';
+import {
+  calcularRenovacaoContrato, contratoDesignacaoDeterminado, lerDataCivilContrato, periodoCobertoPeloContratoDeterminado,
+} from '../../shared/contratoDesignacaoVigencia.js';
 
 // =====================================================================
 // cudEscopado — Backend Hardening Lote 1
@@ -80,7 +83,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'GratificacaoFuncao',
 ]);
 
-const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar', 'admin_list', 'admin_get']);
+const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete', 'bulk', 'encerrar', 'remover', 'desativar', 'admin_list', 'admin_get', 'renovar']);
 const ENTIDADES_LEITURA_ADMIN_PERMISSOES = new Set(['PerfilPermissao', 'UsuarioAcesso']);
 
 // =====================================================================
@@ -783,6 +786,71 @@ function validarCamposFeriasContratoDesignacao(data = {}, erros = []) {
   return erros;
 }
 
+function validarPeriodoAutomaticoContrato(periodo, contratos) {
+  const ativos = contratos.filter((contrato) => normalizarStatusContratoDesignacao(contrato.status_contrato) === 'ativo');
+  if (ativos.length > 1) throw Object.assign(new Error('Há mais de um contrato de designação ativo para o militar.'), { status: 409 });
+  const contrato = ativos[0];
+  if (!contratoDesignacaoDeterminado(contrato)) return;
+  if (contrato.gera_direito_ferias === false || contrato.regra_geracao_periodos === 'bloqueada') {
+    throw Object.assign(new Error('A geração de períodos está bloqueada pelo contrato de designação.'), { status: 409 });
+  }
+  if (!periodoCobertoPeloContratoDeterminado(contrato, periodo.inicio_aquisitivo, periodo.fim_aquisitivo)) {
+    throw Object.assign(new Error('O período aquisitivo precisa corresponder a um ciclo anual integral coberto pela vigência do contrato.'), { status: 409 });
+  }
+}
+
+async function agruparContratosParaGeracao(base44, militarIds) {
+  const porMilitar = new Map();
+  for (let i = 0; i < militarIds.length; i += 100) {
+    const contratos = await base44.asServiceRole.entities.ContratoDesignacaoMilitar.filter(
+      { militar_id: { $in: militarIds.slice(i, i + 100) }, status_contrato: 'ativo' }, undefined, 1000, 0,
+    );
+    for (const contrato of contratos || []) {
+      const chave = String(contrato.militar_id);
+      porMilitar.set(chave, [...(porMilitar.get(chave) || []), contrato]);
+    }
+  }
+  return porMilitar;
+}
+
+async function renovarContratoDesignacao(entity, id, dados, autor) {
+  const atual = await entity.get(id);
+  if (!atual || !contratoDesignacaoDeterminado(atual) || normalizarStatusContratoDesignacao(atual.status_contrato) !== 'ativo') {
+    throw Object.assign(new Error('Somente contratos ativos por prazo determinado podem ser renovados.'), { status: 409 });
+  }
+  const fimAnterior = String(dados.data_fim_esperada || '').trim();
+  const renovacao = calcularRenovacaoContrato(fimAnterior);
+  const dataPublicacao = String(dados.data_publicacao || '').trim();
+  const boletim = String(dados.boletim_referencia || '').trim();
+  const observacoes = String(dados.observacoes || '').trim();
+  if (!renovacao || !lerDataCivilContrato(atual.data_inicio_contrato) || fimAnterior < atual.data_inicio_contrato
+    || (dataPublicacao && !lerDataCivilContrato(dataPublicacao))) {
+    throw Object.assign(new Error('Confira as datas de vigência e da publicação da renovação.'), { status: 400 });
+  }
+  const historico = Array.isArray(atual.historico_renovacoes) ? atual.historico_renovacoes : [];
+  if (fimAnterior !== atual.data_fim_contrato) {
+    const anterior = historico.find((evento) => evento.data_fim_anterior === fimAnterior);
+    if (anterior && (anterior.boletim_referencia || '') === boletim && (anterior.data_publicacao || '') === dataPublicacao
+      && (anterior.observacoes || '') === observacoes) return atual;
+    throw Object.assign(new Error('A vigência do contrato foi alterada. Atualize a tela antes de renovar.'), { status: 409 });
+  }
+
+  const evento = {
+    tipo: 'renovacao', data_fim_anterior: fimAnterior, data_inicio_renovacao: renovacao.inicio, data_fim_nova: renovacao.fim,
+    boletim_referencia: boletim, data_publicacao: dataPublicacao, observacoes,
+    registrado_em: new Date().toISOString(), registrado_por: autor,
+  };
+  const atualizacao = {
+    data_fim_contrato: renovacao.fim,
+    gera_direito_ferias: true,
+    motivo_nao_gera_ferias: '',
+    ...(atual.gera_direito_ferias === false ? { regra_geracao_periodos: 'normal' } : {}),
+    historico_renovacoes: [...historico, evento],
+    atualizado_por: autor,
+  };
+  return fetchWithRetry(() => entity.update(id, atualizacao), `ContratoDesignacaoMilitar.renovar:${id}`);
+}
+
 function possuiActionContratoDesignacao(actions, ...keys) {
   return keys.some((key) => actions?.[key] === true);
 }
@@ -1002,6 +1070,9 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   const dadosRecebidos = data || {};
   data = dadosRecebidos;
   if (operation === 'create') data = prepararCamposFeriasContratoDesignacao(data);
+  if (Object.hasOwn(data, 'historico_renovacoes')) {
+    throw Object.assign(new Error('Use a ação Renovar contrato para alterar o histórico de vigência.'), { status: 409 });
+  }
   if (operation === 'delete') {
     return null;
   }
@@ -1089,6 +1160,14 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   }
 
   const contratoCombinado = { ...registroExistente, ...payloadFinal };
+  if (operation === 'update' && statusAtual === 'ativo' && statusPayload === 'ativo'
+    && contratoDesignacaoDeterminado(registroExistente) && contratoDesignacaoDeterminado(contratoCombinado)
+    && lerDataCivilContrato(registroExistente.data_fim_contrato)
+    && contratoCombinado.data_fim_contrato !== registroExistente.data_fim_contrato
+    && (contratoCombinado.data_fim_contrato > registroExistente.data_fim_contrato
+      || !lerDataCivilContrato(contratoCombinado.data_fim_contrato) || registroExistente.historico_renovacoes?.length)) {
+    throw Object.assign(new Error('Use Renovar contrato para prorrogar a vigência do contrato.'), { status: 409 });
+  }
   const errosFeriasContrato = validarCamposFeriasContratoDesignacao(contratoCombinado, []);
   if (errosFeriasContrato.length) {
     const erro = new Error(errosFeriasContrato.join(' '));
@@ -1206,13 +1285,19 @@ export default async function(req) {
         { status: 400 },
       );
     }
+    if (entityName === 'ContratoDesignacaoMilitar' && operation === 'bulk') {
+      return Response.json({ error: 'Contratos de designação exigem alteração individual.' }, { status: 409 });
+    }
+    if (operation === 'renovar' && entityName !== 'ContratoDesignacaoMilitar') {
+      return Response.json({ error: 'Renovação disponível apenas para contratos de designação.' }, { status: 400 });
+    }
     if (!operation || !OPERACOES_PERMITIDAS.has(operation)) {
       return Response.json(
         { error: `Operação "${operation}" inválida. Use create, update ou delete.` },
         { status: 400 },
       );
     }
-    if ((operation === 'update' || operation === 'delete' || operation === 'admin_get') && !registroId) {
+    if ((operation === 'update' || operation === 'delete' || operation === 'admin_get' || operation === 'renovar') && !registroId) {
       return Response.json(
         { error: `registroId é obrigatório para operação ${operation}.` },
         { status: 400 },
@@ -1429,7 +1514,7 @@ export default async function(req) {
         } else if (operation === 'update' && statusContratoPayload === 'cancelado') {
           requiredPermission = 'cancelar_contrato_designacao';
           allowed = possuiActionContratoDesignacao(targetPerms.actions, 'cancelar_contrato_designacao');
-        } else if (operation === 'update') {
+        } else if (operation === 'update' || operation === 'renovar') {
           requiredPermission = 'editar_metadados_contrato_designacao';
           allowed = possuiActionContratoDesignacao(targetPerms.actions, 'editar_metadados_contrato_designacao');
         } else if (operation === 'delete') {
@@ -1792,7 +1877,18 @@ export default async function(req) {
       }
     }
 
+    if (operation === 'renovar') {
+      const contrato = await renovarContratoDesignacao(base44.asServiceRole.entities.ContratoDesignacaoMilitar, registroId, data, targetEmail);
+      return Response.json({ ok: true, data: contrato });
+    }
+
     let dataValidada = data;
+    if (entityName === 'PeriodoAquisitivo' && operation === 'create' && data.origem_geracao === 'automatica') {
+      const porMilitar = await agruparContratosParaGeracao(base44, [String(militarAlvoId)]);
+      validarPeriodoAutomaticoContrato(data, porMilitar.get(String(militarAlvoId)) || []);
+      const { origem_geracao, ...periodo } = data;
+      dataValidada = periodo;
+    }
 
     // ========== BULK ==========
     if (operation === 'bulk') {
@@ -1804,6 +1900,11 @@ export default async function(req) {
 
       const svcBulk = base44.asServiceRole.entities[entityName];
       const resultados = [];
+      const militaresGeracao = entityName === 'PeriodoAquisitivo'
+        ? [...new Set(itensBulk.filter((item) => item.origem_geracao === 'automatica' && item.militar_id && isInScope(item.militar_id))
+          .map((item) => String(item.militar_id)))]
+        : [];
+      const contratosGeracao = await agruparContratosParaGeracao(base44, militaresGeracao);
 
       // Pre-carregar dados para validação em lote se necessário
       const feriasPorId = new Map();
@@ -1894,6 +1995,11 @@ export default async function(req) {
             itemData = await prepararMilitarTag({ base44, operation: subOp, id: itemId, data: itemData, militarId: mid });
           } else if (entityName === 'FeriasTag') {
             itemData = await prepararFeriasTag({ base44, operation: subOp, id: itemId, data: itemData, feriasId: raw.ferias_id });
+          }
+
+          if (entityName === 'PeriodoAquisitivo' && subOp === 'create' && itemData.origem_geracao === 'automatica') {
+            validarPeriodoAutomaticoContrato(itemData, contratosGeracao.get(String(mid)) || []);
+            delete itemData.origem_geracao;
           }
 
           let res;

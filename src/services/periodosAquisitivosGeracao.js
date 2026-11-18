@@ -1,5 +1,6 @@
 import { addMonths, addYears, format } from 'date-fns';
 import { parseDateOnlyStrict } from './dateOnlyService.js';
+import { lerDataCivilContrato, periodoAnualContrato } from '../../base44/shared/contratoDesignacaoVigencia.js';
 
 const MAX_ANOS_GERACAO = 120;
 
@@ -10,10 +11,10 @@ function normalizarData(data) {
   return normalizada;
 }
 
-function montarPeriodo(dataInicio) {
+function montarPeriodo(dataInicio, fimContrato = null) {
   const inicio = new Date(dataInicio);
-  const fim = addYears(inicio, 1);
-  fim.setDate(fim.getDate() - 1);
+  const fim = fimContrato ? new Date(fimContrato) : addYears(inicio, 1);
+  if (!fimContrato) fim.setDate(fim.getDate() - 1);
   const limiteGozo = addMonths(fim, 24);
 
   return {
@@ -48,11 +49,27 @@ export function periodoAquisitivoJaExiste({ periodosExistentes = [], militarId, 
   });
 }
 
-export function calcularPeriodosAquisitivosParaGeracao({ dataBase, hoje = new Date() } = {}) {
+export function calcularPeriodosAquisitivosParaGeracao({ dataBase, hoje = new Date(), vigenciaContrato } = {}) {
   const dataBaseNormalizada = normalizarData(dataBase);
   const hojeNormalizado = normalizarData(hoje);
 
   if (!dataBaseNormalizada || !hojeNormalizado) return [];
+
+  if (vigenciaContrato) {
+    const { inicio, fim } = vigenciaContrato;
+    if (!lerDataCivilContrato(inicio) || !lerDataCivilContrato(fim) || inicio > fim) return [];
+
+    const cobertos = [];
+    let inicioPeriodo = inicio;
+    for (let ano = 0; ano < MAX_ANOS_GERACAO; ano += 1) {
+      const ciclo = periodoAnualContrato(inicioPeriodo);
+      if (ciclo.fim > fim) break;
+      const periodo = montarPeriodo(parseDateOnlyStrict(ciclo.inicio), parseDateOnlyStrict(ciclo.fim));
+      if (periodo.limiteGozo >= hojeNormalizado) cobertos.push(periodo);
+      inicioPeriodo = ciclo.proximoInicio;
+    }
+    return cobertos;
+  }
 
   const periodos = [];
   let inicioPeriodo = new Date(dataBaseNormalizada);
