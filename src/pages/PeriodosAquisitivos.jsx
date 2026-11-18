@@ -23,6 +23,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from '@/components/ferias/feriasRules';
+import { contratoDesignacaoDeterminado, lerDataCivilContrato, periodoCobertoPeloContratoDeterminado } from '../../base44/shared/contratoDesignacaoVigencia.js';
 import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAquisitivosMapper';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
@@ -131,6 +132,14 @@ export default function PeriodosAquisitivos() {
   }, [contratosDesignacaoMilitar, militarIdFiltro]);
 
   const militarRevisao = militarIdFiltro ? militaresPorId.get(String(militarIdFiltro)) : null;
+  const contratoDeterminadoRevisao = contratoDesignacaoDeterminado(contratoAtivoRevisao) ? contratoAtivoRevisao : null;
+  const periodosForaDaVigencia = contratoDeterminadoRevisao
+    && lerDataCivilContrato(contratoDeterminadoRevisao.data_inicio_contrato)
+    && lerDataCivilContrato(contratoDeterminadoRevisao.data_fim_contrato)
+    ? periodos.filter((periodo) => String(periodo.militar_id) === String(militarIdFiltro)
+      && periodo.inicio_aquisitivo >= contratoDeterminadoRevisao.data_inicio_contrato
+      && !periodoCobertoPeloContratoDeterminado(contratoDeterminadoRevisao, periodo.inicio_aquisitivo, periodo.fim_aquisitivo))
+    : [];
 
   const periodosTransformados = useMemo(() => {
     const mapeados = mapPeriodosAquisitivosPorMilitar({ periodos, ferias, ajustes: ajustesSaldoFerias });
@@ -478,11 +487,22 @@ export default function PeriodosAquisitivos() {
             <span>
               <strong>{militarRevisao?.nome_guerra || 'Militar selecionado'}</strong>
               {militarRevisao?.matricula_atual || militarRevisao?.matricula ? ` • Matrícula ${militarRevisao.matricula_atual || militarRevisao.matricula}` : ''}
-              {contratoAtivoRevisao?.data_inclusao_para_ferias ? ` • Data-base férias ${formatDateBR(contratoAtivoRevisao.data_inclusao_para_ferias)}` : ''}
-              {contratoAtivoRevisao?.data_inclusao_para_ferias
-                ? `. Revise manualmente os períodos incompatíveis com a data-base de férias ${formatDateBR(contratoAtivoRevisao.data_inclusao_para_ferias)}. Exclua apenas períodos sem férias, sem Livro e sem publicações.`
-                : '. Exibindo períodos aquisitivos do militar selecionado para revisão manual.'}
+              {contratoDeterminadoRevisao
+                ? ` · Vigência de ${formatDateBR(contratoDeterminadoRevisao.data_inicio_contrato)} a ${formatDateBR(contratoDeterminadoRevisao.data_fim_contrato)}.`
+                : contratoAtivoRevisao?.data_inclusao_para_ferias
+                  ? ` · Data-base de férias: ${formatDateBR(contratoAtivoRevisao.data_inclusao_para_ferias)}.`
+                  : ''}
+              {!contratoDeterminadoRevisao && (contratoAtivoRevisao?.data_inclusao_para_ferias
+                ? ` Revise manualmente os períodos incompatíveis com a data-base de férias ${formatDateBR(contratoAtivoRevisao.data_inclusao_para_ferias)}. Exclua apenas períodos sem férias, sem Livro e sem publicações.`
+                : ' Exibindo períodos aquisitivos do militar selecionado para revisão manual.')}
             </span>
+            {periodosForaDaVigencia.length > 0 && (
+              <p className="basis-full text-amber-900">
+                Períodos cadastrados para revisão por incompatibilidade com a vigência: {periodosForaDaVigencia.map((periodo) =>
+                  `${formatDateBR(periodo.inicio_aquisitivo)} a ${formatDateBR(periodo.fim_aquisitivo)}`,
+                ).join(', ')}.
+              </p>
+            )}
             <Button variant="ghost" size="sm" className="h-7 px-2 text-blue-800 hover:bg-blue-100" onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}>
               Limpar filtro do militar
             </Button>
