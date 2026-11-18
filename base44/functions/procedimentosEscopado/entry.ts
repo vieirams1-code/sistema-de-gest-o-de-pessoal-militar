@@ -99,10 +99,8 @@ export default async function (req) {
 
     switch (action) {
       case 'listar': {
-        etapa = 'listar:procedimentos';
         const procedimentos = await Procedimentos.list('-data_instauracao', 1000);
         const ids = (procedimentos || []).map((p) => p.id);
-        etapa = 'listar:envolvidos';
         const envolvidos = ids.length
           ? await Envolvidos.filter({ procedimento_id: { $in: ids } }, undefined, 2000, 0)
           : [];
@@ -237,6 +235,6 @@ export default async function (req) {
         return Response.json({ error: 'Ação não suportada.' }, { status: 400 });
     }
   } catch (error) {
-    return Response.json({ error: error?.message || 'Erro ao processar procedimentos.', etapa }, { status: 500 });
+    return Response.json({ error: error?.message || 'Erro ao processar procedimentos.' }, { status: 500 });
   }
 }
