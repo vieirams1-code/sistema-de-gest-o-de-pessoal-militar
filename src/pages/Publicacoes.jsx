@@ -541,6 +541,7 @@ export default function Publicacoes() {
     onSuccess: async () => {
       await Promise.all([
         refrescarDadosPublicacoes(),
+        queryClient.invalidateQueries({ queryKey: ['procedimento-administrativo'] }),
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
         queryClient.invalidateQueries({ queryKey: ['periodos-militar-modal'] }),
         queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
@@ -627,6 +628,7 @@ export default function Publicacoes() {
     onSuccess: async () => {
       await Promise.all([
         refrescarDadosPublicacoes(),
+        queryClient.invalidateQueries({ queryKey: ['procedimento-administrativo'] }),
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
         queryClient.invalidateQueries({ queryKey: ['descontos-ferias-lista'] }),
         queryClient.invalidateQueries({ queryKey: ['ferias'] }),
