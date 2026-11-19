@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { publicacaoProcedimentoSemMilitar } from '@/components/procedimentos/procedimentoPublicacao';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
@@ -377,6 +377,8 @@ function containsTerm(valor, termo) {
 export default function Publicacoes() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const publicacaoEmFocoId = searchParams.get('publicacao_id');
   const [abaOrigemAtiva, setAbaOrigemAtiva] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [exibirPublicados, setExibirPublicados] = useState(false);
@@ -634,12 +636,14 @@ export default function Publicacoes() {
   });
 
   const registrosDaAbaAtiva = useMemo(() => {
+    if (publicacaoEmFocoId) return todosRegistros.filter((registro) => String(registro.id) === publicacaoEmFocoId);
     if (abaOrigemAtiva === 'all') return todosRegistros;
     const abaNormalizada = normalizarOrigemTipoRegistro(abaOrigemAtiva);
     return todosRegistros.filter((registro) => normalizarOrigemTipoRegistro(registro.origem_tipo) === abaNormalizada);
-  }, [todosRegistros, abaOrigemAtiva]);
+  }, [todosRegistros, abaOrigemAtiva, publicacaoEmFocoId]);
 
   const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
+    if (publicacaoEmFocoId) return true; // Link direto ignora filtros e inclui notas já publicadas.
     const statusCanonico = obterStatusCanonicoPublicacao(r);
     const statusNormalizado = normalizarStatusPublicacao(r.status_calculado) || statusCanonico;
     const statusFiltroNormalizado = statusFilter === 'all' || statusFilter === 'Inconsistente'
@@ -672,7 +676,7 @@ export default function Publicacoes() {
       containsTerm(r.tipo_display, termo) ||
       containsTerm(r.grupo_display, termo);
     return matchesPublicado && matchesStatus && matchesSearch;
-  }), [registrosDaAbaAtiva, statusFilter, searchTerm, exibirPublicados]);
+  }), [registrosDaAbaAtiva, statusFilter, searchTerm, exibirPublicados, publicacaoEmFocoId]);
 
   const statsOrigem = useMemo(() => calcularMetricasPublicacao(registrosDaAbaAtiva, {
     getStatusCanonico: obterStatusCanonicoPublicacao,
@@ -840,6 +844,17 @@ export default function Publicacoes() {
           </div>
         </section>
 
+        {publicacaoEmFocoId && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-blue-900">Publicação vinculada ao procedimento</p>
+              <p className="text-xs text-blue-700">Exibição da nota selecionada, inclusive se já publicada.</p>
+            </div>
+            <Button type="button" size="sm" variant="outline" onClick={() => setSearchParams({}, { replace: true })}>
+              Voltar à lista de publicações
+            </Button>
+          </div>
+        )}
         {isLoading ? <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">Carregando registros...</div> : filteredRegistros.length === 0 ? (
           <section className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><Inbox className="h-8 w-8" /></div>
@@ -869,6 +884,7 @@ export default function Publicacoes() {
                         onDelete={handleDelete}
                         onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                         canAccessAction={canAccessAction}
+                        canAcessarProcedimentos={canAccessModule('controle_processos') && canAccessAction('visualizar_controle_processos')}
                         isAdmin={isAdmin}
                       />
                     ))}
