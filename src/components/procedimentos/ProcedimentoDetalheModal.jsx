@@ -4,7 +4,7 @@ import { ROTULOS_PUBLICACAO_PROCEDIMENTO, TIPOS_RP_PROCEDIMENTO } from './proced
 import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, ExternalLink, FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { obterStatusCanonicoPublicacao } from '@/components/publicacao/publicacaoStateMachine';
+import { calcularStatusPublicacaoRegistro } from '@/components/publicacao/publicacaoStateMachine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -49,6 +49,13 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
   const prazos = [...(data?.prazos || [])].sort((a, b) => String(b.data_fim || '').localeCompare(String(a.data_fim || '')));
   const prazo = classificarPrazo(procedimento);
   const publicacoes = data?.publicacoes || [];
+  const resumoPublicacoes = publicacoes.reduce((resumo, pub) => {
+    const status = calcularStatusPublicacaoRegistro(pub);
+    if (status === 'Publicado') resumo.publicadas += 1;
+    else if (status === 'Aguardando Publicação') resumo.aguardandoBg += 1;
+    else resumo.aguardandoNota += 1;
+    return resumo;
+  }, { publicadas: 0, aguardandoBg: 0, aguardandoNota: 0 });
   const temPublicacao = (tipo, prazoId) =>
     publicacoes.some((pub) => pub.tipo === tipo && (!prazoId || pub.procedimento_prazo_id === prazoId));
   const prorrogacaoPendente = prazos.find((item) =>
@@ -171,7 +178,12 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                     <FileText className="h-4 w-4" /> Publicações vinculadas
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{publicacoes.length}</span>
                   </h3>
-                  <p className="mt-1 text-xs text-slate-500">Acompanhe a nota desde a elaboração até sua publicação no BG.</p>
+                  <p className="mt-1 text-xs text-slate-500">Situação das notas e vínculo com o Controle de Publicações.</p>
+                  {publicacoes.length > 0 && (
+                    <p className="mt-1.5 text-xs text-slate-600" aria-label="Resumo das publicações">
+                      {resumoPublicacoes.publicadas} publicada(s) · {resumoPublicacoes.aguardandoBg} aguardando BG · {resumoPublicacoes.aguardandoNota} aguardando nota
+                    </p>
+                  )}
                 </div>
                 {podeGerar && !procedimento.sigiloso && (
                   <DropdownMenu>
@@ -222,24 +234,33 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
               ) : (
                 <ul className="space-y-2">
                   {publicacoes.map((pub) => {
-                    const status = obterStatusCanonicoPublicacao(pub);
+                    const status = calcularStatusPublicacaoRegistro(pub);
                     return (
                       <li key={pub.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-800">{ROTULOS_PUBLICACAO_PROCEDIMENTO[pub.tipo] || pub.tipo}</p>
-                          <span className={'rounded-full border px-2.5 py-1 text-[11px] font-semibold ' + (CLASSES_STATUS_PUBLICACAO[status] || CLASSES_STATUS_PUBLICACAO.padrao)}>
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <p className="min-w-0 text-sm font-semibold text-slate-800">{ROTULOS_PUBLICACAO_PROCEDIMENTO[pub.tipo] || pub.tipo}</p>
+                          <span className={'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ' + (CLASSES_STATUS_PUBLICACAO[status] || CLASSES_STATUS_PUBLICACAO.padrao)}>
                             {status}
                           </span>
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                          <Campo label="Nota para BG" valor={pub.nota_para_bg || 'Não informada'} />
-                          <Campo label="Número do BG" valor={pub.numero_bg || 'Não informado'} />
-                          <Campo label="Data do BG" valor={pub.data_bg ? formatarData(pub.data_bg) : '—'} />
-                        </div>
+                        <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
+                          <div className="flex items-baseline gap-1.5">
+                            <dt className="text-slate-500">Nota nº</dt>
+                            <dd className="font-semibold text-slate-800">{pub.nota_para_bg || 'Pendente'}</dd>
+                          </div>
+                          <div className="flex items-baseline gap-1.5">
+                            <dt className="text-slate-500">BG nº</dt>
+                            <dd className="font-semibold text-slate-800">{pub.numero_bg || 'Pendente'}</dd>
+                          </div>
+                          <div className="flex items-baseline gap-1.5">
+                            <dt className="text-slate-500">Data do BG</dt>
+                            <dd className="font-medium text-slate-700">{pub.data_bg ? formatarData(pub.data_bg) : '—'}</dd>
+                          </div>
+                        </dl>
                         {podeVerPublicacoes && (
-                          <div className="mt-3 border-t border-slate-200 pt-2">
-                            <Link className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline" to={'/Publicacoes?publicacao_id=' + encodeURIComponent(pub.id)}>
-                              Abrir nota no Controle de Publicações <ExternalLink className="h-3.5 w-3.5" />
+                          <div className="mt-2 border-t border-slate-200 pt-2">
+                            <Link className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" to={'/Publicacoes?publicacao_id=' + encodeURIComponent(pub.id)}>
+                              Ver nota e atualizar publicação <ExternalLink className="h-3.5 w-3.5" />
                             </Link>
                           </div>
                         )}
