@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import NotaColetivaVinculos from '@/components/rp/coletiva/NotaColetivaVinculos';
+import { obterProcedimentoEscopado } from '@/services/procedimentosEscopadoClient';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from "@/components/ui/card";
@@ -104,6 +105,17 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     (adminPodeEditarBgPublicado && currentStatus === STATUS_PUBLICACAO.PUBLICADO)
   );
   const podeExcluir = !isPublicado && canAccessAction('excluir_publicacoes');
+  const { data: procedimentoVinculado } = useQuery({
+    queryKey: ['procedimento-publicacao-referencia', registro.procedimento_id],
+    queryFn: () => obterProcedimentoEscopado(registro.procedimento_id),
+    enabled: Boolean(registro.procedimento_id && canAcessarProcedimentos),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const referenciaProcedimento = procedimentoVinculado?.procedimento;
+  const identificacaoProcedimento = referenciaProcedimento
+    ? [referenciaProcedimento.tipo_procedimento, referenciaProcedimento.numero_procedimento || referenciaProcedimento.numero_portaria ? `nº ${referenciaProcedimento.numero_procedimento || referenciaProcedimento.numero_portaria}` : ''].filter(Boolean).join(' · ')
+    : 'Procedimento administrativo';
   const {
     data: textoLivroLazy,
     isFetching: isTextoPublicacaoFetching,
@@ -189,12 +201,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-2">
             <div className="flex items-center gap-2 text-xs font-medium text-indigo-900">
               <FileText className="h-4 w-4" />
-              Vinculada ao procedimento administrativo
+              <span>Vinculada a: <span className="font-semibold">{identificacaoProcedimento}</span></span>
             </div>
             {canAcessarProcedimentos && (
               <Button asChild variant="outline" size="sm" className="h-8 border-indigo-200 bg-white text-indigo-700">
                 <Link to={'/Procedimentos?procedimento_id=' + encodeURIComponent(registro.procedimento_id)}>
-                  Abrir procedimento <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                  Ver procedimento <ExternalLink className="ml-1 h-3.5 w-3.5" />
                 </Link>
               </Button>
             )}
