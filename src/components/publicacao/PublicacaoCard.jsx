@@ -76,7 +76,7 @@ function formatDate(value) {
 }
 
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, isAdmin = false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, canAcessarProcedimentos = false, isAdmin = false }) {
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
@@ -158,8 +158,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <h3 className="text-base font-semibold text-slate-900">{registro.militar_nome_institucional || registro.militar_nome || 'Sem militar'}</h3>
-            <p className="text-sm text-slate-500">{registro.coletiva ? 'Publicação única, conteúdo integral nas fichas vinculadas' : registro.militar_nome_guerra || 'Sem nome de guerra'}</p>
+            <h3 className="text-base font-semibold text-slate-900">{registro.militar_nome_institucional || registro.militar_nome || (registro.procedimento_id ? 'Publicação de procedimento' : 'Sem militar')}</h3>
+            <p className="text-sm text-slate-500">{registro.procedimento_id ? 'Ato administrativo vinculado a um procedimento' : registro.coletiva ? 'Publicação única, conteúdo integral nas fichas vinculadas' : registro.militar_nome_guerra || 'Sem nome de guerra'}</p>
             <div className="flex flex-wrap items-center gap-2">
               <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tipoVisual.className}`}>
                 <TipoIcon className="h-3.5 w-3.5" />
@@ -185,6 +185,21 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </div>
         </div>
 
+        {registro.procedimento_id && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-indigo-900">
+              <FileText className="h-4 w-4" />
+              Vinculada ao procedimento administrativo
+            </div>
+            {canAcessarProcedimentos && (
+              <Button asChild variant="outline" size="sm" className="h-8 border-indigo-200 bg-white text-indigo-700">
+                <Link to={'/Procedimentos?procedimento_id=' + encodeURIComponent(registro.procedimento_id)}>
+                  Abrir procedimento <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
         <NotaColetivaVinculos registro={registro} />
         {registro.coletiva && canAccessAction('editar_publicacoes') && <Button asChild variant="outline" size="sm"><Link to={'/CadastrarRegistroRP?id=' + registro.id}>Editar nota coletiva</Link></Button>}
         {!isDOEMS && (
