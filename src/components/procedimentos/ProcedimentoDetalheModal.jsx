@@ -1,7 +1,10 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ROTULOS_PUBLICACAO_PROCEDIMENTO, TIPOS_RP_PROCEDIMENTO } from './procedimentoPublicacao';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, FileText, Lock, Pencil, Trash2 } from 'lucide-react';
+import { CalendarClock, ExternalLink, FileText, Lock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { obterStatusCanonicoPublicacao } from '@/components/publicacao/publicacaoStateMachine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +13,13 @@ import { obterProcedimentoEscopado, excluirProcedimentoEscopado } from '@/servic
 import {
   classeStatus, classePrazo, classificarPrazo, formatarData,
 } from '@/components/procedimentos/procedimentoConfig';
+
+const CLASSES_STATUS_PUBLICACAO = {
+  'Aguardando Nota': 'bg-amber-50 border-amber-200 text-amber-800',
+  'Aguardando Publicação': 'bg-blue-50 border-blue-200 text-blue-800',
+  Publicado: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  padrao: 'bg-slate-50 border-slate-200 text-slate-700',
+};
 
 function Campo({ label, valor }) {
   return (
@@ -22,7 +32,8 @@ function Campo({ label, valor }) {
 
 export default function ProcedimentoDetalheModal({ open, onOpenChange, procedimentoId, onEdit, onProrrogar, onPublicar, onChanged }) {
   const { toast } = useToast();
-  const { canAccessAction } = useCurrentUser();
+  const { canAccessAction, canAccessModule } = useCurrentUser();
+  const podeVerPublicacoes = canAccessModule('controle_publicacoes') && canAccessAction('visualizar_controle_publicacoes');
   const podeExcluir = canAccessAction('perm_excluir_processo_controle');
   const podeEditar = canAccessAction('perm_editar_processo_controle');
   const podeGerar = canAccessAction('adicionar_publicacoes');
@@ -43,7 +54,6 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
   const prorrogacaoPendente = prazos.find((item) =>
     item.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, item.id),
   );
-  const podePublicarProcedimento = podeGerar && procedimento?.numero_portaria && !procedimento.sigiloso;
   const podeRegistrarPrazo = podeEditar && Boolean(procedimento?.prazo_final || procedimento?.data_instauracao)
     && !['Solucionado', 'Arquivado', 'Cancelado'].includes(procedimento?.status);
 
@@ -104,43 +114,6 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
               />
             </div>
 
-            {podeGerar && !procedimento.sigiloso && (
-              <section className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#1e3a5f]">
-                  <FileText className="h-4 w-4" /> Gerar publicação
-                </h3>
-                {!procedimento.numero_portaria ? (
-                  <p className="text-sm text-slate-600">Cadastre o número da portaria na ficha para gerar sua publicação.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {!temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.instauracao)}>
-                        Gerar publicação da portaria
-                      </Button>
-                    )}
-                    {prorrogacaoPendente ? (
-                      <Button type="button" variant="outline" size="sm" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.prorrogacao, prorrogacaoPendente)}>
-                        Gerar publicação de prorrogação
-                      </Button>
-                    ) : podeRegistrarPrazo && (
-                      <Button variant="outline" size="sm" onClick={() => onProrrogar(procedimento, true)}>
-                        Gerar publicação de prorrogação
-                      </Button>
-                    )}
-                    {!temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao) && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.solucao)}>
-                        Gerar publicação de solução
-                      </Button>
-                    )}
-                    {temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao)
-                      && !prorrogacaoPendente && !podeRegistrarPrazo && (
-                        <p className="text-sm text-slate-600">Consulte os atos gerados no histórico de publicações.</p>
-                      )}
-                  </div>
-                )}
-              </section>
-            )}
-
             {procedimento.objeto && (
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-slate-400">Objeto</p>
@@ -181,10 +154,8 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
                           {p.tipo} · {p.dias || 0} dias · até {formatarData(p.data_fim)}
                         </p>
                         {p.motivo && <p className="text-xs text-slate-500">{p.motivo}</p>}
-                        {podePublicarProcedimento && p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
-                          <button type="button" className="mt-1 text-sm font-medium text-blue-700 hover:underline" onClick={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.prorrogacao, p)}>
-                            Gerar publicação da prorrogação
-                          </button>
+                        {p.tipo === 'Prorrogação' && !temPublicacao(TIPOS_RP_PROCEDIMENTO.prorrogacao, p.id) && (
+                          <p className="mt-1 text-xs text-amber-700">Publicação da prorrogação pendente</p>
                         )}
                       </div>
                     </li>
@@ -193,20 +164,88 @@ export default function ProcedimentoDetalheModal({ open, onOpenChange, procedime
               )}
             </div>
 
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-800">Publicações vinculadas</h3>
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-[#1e3a5f]">
+                    <FileText className="h-4 w-4" /> Publicações vinculadas
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{publicacoes.length}</span>
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">Acompanhe a nota desde a elaboração até sua publicação no BG.</p>
+                </div>
+                {podeGerar && !procedimento.sigiloso && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" aria-label="Ações de publicações" title="Ações de publicações">
+                        <MoreHorizontal className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      {!procedimento.numero_portaria ? (
+                        <DropdownMenuItem disabled>Cadastre o número da portaria primeiro</DropdownMenuItem>
+                      ) : (
+                        <>
+                          {!temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) && (
+                            <DropdownMenuItem onSelect={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.instauracao)}>
+                              <FileText className="mr-2 h-4 w-4" /> Publicar instauração
+                            </DropdownMenuItem>
+                          )}
+                          {prorrogacaoPendente ? (
+                            <DropdownMenuItem onSelect={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.prorrogacao, prorrogacaoPendente)}>
+                              <CalendarClock className="mr-2 h-4 w-4" /> Publicar prorrogação pendente
+                            </DropdownMenuItem>
+                          ) : podeRegistrarPrazo && (
+                            <DropdownMenuItem onSelect={() => onProrrogar(procedimento, true)}>
+                              <CalendarClock className="mr-2 h-4 w-4" /> Prorrogar e gerar publicação
+                            </DropdownMenuItem>
+                          )}
+                          {!temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao) && (
+                            <DropdownMenuItem onSelect={() => onPublicar(procedimento, TIPOS_RP_PROCEDIMENTO.solucao)}>
+                              <FileText className="mr-2 h-4 w-4" /> Publicar solução
+                            </DropdownMenuItem>
+                          )}
+                          {temPublicacao(TIPOS_RP_PROCEDIMENTO.instauracao) &&
+                            temPublicacao(TIPOS_RP_PROCEDIMENTO.solucao) &&
+                            !prorrogacaoPendente && !podeRegistrarPrazo && (
+                              <DropdownMenuItem disabled>Nenhum ato pendente</DropdownMenuItem>
+                            )}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
               {publicacoes.length === 0 ? (
-                <p className="text-xs text-slate-500">Sem publicações vinculadas.</p>
+                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                  Ainda não há notas criadas para este procedimento.
+                </p>
               ) : (
-                <ul className="divide-y rounded-lg border border-slate-200">
-                  {publicacoes.map((pub) => (
-                    <li key={pub.id} className="flex flex-wrap justify-between gap-2 px-3 py-2 text-sm">
-                      <span>{ROTULOS_PUBLICACAO_PROCEDIMENTO[pub.tipo] || pub.tipo}</span>
-                      <span className="text-slate-600">
-                        {[pub.status, pub.nota_para_bg && `Nota ${pub.nota_para_bg}`, pub.numero_bg && `BG ${pub.numero_bg}`, pub.data_bg && formatarData(pub.data_bg)].filter(Boolean).join(' · ')}
-                      </span>
-                    </li>
-                  ))}
+                <ul className="space-y-2">
+                  {publicacoes.map((pub) => {
+                    const status = obterStatusCanonicoPublicacao(pub);
+                    return (
+                      <li key={pub.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-800">{ROTULOS_PUBLICACAO_PROCEDIMENTO[pub.tipo] || pub.tipo}</p>
+                          <span className={'rounded-full border px-2.5 py-1 text-[11px] font-semibold ' + (CLASSES_STATUS_PUBLICACAO[status] || CLASSES_STATUS_PUBLICACAO.padrao)}>
+                            {status}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          <Campo label="Nota para BG" valor={pub.nota_para_bg || 'Não informada'} />
+                          <Campo label="Número do BG" valor={pub.numero_bg || 'Não informado'} />
+                          <Campo label="Data do BG" valor={pub.data_bg ? formatarData(pub.data_bg) : '—'} />
+                        </div>
+                        {podeVerPublicacoes && (
+                          <div className="mt-3 border-t border-slate-200 pt-2">
+                            <Link className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline" to={'/Publicacoes?publicacao_id=' + encodeURIComponent(pub.id)}>
+                              Abrir nota no Controle de Publicações <ExternalLink className="h-3.5 w-3.5" />
+                            </Link>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>
