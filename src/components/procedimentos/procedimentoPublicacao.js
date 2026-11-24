@@ -63,5 +63,8 @@ export function montarTextoDesignacaoProvisoria(formData, autoridade) {
   if (!formData.militar_nome || !formData.funcao?.trim() || !formData.data_designacao) return '';
   const militar = [formData.militar_posto, formData.militar_nome].filter(Boolean).join(' ');
   const matricula = formData.militar_matricula ? `, matrícula ${formData.militar_matricula},` : '';
-  return `${autoridade?.trim() || 'A autoridade competente'}, no uso de suas atribuições, resolve designar ${militar}${matricula} para responder provisoriamente pela função de ${formData.funcao.trim()}, a contar de ${formatarData(formData.data_designacao)}.`;
+  const periodo = formData.data_fim_designacao
+    ? `, a contar de ${formatarData(formData.data_designacao)} até ${formatarData(formData.data_fim_designacao)}.`
+    : `, a contar de ${formatarData(formData.data_designacao)}.`;
+  return `${autoridade?.trim() || 'A autoridade competente'}, no uso de suas atribuições, resolve designar ${militar}${matricula} para responder provisoriamente pela função de ${formData.funcao.trim()}${periodo}`;
 }

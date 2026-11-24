@@ -154,6 +154,7 @@ export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = 
     data_portaria: formatDateBR(formData.data_portaria),
     data_punicao: formatDateBR(formData.data_punicao),
     data_designacao: formatDateBR(formData.data_designacao),
+    data_fim_designacao: formatDateBR(formData.data_fim_designacao),
     data_ata: formatDateBR(formData.data_ata),
     data_melhoria: formatDateBR(formData.data_melhoria),
     data_documento: formatDateBR(formData.data_documento),

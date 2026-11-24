@@ -216,11 +216,11 @@ export default function RPSpecificFieldsExOfficio({
             />
             {tipoRegistro === 'Designação Provisória para Responder por Função' && (
               <FormField
-                label="Autoridade que designa"
-                name="autoridade_designacao"
-                value={formData.autoridade_designacao || ''}
+                label="Data de fim"
+                name="data_fim_designacao"
+                value={formData.data_fim_designacao || ''}
                 onChange={handleChange}
-                placeholder="A Comandante do 1º Grupamento de Bombeiros Militar"
+                type="date"
               />
             )}
           </div>

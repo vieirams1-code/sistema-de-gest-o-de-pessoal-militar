@@ -579,6 +579,19 @@ const VARS_POR_TIPO = {
       { v: '{{data_designacao}}', desc: 'Data de designação' },
     ]
   },
+  'Designação Provisória para Responder por Função': {
+    grupo: 'Designação Provisória',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
+      { v: '{{posto}}', desc: 'Posto/Graduação abreviado' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{funcao}}', desc: 'Função a ser respondida' },
+      { v: '{{data_designacao}}', desc: 'Data de início da designação' },
+      { v: '{{data_fim_designacao}}', desc: 'Data de fim da designação' },
+    ]
+  },
   'Dispensa de Função': {
     grupo: 'Dispensa de Função',
     cor: 'blue',

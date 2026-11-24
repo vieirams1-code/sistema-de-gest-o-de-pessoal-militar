@@ -290,6 +290,7 @@ export default function CadastrarRegistroRP() {
     data_fato: '',
     funcao: '',
     data_designacao: '',
+    data_fim_designacao: '',
     finalidade_jiso: '',
     secao_jiso: '',
     data_ata: '',
@@ -805,7 +806,19 @@ export default function CadastrarRegistroRP() {
     if (tipoRPDeProcedimento(formData.tipo_registro) || formData.tipo_registro === DESIGNACAO_PROVISORIA) {
       if (isEditing) return;
       const textoGerado = formData.tipo_registro === DESIGNACAO_PROVISORIA
-        ? montarTextoDesignacaoProvisoria(formData, formData.autoridade_designacao)
+        ? (templateAtivoSelecionado?.template
+          ? aplicarTemplate(
+            templateAtivoSelecionado.template,
+            montarVariaveisTemplateRP({
+              formData,
+              militar: militarSelecionado,
+              user,
+              publicacoesDisponiveis: publicacoesMilitar,
+              atestadosDisponiveis: atestadosMilitar,
+              medicosDisponiveis: medicosDisponiveisRP,
+            }),
+          )
+          : montarTextoDesignacaoProvisoria(formData))
         : origemValida
           ? montarTextoProcedimento(procedimentoOrigem, formData.tipo_registro, prazoOrigem, Boolean(formData.doems_arquivo), formData)
           : '';
