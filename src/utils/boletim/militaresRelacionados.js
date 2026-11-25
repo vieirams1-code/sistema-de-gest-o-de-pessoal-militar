@@ -5,6 +5,7 @@
  * Funções puras: não gravam nada.
  */
 import { normalizarBuscaBoletim } from './normalizacaoBoletim.js';
+import { isPostoInferior } from '../postoGraduacaoHierarquia.js';
 
 // O PDF entrega o título com quebra de kerning: "MILITARES REL ACIONADOS".
 const MARCA_SECAO = /MILITARES\s+REL\s?ACIONADOS\s+COM\s+A\s+NOTA/i;
@@ -103,38 +104,75 @@ export function extrairSecaoMilitaresRelacionados(contexto = '') {
   return { encontrada: true, militares };
 }
 
-function tokensNome(valor = '') {
-  return new Set(normalizarBuscaBoletim(valor).split(' ').filter(token => token.length >= 2));
-}
-
-/** O nome do boletim (nome de guerra) precisa estar contido no nome do militar. */
-function nomeDoBoletimCorresponde(entrada, militar) {
-  const alvo = tokensNome(entrada?.nome_guerra);
-  if (!alvo.size || !militar) return false;
-  const nomeCompleto = tokensNome(militar.nome_completo);
-  const guerra = tokensNome(militar.nome_guerra);
-  return [...alvo].every(token => nomeCompleto.has(token) || guerra.has(token));
-}
-
-export function nomeCorrespondeAoRelacionado(entrada, militar) {
-  if (!nomeDoBoletimCorresponde(entrada, militar)) return false;
-  return !entrada?.posto_normalizado || !militar?.posto_graduacao
-    || entrada.posto_normalizado === militar.posto_graduacao;
+function tokensNomeGuerra(valor = '') {
+  return normalizarBuscaBoletim(valor).split(' ').filter(Boolean);
 }
 
 /**
- * Relaciona cada entrada da seção ao efetivo. O nome de guerra do boletim é
- * comparado com o nome completo do militar, e o posto reduz os homônimos.
- * Casos com mais de um candidato ou com posto divergente ficam para revisão.
+ * Nomes de guerra iguais. A normalização já ignora pontos, hífens e acentos
+ * ("R.Lima" = "R Lima"); além disso, uma inicial de um dos lados vale como
+ * abreviação do primeiro nome do outro ("R LIMA" = "RICARDO LIMA").
+ */
+function nomeGuerraIgual(a, b) {
+  const ta = tokensNomeGuerra(a);
+  const tb = tokensNomeGuerra(b);
+  if (!ta.length || ta.length !== tb.length) return false;
+  return ta.every((token, i) => token === tb[i]
+    || (token.length === 1 && tb[i].startsWith(token))
+    || (tb[i].length === 1 && token.startsWith(tb[i])));
+}
+
+/**
+ * Sem as iniciais soltas dos dois lados, o restante do nome de guerra precisa
+ * ser idêntico: "C BATISTA" ≈ "BATISTA". Casos assim exigem revisão humana.
+ */
+function nomeGuerraCompativel(a, b) {
+  const semIniciais = valor => tokensNomeGuerra(valor).filter(token => token.length > 1);
+  const ta = semIniciais(a);
+  return ta.length > 0 && ta.join(' ') === semIniciais(b).join(' ');
+}
+
+/** Compatibilidade com o nome completo, quando o cadastro não traz nome de guerra. */
+function nomeDoRelacionadoNoNomeCompleto(entrada, referencia = {}) {
+  const alvo = tokensNomeGuerra(entrada?.nome_guerra);
+  if (!alvo.length) return false;
+  const nomeCompleto = new Set(tokensNomeGuerra(referencia.nome_completo));
+  return alvo.every(token => nomeCompleto.has(token));
+}
+
+/** Posto do boletim abaixo do cadastro: sinal de que são militares diferentes. */
+function postoAbaixoDoCadastro(entrada, militar) {
+  return Boolean(entrada?.posto_normalizado && militar?.posto_graduacao)
+    && isPostoInferior(entrada.posto_normalizado, militar.posto_graduacao);
+}
+
+export function nomeCorrespondeAoRelacionado(entrada, militar) {
+  if (!militar) return false;
+  const postoConfere = !entrada?.posto_normalizado || !militar.posto_graduacao
+    || entrada.posto_normalizado === militar.posto_graduacao;
+  if (!postoConfere) return false;
+  if (!militar.nome_guerra) return nomeDoRelacionadoNoNomeCompleto(entrada, militar);
+  return nomeGuerraIgual(entrada?.nome_guerra, militar.nome_guerra)
+    || nomeGuerraCompativel(entrada?.nome_guerra, militar.nome_guerra);
+}
+
+/**
+ * Relaciona cada entrada da seção ao efetivo comparando apenas o nome de guerra,
+ * que é o que o boletim informa. O posto reduz os homônimos; posto divergente ou
+ * mais de um candidato ficam para revisão.
  */
 export function resolverMilitaresRelacionados(entradas = [], militares = []) {
   const ativos = (militares || []).filter(m => m?.id && m.status_cadastro === 'Ativo');
 
   return (entradas || []).map(entrada => {
+    const iguais = ativos.filter(m => nomeGuerraIgual(entrada?.nome_guerra, m.nome_guerra));
+    const exato = iguais.length > 0;
+    const candidatos = exato
+      ? iguais
+      : ativos.filter(m => nomeGuerraCompativel(entrada?.nome_guerra, m.nome_guerra));
     const comPosto = entrada.posto_normalizado
-      ? ativos.filter(m => m.posto_graduacao === entrada.posto_normalizado && nomeDoBoletimCorresponde(entrada, m))
+      ? candidatos.filter(m => m.posto_graduacao === entrada.posto_normalizado)
       : [];
-    const semPosto = ativos.filter(m => nomeDoBoletimCorresponde(entrada, m));
 
     let militar = null;
     let confianca = 'nao_identificada';
@@ -142,20 +180,21 @@ export function resolverMilitaresRelacionados(entradas = [], militares = []) {
 
     if (comPosto.length === 1) {
       militar = comPosto[0];
-      confianca = 'alta';
-      criterio = 'Seção de militares relacionados (posto e nome)';
-    } else if (comPosto.length > 1) {
+      confianca = exato ? 'alta' : 'revisar';
+      criterio = exato
+        ? 'Nome de guerra igual ao da nota'
+        : 'Nome de guerra compatível, com inicial abreviada';
+    } else if (comPosto.length > 1 || candidatos.length > 1) {
       confianca = 'revisar';
-      criterio = 'Homônimos na seção de militares relacionados';
-    } else if (semPosto.length === 1) {
-      militar = semPosto[0];
+      criterio = 'Homônimos com o mesmo nome de guerra';
+    } else if (candidatos.length === 1 && !postoAbaixoDoCadastro(entrada, candidatos[0])) {
+      // O boletim pode estar adiantado em relação ao cadastro (promoção ainda não
+      // lançada); o contrário indica que são pessoas diferentes, com o mesmo nome.
+      militar = candidatos[0];
       confianca = 'revisar';
-      criterio = 'Militar localizado pelo nome, com posto divergente do boletim';
-    } else if (semPosto.length > 1) {
-      confianca = 'revisar';
-      criterio = 'Homônimos na seção de militares relacionados';
+      criterio = 'Nome de guerra localizado, com posto divergente do boletim';
     }
 
-    return { ...entrada, militar, confianca, criterio, candidatos: semPosto.length };
+    return { ...entrada, militar, confianca, criterio, candidatos: candidatos.length };
   });
 }

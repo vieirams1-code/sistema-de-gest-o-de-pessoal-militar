@@ -521,7 +521,7 @@ export default function ConciliacaoBoletimSimplificada() {
                 <CardTitle className="text-lg text-[#1e3a5f] flex items-center gap-2"><FileText className="w-5 h-5" />2. Notas sem RP confirmado</CardTitle>
                 <Badge variant="outline">{notasSemRP.length} a conferir</Badge>
               </div>
-              <p className="text-sm text-slate-500">Identificação pela seção "Militares relacionados com a nota" (posto e nome de guerra) e, quando necessário, por nome completo ou matrícula no corpo do ato. Confirme o militar antes de importar.</p>
+              <p className="text-sm text-slate-500">Identificação pela seção "Militares relacionados com a nota": o nome de guerra do boletim é comparado com o nome de guerra do cadastro (pontuação e iniciais abreviadas contam como equivalentes) e o posto reduz homônimos. Confirme o militar antes de importar.</p>
             </CardHeader>
             <CardContent className="space-y-3">
               {notasSemRP.length === 0 && <p className="text-sm text-slate-500">Nenhuma nota de militar ativo sem correspondência confirmada foi identificada pelo leitor. Revise o PDF para conferir notas com grafias diferentes.</p>}
@@ -610,7 +610,7 @@ export default function ConciliacaoBoletimSimplificada() {
                     {notasComRelacionadosNaoLocalizados.length} nota(s) com militar relacionado que não foi localizado no efetivo
                   </summary>
                   <p className="mt-2 text-xs text-amber-800">
-                    O boletim identifica o militar, mas o nome não corresponde a nenhum militar ativo do cadastro.
+                    O boletim identifica o militar, mas o nome de guerra não corresponde a nenhum militar ativo do cadastro.
                     Confira o cadastro (nome de guerra, posto ou situação) antes de importar.
                   </p>
                   <div className="mt-2 space-y-2">
