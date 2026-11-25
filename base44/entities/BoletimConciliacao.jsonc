@@ -1,0 +1,144 @@
+{
+  "name": "BoletimConciliacao",
+  "type": "object",
+  "title": "Boletim importado para concilia\u00e7\u00e3o",
+  "description": "Arquivo dos PDFs de BG/BGR analisados na concilia\u00e7\u00e3o, com data, n\u00famero, indicadores da leitura e situa\u00e7\u00e3o do trabalho.",
+  "properties": {
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "BG",
+        "BGR"
+      ],
+      "enumColors": [
+        "blue",
+        "purple"
+      ],
+      "default": "BG"
+    },
+    "numero": {
+      "type": "string",
+      "description": "N\u00famero do boletim, como informado no cabe\u00e7alho."
+    },
+    "data_boletim": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de publica\u00e7\u00e3o do boletim."
+    },
+    "arquivo_nome": {
+      "type": "string"
+    },
+    "arquivo_uri": {
+      "type": "string",
+      "description": "URI do PDF em armazenamento privado; a abertura exige URL assinada."
+    },
+    "arquivo_tamanho": {
+      "type": "number",
+      "description": "Tamanho do PDF em bytes."
+    },
+    "total_paginas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_notas": {
+      "type": "number",
+      "default": 0
+    },
+    "notas_com_relacionados": {
+      "type": "number",
+      "default": 0,
+      "description": "Notas em que a se\u00e7\u00e3o de militares relacionados foi reconhecida."
+    },
+    "militares_relacionados": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de militares listados nas se\u00e7\u00f5es de relacionados (sem contar o respons\u00e1vel pelo ato)."
+    },
+    "notas_sem_militar": {
+      "type": "number",
+      "default": 0,
+      "description": "Notas em que nenhum militar do efetivo foi identificado."
+    },
+    "paginas_sem_texto": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Em an\u00e1lise",
+        "Em concilia\u00e7\u00e3o",
+        "Conclu\u00eddo",
+        "Arquivado"
+      ],
+      "enumColors": [
+        "blue",
+        "yellow",
+        "green",
+        "gray"
+      ],
+      "default": "Em an\u00e1lise"
+    },
+    "importado_por_email": {
+      "type": "string"
+    },
+    "concluido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tipo",
+    "numero",
+    "data_boletim",
+    "arquivo_nome",
+    "arquivo_uri",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.tipo": "BG"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "data.tipo": "BG"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

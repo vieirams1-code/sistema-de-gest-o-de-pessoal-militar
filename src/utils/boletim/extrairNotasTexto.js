@@ -1,4 +1,6 @@
 // Parse textual de notas independente de PDF.js para testes sintéticos.
+import { extrairSecaoMilitaresRelacionados } from './militaresRelacionados.js';
+
 export function extrairNotasDasPaginas(paginas) {
   const trechos = [];
   let offset = 0;
@@ -28,6 +30,7 @@ export function extrairNotasDasPaginas(paginas) {
       contexto: textoCompleto.slice(0, 20000),
       textoTruncado: textoCompleto.length > 20000,
       paginas: trechos.filter(p => p.fim > start && p.inicio < end).map(p => p.pagina),
+      relacionados: extrairSecaoMilitaresRelacionados(textoCompleto),
     });
   }
   return {

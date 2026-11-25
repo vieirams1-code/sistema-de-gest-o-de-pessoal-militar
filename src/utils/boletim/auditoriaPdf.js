@@ -3,23 +3,10 @@
  * de BGR, nem alteram publicações. Todo resultado exige revisão humana.
  */
 import corpoNotaAuditoria from './corpoNotaAuditoria.js';
+import { normalizarBuscaBoletim, normalizarNotaBoletim } from './normalizacaoBoletim.js';
+import { extrairSecaoMilitaresRelacionados, resolverMilitaresRelacionados } from './militaresRelacionados.js';
 
-export function normalizarBuscaBoletim(valor = '') {
-  return String(valor || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-}
-
-export function normalizarNotaBoletim(valor = '') {
-  const texto = String(valor || '');
-  const contextual = texto.match(/NOTA\s*N(?:\.|[º°])?\s*[:\-]?\s*(\d{4,9})/i);
-  const numeros = contextual ? [contextual[1]] : (texto.match(/\b\d{4,9}\b/g) || []);
-  for (const numero of numeros) {
-    const limpo = numero.replace(/^0+/, '');
-    if (/^[1-9]\d{3,7}$/.test(limpo)) return limpo;
-  }
-  return '';
-}
+export { normalizarBuscaBoletim, normalizarNotaBoletim };
 
 function contemFrase(textoNormalizado, frase) {
   const alvo = normalizarBuscaBoletim(frase);
@@ -58,6 +45,46 @@ export function identificarMilitaresEmNota(nota, militares = [], { permitirNomeG
     }
   }
   return matches;
+}
+
+/**
+ * Identifica os destinatários de uma nota. A seção "Militares relacionados com a
+ * nota" é a fonte principal; o corpo do ato (nome completo ou matrícula) confirma
+ * e complementa. Quem assina como "responsável pelo ato" só entra quando o corpo
+ * da própria nota confirma a pessoa.
+ */
+export function identificarMilitaresDaNota(original, notaCorpo, militares = []) {
+  const secao = original?.relacionados?.encontrada
+    ? original.relacionados
+    : extrairSecaoMilitaresRelacionados(original?.contexto || '');
+  const resolvidos = resolverMilitaresRelacionados(secao.militares || [], militares);
+  const porId = new Map();
+  const corpoNormalizado = normalizarBuscaBoletim(notaCorpo?.contexto || '');
+
+  for (const item of resolvidos) {
+    if (!item.militar) continue;
+    if (item.responsavel_pelo_ato) {
+      const confirmaNoCorpo = contemMatricula(notaCorpo?.contexto, item.militar.matricula || item.militar.matricula_atual)
+        || contemFrase(corpoNormalizado, item.militar.nome_completo);
+      if (!confirmaNoCorpo) continue;
+    }
+    const anterior = porId.get(item.militar.id);
+    if (!anterior || (anterior.confianca !== 'alta' && item.confianca === 'alta')) {
+      porId.set(item.militar.id, {
+        militar: item.militar,
+        confianca: item.confianca,
+        criterio: item.criterio,
+      });
+    }
+  }
+
+  for (const hit of identificarMilitaresEmNota(notaCorpo, militares, { permitirNomeGuerra: false })) {
+    if (!porId.has(hit.militar.id)) {
+      porId.set(hit.militar.id, { militar: hit.militar, confianca: hit.confianca, criterio: hit.criterio });
+    }
+  }
+
+  return { identificados: [...porId.values()], secao };
 }
 
 function chavesNotasRegistro(registro) {
@@ -116,9 +143,7 @@ export function analisarBoletimContraRegistros(notas = [], militares = [], regis
   const notasSemMilitar = [];
   for (const original of notas) {
     const nota = corpoNotaAuditoria(original);
-    // Sobrenome/nome de guerra isolado não comprova quem é o destinatário.
-    // Importação requer nome completo ou matrícula no mesmo corpo exibido.
-    const identificados = identificarMilitaresEmNota(nota, militares, { permitirNomeGuerra: false });
+    const { identificados } = identificarMilitaresDaNota(original, nota, militares);
     if (!identificados.length) {
       notasSemMilitar.push(nota);
       continue;

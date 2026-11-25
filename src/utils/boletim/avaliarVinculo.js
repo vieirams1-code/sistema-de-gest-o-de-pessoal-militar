@@ -1,4 +1,5 @@
 import { identificarMilitaresEmNota, normalizarBuscaBoletim, normalizarNotaBoletim } from './auditoriaPdf.js';
+import { extrairSecaoMilitaresRelacionados, nomeCorrespondeAoRelacionado } from './militaresRelacionados.js';
 
 const COMUNS = new Set([
   'PARA','COMO','ESTA','ESTE','SOBRE','FICA','PODE','SENDO','PELO','PELA',
@@ -44,13 +45,26 @@ export function avaliarVinculoPublicacao(pub, nota, militares = [], { paginasLay
   const numeroOK = !!numeroEsperado && numeroEsperado === numeroExtraido;
   const textoBG = nota?.contexto || '';
   const identificados = identificarMilitaresEmNota(nota, militares);
+  // A seção "Militares relacionados com a nota" lista o destinatário por posto e
+  // nome de guerra; ela confirma a identidade mesmo quando o corpo não repete a matrícula.
+  const secao = nota?.relacionados?.encontrada ? nota.relacionados : extrairSecaoMilitaresRelacionados(textoBG);
+  const relacionados = secao.militares || [];
+  const confirmaNaSecao = (militar, p) => {
+    const referencia = militar || {
+      nome_completo: p?.militar_nome || p?.nome_completo || '',
+      posto_graduacao: p?.militar_posto || '',
+    };
+    return relacionados.some(r => !r.responsavel_pelo_ato && nomeCorrespondeAoRelacionado(r, referencia));
+  };
   const participantes = pub?.coletiva ? (pub.militares_ids || []).map(id => ({ ...(pub.militares_vinculados || []).find(m => String(m.militar_id) === String(id)), militar_id: id })) : [pub];
   const identidades = participantes.map(p => {
     const militar = militares.find(m => String(m.id) === String(p?.militar_id));
     const identificado = identificados.find(m => String(m.militar.id) === String(p?.militar_id));
     const matriculaOK = contemMatricula(textoBG, p?.militar_matricula || militar?.matricula || militar?.matricula_atual);
     const nomeOK = contemNome(textoBG, militar?.nome_completo || p?.militar_nome || p?.nome_completo);
-    return identificado?.confianca === 'alta' || matriculaOK || nomeOK ? 'confirmada' : identificado?.confianca === 'revisar' ? 'revisar' : 'nao_identificada';
+    return identificado?.confianca === 'alta' || matriculaOK || nomeOK || confirmaNaSecao(militar, p)
+      ? 'confirmada'
+      : identificado?.confianca === 'revisar' ? 'revisar' : 'nao_identificada';
   });
   const identidade = identidades.length && identidades.every(i => i === 'confirmada') ? 'confirmada' : identidades.includes('nao_identificada') || !identidades.length ? 'nao_identificada' : 'revisar';
 

@@ -15,6 +15,13 @@ import { criarEventoAuditoriaPublicacao, EVENTO_AUDITORIA_PUBLICACAO } from '@/c
 import { normalizarNotaBoletim, normalizarBuscaBoletim, analisarBoletimContraRegistros, inferirTipoPublicacaoNota } from '@/utils/boletim/auditoriaPdf';
 import { lerBoletimPdf } from '@/utils/boletim/leituraPdf';
 import { avaliarVinculoPublicacao } from '@/utils/boletim/avaliarVinculo';
+import ArquivoBoletinsCard from '@/components/conciliacao-boletim/ArquivoBoletinsCard';
+import {
+  arquivarBoletimConciliacao,
+  atualizarStatusBoletimConciliacao,
+  listarBoletinsConciliacao,
+  obterUrlArquivoBoletim,
+} from '@/services/boletimConciliacaoService';
 
 const TIPOS_IMPORTACAO = [
   { value: 'Geral', label: 'Geral', entidade: 'PublicacaoExOfficio' },
@@ -106,6 +113,7 @@ export default function ConciliacaoBoletimSimplificada() {
   const [confirmarImportacao, setConfirmarImportacao] = useState(false);
   const [salvandoImportacao, setSalvandoImportacao] = useState(false);
   const [importados, setImportados] = useState({});
+  const [avisoArquivo, setAvisoArquivo] = useState('');
 
   const { data: bundle = {}, isLoading: loadingPublicacoes, isError: erroPublicacoes } = useQuery({
     queryKey: ['conciliacao-publicacoes-bundle'],
@@ -122,6 +130,12 @@ export default function ConciliacaoBoletimSimplificada() {
     queryFn: () => fetchScopedMilitares({ fetchAll: true, statusCadastro: 'Ativo', includeFoto: false }),
     enabled: isAccessResolved && hasAccess,
     staleTime: 60000,
+  });
+
+  const { data: boletinsArquivados = [], isLoading: carregandoArquivo } = useQuery({
+    queryKey: ['conciliacao-boletins-arquivados'],
+    queryFn: listarBoletinsConciliacao,
+    enabled: isAccessResolved && hasAccess,
   });
 
   const militares = useMemo(() => (bundleMilitares?.militares || []).filter(m => m.status_cadastro === 'Ativo'), [bundleMilitares]);
@@ -141,6 +155,11 @@ export default function ConciliacaoBoletimSimplificada() {
 
   // Somente militares ativos sem RP correspondente. Casos com registro
   // semelhante são para revisão do vínculo, não para criação em duplicidade.
+  const notasComRelacionadosNaoLocalizados = useMemo(
+    () => (auditoria.notasSemMilitar || []).filter(n => (n.relacionados?.militares || []).some(m => !m.responsavel_pelo_ato)),
+    [auditoria]
+  );
+
   const notasSemRP = useMemo(() => auditoria.ocorrencias
     .filter(o => {
       if (importados[o.id] || o.registro || !['sem_registro', 'revisar_identidade'].includes(o.status)) return false;
@@ -179,18 +198,54 @@ export default function ConciliacaoBoletimSimplificada() {
       setErro('Somente o administrador master pode analisar boletim reservado nesta fase.');
       return;
     }
-    setErro(''); setMensagem(''); setLoadingPdf(true); setLeitura(null);
+    setErro(''); setMensagem(''); setAvisoArquivo(''); setLoadingPdf(true); setLeitura(null);
     try {
       const resultado = await lerBoletimPdf(arquivo);
       setLeitura(resultado);
       setSelecoesVinculo({}); setVinculosConfirmados({}); setRevisoesVinculo({}); setImportados({}); resetarImportacao();
+
+      const auditoriaLeitura = analisarBoletimContraRegistros(resultado.notas, militares, registros, { numeroBoletim, dataBoletim });
+      let complemento = '';
+      try {
+        const { jaExistia } = await arquivarBoletimConciliacao({
+          arquivo, tipo: tipoBoletim, numero: numeroBoletim, dataBoletim, leitura: resultado, auditoria: auditoriaLeitura, usuario: user,
+        });
+        queryClient.invalidateQueries({ queryKey: ['conciliacao-boletins-arquivados'] });
+        complemento = jaExistia
+          ? ' Este boletim já constava no arquivo; os dados foram atualizados.'
+          : ' Boletim registrado no arquivo de conciliação.';
+      } catch (e) {
+        setAvisoArquivo('O boletim foi analisado, mas não foi possível guardar o PDF no arquivo: ' + (e?.message || 'falha no armazenamento') + '.');
+      }
+
       if (!resultado.notas.length) {
-        setMensagem('Não foram reconhecidas notas no padrão esperado. Confira o PDF; isto não significa ausência de publicações.');
+        setMensagem('Não foram reconhecidas notas no padrão esperado. Confira o PDF; isto não significa ausência de publicações.' + complemento);
       } else {
-        setMensagem(resultado.notas.length + ' nota(s) identificada(s) no PDF. Confira as propostas antes de confirmar.');
+        setMensagem(resultado.notas.length + ' nota(s) identificada(s) no PDF. Confira as propostas antes de confirmar.' + complemento);
       }
     } catch (e) { setErro(e?.message || 'Não foi possível ler o PDF.'); }
     finally { setLoadingPdf(false); }
+  };
+
+  const abrirArquivoBoletim = async (boletim) => {
+    setErro('');
+    try {
+      const url = await obterUrlArquivoBoletim(boletim.arquivo_uri);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      setErro('Não foi possível abrir o PDF guardado no arquivo.');
+    }
+  };
+
+  const alternarStatusBoletim = async (boletim) => {
+    setErro('');
+    const novoStatus = boletim.status === 'Concluído' ? 'Em conciliação' : 'Concluído';
+    try {
+      await atualizarStatusBoletimConciliacao(boletim.id, novoStatus);
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-boletins-arquivados'] });
+    } catch (e) {
+      setErro(e?.message || 'Não foi possível atualizar a situação do boletim.');
+    }
   };
 
   const idRegistro = r => r.__entidade + ':' + r.id;
@@ -235,7 +290,7 @@ export default function ConciliacaoBoletimSimplificada() {
   const abrirImportacao = item => {
     if (tipoBoletim === 'BGR') return;
     setImportarId(item.id);
-    setMilitarId('');
+    setMilitarId(item.militar?.id || '');
     setBuscaMilitar('');
     const sugestao = inferirTipoPublicacaoNota(item.nota.contexto);
     setTipoImportacao(TIPOS_IMPORTACAO.some(t => t.value === sugestao) ? sugestao : '');
@@ -339,6 +394,13 @@ export default function ConciliacaoBoletimSimplificada() {
           {houveFalhaDados && <p className="text-sm text-red-700">Não foi possível consultar integralmente o RP ou o efetivo. A auditoria está indisponível até corrigir a consulta.</p>}
           {erro && <p role="alert" className="text-sm text-red-700 font-medium">{erro}</p>}
           {mensagem && <p role="status" className="text-sm text-emerald-700">{mensagem}</p>}
+          {avisoArquivo && <p role="alert" className="text-sm text-amber-700">{avisoArquivo}</p>}
+          {leitura && (
+            <p className="text-xs text-slate-600">
+              {leitura.notas.filter(n => n.relacionados?.encontrada).length} de {leitura.notas.length} nota(s) com a seção
+              "Militares relacionados com a nota" reconhecida.
+            </p>
+          )}
           {leitura?.paginasSemTexto?.length > 0 && <p className="text-sm text-amber-700">
             {leitura.paginasSemTexto.length} página(s) sem texto extraível; confira PDF digitalizado/OCR antes de importar.
           </p>}
@@ -349,6 +411,13 @@ export default function ConciliacaoBoletimSimplificada() {
           {tipoBoletim === 'BGR' && <p className="text-xs text-amber-700">BGR: somente leitura local para o administrador master; nenhuma gravação no RP nesta fase.</p>}
         </CardContent>
       </Card>
+
+      <ArquivoBoletinsCard
+        boletins={boletinsArquivados}
+        carregando={carregandoArquivo}
+        onAbrirArquivo={abrirArquivoBoletim}
+        onAlternarStatus={alternarStatusBoletim}
+      />
 
       {leitura && !houveFalhaDados && !carregando && (
         <>
@@ -452,7 +521,7 @@ export default function ConciliacaoBoletimSimplificada() {
                 <CardTitle className="text-lg text-[#1e3a5f] flex items-center gap-2"><FileText className="w-5 h-5" />2. Notas sem RP confirmado</CardTitle>
                 <Badge variant="outline">{notasSemRP.length} a conferir</Badge>
               </div>
-              <p className="text-sm text-slate-500">Identificação por nome completo ou matrícula no corpo da nota, sem usar sobrenomes isolados ou assinaturas. Confirme o militar antes de importar.</p>
+              <p className="text-sm text-slate-500">Identificação pela seção "Militares relacionados com a nota" (posto e nome de guerra) e, quando necessário, por nome completo ou matrícula no corpo do ato. Confirme o militar antes de importar.</p>
             </CardHeader>
             <CardContent className="space-y-3">
               {notasSemRP.length === 0 && <p className="text-sm text-slate-500">Nenhuma nota de militar ativo sem correspondência confirmada foi identificada pelo leitor. Revise o PDF para conferir notas com grafias diferentes.</p>}
@@ -475,8 +544,15 @@ export default function ConciliacaoBoletimSimplificada() {
                     <p className="text-xs text-slate-600">
                       Militar identificado: <strong>{rotuloMilitar(item.militar)}</strong>
                       {item.status === 'possivel_correspondencia' && ' · Possível registro semelhante no sistema: confira antes de importar.'}
-                      {' · Identificação por ' + item.criterio.toLowerCase() + ' no corpo da nota.'}
+                      {' · ' + item.criterio + '.'}
                     </p>
+                    {(item.nota.relacionados?.militares?.length || 0) > 0 && (
+                      <p className="text-xs text-slate-500">
+                        Relacionados na nota: {item.nota.relacionados.militares
+                          .map(r => `${r.posto} ${r.nome_guerra}${r.responsavel_pelo_ato ? ' (responsável pelo ato)' : ''}`)
+                          .join(' · ')}
+                      </p>
+                    )}
                     <TextoNota texto={item.nota.contexto} limite={600} />
                     {aberta && (
                       <div className="border-t pt-4 space-y-3 bg-slate-50/60 rounded-b-lg">
@@ -528,6 +604,29 @@ export default function ConciliacaoBoletimSimplificada() {
                   </div>
                 );
               })}
+              {notasComRelacionadosNaoLocalizados.length > 0 && (
+                <details className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-amber-900">
+                    {notasComRelacionadosNaoLocalizados.length} nota(s) com militar relacionado que não foi localizado no efetivo
+                  </summary>
+                  <p className="mt-2 text-xs text-amber-800">
+                    O boletim identifica o militar, mas o nome não corresponde a nenhum militar ativo do cadastro.
+                    Confira o cadastro (nome de guerra, posto ou situação) antes de importar.
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {notasComRelacionadosNaoLocalizados.map(nota => (
+                      <div key={nota.id} className="rounded border bg-white p-2">
+                        <p className="text-xs font-semibold text-slate-800">Nota {nota.nota} · pág. {nota.pagina}</p>
+                        <p className="text-xs text-slate-600">
+                          {nota.relacionados.militares
+                            .map(r => `${r.posto} ${r.nome_guerra}${r.responsavel_pelo_ato ? ' (responsável pelo ato)' : ''}`)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
               {auditoria.notasSemMilitar.length > 0 && (
                 <p className="text-xs text-slate-500">Outras {auditoria.notasSemMilitar.length} nota(s) não tiveram militar ativo identificado e não foram apresentadas para importação automática. A análise não substitui a conferência integral do boletim.</p>
               )}
