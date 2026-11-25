@@ -57,7 +57,10 @@ export function identificarMilitaresDaNota(original, notaCorpo, militares = []) 
   const secao = original?.relacionados?.encontrada
     ? original.relacionados
     : extrairSecaoMilitaresRelacionados(original?.contexto || '');
-  const resolvidos = resolverMilitaresRelacionados(secao.militares || [], militares);
+  // O corpo da nota é a evidência que desempata homônimos pelo nome completo.
+  const resolvidos = resolverMilitaresRelacionados(secao.militares || [], militares, {
+    textoNota: notaCorpo?.contexto || original?.contexto || '',
+  });
   const porId = new Map();
   const corpoNormalizado = normalizarBuscaBoletim(notaCorpo?.contexto || '');
 

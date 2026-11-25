@@ -24,7 +24,8 @@
     "verify:promocao-runtime": "node scripts/verify-promocao-runtime.mjs",
     "test:template-utils": "node --test src/components/utils/templateContratoUtils.test.js",
     "test:sargenteacao-scope": "node --test scripts/sargenteacao-escopo.test.mjs",
-    "test:campaign-private-files": "node --test scripts/campanhas-anexos-privados.test.mjs"
+    "test:campaign-private-files": "node --test scripts/campanhas-anexos-privados.test.mjs",
+    "test:boletim": "node --test src/utils/boletim/*.test.js"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.63",

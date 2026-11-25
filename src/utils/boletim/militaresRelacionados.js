@@ -140,6 +140,16 @@ function nomeDoRelacionadoNoNomeCompleto(entrada, referencia = {}) {
   return alvo.every(token => nomeCompleto.has(token));
 }
 
+/**
+ * Nome completo citado no corpo da nota. Exige a frase inteira, em sequência:
+ * um sobrenome ou o nome de guerra isolado não confirma o nome completo.
+ */
+function nomeCompletoNoTexto(nomeCompleto, textoNormalizado) {
+  const nome = normalizarBuscaBoletim(nomeCompleto);
+  if (nome.length < 10 || nome.split(' ').length < 2) return false;
+  return (' ' + textoNormalizado + ' ').includes(' ' + nome + ' ');
+}
+
 /** Posto do boletim abaixo do cadastro: sinal de que são militares diferentes. */
 function postoAbaixoDoCadastro(entrada, militar) {
   return Boolean(entrada?.posto_normalizado && militar?.posto_graduacao)
@@ -158,11 +168,13 @@ export function nomeCorrespondeAoRelacionado(entrada, militar) {
 
 /**
  * Relaciona cada entrada da seção ao efetivo comparando apenas o nome de guerra,
- * que é o que o boletim informa. O posto reduz os homônimos; posto divergente ou
- * mais de um candidato ficam para revisão.
+ * que é o que o boletim informa. Quando há homônimos (mesmo nome de guerra, com ou
+ * sem a mesma graduação), o nome completo citado no corpo da nota decide; sem essa
+ * confirmação o caso fica para revisão. Posto divergente também fica para revisão.
  */
-export function resolverMilitaresRelacionados(entradas = [], militares = []) {
+export function resolverMilitaresRelacionados(entradas = [], militares = [], { textoNota = '' } = {}) {
   const ativos = (militares || []).filter(m => m?.id && m.status_cadastro === 'Ativo');
+  const textoNormalizado = normalizarBuscaBoletim(textoNota);
 
   return (entradas || []).map(entrada => {
     const iguais = ativos.filter(m => nomeGuerraIgual(entrada?.nome_guerra, m.nome_guerra));
@@ -173,26 +185,40 @@ export function resolverMilitaresRelacionados(entradas = [], militares = []) {
     const comPosto = entrada.posto_normalizado
       ? candidatos.filter(m => m.posto_graduacao === entrada.posto_normalizado)
       : [];
+    const confirmadosNoTexto = textoNormalizado
+      ? candidatos.filter(m => nomeCompletoNoTexto(m.nome_completo, textoNormalizado))
+      : [];
 
     let militar = null;
     let confianca = 'nao_identificada';
     let criterio = '';
 
-    if (comPosto.length === 1) {
+    if (confirmadosNoTexto.length === 1) {
+      militar = confirmadosNoTexto[0];
+      confianca = 'alta';
+      criterio = 'Nome completo confirmado no texto da nota';
+    } else if (confirmadosNoTexto.length > 1) {
+      confianca = 'revisar';
+      criterio = 'Mais de um homônimo confirmado pelo nome completo na nota';
+    } else if (candidatos.length > 1) {
+      // Homônimos: a graduação sozinha não decide, mesmo quando coincide com a nota.
+      militar = comPosto.length === 1 ? comPosto[0] : null;
+      confianca = 'revisar';
+      criterio = comPosto.length === 1
+        ? 'Homônimo com o mesmo nome de guerra; a graduação coincide, mas o nome completo não consta na nota'
+        : 'Homônimos com o mesmo nome de guerra e sem confirmação do nome completo';
+    } else if (comPosto.length === 1) {
       militar = comPosto[0];
       confianca = exato ? 'alta' : 'revisar';
       criterio = exato
         ? 'Nome de guerra igual ao da nota'
         : 'Nome de guerra compatível, com inicial abreviada';
-    } else if (comPosto.length > 1 || candidatos.length > 1) {
-      confianca = 'revisar';
-      criterio = 'Homônimos com o mesmo nome de guerra';
     } else if (candidatos.length === 1 && !postoAbaixoDoCadastro(entrada, candidatos[0])) {
       // O boletim pode estar adiantado em relação ao cadastro (promoção ainda não
       // lançada); o contrário indica que são pessoas diferentes, com o mesmo nome.
       militar = candidatos[0];
       confianca = 'revisar';
-      criterio = 'Nome de guerra localizado, com posto divergente do boletim';
+      criterio = 'Nome de guerra localizado, com posto divergente do boletim e sem o nome completo na nota';
     }
 
     return { ...entrada, militar, confianca, criterio, candidatos: candidatos.length };
