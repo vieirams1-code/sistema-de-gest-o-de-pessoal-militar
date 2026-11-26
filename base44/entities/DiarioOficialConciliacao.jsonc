@@ -1,0 +1,141 @@
+{
+  "name": "DiarioOficialConciliacao",
+  "type": "object",
+  "title": "Di\u00e1rio Oficial importado para concilia\u00e7\u00e3o",
+  "description": "Arquivo dos PDFs de Di\u00e1rio Oficial (DOEMS) analisados na concilia\u00e7\u00e3o, com edi\u00e7\u00e3o, data, indicadores da leitura, resultado da an\u00e1lise assistida por IA e situa\u00e7\u00e3o do trabalho.",
+  "properties": {
+    "numero_edicao": {
+      "type": "string",
+      "description": "Edi\u00e7\u00e3o ou n\u00famero do Di\u00e1rio Oficial."
+    },
+    "data_publicacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de publica\u00e7\u00e3o do di\u00e1rio."
+    },
+    "arquivo_nome": {
+      "type": "string"
+    },
+    "arquivo_uri": {
+      "type": "string",
+      "description": "URI do PDF em armazenamento privado; a abertura exige URL assinada."
+    },
+    "arquivo_tamanho": {
+      "type": "number",
+      "description": "Tamanho do PDF em bytes."
+    },
+    "total_paginas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_trechos": {
+      "type": "number",
+      "default": 0,
+      "description": "Trechos de texto preparados para a an\u00e1lise."
+    },
+    "trechos_truncados": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica que o documento tinha mais trechos do que o limite lido."
+    },
+    "analise_ia_json": {
+      "type": "string",
+      "description": "Resultado da an\u00e1lise assistida por IA em JSON, para retomar a revis\u00e3o sem repetir a chamada."
+    },
+    "analise_ia_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "analise_ia_por_email": {
+      "type": "string"
+    },
+    "trechos_com_sugestao": {
+      "type": "number",
+      "default": 0
+    },
+    "trechos_importados": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Em an\u00e1lise",
+        "Em concilia\u00e7\u00e3o",
+        "Conclu\u00eddo",
+        "Arquivado"
+      ],
+      "enumColors": [
+        "blue",
+        "yellow",
+        "green",
+        "gray"
+      ],
+      "default": "Em an\u00e1lise"
+    },
+    "importado_por_email": {
+      "type": "string"
+    },
+    "concluido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "numero_edicao",
+    "data_publicacao",
+    "arquivo_nome",
+    "arquivo_uri",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

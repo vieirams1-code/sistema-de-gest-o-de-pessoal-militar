@@ -79,6 +79,21 @@
       ],
       "default": "Em an\u00e1lise"
     },
+    "analise_ia_json": {
+      "type": "string",
+      "description": "Resultado da an\u00e1lise assistida por IA em JSON, para retomar a revis\u00e3o sem repetir a chamada."
+    },
+    "analise_ia_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "analise_ia_por_email": {
+      "type": "string"
+    },
+    "analise_ia_sugestoes": {
+      "type": "number",
+      "default": 0
+    },
     "importado_por_email": {
       "type": "string"
     },

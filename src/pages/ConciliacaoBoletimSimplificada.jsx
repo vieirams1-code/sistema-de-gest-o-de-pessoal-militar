@@ -10,41 +10,25 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { listarAtestadosPublicacaoEscopo, listarLivroPublicacoesEscopo } from '@/services/publicacoesPainelService';
 import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
-import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
-import { criarEventoAuditoriaPublicacao, EVENTO_AUDITORIA_PUBLICACAO } from '@/components/publicacao/publicacaoStateMachine';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { normalizarNotaBoletim, normalizarBuscaBoletim, analisarBoletimContraRegistros, inferirTipoPublicacaoNota } from '@/utils/boletim/auditoriaPdf';
 import { lerBoletimPdf } from '@/utils/boletim/leituraPdf';
 import { avaliarVinculoPublicacao } from '@/utils/boletim/avaliarVinculo';
+import {
+  TIPOS_IMPORTACAO,
+  encontrarDuplicidadeBoletim,
+  importarNotaConciliacao,
+  rotuloMilitar,
+} from '@/services/conciliacaoImportService';
 import ArquivoBoletinsCard from '@/components/conciliacao-boletim/ArquivoBoletinsCard';
+import AnaliseIaBoletimCard from '@/components/conciliacao-boletim/AnaliseIaBoletimCard';
 import {
   arquivarBoletimConciliacao,
   atualizarStatusBoletimConciliacao,
   listarBoletinsConciliacao,
   obterUrlArquivoBoletim,
+  salvarAnaliseIaBoletim,
 } from '@/services/boletimConciliacaoService';
-
-const TIPOS_IMPORTACAO = [
-  { value: 'Geral', label: 'Geral', entidade: 'PublicacaoExOfficio' },
-  { value: 'Elogio Individual', label: 'Elogio Individual', entidade: 'PublicacaoExOfficio' },
-  { value: 'Transcrição de Documentos', label: 'Transcrição de Documentos', entidade: 'PublicacaoExOfficio' },
-  { value: 'Designação de Função', label: 'Designação de Função', entidade: 'PublicacaoExOfficio' },
-  { value: 'Dispensa de Função', label: 'Dispensa de Função', entidade: 'PublicacaoExOfficio' },
-  { value: 'Melhoria de Comportamento', label: 'Melhoria de Comportamento', entidade: 'PublicacaoExOfficio' },
-  { value: 'Punição', label: 'Punição (revisar dados específicos)', entidade: 'PublicacaoExOfficio' },
-  { value: 'Curso/Estágio', label: 'Curso/Estágio', entidade: 'RegistroLivro' },
-  { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', entidade: 'RegistroLivro' },
-  { value: 'Saída Férias', label: 'Saída de Férias', entidade: 'RegistroLivro' },
-  { value: 'Retorno Férias', label: 'Retorno de Férias', entidade: 'RegistroLivro' },
-  { value: 'Interrupção de Férias', label: 'Interrupção de Férias', entidade: 'RegistroLivro' },
-  { value: 'Licença Maternidade', label: 'Licença Maternidade', entidade: 'RegistroLivro' },
-  { value: 'Licença Paternidade', label: 'Licença Paternidade', entidade: 'RegistroLivro' },
-  { value: 'Núpcias', label: 'Núpcias', entidade: 'RegistroLivro' },
-  { value: 'Luto', label: 'Luto', entidade: 'RegistroLivro' },
-  { value: 'Trânsito', label: 'Trânsito', entidade: 'RegistroLivro' },
-  { value: 'Instalação', label: 'Instalação', entidade: 'RegistroLivro' },
-  { value: 'Deslocamento Missão', label: 'Deslocamento para Missão', entidade: 'RegistroLivro' },
-  { value: 'Outro', label: 'Outro (Livro)', entidade: 'RegistroLivro' },
-];
 
 function TextoNota({ texto, limite = 195 }) {
   const [aberto, setAberto] = useState(false);
@@ -69,10 +53,6 @@ function ehPublicado(registro) {
 function tipoRegistro(registro) {
   if (registro.__entidade === 'Atestado') return 'Atestado';
   return registro.tipo_registro || registro.tipo || 'Registro';
-}
-
-function rotuloMilitar(m) {
-  return [m.posto_graduacao, m.nome_completo || m.nome_guerra, m.matricula ? 'Mat. ' + m.matricula : ''].filter(Boolean).join(' · ');
 }
 
 function normalizarLista(registrosLivro, publicacoesExOfficio, atestados) {
@@ -114,6 +94,8 @@ export default function ConciliacaoBoletimSimplificada() {
   const [salvandoImportacao, setSalvandoImportacao] = useState(false);
   const [importados, setImportados] = useState({});
   const [avisoArquivo, setAvisoArquivo] = useState('');
+  const [boletimRegistroId, setBoletimRegistroId] = useState('');
+  const [analiseAnterior, setAnaliseAnterior] = useState(null);
 
   const { data: bundle = {}, isLoading: loadingPublicacoes, isError: erroPublicacoes } = useQuery({
     queryKey: ['conciliacao-publicacoes-bundle'],
@@ -187,7 +169,18 @@ export default function ConciliacaoBoletimSimplificada() {
   const reiniciar = () => {
     setLeitura(null); setSelecoesVinculo({}); setVinculosConfirmados({}); setRevisoesVinculo({}); setImportados({});
     resetarImportacao(); setMensagem(''); setErro('');
+    setBoletimRegistroId(''); setAnaliseAnterior(null);
   };
+
+  // Notas que a leitura local não conseguiu vincular com confiança: são as
+  // candidatas à análise assistida por IA (opcional).
+  const notasParaIa = useMemo(() => {
+    const comConfianca = new Set();
+    for (const ocorrencia of auditoria.ocorrencias || []) {
+      if (ocorrencia.status !== 'revisar_identidade') comConfianca.add(String(ocorrencia.nota.id));
+    }
+    return notas.filter(nota => !comConfianca.has(String(nota.id)));
+  }, [auditoria, notas]);
 
   const processarPdf = async () => {
     if (!numeroBoletim.trim() || !dataBoletim) {
@@ -207,9 +200,15 @@ export default function ConciliacaoBoletimSimplificada() {
       const auditoriaLeitura = analisarBoletimContraRegistros(resultado.notas, militares, registros, { numeroBoletim, dataBoletim });
       let complemento = '';
       try {
-        const { jaExistia } = await arquivarBoletimConciliacao({
+        const { registro, jaExistia } = await arquivarBoletimConciliacao({
           arquivo, tipo: tipoBoletim, numero: numeroBoletim, dataBoletim, leitura: resultado, auditoria: auditoriaLeitura, usuario: user,
         });
+        setBoletimRegistroId(registro?.id || '');
+        let analiseSalva = null;
+        try { analiseSalva = registro?.analise_ia_json ? JSON.parse(registro.analise_ia_json) : null; } catch { analiseSalva = null; }
+        setAnaliseAnterior(analiseSalva
+          ? { ...analiseSalva, em: registro?.analise_ia_em || '', por: registro?.analise_ia_por_email || '' }
+          : null);
         queryClient.invalidateQueries({ queryKey: ['conciliacao-boletins-arquivados'] });
         complemento = jaExistia
           ? ' Este boletim já constava no arquivo; os dados foram atualizados.'
@@ -314,41 +313,30 @@ export default function ConciliacaoBoletimSimplificada() {
     try {
       // Reconsulta o backend antes de criar para reduzir risco de RP duplicado.
       const atual = await listarLivroPublicacoesEscopo({ purpose: 'CONCILIACAO' });
-      const duplicados = [...(atual.registrosLivro || []), ...(atual.publicacoesExOfficio || []), ...atestados]
-        .some(r => (r.coletiva ? (r.militares_ids || []).map(String).includes(String(militar.id)) : String(r.militar_id) === String(militar.id)) &&
-          normalizarNotaBoletim(r.nota_para_bg || r.nota_conciliada_boletim) === normalizarNotaBoletim(item.nota.nota) &&
-          (!r.numero_bg || String(r.numero_bg).replace(/^0+/, '') === numeroBoletim.replace(/^0+/, '')) &&
-          (!r.data_bg || String(r.data_bg).slice(0, 10) === dataBoletim));
-      if (duplicados) throw new Error('Já existe RP para este militar e nota. Atualize a tela e confira o cadastro antes de importar.');
+      const registrosAtuais = [...(atual.registrosLivro || []), ...(atual.publicacoesExOfficio || []), ...atestados];
+      if (encontrarDuplicidadeBoletim({
+        registros: registrosAtuais,
+        militarId: militar.id,
+        nota: item.nota.nota,
+        numeroBg: numeroBoletim.trim(),
+        dataBoletim,
+      })) {
+        throw new Error('Já existe RP para este militar e nota. Atualize a tela e confira o cadastro antes de importar.');
+      }
 
-      const base = {
-        militar_id: militar.id,
-        militar_nome: militar.nome_completo || militar.nome_guerra || '',
-        militar_posto: militar.posto_graduacao || '',
-        militar_matricula: militar.matricula || '',
-        nota_para_bg: item.nota.nota_normalizada,
-        nota_conciliada_boletim: item.nota.nota_normalizada,
-        numero_bg: numeroBoletim.trim(),
-        data_bg: dataBoletim,
-        status: 'Publicado',
-        texto_publicacao: textoImportacao.trim(),
-        observacoes: 'Incluído mediante revisão e confirmação manual na Auditoria de BG. Nota ' +
+      await importarNotaConciliacao({
+        militar,
+        tipo,
+        texto: textoImportacao,
+        nota: item.nota.nota_normalizada,
+        pagina: item.nota.pagina,
+        numeroBg: numeroBoletim.trim(),
+        dataBoletim,
+        origem: 'auditoria_bg_pdf',
+        observacao: 'Incluído mediante revisão e confirmação manual na Auditoria de BG. Nota ' +
           item.nota.nota + ', página ' + item.nota.pagina + '.',
-      };
-      const registro = tipo.entidade === 'RegistroLivro'
-        ? { ...base, tipo_registro: tipo.value, data_registro: dataBoletim, origem: 'Auditoria BG' }
-        : { ...base, tipo: tipo.value, data_publicacao: dataBoletim, criado_por_email: user?.email || '' };
-
-      registro.historico_publicacao = [criarEventoAuditoriaPublicacao({
-        registro: { ...registro, origem_tipo: tipo.entidade === 'RegistroLivro' ? 'livro' : 'ex-officio' },
-        evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
-        usuario: user,
-        resumo: 'Importação manual de nota de BG após confirmação de militar e tipo.',
-        estadoNovo: 'Publicado',
-        metadata: { origem: 'auditoria_bg_pdf', nota: item.nota.nota, pagina: item.nota.pagina,
-          numero_bg: numeroBoletim.trim(), data_bg: dataBoletim },
-      })];
-      await criarEscopado(tipo.entidade, registro);
+        user,
+      });
       setImportados(p => ({ ...p, [item.id]: true }));
       resetarImportacao();
       await Promise.all([

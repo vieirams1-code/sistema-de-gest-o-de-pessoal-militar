@@ -55,6 +55,17 @@ export async function arquivarBoletimConciliacao({ arquivo, tipo, numero, dataBo
   return { registro, jaExistia: false };
 }
 
+/** Guarda o resultado da análise assistida por IA para retomar a revisão sem nova chamada. */
+export async function salvarAnaliseIaBoletim(registroId, { resultado, usuario }) {
+  if (!registroId) return null;
+  return base44.entities[ENTIDADE].update(registroId, {
+    analise_ia_json: JSON.stringify(resultado),
+    analise_ia_em: new Date().toISOString(),
+    analise_ia_por_email: usuario?.email || '',
+    analise_ia_sugestoes: resultado?.sugestoes?.length || 0,
+  });
+}
+
 export async function atualizarStatusBoletimConciliacao(registroId, status) {
   const dados = { status };
   if (status === 'Concluído') dados.concluido_em = new Date().toISOString();
