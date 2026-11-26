@@ -11,19 +11,19 @@ const GRUPOS = [
   {
     chave: 'identificado',
     titulo: 'Identificados no texto',
-    descricao: 'O nome do militar aparece na própria nota. Confira e importe.',
+    descricao: 'Nome completo ou matrícula do cadastro encontrados na própria nota. Confira e importe.',
     classe: 'text-emerald-800',
   },
   {
     chave: 'ambiguo',
     titulo: 'Requerem conferência',
-    descricao: 'Indício parcial ou mais de um militar com o mesmo nome. O vínculo não foi decidido automaticamente.',
+    descricao: 'Mais de um militar com nome completo ou matrícula nesta nota. O vínculo não foi decidido automaticamente.',
     classe: 'text-amber-800',
   },
   {
     chave: 'sem_correspondencia',
     titulo: 'Sem correspondência no texto',
-    descricao: 'Nenhum nome do efetivo foi localizado nesta nota. Isso não significa ausência do militar no efetivo.',
+    descricao: 'Não há nome completo nem matrícula do efetivo nesta nota. Isso não significa ausência do militar no efetivo.',
     classe: 'text-slate-700',
   },
 ];

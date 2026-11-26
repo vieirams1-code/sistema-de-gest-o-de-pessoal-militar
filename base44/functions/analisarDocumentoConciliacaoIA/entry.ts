@@ -1,16 +1,25 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import {
+  prepararIdentidadeMilitar,
+  selecionarCitadosNoItem,
+  descreverMilitar,
+  descreverProva,
+} from '../../shared/conciliacao/identidadeMilitar.ts';
 
 // =====================================================================
 // analisarDocumentoConciliacaoIA
 // ---------------------------------------------------------------------
 // Análise assistida por IA da conciliação documental (BG, BGR e DOEMS).
 //
-// Princípio: o casamento de nomes é DETERMINÍSTICO e por item. Para cada
-// nota, o sistema seleciona apenas os militares cujo nome aparece no
-// próprio texto daquela nota e envia essa lista curta para a IA. A IA só
-// pode escolher dentro dela; qualquer resposta fora da lista é descartada.
-// Isso elimina a troca de militares de mesmo posto e impede que uma nota
-// seja vinculada a alguém que não é citado nela.
+// Princípio: a IDENTIDADE é determinística e por item. Para cada nota, o
+// sistema só considera citado o militar cujo NOME COMPLETO cadastrado
+// aparece integralmente no texto daquela nota ou cuja MATRÍCULA aparece
+// no texto. Nome de guerra, sobrenome isolado e nomes parecidos não
+// identificam ninguém — é isso que eliminava os falsos positivos.
+//
+// A IA recebe apenas essa lista curta por item e serve para descrever o
+// ato (tipo, resumo, trecho) e apontar quem é o responsável. Ela não pode
+// ampliar a lista: qualquer id fora dela é descartado.
 //
 // A IA apenas SUGERE: não grava nada e não altera publicações. Toda
 // importação depende de revisão e confirmação do usuário no frontend.
@@ -21,8 +30,6 @@ const LIMITE_ITENS = 80;
 const LIMITE_CARACTERES_ITENS = 90000;
 const LIMITE_CANDIDATOS = 3000;
 const LIMITE_TRECHO = 4000;
-const LIMITE_NOME = 120;
-const MAX_FRACOS = 6;
 
 const ESQUEMA = {
   type: 'object',
@@ -52,85 +59,13 @@ function limparTexto(valor: any, max: number) {
   return String(valor ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-function normalizar(valor: any) {
-  return String(valor ?? '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Za-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
-}
-
-function tokensDe(valor: any, minimo = 2) {
-  return normalizar(valor).split(' ').filter((token) => token.length >= minimo);
-}
-
 function normalizarConfianca(valor: any) {
   const texto = String(valor ?? '').trim().toLowerCase();
   if (texto === 'alta' || texto === 'media' || texto === 'baixa') return texto;
   return 'baixa';
 }
 
-function prepararMilitar(bruto: any) {
-  return {
-    id: String(bruto.id),
-    posto: limparTexto(bruto.posto, 40),
-    nome_guerra: limparTexto(bruto.nome_guerra, LIMITE_NOME),
-    nome_completo: limparTexto(bruto.nome_completo, LIMITE_NOME),
-    matricula: limparTexto(bruto.matricula, 30),
-    guerra: tokensDe(bruto.nome_guerra, 2),
-    completo: tokensDe(bruto.nome_completo, 4),
-    matriculaChave: normalizar(bruto.matricula).replace(/ /g, ''),
-  };
-}
-
-// Quantos militares compartilham cada token: usado para medir o poder de
-// discriminação de um nome completo (tokens raros são indício, comuns não).
-function construirIndice(militares: any[]) {
-  const frequencia = new Map<string, number>();
-  for (const militar of militares) {
-    for (const token of new Set([...militar.guerra, ...militar.completo])) {
-      frequencia.set(token, (frequencia.get(token) || 0) + 1);
-    }
-  }
-  return frequencia;
-}
-
-// Seleciona, para UM item, os militares citados no texto desse item.
-// Fortes: todos os nomes de guerra presentes, ou dois nomes do nome
-// completo, ou a matrícula. Fracos: apenas um indício parcial (usado só
-// para conferência manual, nunca para vínculo automático).
-function selecionarCandidatosDoItem(texto: string, militares: any[], frequencia: Map<string, number>) {
-  const normalizado = ' ' + normalizar(texto) + ' ';
-  const palavras = new Set(normalizado.split(' ').filter(Boolean));
-  const fortes: any[] = [];
-  const fracos: any[] = [];
-
-  for (const militar of militares) {
-    const guerraOk = militar.guerra.length > 0 && militar.guerra.every((token: string) => palavras.has(token));
-    const completoOk = militar.completo.filter((token: string) => palavras.has(token)).length >= 2;
-    const matriculaOk = militar.matriculaChave.length >= 5 && normalizado.includes(' ' + militar.matriculaChave + ' ');
-
-    if (guerraOk || completoOk || matriculaOk) {
-      fortes.push(militar);
-      continue;
-    }
-
-    const parcialGuerra = militar.guerra.some((token: string) => palavras.has(token) && token.length >= 4);
-    const parcialCompleto = militar.completo.some((token: string) => (
-      palavras.has(token) && token.length >= 6 && (frequencia.get(token) || 0) <= 3
-    ));
-    if (parcialGuerra || parcialCompleto) fracos.push(militar);
-  }
-
-  return { fortes, fracos: fracos.slice(0, MAX_FRACOS) };
-}
-
-function descreverMilitar(militar: any) {
-  return [militar.posto, militar.nome_guerra || militar.nome_completo].filter(Boolean).join(' ');
-}
-
-function montarPrompt(tipo: string, metadados: any, itens: any[], selecao: Map<string, any>) {
+function montarPrompt(tipo: string, metadados: any, itens: any[], selecao: Map<string, any[]>) {
   const contextoDocumento = [
     tipo === 'DOEMS' ? 'DIÁRIO OFICIAL (DOEMS)' : `BOLETIM ${tipo === 'BGR' ? 'RESERVADO (BGR)' : 'GERAL (BG)'}`,
     metadados.numero ? `Edição/número: ${metadados.numero}` : '',
@@ -138,13 +73,14 @@ function montarPrompt(tipo: string, metadados: any, itens: any[], selecao: Map<s
   ].filter(Boolean).join(' | ');
 
   const blocos = itens.map((item, indice) => {
-    const { fortes, fracos } = selecao.get(item.id) || { fortes: [], fracos: [] };
-    const lista = [...fortes, ...fracos].map((militar: any) => [
+    const citados = selecao.get(item.id) || [];
+    const lista = citados.map((militar: any) => [
       `- id: ${militar.id}`,
       militar.posto ? `posto: ${militar.posto}` : '',
       militar.nome_guerra ? `nome de guerra: ${militar.nome_guerra}` : '',
       militar.nome_completo ? `nome completo: ${militar.nome_completo}` : '',
       militar.matricula ? `matrícula: ${militar.matricula}` : '',
+      `prova no texto: ${descreverProva(militar)}`,
     ].filter(Boolean).join(' | ')).join('\n');
 
     const cabecalho = [
@@ -157,8 +93,8 @@ function montarPrompt(tipo: string, metadados: any, itens: any[], selecao: Map<s
     return [
       cabecalho,
       lista
-        ? `MILITARES DO EFETIVO CITADOS NESTE ITEM (use apenas estes ids):\n${lista}`
-        : 'MILITARES DO EFETIVO CITADOS NESTE ITEM: nenhum nome do efetivo foi localizado no texto deste item. Devolva militar_id vazio.',
+        ? `MILITARES DO EFETIVO COM NOME COMPLETO OU MATRÍCULA NESTE ITEM (use apenas estes ids):\n${lista}`
+        : 'MILITARES DO EFETIVO NESTE ITEM: nenhum nome completo nem matrícula do efetivo foi localizado no texto deste item. Devolva militar_id vazio.',
       'TEXTO DO ITEM:',
       item.contexto,
     ].join('\n');
@@ -166,17 +102,17 @@ function montarPrompt(tipo: string, metadados: any, itens: any[], selecao: Map<s
 
   return [
     'Você é um analista documental de uma corporação militar (Corpo de Bombeiros Militar).',
-    'Para CADA item (nota) abaixo, diga qual militar do efetivo é o responsável pelo ato, usando SOMENTE os militares listados dentro daquele item.',
+    'Para CADA item (nota) abaixo, identifique o militar do efetivo responsável pelo ato.',
+    'A lista de cada item já foi verificada pelo sistema: contém somente militares cujo NOME COMPLETO cadastrado ou MATRÍCULA aparece no texto daquele item.',
     '',
     'REGRAS',
-    '1. O nome citado no texto é a evidência principal. Compare letra a letra: nomes diferentes são pessoas diferentes, mesmo com o mesmo posto. Nunca troque um nome por outro parecido e nunca escolha alguém que não esteja citado no texto do item.',
-    '2. Use somente ids da lista de militares daquele item. Nunca invente ids e nunca use militar de outro item.',
-    '3. Posto/graduação serve apenas como confirmação. Abreviações: SD=Soldado, CB=Cabo, SGT=1º/2º/3º Sargento, SUB=Subtenente, ASP=Aspirante, TEN=1º/2º Tenente, CAP=Capitão, MAJ=Major, TEN CEL=Tenente Coronel, CEL=Coronel. Posto no texto inferior ao do cadastro indica outra pessoa; posto superior pode ser promoção ainda não lançada.',
-    '4. Se dois ou mais militares listados no item continuarem possíveis, deixe militar_id vazio e explique o empate no motivo. Não escolha no chute.',
-    '5. Se nenhum militar listado no item for realmente citado no texto, deixe militar_id vazio e explique no motivo. Nunca afirme que o militar não existe no efetivo: você apenas comparou este texto com esta lista.',
-    '6. Classifique o ato em tipo_sugerido: Geral, Elogio Individual, Transcrição de Documentos, Designação de Função, Dispensa de Função, Melhoria de Comportamento, Punição, Curso/Estágio, Dispensa Recompensa, Saída Férias, Retorno Férias, Interrupção de Férias, Licença Maternidade, Licença Paternidade, Núpcias, Luto, Trânsito, Instalação, Deslocamento Missão, Outro.',
-    '7. Em trecho_evidencia copie o trecho exato (até 400 caracteres) em que o nome aparece. Em resumo, descreva o ato em uma frase.',
-    '8. Devolva exatamente uma sugestão por item recebido, sempre com o mesmo item_id.',
+    '1. A identidade foi decidida pelo sistema com base no nome completo ou na matrícula. Não amplie nem substitua essa decisão: nunca escolha alguém por nome de guerra, sobrenome, posto ou semelhança de nome.',
+    '2. Use somente ids da lista daquele item. Nunca invente ids e nunca use militar de outro item.',
+    '3. Se a lista do item tiver mais de um militar, escolha apenas aquele a quem o texto atribui o ato. Se o texto não permitir decidir, devolva militar_id vazio e explique o empate no motivo.',
+    '4. Se o texto do item não tratar de nenhum dos militares listados, devolva militar_id vazio e explique no motivo. Nunca afirme que o militar não existe no efetivo: você apenas comparou este texto com esta lista.',
+    '5. Classifique o ato em tipo_sugerido: Geral, Elogio Individual, Transcrição de Documentos, Designação de Função, Dispensa de Função, Melhoria de Comportamento, Punição, Curso/Estágio, Dispensa Recompensa, Saída Férias, Retorno Férias, Interrupção de Férias, Licença Maternidade, Licença Paternidade, Núpcias, Luto, Trânsito, Instalação, Deslocamento Missão, Outro.',
+    '6. Em trecho_evidencia copie o trecho exato (até 400 caracteres) em que o nome completo ou a matrícula aparece. Em resumo, descreva o ato em uma frase.',
+    '7. Devolva exatamente uma sugestão por item recebido, sempre com o mesmo item_id.',
     '',
     `DOCUMENTO: ${contextoDocumento}`,
     '',
@@ -234,17 +170,16 @@ export default async function (req: Request): Promise<Response> {
     const militares = (Array.isArray(payload?.candidatos) ? payload.candidatos : [])
       .filter((m: any) => m?.id)
       .slice(0, LIMITE_CANDIDATOS)
-      .map(prepararMilitar);
+      .map(prepararIdentidadeMilitar);
     if (!militares.length) {
       return Response.json({ error: 'Nenhum militar do efetivo foi enviado para comparação.' }, { status: 400 });
     }
 
-    // 1) Casamento determinístico por item — a lista enviada à IA é curta e
-    //    específica da nota, então ela não tem como trocar por outro militar.
-    const frequencia = construirIndice(militares);
-    const selecao = new Map<string, any>();
+    // 1) Identidade determinística por item: nome completo contíguo ou
+    //    matrícula, nada além disso.
+    const selecao = new Map<string, any[]>();
     for (const item of itens) {
-      selecao.set(item.id, selecionarCandidatosDoItem(item.contexto, militares, frequencia));
+      selecao.set(item.id, selecionarCitadosNoItem(item.contexto, militares));
     }
 
     const prompt = montarPrompt(tipo, {
@@ -266,56 +201,48 @@ export default async function (req: Request): Promise<Response> {
     }
 
     // 2) Montagem final: a escolha da IA só é aceita se estiver na lista
-    //    daquele item. Sem escolha válida, o resultado é honesto: único
-    //    candidato → identificado; vários → ambíguo; nenhum → sem
-    //    correspondência (nunca "militar ausente do efetivo").
+    //    daquele item. A identificação vem da prova determinística; sem
+    //    nome completo nem matrícula, a nota fica sem correspondência
+    //    (nunca "militar ausente do efetivo").
     const sugestoes: any[] = [];
     let identificados = 0;
     let ambiguos = 0;
     let semCorrespondencia = 0;
 
     for (const item of itens) {
-      const { fortes, fracos } = selecao.get(item.id) || { fortes: [], fracos: [] };
-      const candidatos = [...fortes, ...fracos];
-      const idsValidos = new Set(candidatos.map((militar: any) => militar.id));
+      const citados = selecao.get(item.id) || [];
       const bruto = porItemId.get(item.id) || null;
       const idSugerido = limparTexto(bruto?.militar_id, 80);
-      const militarSugerido = idSugerido && idsValidos.has(idSugerido)
-        ? candidatos.find((militar: any) => militar.id === idSugerido)
+      const escolhido = idSugerido
+        ? citados.find((militar: any) => militar.id === idSugerido) || null
         : null;
-      const escolhidoEhForte = Boolean(militarSugerido)
-        && fortes.some((militar: any) => militar.id === militarSugerido.id);
+      const porMatricula = citados.filter((militar: any) => militar.viaMatricula);
 
       let militar: any = null;
       let categoria = 'sem_correspondencia';
       let confianca = 'baixa';
       let motivo = '';
 
-      if (militarSugerido && escolhidoEhForte) {
-        militar = militarSugerido;
+      if (porMatricula.length === 1) {
+        militar = porMatricula[0];
         categoria = 'identificado';
-        confianca = normalizarConfianca(bruto?.confianca);
-        motivo = limparTexto(bruto?.motivo, 600) || 'Militar citado no texto desta nota.';
-      } else if (militarSugerido) {
-        militar = militarSugerido;
-        categoria = 'ambiguo';
-        confianca = 'baixa';
-        motivo = limparTexto(bruto?.motivo, 600)
-          || 'O nome completo do militar não aparece integralmente nesta nota; confira no PDF antes de importar.';
-      } else if (fortes.length === 1) {
-        militar = fortes[0];
+        confianca = 'alta';
+        motivo = `Matrícula ${militar.matricula} localizada no texto desta nota (${descreverMilitar(militar)}).`;
+      } else if (citados.length === 1) {
+        militar = citados[0];
         categoria = 'identificado';
-        confianca = 'media';
-        motivo = `Único militar do efetivo com esse nome citado nesta nota (${descreverMilitar(militar)}). Confira o posto e o ato antes de importar.`;
-      } else if (fortes.length > 1) {
+        confianca = 'alta';
+        motivo = `Nome completo ${descreverProva(militar)} localizado no texto desta nota (${descreverMilitar(militar)}).`;
+      } else if (citados.length > 1) {
         categoria = 'ambiguo';
-        motivo = `Mais de um militar do efetivo corresponde ao nome citado nesta nota: ${fortes.slice(0, 5).map(descreverMilitar).join('; ')}. Selecione manualmente.`;
-      } else if (candidatos.length > 0) {
-        categoria = 'ambiguo';
-        motivo = `Indício parcial de nome nesta nota (${candidatos.slice(0, 4).map(descreverMilitar).join('; ')}). Confirme no PDF antes de importar.`;
+        militar = escolhido;
+        const lista = citados.slice(0, 5).map(descreverMilitar).join('; ');
+        motivo = militar
+          ? `Mais de um militar do efetivo tem nome completo ou matrícula no texto desta nota (${lista}). Sugestão da IA: ${descreverMilitar(militar)}. Confirme no PDF antes de importar.`
+          : `Mais de um militar do efetivo tem nome completo ou matrícula no texto desta nota (${lista}). Selecione manualmente.`;
       } else {
         categoria = 'sem_correspondencia';
-        motivo = 'Nenhum nome do efetivo foi localizado no texto desta nota. Isto não significa ausência do militar no efetivo: confira o PDF e vincule manualmente se necessário.';
+        motivo = 'Não há, no texto desta nota, o nome completo cadastrado nem a matrícula de nenhum militar do efetivo. Isso não significa ausência do militar no efetivo: confira o PDF e vincule manualmente se necessário.';
       }
 
       if (categoria === 'identificado') identificados += 1;

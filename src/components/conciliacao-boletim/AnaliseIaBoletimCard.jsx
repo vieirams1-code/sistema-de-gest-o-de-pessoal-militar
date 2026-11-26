@@ -173,8 +173,9 @@ export default function AnaliseIaBoletimCard({
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
             <p className="text-xs text-slate-600 flex items-start gap-1.5">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
-              A análise envia o texto destas {notas.length} nota(s) e os militares citados no documento para a IA. Cada análise
-              consome aproximadamente 1 crédito de integração do plano; refazer a análise consome novamente.
+              A análise envia o texto destas {notas.length} nota(s) e o efetivo para a IA. Só é considerado citado o militar cujo
+              nome completo cadastrado ou matrícula aparece na própria nota; nome de guerra e nomes parecidos não vinculam.
+              Cada análise consome aproximadamente 1 crédito de integração do plano; refazer a análise consome novamente.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={analisar} disabled={carregando} className="bg-[#1e3a5f] hover:bg-[#294c75]">
