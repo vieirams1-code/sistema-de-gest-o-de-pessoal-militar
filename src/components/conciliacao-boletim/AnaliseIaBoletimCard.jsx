@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ export default function AnaliseIaBoletimCard({
   analiseAnterior = null,
   podeImportar = false,
   onSalvarAnalise,
+  onMarcarStatus,
   onAtualizar,
   user,
 }) {
@@ -47,8 +48,29 @@ export default function AnaliseIaBoletimCard({
     setSugestoes(comItem);
     setObservacoes(resultado?.observacoes || '');
     setMeta(resultado?.meta || null);
+    const importadas = {};
+    const rejeitadas = {};
+    for (const sugestao of resultado?.sugestoes || []) {
+      if (sugestao.status === 'importada') importadas[sugestao.item_id] = true;
+      if (sugestao.status === 'rejeitada') rejeitadas[sugestao.item_id] = true;
+    }
+    setImportados(importadas);
+    setRejeitados(rejeitadas);
     return comItem;
   };
+
+  // Ao reabrir um boletim do arquivo, retoma a análise salva automaticamente,
+  // sem nova chamada de IA e sem perder as decisões já tomadas.
+  const aplicadoRef = useRef('');
+  useEffect(() => {
+    if (!analiseAnterior) return;
+    const chave = `${boletimId || 'sem-registro'}:${analiseAnterior.em || ''}`;
+    if (aplicadoRef.current === chave) return;
+    if (!(analiseAnterior.sugestoes || []).some(sugestao => itensPorId.has(String(sugestao.item_id)))) return;
+    aplicadoRef.current = chave;
+    aplicarResultado(analiseAnterior);
+    setMensagem('Análise salva carregada. Nenhuma chamada de IA foi feita agora.');
+  }, [analiseAnterior, itensPorId, boletimId]);
 
   const analisar = async () => {
     setErro(''); setMensagem(''); setCarregando(true);
@@ -113,6 +135,7 @@ export default function AnaliseIaBoletimCard({
       user,
     });
     setImportados(prev => ({ ...prev, [sugestao.item_id]: true }));
+    await onMarcarStatus?.(sugestao.item_id, 'importada');
     setMensagem(`Nota ${nota.nota} importada para o RP do militar confirmado.`);
     onAtualizar?.();
   };
@@ -126,7 +149,7 @@ export default function AnaliseIaBoletimCard({
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-lg text-[#1e3a5f] flex items-center gap-2">
-            <Bot className="w-5 h-5" />3. Análise assistida por IA
+            <Bot className="w-5 h-5" />2. Análise assistida por IA
           </CardTitle>
           <Badge variant="outline">{notas.length} nota(s) pendente(s)</Badge>
         </div>
@@ -183,7 +206,10 @@ export default function AnaliseIaBoletimCard({
             podeImportar={podeImportar}
             importados={importados}
             onImportar={importar}
-            onRejeitar={(sugestao) => setRejeitados(prev => ({ ...prev, [sugestao.item_id]: true }))}
+            onRejeitar={(sugestao) => {
+              setRejeitados(prev => ({ ...prev, [sugestao.item_id]: true }));
+              onMarcarStatus?.(sugestao.item_id, 'rejeitada');
+            }}
             rotuloItem={(item) => `Nota ${item?.nota || '—'} · pág. ${item?.pagina || '—'}`}
           />
         )}

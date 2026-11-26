@@ -1,8 +1,18 @@
 import React from 'react';
-import { Archive, Check, FileText, RotateCcw } from 'lucide-react';
+import { Archive, Check, FileText, RotateCcw, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const CORES_STATUS = {
   'Em análise': 'bg-blue-100 text-blue-800',
@@ -10,6 +20,8 @@ const CORES_STATUS = {
   Concluído: 'bg-emerald-100 text-emerald-800',
   Arquivado: 'bg-slate-200 text-slate-700',
 };
+
+const STATUS_EDITAVEIS = ['Em análise', 'Em conciliação', 'Concluído'];
 
 function formatarData(valor) {
   if (!valor) return 'Data não informada';
@@ -25,7 +37,23 @@ function formatarDataHora(valor) {
   return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-export default function ArquivoBoletinsCard({ boletins = [], carregando, onAbrirArquivo, onAlternarStatus }) {
+export default function ArquivoBoletinsCard({
+  boletins = [],
+  carregando,
+  reabrindoId = '',
+  onAbrirArquivo,
+  onReabrir,
+  onAlterarStatus,
+  onExcluir,
+}) {
+  const [excluir, setExcluir] = React.useState(null);
+
+  const confirmarExclusao = async () => {
+    const alvo = excluir;
+    setExcluir(null);
+    if (alvo) await onExcluir(alvo);
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -35,7 +63,9 @@ export default function ArquivoBoletinsCard({ boletins = [], carregando, onAbrir
           </CardTitle>
           <Badge variant="outline">{boletins.length} no arquivo</Badge>
         </div>
-        <p className="text-sm text-slate-500">Histórico dos PDFs já analisados, com data, número, tipo e situação da conciliação.</p>
+        <p className="text-sm text-slate-500">
+          Histórico dos PDFs já analisados. Abra um boletim para retomar a conciliação com a análise já salva.
+        </p>
       </CardHeader>
       <CardContent className="space-y-2">
         {carregando && <p className="text-sm text-slate-500">Carregando o arquivo de boletins…</p>}
@@ -50,14 +80,27 @@ export default function ArquivoBoletinsCard({ boletins = [], carregando, onAbrir
                 <span className="text-sm font-medium text-slate-800">{formatarData(boletim.data_boletim)}</span>
                 <Badge className={CORES_STATUS[boletim.status] || 'bg-slate-100 text-slate-700'}>{boletim.status || 'Em análise'}</Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => onAbrirArquivo(boletim)} disabled={!boletim.arquivo_uri}>
-                  <FileText className="w-4 h-4 mr-1.5" />Abrir PDF
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => onReabrir(boletim)}
+                  disabled={!boletim.arquivo_uri || reabrindoId === boletim.id}>
+                  <RotateCcw className="w-4 h-4 mr-1.5" />
+                  {reabrindoId === boletim.id ? 'Abrindo…' : 'Abrir boletim'}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => onAlternarStatus(boletim)}>
-                  {boletim.status === 'Concluído'
-                    ? <><RotateCcw className="w-4 h-4 mr-1.5" />Reabrir</>
-                    : <><Check className="w-4 h-4 mr-1.5" />Concluir</>}
+                <Button size="sm" variant="outline" onClick={() => onAbrirArquivo(boletim)} disabled={!boletim.arquivo_uri}>
+                  <FileText className="w-4 h-4 mr-1.5" />PDF
+                </Button>
+                <select
+                  aria-label={`Situação do ${boletim.tipo} ${boletim.numero}`}
+                  className="h-8 rounded-md border px-2 text-xs bg-white"
+                  value={STATUS_EDITAVEIS.includes(boletim.status) ? boletim.status : 'Em análise'}
+                  onChange={event => onAlterarStatus(boletim, event.target.value)}
+                >
+                  {STATUS_EDITAVEIS.map(status => <option key={status} value={status}>{status}</option>)}
+                </select>
+                <Button size="sm" variant="ghost" className="text-red-700 hover:text-red-800"
+                  aria-label={`Excluir ${boletim.tipo} ${boletim.numero}`}
+                  onClick={() => setExcluir(boletim)}>
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -81,6 +124,24 @@ export default function ArquivoBoletinsCard({ boletins = [], carregando, onAbrir
           </div>
         ))}
       </CardContent>
+
+      <AlertDialog open={Boolean(excluir)} onOpenChange={(aberto) => { if (!aberto) setExcluir(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir boletim do arquivo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {excluir ? `${excluir.tipo} Nº ${excluir.numero} será removido do arquivo, junto com a análise de IA salva. `
+                + 'As publicações já conciliadas no RP não são alteradas.' : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={confirmarExclusao}>
+              <Check className="w-4 h-4 mr-1.5" />Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

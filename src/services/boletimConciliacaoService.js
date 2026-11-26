@@ -74,6 +74,25 @@ export async function atualizarStatusBoletimConciliacao(registroId, status) {
   return base44.entities[ENTIDADE].update(registroId, dados);
 }
 
+/** Guarda a decisão do usuário sobre uma sugestão da IA, para retomar a revisão sem refazer a análise. */
+export async function marcarStatusSugestaoIaBoletim(registroId, itemId, status) {
+  if (!registroId || !itemId) return null;
+  const registro = await base44.entities[ENTIDADE].get(registroId);
+  let analise = null;
+  try { analise = registro?.analise_ia_json ? JSON.parse(registro.analise_ia_json) : null; } catch { analise = null; }
+  if (!analise) return null;
+  const sugestoes = (analise.sugestoes || []).map(sugestao => (
+    String(sugestao.item_id) === String(itemId) ? { ...sugestao, status } : sugestao
+  ));
+  return base44.entities[ENTIDADE].update(registroId, {
+    analise_ia_json: JSON.stringify({ ...analise, sugestoes }),
+  });
+}
+
+export async function excluirBoletimConciliacao(registroId) {
+  return base44.entities[ENTIDADE].delete(registroId);
+}
+
 export async function obterUrlArquivoBoletim(fileUri) {
   const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri: fileUri, expires_in: 600 });
   return signed_url;
