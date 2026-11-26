@@ -39,11 +39,13 @@ export async function arquivarDiarioConciliacao({ arquivo, numeroEdicao, dataPub
 
 export async function salvarAnaliseIaDiario(registroId, { resultado, usuario }) {
   if (!registroId) return null;
+  const atual = await base44.entities[ENTIDADE].get(registroId).catch(() => null);
   return base44.entities[ENTIDADE].update(registroId, {
     analise_ia_json: JSON.stringify(resultado),
     analise_ia_em: new Date().toISOString(),
     analise_ia_por_email: usuario?.email || '',
     trechos_com_sugestao: resultado?.sugestoes?.length || 0,
+    analise_ia_chamadas: Number(atual?.analise_ia_chamadas || 0) + 1,
     status: 'Em conciliação',
   });
 }

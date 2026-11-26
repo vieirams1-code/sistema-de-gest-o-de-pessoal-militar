@@ -94,6 +94,11 @@
       "type": "number",
       "default": 0
     },
+    "analise_ia_chamadas": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de an\u00e1lises de IA realizadas para este boletim (inclui rean\u00e1lises)."
+    },
     "importado_por_email": {
       "type": "string"
     },

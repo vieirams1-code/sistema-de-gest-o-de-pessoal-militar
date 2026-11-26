@@ -77,6 +77,12 @@ export default function ArquivoDoemsCard({ diarios = [], carregando, onAbrirArqu
               {diario.analise_ia_em ? ` · análise IA em ${formatarDataHora(diario.analise_ia_em)}` : ''}
               {diario.concluido_em ? ` · concluído em ${formatarDataHora(diario.concluido_em)}` : ''}
             </p>
+            {diario.analise_ia_em && (
+              <p className="text-xs text-slate-500">
+                Análise IA: {diario.analise_ia_chamadas || 1} chamada(s) · {diario.trechos_com_sugestao || 0} trecho(s) com sugestão
+                {diario.analise_ia_por_email ? ` · por ${diario.analise_ia_por_email}` : ''}
+              </p>
+            )}
           </div>
         ))}
       </CardContent>

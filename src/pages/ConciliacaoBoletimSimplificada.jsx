@@ -620,6 +620,29 @@ export default function ConciliacaoBoletimSimplificada() {
               )}
             </CardContent>
           </Card>
+
+          <AnaliseIaBoletimCard
+            boletimId={boletimRegistroId}
+            notas={notasParaIa}
+            militares={militares}
+            numeroBoletim={numeroBoletim.trim()}
+            dataBoletim={dataBoletim}
+            tipoBoletim={tipoBoletim}
+            analiseAnterior={analiseAnterior}
+            podeImportar={canAccessAction('adicionar_publicacoes') || canAccessAction('adicionar_livro')}
+            onSalvarAnalise={async (resultado) => {
+              if (!boletimRegistroId) return;
+              await salvarAnaliseIaBoletim(boletimRegistroId, { resultado, usuario: user });
+              queryClient.invalidateQueries({ queryKey: ['conciliacao-boletins-arquivados'] });
+            }}
+            onAtualizar={() => {
+              queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-bundle'] });
+              queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+              queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+              queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
+            }}
+            user={user}
+          />
         </>
       )}
       <p className="text-xs text-slate-500">A leitura do PDF ocorre localmente no navegador; arquivos e textos não são enviados a serviços externos de IA. Boletins digitalizados podem exigir OCR.</p>

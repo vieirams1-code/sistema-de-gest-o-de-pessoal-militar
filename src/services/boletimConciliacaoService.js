@@ -58,11 +58,13 @@ export async function arquivarBoletimConciliacao({ arquivo, tipo, numero, dataBo
 /** Guarda o resultado da análise assistida por IA para retomar a revisão sem nova chamada. */
 export async function salvarAnaliseIaBoletim(registroId, { resultado, usuario }) {
   if (!registroId) return null;
+  const atual = await base44.entities[ENTIDADE].get(registroId).catch(() => null);
   return base44.entities[ENTIDADE].update(registroId, {
     analise_ia_json: JSON.stringify(resultado),
     analise_ia_em: new Date().toISOString(),
     analise_ia_por_email: usuario?.email || '',
     analise_ia_sugestoes: resultado?.sugestoes?.length || 0,
+    analise_ia_chamadas: Number(atual?.analise_ia_chamadas || 0) + 1,
   });
 }
 

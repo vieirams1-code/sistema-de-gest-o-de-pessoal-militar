@@ -42,6 +42,7 @@ import {
   Gavel,
   MinusCircle,
   CalendarX,
+  Newspaper,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -121,6 +122,7 @@ const menuGroups = [
           { name: 'RP', page: 'RP', icon: BookMarked, moduleKey: 'rp', actionKey: 'visualizar_rp' },
           { name: 'Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'controle_publicacoes', actionKey: 'visualizar_controle_publicacoes' },
           { name: 'Conciliação BG/BGR', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'conciliacao_boletim', actionKey: 'visualizar_conciliacao_boletim' },
+          { name: 'Conciliação DOEMS', page: 'ConciliacaoDOEMS', icon: Newspaper, moduleKey: 'conciliacao_boletim', actionKey: 'visualizar_conciliacao_boletim' },
           {
             name: 'Documentos Históricos',
             page: 'DashboardAcervo',

@@ -14,6 +14,7 @@ import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 import RequireAction from '@/components/auth/RequireAction.jsx';
 import DiagnosticoAcesso from '@/pages/DiagnosticoAcesso';
 import Procedimentos from '@/pages/Procedimentos';
+import ConciliacaoDOEMS from '@/pages/ConciliacaoDOEMS';
 import DescontosFerias from '@/pages/DescontosFerias';
 import InativacaoPeriodoLote from '@/pages/InativacaoPeriodoLote';
 import SaneamentoCadastral from '@/pages/SaneamentoCadastral';
@@ -373,6 +374,21 @@ function App() {
                     moduleName="Controle de Processos e Procedimentos"
                   >
                     <Procedimentos />
+                  </RequireAction>
+                </AuthenticatedAppWrapper>
+              }
+            />
+            {/* Conciliação de Diário Oficial (DOEMS) — fluxo separado do BG/BGR */}
+            <Route
+              path="/ConciliacaoDOEMS"
+              element={
+                <AuthenticatedAppWrapper currentPageName="ConciliacaoDOEMS">
+                  <RequireAction
+                    moduleKey="conciliacao_boletim"
+                    actionKey="visualizar_conciliacao_boletim"
+                    moduleName="Conciliação de Documentos"
+                  >
+                    <ConciliacaoDOEMS />
                   </RequireAction>
                 </AuthenticatedAppWrapper>
               }

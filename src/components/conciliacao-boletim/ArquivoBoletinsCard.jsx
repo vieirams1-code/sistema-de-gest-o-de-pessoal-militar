@@ -71,6 +71,13 @@ export default function ArquivoBoletinsCard({ boletins = [], carregando, onAbrir
               {boletim.importado_por_email ? ` · importado por ${boletim.importado_por_email}` : ''}
               {boletim.concluido_em ? ` · concluído em ${formatarDataHora(boletim.concluido_em)}` : ''}
             </p>
+            {boletim.analise_ia_em && (
+              <p className="text-xs text-slate-500">
+                Análise IA: {boletim.analise_ia_chamadas || 1} chamada(s) · {boletim.analise_ia_sugestoes || 0} sugestão(ões) ·
+                {' '}{formatarDataHora(boletim.analise_ia_em)}
+                {boletim.analise_ia_por_email ? ` por ${boletim.analise_ia_por_email}` : ''}
+              </p>
+            )}
           </div>
         ))}
       </CardContent>
