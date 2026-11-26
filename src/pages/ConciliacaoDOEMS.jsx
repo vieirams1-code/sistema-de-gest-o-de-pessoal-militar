@@ -259,7 +259,10 @@ export default function ConciliacaoDOEMS() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAccess) return <AccessDenied modulo="Conciliação de Diário Oficial" />;
 
-  const visiveis = sugestoes.filter(sugestao => !rejeitados[sugestao.item_id]);
+  // No diário, só interessam os trechos em que algum militar do efetivo foi
+  // localizado; trechos sem correspondência ficariam em lista infinita.
+  const visiveis = sugestoes.filter(sugestao => !rejeitados[sugestao.item_id]
+    && sugestao.categoria !== 'sem_correspondencia');
   const carregandoBase = loadingMilitares;
 
   return (

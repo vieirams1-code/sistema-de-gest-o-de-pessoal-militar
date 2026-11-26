@@ -1,23 +1,22 @@
 import { base44 } from '@/api/base44Client';
-import { empacotarCandidatos, montarCandidatosIA } from '@/utils/boletim/candidatosIa';
+import { empacotarCandidatos } from '@/utils/boletim/candidatosIa';
 
 /**
  * Cliente da análise assistida por IA da conciliação (BG, BGR e DOEMS).
  * A chamada só acontece por ação explícita do usuário. O resultado é
  * sempre tratado como sugestão para revisão.
+ *
+ * O recorte dos militares por nota é feito no backend, de forma
+ * determinística: cada item é comparado apenas com os militares citados
+ * no seu próprio texto.
  */
 
-export async function analisarDocumentoComIA({ tipo, numero, data, itens = [], militares = [], idsExtras = [] }) {
+export async function analisarDocumentoComIA({ tipo, numero, data, itens = [], militares = [] }) {
   if (!itens.length) throw new Error('Nenhum trecho disponível para analisar.');
 
-  const candidatos = empacotarCandidatos(montarCandidatosIA({
-    textos: itens.map(item => item.contexto),
-    militares,
-    idsExtras,
-  }));
-
+  const candidatos = empacotarCandidatos(militares);
   if (!candidatos.length) {
-    throw new Error('Nenhum militar do efetivo foi localizado no texto do documento. Confira o cadastro antes de analisar.');
+    throw new Error('O efetivo ativo não foi carregado. Recarregue a página antes de analisar.');
   }
 
   const response = await base44.functions.invoke('analisarDocumentoConciliacaoIA', {

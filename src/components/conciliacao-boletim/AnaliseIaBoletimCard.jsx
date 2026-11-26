@@ -89,9 +89,14 @@ export default function AnaliseIaBoletimCard({
       });
       const aplicadas = aplicarResultado(resultado);
       if (onSalvarAnalise) await onSalvarAnalise(resultado);
+      const metaResultado = resultado?.meta || {};
+      const partes = [];
+      if (metaResultado.itensIdentificados) partes.push(`${metaResultado.itensIdentificados} identificada(s)`);
+      if (metaResultado.itensAmbiguos) partes.push(`${metaResultado.itensAmbiguos} para conferência`);
+      if (metaResultado.itensSemCorrespondencia) partes.push(`${metaResultado.itensSemCorrespondencia} sem correspondência`);
       setMensagem(aplicadas.length
-        ? `${aplicadas.length} sugestão(ões) para revisão. Nada foi gravado.`
-        : 'A análise não encontrou vínculos com evidência suficiente. Confira o documento manualmente.');
+        ? `${partes.join(' · ')}. Revise e confirme cada importação. Nada foi gravado.`
+        : 'A análise não retornou itens para revisão. Confira o documento manualmente.');
     } catch (e) {
       setErro(e?.message || 'Não foi possível concluir a análise assistida por IA.');
     } finally {
@@ -155,7 +160,8 @@ export default function AnaliseIaBoletimCard({
         </div>
         <p className="text-sm text-slate-500">
           Opcional. A conciliação das publicações já cadastradas continua sendo feita pela leitura local, sem IA.
-          Use esta análise apenas para localizar notas do efetivo que a leitura por nome de guerra não conseguiu vincular.
+          Cada nota é comparada apenas com os militares cujo nome aparece no texto dela — a IA não escolhe livremente
+          entre o efetivo.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -195,7 +201,12 @@ export default function AnaliseIaBoletimCard({
         {observacoes && <p className="text-xs text-slate-600">{observacoes}</p>}
         {meta && (
           <p className="text-xs text-slate-500">
-            {meta.itensAnalisados} item(ns) analisado(s) · {meta.candidatosConsiderados} militar(es) comparado(s).
+            {meta.itensAnalisados} item(ns) analisado(s) · {meta.candidatosConsiderados} militar(es) no efetivo comparado.
+          </p>
+        )}
+        {meta?.itensIgnorados > 0 && (
+          <p role="alert" className="text-xs text-amber-700">
+            {meta.itensIgnorados} nota(s) não couberam nesta análise (limite de {meta.itensAnalisados} por chamada). Analise o restante em outro boletim ou reduza o intervalo.
           </p>
         )}
 
